@@ -11,7 +11,7 @@
  * `held.boundary.test.ts`'s: the test engine keeps no journal to close or answer.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -100,9 +100,9 @@ const detail = async (id: string) => (await objectOf(app(), id)).status;
 /** What the RunList (`GET /api/runs`) says of `id` and its steps (`status`). */
 const summary = async (id: string) => (await listedOf(app(), id)).status;
 
-test('a step whose task is held open reads as waiting on a person, never as a session still going: blocked, gated, and rechecked on one task', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a step whose task is held open reads as waiting on a person, never as a session still going: blocked, gated, and rechecked on one task', () => {
+  const s = story(test);
+  s.test(
     'a held step that signed off blocked reads `input-required · BLOCKED` with its question, and waits on you — on both endpoints, as `nemia ls` says',
     async () => {
       assert.equal(
@@ -127,7 +127,7 @@ test('a step whose task is held open reads as waiting on a person, never as a se
       }
     },
   );
-  await s.test(
+  s.test(
     "a held step at its gate reads `awaiting approval`, never the engine's word for a session still going, and waits on you",
     async () => {
       for (const run of [await detail('h-gate'), await summary('h-gate')]) {
@@ -139,7 +139,7 @@ test('a step whose task is held open reads as waiting on a person, never as a se
       }
     },
   );
-  await s.test(
+  s.test(
     "a recheck is no turn: a try after one, on the same task filed before tasks were held open, reads that task's attempts and sign-off as it did",
     async () => {
       const tries = await triesOf(app(), 'h-rechecked', 'plan');

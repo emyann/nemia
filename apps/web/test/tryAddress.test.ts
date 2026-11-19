@@ -3,7 +3,7 @@
  * back as it was written, a malformed entry dropped and one step's choice changed with the others kept; and the file the viewer's sheet
  * shows, `?view=<step>/<path>`, opened by a push and closed with every other key kept.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { setTry, triesOf, triesPrinted, tryShown, trySearch } from '../src/lib/tryAddress.ts';
 import { viewClosed, viewOf, viewOpened, viewSearch, viewValue } from '../src/lib/viewAddress.ts';

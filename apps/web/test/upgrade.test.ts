@@ -3,7 +3,7 @@
  * (`offersReadOf`), an upgrade at work (`atWork`) and the running release's word (`releaseWord`). The offers themselves are proved by
  * `contracts/upgrade-offers.contract.ts`, never tested here.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Upgrade, VersionAnswer } from 'objects';
 import { atWork, offersReadOf, releaseWord } from '../src/lib/upgrade.ts';

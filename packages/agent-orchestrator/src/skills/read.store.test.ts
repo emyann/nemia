@@ -5,7 +5,7 @@
  * it: what a start is given (`skillsFor`), the refusal (`skillLinkRefusal`), the version (`skillVersion`) and the copy as files
  * (`copySkillFiles`); and whether two places are one folder (`oneFolder`). Each refusal is asserted on its kind and the names it says.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -88,8 +88,8 @@ function refusalOf(at: string | WorkflowError | undefined): string {
 const linksUnder = (dir: string): string[] =>
   (fs.readdirSync(dir, { recursive: true }) as string[]).filter((entry) => fs.lstatSync(path.join(dir, entry)).isSymbolicLink());
 
-test('given: a skill read through links that stay inside the checkout, or inside the folder its line names', async (t) => {
-  await t.test('a skill of .claude/skills/ linked to a folder inside the checkout, each file read from its real file', () => {
+describe('given: a skill read through links that stay inside the checkout, or inside the folder its line names', () => {
+  test('a skill of .claude/skills/ linked to a folder inside the checkout, each file read from its real file', () => {
     const repo = checkout();
     linked('../../skills/x', given(repo));
     assert.equal(found(repo), given(repo));
@@ -100,83 +100,65 @@ test('given: a skill read through links that stay inside the checkout, or inside
       { path: 'notes.md', real: path.join(real, 'notes.md') },
     ]);
   });
-
-  await t.test(
-    'a real folder whose SKILL.md alone is a link inside, and one holding a linked folder inside, walked as the folder it is',
-    () => {
-      const repo = checkout();
-      linked(path.join(repo, 'skills', 'x', 'SKILL.md'), path.join(given(repo, 'own'), 'SKILL.md'));
-      linked('../../../skills/x', path.join(given(repo, 'own'), 'more'));
-      assert.equal(found(repo, 'own'), given(repo, 'own'));
-      assert.deepEqual(
-        skillFiles(given(repo, 'own')).map((file) => file.path),
-        ['SKILL.md', 'more/SKILL.md', 'more/notes.md'],
-      );
-      const [entry] = skillFiles(given(repo, 'own'));
-      const real = fs.realpathSync(path.join(repo, 'skills', 'x', 'SKILL.md'));
-      assert.deepEqual(entry, { path: 'SKILL.md', real }, 'the linked SKILL.md read off its real file');
-    },
-  );
-
-  await t.test("a skill that is a folder of its own where the repository's folder of skills is a link inside the checkout", () => {
+  test('a real folder whose SKILL.md alone is a link inside, and one holding a linked folder inside, walked as the folder it is', () => {
+    const repo = checkout();
+    linked(path.join(repo, 'skills', 'x', 'SKILL.md'), path.join(given(repo, 'own'), 'SKILL.md'));
+    linked('../../../skills/x', path.join(given(repo, 'own'), 'more'));
+    assert.equal(found(repo, 'own'), given(repo, 'own'));
+    assert.deepEqual(
+      skillFiles(given(repo, 'own')).map((file) => file.path),
+      ['SKILL.md', 'more/SKILL.md', 'more/notes.md'],
+    );
+    const [entry] = skillFiles(given(repo, 'own'));
+    const real = fs.realpathSync(path.join(repo, 'skills', 'x', 'SKILL.md'));
+    assert.deepEqual(entry, { path: 'SKILL.md', real }, 'the linked SKILL.md read off its real file');
+  });
+  test("a skill that is a folder of its own where the repository's folder of skills is a link inside the checkout", () => {
     const repo = checkout();
     written(repo, { 'kept/skills/own/SKILL.md': SKILL });
     fs.rmSync(path.join(repo, '.claude', 'skills'), { recursive: true });
     fs.symlinkSync('../kept/skills', path.join(repo, '.claude', 'skills'));
     assert.equal(found(repo, 'own'), given(repo, 'own'));
   });
-
-  await t.test(
-    "one folder under both of a repository's places, the root's a link to the team's own, is one skill, given from the team's",
-    () => {
-      const repo = checkout();
-      written(path.join(repo, 'workflows', 'skills', 'x'), { 'SKILL.md': SKILL });
-      linked('../../workflows/skills/x', given(repo));
-      assert.equal(found(repo), path.join(repo, 'workflows', 'skills', 'x'));
-    },
-  );
-
-  await t.test(
-    'a skill named with its folder is found in that folder alone, when asked: no walk lists it, and a bare name is never it',
-    () => {
-      const repo = nestedCheckout();
-      const skills = skillsFor(path.join(repo, 'workflows', 'dev'), { repo });
-      assert.equal(skills.at.get('app:y'), path.join(repo, 'app', '.claude', 'skills', 'y'));
-      assert.equal(skills.at.get('other:z'), path.join(repo, 'other', '.claude', 'skills', 'z'));
-      assert.deepEqual(
-        [...skills.all.keys()].filter((name) => ['y', 'z', 'app:y', 'other:z'].includes(name)),
-        [],
-      );
-      assert.equal(skills.at.get('y'), undefined);
-      assert.equal(skills.at.get('x'), undefined, 'the checkout’s skills/x is no root’s');
-      written(given(repo, 'y'), { 'SKILL.md': SKILL });
-      const rooted = skillsFor(path.join(repo, 'workflows', 'dev'), { repo });
-      assert.equal(rooted.at.get('y'), given(repo, 'y'), "a bare name is the root's, never the folder's");
-      assert.equal(rooted.at.get('../app:y'), undefined, 'neither form: no folder is looked in, nor its bare name');
-    },
-  );
-
-  await t.test(
-    'a nested skill’s link is followed inside the folder its line names, and a named folder linked inside the repository',
-    () => {
-      const repo = nestedCheckout();
-      const y = path.join(repo, 'app', '.claude', 'skills', 'y');
-      linked('../../../shared/notes.md', path.join(y, 'notes.md'));
-      assert.equal(found(repo, 'app:y'), y);
-      assert.deepEqual(
-        skillFiles(y).map((file) => ('real' in file ? [file.path, fs.readFileSync(file.real, 'utf8')] : file)),
-        [
-          ['SKILL.md', SKILL],
-          ['notes.md', 'Of the folder.\n'],
-        ],
-      );
-      written(repo, { 'real/.claude/skills/y/SKILL.md': SKILL });
-      linked(path.join(repo, 'real'), path.join(repo, 'inside'));
-      assert.equal(found(repo, 'inside:y'), path.join(repo, 'inside', '.claude', 'skills', 'y'));
-    },
-  );
-
-  await t.test('one folder: a link and the folder it points at; not two folders, nor one that is not there', () => {
+  test("one folder under both of a repository's places, the root's a link to the team's own, is one skill, given from the team's", () => {
+    const repo = checkout();
+    written(path.join(repo, 'workflows', 'skills', 'x'), { 'SKILL.md': SKILL });
+    linked('../../workflows/skills/x', given(repo));
+    assert.equal(found(repo), path.join(repo, 'workflows', 'skills', 'x'));
+  });
+  test('a skill named with its folder is found in that folder alone, when asked: no walk lists it, and a bare name is never it', () => {
+    const repo = nestedCheckout();
+    const skills = skillsFor(path.join(repo, 'workflows', 'dev'), { repo });
+    assert.equal(skills.at.get('app:y'), path.join(repo, 'app', '.claude', 'skills', 'y'));
+    assert.equal(skills.at.get('other:z'), path.join(repo, 'other', '.claude', 'skills', 'z'));
+    assert.deepEqual(
+      [...skills.all.keys()].filter((name) => ['y', 'z', 'app:y', 'other:z'].includes(name)),
+      [],
+    );
+    assert.equal(skills.at.get('y'), undefined);
+    assert.equal(skills.at.get('x'), undefined, 'the checkout’s skills/x is no root’s');
+    written(given(repo, 'y'), { 'SKILL.md': SKILL });
+    const rooted = skillsFor(path.join(repo, 'workflows', 'dev'), { repo });
+    assert.equal(rooted.at.get('y'), given(repo, 'y'), "a bare name is the root's, never the folder's");
+    assert.equal(rooted.at.get('../app:y'), undefined, 'neither form: no folder is looked in, nor its bare name');
+  });
+  test('a nested skill’s link is followed inside the folder its line names, and a named folder linked inside the repository', () => {
+    const repo = nestedCheckout();
+    const y = path.join(repo, 'app', '.claude', 'skills', 'y');
+    linked('../../../shared/notes.md', path.join(y, 'notes.md'));
+    assert.equal(found(repo, 'app:y'), y);
+    assert.deepEqual(
+      skillFiles(y).map((file) => ('real' in file ? [file.path, fs.readFileSync(file.real, 'utf8')] : file)),
+      [
+        ['SKILL.md', SKILL],
+        ['notes.md', 'Of the folder.\n'],
+      ],
+    );
+    written(repo, { 'real/.claude/skills/y/SKILL.md': SKILL });
+    linked(path.join(repo, 'real'), path.join(repo, 'inside'));
+    assert.equal(found(repo, 'inside:y'), path.join(repo, 'inside', '.claude', 'skills', 'y'));
+  });
+  test('one folder: a link and the folder it points at; not two folders, nor one that is not there', () => {
     const repo = checkout();
     const real = path.join(repo, 'skills', 'x');
     const link = linked('../../skills/x', path.join(repo, '.claude', 'skills', 'x'));
@@ -189,8 +171,8 @@ test('given: a skill read through links that stay inside the checkout, or inside
   });
 });
 
-test('REFUSED by name: a link that leaves the checkout, a library or the folder its line names, or that cannot be followed', async (t) => {
-  await t.test('the folder linked outside the checkout, its SKILL.md linked outside, and a file under it linked outside', () => {
+describe('REFUSED by name: a link that leaves the checkout, a library or the folder its line names, or that cannot be followed', () => {
+  test('the folder linked outside the checkout, its SKILL.md linked outside, and a file under it linked outside', () => {
     const repo = checkout();
     const outside = written(scratch('wf-skill-links-outside-'), { 'x/SKILL.md': SKILL, 'secret.md': 'Not the skill.\n' });
     linked(path.join(outside, 'x'), given(repo));
@@ -208,16 +190,14 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
     linked(path.join(outside, 'secret.md'), path.join(given(repo, 'holds'), 'notes.md'));
     names(refusalOf(found(repo, 'holds')), 'holds/notes.md', ...LEAVES);
   });
-
-  await t.test('a folder linked inside the checkout that holds a link out', () => {
+  test('a folder linked inside the checkout that holds a link out', () => {
     const repo = checkout();
     const outside = written(scratch('wf-skill-links-outside-'), { 'secret.md': 'Not the skill.\n' });
     linked(path.join(outside, 'secret.md'), path.join(repo, 'skills', 'x', 'deep', 'far.md'));
     linked('../../skills/x', given(repo));
     names(refusalOf(found(repo)), path.join('x', 'deep', 'far.md'), ...LEAVES);
   });
-
-  await t.test("a link to a sibling folder whose path starts with the checkout's", () => {
+  test("a link to a sibling folder whose path starts with the checkout's", () => {
     const repo = checkout();
     const sibling = `${repo}-other`;
     try {
@@ -228,8 +208,7 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
       fs.rmSync(sibling, { recursive: true, force: true });
     }
   });
-
-  await t.test("every link of the store's library and of a team's own folder, one that points inside the checkout included", () => {
+  test("every link of the store's library and of a team's own folder, one that points inside the checkout included", () => {
     const repo = checkout();
     const home = scratch('wf-skill-links-home-');
     const library = path.join(home, 'workflows', 'skills');
@@ -243,8 +222,7 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
     linked('../../../skills/ref.md', path.join(repo, 'workflows', 'skills', 'z', 'ref.md'));
     names(refusalOf(found(repo, 'z')), 'z/ref.md', ...LEAVES);
   });
-
-  await t.test('a link whose target is not there, and a linked folder that points back into the skill; the walk ends', () => {
+  test('a link whose target is not there, and a linked folder that points back into the skill; the walk ends', () => {
     const repo = checkout();
     written(given(repo), { 'SKILL.md': SKILL });
     linked('nowhere.md', path.join(given(repo), 'gone.md'));
@@ -253,12 +231,11 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
     linked('.', path.join(given(repo), 'again'));
     names(refusalOf(found(repo)), 'x/again is a link', 'points back at a folder it is in', 'remove it');
   });
-
   for (const [what, linkedAt] of [
     ["the repository's holder of its own skills", (repo: string) => path.join(repo, '.claude')],
     ["the repository's folder of skills", (repo: string) => path.join(repo, '.claude', 'skills')],
   ] as const)
-    await t.test(`a skill that is a folder of its own where ${what} is a link out of the checkout, and nothing of it is copied`, () => {
+    test(`a skill that is a folder of its own where ${what} is a link out of the checkout, and nothing of it is copied`, () => {
       const repo = checkout();
       const outside = written(scratch('wf-skill-links-outside-'), { 'skills/x/SKILL.md': SKILL });
       fs.rmSync(path.join(repo, '.claude'), { recursive: true });
@@ -274,8 +251,7 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
       );
       assert.equal(fs.existsSync(to), false);
     });
-
-  await t.test('a copy of a skill linked outside the checkout, and nothing is written', () => {
+  test('a copy of a skill linked outside the checkout, and nothing is written', () => {
     const repo = checkout();
     const outside = written(scratch('wf-skill-links-outside-'), { 'secret.md': 'Not the skill.\n' });
     written(given(repo), { 'SKILL.md': SKILL });
@@ -291,22 +267,19 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
     );
     assert.equal(fs.existsSync(to), false);
   });
-
-  await t.test("a name both of a repository's places have as two folders, the root's a link to another", () => {
+  test("a name both of a repository's places have as two folders, the root's a link to another", () => {
     const repo = checkout();
     written(path.join(repo, 'workflows', 'skills', 'x'), { 'SKILL.md': SKILL });
     linked('../../skills/x', given(repo));
     names(refusalOf(found(repo)), `x is a skill in both ${path.join(repo, 'workflows', 'skills', 'x')} and ${given(repo)}`, 'Keep one');
   });
-
-  await t.test('a folder that holds no such skill, naming the skill and where it was looked for', () => {
+  test('a folder that holds no such skill, naming the skill and where it was looked for', () => {
     const repo = nestedCheckout();
     const at = path.join(repo, 'app', '.claude', 'skills', 'nope');
     names(refusalOf(found(repo, 'app:nope')), '`app:nope`', '`nope`', 'folder `app`', `${at} holds no SKILL.md`, path.join(at, 'SKILL.md'));
     names(refusalOf(found(repo, 'gone:y')), path.join(repo, 'gone', '.claude', 'skills', 'y'));
   });
-
-  await t.test('a skill named with its folder read with no repository, the store alone or nothing', () => {
+  test('a skill named with its folder read with no repository, the store alone or nothing', () => {
     const repo = nestedCheckout();
     for (const places of [{}, { home: repo }])
       names(
@@ -316,8 +289,7 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
         'take `app:y` off the `skills:` line',
       );
   });
-
-  await t.test('a named folder that is a link out of the repository, by name, and the skill it holds outside is never given', () => {
+  test('a named folder that is a link out of the repository, by name, and the skill it holds outside is never given', () => {
     const repo = checkout();
     const outside = written(scratch('wf-skill-folders-outside-'), { '.claude/skills/y/SKILL.md': '---\nname: y\n---\nSENTINEL\n' });
     linked(outside, path.join(repo, 'app'));
@@ -326,8 +298,7 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
     names(out, "make it a folder of the repository's own", 'take `app:y` off the `skills:` line');
     assert.ok(!out.includes('SENTINEL'));
   });
-
-  await t.test('a nested skill’s link into a sibling folder, naming the folder that bounds it', () => {
+  test('a nested skill’s link into a sibling folder, naming the folder that bounds it', () => {
     const repo = nestedCheckout();
     const y = path.join(repo, 'app', '.claude', 'skills', 'y');
     linked('../../../../shared/notes.md', path.join(y, 'far.md'));
@@ -335,23 +306,19 @@ test('REFUSED by name: a link that leaves the checkout, a library or the folder 
   });
 });
 
-test("a skill's version and its copy as files: digested off its real files, moved by what a link points at", async (t) => {
-  await t.test(
-    "a linked skill's version moves when a file of the folder it points at does, and when a linked SKILL.md's content does",
-    () => {
-      const repo = checkout();
-      linked('../../skills/x', given(repo));
-      const before = skillVersion(given(repo));
-      fs.writeFileSync(path.join(repo, 'skills', 'x', 'notes.md'), 'Other notes.\n');
-      assert.notEqual(skillVersion(given(repo)), before, 'a file of the linked folder');
-      linked(path.join(repo, 'skills', 'x', 'SKILL.md'), path.join(given(repo, 'own'), 'SKILL.md'));
-      const entry = skillVersion(given(repo, 'own'));
-      fs.writeFileSync(path.join(repo, 'skills', 'x', 'SKILL.md'), SKILL.replace('Do it.', 'Do it well.'));
-      assert.notEqual(skillVersion(given(repo, 'own')), entry, 'the content behind a linked SKILL.md');
-    },
-  );
-
-  await t.test('the version of a skill that holds no link is the digest of its sorted files, as it was', () => {
+describe("a skill's version and its copy as files: digested off its real files, moved by what a link points at", () => {
+  test("a linked skill's version moves when a file of the folder it points at does, and when a linked SKILL.md's content does", () => {
+    const repo = checkout();
+    linked('../../skills/x', given(repo));
+    const before = skillVersion(given(repo));
+    fs.writeFileSync(path.join(repo, 'skills', 'x', 'notes.md'), 'Other notes.\n');
+    assert.notEqual(skillVersion(given(repo)), before, 'a file of the linked folder');
+    linked(path.join(repo, 'skills', 'x', 'SKILL.md'), path.join(given(repo, 'own'), 'SKILL.md'));
+    const entry = skillVersion(given(repo, 'own'));
+    fs.writeFileSync(path.join(repo, 'skills', 'x', 'SKILL.md'), SKILL.replace('Do it.', 'Do it well.'));
+    assert.notEqual(skillVersion(given(repo, 'own')), entry, 'the content behind a linked SKILL.md');
+  });
+  test('the version of a skill that holds no link is the digest of its sorted files, as it was', () => {
     const dir = written(path.join(scratch('wf-skill-links-plain-'), 'plain'), {
       'SKILL.md': SKILL,
       'a/b.md': 'B.\n',
@@ -366,8 +333,7 @@ test("a skill's version and its copy as files: digested off its real files, move
     ];
     assert.equal(skillVersion(dir), createHash('sha256').update(JSON.stringify(pairs)).digest('hex').slice(0, 16));
   });
-
-  await t.test('a skill is copied as regular files, each with its content and mode, and its copy has its version', () => {
+  test('a skill is copied as regular files, each with its content and mode, and its copy has its version', () => {
     const repo = checkout();
     written(repo, { 'skills/x/bin/run.sh': '#!/bin/sh\n' });
     fs.chmodSync(path.join(repo, 'skills', 'x', 'bin', 'run.sh'), 0o755);
@@ -416,23 +382,27 @@ test("the folders a workflow's definitions are looked for in follow the one look
   assert.deepEqual(lookupRoots(workflow), [origins.factory], 'with no repository and no store, only its own');
 });
 
-test('a factory finds a library skill and a builtin one once it has added it, and every one while it has no record of its adds', async (t) => {
-  const home = scratch('wf-library-gate-');
-  written(home, { 'workflows/skills/tidy/SKILL.md': SKILL });
-  const repo = checkout();
+describe('a factory finds a library skill and a builtin one once it has added it, and every one while it has no record of its adds', () => {
+  let home!: string;
+  let repo!: string;
+  beforeAll(() => {
+    home = scratch('wf-library-gate-');
+    written(home, { 'workflows/skills/tidy/SKILL.md': SKILL });
+    repo = checkout();
+  });
   const lookup = (factory?: string) =>
     skillsFor(path.join(repo, 'workflows', 'dev'), placesOf(home, repo, factory === undefined ? undefined : addedOf(home, factory))).at;
   const record = (adds: ReadonlyArray<{ kind: 'Agent' | 'Skill' | 'McpServer'; name: string }>) => writeLibraryAdds(home, 'acme', adds);
-  await t.test('unrecorded: the library skill and the builtin are found, as before the library had adds', () => {
+  test('unrecorded: the library skill and the builtin are found, as before the library had adds', () => {
     assert.equal(lookup('acme').get('tidy'), path.join(home, 'workflows', 'skills', 'tidy'));
     assert.equal(lookup('acme').get('create-an-agent'), path.join(BUILTIN_SKILLS, 'create-an-agent'));
   });
-  await t.test('recorded without the add: neither the library skill nor the builtin is found', () => {
+  test('recorded without the add: neither the library skill nor the builtin is found', () => {
     record([]);
     assert.equal(lookup('acme').get('tidy'), undefined);
     assert.equal(lookup('acme').get('create-an-agent'), undefined);
   });
-  await t.test('recorded with the adds: both are found', () => {
+  test('recorded with the adds: both are found', () => {
     record([
       { kind: 'Skill', name: 'tidy' },
       { kind: 'Skill', name: 'create-an-agent' },
@@ -440,7 +410,7 @@ test('a factory finds a library skill and a builtin one once it has added it, an
     assert.equal(lookup('acme').get('tidy'), path.join(home, 'workflows', 'skills', 'tidy'));
     assert.equal(lookup('acme').get('create-an-agent'), path.join(BUILTIN_SKILLS, 'create-an-agent'));
   });
-  await t.test("a read in no factory reads the library whole, and the repository's own skill is never gated", () => {
+  test("a read in no factory reads the library whole, and the repository's own skill is never gated", () => {
     assert.equal(lookup(undefined).get('tidy'), path.join(home, 'workflows', 'skills', 'tidy'));
     record([]);
     assert.equal(lookup('acme').get('x'), undefined, 'checkout() keeps x in skills/, not .claude/skills/');

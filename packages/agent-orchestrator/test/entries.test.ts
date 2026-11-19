@@ -3,7 +3,7 @@
  * not in the api. Types are held by the api's typecheck, which reads the entries, and by this package's own. Each entry is imported by
  * its name, as the api imports it, so its import is dynamic.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 const PINNED: Record<string, string[]> = {

@@ -4,7 +4,7 @@
  * kind, its first wrong field and the fix. The fixtures are shaped as this machine's transcripts are; the refusals as the readers
  * give them are `test/transcript.test.ts`'s, `test/completion.test.ts`'s and `test/usage.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { decodeLine, type LineKind, LINES, lineOf, writtenAt } from './lines.ts';
 
@@ -263,8 +263,8 @@ const DECODE_ROWS: Row[] = [
   },
 ];
 
-test('decodeLine: each kind the runtime reads decodes as Claude Code writes it and with every optional field absent, and a field there in a shape it does not read is refused by its line, its kind, its field and the fix', async (t) => {
-  for (const row of DECODE_ROWS) await t.test(row.name, row.holds);
+describe('decodeLine: each kind the runtime reads decodes as Claude Code writes it and with every optional field absent, and a field there in a shape it does not read is refused by its line, its kind, its field and the fix', () => {
+  for (const row of DECODE_ROWS) test(row.name, row.holds);
 });
 
 const MALFORMED = JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: -1 } } });
@@ -322,6 +322,6 @@ const READ_ROWS: Row[] = [
   },
 ];
 
-test("lineOf and writtenAt: a line torn, no JSON object or of another type passes undecoded, a reader checks only its own kinds, and a line's time is checked where its kind is one the runtime reads", async (t) => {
-  for (const row of READ_ROWS) await t.test(row.name, row.holds);
+describe("lineOf and writtenAt: a line torn, no JSON object or of another type passes undecoded, a reader checks only its own kinds, and a line's time is checked where its kind is one the runtime reads", () => {
+  for (const row of READ_ROWS) test(row.name, row.holds);
 });

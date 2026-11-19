@@ -7,7 +7,7 @@
  * the run records this file seeds. One story, so its checkpoints read one engine, one app and the runs it seeded in turn.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -122,9 +122,9 @@ const statusOf = async (id: string) => (await objectOf(app(), id)).status;
 /** The step `name` of the run `R`'s object. */
 const stepNamed = async (name: string) => stepOf(await objectOf(app(), R), name);
 
-test("a run's object says what its sessions read: each step's classes, peak and rebuilt caches, and the run's own beside its cost", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a run's object says what its sessions read: each step's classes, peak and rebuilt caches, and the run's own beside its cost", () => {
+  const s = story(test);
+  s.test(
     "a step's reads: its classes summed over its attempts, its peak at its `context:` cap, and the resumed session that rebuilt its cache",
     async () => {
       const implement = await stepNamed('implement');
@@ -138,17 +138,14 @@ test("a run's object says what its sessions read: each step's classes, peak and 
       assert.equal(rebuilt, 1);
     },
   );
-  await s.test(
-    'a peak past 200k on a step with no cap is marked, and a cold session that wrote its cache once is not a rebuild',
-    async () => {
-      const review = await stepNamed('review');
-      assert.deepEqual(
-        [review.used!.read, review.used!.peak, review.used!.rebuilt],
-        ['read 2.9M · wrote 100k · peak 250k, past 200k with no cap', 'large', 0],
-      );
-    },
-  );
-  await s.test('a runner that counted the input as one number says nothing of what it read: null, never 0', async () => {
+  s.test('a peak past 200k on a step with no cap is marked, and a cold session that wrote its cache once is not a rebuild', async () => {
+    const review = await stepNamed('review');
+    assert.deepEqual(
+      [review.used!.read, review.used!.peak, review.used!.rebuilt],
+      ['read 2.9M · wrote 100k · peak 250k, past 200k with no cap', 'large', 0],
+    );
+  });
+  s.test('a runner that counted the input as one number says nothing of what it read: null, never 0', async () => {
     const plan = await stepNamed('plan');
     assert.deepEqual([plan.used!.read, plan.used!.peak, plan.used!.rebuilt], [null, null, 0]);
     assert.deepEqual(
@@ -156,7 +153,7 @@ test("a run's object says what its sessions read: each step's classes, peak and 
       [null],
     );
   });
-  await s.test(
+  s.test(
     "the run's reads are every try's of every step, beside its cost — no class or peak where one session measured none of them",
     async () => {
       const run = await statusOf(R);
@@ -193,7 +190,7 @@ test("a run's object says what its sessions read: each step's classes, peak and 
       );
     },
   );
-  await s.test(
+  s.test(
     "a session that compacted reached its cap, short of it in tokens — and the run's peak says so of its own step's compactions alone",
     async () => {
       const compacted = {

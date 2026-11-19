@@ -9,7 +9,8 @@
  * The tick is the store's pass (`tickRun`), on the stage's engine given a pass of its own that does nothing, as `conflicts-feed.test.ts`
  * gives it. The store is its own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,18 +40,21 @@ const factorySaid = () =>
     .lines.filter((l) => l.involved?.kind === 'Factory')
     .map((l) => [l.involved?.name, l.reason, l.type, l.labels]);
 
-test("a factory's library add gone missing said on the feed: one line when it goes, one when it is back, and none again", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+describe("a factory's library add gone missing said on the feed: one line when it goes, one when it is back, and none again", () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
-
-  await s.test('no factory records its adds: a pass says no factory', async () => {
+  s.test('no factory records its adds: a pass says no factory', async () => {
     await pass();
     assert.deepEqual(factorySaid(), []);
   });
-
-  await s.test('default records an add no library holds: a pass says it missing, once, with its fix', async () => {
+  s.test('default records an add no library holds: a pass says it missing, once, with its fix', async () => {
     writeLibraryAdds(ROOT, 'default', [
       { kind: 'Skill', name: 'create-an-agent' },
       { kind: 'Skill', name: GONE },
@@ -60,15 +64,13 @@ test("a factory's library add gone missing said on the feed: one line when it go
     const [line] = readFeed(ROOT, 0).lines.filter((l) => l.reason === 'AddsMissing');
     assert.ok(line?.note?.includes(`nemia library rm Skill ${GONE} --factory default`), 'its note names the fix');
   });
-
-  await s.test('more passes, and a daemon restarted with no fold of its own, say it no second time', async () => {
+  s.test('more passes, and a daemon restarted with no fold of its own, say it no second time', async () => {
     await pass();
     await pass();
     assert.deepEqual(recordFeed(ROOT, new Map(), { memo: freshFeedMemo(), missing: addsMissingNow(ROOT) }).lines, []);
     assert.equal(factorySaid().length, 1);
   });
-
-  await s.test('the skill made again in the user library: a pass says the adds resolved, once', async () => {
+  s.test('the skill made again in the user library: a pass says the adds resolved, once', async () => {
     const dir = path.join(libraryDir(ROOT), 'skills', GONE);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'SKILL.md'), `---\nname: ${GONE}\ndescription: Drafts notes.\n---\nDraft them.\n`);
@@ -76,8 +78,7 @@ test("a factory's library add gone missing said on the feed: one line when it go
     await pass();
     assert.deepEqual(factorySaid().slice(1), [['default', 'AddsResolved', 'Normal', { factory: 'default' }]]);
   });
-
-  await s.test('taken away again and its add taken off: missing said, then resolved', async () => {
+  s.test('taken away again and its add taken off: missing said, then resolved', async () => {
     fs.rmSync(path.join(libraryDir(ROOT), 'skills', GONE), { recursive: true });
     await pass();
     writeLibraryAdds(ROOT, 'default', [{ kind: 'Skill', name: 'create-an-agent' }]);

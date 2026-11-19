@@ -2,7 +2,7 @@
  * Where a harness keeps its user's own agent files (`userAgentFolders`): Claude Code's under its config folder when one is set, else
  * under the home's.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';

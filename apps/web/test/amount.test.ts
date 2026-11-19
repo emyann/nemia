@@ -2,7 +2,7 @@
  * An amount a person types (src/lib/amount.ts): the format its field shows it in, as the board writes money, and what the field's
  * text holds while it is typed, in the field's locale.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { AMOUNT_FORMATS, amountTyped, type AmountKind } from '../src/lib/amount.ts';
 import { dollars } from '../src/lib/money.ts';

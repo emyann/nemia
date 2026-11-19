@@ -9,7 +9,8 @@
  * - A harness whose `command` runs the brief as a script gives each task of one harness its own process, so a bad session and
  *   a good one share the harness.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -55,48 +56,44 @@ const refusalWords = (log: string) => [
   /`ae forget`/,
 ];
 
-test('a Codex run whose stream does not decode is unread alone while it works, why said by its name, read once it decodes, and failed once it has ended, its exit code and statement kept', async (t) => {
-  const s = story(t);
-  const dir = scratch('ae-unread-');
-  const log = codexRun(dir, 'ae/bad/1', 'working', BAD);
-  codexRun(dir, 'ae/good/1', 'done', GOOD);
-  const ops = detachedOps(codex, dir);
-
-  await s.test('REFUSED: at work, observe leaves it out and reads the harness’s other run, warning why once', async () => {
+describe('a Codex run whose stream does not decode is unread alone while it works, why said by its name, read once it decodes, and failed once it has ended, its exit code and statement kept', () => {
+  let dir!: string;
+  let log!: string;
+  let ops!: import('../src/index.ts').RunnerOps;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = scratch('ae-unread-');
+    log = codexRun(dir, 'ae/bad/1', 'working', BAD);
+    codexRun(dir, 'ae/good/1', 'done', GOOD);
+    ops = detachedOps(codex, dir);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('REFUSED: at work, observe leaves it out and reads the harness’s other run, warning why once', async () => {
     const listed = await warned(ops.observe);
     assert.deepEqual([...listed.value.keys()], ['ae/good/1'], 'left out while it runs, never read as a live session that said nothing');
     assert.deepEqual(listed.value.get('ae/good/1')?.usage, USED);
     assert.equal(listed.warnings.length, 1);
     for (const w of refusalWords(log)) assert.match(listed.warnings[0], w);
   });
-
-  await s.test(
-    'REFUSED: observeFor names it unread, neither there nor gone, and why by its name alone, the other read completed',
-    async () => {
-      const asked = await warned(ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
-      assert.deepEqual([...asked.value.unread], ['ae/bad/1'], 'neither there nor gone');
-      assert.deepEqual([...asked.value.seen.keys()], ['ae/good/1']);
-      assert.equal(asked.value.seen.get('ae/good/1')?.state, 'completed');
-      assert.equal(asked.warnings.length, 1);
-      for (const w of refusalWords(log)) assert.match(asked.warnings[0], w);
-      assert.deepEqual(
-        [...(asked.value.unreadWhy ?? [])],
-        [['ae/bad/1', asked.warnings[0]]],
-        'why, by its name, and none for the run read',
-      );
-      for (const w of refusalWords(log)) assert.match(asked.value.unreadWhy?.get('ae/bad/1') ?? '', w);
-    },
-  );
-
-  await s.test('once its stream decodes it is read, and no look after says anything of the last', async () => {
+  s.test('REFUSED: observeFor names it unread, neither there nor gone, and why by its name alone, the other read completed', async () => {
+    const asked = await warned(ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
+    assert.deepEqual([...asked.value.unread], ['ae/bad/1'], 'neither there nor gone');
+    assert.deepEqual([...asked.value.seen.keys()], ['ae/good/1']);
+    assert.equal(asked.value.seen.get('ae/good/1')?.state, 'completed');
+    assert.equal(asked.warnings.length, 1);
+    for (const w of refusalWords(log)) assert.match(asked.warnings[0], w);
+    assert.deepEqual([...(asked.value.unreadWhy ?? [])], [['ae/bad/1', asked.warnings[0]]], 'why, by its name, and none for the run read');
+    for (const w of refusalWords(log)) assert.match(asked.value.unreadWhy?.get('ae/bad/1') ?? '', w);
+  });
+  s.test('once its stream decodes it is read, and no look after says anything of the last', async () => {
     fs.writeFileSync(log, ['Reading additional input from stdin...', ...GOOD.map((l) => JSON.stringify(l))].join('\n'));
     const read = await warned(ops.observeFor!([{ name: 'ae/bad/1' }]));
     assert.deepEqual([...read.value.seen.keys()], ['ae/bad/1'], 'its stream decodes now');
     assert.equal(read.value.unreadWhy, undefined, 'and nothing of the last look is said');
     assert.equal(read.warnings.length, 0);
   });
-
-  await s.test(
+  s.test(
     'REFUSED: ended over a stream that does not decode, it reads failed on every look, its exit code and statement kept, nothing of its output, and why warned each time',
     async () => {
       assert.equal(codexRun(dir, 'ae/bad/1', 'done', BAD), log);
@@ -146,24 +143,35 @@ const settled = async (t: Waiter, engine: ReturnType<typeof builtEngine>, ids: s
   return views.map((v) => v.state);
 };
 
-test(
+describe(
   'tasks of one harness through the engine: one at work whose output does not decode carries why on the pass, list and view until a look reads it, and one that ended so settles failed beside one that succeeded, and is forgotten',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const root = scratch('ae-unread-root-');
-    const engine = builtEngine(Engine.layer({ root, harnesses: { sh: scripted }, defaultHarness: 'sh' }));
-    const cwd = scratch('ae-unread-cwd-');
-    const marker = path.join(cwd, 'go');
-    t.after(() => fs.writeFileSync(marker, ''));
-    const held = await Effect.runPromise(
-      engine.file({ brief: `${printing(BAD)}; timeout 60 sh -c 'while [ ! -e ${marker} ]; do sleep 0.1; done'`, cwd }),
-    );
-    const bad = await Effect.runPromise(engine.file({ brief: printing(BAD), cwd }));
-    const good = await Effect.runPromise(engine.file({ brief: printing(GOOD), cwd }));
-    const log = path.join(root, 'runs', 'sh', `ae_${held.replace(/[^a-zA-Z0-9]+/g, '_')}_1.log`);
-
-    await s.test("REFUSED: the task at work carries why on its view — the pass's, list's and view's — and is never settled", async (c) => {
+  () => {
+    let root!: string;
+    let engine!: import('../src/index.ts').EngineShape;
+    let cwd!: string;
+    let marker!: string;
+    let held!: string;
+    let bad!: string;
+    let good!: string;
+    let log!: string;
+    beforeAll(async () => {
+      const t = teardowns();
+      root = scratch('ae-unread-root-');
+      engine = builtEngine(Engine.layer({ root, harnesses: { sh: scripted }, defaultHarness: 'sh' }));
+      cwd = scratch('ae-unread-cwd-');
+      marker = path.join(cwd, 'go');
+      t.onTestFinished(() => fs.writeFileSync(marker, ''));
+      held = await Effect.runPromise(
+        engine.file({ brief: `${printing(BAD)}; timeout 60 sh -c 'while [ ! -e ${marker} ]; do sleep 0.1; done'`, cwd }),
+      );
+      bad = await Effect.runPromise(engine.file({ brief: printing(BAD), cwd }));
+      good = await Effect.runPromise(engine.file({ brief: printing(GOOD), cwd }));
+      log = path.join(root, 'runs', 'sh', `ae_${held.replace(/[^a-zA-Z0-9]+/g, '_')}_1.log`);
+      return t.end;
+    });
+    const s = story(test);
+    s.test("REFUSED: the task at work carries why on its view — the pass's, list's and view's — and is never settled", async (c) => {
       let pass: TaskView | undefined;
       await until(
         c,
@@ -192,8 +200,7 @@ test(
         }
       }
     });
-
-    await s.test('the first look that reads its output says nothing of why, on the pass, list or view', async () => {
+    s.test('the first look that reads its output says nothing of why, on the pass, list or view', async () => {
       fs.writeFileSync(log, GOOD.map((l) => JSON.stringify(l)).join('\n'));
       const read = (await Effect.runPromise(engine.tick())).views.find((v) => v.id === held);
       assert.ok(read, 'still at work');
@@ -201,8 +208,7 @@ test(
       assert.equal(Object.hasOwn((await Effect.runPromise(engine.list([held]))).views[0], 'unreadWhy'), false, 'nor does list');
       assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(held)), 'unreadWhy'), false, 'nor does view');
     });
-
-    await s.test(
+    s.test(
       'REFUSED: a task whose output does not decode, once ended, settles failed, while a task of the same harness settles succeeded',
       async (c) => {
         const [b, g] = await settled(c, engine, [bad, good]);
@@ -210,15 +216,13 @@ test(
         assert.equal(g.settled, 'succeeded');
       },
     );
-
-    await s.test('the failed task is forgotten, its run files with it', async () => {
+    s.test('the failed task is forgotten, its run files with it', async () => {
       const forgot = await Effect.runPromise(engine.forget([bad], { yes: true }));
       assert.equal(forgot.forgotten, true);
       const left = fs.readdirSync(path.join(root, 'runs', 'sh'));
       assert.ok(left.length > 0 && left.every((f) => !f.startsWith(`ae_${bad.replace(/[^a-zA-Z0-9]+/g, '_')}_`)), left.join(', '));
     });
-
-    await s.test('the task read again settles once its process has ended', async (c) => {
+    s.test('the task read again settles once its process has ended', async (c) => {
       fs.writeFileSync(marker, '');
       const [h] = await settled(c, engine, [held]);
       assert.ok(h.settled, 'settled');
@@ -264,19 +268,26 @@ const START_REFUSAL_WORDS = [
   /`ae forget`/,
 ];
 
-test(
+describe(
   'a session whose start id is a number is unread while its process runs, the next of its harness read and why said by its name; once ended it reads failed with no id, and its task settles and is forgotten',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const root = scratch('ae-start-');
-    const marker = path.join(root, 'go');
-    t.after(() => fs.writeFileSync(marker, ''));
-    const script = `${printedLines(threadStarted(12345))}; timeout 30 sh -c 'while [ ! -e ${marker} ]; do sleep 0.1; done'`;
-    const bad = detachedOps(sh(script, CODEX_START), root);
-    let good: Awaited<ReturnType<typeof ran>> | undefined;
-
-    await s.test('the worker records the refused start on the run file, its process still at work', async (c) => {
+  () => {
+    let root!: string;
+    let marker!: string;
+    let script!: string;
+    let bad!: import('../src/index.ts').RunnerOps;
+    let good!: Awaited<ReturnType<typeof ran>> | undefined;
+    beforeAll(() => {
+      const t = teardowns();
+      root = scratch('ae-start-');
+      marker = path.join(root, 'go');
+      t.onTestFinished(() => fs.writeFileSync(marker, ''));
+      script = `${printedLines(threadStarted(12345))}; timeout 30 sh -c 'while [ ! -e ${marker} ]; do sleep 0.1; done'`;
+      bad = detachedOps(sh(script, CODEX_START), root);
+      return t.end;
+    });
+    const s = story(test);
+    s.test('the worker records the refused start on the run file, its process still at work', async (c) => {
       await Effect.runPromise(bad.spawn({ name: 'ae/bad/1', brief: 'x', cwd: root }));
       await until(
         c,
@@ -287,16 +298,14 @@ test(
       good = await ran(c, sh(printedLines(threadStarted(THREAD)), CODEX_START), 'ae/good/1', root);
       assert.equal(runFile(root, 'ae/bad/1').state, 'working');
     });
-
-    await s.test('REFUSED: observe leaves it out while it runs and reads the next session of the harness, warning why once', async () => {
+    s.test('REFUSED: observe leaves it out while it runs and reads the next session of the harness, warning why once', async () => {
       const listed = await warned(good!.ops.observe);
       assert.deepEqual([...listed.value.keys()], ['ae/good/1'], 'the refused session is left out while it runs, the other read');
       assert.equal(listed.value.get('ae/good/1')?.nativeId, THREAD);
       assert.equal(listed.warnings.length, 1);
       for (const w of START_REFUSAL_WORDS) assert.match(listed.warnings[0], w);
     });
-
-    await s.test('REFUSED: observeFor names it unread, never a live session with no id, and why by its name, as it is warned', async () => {
+    s.test('REFUSED: observeFor names it unread, never a live session with no id, and why by its name, as it is warned', async () => {
       const asked = await warned(good!.ops.observeFor!([{ name: 'ae/bad/1' }, { name: 'ae/good/1' }]));
       assert.deepEqual([...asked.value.unread], ['ae/bad/1'], 'unread while it runs, never read as a live session with no id');
       assert.deepEqual([...asked.value.seen.keys()], ['ae/good/1']);
@@ -305,30 +314,25 @@ test(
       assert.deepEqual([...(asked.value.unreadWhy ?? [])], [['ae/bad/1', asked.warnings[0]]], 'why, by its name, as it is warned');
       for (const w of START_REFUSAL_WORDS) assert.match(asked.value.unreadWhy?.get('ae/bad/1') ?? '', w);
     });
-
-    await s.test(
-      'REFUSED: once its process has ended it reads failed with no id, listed so, still warned, and unread by no look',
-      async (c) => {
-        fs.writeFileSync(marker, '');
-        await until(
-          c,
-          () => runFileOr(root, 'ae/bad/1').state !== 'working',
-          () => `ae/bad/1 ended: its run file is ${JSON.stringify(runFileOr(root, 'ae/bad/1'))}`,
-          { everyMs: 100 },
-        );
-        assert.equal(runFile(root, 'ae/bad/1').state, 'done', 'the harness itself exited 0');
-        const ended = await warned(bad.observeFor!([{ name: 'ae/bad/1' }]));
-        assert.equal(ended.value.seen.get('ae/bad/1')?.state, 'failed');
-        assert.equal(ended.value.seen.get('ae/bad/1')?.nativeId, undefined);
-        assert.deepEqual([...ended.value.unread], []);
-        assert.equal(ended.warnings.length, 1, 'the refusal is still warned');
-        for (const w of START_REFUSAL_WORDS) assert.match(ended.warnings[0] ?? '', w);
-        assert.equal(ended.value.unreadWhy, undefined, 'read as failed, so not unread, and no words of why it is');
-        assert.equal((await Effect.runPromise(bad.observe)).get('ae/bad/1')?.state, 'failed', 'listed, as failed');
-      },
-    );
-
-    await s.test(
+    s.test('REFUSED: once its process has ended it reads failed with no id, listed so, still warned, and unread by no look', async (c) => {
+      fs.writeFileSync(marker, '');
+      await until(
+        c,
+        () => runFileOr(root, 'ae/bad/1').state !== 'working',
+        () => `ae/bad/1 ended: its run file is ${JSON.stringify(runFileOr(root, 'ae/bad/1'))}`,
+        { everyMs: 100 },
+      );
+      assert.equal(runFile(root, 'ae/bad/1').state, 'done', 'the harness itself exited 0');
+      const ended = await warned(bad.observeFor!([{ name: 'ae/bad/1' }]));
+      assert.equal(ended.value.seen.get('ae/bad/1')?.state, 'failed');
+      assert.equal(ended.value.seen.get('ae/bad/1')?.nativeId, undefined);
+      assert.deepEqual([...ended.value.unread], []);
+      assert.equal(ended.warnings.length, 1, 'the refusal is still warned');
+      for (const w of START_REFUSAL_WORDS) assert.match(ended.warnings[0] ?? '', w);
+      assert.equal(ended.value.unreadWhy, undefined, 'read as failed, so not unread, and no words of why it is');
+      assert.equal((await Effect.runPromise(bad.observe)).get('ae/bad/1')?.state, 'failed', 'listed, as failed');
+    });
+    s.test(
       'REFUSED: on a harness whose output is read as Codex’s, the ended start’s refusal is its own, and the session beside it read',
       async (c) => {
         const codexRoot = scratch('ae-start-');
@@ -346,8 +350,7 @@ test(
         assert.equal(asked.seen.get('ae/good/1')?.nativeId, THREAD);
       },
     );
-
-    await s.test('through the engine, its task settles failed with no session id, and is forgotten with its run files', async (c) => {
+    s.test('through the engine, its task settles failed with no session id, and is forgotten with its run files', async (c) => {
       const engineRoot = scratch('ae-start-root-');
       const spec = sh(printedLines(threadStarted(12345)), CODEX_START);
       const engine = builtEngine(Engine.layer({ root: engineRoot, harnesses: { sh: spec }, defaultHarness: 'sh' }));

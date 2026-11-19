@@ -5,7 +5,7 @@
  * would typecheck: this refuses it. The scanner is shown to refuse a planted import, once.
  */
 import './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

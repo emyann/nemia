@@ -11,7 +11,7 @@
  * phase, output and exit code are read off its task as it settles. The test's store is its own, at `ROOT`, given as `ENV`, and the
  * harness's trust file a folder of its own, so no place is trusted until a test trusts it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

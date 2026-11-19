@@ -90,3 +90,41 @@ export const ours = (file: string): boolean => {
   }
   return known.all.has(file) ? !known.marked.has(file) : !notOurs([file]).has(file);
 };
+
+/** What a workspace's `vitest.config.ts` says of its suite: the files it runs, the setup files loaded before each, and how many at once. */
+export type Suite = { include: string[]; setupFiles: string[]; maxWorkers: number | null; timeout: number | null };
+
+/** The strings of the array a config gives `key`, or none. */
+const listed = (text: string, key: string): string[] => {
+  const list = new RegExp(`\\b${key}:\\s*\\[([^\\]]*)\\]`).exec(text)?.[1] ?? '';
+  return [...list.matchAll(/['"]([^'"]+)['"]/g)].map(([, value]) => value!);
+};
+
+/** The number a config gives `key`, underscores read as a numeric separator, or null. */
+const numbered = (text: string, key: string): number | null => {
+  const m = new RegExp(`\\b${key}:\\s*([\\d_]+)\\b`).exec(text);
+  return m ? Number(m[1]!.replaceAll('_', '')) : null;
+};
+
+/**
+ * The suite a workspace's Vitest config runs, read from its code, its comments left out (`include`, `setupFiles`, `maxWorkers`,
+ * `testTimeout`), or null where
+ * the workspace has no `vitest.config.ts`. A config's first `include` is its node tests' own: the board's, which holds its stories'
+ * project beside them, names its node project first.
+ *
+ * @param dir the workspace's folder, absolute
+ */
+export function suiteOf(dir: string): Suite | null {
+  const file = path.join(dir, 'vitest.config.ts');
+  if (!fs.existsSync(file)) return null;
+  const text = fs
+    .readFileSync(file, 'utf8')
+    .replace(/^\s*\/\*[\s\S]*?\*\//gm, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  return {
+    include: listed(text, 'include'),
+    setupFiles: listed(text, 'setupFiles'),
+    maxWorkers: numbered(text, 'maxWorkers'),
+    timeout: numbered(text, 'testTimeout'),
+  };
+}

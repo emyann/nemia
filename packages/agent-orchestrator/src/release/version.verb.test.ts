@@ -3,7 +3,7 @@
  * and the harness version it recorded; an ended attempt, and a settled task, are no session at work. And the newest release the
  * release check read (`latestRelease`), newer or not than the install's own.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect } from 'effect';

@@ -11,7 +11,8 @@
  *
  * A boundary test: a real store, a real detached worker, a second real process running the SDK, and a real child CLI.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,40 +57,47 @@ const wrote = (dir: string, file: string): unknown[] => {
   }
 };
 
-test('an engine with no holder runs a Claude Code job to its end on the Agent SDK, and calls no `claude` on PATH', WAITED, async (t) => {
-  const s = story(t);
-  const root = scratch('ae-job-');
-  const dir = path.join(root, 'work');
-  fs.mkdirSync(dir, { recursive: true });
-  const restore = watchedPath(dir);
-  t.after(restore);
-
-  const engine = builtEngine(Engine.layer({ root, harnesses: { claude: 'claude' }, claudeExecutable: STAND_IN }));
-  const plan = { id: JOB_ID, stream: true, transcript: true, deny: 'Bash', hold: true, cost: 0.02, output: { outcome: 'done' } };
-  const taskId = await Effect.runPromise(
-    engine.file({
-      brief: 'say it',
-      cwd: dir,
-      harness: 'claude',
-      closeoutSchema: { type: 'object' },
-      config: { env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
-    }),
-  );
-  t.after(() => {
-    fs.writeFileSync(path.join(dir, 'more'), '');
-    fs.writeFileSync(path.join(dir, 'end'), '');
-    return Effect.runPromise(Effect.ignore(engine.stop(taskId)));
+describe('an engine with no holder runs a Claude Code job to its end on the Agent SDK, and calls no `claude` on PATH', WAITED, () => {
+  let root!: string;
+  let dir!: string;
+  let restore!: () => void;
+  let engine!: import('../src/index.ts').EngineShape;
+  let taskId!: string;
+  let reading!: Promise<void>;
+  beforeAll(async () => {
+    const t = teardowns();
+    root = scratch('ae-job-');
+    dir = path.join(root, 'work');
+    fs.mkdirSync(dir, { recursive: true });
+    restore = watchedPath(dir);
+    t.onTestFinished(restore);
+    engine = builtEngine(Engine.layer({ root, harnesses: { claude: 'claude' }, claudeExecutable: STAND_IN }));
+    taskId = await Effect.runPromise(
+      engine.file({
+        brief: 'say it',
+        cwd: dir,
+        harness: 'claude',
+        closeoutSchema: { type: 'object' },
+        config: { env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
+      }),
+    );
+    t.onTestFinished(() => {
+      fs.writeFileSync(path.join(dir, 'more'), '');
+      fs.writeFileSync(path.join(dir, 'end'), '');
+      return Effect.runPromise(Effect.ignore(engine.stop(taskId)));
+    });
+    reading = Promise.resolve();
+    return t.end;
   });
+  const s = story(test);
+  const plan = { id: JOB_ID, stream: true, transcript: true, deny: 'Bash', hold: true, cost: 0.02, output: { outcome: 'done' } };
   const seen: string[] = [];
-  let reading: Promise<void> = Promise.resolve();
-
-  await s.test('the brief reaches the session, as the worker wrote it on the bin’s stdin', async (st) => {
+  s.test('the brief reaches the session, as the worker wrote it on the bin’s stdin', async (st) => {
     await Effect.runPromise(engine.tick());
     await until(st, () => wrote(dir, 'said.jsonl').length === 1, 'the brief reached the session', { everyMs: 50 });
     assert.deepEqual(wrote(dir, 'said.jsonl'), ['say it'], 'the brief, as the worker wrote it on the bin’s stdin');
   });
-
-  await s.test('it is followed live, its text given in pieces as it is written', async (st) => {
+  s.test('it is followed live, its text given in pieces as it is written', async (st) => {
     const followed = await Effect.runPromise(engine.follow(taskId));
     assert.ok(followed, 'a job is followed live');
     reading = Effect.runPromise(
@@ -111,14 +119,12 @@ test('an engine with no holder runs a Claude Code job to its end on the Agent SD
       { everyMs: 50 },
     );
   });
-
-  await s.test('words said reach the session mid-turn', async (st) => {
+  s.test('words said reach the session mid-turn', async (st) => {
     await Effect.runPromise(engine.say(taskId, 'and again'));
     await until(st, () => wrote(dir, 'said.jsonl').length === 2, 'the words reached the session mid-turn', { everyMs: 50 });
     assert.deepEqual(wrote(dir, 'said.jsonl'), ['say it', 'and again']);
   });
-
-  await s.test('it runs to its end: its closeout, its cost and its denials read off the capture its own process printed', async (st) => {
+  s.test('it runs to its end: its closeout, its cost and its denials read off the capture its own process printed', async (st) => {
     fs.writeFileSync(path.join(dir, 'end'), '');
     const view = await until(
       st,
@@ -143,16 +149,14 @@ test('an engine with no holder runs a Claude Code job to its end on the Agent SD
       'and the call it was denied, read off the stream as it happened',
     );
   });
-
-  await s.test('its conversation is read from Claude Code’s own record', async () => {
+  s.test('its conversation is read from Claude Code’s own record', async () => {
     const read = await Effect.runPromise(engine.transcript(taskId));
     assert.ok(
       read?.events.some((e) => e.text === 'Half a thought'),
       `the conversation is read from Claude Code's own record: ${JSON.stringify(read?.events)}`,
     );
   });
-
-  await s.test('no `claude` command line was spawned for the job', () => {
+  s.test('no `claude` command line was spawned for the job', () => {
     const called = fs.existsSync(path.join(dir, 'claude-calls'))
       ? fs.readFileSync(path.join(dir, 'claude-calls'), 'utf8').split('\n').filter(Boolean)
       : [];
@@ -177,7 +181,7 @@ test(
         config: { claude: { remoteControl: true }, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
       }),
     );
-    t.after(() => {
+    t.onTestFinished(() => {
       fs.writeFileSync(path.join(dir, 'end'), '');
       return Effect.runPromise(Effect.ignore(engine.stop(taskId)));
     });

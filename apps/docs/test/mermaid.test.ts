@@ -2,7 +2,7 @@
  * The docs draw a state machine from its own markers and a hand-drawn flowchart as written, and a diagram that would draw short, a
  * name no doc holds, a name two docs hold, or a state diagram drawn by hand fails the page, naming it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

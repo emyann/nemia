@@ -3,7 +3,7 @@
  * asked — an entry that is no card, a write back's time and temp file, a try that does not read, the card a path names, the default
  * door's root.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -11,7 +11,7 @@
  * version (`ContentChanged`) is named and switched. The merge with no base itself is `src/factory/upgrade/merge.test.ts`; the naming of a
  * base, `src/factory/applied/applied.verb.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -122,15 +122,14 @@ function templates(): { team: string; other: string; repo: string } {
   return { team, other, repo };
 }
 
-test('a switch onto another template: previewed with no common base, held to its plan, waited on, resolved, merged', async (t) => {
-  const s = story(t);
+describe('a switch onto another template: previewed with no common base, held to its plan, waited on, resolved, merged', () => {
+  const s = story(test);
   let dirs = { team: '', other: '', repo: '' };
   const tree = () => treeDir(ROOT, 'crew');
   let plan = '';
   let conflicts: string[] = [];
   let applied: Record<string, string> = {};
-
-  await s.test('a factory applied from team at 0.1.0, nothing edited on its tree, its base named team', async () => {
+  s.test('a factory applied from team at 0.1.0, nothing edited on its tree, its base named team', async () => {
     dirs = templates();
     await stage.main(['factory', 'apply', 'crew', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
     const status = reconciled(factory('crew'));
@@ -138,8 +137,7 @@ test('a switch onto another template: previewed with no common base, held to its
     assert.ok(fs.existsSync(path.join(tree(), ALMA)), 'the tree holds the agent only team has');
     applied = bytesUnder(appliedDir(ROOT, 'crew'));
   });
-
-  await s.test(
+  s.test(
     'nemia factory diff says it is a switch with no common base, and lists each file the two hold differently as a conflict',
     async () => {
       const before = bytesUnder(FACTORIES);
@@ -169,8 +167,7 @@ test('a switch onto another template: previewed with no common base, held to its
       plan = preview.next.digest;
     },
   );
-
-  await s.test('nemia factory upgrade refuses a switch without its plan, and files it with it', async () => {
+  s.test('nemia factory upgrade refuses a switch without its plan, and files it with it', async () => {
     const file = path.join(FACTORIES, 'crew.json');
     const filedAs = fs.readFileSync(file, 'utf8');
     await assert.rejects(
@@ -185,8 +182,7 @@ test('a switch onto another template: previewed with no common base, held to its
     assert.deepEqual([filed.from, filed.to], ['0.1.0', '1.0.0']);
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).template.source, dirs.other);
   });
-
-  await s.test('the controller waits with the status alone: the base still named team, each conflict with no base side', () => {
+  s.test('the controller waits with the status alone: the base still named team, each conflict with no base side', () => {
     const before = bytesUnder(tree());
     const waiting = reconciled(factory('crew'));
     assert.deepEqual(bytesUnder(tree()), before, 'the tree is left as it is');
@@ -202,8 +198,7 @@ test('a switch onto another template: previewed with no common base, held to its
       'no conflict has a base side',
     );
   });
-
-  await s.test(
+  s.test(
     'each conflict resolved: the agent kept, the hire taken, the rules written by hand, the rest the template, each workflow by its proposal, approved',
     async () => {
       const mine = path.join(scratch('wf-upgrade-switch-choice-'), 'rules.md');
@@ -226,8 +221,7 @@ test('a switch onto another template: previewed with no common base, held to its
       }
     },
   );
-
-  await s.test('the controller merges: each choice in the tree, the base the new render, the status naming other', () => {
+  s.test('the controller merges: each choice in the tree, the base the new render, the status naming other', () => {
     const merged = reconciled(factory('crew'));
     assert.deepEqual([merged.version, merged.template, merged.conditions[0]?.reason], ['1.0.0', 'other', 'Upgraded']);
     assert.ok(textIn(tree(), ALMA).includes('You are Alma; run npm run md3 before you sign off.'), 'the agent the tree alone held, kept');
@@ -236,8 +230,7 @@ test('a switch onto another template: previewed with no common base, held to its
     assert.ok(!fs.existsSync(path.join(appliedDir(ROOT, 'crew'), ALMA)), 'the base is the new render, which holds no alma');
     assert.equal(digestOf(entriesIn(appliedDir(ROOT, 'crew'))), merged.digest);
   });
-
-  await s.test('after it, other at 1.1.0 from another folder of the same name merges three ways: a tree edit kept', async () => {
+  s.test('after it, other at 1.1.0 from another folder of the same name merges three ways: a tree edit kept', async () => {
     const copy = path.join(scratch('wf-upgrade-switch-copy-'), 'other');
     fs.cpSync(dirs.other, copy, { recursive: true });
     edit(copy, 'nemia.yaml', (doc) => {
@@ -256,8 +249,8 @@ test('a switch onto another template: previewed with no common base, held to its
   });
 });
 
-test('a base whose status names no template is refused a switch until a pass names it; an upgrade under way stays three-way', async (t) => {
-  t.mock.method(console, 'log', () => {});
+test('a base whose status names no template is refused a switch until a pass names it; an upgrade under way stays three-way', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const dirs = templates();
   await stage.main(['factory', 'apply', 'later', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('later'));
@@ -288,8 +281,8 @@ test('a base whose status names no template is refused a switch until a pass nam
   assert.equal(readStatus(ROOT, 'later')?.template, undefined);
 });
 
-test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async (t) => {
-  t.mock.method(console, 'log', () => {});
+test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const dirs = templates();
   await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('moved'));
@@ -312,8 +305,8 @@ test('a base unnamed whose template cannot be read is named by no pass, and the 
   assert.deepEqual(headOf(await previewOf(...diff.slice(2))), ['team', '0.1.0', 'other', '1.0.0']);
 });
 
-test('a factory whose template changed under its version is named after that template, and switched from it with no base', async (t) => {
-  t.mock.method(console, 'log', () => {});
+test('a factory whose template changed under its version is named after that template, and switched from it with no base', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const dirs = templates();
   await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('kit'));

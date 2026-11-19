@@ -12,7 +12,7 @@
  * settled, and an answer that is the held task's next turn — and the rest are `held.test.ts`'s, on the stand-ins.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';

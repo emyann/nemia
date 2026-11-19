@@ -1,5 +1,5 @@
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -209,13 +209,13 @@ const saysAsListed = async (id: string) => {
   }
 };
 
-test("the api's own answers: its health and its version", async (t) => {
-  await t.test('health answers', async () => {
+describe("the api's own answers: its health and its version", () => {
+  test('health answers', async () => {
     const res = await app.request('/api/health');
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { ok: true });
   });
-  await t.test("the version answers: the release's version, a non-empty string, and the code the api runs, this checkout", async () => {
+  test("the version answers: the release's version, a non-empty string, and the code the api runs, this checkout", async () => {
     const res = await app.request('/api/version');
     assert.equal(res.status, 200);
     const body = (await res.json()) as { version: string; release: unknown };
@@ -301,9 +301,9 @@ const oneTaskTotals = () => ({
   slot: null,
 });
 
-test("a store's runs read on the list and on a run's page: each summarized with what its steps do, one in full, a blocked step waiting on you, a task the engine has no record of", async (t) => {
-  const s = story(t);
-  await s.test('an empty store lists no runs', async () => {
+describe("a store's runs read on the list and on a run's page: each summarized with what its steps do, one in full, a blocked step waiting on you, a task the engine has no record of", () => {
+  const s = story(test);
+  s.test('an empty store lists no runs', async () => {
     const res = await app.request('/api/runs');
     const list = (await res.json()) as RunList;
     assert.deepEqual([list.kind, list.items], ['RunList', []], 'the RunList holds no run');
@@ -315,7 +315,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     );
     assert.deepEqual(byState, [[], []], "and the board's lists by state none");
   });
-  await s.test('runs are read from the workflow store and summarized, with what each step is doing', async () => {
+  s.test('runs are read from the workflow store and summarized, with what each step is doing', async () => {
     writeRun({
       id: 'r-1',
       repo: '/code/app',
@@ -504,7 +504,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       'finished, as the list asked by state has it: when its work stopped, how, and its wall time in five parts',
     );
   });
-  await s.test("a run in full: the brief, each step's spec and prose, what it was told, and how it went", async () => {
+  s.test("a run in full: the brief, each step's spec and prose, what it was told, and how it went", async () => {
     settledTask('t-2', blocked);
     writeRun(r2);
 
@@ -736,7 +736,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     assert.match(review.told, /already been worked in by: implement/);
     assert.match(review.told, /git diff def456/);
   });
-  await s.test('a step that signed off blocked is waiting on you in the list too', async () => {
+  s.test('a step that signed off blocked is waiting on you in the list too', async () => {
     const run = await listed('r-2');
     assert.deepEqual(
       run.steps.map((s: { message: string }) => s.message),
@@ -744,7 +744,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     );
     assert.deepEqual(run.waitingOnYou, ['implement']);
   });
-  await s.test('a task the engine has no record of is unknown on both endpoints, not queued', async () => {
+  s.test('a task the engine has no record of is unknown on both endpoints, not queued', async () => {
     writeRun({ ...r2, id: 'r-4', steps: { implement: { taskId: 't-4-lost', branch: 'wf/r-4/implement' }, review: { taskId: null } } });
     queuedTask('t-5');
     writeRun({ ...r2, id: 'r-5', steps: { implement: { taskId: 't-5', branch: 'wf/r-5/implement' }, review: { taskId: null } } });
@@ -759,31 +759,28 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     assert.equal((await toldOf(app, 'r-5', 'implement')).told, filedBrief('t-5'));
     assert.equal((await listed('r-5')).steps[0].message, 'pending');
   });
-  await s.test(
-    'the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued',
-    async () => {
-      const e = engine(process.env);
-      for (const id of ['r-2', 'r-4', 'r-5']) {
-        const words = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
-        const run = await listed(id);
-        assert.deepEqual(
-          run.steps.map(({ name, message, branch, phase, reason, on, via, verdict }) => ({
-            name,
-            message,
-            reason,
-            ...(on ? { on } : {}),
-            ...(via ? { via } : {}),
-            phase,
-            ...(verdict ? { verdict } : {}),
-            branch,
-          })),
-          words.steps,
-          id,
-        );
-        assert.deepEqual(run.waitingOnYou, words.waitingOnYou, id);
-      }
-    },
-  );
+  s.test('the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued', async () => {
+    const e = engine(process.env);
+    for (const id of ['r-2', 'r-4', 'r-5']) {
+      const words = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
+      const run = await listed(id);
+      assert.deepEqual(
+        run.steps.map(({ name, message, branch, phase, reason, on, via, verdict }) => ({
+          name,
+          message,
+          reason,
+          ...(on ? { on } : {}),
+          ...(via ? { via } : {}),
+          phase,
+          ...(verdict ? { verdict } : {}),
+          branch,
+        })),
+        words.steps,
+        id,
+      );
+      assert.deepEqual(run.waitingOnYou, words.waitingOnYou, id);
+    }
+  });
 });
 
 /** A loop as `nemia start` freezes it: review loops back to implement, for at most two rounds. */
@@ -851,9 +848,9 @@ const frozenGraph = {
   ],
 };
 
-test('a run whose workflow folder changes or vanishes after it starts is read off what it froze: the steps that ran kept, what moved named, and unjudged where it froze nothing', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a run whose workflow folder changes or vanishes after it starts is read off what it froze: the steps that ran kept, what moved named, and unjudged where it froze nothing', () => {
+  const s = story(test);
+  s.test(
     'a run whose workflow folder is gone, and froze none, is answered unjudged: its list off its record, its page and decision in its words',
     async () => {
       const gone = path.join(NOWHERE, 'no-such-workflow');
@@ -880,7 +877,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       await unjudged('called off, it is still unjudged: the tick reads its steps to stop it');
     },
   );
-  await s.test('a folder changed since the run started keeps the steps that ran, and names what moved', async () => {
+  s.test('a folder changed since the run started keeps the steps that ran, and names what moved', async () => {
     const changed = workflowFolder({
       'original.md': '---\nplace: git\n---\nDo the original thing.\n',
       'review.md': '---\nafter: original\nplace: git\n---\nReview it.\n',
@@ -994,7 +991,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
     );
     assert.deepEqual(summary.waitingOnYou, ['original']);
   });
-  await s.test(
+  s.test(
     'a run that froze its workflow draws from it when its folder does not read: spec, prose, what a step would be told, and the graph',
     async () => {
       const newer = workflowFolder({
@@ -1060,7 +1057,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       assert.deepEqual((await listed('r-41')).graph, frozenGraph);
     },
   );
-  await s.test('a run frozen with a step of the former key `maxAttempts: 2` still reads, and its spec does not carry the key', async () => {
+  s.test('a run frozen with a step of the former key `maxAttempts: 2` still reads, and its spec does not carry the key', async () => {
     const frozen = frozenLoop.map((s) => (s.name === 'review' ? { ...s, maxAttempts: 2 } : s));
     writeRun({
       ...r2,
@@ -1079,7 +1076,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
     assert.equal('maxAttempts' in review, false);
     assert.ok(await listed('r-44'), 'and it lists');
   });
-  await s.test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
+  s.test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
     const edited = workflowFolder({
       'implement.md': '---\nplace: git\nharness: codex\n---\nImplement it, edited.\n',
       'review.md': '---\nplace: git\nharness: claude\n---\nReview it, edited.\n',
@@ -1116,7 +1113,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
     );
     assert.ok(told[1].told?.startsWith(`${PRECEDENCE}\n\nReview it, as frozen.`), String(told[1].told));
   });
-  await s.test(
+  s.test(
     'a run that froze its workflow shows only its steps: one its folder gained since is named in the warning, and neither listed nor drawn',
     async () => {
       const grown = workflowFolder({
@@ -1167,9 +1164,9 @@ const logOf = async (url: string) => {
   return { status: res.status, body: await res.json() };
 };
 
-test("a step's attempts and its log: how many, when the latest began and ended, the last 200 lines of its session, and the engine's word before it starts", async (t) => {
-  const s = story(t);
-  await s.test('each step says how many attempts it has had, when the latest began, and how and when it ended', async () => {
+describe("a step's attempts and its log: how many, when the latest began and ended, the last 200 lines of its session, and the engine's word before it starts", () => {
+  const s = story(test);
+  s.test('each step says how many attempts it has had, when the latest began, and how and when it ended', async () => {
     retryingTask('t-7');
     writeRun({ ...r2, id: 'r-7', steps: { implement: { taskId: 't-7', branch: 'wf/r-7/implement' }, review: { taskId: null } } });
 
@@ -1270,7 +1267,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     );
     assert.equal((await listed('r-7')).steps[0].note, null, 'no note for a step on its first try');
   });
-  await s.test("a step's log is the end of its session's output: the last 200 lines, and whether there were more", async () => {
+  s.test("a step's log is the end of its session's output: the last 200 lines, and whether there were more", async () => {
     settledTask('t-8', blocked);
     codexSession('t-8', 1, numbered(250).join('\n') + '\n');
     writeRun({ ...r2, id: 'r-8', steps: { implement: { taskId: 't-8', branch: 'wf/r-8/implement' }, review: { taskId: null } } });
@@ -1291,7 +1288,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
       'as many lines as it shows is all of them, and output with no final newline loses no line',
     );
   });
-  await s.test("a step with no task has no log yet, and one filed but not started has the engine's word for it", async () => {
+  s.test("a step with no task has no log yet, and one filed but not started has the engine's word for it", async () => {
     assert.deepEqual(await logOf('/api/runs/r-8/steps/review/log'), { status: 200, body: { lines: [], truncated: false } });
     assert.deepEqual(
       await logOf('/api/runs/r-6/steps/replacement/log'),
@@ -1309,15 +1306,15 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
   });
 });
 
-test("GET /api/runs/:id and a step's log refuse: an unknown run or step is a 404, an id is no path out of the store, and output the engine cannot read a 502", async (t) => {
-  await t.test('an unknown run is refused with a 404 that says where to look', async () => {
+describe("GET /api/runs/:id and a step's log refuse: an unknown run or step is a 404, an id is no path out of the store, and output the engine cannot read a 502", () => {
+  test('an unknown run is refused with a 404 that says where to look', async () => {
     const res = await app.request('/api/runs/no-such-run');
     assert.equal(res.status, 404);
     const { error } = (await res.json()) as { error: string };
     assert.match(error, /No run 'no-such-run'/);
     assert.match(error, /GET \/api\/runs/);
   });
-  await t.test('a run id cannot name a file outside the run store', async () => {
+  test('a run id cannot name a file outside the run store', async () => {
     writeRun({ ...r2, id: '../escape' });
     assert.equal(
       runsAtOnce(root).runs.read('../escape').id,
@@ -1328,7 +1325,7 @@ test("GET /api/runs/:id and a step's log refuse: an unknown run or step is a 404
     const res = await app.request('/api/runs/..%2Fescape');
     assert.equal(res.status, 404);
   });
-  await t.test('a log for a run or a step that does not exist is refused with a 404 that says where to look', async () => {
+  test('a log for a run or a step that does not exist is refused with a 404 that says where to look', async () => {
     const noRun = await logOf('/api/runs/no-such-run/steps/implement/log');
     assert.equal(noRun.status, 404);
     const { error: noRunError } = noRun.body as { error: string };
@@ -1353,7 +1350,7 @@ test("GET /api/runs/:id and a step's log refuse: an unknown run or step is a 404
       );
     }
   });
-  await t.test('output the engine cannot read is a 502 that says how to read it from the command line', async () => {
+  test('output the engine cannot read is a 502 that says how to read it from the command line', async () => {
     settledTask('t-10', blocked);
     codexSession('t-10', 1, { unreadable: true });
     writeRun({ ...r2, id: 'r-10', steps: { implement: { taskId: 't-10', branch: 'wf/r-10/implement' }, review: { taskId: null } } });
@@ -1581,9 +1578,9 @@ async function expectJudged(cases: readonly Judgement[]) {
   }
 }
 
-test("what a run established, read as the tick and `nemia ls` have it: each step's words, the run's status and whether it moves, a refused check with retries left, a loop out of rounds sent round again, and the commands it offers", async (t) => {
-  const s = story(t);
-  await s.test("each step says what the run established, in `nemia ls`'s words, on both endpoints", async () => {
+describe("what a run established, read as the tick and `nemia ls` have it: each step's words, the run's status and whether it moves, a refused check with retries left, a loop out of rounds sent round again, and the commands it offers", () => {
+  const s = story(test);
+  s.test("each step says what the run established, in `nemia ls`'s words, on both endpoints", async () => {
     seedChecks();
     const words = [
       ['build', 'verified ✓'],
@@ -1613,7 +1610,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     assert.deepEqual(summary.waitingOnYou, ['test', 'e2e', 'notes']);
     assert.equal(detail.warning, null);
   });
-  await s.test("the api's words, and who it says is waited on, are `list`'s — a refused check's exit code among them", async () => {
+  s.test("the api's words, and who it says is waited on, are `list`'s — a refused check's exit code among them", async () => {
     const e = engine(process.env);
     for (const id of ['r-20', 'r-21']) {
       const words = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
@@ -1640,7 +1637,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       }
     }
   });
-  await s.test(
+  s.test(
     "a run's status is where `assess` puts it on both endpoints, in one word under one key: a run at its gate alone is awaiting approval and one waiting on an answer blocked, REFUSED failed, which is a run in which a step broke",
     async () => {
       settledTask('t-gate', done);
@@ -1679,7 +1676,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       await saysAsListed('r-3');
     },
   );
-  await s.test('a run moves while the engine holds a task of it, or a tick would still file one — whatever `assess` calls it', async () => {
+  s.test('a run moves while the engine holds a task of it, or a tick would still file one — whatever `assess` calls it', async () => {
     const gone = path.join(NOWHERE, 'no-such-workflow');
 
     settledTask('t-24-a', done);
@@ -1763,7 +1760,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     );
     await saysAsListed('r-26');
   });
-  await s.test(
+  s.test(
     'a check that refused with `retries:` left reads as the tick has it — running, moving, waiting on nobody — and one that did not finish, failed and waiting on you',
     async () => {
       const gone = path.join(NOWHERE, 'no-such-workflow');
@@ -1825,7 +1822,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       }
     },
   );
-  await s.test(
+  s.test(
     'a loop out of rounds reads `rounds exhausted`, waits on you, and does not move — until a person sends it round again',
     async () => {
       seedLoop('r-30', DEFAULT_ROUNDS, true);
@@ -1866,7 +1863,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       );
     },
   );
-  await s.test(
+  s.test(
     "a run's lines read answers its decide line, and each step's approve, retry and say lines, built off the command table",
     async () => {
       seedLoop('r-34', 1, true);
@@ -1891,7 +1888,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       });
     },
   );
-  await s.test(
+  s.test(
     'a round the loop asked for, and a try a person asked for, read as the tick has them: a note beside the step, and the run moving',
     async () => {
       seedLoop('r-32', 1, true);
@@ -1936,56 +1933,53 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
   );
 });
 
-test("a step's check read on the board: its command, and once it refused its exit and each stream's last lines, `unfinished` when it was ended, and an answer still where its output cannot be read", async (t) => {
-  const s = story(t);
-  await s.test(
-    "a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines",
-    async () => {
-      const run = (await objectOf(app, 'r-20')).status;
-      const checkOf = (name: string) => run.steps.find((s) => s.name === name)?.check;
-      assert.deepEqual(checkOf('build'), {
-        command: 'npm run build',
-        taskId: 'r-20-build-check',
-        verdict: { result: 'passed', exit: 0 },
-        refused: null,
-      });
-      assert.deepEqual(checkOf('lint'), {
-        command: 'npm run lint',
-        taskId: 'r-20-lint-check',
-        verdict: { result: 'running', exit: null },
-        refused: null,
-      });
-      assert.deepEqual(checkOf('test'), {
-        command: 'npm test',
-        taskId: 'r-20-test-check',
-        verdict: { result: 'failed', exit: 1 },
+describe("a step's check read on the board: its command, and once it refused its exit and each stream's last lines, `unfinished` when it was ended, and an answer still where its output cannot be read", () => {
+  const s = story(test);
+  s.test("a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines", async () => {
+    const run = (await objectOf(app, 'r-20')).status;
+    const checkOf = (name: string) => run.steps.find((s) => s.name === name)?.check;
+    assert.deepEqual(checkOf('build'), {
+      command: 'npm run build',
+      taskId: 'r-20-build-check',
+      verdict: { result: 'passed', exit: 0 },
+      refused: null,
+    });
+    assert.deepEqual(checkOf('lint'), {
+      command: 'npm run lint',
+      taskId: 'r-20-lint-check',
+      verdict: { result: 'running', exit: null },
+      refused: null,
+    });
+    assert.deepEqual(checkOf('test'), {
+      command: 'npm test',
+      taskId: 'r-20-test-check',
+      verdict: { result: 'failed', exit: 1 },
+      refused: {
+        exit: 'exit 1',
+        stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1'], truncated: false },
+        stderr: { lines: ['npm error Test failed.'], truncated: false },
+        unreadable: null,
+      },
+    });
+    assert.deepEqual(
+      checkOf('e2e'),
+      {
+        command: 'npm run e2e',
+        taskId: 'r-20-e2e-check',
+        verdict: { result: 'unfinished', exit: null },
         refused: {
-          exit: 'exit 1',
-          stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1'], truncated: false },
-          stderr: { lines: ['npm error Test failed.'], truncated: false },
+          exit: 'unfinished',
+          stdout: { lines: ['(no output yet)'], truncated: false },
+          stderr: { lines: [], truncated: false },
           unreadable: null,
         },
-      });
-      assert.deepEqual(
-        checkOf('e2e'),
-        {
-          command: 'npm run e2e',
-          taskId: 'r-20-e2e-check',
-          verdict: { result: 'unfinished', exit: null },
-          refused: {
-            exit: 'unfinished',
-            stdout: { lines: ['(no output yet)'], truncated: false },
-            stderr: { lines: [], truncated: false },
-            unreadable: null,
-          },
-        },
-        'stopped before it printed: no number, no stderr file, and, as for any check that kept no stdout, its log: the word of its harness, read by the id its end was recorded under with no observe, that its session printed nothing',
-      );
-      for (const name of ['docs', 'notes', 'plan', 'ship'])
-        assert.equal(checkOf(name), null, `${name}: no check: in the workflow the run froze`);
-    },
-  );
-  await s.test(
+      },
+      'stopped before it printed: no number, no stderr file, and, as for any check that kept no stdout, its log: the word of its harness, read by the id its end was recorded under with no observe, that its session printed nothing',
+    );
+    for (const name of ['docs', 'notes', 'plan', 'ship'])
+      assert.equal(checkOf(name), null, `${name}: no check: in the workflow the run froze`);
+  });
+  s.test(
     'a check its deadline or an operator ended reads `unfinished` whatever code it recorded, and one its harness ended reads its exit',
     async () => {
       const cases = [
@@ -2016,7 +2010,7 @@ test("a step's check read on the board: its command, and once it refused its exi
       });
     },
   );
-  await s.test("an earlier try's check its deadline ended reads `unfinished` whatever code it recorded", async () => {
+  s.test("an earlier try's check its deadline ended reads `unfinished` whatever code it recorded", async () => {
     settledTask('r-73-implement', done);
     checkTask('r-73-implement-check', { settled: 'failed', exitCode: 1, reason: 'deadline' });
     settledTask('r-73-implement-try2', done);
@@ -2040,7 +2034,7 @@ test("a step's check read on the board: its command, and once it refused its exi
     assert.deepEqual([first?.verdict, first?.refused?.exit], [{ result: 'unfinished', exit: null }, 'unfinished']);
     assert.deepEqual(tries[1].check?.verdict, { result: 'passed', exit: 0 });
   });
-  await s.test('a refused check that kept no stdout is read off its log, as `nemia decide` reads it', async () => {
+  s.test('a refused check that kept no stdout is read off its log, as `nemia decide` reads it', async () => {
     settledTask('t-74-e2e', done);
     checkTask('r-74-e2e-check', { settled: 'stopped' });
     detachedSession('check', 'r-74-e2e-check', 1, 'starting the browser\n', 1);
@@ -2055,7 +2049,7 @@ test("a step's check read on the board: its command, and once it refused its exi
     const [e2e] = (await objectOf(app, 'r-74')).status.steps;
     assert.deepEqual(e2e.check?.refused?.stdout, { lines: ['starting the browser'], truncated: false });
   });
-  await s.test('a refused check whose output cannot be read still answers, and says how to read it from the command line', async () => {
+  s.test('a refused check whose output cannot be read still answers, and says how to read it from the command line', async () => {
     settledTask('t-22-test', done);
     checkTask('r-22-test-check', { settled: 'failed', exitCode: 2 });
     detachedSession('check', 'r-22-test-check', 1, { unreadable: true }, 2);
@@ -2084,7 +2078,7 @@ test("a step's check read on the board: its command, and once it refused its exi
     assert.match(refused.unreadable, /Could not read the output of its check \(task r-22-test-check\)/);
     assert.match(refused.unreadable, /`nemia decide r-22`/);
   });
-  await s.test(
+  s.test(
     'a refused check whose stderr the engine cannot give still answers with its stdout, and says how to read it from the command line',
     async () => {
       settledTask('t-71-test', done);
@@ -2121,9 +2115,9 @@ test("a step's check read on the board: its command, and once it refused its exi
 
 const gone = path.join(NOWHERE, 'no-such-workflow');
 
-test("a step's tries and its closeout: every try of a looped step off one observation, each declared field's schema as the run froze it, and a statement that could not be read as it came", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a step's tries and its closeout: every try of a looped step off one observation, each declared field's schema as the run froze it, and a statement that could not be read as it came", () => {
+  const s = story(test);
+  s.test(
     'a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — off one observation',
     async () => {
       const findings = [
@@ -2337,7 +2331,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
       assert.equal(review.message, 'unverified · done');
     },
   );
-  await s.test(
+  s.test(
     "a closeout carries each declared field's schema off the workflow the run froze — given or missing — and never the statement as it was recorded",
     async () => {
       const schema = {
@@ -2380,7 +2374,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
       assert.equal(closeout.raw, null, 'and never the statement as said, which may be any length (`closeoutNarrowed`)');
     },
   );
-  await s.test(
+  s.test(
     'a statement that could not be read reaches the board as it came, with why — and a readable one has nothing unreadable',
     async () => {
       const cut = '{"outcome": "done", "summary": "Cut off';
@@ -2418,9 +2412,9 @@ test("a step's tries and its closeout: every try of a looped step off one observ
   );
 });
 
-test("what a step runs with: the workflow's effort, context and tools, the mode its harness gives its session, and the model a person's retry asked for, on that try alone", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("what a step runs with: the workflow's effort, context and tools, the mode its harness gives its session, and the model a person's retry asked for, on that try alone", () => {
+  const s = story(test);
+  s.test(
     "a step says what it runs with: the workflow's effort, context window and tools, and what the engine filed its try with where the workflow says nothing",
     async () => {
       await Effect.runPromise(
@@ -2492,7 +2486,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
       assert.equal((await objectOf(app, 'r-4')).status.steps[0].filed, null, 'nor for a task the engine has no record of');
     },
   );
-  await s.test(
+  s.test(
     "a step says the mode its session ran in, as its attempt recorded it — the mode filed, the harness's choice where none was, or another its harness put it in — and none before a session said one",
     async () => {
       const cases: Array<
@@ -2526,7 +2520,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
       }
     },
   );
-  await s.test(
+  s.test(
     "a model a person's `nemia retry --model` asked for is on the try it was asked for, past a recheck — and on no other",
     async () => {
       await Effect.runPromise(
@@ -2621,9 +2615,9 @@ function seedFiles() {
   return { dir, named };
 }
 
-test("a step's files: a closeout's files with where they are served, each served by its path with its type and refused as a path out, and read pruned once `nemia prune --artifacts` removed them", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a step's files: a closeout's files with where they are served, each served by its path with its type and refused as a path out, and read pruned once `nemia prune --artifacts` removed them", () => {
+  const s = story(test);
+  s.test(
     "a closeout's files under the step's files directory, at its top or in a folder beneath it, carry where the api serves them, their kind and size — any other path is the path alone",
     async () => {
       const { dir, named } = seedFiles();
@@ -2662,7 +2656,7 @@ test("a step's files: a closeout's files with where they are served, each served
       assert.deepEqual((await triesOf(app, 'r-52', 'shoot'))[0].closeout?.artifacts, shoot.closeout.artifacts);
     },
   );
-  await s.test(
+  s.test(
     "a step's file is served by its path under the directory, with its type and no caching — and a path that climbs out, is absolute, passes a link or is not there is refused",
     async () => {
       const { dir } = seedFiles();
@@ -2729,7 +2723,7 @@ test("a step's files: a closeout's files with where they are served, each served
       assert.equal((await app.request('/api/runs/r-52/steps/deploy/artifacts/shot.png')).status, 404, 'no such step');
     },
   );
-  await s.test(
+  s.test(
     "once `nemia prune --artifacts` removed a run's files, each file a closeout named there reads pruned, the route answers 410 saying so — not a 404 that reads as missing — and the run's page and its decision still answer",
     async () => {
       const { dir, named } = seedFiles();
@@ -2817,9 +2811,9 @@ const ranTask = (
       : []),
   ]);
 
-test("where a run's time and tokens went, on its list line and its page, and the calls its attempts were denied", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("where a run's time and tokens went, on its list line and its page, and the calls its attempts were denied", () => {
+  const s = story(test);
+  s.test(
     "the detail carries where each step's time went — per try and per check, filed when each task's view says — and the run's, in the package's words",
     async () => {
       const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
@@ -2957,7 +2951,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       );
     },
   );
-  await s.test(
+  s.test(
     "a run's list line and its page say what it took — its time at work and its sessions' tokens — as the package has them off the same views",
     async () => {
       const T = (m: number) => new Date(Date.UTC(2026, 8, 14, 9, m)).toISOString();
@@ -3013,7 +3007,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       );
     },
   );
-  await s.test(
+  s.test(
     "a step whose attempts were denied calls says which, on the list and on the run's page, beside a status that is unchanged",
     async () => {
       journal('t-denied', [

@@ -5,33 +5,45 @@
  * `src/waits/waits.ts` is the one copy: a test of a layer above takes it from `agent-runtime/testing`, and the board and the
  * documentation site, which import no package, each keep a copy this file holds to it byte for byte, since a test of theirs builds no
  * path into a package's `src`. A wait asks at
- * once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
+ * once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested Vitest of
  * `test/fixtures/waits/never.ts`, since a test's timeout is reported only outside it. `DEADLINES` counts, file by file, each `now()` of
  * `Date` or `performance` a number is added to, or a start taken from and held under a bound, in the package's tests: each left is a
  * mocked clock, a timestamp, a reaper's bound, a synchronous hold or an assertion, never a wait, and a count only shrinks
  * (`deadlineBreaks`). A change that takes one out lowers its count in the same commit.
  */
-import { test, type TestContext } from 'node:test';
+import { test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
+import { runnerless, vitestOver } from 'test-kit/probe';
+import { scratch } from 'test-kit/scratch';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
 const ROOT = path.join(PACKAGE, '..', '..');
 
 /**
- * A test's signal and diagnostics, as `until` reads them, with what it said kept and its abort in the test's hands: aborted once the test
- * `of` ends, so a wait it left pending holds no process open.
+ * A test's signal, as `until` reads it, and what it said on the test's log (`console.error`, spied), with what it said kept and its abort
+ * in the test's hands: aborted once the test `of` ends, so a wait it left pending holds no process open.
  */
 const waiter = (of: TestContext) => {
-  const said: string[] = [];
   const control = new AbortController();
-  const t: Waiter = { signal: control.signal, diagnostic: (message: string) => void said.push(message) };
-  of.after(() => control.abort());
-  return { t, said, abort: () => control.abort() };
+  const t: Waiter = { signal: control.signal };
+  const logged = vi.isMockFunction(console.error) ? console.error : vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const from = vi.mocked(logged).mock.calls.length;
+  of.onTestFinished(() => control.abort());
+  return {
+    t,
+    get said(): string[] {
+      return vi
+        .mocked(logged)
+        .mock.calls.slice(from)
+        .map((call: unknown[]) => String(call[0]));
+    },
+    abort: () => control.abort(),
+  };
 };
 
 /** A turn of the event loop, so a timer due at once has fired. */
@@ -158,27 +170,28 @@ test('REFUSED: a wait that says what it waits for by a function says it as it st
   assert.equal(still.message, 'never came: (the wait could not say what: the journal does not read)', 'it fails all the same');
 });
 
+/** Runs `fixture` of `fixtures/waits/` in a Vitest of its own, bounded by `timeout`: its status and what it printed. */
+const ranAlone = (fixture: string) => {
+  const over = vitestOver(scratch('ae-waits-config-'), PACKAGE, [path.join('test', 'fixtures', 'waits', fixture)]);
+  const ran = spawnSync('timeout', ['-k', '5', '120', process.execPath, ...over], {
+    cwd: PACKAGE,
+    env: runnerless(process.env),
+    encoding: 'utf8',
+  });
+  return { status: ran.status, out: `${ran.stdout}${ran.stderr}` };
+};
+
 test('REFUSED: a wait that never comes fails its test at the timeout, and the runner says what never came', () => {
-  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
-  const ran = spawnSync(
-    'timeout',
-    ['-k', '5', '120', process.execPath, '--test', '--test-reporter=tap', path.join('test', 'fixtures', 'waits', 'never.ts')],
-    { cwd: PACKAGE, env, encoding: 'utf8' },
-  );
-  assert.equal(ran.status, 1, ran.stdout + ran.stderr);
-  assert.match(ran.stdout, /error: 'test timed out after 50ms'/, ran.stdout);
-  assert.match(ran.stdout, /^# never came: the bell that never rings$/m, ran.stdout);
+  const { status, out } = ranAlone('never.ts');
+  assert.equal(status, 1, out);
+  assert.match(out, /Test timed out in 50ms/, out);
+  assert.match(out, /^never came: the bell that never rings$/m, out);
 });
 
 test('REFUSED: a wait that cannot read its test fails at once, and its process ends on its own, holding no timer open', () => {
-  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
-  const ran = spawnSync(
-    'timeout',
-    ['-k', '5', '120', process.execPath, '--test', '--test-reporter=tap', path.join('test', 'fixtures', 'waits', 'unread.ts')],
-    { cwd: PACKAGE, env, encoding: 'utf8' },
-  );
-  assert.equal(ran.status, 0, `ended by itself, not by \`timeout\` (124): ${ran.stdout}${ran.stderr}`);
-  assert.match(ran.stdout, /^# pass 1$/m, ran.stdout);
+  const { status, out } = ranAlone('unread.ts');
+  assert.equal(status, 0, `ended by itself, not by \`timeout\` (124): ${out}`);
+  assert.match(out, /Tests\s+1 passed \(1\)/, out);
 });
 
 test("the copies of the helper outside the packages are this package's, byte for byte", () => {
@@ -197,36 +210,35 @@ test("the copies of the helper outside the packages are this package's, byte for
   );
 });
 
-/** The default timeout a `test` script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
-const defaultTimeout = (script: string): number | null => {
-  const word = script.split(/\s+/).find((w) => /^--test-timeout=[1-9]\d*$/.test(w));
-  return word ? Number(word.slice('--test-timeout='.length)) : null;
+/** The default timeout a package's `vitest.config.ts` gives every test (`testTimeout: <ms>`), or null for none. */
+const defaultTimeout = (config: string): number | null => {
+  const m = /^\s*testTimeout:\s*([1-9][\d_]*),/m.exec(config);
+  return m ? Number(m[1].replaceAll('_', '')) : null;
 };
 
 /**
- * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a `test` script whose default
- * timeout is not `WAITED`'s, since node's is none.
+ * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a Vitest config whose default
+ * timeout is not `WAITED`'s, since Vitest's is 5 s.
  *
- * @param script the package's `test` script
+ * @param config the text of the package's `vitest.config.ts`
  * @returns one line per break, empty when every test is bounded at `WAITED`'s timeout
  */
-const timeoutBreaks = (script: string): string[] =>
-  defaultTimeout(script) === WAITED.timeout
+const timeoutBreaks = (config: string): string[] =>
+  defaultTimeout(config) === WAITED.timeout
     ? []
-    : [`the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
+    : [`the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
 
-test("the package's test script bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
-  const { scripts } = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } };
-  assert.deepEqual(timeoutBreaks(scripts.test), []);
+test("the package's Vitest config bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
+  assert.deepEqual(timeoutBreaks(fs.readFileSync(path.join(PACKAGE, 'vitest.config.ts'), 'utf8')), []);
 });
 
-test("REFUSED: a test script with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
+test("REFUSED: a Vitest config with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
   const refused = [
-    `the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
+    `the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
   ];
-  assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 'test/*.test.ts'"), refused, 'none');
-  assert.deepEqual(timeoutBreaks("node --test --test-concurrency=2 --test-timeout=600000 'test/*.test.ts'"), refused, 'a longer one');
-  assert.deepEqual(timeoutBreaks(`node --test --test-concurrency=2 --test-timeout=${WAITED.timeout} 'test/*.test.ts'`), [], 'its own');
+  assert.deepEqual(timeoutBreaks('export default { test: { maxWorkers: 2 } };'), refused, 'none');
+  assert.deepEqual(timeoutBreaks('test: {\n    testTimeout: 600_000,\n  }'), refused, 'a longer one');
+  assert.deepEqual(timeoutBreaks(`test: {\n    testTimeout: ${WAITED.timeout},\n  }`), [], 'its own');
 });
 
 /** What a count is held to: how many a file has, and why each is no wait. */

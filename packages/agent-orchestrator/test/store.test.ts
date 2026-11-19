@@ -9,7 +9,7 @@
  * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a
  * pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -214,9 +214,9 @@ const aRepo = (): string => {
   return repo;
 };
 
-test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async (t) => {
+test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async () => {
   let draws = 0;
-  t.mock.method(Math, 'random', () => (draws++ === 0 ? 0.5 : draws / 97));
+  vi.spyOn(Math, 'random').mockImplementation(() => (draws++ === 0 ? 0.5 : draws / 97));
   const first = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   draws = 0;
   const second = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
@@ -864,13 +864,13 @@ test('a step whose harness blocked its session says what the harness waits for �
   assert.doesNotMatch(await decided(), /answer it in Claude Code/, 'no word, no line');
 });
 
-test("REFUSED by the engine: a try's stop of a session that settled since the pass read it is said, and the pass goes on — it files nothing, and the pass after it, reading it settled, files the try", async (t) => {
+test("REFUSED by the engine: a try's stop of a session that settled since the pass read it is said, and the pass goes on — it files nothing, and the pass after it, reading it settled, files the try", async () => {
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
-  t.mock.method(console, 'log', () => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   await onHandler(['retry', run.id, 'implement'], b.e, undefined, stand().place, ENV);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
@@ -897,7 +897,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
 
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 
-test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone — and a pass that reaches a run's asks as they are removed does not make their directory again; a record gone between the store's listing and its read is no run, and no failure", async (t) => {
+test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone — and a pass that reaches a run's asks as they are removed does not make their directory again; a record gone between the store's listing and its read is no run, and no failure", async () => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'done.txt' });
@@ -935,12 +935,12 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
     JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
   );
   const mkdir = fs.mkdirSync;
-  t.mock.method(fs, 'mkdirSync', (at: string, ...rest: unknown[]) => {
+  vi.spyOn(fs, 'mkdirSync').mockImplementation(((at: string, ...rest: unknown[]) => {
     if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
     return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
-  });
+  }) as never);
   await runWith(b.e, advanceRun(runRecord(ROOT, q.run.id)));
-  (fs.mkdirSync as unknown as { mock: { restore: () => void } }).mock.restore();
+  vi.mocked(fs.mkdirSync).mockRestore();
   assert.ok(
     !fs.existsSync(asks),
     'a spent ask the pass moves into `done/` as `nemia rm` removes the directory: no asks directory made again',

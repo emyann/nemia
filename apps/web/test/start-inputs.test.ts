@@ -3,7 +3,7 @@
  * function `contracts/start-inputs.contract.ts` proves (`inputAddedOf`), so the last of a drop under one name wins, where the one it
  * replaces stood. What one file added does is the contract's, proved; this holds a drop of several, which no law reads.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { inputAddedOf, inputsAdded } from '../src/lib/startInputs.ts';
 

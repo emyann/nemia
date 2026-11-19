@@ -25,7 +25,7 @@
  * import of the api; `packages/agent-orchestrator/test/contract.test.ts` holds the CLI entries' resolve across the repository. A
  * comment is no code: the store and feed rules read code alone, and a JSDoc may name what the code does not.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -8,7 +8,7 @@
  * is run whole as the run runs a check (`checkArgv`), from the rendered carried folder as the run's frozen carried files, with the pull
  * request's world stood up (`test/origin.ts`), so the clause is proven wired and not only written.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

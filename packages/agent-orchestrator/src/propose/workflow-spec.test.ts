@@ -1,5 +1,5 @@
 /** `workflowSpecOf`: a workflow folder's text files read as the spec a Workflow carries. */
-import { test } from 'node:test';
+import { afterAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { workflowSpecOf } from './workflow-spec.ts';
 import { Schema } from 'effect';
@@ -47,7 +47,9 @@ test('markdown in capitals is markdown: a README.MD is the README, and no .MD is
   assert.deepEqual(spec.files, []);
 });
 
-test("a key the loader reads as text though it holds a map is carried as readKeys' JSON text, flow or block, and written back loads as it was", async (t) => {
+describe("a key the loader reads as text though it holds a map is carried as readKeys' JSON text, flow or block, and written back loads as it was", () => {
+  let routed!: { name: string; keys: Record<string, unknown>; body: string };
+  let routedBack!: string;
   const policy = { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [78] } }] };
   const rows: [string, string][] = [
     ['a flow map', 'checkFailurePolicy: { rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }\n'],
@@ -57,7 +59,7 @@ test("a key the loader reads as text though it holds a map is carried as readKey
     ],
   ];
   for (const [form, lines] of rows)
-    await t.test(form, () => {
+    test(form, () => {
       const text = `---\nplace: git\ncheck: npm test\nretries: 2\n${lines}---\nDo it.\n`;
       const [step] = workflowSpecOf([{ name: 'implement.md', text }]).steps;
       const read = readKeys('implement', splitFrontmatter('implement', text).block ?? '', () => undefined, MAP_KEYS).meta;
@@ -66,10 +68,12 @@ test("a key the loader reads as text though it holds a map is carried as readKey
       const written = renderStep({ name: 'implement', body: step?.body ?? '', ...step?.keys } as never);
       assert.deepEqual(parseWorkflow('implement', written).checkFailurePolicy, policy);
     });
-  const [routed] = workflowSpecOf([{ name: 'gate.md', text: '---\nroute:\n  script: route.ts\n---\nRoute.\n' }]).steps;
-  assert.equal(routed?.keys.route, JSON.stringify({ script: 'route.ts' }), '`route:` as a map is text too');
-  const routedBack = renderStep({ name: 'gate', body: routed?.body ?? '', ...routed?.keys, routes: ['a', 'b'] } as never);
-  assert.match(routedBack, /^route:\n {2}script: route\.ts$/m, 'and written back, a map again');
+  afterAll(() => {
+    [routed] = workflowSpecOf([{ name: 'gate.md', text: '---\nroute:\n  script: route.ts\n---\nRoute.\n' }]).steps;
+    assert.equal(routed?.keys.route, JSON.stringify({ script: 'route.ts' }), '`route:` as a map is text too');
+    routedBack = renderStep({ name: 'gate', body: routed?.body ?? '', ...routed?.keys, routes: ['a', 'b'] } as never);
+    assert.match(routedBack, /^route:\n {2}script: route\.ts$/m, 'and written back, a map again');
+  });
 });
 
 test("a harness's block is read into its fence keys as the parser reads it, written back as the block, and a key no step has stays to be refused", () => {

@@ -3,7 +3,7 @@
  * distance date-fns's `formatDistance` would write are refused, and so is a time wider than its cell's room. `npm run e2e` reads the
  * page itself (`runs`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { AGO, agosRefused, type DrawnAgo } from './e2e/runs-times.ts';
 

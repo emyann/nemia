@@ -13,7 +13,7 @@
  * A file moved whole renames its ceiling block in the same commit, its numbers unchanged; no number is ever raised: a change that meets
  * a limit cuts the function.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

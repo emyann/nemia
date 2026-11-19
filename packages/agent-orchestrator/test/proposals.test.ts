@@ -7,7 +7,7 @@
  * past the delegation, a Factory read before its rules, its instruction or its status moved, and the Proposal door's own refusals. Kinds
  * and `_tag`s are asserted, never a sentence. The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -142,13 +142,19 @@ async function ruleConfirmed(agent: string, rule: Omit<Rule, 'answer' | 'id'>): 
   await run(POLICY_CONFIRM.handler({ name: agent, id: full.id, words: ruleWords(full) }));
 }
 
-test('the proposal story: an agent proposes, the person approves, it is applied as a new revision, and undone by proposing it back', async (t) => {
-  const tree = factory('story');
-  const was = planIn(tree);
-  const proposed = await run(
-    proposeProgram(agentOf('implementer', 'story'), 'story', { objects: [await devChanged('story', 'Plan it twice.\n')] }, PLACE),
-  );
-  await t.test('proposed: waiting, named by its proposer, proposed by the caller, its change an update of workflows/dev', () => {
+describe('the proposal story: an agent proposes, the person approves, it is applied as a new revision, and undone by proposing it back', () => {
+  let tree!: string;
+  let was!: string;
+  let proposed!: Effect.Success<ReturnType<typeof proposeProgram>>;
+  let applied!: Effect.Success<ReturnType<typeof approveProgram>>;
+  beforeAll(async () => {
+    tree = factory('story');
+    was = planIn(tree);
+    proposed = await run(
+      proposeProgram(agentOf('implementer', 'story'), 'story', { objects: [await devChanged('story', 'Plan it twice.\n')] }, PLACE),
+    );
+  });
+  test('proposed: waiting, named by its proposer, proposed by the caller, its change an update of workflows/dev', () => {
     assert.equal(proposed.status.phase, 'waiting');
     assert.match(proposed.metadata.name, /^implementer-[a-z0-9]{5}$/);
     assert.deepEqual(proposed.status.proposedBy, { agent: 'implementer' });
@@ -158,20 +164,17 @@ test('the proposal story: an agent proposes, the person approves, it is applied 
     );
     assert.equal(planIn(tree), was, 'nothing is written while it waits');
   });
-  const applied = await run(approveProgram(PERSON, 'story', proposed.metadata.name, PLACE));
-  await t.test(
-    'approved by the person: applied at once, the tree written, a revision named, and what the workflow held before kept',
-    () => {
-      assert.equal(applied.status.phase, 'applied', applied.status.message);
-      assert.equal(applied.status.approvedBy?.by, 'person');
-      assert.match(planIn(tree), /Plan it twice\./);
-      assert.equal(applied.status.revisions?.length, 1);
-      assert.match(applied.status.revisions?.[0] ?? '', /^workflows\/dev#\d+$/);
-      const before = applied.status.before?.[0]?.spec as { steps: { name: string; body: string }[] };
-      assert.equal(before.steps.find((s) => s.name === 'plan')?.body.trim(), 'Plan the change.');
-    },
-  );
-  await t.test('undone: a new proposal of the workflow as it stood, approved and applied, the tree back as it was', async () => {
+  test('approved by the person: applied at once, the tree written, a revision named, and what the workflow held before kept', async () => {
+    applied = await run(approveProgram(PERSON, 'story', proposed.metadata.name, PLACE));
+    assert.equal(applied.status.phase, 'applied', applied.status.message);
+    assert.equal(applied.status.approvedBy?.by, 'person');
+    assert.match(planIn(tree), /Plan it twice\./);
+    assert.equal(applied.status.revisions?.length, 1);
+    assert.match(applied.status.revisions?.[0] ?? '', /^workflows\/dev#\d+$/);
+    const before = applied.status.before?.[0]?.spec as { steps: { name: string; body: string }[] };
+    assert.equal(before.steps.find((s) => s.name === 'plan')?.body.trim(), 'Plan the change.');
+  });
+  test('undone: a new proposal of the workflow as it stood, approved and applied, the tree back as it was', async () => {
     const undo = await run(undoProgram(PERSON, 'story', applied.metadata.name, PLACE));
     assert.equal(undo.status.phase, 'waiting');
     assert.notEqual(undo.metadata.name, applied.metadata.name);
@@ -179,7 +182,7 @@ test('the proposal story: an agent proposes, the person approves, it is applied 
     assert.equal(back.status.phase, 'applied');
     assert.equal(planIn(tree), was);
   });
-  await t.test('REFUSED: an undo of what was not applied (Conflict), a decline of what is applied (Conflict)', async () => {
+  test('REFUSED: an undo of what was not applied (Conflict), a decline of what is applied (Conflict)', async () => {
     const waiting = await run(proposeProgram(PERSON, 'story', { objects: [await devChanged('story', 'Again.\n')] }, PLACE));
     assert.equal((await refusalOf(undoProgram(PERSON, 'story', waiting.metadata.name, PLACE)))._tag, 'Conflict');
     assert.equal((await refusalOf(declineProgram(PERSON, 'story', applied.metadata.name)))._tag, 'Conflict');
@@ -219,23 +222,34 @@ async function devFiles(factoryName: string, files: { path: string; text: string
   };
 }
 
-test("a Workflow proposal carries its folder's scripts: applied whole, undone back, and stale once a script moved after the read", async (t) => {
-  const tree = factory('scripts');
-  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
-  fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'check.ts'), 'process.exit(0);\n');
-  fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'old.ts'), 'export {};\n');
-  fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'logo.png'), picture);
-  const proposed = await run(
-    proposeProgram(PERSON, 'scripts', { objects: [await devFiles('scripts', [{ path: 'check.ts', text: 'process.exit(1);\n' }])] }, PLACE),
-  );
-  const applied = await run(approveProgram(PERSON, 'scripts', proposed.metadata.name, PLACE));
-  await t.test("applied: the tree's script holds the proposal's text, one the spec leaves out is gone, a picture is left", () => {
+describe("a Workflow proposal carries its folder's scripts: applied whole, undone back, and stale once a script moved after the read", () => {
+  let tree!: string;
+  let picture!: Uint8Array<ArrayBuffer>;
+  let proposed!: Effect.Success<ReturnType<typeof proposeProgram>>;
+  let applied!: Effect.Success<ReturnType<typeof approveProgram>>;
+  beforeAll(async () => {
+    tree = factory('scripts');
+    picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+    fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'check.ts'), 'process.exit(0);\n');
+    fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'old.ts'), 'export {};\n');
+    fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'logo.png'), picture);
+    proposed = await run(
+      proposeProgram(
+        PERSON,
+        'scripts',
+        { objects: [await devFiles('scripts', [{ path: 'check.ts', text: 'process.exit(1);\n' }])] },
+        PLACE,
+      ),
+    );
+    applied = await run(approveProgram(PERSON, 'scripts', proposed.metadata.name, PLACE));
+  });
+  test("applied: the tree's script holds the proposal's text, one the spec leaves out is gone, a picture is left", () => {
     assert.equal(applied.status.phase, 'applied', applied.status.message);
     assert.equal(devFile(tree, 'check.ts'), 'process.exit(1);\n');
     assert.equal(devFile(tree, 'old.ts'), undefined);
     assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(tree, 'workflows', 'dev', 'logo.png'))), picture);
   });
-  await t.test('before holds the old files, and the undo puts them back', async () => {
+  test('before holds the old files, and the undo puts them back', async () => {
     const before = applied.status.before?.[0]?.spec as { files?: { path: string; text: string }[] };
     assert.deepEqual(before.files, [
       { path: 'check.ts', text: 'process.exit(0);\n' },
@@ -247,18 +261,15 @@ test("a Workflow proposal carries its folder's scripts: applied whole, undone ba
     assert.equal(devFile(tree, 'check.ts'), 'process.exit(0);\n');
     assert.equal(devFile(tree, 'old.ts'), 'export {};\n');
   });
-  await t.test(
-    'REFUSED stale: a script edited after the read leaves the proposal stale at approval, and is refused Conflict at propose',
-    async () => {
-      const read = await devFiles('scripts', [{ path: 'check.ts', text: 'process.exit(2);\n' }]);
-      const waiting = await run(proposeProgram(PERSON, 'scripts', { objects: [read] }, PLACE));
-      fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'check.ts'), 'process.exit(3);\n');
-      const after = await run(approveProgram(PERSON, 'scripts', waiting.metadata.name, PLACE));
-      assert.equal(after.status.phase, 'stale');
-      assert.equal(devFile(tree, 'check.ts'), 'process.exit(3);\n');
-      assert.equal((await refusalOf(proposeProgram(PERSON, 'scripts', { objects: [read] }, PLACE)))._tag, 'Conflict');
-    },
-  );
+  test('REFUSED stale: a script edited after the read leaves the proposal stale at approval, and is refused Conflict at propose', async () => {
+    const read = await devFiles('scripts', [{ path: 'check.ts', text: 'process.exit(2);\n' }]);
+    const waiting = await run(proposeProgram(PERSON, 'scripts', { objects: [read] }, PLACE));
+    fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'check.ts'), 'process.exit(3);\n');
+    const after = await run(approveProgram(PERSON, 'scripts', waiting.metadata.name, PLACE));
+    assert.equal(after.status.phase, 'stale');
+    assert.equal(devFile(tree, 'check.ts'), 'process.exit(3);\n');
+    assert.equal((await refusalOf(proposeProgram(PERSON, 'scripts', { objects: [read] }, PLACE)))._tag, 'Conflict');
+  });
 });
 
 /** A result schema strict enough for every harness: one field, required, nothing else. */
@@ -297,17 +308,25 @@ const tidyFile = (tree: string, file: string): string | undefined => {
   }
 };
 
-test("a Skill proposal carries its folder's other text files: read at any depth, applied whole, a picture left, and undone back", async (t) => {
-  const tree = factory('skilled');
-  const dir = path.join(tree, 'workflows', 'skills', 'tidy');
-  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
-  fs.mkdirSync(path.join(dir, 'notes'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: tidy\ndescription: Tidy a change.\n---\nTidy it.\n');
-  fs.writeFileSync(path.join(dir, 'notes', 'old.md'), 'Old.\n');
-  fs.writeFileSync(path.join(dir, 'run.sh'), 'echo one\n');
-  fs.writeFileSync(path.join(dir, 'logo.png'), picture);
-  const now = await run(currentOf(PLACE, 'skilled', 'Skill', 'tidy'));
-  await t.test('read: its other text files by their path, sorted, the picture not among them', () => {
+describe("a Skill proposal carries its folder's other text files: read at any depth, applied whole, a picture left, and undone back", () => {
+  let tree!: string;
+  let dir!: string;
+  let picture!: Uint8Array<ArrayBuffer>;
+  let now!: import('../src/propose/current.verb.ts').Current;
+  let object!: ProposedObject;
+  let applied!: Effect.Success<ReturnType<typeof approveProgram>>;
+  beforeAll(async () => {
+    tree = factory('skilled');
+    dir = path.join(tree, 'workflows', 'skills', 'tidy');
+    picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+    fs.mkdirSync(path.join(dir, 'notes'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: tidy\ndescription: Tidy a change.\n---\nTidy it.\n');
+    fs.writeFileSync(path.join(dir, 'notes', 'old.md'), 'Old.\n');
+    fs.writeFileSync(path.join(dir, 'run.sh'), 'echo one\n');
+    fs.writeFileSync(path.join(dir, 'logo.png'), picture);
+    now = await run(currentOf(PLACE, 'skilled', 'Skill', 'tidy'));
+  });
+  test('read: its other text files by their path, sorted, the picture not among them', () => {
     assert.deepEqual((now.spec as { files?: unknown }).files, [
       { path: 'notes/old.md', text: 'Old.\n' },
       { path: 'run.sh', text: 'echo one\n' },
@@ -317,22 +336,22 @@ test("a Skill proposal carries its folder's other text files: read at any depth,
     { path: 'ref/new.md', text: 'New.\n' },
     { path: 'run.sh', text: 'echo two\n' },
   ];
-  const object: ProposedObject = {
-    kind: 'Skill',
-    metadata: { name: 'tidy', resourceVersion: now.version ?? undefined },
-    spec: { ...(now.spec as object), files },
-  };
-  const applied = await run(
-    approveProgram(PERSON, 'skilled', (await run(proposeProgram(PERSON, 'skilled', { objects: [object] }, PLACE))).metadata.name, PLACE),
-  );
-  await t.test('applied: the given written, one left out gone, the picture as it was', () => {
+  test('applied: the given written, one left out gone, the picture as it was', async () => {
+    object = {
+      kind: 'Skill',
+      metadata: { name: 'tidy', resourceVersion: now.version ?? undefined },
+      spec: { ...(now.spec as object), files },
+    };
+    applied = await run(
+      approveProgram(PERSON, 'skilled', (await run(proposeProgram(PERSON, 'skilled', { objects: [object] }, PLACE))).metadata.name, PLACE),
+    );
     assert.equal(applied.status.phase, 'applied', applied.status.message);
     assert.equal(tidyFile(tree, 'ref/new.md'), 'New.\n');
     assert.equal(tidyFile(tree, 'run.sh'), 'echo two\n');
     assert.equal(tidyFile(tree, 'notes/old.md'), undefined);
     assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(dir, 'logo.png'))), picture);
   });
-  await t.test('undone: the files as they stood', async () => {
+  test('undone: the files as they stood', async () => {
     const undo = await run(undoProgram(PERSON, 'skilled', applied.metadata.name, PLACE));
     const back = await run(approveProgram(PERSON, 'skilled', undo.metadata.name, PLACE));
     assert.equal(back.status.phase, 'applied', back.status.message);
@@ -340,7 +359,7 @@ test("a Skill proposal carries its folder's other text files: read at any depth,
     assert.equal(tidyFile(tree, 'run.sh'), 'echo one\n');
     assert.equal(tidyFile(tree, 'ref/new.md'), undefined);
   });
-  await t.test('REFUSED at propose: a file at a path that climbs out of the skill, Invalid', async () => {
+  test('REFUSED at propose: a file at a path that climbs out of the skill, Invalid', async () => {
     const read = await run(currentOf(PLACE, 'skilled', 'Skill', 'tidy'));
     const out: ProposedObject = {
       kind: 'Skill',

@@ -3,7 +3,7 @@
  * kept, one missing every optional key read; who fills it and where each setting came from closed words; and the write body the Api
  * takes.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Hire, HireWrite } from 'objects';

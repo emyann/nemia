@@ -5,7 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -207,9 +207,9 @@ function countedStanding() {
   return { layer: PlaceService.layer(place), asks: () => asks };
 }
 
-test("a finished run's decision: what its branch touched, the lesson, the diffs cut per file, what each step consumed and the commands, off the tick's last pass of where the branches stand, and its total's peak against its own step's cap", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a finished run's decision: what its branch touched, the lesson, the diffs cut per file, what each step consumed and the commands, off the tick's last pass of where the branches stand, and its total's peak against its own step's cap", () => {
+  const s = story(test);
+  s.test(
     'a finished run, after a pass: what its result branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands',
     async () => {
       await aPass();
@@ -349,7 +349,7 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
       assert.equal(git(repo, 'rev-parse', 'main').trim(), base, 'the branch is still where it was, and main has not moved');
     },
   );
-  await s.test(
+  s.test(
     "a decidable run's decision asks the place nothing of where the branches stand: it reads the tick's last pass, as the board does",
     async () => {
       const served = countedStanding();
@@ -357,7 +357,7 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
       assert.equal(served.asks(), 0, 'standing.json is read, and the place is not asked');
     },
   );
-  await s.test("the run's total reads its peak against the cap of the step that reached it: two steps' caps are not one cap", async () => {
+  s.test("the run's total reads its peak against the cap of the step that reached it: two steps' caps are not one cap", async () => {
     const classes = (read: number, wrote: number, peak: number) => ({
       inputTokens: read + wrote,
       cacheReadTokens: read,
@@ -388,9 +388,9 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
   });
 });
 
-test("a run in flight is `running` and runs not one `git`: still running, and held by the cap on runs in flight as the environment's `WF_MAX_RUNS` says", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a run in flight is `running` and runs not one `git`: still running, and held by the cap on runs in flight as the environment's `WF_MAX_RUNS` says", () => {
+  const s = story(test);
+  s.test(
     'a run still running is `running` and nothing else, and not one `git` is run for it — nor where its result branch stands',
     async () => {
       journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
@@ -415,7 +415,7 @@ test("a run in flight is `running` and runs not one `git`: still running, and he
       assert.ok(gitCount() > before, "the count counts: a decidable run's decision is read out of git, through the same PATH");
     },
   );
-  await s.test(
+  s.test(
     "a run the cap on runs in flight holds is `running`, held at the count of runs in flight — by the `WF_MAX_RUNS` of the environment it is read over, never the process's — and not one `git` is run for it",
     async () => {
       journal('t-d13-implement', [filed('t-d13-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
@@ -434,215 +434,203 @@ test("a run in flight is `running` and runs not one `git`: still running, and he
   );
 });
 
-test('the commands a decision offers are bare `nemia` lines, by the state the run is in', async (t) => {
-  await t.test(
-    'a loop out of rounds offers both answers as commands, each the bare `nemia` line and not the sentence that carries it',
-    async () => {
-      const looping = [
-        { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-        {
-          name: 'review',
-          after: ['implement'],
-          body: 'Review it.',
-          harness: 'codex',
-          /** `implement ⇄ review`, two rounds: both spent, and review asks for a third. */
-          loop: 'implement',
-          rounds: 2,
-          output: {
-            file: 'review.json',
-            schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false },
-          },
+describe('the commands a decision offers are bare `nemia` lines, by the state the run is in', () => {
+  test('a loop out of rounds offers both answers as commands, each the bare `nemia` line and not the sentence that carries it', async () => {
+    const looping = [
+      { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+      {
+        name: 'review',
+        after: ['implement'],
+        body: 'Review it.',
+        harness: 'codex',
+        /** `implement ⇄ review`, two rounds: both spent, and review asks for a third. */
+        loop: 'implement',
+        rounds: 2,
+        output: {
+          file: 'review.json',
+          schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false },
         },
-      ];
-      settledTask('t-d9-implement-2', done);
-      settledTask('t-d9-review-2', { ...done, again: true });
-      const tries = (name: string) => [{ taskId: `t-d9-${name}-1`, cause: 'round' }];
-      writeRun({
-        id: 'r-d9',
-        repo,
-        baseRef: base,
-        workflow: looping,
-        steps: {
-          implement: { taskId: 't-d9-implement-2', branch, tries: tries('implement') },
-          review: { taskId: 't-d9-review-2', branch, tries: tries('review') },
-        },
-      });
+      },
+    ];
+    settledTask('t-d9-implement-2', done);
+    settledTask('t-d9-review-2', { ...done, again: true });
+    const tries = (name: string) => [{ taskId: `t-d9-${name}-1`, cause: 'round' }];
+    writeRun({
+      id: 'r-d9',
+      repo,
+      baseRef: base,
+      workflow: looping,
+      steps: {
+        implement: { taskId: 't-d9-implement-2', branch, tries: tries('implement') },
+        review: { taskId: 't-d9-review-2', branch, tries: tries('review') },
+      },
+    });
 
-      const body = await decidable('r-d9');
-      assert.deepEqual(
-        body.commands
-          .filter((c: { label: string }) => c.label !== 'land it' && c.label !== 'drop it')
-          .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
-        [
-          { label: 'once more', command: 'nemia retry r-d9 review --round', step: 'review' },
-          { label: 'approve', command: 'nemia approve r-d9 review --message "<why>"', step: 'review' },
-          { label: 'once more', command: 'nemia retry r-d9 implement', step: 'implement' },
-        ],
-        'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
-      );
-      assert.deepEqual(
-        body.commands.filter((c) => !/^(nemia|git -C) \S+( \S+)*$/.test(c.command) || /\n|\.$/.test(c.command)).map((c) => c.command),
-        [],
-        'every command is one line a person runs, never a sentence',
-      );
-      const accept = body.commands.find((c) => c.label === 'approve');
-      assert.ok(accept?.said, JSON.stringify(body.commands));
-      assert.match(accept.said, /^review: enough — .*:  nemia approve r-d9 review --message "<why>"$/);
-    },
-  );
-  await t.test(
-    'an ending whose check did not finish on the merge it staged is offered the bare `nemia retry <run> ship`, labelled once more, and never --recheck: the run aborted that merge',
-    async () => {
-      const { repo, base } = aRepo();
-      const branch = 'wf/r-d20/implement';
-      branchOff(repo, branch, () => write(repo, 'packages/x/src/sub.ts', 'export const sub = (a, b) => a - b;\n'));
-      const landing = [
-        { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-        {
-          name: 'ship',
-          after: ['implement'],
-          body: 'Ship it.',
-          harness: 'claude',
-          workspace: 'main',
-          gate: true,
-          check: 'npm test',
-          output: {
-            file: 'shipper.schema.json',
-            schema: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false },
-          },
+    const body = await decidable('r-d9');
+    assert.deepEqual(
+      body.commands
+        .filter((c: { label: string }) => c.label !== 'land it' && c.label !== 'drop it')
+        .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
+      [
+        { label: 'once more', command: 'nemia retry r-d9 review --round', step: 'review' },
+        { label: 'approve', command: 'nemia approve r-d9 review --message "<why>"', step: 'review' },
+        { label: 'once more', command: 'nemia retry r-d9 implement', step: 'implement' },
+      ],
+      'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
+    );
+    assert.deepEqual(
+      body.commands.filter((c) => !/^(nemia|git -C) \S+( \S+)*$/.test(c.command) || /\n|\.$/.test(c.command)).map((c) => c.command),
+      [],
+      'every command is one line a person runs, never a sentence',
+    );
+    const accept = body.commands.find((c) => c.label === 'approve');
+    assert.ok(accept?.said, JSON.stringify(body.commands));
+    assert.match(accept.said, /^review: enough — .*:  nemia approve r-d9 review --message "<why>"$/);
+  });
+  test('an ending whose check did not finish on the merge it staged is offered the bare `nemia retry <run> ship`, labelled once more, and never --recheck: the run aborted that merge', async () => {
+    const { repo, base } = aRepo();
+    const branch = 'wf/r-d20/implement';
+    branchOff(repo, branch, () => write(repo, 'packages/x/src/sub.ts', 'export const sub = (a, b) => a - b;\n'));
+    const landing = [
+      { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+      {
+        name: 'ship',
+        after: ['implement'],
+        body: 'Ship it.',
+        harness: 'claude',
+        workspace: 'main',
+        gate: true,
+        check: 'npm test',
+        output: {
+          file: 'shipper.schema.json',
+          schema: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false },
         },
-      ];
-      settledTask('t-d20-implement', done);
-      settledTask('t-d20-ship', { ...done, message: 'Add sub\n\nsub beside add.' });
-      journal('t-d20-ship-check', [
-        { kind: 'filed', at, brief: JSON.stringify({ check: 'npm test', env: {} }), cwd: repo, maxAttempts: 1, harness: 'check' },
-        { kind: 'starting', at, attempt: 1 },
-        { kind: 'spawned', at, attempt: 1 },
-        { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-d20-ship-check/1', observed: 'failed', reason: 'deadline' },
-        { kind: 'settled', at, outcome: 'failed' },
-      ]);
-      writeRun({
-        id: 'r-d20',
-        repo,
-        baseRef: base,
-        workflow: landing,
-        steps: {
-          implement: { taskId: 't-d20-implement', branch },
-          ship: {
-            taskId: 't-d20-ship',
-            workspace: repo,
-            branch: 'main',
-            check: { taskId: 't-d20-ship-check' },
-            /** Its check was killed at its deadline: no exit code, so no verdict on the merge, and the run aborted it (`landingDue`). */
-            landed: { aborted: 'its check did not finish' },
-          },
+      },
+    ];
+    settledTask('t-d20-implement', done);
+    settledTask('t-d20-ship', { ...done, message: 'Add sub\n\nsub beside add.' });
+    journal('t-d20-ship-check', [
+      { kind: 'filed', at, brief: JSON.stringify({ check: 'npm test', env: {} }), cwd: repo, maxAttempts: 1, harness: 'check' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-d20-ship-check/1', observed: 'failed', reason: 'deadline' },
+      { kind: 'settled', at, outcome: 'failed' },
+    ]);
+    writeRun({
+      id: 'r-d20',
+      repo,
+      baseRef: base,
+      workflow: landing,
+      steps: {
+        implement: { taskId: 't-d20-implement', branch },
+        ship: {
+          taskId: 't-d20-ship',
+          workspace: repo,
+          branch: 'main',
+          check: { taskId: 't-d20-ship-check' },
+          /** Its check was killed at its deadline: no exit code, so no verdict on the merge, and the run aborted it (`landingDue`). */
+          landed: { aborted: 'its check did not finish' },
         },
-      });
-      const asks = path.join(root, 'runs', 'r-d20.asks');
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+      },
+    });
+    const asks = path.join(root, 'runs', 'r-d20.asks');
+    fs.mkdirSync(asks, { recursive: true });
+    fs.writeFileSync(path.join(asks, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
 
-      const body = await decidable('r-d20');
-      const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
-      assert.deepEqual(
-        offered.map(({ command }: DecideCommand) => command),
-        ['nemia retry r-d20 ship'],
-        JSON.stringify(body.commands),
-      );
-      const [first] = offered;
-      assert.ok(first?.said, JSON.stringify(offered));
-      assert.match(first.said, /^ship: its check did not finish, .*:  nemia retry r-d20 ship$/);
-      assert.ok(!JSON.stringify(body).includes('--recheck'), 'a check the run aborted the merge of is never checked again on its own');
-    },
-  );
-  await t.test(
-    'a step `denials: fail` stopped is offered the bare `nemia retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `nemia decide` said — and reads `denied`, waited on by a person',
-    async () => {
-      const denying = [
-        { ...workflow[0], harness: 'claude', denials: 'fail' },
-        { ...workflow[1], harness: 'claude' },
-      ];
-      journal('t-d11-implement', [
-        { ...filed('t-d11-implement'), harness: 'claude' },
-        { kind: 'starting', at, attempt: 1 },
-        { kind: 'spawned', at, attempt: 1 },
-        {
-          kind: 'ended',
-          at,
-          attempt: 1,
-          sessionId: 'ae/t-d11-implement/1',
-          observed: 'done',
-          reason: 'harness',
-          closeout: done,
-          denials: [{ tool: 'Write', what: '/tmp/w/notes.md' }],
-        },
-        { kind: 'settled', at, outcome: 'succeeded' },
-      ]);
-      writeRun({
-        id: 'r-d11',
-        repo,
-        baseRef: base,
-        workflow: denying,
-        steps: { implement: { taskId: 't-d11-implement', branch }, review: { taskId: null } },
-      });
+    const body = await decidable('r-d20');
+    const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
+    assert.deepEqual(
+      offered.map(({ command }: DecideCommand) => command),
+      ['nemia retry r-d20 ship'],
+      JSON.stringify(body.commands),
+    );
+    const [first] = offered;
+    assert.ok(first?.said, JSON.stringify(offered));
+    assert.match(first.said, /^ship: its check did not finish, .*:  nemia retry r-d20 ship$/);
+    assert.ok(!JSON.stringify(body).includes('--recheck'), 'a check the run aborted the merge of is never checked again on its own');
+  });
+  test('a step `denials: fail` stopped is offered the bare `nemia retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `nemia decide` said — and reads `denied`, waited on by a person', async () => {
+    const denying = [
+      { ...workflow[0], harness: 'claude', denials: 'fail' },
+      { ...workflow[1], harness: 'claude' },
+    ];
+    journal('t-d11-implement', [
+      { ...filed('t-d11-implement'), harness: 'claude' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: 'ae/t-d11-implement/1',
+        observed: 'done',
+        reason: 'harness',
+        closeout: done,
+        denials: [{ tool: 'Write', what: '/tmp/w/notes.md' }],
+      },
+      { kind: 'settled', at, outcome: 'succeeded' },
+    ]);
+    writeRun({
+      id: 'r-d11',
+      repo,
+      baseRef: base,
+      workflow: denying,
+      steps: { implement: { taskId: 't-d11-implement', branch }, review: { taskId: null } },
+    });
 
-      const body = await decidable('r-d11');
-      const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
-      assert.deepEqual(
-        once.map(({ label, command }: DecideCommand) => ({ label, command })),
-        [{ label: 'once more', command: 'nemia retry r-d11 implement --fresh' }],
-      );
-      assert.ok(once[0]?.said, JSON.stringify(once));
-      assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allowedTools:/);
-    },
-  );
+    const body = await decidable('r-d11');
+    const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
+    assert.deepEqual(
+      once.map(({ label, command }: DecideCommand) => ({ label, command })),
+      [{ label: 'once more', command: 'nemia retry r-d11 implement --fresh' }],
+    );
+    assert.ok(once[0]?.said, JSON.stringify(once));
+    assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allowedTools:/);
+  });
 });
 
-test('a decision where the place cannot say: a branch it has not is an error on its entry, and a report not heard is what the run changed not known', async (t) => {
-  await t.test(
-    'a branch the place has not is an `error` on its entry — the lesson not known, its diff not known — and the request still answers',
-    async () => {
-      settledTask('t-d3-implement', blocked);
-      const gone = 'wf/r-d3/gone';
-      writeRun({
-        id: 'r-d3',
-        repo,
-        baseRef: base,
-        steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } },
-      });
+describe('a decision where the place cannot say: a branch it has not is an error on its entry, and a report not heard is what the run changed not known', () => {
+  test('a branch the place has not is an `error` on its entry — the lesson not known, its diff not known — and the request still answers', async () => {
+    settledTask('t-d3-implement', blocked);
+    const gone = 'wf/r-d3/gone';
+    writeRun({
+      id: 'r-d3',
+      repo,
+      baseRef: base,
+      steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } },
+    });
 
-      const body = await decidable('r-d3');
-      const unread = `what this run changed is not known: the place has no branch ${gone} in ${repo}`;
-      assert.deepEqual(body.touched, [{ branch: gone, radius: { error: unread } }], "implement's branch is read, though nobody made it");
-      assert.deepEqual(body.lesson, { said: `not known — ${gone} could not be read`, state: 'unknown' });
-      assert.deepEqual(body.sensitive, [{ branch: gone, files: [], error: unread }]);
-      assert.equal(body.commands.length, 1, 'no result branch to land or drop');
-      assert.deepEqual(
-        { ...body.commands[0], said: undefined },
-        { label: 'once more', command: 'nemia retry r-d3 implement', said: undefined, step: 'implement' },
-        'implement may be tried again, with the command `nemia decide` prints for it',
-      );
-      const [retried] = body.commands;
-      assert.ok(retried?.said, JSON.stringify(retried));
-      assert.match(retried.said, /^implement: .*:  nemia retry r-d3 implement {2}\(--fresh/);
+    const body = await decidable('r-d3');
+    const unread = `what this run changed is not known: the place has no branch ${gone} in ${repo}`;
+    assert.deepEqual(body.touched, [{ branch: gone, radius: { error: unread } }], "implement's branch is read, though nobody made it");
+    assert.deepEqual(body.lesson, { said: `not known — ${gone} could not be read`, state: 'unknown' });
+    assert.deepEqual(body.sensitive, [{ branch: gone, files: [], error: unread }]);
+    assert.equal(body.commands.length, 1, 'no result branch to land or drop');
+    assert.deepEqual(
+      { ...body.commands[0], said: undefined },
+      { label: 'once more', command: 'nemia retry r-d3 implement', said: undefined, step: 'implement' },
+      'implement may be tried again, with the command `nemia decide` prints for it',
+    );
+    const [retried] = body.commands;
+    assert.ok(retried?.said, JSON.stringify(retried));
+    assert.match(retried.said, /^implement: .*:  nemia retry r-d3 implement {2}\(--fresh/);
 
-      writeRun({
-        id: 'r-d3b',
-        repo: path.join(root, 'no-such-repo'),
-        baseRef: base,
-        steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } },
-      });
-      const nowhere = await decidable('r-d3b');
-      const refused = `what this run changed is not known: ${path.join(root, 'no-such-repo')} is not a directory, so nothing a branch in it changed can be read`;
-      assert.deepEqual(
-        nowhere.touched,
-        [{ branch: gone, radius: { error: refused } }],
-        'a repository that is not there at all: the place refuses',
-      );
-      assert.equal(nowhere.lesson.state, 'unknown');
-    },
-  );
-  await t.test('a place whose report is not heard says what the run changed is not known, never that it changed nothing', async () => {
+    writeRun({
+      id: 'r-d3b',
+      repo: path.join(root, 'no-such-repo'),
+      baseRef: base,
+      steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } },
+    });
+    const nowhere = await decidable('r-d3b');
+    const refused = `what this run changed is not known: ${path.join(root, 'no-such-repo')} is not a directory, so nothing a branch in it changed can be read`;
+    assert.deepEqual(
+      nowhere.touched,
+      [{ branch: gone, radius: { error: refused } }],
+      'a repository that is not there at all: the place refuses',
+    );
+    assert.equal(nowhere.lesson.state, 'unknown');
+  });
+  test('a place whose report is not heard says what the run changed is not known, never that it changed nothing', async () => {
     const before = process.env.PATH;
     process.env.PATH = scratch('wf-decision-no-git-');
     try {
@@ -660,44 +648,34 @@ test('a decision where the place cannot say: a branch it has not is an error on 
   });
 });
 
-test('a decision with nothing to try, nothing to decide, or no run: pruned, called off, unknown', async (t) => {
-  await t.test(
-    'REFUSED once pruned: a run whose worktrees `nemia prune` removed offers no try, since the verb refuses it, and its page says when it was pruned',
-    async () => {
-      writeRun({ id: 'r-d10', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch }, review: { taskId: null } } });
-      assert.deepEqual(
-        (await decidable('r-d10')).commands.map((c: DecideCommand) => c.command),
-        ['nemia retry r-d10 implement'],
-        'as r-d3: implement signed off blocked, and may be tried again while the run is not pruned',
-      );
-      const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
-      fs.writeFileSync(path.join(root, 'runs', 'r-d10.pruned'), JSON.stringify(pruned));
+describe('a decision with nothing to try, nothing to decide, or no run: pruned, called off, unknown', () => {
+  test('REFUSED once pruned: a run whose worktrees `nemia prune` removed offers no try, since the verb refuses it, and its page says when it was pruned', async () => {
+    writeRun({ id: 'r-d10', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch }, review: { taskId: null } } });
+    assert.deepEqual(
+      (await decidable('r-d10')).commands.map((c: DecideCommand) => c.command),
+      ['nemia retry r-d10 implement'],
+      'as r-d3: implement signed off blocked, and may be tried again while the run is not pruned',
+    );
+    const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
+    fs.writeFileSync(path.join(root, 'runs', 'r-d10.pruned'), JSON.stringify(pruned));
 
-      const body = await decidable('r-d10');
-      assert.deepEqual(body.commands, []);
-    },
-  );
-  await t.test(
-    "a run called off has nothing to decide: a 200 whose body carries `nothing` alone, and no git call — the verdict's own words are the orchestrator's, pinned there over a real repository",
-    async () => {
-      writeRun({
-        id: 'r-d4',
-        repo,
-        baseRef: base,
-        steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: 't-d1-review', branch } },
-      });
-      fs.writeFileSync(path.join(root, 'runs', 'r-d4.cancelled'), '2026-09-13T01:00:00.000Z');
-      const before = gitCount();
-      const body = await decisionOf('r-d4');
-      assert.deepEqual(
-        body,
-        { nothing: 'cancelled at 2026-09-13T01:00:00.000Z — nothing to decide' },
-        'the one key: no commands, no steps',
-      );
-      assert.equal(gitCount(), before, 'no git call for a cancelled run');
-    },
-  );
-  await t.test('REFUSED: an unknown run is `Missing`, naming it, and a name that leaves the store a refusal too', async () => {
+    const body = await decidable('r-d10');
+    assert.deepEqual(body.commands, []);
+  });
+  test("a run called off has nothing to decide: a 200 whose body carries `nothing` alone, and no git call — the verdict's own words are the orchestrator's, pinned there over a real repository", async () => {
+    writeRun({
+      id: 'r-d4',
+      repo,
+      baseRef: base,
+      steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: 't-d1-review', branch } },
+    });
+    fs.writeFileSync(path.join(root, 'runs', 'r-d4.cancelled'), '2026-09-13T01:00:00.000Z');
+    const before = gitCount();
+    const body = await decisionOf('r-d4');
+    assert.deepEqual(body, { nothing: 'cancelled at 2026-09-13T01:00:00.000Z — nothing to decide' }, 'the one key: no commands, no steps');
+    assert.equal(gitCount(), before, 'no git call for a cancelled run');
+  });
+  test('REFUSED: an unknown run is `Missing`, naming it, and a name that leaves the store a refusal too', async () => {
     await assert.rejects(decisionOf('no-such-run'), (err: Error) => err instanceof Missing && /no-such-run/.test(err.message));
     await assert.rejects(decisionOf('../escape'), (err: unknown) => isRefusal(err));
   });

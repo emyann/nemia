@@ -12,7 +12,7 @@
  * is read through `tapped`, which notes each task viewed and fails the view of a spoiled task as a journal that does not read fails it.
  * The test's store is its own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -131,11 +131,10 @@ async function aRun(id: string, i: number, costUsd: number, more: { settled?: bo
   );
 }
 
-test('Costs told to the step that reads them: after the approval and before where to look, the window of finished runs, never again to a session continued', async (t) => {
-  const s = story(t);
+describe('Costs told to the step that reads them: after the approval and before where to look, the window of finished runs, never again to a session continued', () => {
+  const s = story(test);
   let id = '';
-
-  await s.test(
+  s.test(
     'the store holds RECENT_RUNS + 1 finished runs of costed, c00 the oldest at $1 to c20 at $21; newer, one unfinished, one whose journal does not read, and one each of another workflow and another factory at $1000',
     async () => {
       for (let i = 0; i <= RECENT_RUNS; i++) await aRun(`c${String(i).padStart(2, '0')}`, i, i + 1);
@@ -146,16 +145,14 @@ test('Costs told to the step that reads them: after the approval and before wher
       await aRun('z-other', 43, 1000, { factory: 'other' });
     },
   );
-
-  await s.test('a step without the line is told none, and its pass reads no other run', async () => {
+  s.test('a step without the line is told none, and its pass reads no other run', async () => {
     id = (await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }))).id;
     viewed.length = 0;
     assert.deepEqual((await tick(id)).filed, ['design']);
     assert.equal(briefOf(taskOf(id, 'design')).includes(SECTION), false);
     assert.deepEqual(othersViewed(id), []);
   });
-
-  await s.test(
+  s.test(
     'once design is approved, implement is told what the newest twenty finished runs of costed cost in its factory, after the approval and before where to look; the reader stops at the window',
     async () => {
       stage.board().settle(taskOf(id, 'design'), 'succeeded', SIGNED);
@@ -179,8 +176,7 @@ test('Costs told to the step that reads them: after the approval and before wher
       assert.ok(brief.includes('- the whole run: median 11.50, p90 19.00; no loop ran to acceptance'), brief);
     },
   );
-
-  await s.test('a fresh try of the step is told the costs again, read afresh', async () => {
+  s.test('a fresh try of the step is told the costs again, read afresh', async () => {
     stage.board().settle(taskOf(id, 'implement'), 'failed');
     await tick(id);
     await stage.runWith(tapped(), retryRun(id, 'implement', { mode: 'fresh' }));
@@ -191,8 +187,7 @@ test('Costs told to the step that reads them: after the approval and before wher
     assert.ok(viewed.includes('c20-design'), 'the pass that files a fresh try reads the newest run');
     assert.ok(briefOf(fresh).includes(SECTION), briefOf(fresh));
   });
-
-  await s.test("a try that continues the last session neither reads nor is told them: it was, on that session's first brief", async () => {
+  s.test("a try that continues the last session neither reads nor is told them: it was, on that session's first brief", async () => {
     const fresh = taskOf(id, 'implement');
     stage.board().settle(fresh, 'failed');
     await tick(id);
@@ -204,8 +199,7 @@ test('Costs told to the step that reads them: after the approval and before wher
     assert.deepEqual(othersViewed(id), [], 'the pass that files a continued session reads no other run');
     assert.equal(briefOf(nudged).includes(SECTION), false, briefOf(nudged));
   });
-
-  await s.test('a round whose target starts a new session is told the costs', async () => {
+  s.test('a round whose target starts a new session is told the costs', async () => {
     id = (await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: LOOPED, isolate: false }))).id;
     assert.deepEqual((await tick(id)).filed, ['implement']);
     const first = taskOf(id, 'implement');
@@ -220,8 +214,7 @@ test('Costs told to the step that reads them: after the approval and before wher
     assert.ok(viewed.includes('c20-design'), 'the pass that files a round on a new session reads the newest run');
     assert.ok(briefOf(cold).includes(SECTION), briefOf(cold));
   });
-
-  await s.test('a round that continues the last session neither reads nor is told them', async () => {
+  s.test('a round that continues the last session neither reads nor is told them', async () => {
     const cold = taskOf(id, 'implement');
     stage.board().settle(cold, 'succeeded', { ...SIGNED, replies: [{ finding: 'review', answer: 'fixed', why: 'did it' }] });
     assert.deepEqual((await tick(id)).filed, ['review']);

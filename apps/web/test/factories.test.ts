@@ -4,7 +4,7 @@
  * floor starts a run; and, for the pages that list the whole machine, the factory each run or card is tagged with, what the factory picked
  * keeps, the factories a workflow listed with no factory is in and where the address's place reads a list of workflows.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Factory } from '../src/lib/api/factories.ts';
 import type { InboxEntry } from '../src/lib/api/inbox.ts';
@@ -94,68 +94,59 @@ const tagged = [
   { id: 'n-2', factory: 'nemia' },
 ];
 
-test('openBlocks, blockOf, factoriesShown: the machine split into a block a factory, and what each counts', async (t) => {
-  await t.test(
-    'the default factory is a block only while no factory is filed and its answer counts a run (`held`), whatever the order it is listed in',
-    () => {
-      const nemia = factory('nemia');
-      const broken = factory('broken', { worksOn: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
-      const blocks = (factories: Factory[], held: boolean) => names(openBlocks(factories, answers(factories), held));
-      assert.deepEqual(blocks([fallback], true), ['default']);
-      assert.deepEqual(blocks([fallback], false), []);
-      assert.deepEqual(blocks([fallback, nemia], false), ['nemia']);
-      assert.deepEqual(blocks([fallback, nemia], true), ['nemia']);
-      assert.deepEqual(blocks([nemia, factory('pipao'), fallback], true), ['nemia', 'pipao']);
-      assert.deepEqual(blocks([fallback, broken], true), ['broken']);
-    },
-  );
-  await t.test('a factory shown whose answer is not read yet has no block, and hides no other', () => {
+describe('openBlocks, blockOf, factoriesShown: the machine split into a block a factory, and what each counts', () => {
+  test('the default factory is a block only while no factory is filed and its answer counts a run (`held`), whatever the order it is listed in', () => {
+    const nemia = factory('nemia');
+    const broken = factory('broken', { worksOn: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
+    const blocks = (factories: Factory[], held: boolean) => names(openBlocks(factories, answers(factories), held));
+    assert.deepEqual(blocks([fallback], true), ['default']);
+    assert.deepEqual(blocks([fallback], false), []);
+    assert.deepEqual(blocks([fallback, nemia], false), ['nemia']);
+    assert.deepEqual(blocks([fallback, nemia], true), ['nemia']);
+    assert.deepEqual(blocks([nemia, factory('pipao'), fallback], true), ['nemia', 'pipao']);
+    assert.deepEqual(blocks([fallback, broken], true), ['broken']);
+  });
+  test('a factory shown whose answer is not read yet has no block, and hides no other', () => {
     const harbour = factory('harbour');
     assert.deepEqual(names(openBlocks([fallback, harbour, factory('quay')], answers([harbour]), false)), ['harbour']);
   });
-  await t.test(
-    "each run is in the factory its record names, the default factory's naming none: a pipao run in neither default nor nemia",
-    () => {
-      const runs = [run('d', null), run('n', 'nemia'), run('p', 'pipao')];
-      assert.deepEqual(ids(runsIn(runs, fallback)), ['d']);
-      assert.deepEqual(ids(runsIn(runs, factory('nemia'))), ['n']);
-      assert.deepEqual(ids(runsIn(runs, factory('pipao'))), ['p']);
-      assert.deepEqual(ids(runsIn(runs, factory('nope'))), []);
-    },
-  );
-  await t.test("each queued card is in the factory it names, the default factory's naming none", () => {
+  test("each run is in the factory its record names, the default factory's naming none: a pipao run in neither default nor nemia", () => {
+    const runs = [run('d', null), run('n', 'nemia'), run('p', 'pipao')];
+    assert.deepEqual(ids(runsIn(runs, fallback)), ['d']);
+    assert.deepEqual(ids(runsIn(runs, factory('nemia'))), ['n']);
+    assert.deepEqual(ids(runsIn(runs, factory('pipao'))), ['p']);
+    assert.deepEqual(ids(runsIn(runs, factory('nope'))), []);
+  });
+  test("each queued card is in the factory it names, the default factory's naming none", () => {
     const card = (name: string, factoryName: string | null) => ({ name, factory: factoryName }) as InboxEntry;
     const cards = [card('d', null), card('n', 'nemia')];
     assert.deepEqual(names(queuedIn(cards, fallback)), ['d']);
     assert.deepEqual(names(queuedIn(cards, factory('nemia'))), ['n']);
   });
-  await t.test(
-    "a block's runs, in flight and waiting on you are its own answer's counts, never another factory's; its workflows and hires its file's",
-    () => {
-      const opens = new Map([
-        ['harbour', answer(1, 3, 4)],
-        ['default', answer(2, 5, 7)],
-      ]);
-      const [harbour] = openBlocks([fallback, factory('harbour')], opens, true);
-      const [def] = openBlocks([fallback], opens, true);
-      assert.deepEqual(
-        { ...harbour },
-        {
-          name: 'harbour',
-          default: false,
-          repos: ['nemia'],
-          runs: 8,
-          inFlight: 3,
-          waitsOnYou: 1,
-          workflows: 1,
-          hires: 1,
-          error: null,
-        },
-      );
-      assert.deepEqual([def.runs, def.inFlight, def.waitsOnYou, def.workflows, def.hires, def.repos], [14, 5, 2, null, 0, ['app']]);
-    },
-  );
-  await t.test('a factory whose file does not read is still a block, with why, and hides no other', () => {
+  test("a block's runs, in flight and waiting on you are its own answer's counts, never another factory's; its workflows and hires its file's", () => {
+    const opens = new Map([
+      ['harbour', answer(1, 3, 4)],
+      ['default', answer(2, 5, 7)],
+    ]);
+    const [harbour] = openBlocks([fallback, factory('harbour')], opens, true);
+    const [def] = openBlocks([fallback], opens, true);
+    assert.deepEqual(
+      { ...harbour },
+      {
+        name: 'harbour',
+        default: false,
+        repos: ['nemia'],
+        runs: 8,
+        inFlight: 3,
+        waitsOnYou: 1,
+        workflows: 1,
+        hires: 1,
+        error: null,
+      },
+    );
+    assert.deepEqual([def.runs, def.inFlight, def.waitsOnYou, def.workflows, def.hires, def.repos], [14, 5, 2, null, 0, ['app']]);
+  });
+  test('a factory whose file does not read is still a block, with why, and hides no other', () => {
     const broken = factory('broken', { worksOn: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
     const factories = [fallback, factory('nemia'), broken, factory('pipao')];
     const blocks = openBlocks(factories, answers(factories), false);
@@ -169,30 +160,27 @@ test('openBlocks, blockOf, factoriesShown: the machine split into a block a fact
       ],
     );
   });
-  await t.test(
-    "REFUSED: a factory's bar off its light answer counts every run, those waiting and those in flight by the api's counts",
-    () => {
-      const holding = { at: 'x', runs: [], word: 'held until r-0 lands', advice: 'wait', waitingOnYou: false };
-      const working = run('working', 'nemia', { status: 'running', moving: true });
-      const held = run('held', 'nemia', { status: 'running', holding });
-      const gate = run('gate', 'nemia', { status: 'running', waitingOnYou: ['plan'] });
-      const stopped = run('stopped', 'nemia', { status: 'failed', waitingOnYou: ['plan'] });
-      const done = run('done', 'nemia');
-      const open = { counts: { waiting: 2, inFlight: 2, finished: 1 }, waiting: [gate, stopped], inFlight: [working, held] };
-      const block = openBlockOf(factory('nemia'), open);
-      assert.equal(runsOf(block), '2 in flight · 2 waiting on you · 5 runs');
-      assert.equal(
-        blockOf(factory('nemia'), [working, held, gate, stopped, done]).inFlight,
-        3,
-        'the whole list still counts a running run at its gate in flight: the pages that read it keep that rule',
-      );
-      assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).runs, 36);
-      assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).waitsOnYou, 4);
-      assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 6, finished: 30 } }).inFlight, 6);
-      assert.equal(runsOf(openBlockOf(factory('nemia'), { counts: { waiting: 0, inFlight: 0, finished: 0 } })), 'No runs yet');
-    },
-  );
-  await t.test('REFUSED: the default factory is shown only while no factory is named and it holds a run', () => {
+  test("REFUSED: a factory's bar off its light answer counts every run, those waiting and those in flight by the api's counts", () => {
+    const holding = { at: 'x', runs: [], word: 'held until r-0 lands', advice: 'wait', waitingOnYou: false };
+    const working = run('working', 'nemia', { status: 'running', moving: true });
+    const held = run('held', 'nemia', { status: 'running', holding });
+    const gate = run('gate', 'nemia', { status: 'running', waitingOnYou: ['plan'] });
+    const stopped = run('stopped', 'nemia', { status: 'failed', waitingOnYou: ['plan'] });
+    const done = run('done', 'nemia');
+    const open = { counts: { waiting: 2, inFlight: 2, finished: 1 }, waiting: [gate, stopped], inFlight: [working, held] };
+    const block = openBlockOf(factory('nemia'), open);
+    assert.equal(runsOf(block), '2 in flight · 2 waiting on you · 5 runs');
+    assert.equal(
+      blockOf(factory('nemia'), [working, held, gate, stopped, done]).inFlight,
+      3,
+      'the whole list still counts a running run at its gate in flight: the pages that read it keep that rule',
+    );
+    assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).runs, 36);
+    assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 2, finished: 30 } }).waitsOnYou, 4);
+    assert.equal(openBlockOf(factory('nemia'), { ...open, counts: { waiting: 4, inFlight: 6, finished: 30 } }).inFlight, 6);
+    assert.equal(runsOf(openBlockOf(factory('nemia'), { counts: { waiting: 0, inFlight: 0, finished: 0 } })), 'No runs yet');
+  });
+  test('REFUSED: the default factory is shown only while no factory is named and it holds a run', () => {
     const nemia = factory('nemia');
     assert.deepEqual(names(factoriesShown([fallback], true)), ['default']);
     assert.deepEqual(names(factoriesShown([fallback], false)), []);
@@ -201,234 +189,198 @@ test('openBlocks, blockOf, factoriesShown: the machine split into a block a fact
   });
 });
 
-test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a floor starts a run, and why it cannot', async (t) => {
-  await t.test(
-    "a workflow starts on the repository the factory's wiring names for it, else its only one; never on a card's: the orchestrator's workflowRepo",
-    () => {
-      const pair = { worksOn: ['/r/app', '/r/docs'] };
-      const rows: Array<[string, Partial<Factory>, string, string | null, 'none' | 'unwired' | 'unknown' | 'shared' | null]> = [
-        ['wired', { ...pair, workflowRepos: { build: 'docs' } }, 'build', '/r/docs', null],
-        [
-          'wired with a trailing separator',
-          { worksOn: ['/r/app/', '/r/docs/'], workflowRepos: { build: 'docs' } },
-          'build',
-          '/r/docs/',
-          null,
-        ],
-        ['only one, none named', { worksOn: ['/r/app'] }, 'build', '/r/app', null],
-        ['only one, another workflow wired', { worksOn: ['/r/app'], workflowRepos: { quick: 'app' } }, 'build', '/r/app', null],
-        ['several, none named', pair, 'build', null, 'unwired'],
-        ['several, another workflow wired', { ...pair, workflowRepos: { quick: 'app' } }, 'build', null, 'unwired'],
-        ["a prototype's name is no wiring", { ...pair, workflowRepos: {} }, 'constructor', null, 'unwired'],
-        ['none at all', { worksOn: [] }, 'build', null, 'none'],
-        ['none at all, the workflow wired', { worksOn: [], workflowRepos: { build: 'app' } }, 'build', null, 'none'],
-        ['a name none has', { ...pair, workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
-        ['a name none has, on its only one', { worksOn: ['/r/app'], workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
-        ['a name two share', { worksOn: ['/a/app', '/b/app'], workflowRepos: { build: 'app' } }, 'build', null, 'shared'],
-      ];
-      for (const [row, extra, workflow, repo, refused] of rows) {
-        const on = startRepo(factory('pair', extra), workflow);
-        if (repo !== null) assert.deepEqual(on, { repo }, row);
-        else {
-          assert.ok('refused' in on, row);
-          assert.equal(on.refused, refused, row);
-          if (refused === 'none')
-            assert.ok(on.why.includes('nemia factory volume add pair'), `${row}: names the volume add that fixes it: ${on.why}`);
-          else assert.match(on.why, new RegExp(`nemia factory attach pair ${workflow} --repo`), `${row}: names the attach that fixes it`);
-          for (const name of new Set((extra.worksOn ?? []).map((r) => r.split('/').filter(Boolean).at(-1)))) {
-            assert.ok(on.why.includes(name!), `${row}: offers ${name}`);
-          }
+describe('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a floor starts a run, and why it cannot', () => {
+  test("a workflow starts on the repository the factory's wiring names for it, else its only one; never on a card's: the orchestrator's workflowRepo", () => {
+    const pair = { worksOn: ['/r/app', '/r/docs'] };
+    const rows: Array<[string, Partial<Factory>, string, string | null, 'none' | 'unwired' | 'unknown' | 'shared' | null]> = [
+      ['wired', { ...pair, workflowRepos: { build: 'docs' } }, 'build', '/r/docs', null],
+      [
+        'wired with a trailing separator',
+        { worksOn: ['/r/app/', '/r/docs/'], workflowRepos: { build: 'docs' } },
+        'build',
+        '/r/docs/',
+        null,
+      ],
+      ['only one, none named', { worksOn: ['/r/app'] }, 'build', '/r/app', null],
+      ['only one, another workflow wired', { worksOn: ['/r/app'], workflowRepos: { quick: 'app' } }, 'build', '/r/app', null],
+      ['several, none named', pair, 'build', null, 'unwired'],
+      ['several, another workflow wired', { ...pair, workflowRepos: { quick: 'app' } }, 'build', null, 'unwired'],
+      ["a prototype's name is no wiring", { ...pair, workflowRepos: {} }, 'constructor', null, 'unwired'],
+      ['none at all', { worksOn: [] }, 'build', null, 'none'],
+      ['none at all, the workflow wired', { worksOn: [], workflowRepos: { build: 'app' } }, 'build', null, 'none'],
+      ['a name none has', { ...pair, workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
+      ['a name none has, on its only one', { worksOn: ['/r/app'], workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
+      ['a name two share', { worksOn: ['/a/app', '/b/app'], workflowRepos: { build: 'app' } }, 'build', null, 'shared'],
+    ];
+    for (const [row, extra, workflow, repo, refused] of rows) {
+      const on = startRepo(factory('pair', extra), workflow);
+      if (repo !== null) assert.deepEqual(on, { repo }, row);
+      else {
+        assert.ok('refused' in on, row);
+        assert.equal(on.refused, refused, row);
+        if (refused === 'none')
+          assert.ok(on.why.includes('nemia factory volume add pair'), `${row}: names the volume add that fixes it: ${on.why}`);
+        else assert.match(on.why, new RegExp(`nemia factory attach pair ${workflow} --repo`), `${row}: names the attach that fixes it`);
+        for (const name of new Set((extra.worksOn ?? []).map((r) => r.split('/').filter(Boolean).at(-1)))) {
+          assert.ok(on.why.includes(name!), `${row}: offers ${name}`);
         }
       }
-    },
-  );
-  await t.test(
-    "a place is named in a request's query, encoded; the default factory and no place name none, as the api answers them alike",
-    () => {
-      assert.equal(placeQuery(), '');
-      assert.equal(placeQuery(null), '');
-      assert.equal(placeQuery({ factory: 'default', repo: '/code/app' }), '');
-      assert.equal(placeQuery({ factory: 'hiring', repo: '/r/x' }), '?factory=hiring&repo=%2Fr%2Fx');
-    },
-  );
-  await t.test('the default floor starts no run: every run started from a floor names its factory', () => {
+    }
+  });
+  test("a place is named in a request's query, encoded; the default factory and no place name none, as the api answers them alike", () => {
+    assert.equal(placeQuery(), '');
+    assert.equal(placeQuery(null), '');
+    assert.equal(placeQuery({ factory: 'default', repo: '/code/app' }), '');
+    assert.equal(placeQuery({ factory: 'hiring', repo: '/r/x' }), '?factory=hiring&repo=%2Fr%2Fx');
+  });
+  test('the default floor starts no run: every run started from a floor names its factory', () => {
     assert.equal(floorPlace(fallback), null);
   });
-  await t.test(
-    'a named floor starts on its one repository, on none until a person picks among several, and says why when it cannot start',
-    () => {
-      assert.deepEqual(floorPlace(factory('nemia')), { factory: 'nemia', repos: ['/code/nemia'], repo: '/code/nemia' });
-      assert.deepEqual(floorPlace(factory('pair', { worksOn: ['/r/a', '/r/b'] })), {
-        factory: 'pair',
-        repos: ['/r/a', '/r/b'],
-        repo: null,
-      });
-      const broken = floorPlace(factory('broken', { worksOn: ['/r/a'], error: '/wf/factories/broken.json is not JSON' }));
-      assert.ok(broken && 'why' in broken, 'a factory whose file does not read cannot start');
-      assert.match(broken.why, /broken[\s\S]*\/wf\/factories\/broken\.json is not JSON/);
-      const none = floorPlace(factory('bare', { worksOn: [] }));
-      assert.ok(none && 'why' in none, 'a factory on no repository cannot start');
-      assert.match(none.why, /bare/);
-    },
-  );
-  await t.test("a workflow that cannot start says why: its folder's error before the steps its hires leave unfilled", () => {
+  test('a named floor starts on its one repository, on none until a person picks among several, and says why when it cannot start', () => {
+    assert.deepEqual(floorPlace(factory('nemia')), { factory: 'nemia', repos: ['/code/nemia'], repo: '/code/nemia' });
+    assert.deepEqual(floorPlace(factory('pair', { worksOn: ['/r/a', '/r/b'] })), {
+      factory: 'pair',
+      repos: ['/r/a', '/r/b'],
+      repo: null,
+    });
+    const broken = floorPlace(factory('broken', { worksOn: ['/r/a'], error: '/wf/factories/broken.json is not JSON' }));
+    assert.ok(broken && 'why' in broken, 'a factory whose file does not read cannot start');
+    assert.match(broken.why, /broken[\s\S]*\/wf\/factories\/broken\.json is not JSON/);
+    const none = floorPlace(factory('bare', { worksOn: [] }));
+    assert.ok(none && 'why' in none, 'a factory on no repository cannot start');
+    assert.match(none.why, /bare/);
+  });
+  test("a workflow that cannot start says why: its folder's error before the steps its hires leave unfilled", () => {
     assert.equal(whyNotStarted({ error: null, unfilled: null }), null);
     assert.equal(whyNotStarted({ error: 'no steps', unfilled: null }), 'no steps');
     assert.equal(whyNotStarted({ error: null, unfilled: 'hire dev/review' }), 'hire dev/review');
     assert.equal(whyNotStarted({ error: 'no steps', unfilled: 'hire dev/review' }), 'no steps');
   });
-  await t.test(
-    "a run's untrusted place: a factory's untrusted place that is its repository, whichever factory lists it; nothing for another",
-    () => {
-      const place = { place: '/code/nemia', harness: 'A harness', withheld: 'its allow rules', never: null };
-      const lacking = factory('nemia', { untrusted: [place] });
-      const trusting = factory('pipao', { worksOn: ['/code/pipao'] });
-      const found = { factory: 'nemia', trust: 'nemia factory trust nemia', place };
-      assert.deepEqual(untrustedFor([trusting, lacking], { repo: '/code/nemia' }), found);
-      assert.equal(untrustedFor([trusting, lacking], { repo: '/code/pipao' }), undefined, 'another repository');
-      assert.equal(untrustedFor([trusting, lacking], { repo: '/code/nemia/sub' }), undefined, 'a path beside it');
-      assert.equal(untrustedFor([trusting, lacking], { repo: null }), undefined, 'a run on no repository');
-      assert.equal(untrustedFor([trusting, factory('nemia')], { repo: '/code/nemia' }), undefined, 'a trusted place');
-    },
-  );
+  test("a run's untrusted place: a factory's untrusted place that is its repository, whichever factory lists it; nothing for another", () => {
+    const place = { place: '/code/nemia', harness: 'A harness', withheld: 'its allow rules', never: null };
+    const lacking = factory('nemia', { untrusted: [place] });
+    const trusting = factory('pipao', { worksOn: ['/code/pipao'] });
+    const found = { factory: 'nemia', trust: 'nemia factory trust nemia', place };
+    assert.deepEqual(untrustedFor([trusting, lacking], { repo: '/code/nemia' }), found);
+    assert.equal(untrustedFor([trusting, lacking], { repo: '/code/pipao' }), undefined, 'another repository');
+    assert.equal(untrustedFor([trusting, lacking], { repo: '/code/nemia/sub' }), undefined, 'a path beside it');
+    assert.equal(untrustedFor([trusting, lacking], { repo: null }), undefined, 'a run on no repository');
+    assert.equal(untrustedFor([trusting, factory('nemia')], { repo: '/code/nemia' }), undefined, 'a trusted place');
+  });
 });
 
-test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf: which factory a run, a card or a workflow is in, and what an address reads', async (t) => {
-  await t.test('a run or a card is tagged with the factory it names, and with default when it names none or names default', () => {
+describe('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf: which factory a run, a card or a workflow is in, and what an address reads', () => {
+  test('a run or a card is tagged with the factory it names, and with default when it names none or names default', () => {
     assert.equal(namespaceOf(null), 'default');
     assert.equal(namespaceOf(undefined), 'default');
     assert.equal(namespaceOf('default'), 'default');
     assert.equal(namespaceOf('nemia'), 'nemia');
   });
-  await t.test("a name goes back to the api's form: null for the default factory and for none, a named factory as it is", () => {
+  test("a name goes back to the api's form: null for the default factory and for none, a named factory as it is", () => {
     assert.equal(factoryIn('default'), null);
     assert.equal(factoryIn(undefined), null);
     assert.equal(factoryIn('nemia'), 'nemia');
     for (const factory of [null, 'nemia']) assert.equal(factoryIn(namespaceOf(factory)), factory, 'the two converters undo each other');
   });
-  await t.test(
-    "a filter keeps the runs or cards of its factory in their order — the default's naming none or naming default — and no filter keeps all",
-    () => {
-      assert.deepEqual(ids(shownIn(tagged, undefined)), ['q-1', 'd-1', 'n-1', 'd-2', 'n-2']);
-      assert.deepEqual(ids(shownIn(tagged, 'nemia')), ['n-1', 'n-2']);
-      assert.deepEqual(ids(shownIn(tagged, 'default')), ['d-1', 'd-2']);
-      assert.deepEqual(ids(shownIn(tagged, 'gone')), []);
-    },
-  );
-  await t.test(
-    "REFUSED: a workflow is tagged only with the factories that attach it where it is found — the repository's on its repository, yours on any — never the default or a factory whose file does not read",
-    () => {
-      const factories = [
-        factory('default', { default: true, worksOn: ['/r'], workflows: null, hires: {} }),
-        factory('b-other', { worksOn: ['/elsewhere'], workflows: ['dev'] }),
-        factory('a-here', { worksOn: ['/r'], workflows: ['dev'] }),
-        factory('c-broken', { worksOn: ['/r'], workflows: ['dev'], hires: {}, error: '/wf/factories/c-broken.json is not JSON' }),
-        factory('d-here', { worksOn: ['/r'], workflows: ['build'] }),
-      ];
-      assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, factories), ['a-here']);
-      assert.deepEqual(workflowFactories({ name: 'dev', from: 'user' }, factories), ['a-here', 'b-other']);
-      assert.deepEqual(workflowFactories({ name: 'build', from: 'repo' }, factories), ['d-here']);
-      assert.deepEqual(workflowFactories({ name: 'intake', from: 'user' }, factories), []);
-      assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, []), [], 'with no factories read, a workflow is in none');
-    },
-  );
-  await t.test(
-    "REFUSED: a named factory's workflows are read in it, on its own repository — never judged against the default factory's",
-    () => {
-      const factories = [fallback, factory('pipao', { worksOn: ['/code/pipao'], workflows: ['dev'] })];
-      assert.deepEqual(listPlace({ factory: 'pipao' }, factories), {
-        kind: 'in',
-        place: { factory: 'pipao', repo: '/code/pipao' },
-        repos: ['/code/pipao'],
-      });
-      assert.deepEqual(
-        listPlace({ factory: 'pipao' }, factories.slice(1)),
-        listPlace({ factory: 'pipao' }, factories),
-        'default read or not',
-      );
-    },
-  );
-  await t.test(
-    'REFUSED: the address reads every workflow with no factory or the default; a factory on several repositories is read on the one named, and asks which when none is',
-    () => {
-      const two = factory('quay', { worksOn: ['/a', '/b'] });
-      const factories = [fallback, factory('nemia'), two];
-      assert.deepEqual(listPlace({}, factories), { kind: 'every' });
-      assert.deepEqual(listPlace({ repo: '/a' }, factories), { kind: 'every' });
-      assert.deepEqual(listPlace({ factory: 'default' }, factories), { kind: 'every' });
-      assert.deepEqual(listPlace({ factory: 'quay', repo: '/b' }, factories), {
-        kind: 'in',
-        place: { factory: 'quay', repo: '/b' },
-        repos: ['/a', '/b'],
-      });
-      assert.deepEqual(listPlace({ factory: 'quay' }, factories), { kind: 'pick', factory: 'quay', repos: ['/a', '/b'] });
-    },
-  );
-  await t.test(
-    'REFUSED: a factory of no such name, one whose file does not read and one on no repository list nothing, and say why',
-    () => {
-      const broken = factory('broken', { error: '/wf/factories/broken.json is not JSON' });
-      const homeless = factory('homeless', { worksOn: [] });
-      const factories = [fallback, broken, homeless];
-      assert.deepEqual(listPlace({ factory: 'gone' }, factories), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
-      assert.deepEqual(listPlace({ factory: 'gone' }, []), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
-      const why = (name: string, of: Factory) => {
-        const floor = floorPlace(of);
-        assert.ok(floor && 'why' in floor);
-        assert.deepEqual(listPlace({ factory: name, repo: '/x' }, factories), { kind: 'refused', factory: name, why: floor.why });
-      };
-      why('broken', broken);
-      why('homeless', homeless);
-    },
-  );
-  await t.test(
-    "REFUSED: a workflow read in a named factory is the factory's, never said to be this repository's; the user library's is the user library's anywhere",
-    () => {
-      assert.equal(fromWord('user'), 'the user library');
-      assert.equal(fromWord('user', 'pipao'), 'the user library');
-      assert.equal(fromWord('repo'), 'this repository');
-      assert.equal(fromWord('repo', 'default'), 'this repository');
-      assert.equal(fromWord('repo', 'pipao'), "the factory's");
-      assert.equal(fromWord('factory', 'pipao'), "the factory's", "a factory's own tree, by its origin");
-    },
-  );
-  await t.test(
-    "REFUSED: New agent's address names the step it hires into only whole — a factory (`into`), a workflow and a step, each a string not empty",
-    () => {
-      const whole = { into: 'nemia', workflow: 'dev', step: 'implement' };
-      const place = { factory: 'nemia', workflow: 'dev', step: 'implement' };
-      assert.deepEqual(hirePlaceOf(whole), place);
-      assert.deepEqual(hirePlaceOf({ ...whole, other: 'x' }), place);
-      assert.deepEqual(hirePlaceOf({}), {});
-      assert.deepEqual(hirePlaceOf({ ...whole, step: '' }), {}, 'a step named with nothing');
-      assert.deepEqual(hirePlaceOf({ ...whole, into: undefined }), {}, 'no factory');
-      assert.deepEqual(
-        hirePlaceOf({ workflow: 'dev', step: 'implement', factory: 'nemia' }),
-        {},
-        'the factory is the hire’s `into`, never `factory`',
-      );
-      assert.deepEqual(hirePlaceOf({ ...whole, workflow: 3 }), {}, 'a workflow that is no string');
-    },
-  );
-  await t.test("a page's search names the repository it reads, never its factory, which is its path's", () => {
+  test("a filter keeps the runs or cards of its factory in their order — the default's naming none or naming default — and no filter keeps all", () => {
+    assert.deepEqual(ids(shownIn(tagged, undefined)), ['q-1', 'd-1', 'n-1', 'd-2', 'n-2']);
+    assert.deepEqual(ids(shownIn(tagged, 'nemia')), ['n-1', 'n-2']);
+    assert.deepEqual(ids(shownIn(tagged, 'default')), ['d-1', 'd-2']);
+    assert.deepEqual(ids(shownIn(tagged, 'gone')), []);
+  });
+  test("REFUSED: a workflow is tagged only with the factories that attach it where it is found — the repository's on its repository, yours on any — never the default or a factory whose file does not read", () => {
+    const factories = [
+      factory('default', { default: true, worksOn: ['/r'], workflows: null, hires: {} }),
+      factory('b-other', { worksOn: ['/elsewhere'], workflows: ['dev'] }),
+      factory('a-here', { worksOn: ['/r'], workflows: ['dev'] }),
+      factory('c-broken', { worksOn: ['/r'], workflows: ['dev'], hires: {}, error: '/wf/factories/c-broken.json is not JSON' }),
+      factory('d-here', { worksOn: ['/r'], workflows: ['build'] }),
+    ];
+    assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, factories), ['a-here']);
+    assert.deepEqual(workflowFactories({ name: 'dev', from: 'user' }, factories), ['a-here', 'b-other']);
+    assert.deepEqual(workflowFactories({ name: 'build', from: 'repo' }, factories), ['d-here']);
+    assert.deepEqual(workflowFactories({ name: 'intake', from: 'user' }, factories), []);
+    assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, []), [], 'with no factories read, a workflow is in none');
+  });
+  test("REFUSED: a named factory's workflows are read in it, on its own repository — never judged against the default factory's", () => {
+    const factories = [fallback, factory('pipao', { worksOn: ['/code/pipao'], workflows: ['dev'] })];
+    assert.deepEqual(listPlace({ factory: 'pipao' }, factories), {
+      kind: 'in',
+      place: { factory: 'pipao', repo: '/code/pipao' },
+      repos: ['/code/pipao'],
+    });
+    assert.deepEqual(
+      listPlace({ factory: 'pipao' }, factories.slice(1)),
+      listPlace({ factory: 'pipao' }, factories),
+      'default read or not',
+    );
+  });
+  test('REFUSED: the address reads every workflow with no factory or the default; a factory on several repositories is read on the one named, and asks which when none is', () => {
+    const two = factory('quay', { worksOn: ['/a', '/b'] });
+    const factories = [fallback, factory('nemia'), two];
+    assert.deepEqual(listPlace({}, factories), { kind: 'every' });
+    assert.deepEqual(listPlace({ repo: '/a' }, factories), { kind: 'every' });
+    assert.deepEqual(listPlace({ factory: 'default' }, factories), { kind: 'every' });
+    assert.deepEqual(listPlace({ factory: 'quay', repo: '/b' }, factories), {
+      kind: 'in',
+      place: { factory: 'quay', repo: '/b' },
+      repos: ['/a', '/b'],
+    });
+    assert.deepEqual(listPlace({ factory: 'quay' }, factories), { kind: 'pick', factory: 'quay', repos: ['/a', '/b'] });
+  });
+  test('REFUSED: a factory of no such name, one whose file does not read and one on no repository list nothing, and say why', () => {
+    const broken = factory('broken', { error: '/wf/factories/broken.json is not JSON' });
+    const homeless = factory('homeless', { worksOn: [] });
+    const factories = [fallback, broken, homeless];
+    assert.deepEqual(listPlace({ factory: 'gone' }, factories), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
+    assert.deepEqual(listPlace({ factory: 'gone' }, []), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
+    const why = (name: string, of: Factory) => {
+      const floor = floorPlace(of);
+      assert.ok(floor && 'why' in floor);
+      assert.deepEqual(listPlace({ factory: name, repo: '/x' }, factories), { kind: 'refused', factory: name, why: floor.why });
+    };
+    why('broken', broken);
+    why('homeless', homeless);
+  });
+  test("REFUSED: a workflow read in a named factory is the factory's, never said to be this repository's; the user library's is the user library's anywhere", () => {
+    assert.equal(fromWord('user'), 'the user library');
+    assert.equal(fromWord('user', 'pipao'), 'the user library');
+    assert.equal(fromWord('repo'), 'this repository');
+    assert.equal(fromWord('repo', 'default'), 'this repository');
+    assert.equal(fromWord('repo', 'pipao'), "the factory's");
+    assert.equal(fromWord('factory', 'pipao'), "the factory's", "a factory's own tree, by its origin");
+  });
+  test("REFUSED: New agent's address names the step it hires into only whole — a factory (`into`), a workflow and a step, each a string not empty", () => {
+    const whole = { into: 'nemia', workflow: 'dev', step: 'implement' };
+    const place = { factory: 'nemia', workflow: 'dev', step: 'implement' };
+    assert.deepEqual(hirePlaceOf(whole), place);
+    assert.deepEqual(hirePlaceOf({ ...whole, other: 'x' }), place);
+    assert.deepEqual(hirePlaceOf({}), {});
+    assert.deepEqual(hirePlaceOf({ ...whole, step: '' }), {}, 'a step named with nothing');
+    assert.deepEqual(hirePlaceOf({ ...whole, into: undefined }), {}, 'no factory');
+    assert.deepEqual(
+      hirePlaceOf({ workflow: 'dev', step: 'implement', factory: 'nemia' }),
+      {},
+      'the factory is the hire’s `into`, never `factory`',
+    );
+    assert.deepEqual(hirePlaceOf({ ...whole, workflow: 3 }), {}, 'a workflow that is no string');
+  });
+  test("a page's search names the repository it reads, never its factory, which is its path's", () => {
     assert.deepEqual(pagePlaceOf({ repo: '/r', factory: 'nemia' }), { repo: '/r' });
     for (const none of [{}, { repo: '' }, { repo: ['/r'] }, { repo: 7 }]) assert.deepEqual(pagePlaceOf(none), {});
   });
-  await t.test(
-    'REFUSED: an agent made from New agent is hired only when the api takes the hire — a refusal is said, in its words, never passed over',
-    async () => {
-      const place = { factory: 'mill', workflow: 'mine', step: 'plan' };
-      const sent: string[] = [];
-      const taken = async (factory: string, step: string, agent: string) => {
-        sent.push(`${factory} ${step} ${agent}`);
-      };
-      assert.deepEqual(await hireOnCreate(place, 'scribe', taken), { hired: true });
-      assert.deepEqual(sent, ['mill mine/plan scribe'], 'the step is sent as <workflow>/<step>');
-      const words = 'mill does not offer the workflow mine, so it hires no one into its steps.';
-      assert.deepEqual(await hireOnCreate(place, 'scribe', () => Promise.reject(new Error(words))), { hired: false, why: words });
-    },
-  );
-  await t.test("a template's condition is amiss when Applied is not true, or ConflictsPending is: the others are as they should be", () => {
+  test('REFUSED: an agent made from New agent is hired only when the api takes the hire — a refusal is said, in its words, never passed over', async () => {
+    const place = { factory: 'mill', workflow: 'mine', step: 'plan' };
+    const sent: string[] = [];
+    const taken = async (factory: string, step: string, agent: string) => {
+      sent.push(`${factory} ${step} ${agent}`);
+    };
+    assert.deepEqual(await hireOnCreate(place, 'scribe', taken), { hired: true });
+    assert.deepEqual(sent, ['mill mine/plan scribe'], 'the step is sent as <workflow>/<step>');
+    const words = 'mill does not offer the workflow mine, so it hires no one into its steps.';
+    assert.deepEqual(await hireOnCreate(place, 'scribe', () => Promise.reject(new Error(words))), { hired: false, why: words });
+  });
+  test("a template's condition is amiss when Applied is not true, or ConflictsPending is: the others are as they should be", () => {
     assert.equal(conditionAmiss({ type: 'Applied', status: 'True' }), false);
     assert.equal(conditionAmiss({ type: 'Applied', status: 'False' }), true);
     assert.equal(conditionAmiss({ type: 'ConflictsPending', status: 'False' }), false);

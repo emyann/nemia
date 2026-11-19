@@ -13,7 +13,7 @@
 
  */
 import { storeGiven } from './config-given.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -158,9 +158,9 @@ const decidedAtAuto = async (command: string) =>
     )
   )?.decision;
 
-test('Her floor: a call on a run or a factory left at manual is denied, one raised is hers, an unread run asked; the store raised raises every factory', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('Her floor: a call on a run or a factory left at manual is denied, one raised is hers, an unread run asked; the store raised raises every factory', () => {
+  const s = story(test);
+  s.test(
     'REFUSED: a call on a run of a factory at manual, or on the factory, is denied; one raised is hers; an unread run is asked',
     async () => {
       for (const name of ['pipao', 'hkb']) factory(name);
@@ -179,16 +179,16 @@ test('Her floor: a call on a run or a factory left at manual is denied, one rais
       assert.equal(await decided('nemia show r-pipao', 'none'), undefined, 'no floor, no scope');
     },
   );
-  await s.test("the store's level raised raises the default factory, and every factory without its own", async () => {
+  s.test("the store's level raised raises the default factory, and every factory without its own", async () => {
     writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
     assert.equal(await decided('nemia show r-default'), undefined, "the store's level raises the default factory");
     assert.equal(await decided('nemia show r-pipao'), undefined, 'and every factory without its own');
   });
 });
 
-test('Auto rules decide an approval: proposed, confirmed beside the default, given unasked at auto, asked otherwise, dropped, and a proposal gone stale', async (t) => {
-  const s = story(t);
-  await s.test("a proposal writes the agent's file alone; the person's list is none, and the default stays in force", async () => {
+describe('Auto rules decide an approval: proposed, confirmed beside the default, given unasked at auto, asked otherwise, dropped, and a proposal gone stale', () => {
+  const s = story(test);
+  s.test("a proposal writes the agent's file alone; the person's list is none, and the default stays in force", async () => {
     writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
     assert.equal(fs.existsSync(confirmedFile(ROOT, 'nemia')), false);
     assert.equal(path.dirname(proposedFile(ROOT, 'nemia')), path.dirname(confirmedFile(ROOT, 'nemia')));
@@ -206,7 +206,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     );
     assert.deepEqual(list.proposed?.guidance, ['be kind to the reviewer']);
   });
-  await s.test('the first confirm seeds the list with the default beside the rule confirmed, marked by where each came from', async () => {
+  s.test('the first confirm seeds the list with the default beside the rule confirmed, marked by where each came from', async () => {
     confirmRule(ROOT, 'nemia', 'tries', TRIES, NOW);
     assert.deepEqual(readConfirmed(ROOT, 'nemia'), {
       since: NOW.toISOString(),
@@ -217,12 +217,12 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     const words = list.rules[1]?.words ?? '';
     for (const fact of ['Try implement again', 'its check passed', 'under $20']) assert.ok(words.includes(fact), words);
   });
-  await s.test("a proposal written again leaves the person's list as it was: it is no proposal's to write", () => {
+  s.test("a proposal written again leaves the person's list as it was: it is no proposal's to write", () => {
     const before = fs.readFileSync(confirmedFile(ROOT, 'nemia'));
     writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL.replace('20', '30')), digest: null });
     assert.deepEqual(fs.readFileSync(confirmedFile(ROOT, 'nemia')), before, "the person's list is no proposal's to write");
   });
-  await s.test(
+  s.test(
     'at auto, an approval the default allows is given unasked; at semi-auto, on a refused check, an unread run, or a cap raised, asked',
     async () => {
       for (const name of ['auto', 'semi']) factory(name);
@@ -271,7 +271,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       assert.equal(await decidedAtAuto('nemia retry g-free implement --budget 5'), 'ask', 'is asked once it raises the cap');
     },
   );
-  await s.test(
+  s.test(
     "REFUSED: at auto, a gate whose step proposes a cap above a step's own budget is asked; one within it is given unasked",
     async () => {
       const schema = { type: 'object', properties: { budgets: BUDGETS_SCHEMA }, required: ['budgets'], additionalProperties: false };
@@ -299,7 +299,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       assert.equal(await decidedAtAuto('nemia approve g-within build'), undefined, '$30 for land, within it');
     },
   );
-  await s.test(
+  s.test(
     "REFUSED: at auto, a gate whose caps pass the run's cost line is asked; one whose caps stay under it is given unasked",
     async () => {
       const schema = { type: 'object', properties: { budgets: BUDGETS_SCHEMA }, required: ['budgets'], additionalProperties: false };
@@ -333,25 +333,22 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       assert.equal(await decidedAtAuto('nemia approve g-under build'), undefined, '$30 for land, under the line of $50');
     },
   );
-  await s.test('REFUSED: a confirm of a rule is asked every time, at auto', async () => {
+  s.test('REFUSED: a confirm of a rule is asked every time, at auto', async () => {
     assert.equal(await decidedAtAuto('nemia policy confirm nemia default'), 'ask');
   });
-  await s.test(
-    'a proposal read from a custom instruction is stale once its words change, and one proposed from none is stale',
-    async () => {
-      const file = customInstructionsFile(ROOT, 'nemia');
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, 'approve when all agree\n');
-      writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: digestOf('approve when all agree') });
-      assert.equal((await shown()).proposed?.stale, false);
-      assert.equal((await shown()).instruction, 'approve when all agree');
-      fs.writeFileSync(file, 'approve when all agree, and retry a check once\n');
-      assert.equal((await shown()).proposed?.stale, true);
-      writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
-      assert.equal((await shown()).proposed?.stale, true, 'proposed from no instruction');
-    },
-  );
-  await s.test("her custom instruction is read through the Agent door: shown, and a proposal's digest is of it, none on disk", async () => {
+  s.test('a proposal read from a custom instruction is stale once its words change, and one proposed from none is stale', async () => {
+    const file = customInstructionsFile(ROOT, 'nemia');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'approve when all agree\n');
+    writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: digestOf('approve when all agree') });
+    assert.equal((await shown()).proposed?.stale, false);
+    assert.equal((await shown()).instruction, 'approve when all agree');
+    fs.writeFileSync(file, 'approve when all agree, and retry a check once\n');
+    assert.equal((await shown()).proposed?.stale, true);
+    writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
+    assert.equal((await shown()).proposed?.stale, true, 'proposed from no instruction');
+  });
+  s.test("her custom instruction is read through the Agent door: shown, and a proposal's digest is of it, none on disk", async () => {
     const home = scratch('auto-store-');
     const agents = agentDoorMemory();
     const WORDS = 'approve when all agree, in memory';
@@ -368,7 +365,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     assert.equal(readProposed(home, 'nemia')?.digest, digestOf(WORDS), 'the digest is of the words the door holds');
     assert.equal(list.proposed?.stale, false);
   });
-  await s.test('the person drops the default: an approval is asked, and a list that does not read lets nothing through', async () => {
+  s.test('the person drops the default: an approval is asked, and a list that does not read lets nothing through', async () => {
     dropRule(ROOT, 'nemia', 'default', new Date('2026-10-06T09:00:00.000Z'));
     assert.deepEqual(
       readConfirmed(ROOT, 'nemia')?.rules.map((r) => r.id),
@@ -378,7 +375,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     fs.writeFileSync(confirmedFile(ROOT, 'nemia'), '{');
     assert.equal(await decidedAtAuto('nemia approve g-auto build'), 'ask', 'a list that does not read lets nothing through');
   });
-  await s.test('a drop before any confirm takes the default out of force, and the default is confirmed again by its id', async () => {
+  s.test('a drop before any confirm takes the default out of force, and the default is confirmed again by its id', async () => {
     const home = proposed();
     dropRule(home, 'nemia', 'default', NOW);
     assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [], 'nothing in force: every answer is asked');
@@ -388,41 +385,38 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
   });
 });
 
-test('`nemia admit` refuses a floor that is no level and an --auto naming no agent', async (t) => {
-  await t.test('REFUSED: a floor that is no level, naming the flags', () => {
+describe('`nemia admit` refuses a floor that is no level and an --auto naming no agent', () => {
+  test('REFUSED: a floor that is no level, naming the flags', () => {
     names(ADMIT.check?.({ atLeast: 'on' }), '"on" is no level', 'nemia admit', '--at-least manual|semi-auto|auto', '--auto <agent>');
   });
-  await t.test('a floor that is a level', () => {
+  test('a floor that is a level', () => {
     assert.equal(ADMIT.check?.({ atLeast: 'semi-auto' }), null);
   });
-  await t.test('REFUSED: --auto naming no agent', () => {
+  test('REFUSED: --auto naming no agent', () => {
     const said = ADMIT.check?.({ auto: '../x' });
     names(said, "`../x` is not an agent's name:");
     assert.ok(said!.startsWith('`../x`'), said!);
   });
-  await t.test('--auto naming an agent', () => {
+  test('--auto naming an agent', () => {
     assert.equal(ADMIT.check?.({ auto: 'nemia' }), null);
   });
 });
 
-test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
-  await t.test(
-    'REFUSED (Missing, Conflict, Invalid): a rule not proposed, one in force already, a drop of one not in force, a name that is no agent',
-    () => {
-      const home = proposed();
-      assert.equal(refusal(() => confirmRule(home, 'nemia', 'ghost', TRIES, NOW)).kind, 'Missing');
-      assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
-      assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', DEFAULT, NOW)).kind, 'Conflict', 'the default is in force already');
-      assert.equal(refusal(() => dropRule(home, 'nemia', 'tries', NOW)).kind, 'Missing');
-      assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
-      confirmRule(home, 'nemia', 'tries', TRIES, NOW);
-      const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
-      assert.equal(kind, 'Conflict');
-      names(message, 'nemia policy rm nemia tries');
-      assert.equal(refusal(() => confirmedFile(home, '../x')).kind, 'Invalid');
-    },
-  );
-  await t.test('REFUSED (Conflict): a confirm of words the rule under its id no longer reads, proposed again since', () => {
+describe('The rules on disk refuse, by their kind, writing nothing', () => {
+  test('REFUSED (Missing, Conflict, Invalid): a rule not proposed, one in force already, a drop of one not in force, a name that is no agent', () => {
+    const home = proposed();
+    assert.equal(refusal(() => confirmRule(home, 'nemia', 'ghost', TRIES, NOW)).kind, 'Missing');
+    assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
+    assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', DEFAULT, NOW)).kind, 'Conflict', 'the default is in force already');
+    assert.equal(refusal(() => dropRule(home, 'nemia', 'tries', NOW)).kind, 'Missing');
+    assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
+    confirmRule(home, 'nemia', 'tries', TRIES, NOW);
+    const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
+    assert.equal(kind, 'Conflict');
+    names(message, 'nemia policy rm nemia tries');
+    assert.equal(refusal(() => confirmedFile(home, '../x')).kind, 'Invalid');
+  });
+  test('REFUSED (Conflict): a confirm of words the rule under its id no longer reads, proposed again since', () => {
     const home = proposed();
     writeProposed(home, 'nemia', {
       at: NOW.toISOString(),
@@ -437,7 +431,7 @@ test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
     assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', `${DEFAULT} `, NOW)).kind, 'Conflict', "the default's own words");
     assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
   });
-  await t.test("REFUSED (Invalid): a person's list that does not read, naming its file and the fix", () => {
+  test("REFUSED (Invalid): a person's list that does not read, naming its file and the fix", () => {
     const home = scratch('auto-store-');
     fs.mkdirSync(path.dirname(confirmedFile(home, 'nemia')), { recursive: true });
     fs.writeFileSync(
@@ -459,7 +453,7 @@ test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
     ['the id of the rule that ships', JSON.stringify({ rules: [{ ...rule, id: 'default' }] })],
     ['a blank word of guidance', JSON.stringify({ rules: [rule], guidance: [''] })],
   ] as const)
-    await t.test(`REFUSED (Invalid): a proposal with ${name}`, () => {
+    test(`REFUSED (Invalid): a proposal with ${name}`, () => {
       assert.equal(refusal(() => proposalOf(words)).kind, 'Invalid', words);
     });
 });

@@ -3,7 +3,7 @@
  * outside the folder reaches past the door, and the skill a session loads before it changes the board names every part the door
  * exports. Each rule is run on a fixture that breaks it, then on the tree.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,8 +55,8 @@ function filesUnder(dir: string, from = dir): string[] {
   });
 }
 
-test("the look's door: every part with its stories, no import past the door, and every part the door exports named by the skill", async (t) => {
-  await t.test('REFUSED: a part of the look with no story', () => {
+describe("the look's door: every part with its stories, no import past the door, and every part the door exports named by the skill", () => {
+  test('REFUSED: a part of the look with no story', () => {
     const shipped = fs.readdirSync(LOOK);
     assert.ok(shipped.includes('CutFrame.tsx') && shipped.includes('index.ts'), 'the folder is read');
     assert.deepEqual(lookStoryless([...shipped, 'Extra.tsx']), ['Extra'], 'a part added with no stories is named');
@@ -67,7 +67,7 @@ test("the look's door: every part with its stories, no import past the door, and
     );
     assert.deepEqual(lookStoryless(shipped), [], 'every shipped part has its stories');
   });
-  await t.test('REFUSED: an import past the door of the look', () => {
+  test('REFUSED: an import past the door of the look', () => {
     assert.deepEqual(pastDoor('components/run/WaitingCard.tsx', "import { CutFrame } from '../look/CutFrame';"), ['../look/CutFrame']);
     assert.deepEqual(pastDoor('routes/runs.index.tsx', "import { Plate } from '@/components/look/Plate';"), ['@/components/look/Plate']);
     assert.deepEqual(pastDoor('routes/x.tsx', "const cut = await import('../components/look/cut.ts');"), ['../components/look/cut.ts']);
@@ -83,7 +83,7 @@ test("the look's door: every part with its stories, no import past the door, and
     for (const file of files)
       assert.deepEqual(pastDoor(file, fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} goes through the door`);
   });
-  await t.test('REFUSED: a part the door exports that the skill does not name', () => {
+  test('REFUSED: a part the door exports that the skill does not name', () => {
     const door = fs.readFileSync(path.join(LOOK, 'index.ts'), 'utf8');
     const skill = fs.readFileSync(SKILL, 'utf8');
     assert.deepEqual(
@@ -148,8 +148,8 @@ export function surfaceSpecks(css: string): { light: string; dark: string } {
   return { light: specksOf(css.slice(0, dark)), dark: specksOf(css.slice(dark, drawn)) };
 }
 
-test("the cut and the grain in the board's source: no ring a clip breaks, the composer's cut field, the grain's tiles, its import and its specks", async (t) => {
-  await t.test('REFUSED: a focus ring in a file that draws a cut: a clip takes a rectangular ring off the two cut corners', () => {
+describe("the cut and the grain in the board's source: no ring a clip breaks, the composer's cut field, the grain's tiles, its import and its specks", () => {
+  test('REFUSED: a focus ring in a file that draws a cut: a clip takes a rectangular ring off the two cut corners', () => {
     assert.deepEqual(ringedCut("'ring-1 ring-outline-variant ring-inset focus-within:ring-2 focus-within:ring-alive'"), [
       'focus-within:ring-2',
       'focus-within:ring-alive',
@@ -171,7 +171,7 @@ test("the cut and the grain in the board's source: no ring a clip breaks, the co
     for (const file of drawing)
       assert.deepEqual(ringedCut(fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} draws a ring the cut would break`);
   });
-  await t.test("a field drawn in a cut takes the look's cut field, and the send beside it a band in the cut shape", () => {
+  test("a field drawn in a cut takes the look's cut field, and the send beside it a band in the cut shape", () => {
     const composer = fs.readFileSync(path.join(SRC, 'components', 'conversation', 'Composer.tsx'), 'utf8');
     assert.match(composer, /import\s*\{[^}]*\bCutField\b[^}]*\}\s*from\s*'@\/components\/look'/, 'the field through the door');
     assert.match(composer, /<CutField\s+size=\{COMPOSER_CUT\}/, 'its edge is drawn in its cut, never a ring a clip breaks');
@@ -179,7 +179,7 @@ test("the cut and the grain in the board's source: no ring a clip breaks, the co
     assert.match(composer, /clipPath:\s*cutRing\(COMPOSER_CUT, GAP, RING\)/, "the send's focus ring is a band in the send's cut");
     assert.match(composer, /group-has-data-focus-visible\/send:block/, 'shown when the keyboard reaches the send');
   });
-  await t.test("REFUSED: a grain's tile written outside the look's grain, which holds three, each once", () => {
+  test("REFUSED: a grain's tile written outside the look's grain, which holds three, each once", () => {
     const sources = Object.fromEntries(
       filesUnder(SRC)
         .filter((file) => /\.(?:tsx?|css)$/.test(file) && ours(`src/${file}`))
@@ -197,7 +197,7 @@ test("the cut and the grain in the board's source: no ring a clip breaks, the co
     assert.equal(grain.split('--grain-label:').length - 1, 1, "a label's tile is the same in both schemes");
     assert.equal(grain.split('--grain-surface:').length - 1, 2, "a surface's tile is written for each scheme");
   });
-  await t.test('REFUSED: an entry stylesheet that imports the grain under another at-rule, or not at all', () => {
+  test('REFUSED: an entry stylesheet that imports the grain under another at-rule, or not at all', () => {
     const grain = "@import './components/look/grain.css';";
     assert.equal(readsGrain(`@import 'tailwindcss';\n${grain}\n@custom-variant dark {\n}\n`), true);
     assert.equal(readsGrain(`@import 'tailwindcss';\n@custom-variant dark {\n}\n${grain}\n`), false, 'the build drops it there');
@@ -205,7 +205,7 @@ test("the cut and the grain in the board's source: no ring a clip breaks, the co
     assert.equal(readsGrain("@import\n  './components/look/grain.css'\n;\n@layer base {\n}\n"), true, 'across line breaks');
     assert.equal(readsGrain(fs.readFileSync(path.join(SRC, 'styles.css'), 'utf8')), true, 'the board reads it');
   });
-  await t.test("REFUSED: a surface's grain whose specks are ink in the dark scheme or white in the light one", () => {
+  test("REFUSED: a surface's grain whose specks are ink in the dark scheme or white in the light one", () => {
     const grain = fs.readFileSync(path.join(SRC, GRAIN), 'utf8');
     const [light, dark] = [...grain.matchAll(/--grain-surface\s*:\s*(url\([^)]+\))/g)].map((found) => found[1] ?? '');
     assert.ok(light && dark && light !== dark, 'the grain writes a surface tile for each scheme');

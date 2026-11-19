@@ -2,7 +2,7 @@
  * A `claude -p` job followed live (`RunnerOps.follow`, `followOf`): its run file, the stdout its worker keeps whole and its
  * transcript written by the test as the worker and Claude Code write them, and what a follower is handed read back in order.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +14,7 @@ import { claudeTranscriptEvents } from '../src/harness/claude/transcript.ts';
 import type { Followed } from '../src/harness/seam.ts';
 import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from '../src/waits/index.ts';
-import { story } from 'test-kit/checkpoints';
+import { outlived, story, teardowns } from 'test-kit/checkpoints';
 
 const line = (o: object) => `${JSON.stringify(o)}\n`;
 const event = (e: object) => line({ type: 'stream_event', event: e, session_id: 'sid-1' });
@@ -75,16 +75,22 @@ const followFailure = async (ops: ReturnType<typeof detachedOps>, name: string) 
   return err.message;
 };
 
-test('a job is followed live to its end, and followed again once settled', WAITED, async (t) => {
-  const s = story(t);
-  const j = job('ae/f1/1', OPENED + event({ type: 'content_block_start', index: 0 }) + delta(0, 'Riv'));
-  j.transcript({ type: 'user', uuid: 'u-1', timestamp: '2026-10-07T11:59:59.000Z', message: { role: 'user', content: 'Say it.' } });
+describe('a job is followed live to its end, and followed again once settled', WAITED, () => {
+  const outer = outlived();
+  let j!: ReturnType<typeof job>;
+  let ended!: ReturnType<typeof follow>;
+  beforeAll(() => {
+    const t = teardowns();
+    j = job('ae/f1/1', OPENED + event({ type: 'content_block_start', index: 0 }) + delta(0, 'Riv'));
+    j.transcript({ type: 'user', uuid: 'u-1', timestamp: '2026-10-07T11:59:59.000Z', message: { role: 'user', content: 'Say it.' } });
+    return t.end;
+  });
+  const s = story(test);
   const got: Followed[] = [];
-  let ended: ReturnType<typeof follow>;
-  await s.test('a followed job says its state and the text so far', async () => {
+  s.test('a followed job says its state and the text so far', async () => {
     ended = follow(j.ops, 'ae/f1/1', got);
     await until(
-      t,
+      outer,
       () => got.length >= 2,
       () => `the state and the text so far: ${JSON.stringify(got)}`,
       { bell: rung },
@@ -94,12 +100,12 @@ test('a job is followed live to its end, and followed again once settled', WAITE
       { kind: 'partial', key: 'msg_1:0', text: 'Riv', append: false, last: false },
     ]);
   });
-  await s.test('then each piece once and in order, though its run file is rewritten between them', async () => {
+  s.test('then each piece once and in order, though its run file is rewritten between them', async () => {
     j.stdout(delta(0, 'ers'));
     j.setState('working');
     j.stdout(delta(0, ' run.') + event({ type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 's' } }));
     await until(
-      t,
+      outer,
       () => got.length >= 4,
       () => `each piece: ${JSON.stringify(got)}`,
       { bell: rung },
@@ -115,11 +121,11 @@ test('a job is followed live to its end, and followed again once settled', WAITE
       'each piece once, in order, the state not said again for a rewrite of the run file',
     );
   });
-  await s.test('then each whole event of its transcript once, and it ends when it settles', async () => {
+  s.test('then each whole event of its transcript once, and it ends when it settles', async () => {
     j.stdout(line(said('a-1', 'Rivers run.')) + event({ type: 'content_block_stop', index: 0 }));
     j.transcript(said('a-1', 'Rivers run.'));
     await until(
-      t,
+      outer,
       () => got.some((m) => m.kind === 'events'),
       () => `the whole message: ${JSON.stringify(got)}`,
       { bell: rung },
@@ -142,29 +148,25 @@ test('a job is followed live to its end, and followed again once settled', WAITE
     );
     assert.equal(events?.kind === 'events' && events.events[0]?.text, 'Rivers run.');
   });
-  await s.test('a job followed once it has settled says its state alone, and ends', async () => {
+  s.test('a job followed once it has settled says its state alone, and ends', async () => {
     const again: Followed[] = [];
     assert.ok(Exit.isSuccess(await follow(j.ops, 'ae/f1/1', again)));
     assert.deepEqual(again, [{ kind: 'state', state: 'completed' }]);
   });
 });
 
-test('REFUSED: a follow of a job fails, naming what to fix', async (t) => {
-  await t.test(
-    'a job whose stdout says a piece of text under no number fails the follow, naming the line, its field and the schema',
-    async () => {
-      const j = job(
-        'ae/f2/1',
-        OPENED + event({ type: 'content_block_delta', index: 'one', delta: { type: 'text_delta', text: 'x' } }),
-        'done',
-      );
-      const message = await followFailure(j.ops, 'ae/f2/1');
-      assert.match(message, /^claude: `ae\/f2\/1`'s output cannot be followed: /);
-      for (const name of ['line 3', '`stream_event`', '`event.index`', '`PRINTED`'])
-        assert.ok(message.includes(name), `${name}: ${message}`);
-    },
-  );
-  await t.test('a name with no run is not followed', async () => {
+describe('REFUSED: a follow of a job fails, naming what to fix', () => {
+  test('a job whose stdout says a piece of text under no number fails the follow, naming the line, its field and the schema', async () => {
+    const j = job(
+      'ae/f2/1',
+      OPENED + event({ type: 'content_block_delta', index: 'one', delta: { type: 'text_delta', text: 'x' } }),
+      'done',
+    );
+    const message = await followFailure(j.ops, 'ae/f2/1');
+    assert.match(message, /^claude: `ae\/f2\/1`'s output cannot be followed: /);
+    for (const name of ['line 3', '`stream_event`', '`event.index`', '`PRINTED`']) assert.ok(message.includes(name), `${name}: ${message}`);
+  });
+  test('a name with no run is not followed', async () => {
     const j = job('ae/f4/1', '');
     const message = await followFailure(j.ops, 'ae/f4/2');
     assert.match(message, /^claude: no session `ae\/f4\/2` is there to follow/);

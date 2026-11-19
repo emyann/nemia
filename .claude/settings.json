@@ -23,7 +23,7 @@
       "Bash(npm run board:serve)",
       "Bash(npm run board:stop)",
       "Bash(npx turbo run test:*)",
-      "Bash(node --test:*)",
+      "Bash(npx vitest run:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",

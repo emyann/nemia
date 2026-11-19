@@ -2,7 +2,7 @@
  * The machine's memory read off `/proc/meminfo`'s text: a planted text, never the host's own, so the test says the same on every
  * machine.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { meminfoOf } from './machine.ts';
 
@@ -14,17 +14,17 @@ const MEMINFO = [
   'Cached:          7012448 kB',
 ].join('\n');
 
-test("meminfoOf: the machine's total and available memory in bytes off the kernel's lines, and nothing where either is missing", async (t) => {
-  await t.test('both lines: each kibibyte count in bytes', () => {
+describe("meminfoOf: the machine's total and available memory in bytes off the kernel's lines, and nothing where either is missing", () => {
+  test('both lines: each kibibyte count in bytes', () => {
     assert.deepEqual(meminfoOf(MEMINFO), { totalBytes: 16318412 * 1024, availableBytes: 9 * 2 ** 30 });
   });
-  await t.test('no `MemAvailable`, as a kernel before 3.14 writes it: no reading, never a guess from free memory', () => {
+  test('no `MemAvailable`, as a kernel before 3.14 writes it: no reading, never a guess from free memory', () => {
     assert.equal(meminfoOf(MEMINFO.replace(/^MemAvailable:.*$/m, '')), undefined);
   });
-  await t.test('no `MemTotal`: no reading', () => {
+  test('no `MemTotal`: no reading', () => {
     assert.equal(meminfoOf(MEMINFO.replace(/^MemTotal:.*$/m, '')), undefined);
   });
-  await t.test('an empty file: no reading', () => {
+  test('an empty file: no reading', () => {
     assert.equal(meminfoOf(''), undefined);
   });
 });

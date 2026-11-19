@@ -11,7 +11,8 @@
  * `src/factory/applied/render.test.ts`; the system's own tar, `template-tar.boundary.test.ts`. Its store is its own at `ROOT`, given as
  * `ENV`, and `CLAUDE_CONFIG_DIR` is set before any test runs.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -67,13 +68,13 @@ function filesOf(dir: string, under = ''): Array<[string, number, string]> {
 }
 
 /** What `argv` printed, as `nemia` prints it, line by line. */
-async function printedBy(t: { mock: { method: Function } }, ...argv: string[]): Promise<string[]> {
+async function printedBy(t: TestContext, ...argv: string[]): Promise<string[]> {
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...words: unknown[]) => printed.push(words.join(' ')));
+  const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
   try {
     await stage.main(argv);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
   return printed.flatMap((p) => p.split('\n'));
 }
@@ -100,16 +101,23 @@ const factory = (name: string) =>
 
 const REVIEW = 'workflows/dev/review.md';
 
-test("a template's round trip: the team exported, checked, packed, unpacked, applied with --set, rendered, started and diffed", async (t) => {
-  const s = story(t);
-  const repo = scratch('wf-template-trip-repo-');
-  fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
-  const dir = path.join(scratch('wf-template-trip-out-'), 'team');
-  const archive = path.join(scratch('wf-template-trip-pack-'), 'team.tgz');
-  const parent = scratch('wf-template-trip-unpack-');
+describe("a template's round trip: the team exported, checked, packed, unpacked, applied with --set, rendered, started and diffed", () => {
+  let repo!: string;
+  let dir!: string;
+  let archive!: string;
+  let parent!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    repo = scratch('wf-template-trip-repo-');
+    fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+    dir = path.join(scratch('wf-template-trip-out-'), 'team');
+    archive = path.join(scratch('wf-template-trip-pack-'), 'team.tgz');
+    parent = scratch('wf-template-trip-unpack-');
+    return t.end;
+  });
+  const s = story(test);
   const checked = (source: string) => checkedTree(readTemplate(source), packageSkillNames()).problems;
-
-  await s.test("the tests' team exports into a folder that passes its check, each part said with where it came from", () => {
+  s.test("the tests' team exports into a folder that passes its check, each part said with where it came from", () => {
     stage.place().world.repository(repo, {});
     stage.place().world.commit(repo, 'base');
     const reviewer = path.join(repo, 'workflows', 'agents', 'reviewer.md');
@@ -158,8 +166,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
       fs.readFileSync(path.join(repo, 'workflows/agents/review.schema.json'), 'utf8'),
     );
   });
-
-  await s.test('a parameter given its place, nemia template lint says the folder passes, with the digest of its content', async (t) => {
+  s.test('a parameter given its place, nemia template lint says the folder passes, with the digest of its content', async (t) => {
     edit(dir, 'nemia.yaml', (spec) => {
       spec.parameters = {
         budget: { type: 'number', description: 'dollars for a review' },
@@ -176,8 +183,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.deepEqual(printed, [`${dir} passes`, `digest of the content: ${readTemplate(dir).digest}`]);
     assert.match(printed[1], /^digest of the content: sha256:[0-9a-f]{64}$/);
   });
-
-  await s.test('pack and unpack give the folder back byte for byte with its modes, one digest for all three', async (t) => {
+  s.test('pack and unpack give the folder back byte for byte with its modes, one digest for all three', async (t) => {
     const digest = `digest of the content: ${readTemplate(dir).digest}`;
     const team = path.join(parent, 'team');
     assert.deepEqual(await printedBy(t, 'template', 'pack', dir, '--out', archive), [`written: ${archive}`, digest]);
@@ -197,8 +203,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.deepEqual(fs.readFileSync(again), fs.readFileSync(archive), 'the same folder packs to the same bytes');
     fs.rmSync(again);
   });
-
-  await s.test("apply of the archive with --set files only the factory's file, and trusts the repository it names", async () => {
+  s.test("apply of the archive with --set files only the factory's file, and trusts the repository it names", async () => {
     const made = (await stage.main(['factory', 'apply', 'trip', '--template', archive, '--volume', `${repo}:rw`, '--set', 'budget=7'])) as {
       trusts: ReadonlyArray<{ place: string; wrote?: boolean }>;
     };
@@ -227,8 +232,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
       JSON.stringify(made.trusts),
     );
   });
-
-  await s.test('the controller renders the base read-only and seeds the tree once; the tree, once seeded, is the person’s', async () => {
+  s.test('the controller renders the base read-only and seeds the tree once; the tree, once seeded, is the person’s', async () => {
     const at = AT;
     const status = reconciledAt(factory('trip'), at);
     assert.deepEqual(status.conditions, [
@@ -267,38 +271,32 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.match(fs.readFileSync(review, 'utf8'), /^budget: 9$/m, "the tree, once seeded, is the person's");
     assert.equal(fs.statSync(statusFile(ROOT, 'trip')).mtimeMs, written, 'a status that did not change is not written');
   });
-
-  await s.test(
-    'a restart reads it all again off the disk, a status it cannot read written again, a tree removed seeded again',
-    async () => {
-      const status = readStatus(ROOT, 'trip')!;
-      const tree = path.join(treeDir(ROOT, 'trip'), REVIEW);
-      const kept = fs.readFileSync(tree, 'utf8');
-      fs.rmSync(statusFile(ROOT, 'trip'));
-      fs.rmSync(treeDir(ROOT, 'trip'), { recursive: true });
-      await Effect.runPromise(
-        reconcileOnce().pipe(Effect.provideService(StoreRoot, ROOT), Effect.provideService(Clock.Clock, seededClock(Date.parse(AT)))),
-      );
-      assert.deepEqual(readStatus(ROOT, 'trip'), status);
-      assert.match(fs.readFileSync(tree, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
-      const onDisk = JSON.parse(fs.readFileSync(statusFile(ROOT, 'trip'), 'utf8'));
-      const [applied, conflicts] = status.conditions;
-      fs.writeFileSync(statusFile(ROOT, 'trip'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
-      assert.equal(readStatus(ROOT, 'trip'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
-      assert.deepEqual(reconciledAt(factory('trip'), AT), status, 'and the next pass writes it again');
-      fs.writeFileSync(tree, kept);
-    },
-  );
-
-  await s.test("a bare workflow name started is the tree's, and the run is told the tree's step as the person changed it", async () => {
+  s.test('a restart reads it all again off the disk, a status it cannot read written again, a tree removed seeded again', async () => {
+    const status = readStatus(ROOT, 'trip')!;
+    const tree = path.join(treeDir(ROOT, 'trip'), REVIEW);
+    const kept = fs.readFileSync(tree, 'utf8');
+    fs.rmSync(statusFile(ROOT, 'trip'));
+    fs.rmSync(treeDir(ROOT, 'trip'), { recursive: true });
+    await Effect.runPromise(
+      reconcileOnce().pipe(Effect.provideService(StoreRoot, ROOT), Effect.provideService(Clock.Clock, seededClock(Date.parse(AT)))),
+    );
+    assert.deepEqual(readStatus(ROOT, 'trip'), status);
+    assert.match(fs.readFileSync(tree, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
+    const onDisk = JSON.parse(fs.readFileSync(statusFile(ROOT, 'trip'), 'utf8'));
+    const [applied, conflicts] = status.conditions;
+    fs.writeFileSync(statusFile(ROOT, 'trip'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
+    assert.equal(readStatus(ROOT, 'trip'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
+    assert.deepEqual(reconciledAt(factory('trip'), AT), status, 'and the next pass writes it again');
+    fs.writeFileSync(tree, kept);
+  });
+  s.test("a bare workflow name started is the tree's, and the run is told the tree's step as the person changed it", async () => {
     const started = (await stage.main(['start', 'Cache the views', '--factory', 'trip', '--workflows', 'dev'])) as StartedAnswer;
     const run = runRecord(ROOT, started.id);
     assert.equal(run.workflowDir, path.join(treeDir(ROOT, 'trip'), 'workflows', 'dev'));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9);
     assert.equal(run.factory, 'trip');
   });
-
-  await s.test("a due schedule starts the tree's workflow, as a person's start does, never the repository's", async (t) => {
+  s.test("a due schedule starts the tree's workflow, as a person's start does, never the repository's", async (t) => {
     await printedBy(t, 'factory', 'schedule', 'trip', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views');
     const started = await stage.runWith(stage.board().e, startDue([], Date.parse('2100-01-01T00:00:00Z')));
     assert.ok(started && 'run' in started, `the due schedule started a run: ${JSON.stringify(started)}`);
@@ -306,8 +304,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.equal(run.workflowDir, path.join(treeDir(ROOT, 'trip'), 'workflows', 'dev'));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9);
   });
-
-  await s.test('a new version packed onto the archive is drift, left as it is, and nemia factory diff previews it', async (t) => {
+  s.test('a new version packed onto the archive is drift, left as it is, and nemia factory diff previews it', async (t) => {
     const before = readStatus(ROOT, 'trip')!;
     edit(dir, 'nemia.yaml', (spec) => {
       spec.version = '0.2.0';

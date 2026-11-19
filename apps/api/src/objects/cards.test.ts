@@ -4,7 +4,7 @@
  * `labelSelector` and its retired spelling select alike. The guard before every write is `test/guarded.test.ts`'s.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -103,7 +103,7 @@ test('a card filed, labelled, queued, taken off and dropped through the verbs is
 test('a stray file of the same name as a card is passed over: the card is read and pressed by its verbs, never answered 404', async (t) => {
   card('z-notes');
   fs.writeFileSync(path.join(inbox, 'z-notes'), 'a stray file, no card\n');
-  t.after(() => {
+  t.onTestFinished(() => {
     fs.rmSync(path.join(inbox, 'z-notes'), { force: true });
     fs.rmSync(path.join(inbox, 'z-notes.md'), { force: true });
   });
@@ -155,7 +155,7 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   card('w-started');
   run('ctx-a1');
   run('started-b2', 'w-started');
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const name of ['w-1', 'w-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
     for (const id of ['ctx-a1', 'started-b2']) fs.rmSync(path.join(runs, `${id}.json`), { force: true });
   });
@@ -206,7 +206,7 @@ test("PUT a card's text to its source: the name kept, the text's body and keys; 
       from: { inbox: 'e-started' },
     }),
   );
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const name of ['e-1', 'e-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
     fs.rmSync(path.join(runs, 'started-e3.json'), { force: true });
   });
@@ -262,7 +262,7 @@ test("a card filed from runs that disagree on a label says the key it left out, 
   run('left-a1', 'core');
   run('left-b2', 'infra');
   const filedAs: string[] = [];
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const name of filedAs) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
     for (const id of ['left-a1', 'left-b2'])
       for (const end of ['json', 'labels']) fs.rmSync(path.join(runs, `${id}.${end}`), { force: true });
@@ -294,7 +294,7 @@ test("a card filed from runs that disagree on a label says the key it left out, 
 test('a card file that does not parse is listed all the same, its status saying why, and read alone with that why', async (t) => {
   fs.mkdirSync(inbox, { recursive: true });
   fs.writeFileSync(path.join(inbox, 'y-broken.md'), '---\nnot-a-key: 1\n---\nDo it.\n');
-  t.after(() => fs.rmSync(path.join(inbox, 'y-broken.md'), { force: true }));
+  t.onTestFinished(() => fs.rmSync(path.join(inbox, 'y-broken.md'), { force: true }));
   const listed = (await list('/api/cards')).body.items.find((c) => c.metadata.name === 'y-broken');
   assert.ok(listed, 'listed, never hidden');
   assert.equal(listed.spec.body, undefined, 'no body read of a card that does not parse');

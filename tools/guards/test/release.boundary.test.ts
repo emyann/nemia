@@ -6,7 +6,7 @@
  * releases made, a tag it is asked for pushed to the origin. What it
  * asserts is the exit code, the calls made and positions in a body, never a sentence.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -330,7 +330,7 @@ test('a second pr with nothing moved pushes, patches and dispatches nothing; wit
   );
 });
 
-test("pr decides from the head's dispatched runs, never from whether it pushed: a missing, failed or cancelled run is dispatched again", async (t) => {
+describe("pr decides from the head's dispatched runs, never from whether it pushed: a missing, failed or cancelled run is dispatched again", () => {
   const settled = (status: string, conclusion: string | null) => {
     const w = world();
     const feature = w.land('a feature');
@@ -340,7 +340,7 @@ test("pr decides from the head's dispatched runs, never from whether it pushed: 
     w.state({ ...w.read(), runs: runs.map((run) => (run.file === 'ci.yml' ? { ...run, status, conclusion } : run)) });
     return w;
   };
-  await t.test('the head with no dispatched run left gets both, though release is not pushed', () => {
+  test('the head with no dispatched run left gets both, though release is not pushed', () => {
     const w = world();
     const feature = w.land('a feature');
     w.state({ pulls: [merged(1, ['feature'], feature)], labels: [], next: 900 });
@@ -353,13 +353,13 @@ test("pr decides from the head's dispatched runs, never from whether it pushed: 
     assert.deepEqual(dispatched(ran.calls), BOTH(900));
   });
   for (const conclusion of ['failure', 'cancelled'])
-    await t.test(`a ci ended ${conclusion} is dispatched again, and the queued release-label is left`, () => {
+    test(`a ci ended ${conclusion} is dispatched again, and the queued release-label is left`, () => {
       const w = settled('completed', conclusion);
       const ran = w.run('pr');
       assert.equal(ran.status, 0, ran.out);
       assert.deepEqual(dispatched(ran.calls), [['ci.yml', '--ref', 'release']]);
     });
-  await t.test('a ci that succeeded, or is still in progress, is not dispatched again', () => {
+  test('a ci that succeeded, or is still in progress, is not dispatched again', () => {
     for (const [status, conclusion] of [
       ['completed', 'success'],
       ['in_progress', null],
@@ -385,8 +385,8 @@ test('with every pull request merged since the last release internal, pr opens n
   assert.deepEqual(runReads(ran.calls), [], 'and no runs read');
 });
 
-test("check, given PR_NUMBER and no LABELS, reads the pull request's labels as they are now", async (t) => {
-  await t.test('the release pull request, labelled internal after it opened, passes', () => {
+describe("check, given PR_NUMBER and no LABELS, reads the pull request's labels as they are now", () => {
+  test('the release pull request, labelled internal after it opened, passes', () => {
     const w = world();
     const open: Pull = { ...merged(900, ['internal'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
     w.state({ pulls: [merged(1, ['fix'], w.legacy), open], labels: [], next: 901 });
@@ -398,13 +398,13 @@ test("check, given PR_NUMBER and no LABELS, reads the pull request's labels as t
       'one read, of the pull request by its number',
     );
   });
-  await t.test('REFUSED: the pull request carries no release label, exit 1', () => {
+  test('REFUSED: the pull request carries no release label, exit 1', () => {
     const w = world();
     const open: Pull = { ...merged(900, ['dependencies'], null), title: 'release: v1.0.0', head: { ref: 'release' } };
     w.state({ pulls: [open], labels: [], next: 901 });
     assert.equal(w.run('check', { PR_NUMBER: '900' }).status, 1);
   });
-  await t.test("a dispatched run passes on the pull request's head, and is refused on another commit, exit 1", () => {
+  test("a dispatched run passes on the pull request's head, and is refused on another commit, exit 1", () => {
     const w = world();
     const open: Pull = { ...merged(900, ['internal'], null), title: 'release: v1.0.0', head: { ref: 'release', sha: 'a'.repeat(40) } };
     w.state({ pulls: [open], labels: [], next: 901 });
@@ -416,7 +416,7 @@ test("check, given PR_NUMBER and no LABELS, reads the pull request's labels as t
     assert.equal(event.status, 0, 'an empty HEAD_SHA, as a pull_request event passes it, compares nothing');
     assert.equal(event.calls.length, 1, 'one read');
   });
-  await t.test('REFUSED: no pull request has the number, exit 1', () => {
+  test('REFUSED: no pull request has the number, exit 1', () => {
     const w = world();
     w.state({ pulls: [], labels: [], next: 901 });
     assert.equal(w.run('check', { PR_NUMBER: '900' }).status, 1);

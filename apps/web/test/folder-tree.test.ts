@@ -2,7 +2,7 @@
  * A step's folder of files as the folders that hold them (src/lib/folderTree.ts), which the step's detail and an agent's try draw as the
  * kit's Tree.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { StepArtifact } from '../src/lib/api/tries.ts';
 import { folderTreeOf, type FolderTreeNode } from '../src/lib/folderTree.ts';

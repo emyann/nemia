@@ -6,7 +6,7 @@
  * Over the files a worker and a job's process leave: a run file, the hold file beside it and the store's sessions' drain, each written
  * here, read through the runner's own look (`observe`). No process runs.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,41 +59,41 @@ const LOST = { state: 'working', staleMs: STALE_MS + 10 * 60_000, nativeId: JOB_
 /** What of a sighting this test reads: its state and the hold's facts. */
 const factsOf = (s: Sighting) => ({ state: s.state, calling: s.calling, heldBack: s.heldBack, parked: s.parked });
 
-test('a job’s hold file, read into its sighting, and which lost job reads parked', async (t) => {
-  await t.test('while it works: the call it is in and the call it holds back', async () => {
+describe('a job’s hold file, read into its sighting, and which lost job reads parked', () => {
+  test('while it works: the call it is in and the call it holds back', async () => {
     const s = await sightingOf({ state: 'working', nativeId: JOB_ID }, { calling: CALL, heldBack: { since: CALL.since } });
     assert.deepEqual(factsOf(s), { state: 'working', calling: CALL, heldBack: { since: CALL.since }, parked: undefined });
   });
-  await t.test('held after a call: the call it stopped after, carried on `heldBack.after`', async () => {
+  test('held after a call: the call it stopped after, carried on `heldBack.after`', async () => {
     const heldBack = { since: CALL.since, after: { tool: 'Read' } };
     const s = await sightingOf({ state: 'working', nativeId: JOB_ID }, { heldBack });
     assert.deepEqual(s.heldBack, heldBack);
   });
-  await t.test('ended parked: `parked` with the call it cut, read failed', async () => {
+  test('ended parked: `parked` with the call it cut, read failed', async () => {
     const s = await sightingOf({ state: 'failed', nativeId: JOB_ID }, { parked: { at: CALL.since, calling: CALL } });
     assert.deepEqual(factsOf(s), { state: 'failed', calling: undefined, heldBack: undefined, parked: { calling: CALL } });
   });
-  await t.test('a lost job held back: parked, with its last call', async () => {
+  test('a lost job held back: parked, with its last call', async () => {
     const s = await sightingOf(LOST, { calling: CALL, heldBack: { since: CALL.since } });
     assert.deepEqual([s.state, s.parked], ['failed', { calling: CALL }]);
   });
-  await t.test('a lost job draining: parked, with its last call', async () => {
+  test('a lost job draining: parked, with its last call', async () => {
     const s = await sightingOf(LOST, { calling: CALL, draining: { since: CALL.since } });
     assert.deepEqual([s.state, s.parked], ['failed', { calling: CALL }]);
   });
-  await t.test('a lost job with no hold fact while a sessions’ drain stands: parked', async () => {
+  test('a lost job with no hold fact while a sessions’ drain stands: parked', async () => {
     const s = await sightingOf(LOST, undefined, true);
     assert.deepEqual([s.state, s.parked], ['failed', {}]);
   });
-  await t.test('REFUSED: a lost job with no hold fact and no drain is failed, as an ordinary crash, and not parked', async () => {
+  test('REFUSED: a lost job with no hold fact and no drain is failed, as an ordinary crash, and not parked', async () => {
     const s = await sightingOf(LOST, { calling: CALL });
     assert.deepEqual([s.state, s.parked], ['failed', undefined]);
   });
-  await t.test('REFUSED: a lost job with no session id is failed whatever its hold file says: there is nothing to resume', async () => {
+  test('REFUSED: a lost job with no session id is failed whatever its hold file says: there is nothing to resume', async () => {
     const s = await sightingOf({ ...LOST, nativeId: undefined }, { calling: CALL, heldBack: { since: CALL.since } }, true);
     assert.deepEqual([s.state, s.parked], ['failed', undefined]);
   });
-  await t.test('REFUSED: a job whose worker wrote its failure, not lost, is not parked by a drain standing', async () => {
+  test('REFUSED: a job whose worker wrote its failure, not lost, is not parked by a drain standing', async () => {
     const s = await sightingOf({ state: 'failed', nativeId: JOB_ID }, { draining: { since: CALL.since } }, true);
     assert.deepEqual([s.state, s.parked], ['failed', undefined]);
   });

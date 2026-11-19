@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts'",
+    "test": "vitest run",
     "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "@types/node": "^24.19.2",
     "js-yaml": "^4.3.2",
     "test-kit": "*",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "5.1.0"
   }
 }

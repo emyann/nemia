@@ -2,7 +2,7 @@
  * A harness's checks and the store's milestones (`src/harness-check.ts`, `src/milestones.ts`): a check turn, an install piece carrying its
  * two checks and the four milestones each decoded as the api answers them, a check state or a milestone word outside its words refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { HarnessTurn, Milestones, ReadinessPiece } from 'objects';

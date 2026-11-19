@@ -13,7 +13,7 @@
  * read where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -174,9 +174,9 @@ const asWaits = (waiting: Listed['waiting']): Wait[] =>
     ...(w.gone.length ? { gone: w.gone } : {}),
   }));
 
-test('a run waiting on runs, read on the list, its page and its decision as `nemia ls` and `nemia decide` say: what it waits on, whether it moves, when it started', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a run waiting on runs, read on the list, its page and its decision as `nemia ls` and `nemia decide` say: what it waits on, whether it moves, when it started', () => {
+  const s = story(test);
+  s.test(
     "the list carries each run's `after` as the record froze it, and `waiting` in `nemia ls`'s words: a root says `waiting on <run>`, and a parent that never lands says why",
     async () => {
       const runs = await listedRuns();
@@ -224,43 +224,40 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
       assert.deepEqual([runs.get('a-landed')!.after, runs.get('a-landed')!.waiting], [[], null], 'started without --after');
     },
   );
-  await s.test(
-    "the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`",
-    async () => {
-      const runs = await listedRuns();
-      const e = engine(ENV);
-      for (const id of [
-        'd-waits',
-        'e-cancelled-parent',
-        'f-no-such-parent',
-        'g-parents-landed',
-        'h-gone-parent',
-        'i-started',
-        'a-landed',
-        'b-running',
-        'c-cancelled',
-      ]) {
-        const api = runs.get(id)!;
-        const cli = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
-        assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
-        assert.deepEqual(
-          api.steps.map((s) => s.message),
-          cli.steps.map((s) => s.message),
-          id,
+  s.test("the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`", async () => {
+    const runs = await listedRuns();
+    const e = engine(ENV);
+    for (const id of [
+      'd-waits',
+      'e-cancelled-parent',
+      'f-no-such-parent',
+      'g-parents-landed',
+      'h-gone-parent',
+      'i-started',
+      'a-landed',
+      'b-running',
+      'c-cancelled',
+    ]) {
+      const api = runs.get(id)!;
+      const cli = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
+      assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
+      assert.deepEqual(
+        api.steps.map((s) => s.message),
+        cli.steps.map((s) => s.message),
+        id,
+      );
+      if (cli.waiting.length) {
+        assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
+        assert.equal(api.waiting?.advice, waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting), id);
+        assert.equal(
+          api.waiting?.waitingOnYou,
+          !waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
+          `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still land`,
         );
-        if (cli.waiting.length) {
-          assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
-          assert.equal(api.waiting?.advice, waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting), id);
-          assert.equal(
-            api.waiting?.waitingOnYou,
-            !waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
-            `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still land`,
-          );
-        }
       }
-    },
-  );
-  await s.test(
+    }
+  });
+  s.test(
     'a run waiting on runs moves — the tick files its roots once they land — unless one never lands without a person, when it moves no more',
     async () => {
       const runs = await listedRuns();
@@ -282,7 +279,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         );
     },
   );
-  await s.test("a run's detail carries the same `after`, `waiting` and `moving`", async () => {
+  s.test("a run's detail carries the same `after`, `waiting` and `moving`", async () => {
     const runs = await listedRuns();
     for (const id of ['d-waits', 'e-cancelled-parent', 'i-started']) {
       const run = await objectOf(app, id);
@@ -299,7 +296,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
       );
     }
   });
-  await s.test(
+  s.test(
     "a run started when its first task was filed, as its task's view says, not when it was created — on the list and the detail alike; nothing filed, not started",
     async () => {
       const runs = await listedRuns();
@@ -318,7 +315,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
       }
     },
   );
-  await s.test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {
+  s.test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {
     const runs = await listedRuns();
     const e = engine(ENV);
     for (const id of ['d-waits', 'e-cancelled-parent', 'h-gone-parent']) {

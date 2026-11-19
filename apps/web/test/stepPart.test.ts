@@ -3,7 +3,7 @@
  * slot that does not apply saying none, a step to come showing its declared fields as dashes, Got's lines in the order of their sources,
  * the packet a step hands named alike in its Gave and its taker's Got, and the files its folders hold that its closeout did not name.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { RunDetail } from '../src/lib/runView.ts';
 import {

@@ -9,7 +9,7 @@
 #
 # Then, on the same spans, test_scope says what a test command ran: suite (`turbo run test` or `npm test`), package (with --filter, -F,
 # -w or --workspace, or when the command comes right after a `cd` into packages/<name> or apps/<name> and `&&` or `;`), files (`node
-# --test`), `e2e: all` (`npm run e2e`) or `e2e: pages` (with --pages). It is read at any command of the line, past the same words and
+# --test`, or `vitest run` given a file), `e2e: all` (`npm run e2e`) or `e2e: pages` (with --pages). It is read at any command of the line, past the same words and
 # wrappers, a flag only in its own command; the statements run in order and the last that matches wins. Each sets a literal, so no
 # name gets in; any other command has none.
 #
@@ -37,7 +37,7 @@ processors:
           - 'set(attributes["test_scope"], "package") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?:turbo\\s+run\\s+test|npm\\s+(?:run\\s+)?test)\\s(?:[^;&|\\n]*\\s)?(?:--filter|-F|-w|--workspace)(?:[=\\s;&|)]|$$)")'
           - 'set(attributes["test_scope"], "package") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*npm\\s+(?:-w|--workspace)(?:=|\\s+)\\S+\\s+(?:run\\s+)?test(?:[\\s;&|)]|$$)")'
           - 'set(attributes["test_scope"], "package") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*cd\\s+\\S*(?:packages|apps)/[^/\\s;&|]+/?\\s*(?:&&|;)\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?:turbo\\s+run\\s+test|npm\\s+(?:run\\s+)?test)(?:[\\s;&|)]|$$)")'
-          - 'set(attributes["test_scope"], "files") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*node\\s+(?:[^;&|\\n]*\\s)?--test(?:[\\s;&|)]|$$)")'
+          - 'set(attributes["test_scope"], "files") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*(?:node\\s+(?:[^;&|\\n]*\\s)?--test(?:[\\s;&|)]|$$)|vitest\\s+run(?:\\s+-\\S+)*\\s+[^-\\s;&|])")'
           - 'set(attributes["test_scope"], "e2e: all") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*npm\\s+run\\s+e2e(?:[\\s;&|)]|$$)")'
           - 'set(attributes["test_scope"], "e2e: pages") where IsMatch(attributes["full_command"], "(?:^|[;&|(\\n])\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*(?:(?:timeout\\s+(?:-\\S+\\s+)*\\S+|nohup|time|npx)\\s+)*npm\\s+run\\s+e2e\\s(?:[^;&|\\n]*\\s)?--pages(?:[=\\s;&|)]|$$)")'
 

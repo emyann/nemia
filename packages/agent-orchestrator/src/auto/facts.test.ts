@@ -4,7 +4,7 @@
  * asking again or accepted by a person over its findings, a step at its cap, a question or a need left open, and another step waiting.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { describe, test } from 'vitest';
 import { factsOf, type Seen } from './index.ts';
 
 /** What admission reads of a run where all agree. */
@@ -20,8 +20,8 @@ const AGREED: Seen = {
   othersWaiting: false,
 };
 
-test('`factsOf`: all five hold where all agree, and each fails on the state that breaks it', async (t) => {
-  await t.test('all five hold where all agree, with the spend read as it is', () => {
+describe('`factsOf`: all five hold where all agree, and each fails on the state that breaks it', () => {
+  test('all five hold where all agree, with the spend read as it is', () => {
     assert.deepEqual(factsOf(AGREED), {
       recommends: true,
       checked: true,
@@ -32,7 +32,7 @@ test('`factsOf`: all five hold where all agree, and each fails on the state that
     });
     assert.equal(factsOf({ ...AGREED, loops: [] }).accepted, true, 'no loop signed, no reviewer refused');
   });
-  await t.test('REFUSED recommends: a blocked step, one that signed nothing, and a question with no recommended answer', () => {
+  test('REFUSED recommends: a blocked step, one that signed nothing, and a question with no recommended answer', () => {
     assert.equal(factsOf({ ...AGREED, closeout: { outcome: 'blocked', needs: 'a key' } }).recommends, false);
     assert.equal(factsOf({ ...AGREED, closeout: undefined }).recommends, false);
     assert.equal(factsOf({ ...AGREED, questions: [{ recommended: 'Strict' }, { recommended: null }] }).recommends, false);
@@ -40,12 +40,12 @@ test('`factsOf`: all five hold where all agree, and each fails on the state that
     assert.equal(factsOf({ ...AGREED, questions: [{ recommended: 'Strict' }] }).recommends, true);
     assert.equal(factsOf({ ...AGREED, questions: [{ recommended: ['Card', 'Run'] }] }).recommends, true);
   });
-  await t.test('REFUSED checked: a check that refused, one that did not finish, and a step with no check', () => {
+  test('REFUSED checked: a check that refused, one that did not finish, and a step with no check', () => {
     assert.equal(factsOf({ ...AGREED, verdict: 1 }).checked, false);
     assert.equal(factsOf({ ...AGREED, verdict: 'unfinished' }).checked, false);
     assert.equal(factsOf({ ...AGREED, verdict: undefined }).checked, false, 'strict: no check is no pass');
   });
-  await t.test('REFUSED accepted: a loop that asks again, exhausted or not, and one a person accepted over its findings', () => {
+  test('REFUSED accepted: a loop that asks again, exhausted or not, and one a person accepted over its findings', () => {
     assert.equal(
       factsOf({
         ...AGREED,
@@ -58,17 +58,17 @@ test('`factsOf`: all five hold where all agree, and each fails on the state that
     );
     assert.equal(factsOf({ ...AGREED, loops: [{ again: false, personAccepted: true }] }).accepted, false);
   });
-  await t.test('REFUSED withinBudget: a step at or past its cap', () => {
+  test('REFUSED withinBudget: a step at or past its cap', () => {
     assert.equal(factsOf({ ...AGREED, overBudget: true }).withinBudget, false);
   });
-  await t.test("REFUSED withinBudget: a proposed cap above a step's own budget, which a person sees at the gate", () => {
+  test("REFUSED withinBudget: a proposed cap above a step's own budget, which a person sees at the gate", () => {
     assert.equal(factsOf({ ...AGREED, aboveCeiling: true }).withinBudget, false);
     assert.equal(factsOf(AGREED).withinBudget, true);
   });
-  await t.test("REFUSED withinBudget: a gate whose caps pass the factory's cost line", () => {
+  test("REFUSED withinBudget: a gate whose caps pass the factory's cost line", () => {
     assert.equal(factsOf({ ...AGREED, pastLine: true }).withinBudget, false);
   });
-  await t.test('REFUSED nothingOpen: a question asked, a need said, and another step waiting on the person', () => {
+  test('REFUSED nothingOpen: a question asked, a need said, and another step waiting on the person', () => {
     assert.equal(factsOf({ ...AGREED, questions: [{ recommended: 'Strict' }] }).nothingOpen, false);
     assert.equal(factsOf({ ...AGREED, closeout: { outcome: 'done', needs: 'the key' } }).nothingOpen, false);
     assert.equal(factsOf({ ...AGREED, closeout: { outcome: 'done', needs: '  ' } }).nothingOpen, true, 'blank words need nothing');

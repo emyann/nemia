@@ -2,7 +2,7 @@
  * The watcher's cursor file: a missing file starts a watch where it was told, a write and a read round-trip, a write leaves nothing
  * behind, a cut rewrites 0, and a directory that is not there and a file that holds no number are each refused by name.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,11 +15,11 @@ const ROOT = scratch('wf-cursor-file-');
 /** A path of this test's own under `ROOT`, its directory there, the file not written. */
 const at = (name: string): string => path.join(ROOT, `${name}.cursor`);
 
-test('the cursor file: none starts a watch where it was told, a write is read back whole, a cut rewrites 0, and what cannot be one is refused by name', async (t) => {
-  await t.test('a cursor file that is not there starts the watch where it was told to', () => {
+describe('the cursor file: none starts a watch where it was told, a write is read back whole, a cut rewrites 0, and what cannot be one is refused by name', () => {
+  test('a cursor file that is not there starts the watch where it was told to', () => {
     assert.equal(cursorFileStart(at('none')), undefined);
   });
-  await t.test('a cursor written is the cursor read back, and nothing is left beside it', () => {
+  test('a cursor written is the cursor read back, and nothing is left beside it', () => {
     const file = at('kept');
     keepCursor(file, 0);
     assert.equal(cursorFileStart(file), 0);
@@ -32,13 +32,13 @@ test('the cursor file: none starts a watch where it was told, a write is read ba
     );
     assert.equal(fs.readFileSync(file, 'utf8'), '1834\n', 'one decimal number and a newline');
   });
-  await t.test('a feed cut under the watch rewrites the cursor file to 0', () => {
+  test('a feed cut under the watch rewrites the cursor file to 0', () => {
     const file = at('cut');
     keepCursor(file, 4096);
     cutCursorFile(file);
     assert.equal(cursorFileStart(file), 0);
   });
-  await t.test('REFUSED: a cursor file in a directory that is not there, named, before a line is read', () => {
+  test('REFUSED: a cursor file in a directory that is not there, named, before a line is read', () => {
     const file = path.join(ROOT, 'nope', 'watch.cursor');
     assert.throws(
       () => keepCursor(file, 12),
@@ -49,7 +49,7 @@ test('the cursor file: none starts a watch where it was told, a write is read ba
       },
     );
   });
-  await t.test('REFUSED: a cursor file that holds anything but a whole number, named, never read as 0', () => {
+  test('REFUSED: a cursor file that holds anything but a whole number, named, never read as 0', () => {
     const file = at('junk');
     for (const text of ['abc', '', '-1', '12 34', '1.5']) {
       fs.writeFileSync(file, text);

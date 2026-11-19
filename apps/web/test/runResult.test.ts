@@ -3,7 +3,7 @@
  * and the law of `resultOf` its contract holds out (what is drawn as given is exactly the final steps the run will run: a filter's result,
  * which tsverify 0.9.0 does not prove whole), held here on runs longer than its search side's four steps.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { resultOf, resultStepsOf, runEndOf, standsOf } from '../src/lib/runResult.ts';
 import { coded, detail, step } from './run-fixtures.ts';

@@ -4,7 +4,7 @@
  * the agent it names, and refused where the two cannot run together; the folder of agents beside the workflows; and the card an agent is
  * listed by (`agentCard`, `cardSkills`, `skillEntryOf`). A refusal is asserted by its kind, its exit code and what it names.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,14 +64,14 @@ function refusal(fn: () => unknown): string {
 /** A refusal row: its name, what is refused, and what the refusal names — the file, the line, the fix. */
 type Refused = readonly [name: string, refused: () => unknown, ...facts: string[]];
 
-/** Each row of `rows` a subtest of `t`, refused as `refusal` says and naming each of its facts. */
-async function refusedRows(t: TestContext, rows: readonly Refused[]): Promise<void> {
-  for (const [name, refused, ...facts] of rows) await t.test(name, () => names(refusal(refused), ...facts));
+/** Each row of `all` a test of the describe it is called in, refused as `refusal` says and naming each of its facts. */
+function refusedRows(rows: readonly Refused[]): void {
+  for (const [name, refused, ...facts] of rows) test(name, () => names(refusal(refused), ...facts));
 }
 
-/** Each row of `rows` a subtest of `t`: its name, and what it asserts. */
-async function rows(t: TestContext, all: ReadonlyArray<readonly [string, () => void]>): Promise<void> {
-  for (const [name, body] of all) await t.test(name, body);
+/** Each row of `all` a test of the describe it is called in: its name, and what it asserts. */
+function rows(all: ReadonlyArray<readonly [string, () => void]>): void {
+  for (const [name, body] of all) test(name, body);
 }
 
 const agent = (name: string, text: string, read?: (file: string) => string | undefined): Agent => parseAgent(name, text, read);
@@ -110,8 +110,8 @@ const WIZARD =
 /** The wizard's file with its description unquoted, `Example: ` and all: the former line form. */
 const UNQUOTED = WIZARD.replace(/description: "(.*)"/, 'description: $1');
 
-test('parseAgent: an agent file read as its role keys, its own lines and its instructions', async (t) => {
-  await rows(t, [
+describe('parseAgent: an agent file read as its role keys, its own lines and its instructions', () => {
+  rows([
     [
       'its role keys as written, its description, and its body as its instructions',
       () => {
@@ -275,8 +275,8 @@ const WIRING = [
   'workflow',
 ];
 
-test('REFUSED at shipped defaults: an agent file, one row per line it may not say', async (t) => {
-  await t.test('every wiring key, by name, saying it belongs on the step', () => {
+describe('REFUSED at shipped defaults: an agent file, one row per line it may not say', () => {
+  test('every wiring key, by name, saying it belongs on the step', () => {
     assert.deepEqual(
       STEP_KEYS.filter((k) => !(AGENT_KEYS as readonly string[]).includes(k) && k !== ('agent' as string)).sort(),
       [...WIRING].sort(),
@@ -292,7 +292,7 @@ test('REFUSED at shipped defaults: an agent file, one row per line it may not sa
         'Move the line to each step',
       );
   });
-  await refusedRows(t, [
+  refusedRows([
     [
       "`agent:`, a step's key",
       () => agent('reviewer', '---\nagent: implementer\n---\nReview it.\n'),
@@ -511,8 +511,8 @@ test('REFUSED at shipped defaults: an agent file, one row per line it may not sa
   ]);
 });
 
-test('renderAgent: a draft written as its file, and read back as the same agent', async (t) => {
-  await rows(t, [
+describe('renderAgent: a draft written as its file, and read back as the same agent', () => {
+  rows([
     [
       'the role and the description first, the keys in their order, an unset key not at all, and the fence in its block',
       () => {
@@ -591,9 +591,9 @@ test('renderAgent: a draft written as its file, and read back as the same agent'
   ]);
 });
 
-test('REFUSED: a draft renderAgent will not write, one row per line', async (t) => {
+describe('REFUSED: a draft renderAgent will not write, one row per line', () => {
   const keyed = (keys: Record<string, string>, description?: string) => () => renderAgent({ name: 'a', description, keys, body: 'x' });
-  await refusedRows(t, [
+  refusedRows([
     ['`agent:` among the keys', keyed({ agent: 'b' }), 'agents/a.md', '`agent`', "step's key"],
     ['wiring among the keys', keyed({ check: 'npm test' }), '`check` is wiring', 'belongs on the step'],
     ['a key no agent has', keyed({ modle: 'opus' }), '`modle` is not a key an agent has'],
@@ -656,9 +656,9 @@ const filed = (step: StepSpec) =>
   );
 const fromRecord = (step: StepSpec): StepSpec => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as StepSpec;
 
-test("a step resolved with the agent it names: the agent's keys and words, the step's own winning and its own kept", async (t) => {
+describe("a step resolved with the agent it names: the agent's keys and words, the step's own winning and its own kept", () => {
   const agents = agentsOf({ implementer: IMPLEMENTER });
-  await rows(t, [
+  rows([
     [
       "the agent's role keys, the step's own winning, and the agent's words told first",
       () => {
@@ -903,7 +903,7 @@ test("a step resolved with the agent it names: the agent's keys and words, the s
   ]);
 });
 
-test('REFUSED at shipped defaults: a step and the agent it names, one row per rule', async (t) => {
+describe('REFUSED at shipped defaults: a step and the agent it names, one row per rule', () => {
   const two = agentsOf({ implementer: IMPLEMENTER, reviewer: '---\nmodel: opus\n---\nReview it.\n' });
   const fenced = agentsOf({
     implementer: '---\nharness: claude\npermissionMode: dontAsk\n---\nImplement.\n',
@@ -912,7 +912,7 @@ test('REFUSED at shipped defaults: a step and the agent it names, one row per ru
   const skills = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
   const skilled = '---\nskills: write-a-note\ntools: Read, Skill\n---\nYou build.\n';
   const plan = { 'workflows/team/plan.md': '---\nplace: git\n---\nPlan it.\n' };
-  await refusedRows(t, [
+  refusedRows([
     [
       'an agent there is not, listing the agents there are',
       () => parseWorkflow('build', '---\nplace: git\nagent: builder\n---\nBuild it.\n', undefined, two),
@@ -1113,7 +1113,7 @@ test('REFUSED at shipped defaults: a step and the agent it names, one row per ru
       'Delete the line',
     ],
   ]);
-  await t.test("REFUSED: a hired agent there is not, in the factory's words, never an `agent:` line", () => {
+  test("REFUSED: a hired agent there is not, in the factory's words, never an `agent:` line", () => {
     const unknown = refusal(() =>
       parseWorkflow('implement', '---\nplace: git\n---\nBuild it.\n', undefined, two, undefined, hire('scout')),
     );
@@ -1129,7 +1129,7 @@ test('REFUSED at shipped defaults: a step and the agent it names, one row per ru
     names(broken, 'acme', 'its file is refused', 'agents/scout.md: `after` is wiring.');
     for (const words of [unknown, none, broken]) assert.doesNotMatch(words, /`agent: scout`/);
   });
-  await t.test('and let through where the rule does not reach: a mode the model keeps, a model that keeps auto, codex, no model', () => {
+  test('and let through where the rule does not reach: a mode the model keeps, a model that keeps auto, codex, no model', () => {
     assert.equal(loadWorkflows(team('---\nmodel: claude-haiku-4-5\npermissionMode: dontAsk\n---\nx\n', {})).length, 1);
     assert.equal(loadWorkflows(team('---\nmodel: sonnet\n---\nx\n', {})).length, 1);
     assert.equal(loadWorkflows(team('---\nmodel: haiku\n---\nx\n', {})).length, 1, 'the alias keeps `auto`');
@@ -1139,9 +1139,9 @@ test('REFUSED at shipped defaults: a step and the agent it names, one row per ru
   });
 });
 
-test('the folder of agents: beside the workflows, read whole, a broken one refused only where a step names it', async (t) => {
+describe('the folder of agents: beside the workflows, read whole, a broken one refused only where a step names it', () => {
   const workflows = (files: Record<string, string>): string => tree(files);
-  await rows(t, [
+  rows([
     [
       "loadAgents reads every agent in the folder, and keeps a broken one's refusal for the step that names it",
       () => {
@@ -1345,8 +1345,8 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
 /** The card entry a SKILL.md's frontmatter gives (`skillEntryOf`), or the refusal of it. */
 const entry = (front: string) => skillEntryOf('skills/a-skill/SKILL.md', 'a-skill', `---\n${front}\n---\nHow to do it.\n`);
 
-test("skillEntryOf: a skill's card entry read off its SKILL.md's keys as YAML reads them, in any form", async (t) => {
-  await rows(t, [
+describe("skillEntryOf: a skill's card entry read off its SKILL.md's keys as YAML reads them, in any form", () => {
+  rows([
     [
       'every key the card reads',
       () =>
@@ -1407,7 +1407,7 @@ test("skillEntryOf: a skill's card entry read off its SKILL.md's keys as YAML re
     ['description: d\nexamples: []', '`examples` is an empty list'],
     ['description: d\ntags: ["", "x"]', 'is not a list of words'],
   ];
-  await refusedRows(t, [
+  refusedRows([
     ...cases.map(([front, why]): Refused => [`REFUSED: ${JSON.stringify(front)}`, () => entry(front), 'skills/a-skill/SKILL.md', why]),
     [
       'REFUSED: no frontmatter at all',
@@ -1483,8 +1483,8 @@ function composed(): { root: string; found: ReturnType<typeof skillsFor>; scribe
   return { root, found: skillsFor(path.join(root, '_')), scribe: parseAgent('scribe', SCRIBE, () => undefined) };
 }
 
-test("agentCard: what an agent says it can do, in A2A's shape — not an Agent Card, the omission pinned", async (t) => {
-  await rows(t, [
+describe("agentCard: what an agent says it can do, in A2A's shape — not an Agent Card, the omission pinned", () => {
+  rows([
     [
       "an entry for each skill its `skills:` gives, read off its SKILL.md, in that order; its description the agent's",
       () => {
@@ -1562,7 +1562,7 @@ test("agentCard: what an agent says it can do, in A2A's shape — not an Agent C
   ]);
   const { root, found, scribe } = composed();
   const bare = parseAgent('scribe', '---\neffort: low\n---\nWrite the notes.\n', () => undefined);
-  await refusedRows(t, [
+  refusedRows([
     [
       'REFUSED: a card with no skills, naming the line its entries are generated from',
       () => agentCard(scribe, 'abc123', []),
@@ -1584,7 +1584,7 @@ test("agentCard: what an agent says it can do, in A2A's shape — not an Agent C
       path.join(root, 'skills'),
     ],
   ]);
-  await t.test('REFUSED: a skill whose SKILL.md says nothing it can be listed by', () => {
+  test('REFUSED: a skill whose SKILL.md says nothing it can be listed by', () => {
     fs.writeFileSync(path.join(root, 'skills', 'file-it', 'SKILL.md'), '---\nname: File it away\n---\nHow to file.\n');
     names(
       refusal(() => cardSkills(scribe, found)),

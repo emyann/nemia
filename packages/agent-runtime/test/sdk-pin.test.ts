@@ -12,7 +12,7 @@
  * The pin is the runtime's own fact and lives here, not in `agent-orchestrator/test/contract.test.ts`: that scans every package's
  * manifest for which layer may import what, and the runtime's dependency versions are not the orchestrator's to keep.
  */
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

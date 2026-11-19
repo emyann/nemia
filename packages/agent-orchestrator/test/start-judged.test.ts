@@ -12,7 +12,8 @@
  * pure `storeRootRefusal` (`src/start/store-root.test.ts`); an ending after a step starting under a root every rule carries is the
  * start of `mounts.test.ts`'s story.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -121,15 +122,19 @@ async function refused(act: () => unknown, ...facts: string[]): Promise<string> 
   return failed.message;
 }
 
-test('nemia start judges what a session may call: a tool no rule names refused, started once the repository allows it, its trust said second', async (t) => {
-  const s = story(t);
-  const held = folder(
-    'held',
-    { design: '---\nplace: git\nagent: architect\n---\nWrite the spec.\n' },
-    { architect: '---\nrole: Architect\npermissionMode: dontAsk\ntools: Read, Grep, Glob, WebFetch\n---\nDesign it.\n' },
-  );
-
-  await s.test(
+describe('nemia start judges what a session may call: a tool no rule names refused, started once the repository allows it, its trust said second', () => {
+  let held!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    held = folder(
+      'held',
+      { design: '---\nplace: git\nagent: architect\n---\nWrite the spec.\n' },
+      { architect: '---\nrole: Architect\npermissionMode: dontAsk\ntools: Read, Grep, Glob, WebFetch\n---\nDesign it.\n' },
+    );
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'REFUSED: a step given a tool no rule of its session names, as Invalid with exit 2, naming the step, the tool, the fence and the fix',
     async () => {
       const said = await refused(
@@ -141,8 +146,7 @@ test('nemia start judges what a session may call: a tool no rule names refused, 
       assert.match(said, /^design: /);
     },
   );
-
-  await s.test('a trust the harness withholds is said as the second thing to check, and nothing is said where it is given', async () => {
+  s.test('a trust the harness withholds is said as the second thing to check, and nothing is said where it is given', async () => {
     const config = scratch('wf-untrusted-');
     process.env.CLAUDE_CONFIG_DIR = config;
     try {
@@ -158,93 +162,77 @@ test('nemia start judges what a session may call: a tool no rule names refused, 
       delete process.env.CLAUDE_CONFIG_DIR;
     }
   });
-
-  await s.test('the same folder starts in a repository whose own settings allow the call, scoped or bare', () => {
+  s.test('the same folder starts in a repository whose own settings allow the call, scoped or bare', () => {
     for (const allow of [['WebFetch'], ['WebFetch(domain:example.com)', 'Bash(npm test)']])
       assert.ok(written(started(held, { repo: aRepo(allow) })), allow.join(', '));
   });
-
-  await s.test(
-    'the rules are read off the repository at the start: the folder refused there starts once that repository allows it',
-    async () => {
-      const repo = aRepo();
-      await refused(() => started(held, { repo }), 'gives its session `WebFetch`');
-      settings(repo, ['WebFetch']);
-      assert.ok(written(started(held, { repo })), 'the same folder and the same repository, with the rule added');
-    },
-  );
-
-  await s.test(
-    'a factory architect given `Write, Edit` in `dontAsk` and allowed two `Edit(…)` path rules starts: they reach its `Write`',
-    () => {
-      const contracts = folder(
-        'contracts',
-        { design: '---\nplace: git\nagent: implementer\n---\nWrite the spec and its contracts.\n' },
-        {
-          implementer:
-            '---\nrole: Architect\npermissionMode: dontAsk\ntools: Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch, Write, Edit\n' +
-            'allowedTools: Bash(git log:*), Agent, WebFetch, WebSearch, Edit(packages/*/contracts/*.contract.ts), ' +
-            'Edit(apps/*/contracts/*.contract.ts)\n---\nDesign it.\n',
-        },
-      );
-      assert.ok(written(started(contracts)), 'an `Edit` path rule allows the `Write` of the files it names');
-    },
-  );
+  s.test('the rules are read off the repository at the start: the folder refused there starts once that repository allows it', async () => {
+    const repo = aRepo();
+    await refused(() => started(held, { repo }), 'gives its session `WebFetch`');
+    settings(repo, ['WebFetch']);
+    assert.ok(written(started(held, { repo })), 'the same folder and the same repository, with the rule added');
+  });
+  s.test('a factory architect given `Write, Edit` in `dontAsk` and allowed two `Edit(…)` path rules starts: they reach its `Write`', () => {
+    const contracts = folder(
+      'contracts',
+      { design: '---\nplace: git\nagent: implementer\n---\nWrite the spec and its contracts.\n' },
+      {
+        implementer:
+          '---\nrole: Architect\npermissionMode: dontAsk\ntools: Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch, Write, Edit\n' +
+          'allowedTools: Bash(git log:*), Agent, WebFetch, WebSearch, Edit(packages/*/contracts/*.contract.ts), ' +
+          'Edit(apps/*/contracts/*.contract.ts)\n---\nDesign it.\n',
+      },
+    );
+    assert.ok(written(started(contracts)), 'an `Edit` path rule allows the `Write` of the files it names');
+  });
 });
 
 /** What a place denies a landing session, as a start hands it on: a commit, as the git place denies one, given here by hand. */
 const DENIED = ['Bash(git commit:*)'];
 const PLACES = { home: ROOT };
 
-test("configRefused: the runtime asked of each local step's first filing, refused in its words after the line it comes from", async (t) => {
-  const gated = folder('gated', {
-    implement: '---\nplace: git\neffort: high\n---\nBuild it.\n',
-    ship: '---\nafter: implement\nplace: git\nworkspace: base\ngate: true\ncheck: npm test\n---\nShip it.\n',
+describe("configRefused: the runtime asked of each local step's first filing, refused in its words after the line it comes from", () => {
+  let gated!: string;
+  let steps!: import('../src/workflow.ts').StepSpec[];
+  beforeAll(() => {
+    gated = folder('gated', {
+      implement: '---\nplace: git\neffort: high\n---\nBuild it.\n',
+      ship: '---\nafter: implement\nplace: git\nworkspace: base\ngate: true\ncheck: npm test\n---\nShip it.\n',
+    });
+    steps = loadWorkflows(gated, PLACES);
   });
-  const steps = loadWorkflows(gated, PLACES);
   const over = (name: string, more: Partial<Workflow>) => steps.map((s) => (s.name === name ? { ...s, ...more } : s));
-
-  await t.test("REFUSED: a step's value its harness refuses, named by the line it comes from and the field it is filed as", () => {
+  test("REFUSED: a step's value its harness refuses, named by the line it comes from and the field it is filed as", () => {
     names(
       configRefused(ROOT, over('implement', { effort: 'ultra' }), PLACES, [], DENIED),
       'implement: `effort: ultra` (filed as `effort`): ',
       configRefusal('claude', { effort: 'ultra' })!,
     );
   });
-
-  await t.test('REFUSED: an ending on a harness that cannot be denied the commit it lands, named by the step alone', () => {
+  test('REFUSED: an ending on a harness that cannot be denied the commit it lands, named by the step alone', () => {
     const why = configRefused(ROOT, over('ship', { harness: 'codex' }), PLACES, [], DENIED);
     names(why, `ship: ${configRefusal('codex', { disallowedTools: [...DENIED] })}`);
   });
-
-  await t.test(
-    'REFUSED: the deny list follows an ending that lands on its check, gated or not; an ending with no `check:` takes none',
-    () => {
-      const ungated = over('ship', { harness: 'codex', gate: undefined });
-      assert.match(
-        configRefused(ROOT, ungated, PLACES, [], DENIED)!,
-        /^ship: .*is a deny list/,
-        'an ungated ending lands on its check all the same',
-      );
-      assert.match(
-        configRefused(ROOT, ungated, PLACES, ['ship'], DENIED)!,
-        /^ship: .*is a deny list/,
-        'a gate given at start changes nothing',
-      );
-      assert.equal(
-        configRefused(ROOT, over('ship', { harness: 'codex', gate: undefined, check: undefined }), PLACES, [], DENIED),
-        undefined,
-      );
-    },
-  );
-
-  await t.test('a step on a remote agent is asked nothing, and a folder whose every step its harness takes is no refusal', () => {
+  test('REFUSED: the deny list follows an ending that lands on its check, gated or not; an ending with no `check:` takes none', () => {
+    const ungated = over('ship', { harness: 'codex', gate: undefined });
+    assert.match(
+      configRefused(ROOT, ungated, PLACES, [], DENIED)!,
+      /^ship: .*is a deny list/,
+      'an ungated ending lands on its check all the same',
+    );
+    assert.match(
+      configRefused(ROOT, ungated, PLACES, ['ship'], DENIED)!,
+      /^ship: .*is a deny list/,
+      'a gate given at start changes nothing',
+    );
+    assert.equal(configRefused(ROOT, over('ship', { harness: 'codex', gate: undefined, check: undefined }), PLACES, [], DENIED), undefined);
+  });
+  test('a step on a remote agent is asked nothing, and a folder whose every step its harness takes is no refusal', () => {
     const [implement] = loadWorkflows(lone('taken', 'effort: high'), PLACES);
     assert.equal(configRefused(ROOT, [implement], PLACES, [], DENIED), undefined);
     assert.equal(configRefused(ROOT, [{ ...implement, harness: 'a2a:reviewer', effort: 'ultra' }], PLACES, [], DENIED), undefined);
   });
-
-  await t.test('stepsToStart asks the same of a folder it lets through, the gates beside the workflow', () => {
+  test('stepsToStart asks the same of a folder it lets through, the gates beside the workflow', () => {
     const asked: (readonly string[])[] = [];
     Effect.runSync(
       Effect.provideService(
@@ -265,28 +253,24 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
   });
 });
 
-test("REFUSED at nemia start, before a run is written: a step's first filing its harness refuses, in the runtime's words after the step's line", async (t) => {
-  const ultra = lone('ultra', 'effort: ultra');
+describe("REFUSED at nemia start, before a run is written: a step's first filing its harness refuses, in the runtime's words after the step's line", () => {
+  let ultra!: string;
+  beforeAll(() => {
+    ultra = lone('ultra', 'effort: ultra');
+  });
   const ultraSaid = ['implement: `effort: ultra` (filed as `effort`): ', configRefusal('claude', { effort: 'ultra' })!];
-
-  await t.test('REFUSED: a step whose line its harness refuses fails startRun as Invalid, exit 2, and no run is written', async () => {
+  test('REFUSED: a step whose line its harness refuses fails startRun as Invalid, exit 2, and no run is written', async () => {
     await refused(() => started(ultra), ...ultraSaid);
   });
-
-  await t.test('REFUSED: a card whose workflow has a step its harness refuses fails startPlan behind the card', async () => {
+  test('REFUSED: a card whose workflow has a step its harness refuses fails startPlan behind the card', async () => {
     const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
     fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${ultra}\n---\nadd a flag\n`);
     await refused(() => stage.runPlaced(startPlan({ dir: plan, repo: aRepo() })), `card.md: \`workflow: ${ultra}\` — `, ...ultraSaid);
   });
-
-  await t.test(
-    'the same folder starts when the refusal startRun reads takes every step: the refusal came from the gate, not the load',
-    () => {
-      assert.ok(written(started(ultra, { refused: () => undefined })));
-    },
-  );
-
-  await t.test('the gates startRun is given are the gates its refusal is asked of the steps with', () => {
+  test('the same folder starts when the refusal startRun reads takes every step: the refusal came from the gate, not the load', () => {
+    assert.ok(written(started(ultra, { refused: () => undefined })));
+  });
+  test('the gates startRun is given are the gates its refusal is asked of the steps with', () => {
     const asked: (readonly string[])[] = [];
     started(lone('gates-asked', 'effort: high'), {
       gates: ['implement'],
@@ -294,8 +278,7 @@ test("REFUSED at nemia start, before a run is written: a step's first filing its
     });
     assert.deepEqual(asked, [['implement']]);
   });
-
-  await t.test("a factory's harness settings are on the run its refusal is asked of the steps' first filing with", () => {
+  test("a factory's harness settings are on the run its refusal is asked of the steps' first filing with", () => {
     const asked: unknown[] = [];
     const repo = aRepo();
     const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
@@ -308,26 +291,20 @@ test("REFUSED at nemia start, before a run is written: a step's first filing its
     const steps = loadWorkflows(dir, PLACES);
     assert.equal(configRefused(ROOT, steps, PLACES, [], [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
   });
-
-  await t.test(
-    'REFUSED: `remote: true` where the runtime bridges no session — codex — named by its line; taken on a claude job, and `remote: false` on any',
-    async () => {
-      await refused(
-        () => started(lone('remote-codex', 'harness: codex\nremote: true')),
-        'implement: `remote: true` (filed as `claude`): ',
-        configRefusal('codex', { claude: { remoteControl: true } })!,
-      );
-      for (const own of ['remote: true', 'harness: claude\nremote: true', 'harness: codex\nremote: false'])
-        assert.ok(started(lone(`bridged-${own.replace(/\W+/g, '-')}`, own)), own);
-    },
-  );
-
+  test('REFUSED: `remote: true` where the runtime bridges no session — codex — named by its line; taken on a claude job, and `remote: false` on any', async () => {
+    await refused(
+      () => started(lone('remote-codex', 'harness: codex\nremote: true')),
+      'implement: `remote: true` (filed as `claude`): ',
+      configRefusal('codex', { claude: { remoteControl: true } })!,
+    );
+    for (const own of ['remote: true', 'harness: claude\nremote: true', 'harness: codex\nremote: false'])
+      assert.ok(started(lone(`bridged-${own.replace(/\W+/g, '-')}`, own)), own);
+  });
   for (const own of ['background: true', 'background: false', 'harness: claude-detached'])
-    await t.test(`REFUSED: a file that still says \`${own}\`, naming the line to delete`, async () => {
+    test(`REFUSED: a file that still says \`${own}\`, naming the line to delete`, async () => {
       const said = await refused(() => started(lone(`retired-${own.replace(/\W+/g, '-')}`, own)), 'Delete the line');
       assert.match(said, /^implement: /);
     });
-
   const words: [string, string, string, Record<string, unknown>][] = [
     ['effort: ultra', 'claude', 'effort', { effort: 'ultra' }],
     ['harness: codex\neffort: ultra', 'codex', 'effort', { effort: 'ultra' }],
@@ -342,30 +319,23 @@ test("REFUSED at nemia start, before a run is written: a step's first filing its
   ];
   for (const [own, harness, field, config] of words) {
     const line = own.split('\n').at(-1)!;
-    await t.test(
-      `REFUSED: \`${own.replace('\n', ', ')}\`, a word the load once judged by a copy of the runtime's lists, now by the runtime`,
-      async () => {
-        await refused(
-          () => started(lone(`words-${own.replace(/\W+/g, '-')}`, own)),
-          `implement: \`${line}\` (filed as \`${field}\`): `,
-          configRefusal(harness, config)!,
-        );
-      },
-    );
+    test(`REFUSED: \`${own.replace('\n', ', ')}\`, a word the load once judged by a copy of the runtime's lists, now by the runtime`, async () => {
+      await refused(
+        () => started(lone(`words-${own.replace(/\W+/g, '-')}`, own)),
+        `implement: \`${line}\` (filed as \`${field}\`): `,
+        configRefusal(harness, config)!,
+      );
+    });
   }
-
-  await t.test(
-    "REFUSED: a codex sandbox written under its former name, `permissionMode:`, quoted as the file writes it — the step's line, or its agent's",
-    async () => {
-      const said = [
-        'implement: `permissionMode: dontAsk` (filed as `permissionMode`): ',
-        configRefusal('codex', { permissionMode: 'dontAsk' })!,
-      ];
-      await refused(() => started(lone('former-mode', 'harness: codex\npermissionMode: dontAsk')), ...said);
-      const moded = { moded: '---\nharness: codex\npermissionMode: dontAsk\n---\nYou build.\n' };
-      await refused(() => started(lone('former-mode-agent', 'agent: moded', moded)), ...said);
-    },
-  );
+  test("REFUSED: a codex sandbox written under its former name, `permissionMode:`, quoted as the file writes it — the step's line, or its agent's", async () => {
+    const said = [
+      'implement: `permissionMode: dontAsk` (filed as `permissionMode`): ',
+      configRefusal('codex', { permissionMode: 'dontAsk' })!,
+    ];
+    await refused(() => started(lone('former-mode', 'harness: codex\npermissionMode: dontAsk')), ...said);
+    const moded = { moded: '---\nharness: codex\npermissionMode: dontAsk\n---\nYou build.\n' };
+    await refused(() => started(lone('former-mode-agent', 'agent: moded', moded)), ...said);
+  });
 });
 
 /** The store's words for `step`, given `what` by a rule naming a path under the store, and never the runtime's. */
@@ -377,33 +347,28 @@ const storeRefused = async (dir: string, step: string, what: string, opts: Param
 const lines = (steps: Record<string, string>) =>
   Object.fromEntries(Object.entries(steps).map(([name, front]) => [name, `---\nplace: git\n${front}\n---\n${name} it\n`]));
 
-test("REFUSED at nemia start: a store whose path holds a `(`, which no permission rule carries, in the store's words before anything is written", async (t) => {
-  await t.test('REFUSED: a later step, handed the artifacts folders of the steps before it', async () => {
+describe("REFUSED at nemia start: a store whose path holds a `(`, which no permission rule carries, in the store's words before anything is written", () => {
+  test('REFUSED: a later step, handed the artifacts folders of the steps before it', async () => {
     const dir = folder('handed', lines({ implement: 'harness: claude', review: 'after: implement' }));
     await storeRefused(dir, 'review', 'the artifacts folders of the steps before it', { isolate: false });
   });
-
-  await t.test('REFUSED: a step whose `reads:` names the inbox', async () => {
+  test('REFUSED: a step whose `reads:` names the inbox', async () => {
     await storeRefused(folder('reads', lines({ triage: 'reads: inbox' })), 'triage', 'the inbox', { isolate: false });
   });
-
-  await t.test("REFUSED: a lone step in the checkout, and one after another, each filed a read of its run's artifacts folder", async () => {
+  test("REFUSED: a lone step in the checkout, and one after another, each filed a read of its run's artifacts folder", async () => {
     await storeRefused(folder('alone', lines({ ship: 'workspace: base' })), 'ship', "a read of its run's artifacts folder");
     const after = folder('after', lines({ implement: '', ship: 'after: implement\nworkspace: base' }));
     await storeRefused(after, 'ship', "a read of its run's artifacts folder");
   });
-
-  await t.test("REFUSED at nemia start --input: a lone step, filed its run's inputs folder read-only", async () => {
+  test("REFUSED at nemia start --input: a lone step, filed its run's inputs folder read-only", async () => {
     const given = path.join(ROOT, 'notes.md');
     fs.writeFileSync(given, 'notes\n');
     await storeRefused(folder('plain', lines({ implement: '' })), 'implement', "the run's inputs folder", { inputs: [given] });
   });
-
-  await t.test('a workflow of one step, handed nothing and reading no store folder, starts in the same store', () => {
+  test('a workflow of one step, handed nothing and reading no store folder, starts in the same store', () => {
     assert.ok(written(started(folder('one', lines({ implement: 'harness: claude' })), { isolate: false })));
   });
-
-  await t.test('a start reads its agent through the Agent door it is given: rendered and pinned from memory, the agent on no disk', () => {
+  test('a start reads its agent through the Agent door it is given: rendered and pinned from memory, the agent on no disk', () => {
     const dir = folder('remembered', { implement: '---\nplace: git\nagent: scribe\n---\nBuild it.\n' });
     const at = { dir: path.join(dir, '..', 'agents'), anywhere: true };
     const { run, version } = Effect.runSync(
@@ -422,8 +387,8 @@ test("REFUSED at nemia start: a store whose path holds a `(`, which no permissio
   });
 });
 
-test("nemia start copies the workflow folder whole into the run's own, read-only, and refuses a link in it before anything is written", async (t) => {
-  await t.test('every file, at any depth, byte for byte and not writable, under the digest the record names', () => {
+describe("nemia start copies the workflow folder whole into the run's own, read-only, and refuses a link in it before anything is written", () => {
+  test('every file, at any depth, byte for byte and not writable, under the digest the record names', () => {
     const dir = folder('frozen', lines({ implement: '' }));
     fs.writeFileSync(path.join(dir, 'helper.ts'), 'console.log("first");\n');
     fs.mkdirSync(path.join(dir, 'sub'));
@@ -440,8 +405,7 @@ test("nemia start copies the workflow folder whole into the run's own, read-only
     rooted.runs.forget(id);
     assert.equal(fs.existsSync(path.join(ROOT, 'runs', id)), false, '`nemia rm` removes the copy with the run, its files unwritable');
   });
-
-  await t.test('REFUSED: a link in the folder, named, and neither a run directory nor a record is left', async () => {
+  test('REFUSED: a link in the folder, named, and neither a run directory nor a record is left', async () => {
     const dir = folder('linked', lines({ implement: '' }));
     fs.symlinkSync(path.join(ROOT, 'notes.md'), path.join(dir, 'helper.ts'));
     const dirs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);

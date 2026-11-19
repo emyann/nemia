@@ -3,7 +3,7 @@
  * `nemia factory apply` filed the factory's file alone, renders its base, seeds its tree and writes its status, with no other verb run.
  * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo, in the child as in any test that ticks a store.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -49,7 +49,9 @@ test(
     const folder = path.join(root, 'factories', 'shaped');
     assert.deepEqual(fs.existsSync(folder) ? fs.readdirSync(folder) : [], [], 'apply files the factory file alone');
     const up = nodeChild(`process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'up']; await import(${JSON.stringify(BIN)});`, env);
-    t.after(() => up.child.kill());
+    t.onTestFinished(() => {
+      up.child.kill();
+    });
     const status = path.join(folder, 'status.json');
     const tree = path.join(folder, 'tree', 'factory.json');
     await up.until(() => fs.existsSync(status) && fs.existsSync(tree), "the controller writes the factory's status and seeds its tree");

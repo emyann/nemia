@@ -4,7 +4,7 @@
  * does not know is dropped; a refusal of the api's stays in its words. Every read and write goes through the objects' client, whose
  * fetch is the board's only one (`test/structure.test.ts`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { decodes } from '../src/lib/api/decodes.ts';
@@ -15,10 +15,10 @@ import type { StepView } from '../src/lib/runView.ts';
 import { detail, runList, runObject, step } from './run-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
-function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const before = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
 }
@@ -72,8 +72,8 @@ const readRuns = runsSelectedQuery('').queryFn as unknown as () => Promise<RunRo
 /** The frame read for `factory`, or for every factory, with no context of a query's. */
 const readOpen = (factory?: string) => (openRunsQuery(factory).queryFn as unknown as () => Promise<OpenRuns>)();
 
-test("runViewOf: the one view of a run off its object — its factory from its namespace, each step's agent (agentOf) and since (sinceOf)", async (t) => {
-  await t.test("a step's since is the earliest spawnedAt of a session or check of it that has not ended", () => {
+describe("runViewOf: the one view of a run off its object — its factory from its namespace, each step's agent (agentOf) and since (sinceOf)", () => {
+  test("a step's since is the earliest spawnedAt of a session or check of it that has not ended", () => {
     const run = object([
       tried(1, '2026-10-12T10:00:00.000Z', '2026-10-12T10:05:00.000Z'),
       tried(2, '2026-10-12T10:20:00.000Z', null, ['2026-10-12T10:10:00.000Z', null]),
@@ -83,18 +83,18 @@ test("runViewOf: the one view of a run off its object — its factory from its n
     assert.equal(sinceOf(plan), '2026-10-12T10:10:00.000Z');
     assert.equal(sinceOf(land), null, 'a step never tried has none');
   });
-  await t.test('REFUSED: a step all of whose spans have ended has no since', () => {
+  test('REFUSED: a step all of whose spans have ended has no since', () => {
     const run = object([
       tried(1, '2026-10-12T10:00:00.000Z', '2026-10-12T10:05:00.000Z', ['2026-10-12T10:06:00.000Z', '2026-10-12T10:07:00.000Z']),
     ]);
     assert.equal(sinceOf(runViewOf(run).steps[0]), null);
   });
-  await t.test("the factory is the run's namespace, none for the default factory's", () => {
+  test("the factory is the run's namespace, none for the default factory's", () => {
     assert.equal(runViewOf(object([], 'harbour')).factory, 'harbour');
     assert.equal(runViewOf(object([], 'default')).factory, null);
     assert.equal(runViewOf(object([])).factory, null);
   });
-  await t.test("each step's agent is the one its spec froze, none for a step given none; the graph keeps no input edge", () => {
+  test("each step's agent is the one its spec froze, none for a step given none; the graph keeps no input edge", () => {
     const row = runViewOf(object([]));
     assert.deepEqual(
       row.steps.map((s) => [s.name, agentOf(s)]),
@@ -106,7 +106,7 @@ test("runViewOf: the one view of a run off its object — its factory from its n
     assert.deepEqual(row.graph.edges, [{ from: 'plan', to: 'land', kind: 'after' }]);
     assert.deepEqual([row.id, row.createdAt], ['r-1', '2026-09-30T05:00:00.000Z']);
   });
-  await t.test('a run the list could not judge is said unjudged: its name, its factory and why, and nothing judged of it', () => {
+  test('a run the list could not judge is said unjudged: its name, its factory and why, and nothing judged of it', () => {
     const unjudged = { name: 'r-9', namespace: 'harbour', error: 'journal t-9 does not read', state: 'inFlight' as const };
     assert.deepEqual(rowsOf(runList([], {}, [unjudged, { name: 'r-8', namespace: 'default', error: 'x' }])), [
       { id: 'r-8', factory: null, unjudged: 'x' },
@@ -123,7 +123,7 @@ test('every run is the plain RunList whole, a label selector going with it, each
     const list = runList([runObject(detail({ id: 'r-2' }))], {}, [{ name: 'r-1', namespace: 'default', error: 'unread' }]);
     return new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   const rows = await readRuns();
@@ -163,7 +163,7 @@ test("the frame is the RunList of the runs not finished, split by each run's sta
     asked.push(String(input));
     return new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   const open = await readOpen();

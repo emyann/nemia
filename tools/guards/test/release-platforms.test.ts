@@ -6,7 +6,7 @@
  * archive tool imports nothing installed, and no package imports a tool), so the guard reads them as texts: a pure judgement,
  * proven on planted copies, and run once on the shipped files.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { textOf } from 'test-kit/repo';
 import { PLATFORMS, SDK_PLATFORM_PREFIX } from '../../release/archive.ts';

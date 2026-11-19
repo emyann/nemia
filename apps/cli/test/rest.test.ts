@@ -6,7 +6,7 @@
  *
  * Each refusal asserts its exit code and the command or the name it names, never its sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,7 +59,7 @@ const store = await servedStore('nemia-rest-', (root) => {
   ]);
   write(path.join(root, 'nemia', 'memory', 'feed-cursor'), '42\n');
 });
-after(store.stop);
+afterAll(store.stop);
 
 /** `nemia <argv>` on the served store, its exit asserted `code`. */
 const typed = async (argv: readonly string[], code = 0) => {

@@ -4,7 +4,7 @@
  * the line of `parseArgv` (or of the function it calls) it guards (`LINES`). The words of the commands the client holds
  * (`COMMAND_WORDS`) are held here too: each name once, and each endpoint they link one the `Api` declares.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Api, COMMAND_WORDS, CommandRefused, commandLine, helpOf, parseArgv, type Spec } from 'objects';
 
@@ -167,7 +167,7 @@ test('an empty text where a spec says its refusal is given to the handler, which
   assert.equal(parseArgv({ ...idea, missing: undefined }, ['']), undefined, LINES.unfilled);
 });
 
-test('a flag is read wherever it stands among the positionals: a switch, a valued flag and a repeated flag, before them as after', async (t) => {
+describe('a flag is read wherever it stands among the positionals: a switch, a valued flag and a repeated flag, before them as after', () => {
   const rows: readonly (readonly [row: string, spec: Spec, after: readonly string[], before: readonly string[]])[] = [
     ['a switch', HOLDING, ['r-1', '--off'], ['--off', 'r-1']],
     ['a valued flag', SPEC, ['r-1', 'impl', '--who', 'bo'], ['--who', 'bo', 'r-1', 'impl']],
@@ -175,7 +175,7 @@ test('a flag is read wherever it stands among the positionals: a switch, a value
     ['a repeated flag', HOLDING, ['r-1', '--until', 'a', '--until', 'b'], ['--until', 'a', 'r-1', '--until', 'b']],
   ];
   for (const [row, spec, after, before] of rows)
-    await t.test(row, () => {
+    test(row, () => {
       const read = parseArgv(spec, after);
       assert.ok(read, `${after.join(' ')} is read`);
       assert.deepEqual(parseArgv(spec, before), read, LINES.read);

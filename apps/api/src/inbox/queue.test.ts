@@ -7,7 +7,7 @@
  * package's programs are given this file's environment (`ENV`), with no `WF_MAX_RUNS`, so no cap comes from the shell.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -167,18 +167,18 @@ const startedFrom = (id: string, card: string): string =>
 
 const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
-test("a person queues cards, reads their order and the tick's tries, and takes them back", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a person queues cards, reads their order and the tick's tries, and takes them back", () => {
+  const s = story(test);
+  s.test(
     "GET /api/cards carries a queued card's time, and the tick's last try of its start, as the package lists them, and its order is the package's",
-    async (t) => {
+    async () => {
       clear();
-      t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
+      vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
       const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev' })).card;
       const second = onStore(addToInbox({ text: 'Show what a step cost', workflow: 'gone' })).card;
       const parked = onStore(addToInbox({ text: 'Not queued' })).card;
       onStore(queueInInbox(first.name));
-      t.mock.timers.tick(1);
+      vi.advanceTimersByTime(1);
       onStore(queueInInbox(second.name));
       const tried = {
         at: '2026-09-16T10:00:00.000Z',
@@ -222,12 +222,11 @@ test("a person queues cards, reads their order and the tick's tries, and takes t
       assert.equal(byName.get(parked.name)?.spec.queued, undefined, 'a card not queued carries no `queued`');
     },
   );
-
-  await s.test(
+  s.test(
     'the queue verb queues a card as `nemia inbox queue` does, behind those queued before; unqueue takes it back as `--off` does, and a second writes nothing',
-    async (t) => {
+    async () => {
       clear();
-      t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
+      vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
       const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev' })).card;
       const second = onStore(addToInbox({ text: 'Show what a step cost', workflow: 'dev' })).card;
 
@@ -243,7 +242,7 @@ test("a person queues cards, reads their order and the tick's tries, and takes t
         'written as nemia inbox queue writes it',
       );
 
-      t.mock.timers.tick(1);
+      vi.advanceTimersByTime(1);
       const behind = await queue(second.name, JSON_TYPE, '{}');
       assert.equal(behind.status, 200, 'a body of {} is no body');
       assert.deepEqual(inLine(await listed()), [first.name, second.name]);
@@ -262,36 +261,31 @@ test("a person queues cards, reads their order and the tick's tries, and takes t
       assert.deepEqual(inboxAsIs(), before, 'and nothing written');
     },
   );
+  s.test("a queue and its taking back leave a card's filing time as it was: no edit of the idea, and the Inbox orders by it", async () => {
+    clear();
+    const older = onStore(addToInbox({ text: 'Filed an hour ago', workflow: 'dev' }));
+    const newer = onStore(addToInbox({ text: 'Filed a minute ago', workflow: 'dev' }));
+    const [hourAgo, minuteAgo] = [new Date('2026-09-16T09:00:00.000Z'), new Date('2026-09-16T09:59:00.000Z')];
+    fs.utimesSync(older.file, hourAgo, hourAgo);
+    fs.utimesSync(newer.file, minuteAgo, minuteAgo);
+    const filedAt = async () => new Map((await listed()).map((c) => [c.metadata.name, c.metadata.creationTimestamp]));
+    const before = await filedAt();
+    assert.deepEqual([before.get(older.card.name), before.get(newer.card.name)], [hourAgo.toISOString(), minuteAgo.toISOString()]);
 
-  await s.test(
-    "a queue and its taking back leave a card's filing time as it was: no edit of the idea, and the Inbox orders by it",
-    async () => {
-      clear();
-      const older = onStore(addToInbox({ text: 'Filed an hour ago', workflow: 'dev' }));
-      const newer = onStore(addToInbox({ text: 'Filed a minute ago', workflow: 'dev' }));
-      const [hourAgo, minuteAgo] = [new Date('2026-09-16T09:00:00.000Z'), new Date('2026-09-16T09:59:00.000Z')];
-      fs.utimesSync(older.file, hourAgo, hourAgo);
-      fs.utimesSync(newer.file, minuteAgo, minuteAgo);
-      const filedAt = async () => new Map((await listed()).map((c) => [c.metadata.name, c.metadata.creationTimestamp]));
-      const before = await filedAt();
-      assert.deepEqual([before.get(older.card.name), before.get(newer.card.name)], [hourAgo.toISOString(), minuteAgo.toISOString()]);
+    const queued = await queue(older.card.name);
+    assert.equal(queued.status, 200, await queued.clone().text());
+    assert.match(cardText(older.card.name), /\nqueued: /, 'the card is queued');
+    assert.deepEqual(await filedAt(), before, 'queued, the older card keeps its filing time, and stays behind the newer one');
 
-      const queued = await queue(older.card.name);
-      assert.equal(queued.status, 200, await queued.clone().text());
-      assert.match(cardText(older.card.name), /\nqueued: /, 'the card is queued');
-      assert.deepEqual(await filedAt(), before, 'queued, the older card keeps its filing time, and stays behind the newer one');
+    const off = await unqueue(older.card.name);
+    assert.equal(off.status, 200);
+    assert.doesNotMatch(cardText(older.card.name), /\nqueued: /, 'the card is taken off the queue');
+    assert.deepEqual(await filedAt(), before, 'taken back, it keeps it too');
 
-      const off = await unqueue(older.card.name);
-      assert.equal(off.status, 200);
-      assert.doesNotMatch(cardText(older.card.name), /\nqueued: /, 'the card is taken off the queue');
-      assert.deepEqual(await filedAt(), before, 'taken back, it keeps it too');
-
-      assert.equal((await unqueue(newer.card.name)).status, 200);
-      assert.deepEqual(await filedAt(), before, 'a card taken off a queue it was not in is left as it was');
-    },
-  );
-
-  await s.test(
+    assert.equal((await unqueue(newer.card.name)).status, 200);
+    assert.deepEqual(await filedAt(), before, 'a card taken off a queue it was not in is left as it was');
+  });
+  s.test(
     'a queued old card whose `repo:` names a folder gone is listed in its place, with no error — its `repo:` retired, never read — and taken back as `--off` does',
     async () => {
       clear();
@@ -317,81 +311,70 @@ test("a person queues cards, reads their order and the tick's tries, and takes t
   );
 });
 
-test('the queue verbs: what a queue or a take-back refuses, writing nothing', async (t) => {
-  await t.test(
-    'a card with no workflow, or that does not read, is a 422; one not there a 404; one queued or started from a 409',
-    async () => {
-      clear();
-      const bare = onStore(addToInbox({ text: 'No workflow named' })).card;
-      const queued = onStore(addToInbox({ text: 'Queued already', workflow: 'dev' })).card;
-      onStore(queueInInbox(queued.name));
-      const started = onStore(addToInbox({ text: 'Started already', workflow: 'dev' })).card;
-      fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-      fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
-      fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');
-      const before = inboxAsIs();
+describe('the queue verbs: what a queue or a take-back refuses, writing nothing', () => {
+  test('a card with no workflow, or that does not read, is a 422; one not there a 404; one queued or started from a 409', async () => {
+    clear();
+    const bare = onStore(addToInbox({ text: 'No workflow named' })).card;
+    const queued = onStore(addToInbox({ text: 'Queued already', workflow: 'dev' })).card;
+    onStore(queueInInbox(queued.name));
+    const started = onStore(addToInbox({ text: 'Started already', workflow: 'dev' })).card;
+    fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
+    fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');
+    const before = inboxAsIs();
 
-      for (const [name, status, off] of [
-        [bare.name, 422, false],
-        ['broken', 422, false],
-        ['broken', 422, true],
-        ['no-such-card', 404, false],
-        ['no-such-card', 404, true],
-        [`${bare.name}.md`, 404, false],
-        [queued.name, 409, false],
-        [started.name, 409, false],
-      ] as const) {
-        const res = off ? await unqueue(name) : await queue(name);
-        assert.equal(res.status, status, `${off ? 'unqueue' : 'queue'} ${name}`);
-      }
-      assert.deepEqual(inboxAsIs(), before);
-    },
-  );
+    for (const [name, status, off] of [
+      [bare.name, 422, false],
+      ['broken', 422, false],
+      ['broken', 422, true],
+      ['no-such-card', 404, false],
+      ['no-such-card', 404, true],
+      [`${bare.name}.md`, 404, false],
+      [queued.name, 409, false],
+      [started.name, 409, false],
+    ] as const) {
+      const res = off ? await unqueue(name) : await queue(name);
+      assert.equal(res.status, status, `${off ? 'unqueue' : 'queue'} ${name}`);
+    }
+    assert.deepEqual(inboxAsIs(), before);
+  });
+  test("as shipped, a card that names no factory is a 422 in the package's words; a factory's card is queued, one queued before the rule taken back", async (t) => {
+    const was = ENV.WF_DEFAULT_FACTORY_STARTS;
+    ENV.WF_DEFAULT_FACTORY_STARTS = undefined;
+    t.onTestFinished(() => {
+      ENV.WF_DEFAULT_FACTORY_STARTS = was;
+    });
+    clear();
+    fs.mkdirSync(inbox, { recursive: true });
+    fs.writeFileSync(path.join(inbox, 'loose.md'), '---\nworkflow: dev\n---\nSomewhere.\n');
+    fs.writeFileSync(path.join(inbox, 'placed.md'), '---\nworkflow: dev\nfactory: mill\n---\nIn the mill.\n');
+    fs.writeFileSync(path.join(inbox, 'older.md'), '---\nworkflow: dev\nqueued: 2026-09-16T09:01:00.000Z\n---\nQueued before the rule.\n');
+    const before = inboxAsIs();
 
-  await t.test(
-    "as shipped, a card that names no factory is a 422 in the package's words; a factory's card is queued, one queued before the rule taken back",
-    async (t) => {
-      const was = ENV.WF_DEFAULT_FACTORY_STARTS;
-      ENV.WF_DEFAULT_FACTORY_STARTS = undefined;
-      t.after(() => {
-        ENV.WF_DEFAULT_FACTORY_STARTS = was;
-      });
-      clear();
-      fs.mkdirSync(inbox, { recursive: true });
-      fs.writeFileSync(path.join(inbox, 'loose.md'), '---\nworkflow: dev\n---\nSomewhere.\n');
-      fs.writeFileSync(path.join(inbox, 'placed.md'), '---\nworkflow: dev\nfactory: mill\n---\nIn the mill.\n');
-      fs.writeFileSync(
-        path.join(inbox, 'older.md'),
-        '---\nworkflow: dev\nqueued: 2026-09-16T09:01:00.000Z\n---\nQueued before the rule.\n',
-      );
-      const before = inboxAsIs();
+    const refused = await queue('loose');
+    assert.equal(refused.status, 422);
+    const { error } = (await refused.json()) as { error: string };
+    assert.equal(error, refusalOf('loose'));
+    for (const fact of ['inbox/loose.md: ', 'names no factory', 'nemia inbox queue loose.'])
+      assert.ok(error.includes(fact), `${fact}: ${error}`);
+    assert.ok(error.endsWith('Nothing was queued.'), error);
+    assert.deepEqual(inboxAsIs(), before);
 
-      const refused = await queue('loose');
-      assert.equal(refused.status, 422);
-      const { error } = (await refused.json()) as { error: string };
-      assert.equal(error, refusalOf('loose'));
-      for (const fact of ['inbox/loose.md: ', 'names no factory', 'nemia inbox queue loose.'])
-        assert.ok(error.includes(fact), `${fact}: ${error}`);
-      assert.ok(error.endsWith('Nothing was queued.'), error);
-      assert.deepEqual(inboxAsIs(), before);
+    const placed = await queue('placed', JSON_TYPE, undefined, 'mill');
+    assert.equal(placed.status, 200, await placed.clone().text());
+    const { status } = (await placed.json()) as Card;
+    assert.equal(status.queueLength, 2, "the answer of a queue counts the cards queued, every factory's");
+    assert.equal(status.factoryRepo, undefined, 'a factory not on file names no repository to start on');
+    const cards = await listed();
+    assert.equal(cards.find((c) => c.metadata.name === 'placed')?.metadata.namespace, 'mill');
+    assert.deepEqual(inLine(cards), ['older', 'placed'], 'behind the card queued before it');
+    assert.equal((await queue('placed')).status, 404, "a factory's card is no card of the default namespace");
 
-      const placed = await queue('placed', JSON_TYPE, undefined, 'mill');
-      assert.equal(placed.status, 200, await placed.clone().text());
-      const { status } = (await placed.json()) as Card;
-      assert.equal(status.queueLength, 2, "the answer of a queue counts the cards queued, every factory's");
-      assert.equal(status.factoryRepo, undefined, 'a factory not on file names no repository to start on');
-      const cards = await listed();
-      assert.equal(cards.find((c) => c.metadata.name === 'placed')?.metadata.namespace, 'mill');
-      assert.deepEqual(inLine(cards), ['older', 'placed'], 'behind the card queued before it');
-      assert.equal((await queue('placed')).status, 404, "a factory's card is no card of the default namespace");
-
-      const back = await unqueue('older');
-      assert.equal(back.status, 200, await back.clone().text());
-      assert.doesNotMatch(fs.readFileSync(path.join(inbox, 'older.md'), 'utf8'), /queued:/);
-    },
-  );
-
-  await t.test("a name that is not a card's is a 422 before the card is read, in the package's words", async () => {
+    const back = await unqueue('older');
+    assert.equal(back.status, 200, await back.clone().text());
+    assert.doesNotMatch(fs.readFileSync(path.join(inbox, 'older.md'), 'utf8'), /queued:/);
+  });
+  test("a name that is not a card's is a 422 before the card is read, in the package's words", async () => {
     clear();
     onStore(addToInbox({ text: 'No workflow named' }));
     const before = inboxAsIs();
@@ -404,29 +387,24 @@ test('the queue verbs: what a queue or a take-back refuses, writing nothing', as
     }
     assert.deepEqual(inboxAsIs(), before);
   });
-
-  await t.test(
-    "the queue takes a workflow by name in its query, written over the card's own; one given as a path, or empty, is refused, writing nothing",
-    async () => {
-      clear();
-      const { card } = onStore(addToInbox({ text: 'Queue me on mine' }));
-      for (const workflow of ['./workflows/dev', path.join(repo, 'workflows', 'dev'), 'a\\b', '']) {
-        const res = await queuedOn(card.name, workflow);
-        assert.equal(res.status, 422, `${workflow}: refused`);
-        assert.match(((await res.json()) as { error: string }).error, /--workflow <name>/, 'naming the by-name form');
-      }
-      assert.equal(cardText(card.name), 'Queue me on mine\n', 'nothing written');
-      const res = await queuedOn(card.name, 'dev');
-      assert.equal(res.status, 200, await res.clone().text());
-      const queued = (await res.json()) as Card;
-      assert.equal(queued.spec.workflow, 'dev', 'queued on the workflow sent, by name');
-      assert.equal(typeof queued.spec.queued, 'string', 'and queued');
-      assert.equal(queued.status.queueLength, 1, 'the only card queued');
-      assert.match(cardText(card.name), /\nworkflow: dev\n/, "the card's file names it");
-    },
-  );
-
-  await t.test('the queue reads no body: a workflow, null, text that is no JSON sent there is not read', async () => {
+  test("the queue takes a workflow by name in its query, written over the card's own; one given as a path, or empty, is refused, writing nothing", async () => {
+    clear();
+    const { card } = onStore(addToInbox({ text: 'Queue me on mine' }));
+    for (const workflow of ['./workflows/dev', path.join(repo, 'workflows', 'dev'), 'a\\b', '']) {
+      const res = await queuedOn(card.name, workflow);
+      assert.equal(res.status, 422, `${workflow}: refused`);
+      assert.match(((await res.json()) as { error: string }).error, /--workflow <name>/, 'naming the by-name form');
+    }
+    assert.equal(cardText(card.name), 'Queue me on mine\n', 'nothing written');
+    const res = await queuedOn(card.name, 'dev');
+    assert.equal(res.status, 200, await res.clone().text());
+    const queued = (await res.json()) as Card;
+    assert.equal(queued.spec.workflow, 'dev', 'queued on the workflow sent, by name');
+    assert.equal(typeof queued.spec.queued, 'string', 'and queued');
+    assert.equal(queued.status.queueLength, 1, 'the only card queued');
+    assert.match(cardText(card.name), /\nworkflow: dev\n/, "the card's file names it");
+  });
+  test('the queue reads no body: a workflow, null, text that is no JSON sent there is not read', async () => {
     clear();
     const { card } = onStore(addToInbox({ text: 'Queue me on mine' }));
     for (const body of [JSON.stringify({ workflow: 'dev' }), '{"workflow":null}', 'null']) {
@@ -516,15 +494,14 @@ const PASS = {
   harnesses: { claude: { calls: 1, ms: 30, listed: 3, spawned: 1 } },
 };
 
-test("a person reads the ceilings: no cap, then the cap of the daemon's last pass and the runs it holds, and what the pass cost", async (t) => {
-  const s = story(t);
-  await s.test('with no pass written and no cap: `no cap`, and nothing read, no run', async () => {
+describe("a person reads the ceilings: no cap, then the cap of the daemon's last pass and the runs it holds, and what the pass cost", () => {
+  const s = story(test);
+  s.test('with no pass written and no cap: `no cap`, and nothing read, no run', async () => {
     clear();
     seedRuns();
     assert.deepEqual(await ceilings(), { last: null, cap: 0, inFlight: null, held: [], pass: null });
   });
-
-  await s.test(
+  s.test(
     "the cap the daemon's last pass ran with, the runs in flight oldest first, and those held as `runSlots` holds them — off one list",
     async () => {
       clear();
@@ -569,13 +546,12 @@ test("a person reads the ceilings: no cap, then the cap of the daemon's last pas
       assert.deepEqual((await ceilings()).inFlight, ['a-flying', '0-also-flying'], 'two in flight, oldest first by createdAt, then id');
     },
   );
-
-  await s.test(
+  s.test(
     "judged by the last pass, not the api's WF_MAX_RUNS, which is read before any pass alone, and refused (422) when it is no count",
     async (t) => {
       clear();
       seedRuns();
-      t.after(() => {
+      t.onTestFinished(() => {
         ENV.WF_MAX_RUNS = undefined;
       });
 
@@ -602,8 +578,7 @@ test("a person reads the ceilings: no cap, then the cap of the daemon's last pas
       assert.equal((await ceilings()).cap, 2, "once a pass has written its ceilings, the api's environment is not read at all");
     },
   );
-
-  await s.test(
+  s.test(
     'what the last pass cost, beside the ceilings, cap or none, as the tick wrote it; null for a file that does not read as one',
     async () => {
       clear();

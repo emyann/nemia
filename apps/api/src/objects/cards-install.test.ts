@@ -8,7 +8,7 @@
  * `{ repo }`), which an attach sent with no body leaves as it was.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,10 +43,11 @@ attachWorkflow({ factory: 'mill', workflow: 'dev' });
 const JSON_TYPE = { 'content-type': 'application/json' };
 const send = (url: string, method: string, body: unknown) => app.request(url, { method, headers: JSON_TYPE, body: JSON.stringify(body) });
 
-test('on an install, a card is placed by its factory, or filed with no repository, never refused for the api having none', async (t) => {
-  const s = story(t);
-
-  await s.test('a card saying factory: mill, of one repository, is filed in mill and listed there', async () => {
+describe('on an install, a card is placed by its factory, or filed with no repository, never refused for the api having none', () => {
+  let filed!: string;
+  let name!: string;
+  const s = story(test);
+  s.test('a card saying factory: mill, of one repository, is filed in mill and listed there', async () => {
     const res = await send('/api/namespaces/mill/cards', 'POST', { body: 'Cache the views.', factory: 'mill', workflow: 'dev' });
     const card = (await res.json()) as Card;
     assert.equal(res.status, 201, JSON.stringify(card));
@@ -58,12 +59,10 @@ test('on an install, a card is placed by its factory, or filed with no repositor
       [card.metadata.name],
     );
   });
-
-  const [filed] = fs.readdirSync(path.join(root, 'inbox'));
-  assert.ok(filed);
-  const name = filed.replace(/\.md$/, '');
-
-  await s.test('the card in mill is labelled and queued on the install', async () => {
+  s.test('the card in mill is labelled and queued on the install', async () => {
+    [filed] = fs.readdirSync(path.join(root, 'inbox'));
+    assert.ok(filed);
+    name = filed.replace(/\.md$/, '');
     const labelled = await send(`/api/namespaces/mill/cards/${name}/labels`, 'POST', { labels: ['team=core'] });
     assert.equal(labelled.status, 200, await labelled.clone().text());
     const queued = await send(`/api/namespaces/mill/cards/${name}/queue`, 'POST', {});
@@ -71,23 +70,20 @@ test('on an install, a card is placed by its factory, or filed with no repositor
     assert.equal(queued.status, 200, JSON.stringify(card));
     assert.ok(card.spec.queued, 'the card is queued');
   });
-
-  await s.test('a card that names no factory and no repository is filed with none, in default', async () => {
+  s.test('a card that names no factory and no repository is filed with none, in default', async () => {
     const res = await send('/api/namespaces/default/cards', 'POST', { body: 'An idea for later.' });
     const card = (await res.json()) as Card;
     assert.equal(res.status, 201, JSON.stringify(card));
     assert.equal(card.metadata.namespace, 'default');
     assert.equal(card.spec.repo, undefined, 'no repository is written that nobody chose');
   });
-
-  await s.test('a card in no factory naming a workflow is filed with it by name, no repository looked at', async () => {
+  s.test('a card in no factory naming a workflow is filed with it by name, no repository looked at', async () => {
     const res = await send('/api/namespaces/default/cards', 'POST', { body: 'Somewhere.', workflow: 'dev' });
     const card = (await res.json()) as Card;
     assert.equal(res.status, 201, JSON.stringify(card));
     assert.equal(card.spec.workflow, 'dev');
   });
-
-  await s.test(
+  s.test(
     'REFUSED: a card in no factory, started in default with no ?factory=, is 422 naming ?factory= and factory:, no run started',
     async () => {
       const listed = (await (await app.request('/api/namespaces/default/cards')).json()) as CardList;
@@ -102,22 +98,19 @@ test('on an install, a card is placed by its factory, or filed with no repositor
       assert.deepEqual(runs(), before, 'no run is started on any folder');
     },
   );
-
-  await s.test('REFUSED: a card sent with a repo is 422, the repo being retired, nothing filed', async () => {
+  s.test('REFUSED: a card sent with a repo is 422, the repo being retired, nothing filed', async () => {
     const before = fs.readdirSync(path.join(root, 'inbox')).length;
     const res = await send('/api/namespaces/default/cards', 'POST', { body: 'On the mill.', repo: millRepo, workflow: 'dev' });
     assert.equal(res.status, 422, await res.clone().text());
     assert.equal(fs.readdirSync(path.join(root, 'inbox')).length, before);
   });
-
-  await s.test("REFUSED: a card's start that names ?repo= is 422, naming the attach, no run started", async () => {
+  s.test("REFUSED: a card's start that names ?repo= is 422, naming the attach, no run started", async () => {
     const res = await send(`/api/namespaces/mill/cards/${name}/start?repo=${encodeURIComponent(millRepo)}`, 'POST', {});
     const answer = await res.text();
     assert.equal(res.status, 422, answer);
     assert.ok(answer.includes('nemia factory attach'), answer);
   });
-
-  await s.test("an attach names the repository a workflow works on by its folder's name, and one sent with no repo keeps it", async () => {
+  s.test("an attach names the repository a workflow works on by its folder's name, and one sent with no repo keeps it", async () => {
     const wired = await send('/api/factories/mill/workflows/dev', 'PUT', { repo: path.basename(millRepo) });
     assert.equal(wired.status, 200, await wired.clone().text());
     const kept = (await (await send('/api/factories/mill/workflows/dev', 'PUT', {})).json()) as Factory;

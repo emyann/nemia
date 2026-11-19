@@ -11,7 +11,7 @@
  * the run record this file seeds. The table runs first: the story writes asks beside the run, and they stay.
  */
 import { root, SEATED } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -124,7 +124,7 @@ const refused = async (res: Response, status: number): Promise<{ error: string; 
   return (await res.json()) as { error: string; field?: string };
 };
 
-test('POST …/retry with answers: what it refuses — answers that do not fit the questions the step asks now, answers on a recheck (422s), answers that are no list (a 400) — and nothing written', async (t) => {
+describe('POST …/retry with answers: what it refuses — answers that do not fit the questions the step asks now, answers on a recheck (422s), answers that are no list (a 400) — and nothing written', () => {
   const rows: Array<[string, string, object, RegExp | RegExp[]]> = [
     [
       'an option the question does not offer',
@@ -165,22 +165,21 @@ test('POST …/retry with answers: what it refuses — answers that do not fit t
     ['answers on a recheck', 'design', { mode: 'recheck', answers: [{ question: cut.title, chose: ['a'] }] }, /a recheck files no session/],
   ];
   for (const [name, step, body, facts] of rows)
-    await t.test(name, async () => {
+    test(name, async () => {
       const { error } = await refused(await ask(step, body), 422);
       for (const fact of [facts].flat()) assert.match(error, fact);
       assert.deepEqual(asked(), []);
     });
-  await t.test('answers that are no list', async () => {
+  test('answers that are no list', async () => {
     const { field } = await refused(await ask('design', { mode: 'continue', answers: 'a' }), 400);
     assert.ok(field?.startsWith('payload.answers'), field);
     assert.deepEqual(asked(), []);
   });
 });
 
-test('a person reads the questions a closeout asks on the run’s detail and answers them on the try: the answers are its message, in the package’s words', async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe('a person reads the questions a closeout asks on the run’s detail and answers them on the try: the answers are its message, in the package’s words', () => {
+  const s = story(test);
+  s.test(
     "a closeout's questions are on the run's detail, blocked or done; a field that asks in free text, or does not decode, has none",
     async () => {
       const run = await objectOf(app(), R);
@@ -201,8 +200,7 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
       assert.equal(stepOf(run, 'design').needs, 'Two questions.', '`needs` stays the one line it was');
     },
   );
-
-  await s.test(
+  s.test(
     'answers that fit are the try’s message, in the package’s words, their note the message beside them; a free-text question still takes a message, and questions that do not read wait on the run',
     async () => {
       const answers = [

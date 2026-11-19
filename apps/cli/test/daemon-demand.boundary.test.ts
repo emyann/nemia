@@ -8,12 +8,13 @@
  * (`ensureDaemon` starts a unit only where its `WF_ROOT` is the store) and the daemon's engine is the store's own. The daemon a start
  * spawns is given the service's environment alone (`daemonEnv`), so it listens on the daemon's port, 8787, whatever `PORT` says: where
  * another process holds that port — the person's own daemon — the test is skipped, saying so, rather than start one that cannot listen.
- * Run it where the port is free (CI), or in a network namespace of its own: `unshare -rn sh -c 'ip link set lo up && node --test <file>'`.
+ * Run it where the port is free (CI), or in a network namespace of its own: `unshare -rn sh -c 'ip link set lo up && npx vitest run
+ * <file>'`.
  *
  * With the start turned off (`NEMIA_DAEMON_START=off`), on a store of its own, the same read is refused, exit 2, naming the command that
  * starts one here (`nemia up`) and the one that installs the service, and never `--local`, which is refused.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -95,7 +96,7 @@ async function stopStarted(): Promise<void> {
   while (alive(pid)) await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
-after(async () => {
+afterAll(async () => {
   await stopStarted();
   fs.rmSync(SCRATCH, { recursive: true, force: true });
 });
@@ -107,22 +108,25 @@ const skip =
       ? `127.0.0.1:${DAEMON_PORT} is held by another process (a daemon of the person's own store?): a daemon started here could not listen`
       : false;
 
-test('nemia ls on a store no daemon serves starts one through nemia daemon, reads from it, and the test stops it', { skip }, async () => {
-  assert.equal(lease(), undefined);
-  const { code, stderr } = await nemia(['ls']);
-  assert.equal(code, 0, stderr);
-  const held = lease();
-  assert.equal(held?.by, 'api');
-  assert.equal(held?.url, `http://127.0.0.1:${DAEMON_PORT}`);
-  assert.equal(typeof held?.pid, 'number');
-  assert.notEqual(held?.pid, process.pid);
-  assert.ok(ofThisStore(held?.pid as number), `pid ${String(held?.pid)} is not a process of ${ROOT}`);
-  assert.ok(stderr.includes(`kill ${String(held?.pid)}`), stderr);
-  const credential = path.join(ROOT, 'credential');
-  assert.equal(fs.statSync(credential).mode & 0o777, 0o600, "the daemon's start put the person's credential in place, read by ls");
-  await stopStarted();
-  assert.equal(alive(held?.pid as number), false);
-});
+test.skipIf(skip)(
+  'nemia ls on a store no daemon serves starts one through nemia daemon, reads from it, and the test stops it',
+  async () => {
+    assert.equal(lease(), undefined);
+    const { code, stderr } = await nemia(['ls']);
+    assert.equal(code, 0, stderr);
+    const held = lease();
+    assert.equal(held?.by, 'api');
+    assert.equal(held?.url, `http://127.0.0.1:${DAEMON_PORT}`);
+    assert.equal(typeof held?.pid, 'number');
+    assert.notEqual(held?.pid, process.pid);
+    assert.ok(ofThisStore(held?.pid as number), `pid ${String(held?.pid)} is not a process of ${ROOT}`);
+    assert.ok(stderr.includes(`kill ${String(held?.pid)}`), stderr);
+    const credential = path.join(ROOT, 'credential');
+    assert.equal(fs.statSync(credential).mode & 0o777, 0o600, "the daemon's start put the person's credential in place, read by ls");
+    await stopStarted();
+    assert.equal(alive(held?.pid as number), false);
+  },
+);
 
 test('REFUSED: with NEMIA_DAEMON_START=off no daemon is started: exit 2, naming `nemia up` and `nemia service install`, never --local', async () => {
   const root = path.join(SCRATCH, 'off');

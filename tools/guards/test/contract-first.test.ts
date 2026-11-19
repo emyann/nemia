@@ -9,7 +9,7 @@
  * The contracts written before this rule are named in `contract-first.baseline.ts`, which only shrinks: a contract it does not name is
  * refused, and so is a name it holds for a contract that reads its code no more.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { files, textOf } from 'test-kit/repo';

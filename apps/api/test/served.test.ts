@@ -9,7 +9,7 @@
  * and a retired read (`/api/listing`) is no route.
  */
 import './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
 import { Api, readsUnbounded } from 'objects';

@@ -10,7 +10,7 @@
  * over one run it seeds and removes.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import { names } from './named.ts';
 import assert from 'node:assert/strict';
@@ -46,7 +46,7 @@ function refused(answer: { status: number; body: Record<string, unknown> }, stat
   names(answer.body.error, ...facts);
 }
 
-test('POST /api/pause refuses, before the store is written: a body that is not a pause, words nemia pause refuses, the cordon gone', async (t) => {
+describe('POST /api/pause refuses, before the store is written: a body that is not a pause, words nemia pause refuses, the cordon gone', () => {
   const DOCUMENT = 'GET /openapi/v3/nemia/v1';
   const ROWS: { name: string; ask: () => Promise<{ status: number; body: Record<string, unknown> }>; status: number; facts: string[] }[] = [
     {
@@ -88,13 +88,13 @@ test('POST /api/pause refuses, before the store is written: a body that is not a
     },
   ];
   for (const row of ROWS)
-    await t.test(row.name, async () => {
+    test(row.name, async () => {
       const answer = await row.ask();
       if (row.facts.length) refused(answer, row.status, ...row.facts);
       else assert.equal(answer.status, row.status);
       assert.equal(fs.existsSync(FILE), false, 'nothing paused the store');
     });
-  await t.test('the cordon routes are gone: /api/cordon answers 404 to every verb and pauses nothing', async () => {
+  test('the cordon routes are gone: /api/cordon answers 404 to every verb and pauses nothing', async () => {
     for (const method of ['GET', 'POST', 'DELETE']) {
       const res = await app.request('/api/cordon', { method, headers: BOARD, ...(method === 'POST' ? { body: '{}' } : {}) });
       assert.equal(res.status, 404, method);
@@ -122,40 +122,37 @@ function appAtWork(working: string) {
   return { on: appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(own))).app, stops };
 }
 
-test('the board pauses the store and lifts it, refused a second of each; then reads what a pause at once would stop, pauses at once, and keeps the pause that stands', async (t) => {
-  const s = story(t);
-  await s.test(
-    'the board pauses the store, reads the pause back, is refused a second, lifts it, and is refused a second lift',
-    async () => {
-      assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], parked: [], staged: [], held: [] } });
-      const put = await asked('POST', { why: 'merging by hand', by: 'ann' });
-      assert.equal(put.status, 200);
-      const pause = put.body.pause as { at: string; by: string; why: string; timeoutMs: number };
-      assert.deepEqual(
-        { ...pause, at: typeof pause.at },
-        { at: 'string', by: 'ann', why: 'merging by hand', timeoutMs: 600_000, actor: { kind: 'person', token: 'harness' } },
-        "the store's timeout, 10m with none set",
-      );
-      assert.deepEqual(JSON.parse(fs.readFileSync(FILE, 'utf8')), pause, "the store's pause file holds it");
-      assert.deepEqual(await asked('GET'), { status: 200, body: { pause, finishing: [], parked: [], staged: [], held: [] } });
-      refused(await asked('POST', {}), 409, 'ann', pause.at, 'nemia resume', 'nemia pause --now');
-      assert.deepEqual(await asked('DELETE'), { status: 200, body: { pause } });
-      assert.equal(fs.existsSync(FILE), false, 'the file removed');
-      assert.deepEqual(
-        JSON.parse(fs.readFileSync(`${FILE}.lifted`, 'utf8')),
-        { since: pause.at, actor: { kind: 'person', token: 'harness' } },
-        'who lifted it kept beside the pause, paired by the moment of the pause it lifted',
-      );
-      assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], parked: [], staged: [], held: [] } });
-      refused(await asked('DELETE'), 404, 'nemia pause');
-      const timed = await asked('POST', { timeout: '15m', by: 'ann' });
-      assert.equal(timed.status, 200, JSON.stringify(timed.body));
-      assert.equal((timed.body.pause as { timeoutMs: number }).timeoutMs, 900_000, 'the timeout given, for this pause');
-      assert.equal(JSON.parse(fs.readFileSync(FILE, 'utf8')).timeoutMs, 900_000);
-      assert.equal((await asked('DELETE')).status, 200);
-    },
-  );
-  await s.test(
+describe('the board pauses the store and lifts it, refused a second of each; then reads what a pause at once would stop, pauses at once, and keeps the pause that stands', () => {
+  const s = story(test);
+  s.test('the board pauses the store, reads the pause back, is refused a second, lifts it, and is refused a second lift', async () => {
+    assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], parked: [], staged: [], held: [] } });
+    const put = await asked('POST', { why: 'merging by hand', by: 'ann' });
+    assert.equal(put.status, 200);
+    const pause = put.body.pause as { at: string; by: string; why: string; timeoutMs: number };
+    assert.deepEqual(
+      { ...pause, at: typeof pause.at },
+      { at: 'string', by: 'ann', why: 'merging by hand', timeoutMs: 600_000, actor: { kind: 'person', token: 'harness' } },
+      "the store's timeout, 10m with none set",
+    );
+    assert.deepEqual(JSON.parse(fs.readFileSync(FILE, 'utf8')), pause, "the store's pause file holds it");
+    assert.deepEqual(await asked('GET'), { status: 200, body: { pause, finishing: [], parked: [], staged: [], held: [] } });
+    refused(await asked('POST', {}), 409, 'ann', pause.at, 'nemia resume', 'nemia pause --now');
+    assert.deepEqual(await asked('DELETE'), { status: 200, body: { pause } });
+    assert.equal(fs.existsSync(FILE), false, 'the file removed');
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(`${FILE}.lifted`, 'utf8')),
+      { since: pause.at, actor: { kind: 'person', token: 'harness' } },
+      'who lifted it kept beside the pause, paired by the moment of the pause it lifted',
+    );
+    assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], parked: [], staged: [], held: [] } });
+    refused(await asked('DELETE'), 404, 'nemia pause');
+    const timed = await asked('POST', { timeout: '15m', by: 'ann' });
+    assert.equal(timed.status, 200, JSON.stringify(timed.body));
+    assert.equal((timed.body.pause as { timeoutMs: number }).timeoutMs, 900_000, 'the timeout given, for this pause');
+    assert.equal(JSON.parse(fs.readFileSync(FILE, 'utf8')).timeoutMs, 900_000);
+    assert.equal((await asked('DELETE')).status, 200);
+  });
+  s.test(
     'the board reads what a pause at once would stop, pauses at once, and a second keeps the pause that stands as it was',
     async () => {
       const id = 'r-pause-now';

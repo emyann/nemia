@@ -5,7 +5,7 @@
  * touched; and a rule broken by a call the try was denied that one of its `breaks` matches, as a `disallowedTools:` rule matches a call,
  * kept otherwise, and counted on no try whose denials were not measured.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { deniedCallsOf, filesTouchedOf, ruleRowsOf, rulesOfTry, skillRowsOf, skillsDueOf, skillsLoadedOf } from './discipline.ts';
 import type { SkillRule } from '../skills/skills.ts';
@@ -54,8 +54,8 @@ const DENIED: Array<{ name: string; view: Parameters<typeof deniedCallsOf>[0]; c
   { name: 'no view', view: undefined, calls: null },
 ];
 
-test('`deniedCallsOf`: the calls a session was denied, measured only where each ended attempt says them', async (t) => {
-  for (const row of DENIED) await t.test(row.name, () => assert.deepEqual(deniedCallsOf(row.view), row.calls));
+describe('`deniedCallsOf`: the calls a session was denied, measured only where each ended attempt says them', () => {
+  for (const row of DENIED) test(row.name, () => assert.deepEqual(deniedCallsOf(row.view), row.calls));
 });
 
 const ended = (more: object = {}) => ({ ended: 'succeeded', ...more });
@@ -98,10 +98,9 @@ const TOUCHED: Array<{ name: string; view: Parameters<typeof filesTouchedOf>[0];
   { name: 'no view: unmeasured', view: undefined, files: null },
 ];
 
-test('`skillsLoadedOf` and `filesTouchedOf`: what a session loaded and touched, measured only where every ended attempt says', async (t) => {
-  for (const row of LOADED)
-    await t.test(`skills: ${row.name}`, () => assert.deepEqual(skillsLoadedOf(row.view, row.given ?? []), row.skills));
-  for (const row of TOUCHED) await t.test(`files: ${row.name}`, () => assert.deepEqual(filesTouchedOf(row.view), row.files));
+describe('`skillsLoadedOf` and `filesTouchedOf`: what a session loaded and touched, measured only where every ended attempt says', () => {
+  for (const row of LOADED) test(`skills: ${row.name}`, () => assert.deepEqual(skillsLoadedOf(row.view, row.given ?? []), row.skills));
+  for (const row of TOUCHED) test(`files: ${row.name}`, () => assert.deepEqual(filesTouchedOf(row.view), row.files));
 });
 
 const APPLIES = new Map<string, string[]>([
@@ -180,9 +179,9 @@ const SKILL_ROWS: Array<{ name: string; tries: Loaded[]; rows: ReturnType<typeof
   },
 ];
 
-test('`skillsDueOf` and `skillRowsOf`: the skills a try was due to load by the paths it touched, and their rows over a set of tries', async (t) => {
-  for (const row of DUE) await t.test(`due: ${row.name}`, () => assert.deepEqual(skillsDueOf(row.files, APPLIES), row.due));
-  for (const row of SKILL_ROWS) await t.test(`rows: ${row.name}`, () => assert.deepEqual(skillRowsOf(row.tries), row.rows));
+describe('`skillsDueOf` and `skillRowsOf`: the skills a try was due to load by the paths it touched, and their rows over a set of tries', () => {
+  for (const row of DUE) test(`due: ${row.name}`, () => assert.deepEqual(skillsDueOf(row.files, APPLIES), row.due));
+  for (const row of SKILL_ROWS) test(`rows: ${row.name}`, () => assert.deepEqual(skillRowsOf(row.tries), row.rows));
 });
 
 const readWithRead: SkillRule = { id: 'read-with-read', says: 'Read a file with Read', breaks: ['Bash(cat:*)', 'Bash(head:*)'] };
@@ -281,6 +280,6 @@ const RULES: Array<{ name: string; check: () => void }> = [
   },
 ];
 
-test('`rulesOfTry` and `ruleRowsOf`: a rule broken by a denied call as a fence matches it, kept otherwise, totalled over measured tries', async (t) => {
-  for (const row of RULES) await t.test(row.name, row.check);
+describe('`rulesOfTry` and `ruleRowsOf`: a rule broken by a denied call as a fence matches it, kept otherwise, totalled over measured tries', () => {
+  for (const row of RULES) test(row.name, row.check);
 });

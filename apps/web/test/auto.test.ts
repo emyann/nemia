@@ -3,7 +3,7 @@
  * custom instruction (`AgentInstructions`) — and the writes of a confirm, sending the words the person read, and a drop, each on its
  * route.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { policyQuery, confirmRule, dropRule, type PolicyList } from '../src/lib/api/policy.ts';
 
@@ -39,7 +39,11 @@ const LIST: PolicyList = {
 /** A body as the client sent it, as text: a string as it is, bytes decoded. */
 const textOf = (body: BodyInit | null): string => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
 
-function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200): { method: string; path: string; body: unknown }[] {
+function answering(
+  t: { onTestFinished: (fn: () => void) => void },
+  body: unknown,
+  status = 200,
+): { method: string; path: string; body: unknown }[] {
   const before = globalThis.fetch;
   const calls: { method: string; path: string; body: unknown }[] = [];
   globalThis.fetch = async (input, init) => {
@@ -50,7 +54,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
     });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   return calls;
@@ -58,23 +62,20 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
 
 const readAuto = policyQuery('nemia').queryFn as unknown as () => Promise<PolicyList>;
 
-test('policyQuery, confirmRule, dropRule: her rules read back as the api answers them, and a confirm and a drop sent on their routes', async (t) => {
-  await t.test('her rules read back what the api answered, a key it does not read dropped', async (t) => {
+describe('policyQuery, confirmRule, dropRule: her rules read back as the api answers them, and a confirm and a drop sent on their routes', () => {
+  test('her rules read back what the api answered, a key it does not read dropped', async (t) => {
     answering(t, { ...LIST, later: true });
     assert.deepEqual(await readAuto(), LIST);
     answering(t, { ...LIST, proposed: null, instruction: null });
     assert.deepEqual(await readAuto(), { ...LIST, proposed: null, instruction: null });
   });
-  await t.test(
-    'a confirm is a PUT sending the words read and a drop a DELETE sending `{}` (its endpoint declares no body), each reading the rules back',
-    async (t) => {
-      const calls = answering(t, LIST);
-      assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
-      assert.deepEqual(await dropRule('nemia', 'default'), LIST);
-      assert.deepEqual(calls, [
-        { method: 'PUT', path: '/api/policy/nemia/rules/tries', body: { words: 'Try again.' } },
-        { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: {} },
-      ]);
-    },
-  );
+  test('a confirm is a PUT sending the words read and a drop a DELETE sending `{}` (its endpoint declares no body), each reading the rules back', async (t) => {
+    const calls = answering(t, LIST);
+    assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
+    assert.deepEqual(await dropRule('nemia', 'default'), LIST);
+    assert.deepEqual(calls, [
+      { method: 'PUT', path: '/api/policy/nemia/rules/tries', body: { words: 'Try again.' } },
+      { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: {} },
+    ]);
+  });
 });

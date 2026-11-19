@@ -10,7 +10,8 @@
  * - `ionice -c3` runs on some machines and not others: a test asks `nice -n 10 ionice -c3 true`, as the harness does, and holds
  *   the harness to the answer either way.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { spawnSync } from 'node:child_process';
@@ -36,34 +37,43 @@ const ownNiceness = (): number => Number(spawnSync('ps', ['-o', 'ni=', '-p', Str
 /** Whether this machine runs the idle IO class under a niceness, as the harness's `prepare` asks it. */
 const idleRuns = () => spawnSync('nice', ['-n', '10', 'ionice', '-c3', 'true'], { stdio: 'ignore' }).status === 0;
 
-test(
+describe(
   'command tasks run on one engine: their streams read back whole and apart, their exit code the verdict, in their folder, env and niceness; a stop leaves no code',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const root = scratch('ae-command-');
-    const cwd = scratch('ae-command-cwd-');
-    const engine = builtEngine(EngineService.layer({ root, harnesses: { command: commandHarness } }));
-    const started = path.join(cwd, 'started');
+  () => {
+    let root!: string;
+    let cwd!: string;
+    let engine!: import('../src/index.ts').EngineShape;
+    let started!: string;
+    let ids!: Record<string, Awaited<ReturnType<typeof file>>>;
+    beforeAll(async () => {
+      const t = teardowns();
+      root = scratch('ae-command-');
+      cwd = scratch('ae-command-cwd-');
+      engine = builtEngine(EngineService.layer({ root, harnesses: { command: commandHarness } }));
+      started = path.join(cwd, 'started');
+      ids = {
+        seq: await file(['seq', '1', '200000']),
+        split: await file(['sh', '-c', 'echo out; echo err >&2; echo more; exit 5']),
+        env: await file(['sh', '-c', 'printf "%s|%s|%s" "$NEMIA_A" "$PWD" "${PATH:+path}"'], { env: { NEMIA_A: 'a b' } }),
+        nice: await file(['sh', '-c', 'ps -o ni= -p $$; ionice -p $$ 2>/dev/null || echo none'], { niceness: 10 }),
+        plain: await file(['sh', '-c', 'ps -o ni= -p $$'], { niceness: 0 }),
+        held: await file(['sh', '-c', 'echo first; sleep 30 & echo last']),
+        stopped: await file(['sh', '-c', `trap 'exit 7' TERM; : > ${started}; while :; do sleep 0.1; done`]),
+        printed: await file(['sh', '-c', 'echo out; echo err >&2']),
+        said: await file(['sh', '-c', `printf 'route: web\\n' > ${term('said')}; echo stdout never answers; exit 3`], {
+          terminationMessagePath: term('said'),
+        }),
+        unsaid: await file(['true'], { terminationMessagePath: term('unsaid') }),
+        long: await file(['sh', '-c', `head -c 5000 /dev/zero | tr '\\0' x > ${term('long')}`], { terminationMessagePath: term('long') }),
+        folder: await file(['mkdir', term('folder')], { terminationMessagePath: term('folder') }),
+      };
+      return t.end;
+    });
+    const s = story(test);
     const term = (name: string) => path.join(cwd, name);
     const file = (command: string[], config: { env?: Record<string, string>; niceness?: number; terminationMessagePath?: string } = {}) =>
       Effect.runPromise(engine.file({ brief: 'run it', cwd, harness: 'command', config: { command, ...config } }));
-    const ids = {
-      seq: await file(['seq', '1', '200000']),
-      split: await file(['sh', '-c', 'echo out; echo err >&2; echo more; exit 5']),
-      env: await file(['sh', '-c', 'printf "%s|%s|%s" "$NEMIA_A" "$PWD" "${PATH:+path}"'], { env: { NEMIA_A: 'a b' } }),
-      nice: await file(['sh', '-c', 'ps -o ni= -p $$; ionice -p $$ 2>/dev/null || echo none'], { niceness: 10 }),
-      plain: await file(['sh', '-c', 'ps -o ni= -p $$'], { niceness: 0 }),
-      held: await file(['sh', '-c', 'echo first; sleep 30 & echo last']),
-      stopped: await file(['sh', '-c', `trap 'exit 7' TERM; : > ${started}; while :; do sleep 0.1; done`]),
-      printed: await file(['sh', '-c', 'echo out; echo err >&2']),
-      said: await file(['sh', '-c', `printf 'route: web\\n' > ${term('said')}; echo stdout never answers; exit 3`], {
-        terminationMessagePath: term('said'),
-      }),
-      unsaid: await file(['true'], { terminationMessagePath: term('unsaid') }),
-      long: await file(['sh', '-c', `head -c 5000 /dev/zero | tr '\\0' x > ${term('long')}`], { terminationMessagePath: term('long') }),
-      folder: await file(['mkdir', term('folder')], { terminationMessagePath: term('folder') }),
-    };
     const stdout = async (id: string) => Effect.runPromise(engine.output(id, 'stdout'));
     const attempt = async (id: string) => (await Effect.runPromise(engine.view(id))).state;
     const ae = (...args: string[]) => {
@@ -73,14 +83,12 @@ test(
       });
       return { status: r.status, stdout: r.stdout, stderr: r.stderr };
     };
-
-    await s.test('`ae output` says on stderr, and exits 0, when no stream is kept: no attempt has run yet', () => {
+    s.test('`ae output` says on stderr, and exits 0, when no stream is kept: no attempt has run yet', () => {
       const before = ae(ids.printed);
       assert.deepEqual([before.status, before.stdout], [0, '']);
       assert.ok(before.stderr.startsWith(`${ids.printed}: no stdout kept`), before.stderr);
     });
-
-    await s.test('every command runs to its end, the one asked to stop once it has started', async (sub) => {
+    s.test('every command runs to its end, the one asked to stop once it has started', async (sub) => {
       let asked = false;
       await until(
         sub,
@@ -97,8 +105,7 @@ test(
         { everyMs: 50 },
       );
     });
-
-    await s.test('a command runs to its end: its stdout read back whole, 200,000 lines, and its last bytes alone', async () => {
+    s.test('a command runs to its end: its stdout read back whole, 200,000 lines, and its last bytes alone', async () => {
       const lines = Array.from({ length: 200_000 }, (_, i) => `${i + 1}\n`).join('');
       assert.equal((await attempt(ids.seq)).attempts[0].exitCode, 0);
       const whole = await stdout(ids.seq);
@@ -107,19 +114,16 @@ test(
       assert.equal(await Effect.runPromise(engine.output(ids.seq, 'stdout', 14)), '199999\n200000\n');
       assert.equal(await Effect.runPromise(engine.output(ids.seq, 'stderr')), '', 'a stream it wrote nothing on is empty, not absent');
     });
-
-    await s.test('stderr is kept apart from stdout, and the exit code is the verdict', async () => {
+    s.test('stderr is kept apart from stdout, and the exit code is the verdict', async () => {
       const state = await attempt(ids.split);
       assert.deepEqual([state.attempts[0].exitCode, state.settled], [5, 'failed']);
       assert.equal(await stdout(ids.split), 'out\nmore\n');
       assert.equal(await Effect.runPromise(engine.output(ids.split, 'stderr')), 'err\n');
     });
-
-    await s.test("the command runs in the task's folder, with its env laid over the worker's own", async () => {
+    s.test("the command runs in the task's folder, with its env laid over the worker's own", async () => {
       assert.equal(await stdout(ids.env), `a b|${fs.realpathSync(cwd)}|path`);
     });
-
-    await s.test(
+    s.test(
       "a niceness lowers the priority the command runs at from the worker's own, and gives it the idle IO class where the machine has one",
       async () => {
         const [ni, io] = (await stdout(ids.nice))!.trim().split('\n');
@@ -129,8 +133,7 @@ test(
         assert.equal((await stdout(ids.plain))!.trim(), String(ownNiceness()), "niceness 0 is the worker's own");
       },
     );
-
-    await s.test(
+    s.test(
       'a command given a terminationMessagePath keeps what it wrote there on its attempt, read once at its exit: none for a file it left missing or a folder, at most 4096 bytes',
       async () => {
         const said = (await attempt(ids.said)).attempts[0];
@@ -141,21 +144,18 @@ test(
         assert.equal(TERMINATION_MESSAGE_BYTES, 4096);
       },
     );
-
-    await s.test('a command a stop ended has no exit code, whatever it exited with', async () => {
+    s.test('a command a stop ended has no exit code, whatever it exited with', async () => {
       const state = await attempt(ids.stopped);
       assert.deepEqual([state.settled, state.attempts[0].exitCode], ['stopped', null]);
     });
-
-    await s.test(
+    s.test(
       'a child the command left holding its stdout ends neither the run nor the streams late: what it wrote first is kept',
       async () => {
         assert.equal((await attempt(ids.held)).attempts[0].exitCode, 0);
         assert.equal(await stdout(ids.held), 'first\nlast\n');
       },
     );
-
-    await s.test('`ae output` prints a stream whole, stdout unless told stderr, and refuses another stream with exit 2', () => {
+    s.test('`ae output` prints a stream whole, stdout unless told stderr, and refuses another stream with exit 2', () => {
       assert.deepEqual(ae(ids.printed), { status: 0, stdout: 'out\n', stderr: '' });
       assert.deepEqual(ae(ids.printed, 'stderr'), { status: 0, stdout: 'err\n', stderr: '' });
       const other = ae(ids.printed, 'both');
@@ -217,22 +217,25 @@ const refusedNaming = (got: { tag?: string; message: string }, ...names: string[
   for (const name of names) assert.ok(got.message.includes(name), `${name} named in: ${got.message}`);
 };
 
-test('file(): command, niceness, env and projectMcp go to the harnesses that take them, and are refused by name where the session would start without them', async (t) => {
-  const root = scratch('ae-command-');
+describe('file(): command, niceness, env and projectMcp go to the harnesses that take them, and are refused by name where the session would start without them', () => {
+  let root!: string;
+  let engine!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    root = scratch('ae-command-');
+    engine = builtEngine(EngineService.layer({ root, harnesses }));
+  });
   const harnesses = {
     codex,
     claude: 'claude',
     remote: { url: 'https://agent.example' },
     command: commandHarness,
   } as const;
-  const engine = builtEngine(EngineService.layer({ root, harnesses }));
   const filed = (harness: string, config: object, more: object = {}) =>
     Effect.runPromise(engine.file({ brief: 'b', cwd: root, harness, config, ...more })).then(
       () => ({ tag: 'filed', message: '' }),
       (err: Error & { _tag?: string }) => ({ tag: err._tag, message: err.message }),
     );
-
-  await t.test('a spawn of a run that names no command is refused before anything runs, naming the field to give', async () => {
+  test('a spawn of a run that names no command is refused before anything runs, naming the field to give', async () => {
     const ops = detachedOps(commandHarness, root);
     for (const config of [{}, { command: [] }]) {
       const err = await Effect.runPromise(Effect.flip(ops.spawn({ name: 'ae/bare/1', brief: 'x', cwd: root, config })));
@@ -241,57 +244,45 @@ test('file(): command, niceness, env and projectMcp go to the harnesses that tak
       assert.equal((await Effect.runPromise(ops.observe)).get('ae/bare/1'), undefined, 'no worker was started');
     }
   });
-
-  await t.test(
-    'the command harness refuses, at file(), a task without a command, one carrying an argument of an agent, a statement or a session to resume',
-    async () => {
-      refusedNaming(await filed('command', {}), '`config.command`');
-      refusedNaming(await filed('command', { command: ['true'], model: 'opus' }), '`model`');
-      assert.match((await filed('command', { command: ['true'], model: 'opus' })).message, /^`model` is an argument of an agent's harness/);
-      assert.match(
-        (await filed('command', { command: ['true'], permissionMode: 'auto' })).message,
-        /^`permissionMode` is an argument of an agent's harness/,
-      );
-      const schema = await filed('command', { command: ['true'] }, { closeoutSchema: { type: 'object' } });
-      assert.equal(schema.tag, 'FileRefused', schema.message);
-      assert.match(schema.message, /writes no closing statement/);
-      const resumed = await filed('command', { command: ['true'] }, { resumeFrom: 'ae/x/1' });
-      assert.equal(resumed.tag, 'FileRefused', resumed.message);
-      assert.match(resumed.message, /`resumeFrom: ae\/x\/1` continues a session/);
-    },
-  );
-
+  test('the command harness refuses, at file(), a task without a command, one carrying an argument of an agent, a statement or a session to resume', async () => {
+    refusedNaming(await filed('command', {}), '`config.command`');
+    refusedNaming(await filed('command', { command: ['true'], model: 'opus' }), '`model`');
+    assert.match((await filed('command', { command: ['true'], model: 'opus' })).message, /^`model` is an argument of an agent's harness/);
+    assert.match(
+      (await filed('command', { command: ['true'], permissionMode: 'auto' })).message,
+      /^`permissionMode` is an argument of an agent's harness/,
+    );
+    const schema = await filed('command', { command: ['true'] }, { closeoutSchema: { type: 'object' } });
+    assert.equal(schema.tag, 'FileRefused', schema.message);
+    assert.match(schema.message, /writes no closing statement/);
+    const resumed = await filed('command', { command: ['true'] }, { resumeFrom: 'ae/x/1' });
+    assert.equal(resumed.tag, 'FileRefused', resumed.message);
+    assert.match(resumed.message, /`resumeFrom: ae\/x\/1` continues a session/);
+  });
   for (const harness of ['codex', 'claude', 'remote'])
-    await t.test(`command and niceness are refused on ${harness}, a harness that runs no command, naming the one that does`, async () => {
+    test(`command and niceness are refused on ${harness}, a harness that runs no command, naming the one that does`, async () => {
       for (const config of [{ command: ['true'] }, { niceness: 5 }]) {
         const key = Object.keys(config)[0];
         refusedNaming(await filed(harness, config), `\`${key}\``, `the \`${harness}\` harness`, 'File the task on `command`');
       }
     });
-
   for (const harness of ['codex', 'claude', 'remote'])
-    await t.test(`terminationMessagePath is refused on ${harness}, a harness that runs no command`, async () => {
+    test(`terminationMessagePath is refused on ${harness}, a harness that runs no command`, async () => {
       assert.equal((await filed(harness, { terminationMessagePath: '/tmp/said' })).tag, 'FileRefused');
     });
-
-  await t.test(
-    'terminationMessagePath is filed on the command harness as an absolute path, and refused relative or with a NUL',
-    async () => {
-      const at = (p: string) => filed('command', { command: ['true'], terminationMessagePath: p });
-      assert.equal((await at('/tmp/said')).tag, 'filed');
-      for (const bad of ['said', './said', '', `/tmp/a${String.fromCharCode(0)}b`]) assert.equal((await at(bad)).tag, 'FileRefused', bad);
-    },
-  );
-
-  await t.test("env is filed on every harness that spawns the session's process", async () => {
+  test('terminationMessagePath is filed on the command harness as an absolute path, and refused relative or with a NUL', async () => {
+    const at = (p: string) => filed('command', { command: ['true'], terminationMessagePath: p });
+    assert.equal((await at('/tmp/said')).tag, 'filed');
+    for (const bad of ['said', './said', '', `/tmp/a${String.fromCharCode(0)}b`]) assert.equal((await at(bad)).tag, 'FileRefused', bad);
+  });
+  test("env is filed on every harness that spawns the session's process", async () => {
     const env = { CI: '1' };
     assert.equal((await filed('codex', { env })).tag, 'filed');
     assert.equal((await filed('claude', { env })).tag, 'filed');
     assert.equal((await filed('claude', { env }, { restartPolicy: 'Always' })).tag, 'filed', 'a long-lived Claude Code session too');
     assert.equal((await filed('command', { command: ['true'], env })).tag, 'filed');
   });
-
-  await t.test('env is refused on a remote agent, which spawns no process, naming the harnesses that take it', async () => {
+  test('env is refused on a remote agent, which spawns no process, naming the harnesses that take it', async () => {
     refusedNaming(
       await filed('remote', { env: { CI: '1' } }),
       '`env`',
@@ -300,24 +291,19 @@ test('file(): command, niceness, env and projectMcp go to the harnesses that tak
       '`codex` or `claude` or `command`',
     );
   });
-
-  await t.test("a Codex task's env reaches the command that runs its session", () => {
+  test("a Codex task's env reaches the command that runs its session", () => {
     const r = { name: 'ae/t/1', brief: 'b', cwd: '/r' };
     assert.deepEqual(codex.command({ ...r, config: { env: { CI: '1' } } }).env, { CI: '1' });
     assert.equal(codex.command(r).env, undefined, 'none given, none laid');
   });
-
-  await t.test(
-    'projectMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it',
-    async () => {
-      refusedNaming(
-        await filed('command', { command: ['true'], projectMcp: [] }),
-        '`projectMcp`',
-        'the `command` harness',
-        '`codex` or `claude`',
-      );
-      assert.equal((await filed('codex', { projectMcp: [] })).tag, 'filed');
-      assert.equal((await filed('claude', { projectMcp: ['a'] })).tag, 'filed');
-    },
-  );
+  test('projectMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it', async () => {
+    refusedNaming(
+      await filed('command', { command: ['true'], projectMcp: [] }),
+      '`projectMcp`',
+      'the `command` harness',
+      '`codex` or `claude`',
+    );
+    assert.equal((await filed('codex', { projectMcp: [] })).tag, 'filed');
+    assert.equal((await filed('claude', { projectMcp: ['a'] })).tag, 'filed');
+  });
 });

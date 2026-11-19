@@ -10,7 +10,7 @@
  * factory's parts through the api of the context in use and hands them on stdin. The laws of `routeOf` are its contract's
  * (`route.contract.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';

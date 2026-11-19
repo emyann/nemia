@@ -9,7 +9,7 @@
  * bare `WF_RUN`, which names no store: one carrying the finished run's id alone, as another store's check of a run of that id would,
  * is never ended. Each child is ended by its pid in `t.after`.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,7 +64,7 @@ async function leftChild(t: TestContext, cwd: string, marks: Record<string, stri
     ['-e', "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setInterval(() => {}, 1000);"],
     { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] },
   );
-  t.after(() => {
+  t.onTestFinished(() => {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
   });
   const [chunk] = (await once(child.stdout ?? child, 'data')) as [Buffer];

@@ -11,7 +11,7 @@
  * `nemia level` and `nemia policy confirm` write them, the tokens minted through the package's `TokenDoor`.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -158,7 +158,7 @@ test('REFUSED 403 other-factory on the MCP port: a tool call reaches its endpoin
   await client.close();
 });
 
-test('floorEntryOf: an endpoint is the entry that links it; one no entry links is a read for a GET, an act for a chat send, and out of reach otherwise', async (t) => {
+describe('floorEntryOf: an endpoint is the entry that links it; one no entry links is a read for a GET, an act for a chat send, and out of reach otherwise', () => {
   for (const [endpoint, method, name, cls] of [
     ['runs.approve', 'POST', 'approve', 'answer'],
     ['tokens.mint', 'POST', 'token add', 'none'],
@@ -166,7 +166,7 @@ test('floorEntryOf: an endpoint is the entry that links it; one no entry links i
     ['session.signIn', 'POST', 'session.signIn', 'none'],
     ['nemia.chatSend', 'POST', 'nemia.chatSend', 'act'],
   ] as const)
-    await t.test(`${method} ${endpoint}`, () => {
+    test(`${method} ${endpoint}`, () => {
       const entry = floorEntryOf(endpoint, method);
       assert.deepEqual([entry.name, entry.class], [name, cls]);
     });

@@ -2,13 +2,13 @@
  * A folder's steps read from their text: what a step's name may be (`stepNameRefusal`), and `parseFolder`, which reads steps as
  * `loadWorkflows` reads a folder — in the order of their files, validated, in the order they run.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { parseFolder, stepNameRefusal } from './folder.ts';
 import { validate } from '../workflow/validate.ts';
 import { WorkflowError } from '../step/step.ts';
 
-test("`stepNameRefusal`: a step's name is its file's in the folder", async (t) => {
+describe("`stepNameRefusal`: a step's name is its file's in the folder", () => {
   const rows: Array<[row: string, name: unknown, naming: string[]]> = [
     ['a name', 'implement', []],
     ['a dash and a digit', 'review-2', []],
@@ -32,7 +32,7 @@ test("`stepNameRefusal`: a step's name is its file's in the folder", async (t) =
     ['REFUSED: too long', 'r'.repeat(253), ['255 bytes']],
   ];
   for (const [row, name, naming] of rows)
-    await t.test(row, () => {
+    test(row, () => {
       const why = stepNameRefusal(name);
       if (!naming.length) return assert.equal(why, undefined);
       assert.ok(why !== undefined, `${JSON.stringify(name)} is taken`);

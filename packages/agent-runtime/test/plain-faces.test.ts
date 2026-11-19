@@ -5,7 +5,7 @@
  * answers a plain value, as it may; a verb is an Effect of the engine. Read by the TypeScript checker, over the entries `package.json`
  * names, and proven on `fixtures/promise-face.ts`, which exports both shapes.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';

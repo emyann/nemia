@@ -3,7 +3,7 @@
  * templated factory's tree and applied base alike, the body untouched; a second run finds nothing; `--check` writes nothing and ends with
  * exit 1; a file in neither form is refused at its line, exit 2; and a ` #` tail of a YAML file is listed and left as written.
  */
-import { mock, test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -88,14 +88,14 @@ test("the store's workflows, inbox and a templated factory's tree and applied ba
 test('REFUSED: a mode that cannot be set leaves the read-only file in place, unreplaced, and no hidden file beside it', () => {
   const dir = scratch('wf-frontmatter-mode-');
   const file = put(path.join(dir, 'land.md'), FORMER, 0o444);
-  const chmod = mock.method(fs, 'chmodSync', () => {
+  const chmod = vi.spyOn(fs, 'chmodSync').mockImplementation(() => {
     throw new Error('chmod refused');
   });
   try {
     assert.throws(() => rewriteFolders([dir], false));
-    assert.ok(chmod.mock.callCount() > 0, 'the mode step was reached');
+    assert.ok(chmod.mock.calls.length > 0, 'the mode step was reached');
   } finally {
-    chmod.mock.restore();
+    chmod.mockRestore();
   }
   assert.equal(fs.readFileSync(file, 'utf8'), FORMER);
   assert.equal(fs.statSync(file).mode & 0o777, 0o444);

@@ -22,7 +22,8 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import test, { type TestContext } from 'node:test';
+import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions, letGoOf, type Attached } from '../src/harness/claude/attached.ts';
 import { IMAGE } from '../src/harness/image.ts';
@@ -126,208 +127,204 @@ const capKept = (root: string) => (run(root)?.request.config as { budgetUsd?: nu
 /** A process that idles until killed, in a group of its own: what takes a pid a run file names. */
 const squatter = (t: TestContext) => {
   const p = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });
-  t.after(() => void (p.pid && alive(p.pid) && process.kill(-p.pid, 'SIGKILL')));
+  t.onTestFinished(() => void (p.pid && alive(p.pid) && process.kill(-p.pid, 'SIGKILL')));
   return p.pid!;
 };
 
-test(
-  'a long-lived attached session takes turns, is interrupted, parks between turns and resumes under the next holder',
-  WAITED,
-  async (t) => {
-    const s = story(t);
-    const prompt = path.join(scratch('ae-attached-kept-prompt-'), 'agent.md');
+describe('a long-lived attached session takes turns, is interrupted, parks between turns and resumes under the next holder', WAITED, () => {
+  let prompt!: string;
+  let root!: string;
+  let dir!: string;
+  let request!: ReturnType<typeof kept>['request'];
+  let first!: { attached: Attached; said: string[]; close: () => Promise<void> };
+  let firstHeld!: boolean;
+  let second!: Awaited<ReturnType<typeof holder>> | undefined;
+  let bridgeSessionId!: string | undefined;
+  beforeAll(async () => {
+    const t = teardowns();
+    prompt = path.join(scratch('ae-attached-kept-prompt-'), 'agent.md');
     fs.writeFileSync(prompt, 'you are the agent');
-    const { root, dir, request } = kept({ hold: true, output: {} }, { claude: { remoteControl: true, appendSystemPromptFile: prompt } });
-    const end = () => fs.writeFileSync(path.join(dir, 'end'), '');
-    const say = (h: Awaited<ReturnType<typeof holder>>, words: string) =>
-      Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, words));
-    const first = await holder(root);
-    let firstHeld = true;
-    let second: Awaited<ReturnType<typeof holder>> | undefined;
-    t.after(async () => {
+    ({ root, dir, request } = kept({ hold: true, output: {} }, { claude: { remoteControl: true, appendSystemPromptFile: prompt } }));
+    first = await holder(root);
+    firstHeld = true;
+    t.onTestFinished(async () => {
       end();
       if (firstHeld) await first.close();
       await second?.close();
     });
-    let sessionId = '';
-    let bridgeSessionId: string | undefined;
-
-    await s.test("it is started on Claude Code's own system prompt, the agent's appended as text and never as a flag", async (st) => {
-      await Effect.runPromise(first.attached.ops.spawn(request));
-      const init = await until(
-        st,
-        () => lines(dir, 'initialize.jsonl')[0] as { systemPrompt?: unknown; appendSystemPrompt?: unknown } | undefined,
-        'the SDK sent an initialize request',
-        { everyMs: 50 },
-      );
-      assert.equal(
-        init.systemPrompt,
-        undefined,
-        `the preset sends no prompt of ours, so Claude Code renders its own; it sent ${JSON.stringify(init.systemPrompt)}`,
-      );
-      assert.equal(
-        init.appendSystemPrompt,
-        'you are the agent',
-        "the agent's own prompt is appended on the initialize request (`sdk.d.ts:4874`), as its text and not its file's path",
-      );
-      const [argv] = lines(dir, 'argv.jsonl') as string[][];
-      assert.ok(!argv.includes('--append-system-prompt-file'), "the prompt is no flag: the SDK carries it in the session's init");
-      assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
-    });
-
-    await s.test(
-      'the claude.ai bridge it asked for is opened at init, while its first turn still runs, kept past its process, its link sighted',
-      async (st) => {
-        const bridged = await until(st, () => run(root)?.bridge?.url && run(root)!, 'the bridge opened', { everyMs: 50 });
-        assert.equal(bridged.bridge?.bridgeSessionId, 'cse_stand-in-session');
-        assert.equal(bridged.bridge?.url, 'https://claude.ai/s/cse_stand-in-session');
-        assert.equal(bridged.bridge?.environmentId, 'env-stand-in');
-        assert.equal(bridged.bridge?.epoch, 1);
-        bridgeSessionId = bridged.bridge?.bridgeSessionId;
-        await until(st, () => run(root)?.bridge?.state === 'connected', 'the bridge connected, as its stream said', { everyMs: 50 });
-        assert.equal(run(root)?.state, 'working', 'opened at init: its first turn is still held');
-        const asks = taken(dir).filter((r) => r.subtype === 'remote_control');
-        assert.equal(asks.length, 1, 'one bridge control request');
-        assert.equal(asks[0].keep_session_on_exit, true, 'a long-lived session keeps its claude.ai session past a process');
-        assert.deepEqual(
-          (await sighted(first))!.bridge,
-          { url: 'https://claude.ai/s/cse_stand-in-session' },
-          'its sighting carries the link',
-        );
-      },
+    return t.end;
+  });
+  const s = story(test);
+  const end = () => fs.writeFileSync(path.join(dir, 'end'), '');
+  const say = (h: Awaited<ReturnType<typeof holder>>, words: string) =>
+    Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, words));
+  let sessionId = '';
+  s.test("it is started on Claude Code's own system prompt, the agent's appended as text and never as a flag", async (st) => {
+    await Effect.runPromise(first.attached.ops.spawn(request));
+    const init = await until(
+      st,
+      () => lines(dir, 'initialize.jsonl')[0] as { systemPrompt?: unknown; appendSystemPrompt?: unknown } | undefined,
+      'the SDK sent an initialize request',
+      { everyMs: 50 },
     );
-
-    await s.test('its first turn ends without ending it: idle, held by this process, read by decide as open between turns', async (st) => {
-      end();
-      const firstIdle = await idle(st, root);
-      assert.ok(firstIdle.sessionId, 'the idle run file keeps the session id a resume continues');
-      sessionId = firstIdle.sessionId;
-      const seen = (await sighted(first))!;
+    assert.equal(
+      init.systemPrompt,
+      undefined,
+      `the preset sends no prompt of ours, so Claude Code renders its own; it sent ${JSON.stringify(init.systemPrompt)}`,
+    );
+    assert.equal(
+      init.appendSystemPrompt,
+      'you are the agent',
+      "the agent's own prompt is appended on the initialize request (`sdk.d.ts:4874`), as its text and not its file's path",
+    );
+    const [argv] = lines(dir, 'argv.jsonl') as string[][];
+    assert.ok(!argv.includes('--append-system-prompt-file'), "the prompt is no flag: the SDK carries it in the session's init");
+    assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
+  });
+  s.test(
+    'the claude.ai bridge it asked for is opened at init, while its first turn still runs, kept past its process, its link sighted',
+    async (st) => {
+      const bridged = await until(st, () => run(root)?.bridge?.url && run(root)!, 'the bridge opened', { everyMs: 50 });
+      assert.equal(bridged.bridge?.bridgeSessionId, 'cse_stand-in-session');
+      assert.equal(bridged.bridge?.url, 'https://claude.ai/s/cse_stand-in-session');
+      assert.equal(bridged.bridge?.environmentId, 'env-stand-in');
+      assert.equal(bridged.bridge?.epoch, 1);
+      bridgeSessionId = bridged.bridge?.bridgeSessionId;
+      await until(st, () => run(root)?.bridge?.state === 'connected', 'the bridge connected, as its stream said', { everyMs: 50 });
+      assert.equal(run(root)?.state, 'working', 'opened at init: its first turn is still held');
+      const asks = taken(dir).filter((r) => r.subtype === 'remote_control');
+      assert.equal(asks.length, 1, 'one bridge control request');
+      assert.equal(asks[0].keep_session_on_exit, true, 'a long-lived session keeps its claude.ai session past a process');
       assert.deepEqual(
-        [seen.state, seen.held, seen.pid],
-        ['input-required', true, process.pid],
-        'its sighting says a person is waited on and this process holds it',
+        (await sighted(first))!.bridge,
+        { url: 'https://claude.ai/s/cse_stand-in-session' },
+        'its sighting carries the link',
       );
-      assert.deepEqual(read(seen), { idle: true, respawning: false }, 'and `decide` reads it as a session open between turns');
+    },
+  );
+  s.test('its first turn ends without ending it: idle, held by this process, read by decide as open between turns', async (st) => {
+    end();
+    const firstIdle = await idle(st, root);
+    assert.ok(firstIdle.sessionId, 'the idle run file keeps the session id a resume continues');
+    sessionId = firstIdle.sessionId;
+    const seen = (await sighted(first))!;
+    assert.deepEqual(
+      [seen.state, seen.held, seen.pid],
+      ['input-required', true, process.pid],
+      'its sighting says a person is waited on and this process holds it',
+    );
+    assert.deepEqual(read(seen), { idle: true, respawning: false }, 'and `decide` reads it as a session open between turns');
+  });
+  s.test('words said begin a turn of their own, written working as they are pushed, on the one Claude Code', async (st) => {
+    await say(first, 'one more thing');
+    assert.equal(run(root)?.state, 'working', 'the words it heard began a turn of their own, written as they were pushed');
+    assert.equal(
+      (await sighted(first))?.state,
+      'working',
+      'a session answering again is no session waiting on a person: its turn can be ended',
+    );
+    await until(st, () => saidIn(dir).includes('one more thing'), 'the second turn heard', { everyMs: 50 });
+    assert.deepEqual(saidIn(dir), ['do the work', 'one more thing'], 'one session, two turns');
+    assert.equal(lines(dir, 'argv.jsonl').length, 1, 'and one Claude Code, never restarted between them');
+  });
+  s.test('an interrupt ends the turn and never the session: idle under the same id, one interrupt request sent', async (st) => {
+    await Effect.runPromise(first.attached.ops.interrupt!({ name: NAME, sessionId: NAME }));
+    const cut = await idle(st, root, 'the interrupted turn ended');
+    assert.equal(cut.state, 'idle', 'an `error_during_execution` result ends the turn, not the session');
+    assert.equal((await sighted(first))?.state, 'input-required');
+    assert.equal(cut.sessionId, sessionId, 'the same session, interrupted');
+    assert.equal(interrupts(dir), 1, 'one interrupt control request, and one only');
+  });
+  s.test('words said while a turn runs leave it answering until the turn that answered them ends', async (st) => {
+    await say(first, 'carry on then');
+    await say(first, 'and this too');
+    await until(st, () => saidIn(dir).length === 4, 'the words it heard are worked as a turn of their own', { everyMs: 50 });
+    const before = resultsOf(root);
+    end();
+    await until(st, () => resultsOf(root) === before + 1, 'the turn ended, with a result that did not name the words', {
+      everyMs: 50,
     });
-
-    await s.test('words said begin a turn of their own, written working as they are pushed, on the one Claude Code', async (st) => {
-      await say(first, 'one more thing');
-      assert.equal(run(root)?.state, 'working', 'the words it heard began a turn of their own, written as they were pushed');
-      assert.equal(
-        (await sighted(first))?.state,
-        'working',
-        'a session answering again is no session waiting on a person: its turn can be ended',
-      );
-      await until(st, () => saidIn(dir).includes('one more thing'), 'the second turn heard', { everyMs: 50 });
-      assert.deepEqual(saidIn(dir), ['do the work', 'one more thing'], 'one session, two turns');
-      assert.equal(lines(dir, 'argv.jsonl').length, 1, 'and one Claude Code, never restarted between them');
+    assert.equal(run(root)?.state, 'working', 'the turn ended, and the words it did not answer leave the session answering');
+    assert.equal(
+      (await sighted(first))?.state,
+      'working',
+      'so its sighting says a turn of it can still be ended, never that it waits on a person',
+    );
+    end();
+    const after = await idle(st, root, 'and it is idle once the turn that answered them ends');
+    assert.ok(saidIn(dir).includes('carry on then'), 'the turn after the interrupt heard the words');
+    assert.equal(after.sessionId, sessionId, 'the same session answered after the interrupt');
+  });
+  s.test("an interrupt asked by another process is honoured on the holder's next look, and its file goes", async (st) => {
+    await say(first, 'one last turn');
+    await until(st, () => saidIn(dir).includes('one last turn'), 'the next turn heard', { everyMs: 50 });
+    const other = claudeCodeOps({ root }, attachedSessions(root, STAND_IN));
+    await Effect.runPromise(other.interrupt!({ name: NAME, sessionId: NAME }));
+    assert.ok(fs.existsSync(filesOf(root, NAME).interrupt), 'a process that holds nothing leaves the ask on a file of its own');
+    await until(
+      st,
+      async () => {
+        await sighted(first);
+        return run(root)?.state === 'idle';
+      },
+      "the holder's look honoured the ask",
+      { everyMs: 50 },
+    );
+    assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes once the request was sent');
+    assert.equal(interrupts(dir), 2, 'the ask was sent as one interrupt control request');
+    const refused = await Effect.runPromise(Effect.flip(other.interrupt!({ name: NAME, sessionId: NAME })));
+    assert.match(refused.message, /is idle, so it has no turn to end/, 'and an idle session has no turn to end');
+  });
+  s.test("REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept", async () => {
+    fs.writeFileSync(filesOf(root, NAME).interrupt, '4242');
+    await sighted(first);
+    assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes: there is no turn to end');
+    assert.equal(interrupts(dir), 2, 'and nothing was asked of the session, so its next turn runs to its own end');
+  });
+  s.test('let go between turns, it is parked, and the next holder resumes it under the same Claude Code id', async (st) => {
+    firstHeld = false;
+    await first.close();
+    assert.equal(run(root)?.state, 'parked', 'a session let go between turns is parked for the next holder');
+    const parked = run(root)!;
+    const { epoch, ...bridgeKept } = parked.bridge!;
+    assert.notEqual(epoch, undefined, 'the parked run file keeps the bridge the first holder opened');
+    writeRun(root, { ...parked, bridge: bridgeKept });
+    second = await holder(root);
+    await sighted(second);
+    await until(st, () => lines(dir, 'argv.jsonl').length === 2, 'the next holder started its Claude Code', { everyMs: 50 });
+    const [, argv] = lines(dir, 'argv.jsonl') as string[][];
+    assert.ok(argv.includes(`--resume=${sessionId}`), 'resumed by its own id');
+    end();
+    const after = await idle(st, root, 'the resumed session idle again');
+    assert.equal(after.sessionId, sessionId, 'the same Claude Code session, resumed');
+    assert.equal(after.carried?.costUsd ?? null, null, 'and a session resumed by its own holder carries nothing of a parent');
+    await say(second, 'and now this');
+    await until(st, () => saidIn(dir).includes('and now this'), 'and she answers the next words', { everyMs: 50 });
+  });
+  s.test('the resume re-attaches the claude.ai session its run file kept', async (st) => {
+    const asked = await until(
+      st,
+      () => taken(dir).filter((r) => r.subtype === 'remote_control')[1],
+      'the bridge asked for again by the next holder',
+      { everyMs: 50 },
+    );
+    assert.ok(bridgeSessionId, 'the first holder kept a claude.ai session');
+    assert.equal(asked.reattach_session_id, bridgeSessionId, 'the request names the kept claude.ai session, not a new one');
+    const again = await until(st, () => run(root)?.bridge?.epoch !== undefined && run(root)!, 'the bridge opened again', {
+      everyMs: 50,
     });
-
-    await s.test('an interrupt ends the turn and never the session: idle under the same id, one interrupt request sent', async (st) => {
-      await Effect.runPromise(first.attached.ops.interrupt!({ name: NAME, sessionId: NAME }));
-      const cut = await idle(st, root, 'the interrupted turn ended');
-      assert.equal(cut.state, 'idle', 'an `error_during_execution` result ends the turn, not the session');
-      assert.equal((await sighted(first))?.state, 'input-required');
-      assert.equal(cut.sessionId, sessionId, 'the same session, interrupted');
-      assert.equal(interrupts(dir), 1, 'one interrupt control request, and one only');
-    });
-
-    await s.test('words said while a turn runs leave it answering until the turn that answered them ends', async (st) => {
-      await say(first, 'carry on then');
-      await say(first, 'and this too');
-      await until(st, () => saidIn(dir).length === 4, 'the words it heard are worked as a turn of their own', { everyMs: 50 });
-      const before = resultsOf(root);
-      end();
-      await until(st, () => resultsOf(root) === before + 1, 'the turn ended, with a result that did not name the words', {
-        everyMs: 50,
-      });
-      assert.equal(run(root)?.state, 'working', 'the turn ended, and the words it did not answer leave the session answering');
-      assert.equal(
-        (await sighted(first))?.state,
-        'working',
-        'so its sighting says a turn of it can still be ended, never that it waits on a person',
-      );
-      end();
-      const after = await idle(st, root, 'and it is idle once the turn that answered them ends');
-      assert.ok(saidIn(dir).includes('carry on then'), 'the turn after the interrupt heard the words');
-      assert.equal(after.sessionId, sessionId, 'the same session answered after the interrupt');
-    });
-
-    await s.test("an interrupt asked by another process is honoured on the holder's next look, and its file goes", async (st) => {
-      await say(first, 'one last turn');
-      await until(st, () => saidIn(dir).includes('one last turn'), 'the next turn heard', { everyMs: 50 });
-      const other = claudeCodeOps({ root }, attachedSessions(root, STAND_IN));
-      await Effect.runPromise(other.interrupt!({ name: NAME, sessionId: NAME }));
-      assert.ok(fs.existsSync(filesOf(root, NAME).interrupt), 'a process that holds nothing leaves the ask on a file of its own');
-      await until(
-        st,
-        async () => {
-          await sighted(first);
-          return run(root)?.state === 'idle';
-        },
-        "the holder's look honoured the ask",
-        { everyMs: 50 },
-      );
-      assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes once the request was sent');
-      assert.equal(interrupts(dir), 2, 'the ask was sent as one interrupt control request');
-      const refused = await Effect.runPromise(Effect.flip(other.interrupt!({ name: NAME, sessionId: NAME })));
-      assert.match(refused.message, /is idle, so it has no turn to end/, 'and an idle session has no turn to end');
-    });
-
-    await s.test("REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept", async () => {
-      fs.writeFileSync(filesOf(root, NAME).interrupt, '4242');
-      await sighted(first);
-      assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes: there is no turn to end');
-      assert.equal(interrupts(dir), 2, 'and nothing was asked of the session, so its next turn runs to its own end');
-    });
-
-    await s.test('let go between turns, it is parked, and the next holder resumes it under the same Claude Code id', async (st) => {
-      firstHeld = false;
-      await first.close();
-      assert.equal(run(root)?.state, 'parked', 'a session let go between turns is parked for the next holder');
-      const parked = run(root)!;
-      const { epoch, ...bridgeKept } = parked.bridge!;
-      assert.notEqual(epoch, undefined, 'the parked run file keeps the bridge the first holder opened');
-      writeRun(root, { ...parked, bridge: bridgeKept });
-      second = await holder(root);
-      await sighted(second);
-      await until(st, () => lines(dir, 'argv.jsonl').length === 2, 'the next holder started its Claude Code', { everyMs: 50 });
-      const [, argv] = lines(dir, 'argv.jsonl') as string[][];
-      assert.ok(argv.includes(`--resume=${sessionId}`), 'resumed by its own id');
-      end();
-      const after = await idle(st, root, 'the resumed session idle again');
-      assert.equal(after.sessionId, sessionId, 'the same Claude Code session, resumed');
-      assert.equal(after.carried?.costUsd ?? null, null, 'and a session resumed by its own holder carries nothing of a parent');
-      await say(second, 'and now this');
-      await until(st, () => saidIn(dir).includes('and now this'), 'and she answers the next words', { everyMs: 50 });
-    });
-
-    await s.test('the resume re-attaches the claude.ai session its run file kept', async (st) => {
-      const asked = await until(
-        st,
-        () => taken(dir).filter((r) => r.subtype === 'remote_control')[1],
-        'the bridge asked for again by the next holder',
-        { everyMs: 50 },
-      );
-      assert.ok(bridgeSessionId, 'the first holder kept a claude.ai session');
-      assert.equal(asked.reattach_session_id, bridgeSessionId, 'the request names the kept claude.ai session, not a new one');
-      const again = await until(st, () => run(root)?.bridge?.epoch !== undefined && run(root)!, 'the bridge opened again', {
-        everyMs: 50,
-      });
-      assert.equal(again.bridge?.bridgeSessionId, bridgeSessionId, 'the kept claude.ai session is re-attached');
-    });
-  },
-);
+    assert.equal(again.bridge?.bridgeSessionId, bridgeSessionId, 'the kept claude.ai session is re-attached');
+  });
+});
 
 test(
   'an attached job that asked for the bridge opens it at init, before its result: one request, closed with the job, its link sighted',
   WAITED,
   async (t) => {
     const { root, dir, request } = place({ hold: true, output: {} }, { claude: { remoteControl: true } });
-    t.after(() => fs.writeFileSync(path.join(dir, 'end'), ''));
+    t.onTestFinished(() => fs.writeFileSync(path.join(dir, 'end'), ''));
     const h = await holder(root);
-    t.after(h.close);
+    t.onTestFinished(h.close);
     await Effect.runPromise(h.attached.ops.spawn(request));
     const bridged = await until(t, () => run(root)?.bridge?.url && run(root)!, 'the bridge opened', { everyMs: 50 });
     assert.equal(bridged.state, 'working', 'before its result: its one turn is still held');
@@ -339,13 +336,20 @@ test(
   },
 );
 
-test('a long-lived session asked for no bridge folds words said into its call’s turn, one result answering both', WAITED, async (t) => {
-  const s = story(t);
-  const { root, dir, request } = kept({ hold: true, fold: true, output: {} });
-  const h = await holder(root);
-  t.after(h.close);
-
-  await s.test('words folded into the turn in flight are answered by its one result, which leaves the session idle', async (st) => {
+describe('a long-lived session asked for no bridge folds words said into its call’s turn, one result answering both', WAITED, () => {
+  let root!: string;
+  let dir!: string;
+  let request!: ReturnType<typeof kept>['request'];
+  let h!: { attached: Attached; said: string[]; close: () => Promise<void> };
+  beforeAll(async () => {
+    const t = teardowns();
+    ({ root, dir, request } = kept({ hold: true, fold: true, output: {} }));
+    h = await holder(root);
+    t.onTestFinished(h.close);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('words folded into the turn in flight are answered by its one result, which leaves the session idle', async (st) => {
     await Effect.runPromise(h.attached.ops.spawn(request));
     await until(st, () => run(root)?.sessionId, 'the session started its first turn', { everyMs: 50 });
     await Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: NAME }, 'and this too'));
@@ -360,8 +364,7 @@ test('a long-lived session asked for no bridge folds words said into its call’
     assert.equal(results, 1, 'the words it folded in ended in the turn it folded them into, so one result answers both');
     assert.equal(run(root)?.state, 'idle', 'one result named both messages, so nothing of it is left unanswered');
   });
-
-  await s.test('a request that asks for no bridge never sends the bridge control request', () => {
+  s.test('a request that asks for no bridge never sends the bridge control request', () => {
     assert.deepEqual(
       taken(dir).map((r) => r.subtype),
       ['initialize'],
@@ -371,80 +374,89 @@ test('a long-lived session asked for no bridge folds words said into its call’
   });
 });
 
-test(
-  'a look at a run file: the harness’s words translated, a non-holder adopting nothing, a holder gone said not held',
-  WAITED,
-  async (t) => {
-    await t.test('attachedStateOf: idle is input-required, parked is working, every other state is itself', () => {
-      const of = (state: AttachedRun['state']) =>
-        attachedStateOf({ name: NAME, state, owner: 1, startedAt: '2026-01-01T00:00:00.000Z', request: {} });
-      assert.equal(of('idle'), 'input-required', 'a long-lived session between turns waits on a person');
-      assert.equal(of('parked'), 'working', 'a session let go is taken up on the next look');
-      assert.deepEqual((['working', 'completed', 'failed', 'canceled'] as const).map(of), ['working', 'completed', 'failed', 'canceled']);
+describe('a look at a run file: the harness’s words translated, a non-holder adopting nothing, a holder gone said not held', WAITED, () => {
+  test('attachedStateOf: idle is input-required, parked is working, every other state is itself', () => {
+    const of = (state: AttachedRun['state']) =>
+      attachedStateOf({ name: NAME, state, owner: 1, startedAt: '2026-01-01T00:00:00.000Z', request: {} });
+    assert.equal(of('idle'), 'input-required', 'a long-lived session between turns waits on a person');
+    assert.equal(of('parked'), 'working', 'a session let go is taken up on the next look');
+    assert.deepEqual((['working', 'completed', 'failed', 'canceled'] as const).map(of), ['working', 'completed', 'failed', 'canceled']);
+  });
+  test('a non-holder sees an orphaned session at work and adopts nothing', async () => {
+    const { root, dir, request } = place({});
+    writeRun(root, {
+      name: NAME,
+      state: 'parked',
+      owner: process.pid,
+      startedAt: new Date().toISOString(),
+      sessionId: 'left-alone',
+      request: { ...request, brief: undefined },
     });
-
-    await t.test('a non-holder sees an orphaned session at work and adopts nothing', async () => {
-      const { root, dir, request } = place({});
-      writeRun(root, {
-        name: NAME,
-        state: 'parked',
-        owner: process.pid,
-        startedAt: new Date().toISOString(),
-        sessionId: 'left-alone',
-        request: { ...request, brief: undefined },
-      });
-      const attached = attachedSessions(root, STAND_IN);
-      const ops = claudeCodeOps({ root }, attached);
-      assert.equal((await Effect.runPromise(ops.observe)).get(NAME)?.state, 'working');
-      assert.deepEqual(lines(dir, 'argv.jsonl'), [], 'no session was started');
-      assert.equal(run(root)?.state, 'parked');
-      assert.equal(attached.holding(), false);
+    const attached = attachedSessions(root, STAND_IN);
+    const ops = claudeCodeOps({ root }, attached);
+    assert.equal((await Effect.runPromise(ops.observe)).get(NAME)?.state, 'working');
+    assert.deepEqual(lines(dir, 'argv.jsonl'), [], 'no session was started');
+    assert.equal(run(root)?.state, 'parked');
+    assert.equal(attached.holding(), false);
+  });
+  test('a long-lived session whose holder is gone says its process is not held, so decide reads it as one being taken up', async () => {
+    const { root, request } = kept({ output: {} });
+    writeRun(root, {
+      name: NAME,
+      state: 'idle',
+      owner: 2_147_483_600,
+      ownerStart: 'a holder long gone',
+      startedAt: new Date().toISOString(),
+      sessionId: 'left-idle',
+      request: { ...request, brief: undefined },
     });
+    const seen = (await Effect.runPromise(attachedSessions(root, STAND_IN).ops.observe)).get(NAME)!;
+    assert.deepEqual([seen.state, seen.held, seen.pid], ['input-required', false, undefined]);
+    assert.deepEqual(read(seen), { idle: false, respawning: true }, 'never idle, so no end of it is recorded under its feet');
+  });
+});
 
-    await t.test(
-      'a long-lived session whose holder is gone says its process is not held, so decide reads it as one being taken up',
-      async () => {
-        const { root, request } = kept({ output: {} });
-        writeRun(root, {
-          name: NAME,
-          state: 'idle',
-          owner: 2_147_483_600,
-          ownerStart: 'a holder long gone',
-          startedAt: new Date().toISOString(),
-          sessionId: 'left-idle',
-          request: { ...request, brief: undefined },
-        });
-        const seen = (await Effect.runPromise(attachedSessions(root, STAND_IN).ops.observe)).get(NAME)!;
-        assert.deepEqual([seen.state, seen.held, seen.pid], ['input-required', false, undefined]);
-        assert.deepEqual(read(seen), { idle: false, respawning: true }, 'never idle, so no end of it is recorded under its feet');
-      },
-    );
-  },
-);
-
-test(
+describe(
   'a session is spawned as its task asked: its prompt, its servers and window, its parent’s cost left out, a call that would ask denied',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const prompt = path.join(scratch('ae-attached-prompt-'), 'agent.md');
-    fs.writeFileSync(prompt, 'you are the agent');
-    const { root, dir, request } = place(
-      { ask: 'Write', output: {}, cost: 0.4 },
-      { claude: { appendSystemPromptFile: prompt }, contextTokens: 150_000, mcp: { probe: { command: 'probe-server', args: ['--once'] } } },
-    );
-    const stale = filesOf(root, NAME).mcp;
-    fs.mkdirSync(path.dirname(stale), { recursive: true });
-    fs.writeFileSync(stale, JSON.stringify({ mcpServers: { gone: { command: 'a server it was not given' } } }));
-    const parent = 'ae/t0/1';
-    writeRun(root, {
-      name: parent,
-      state: 'completed',
-      owner: process.pid,
-      startedAt: new Date(Date.now() - 60_000).toISOString(),
-      sessionId: 'parent-session',
-      request: {},
+  () => {
+    let prompt!: string;
+    let root!: string;
+    let dir!: string;
+    let request!: SpawnRequest;
+    let stale!: string;
+    let h!: { attached: Attached; said: string[]; close: () => Promise<void> };
+    let seen!: Sighting | undefined;
+    beforeAll(async () => {
+      const t = teardowns();
+      prompt = path.join(scratch('ae-attached-prompt-'), 'agent.md');
+      fs.writeFileSync(prompt, 'you are the agent');
+      ({ root, dir, request } = place(
+        { ask: 'Write', output: {}, cost: 0.4 },
+        {
+          claude: { appendSystemPromptFile: prompt },
+          contextTokens: 150_000,
+          mcp: { probe: { command: 'probe-server', args: ['--once'] } },
+        },
+      ));
+      stale = filesOf(root, NAME).mcp;
+      fs.mkdirSync(path.dirname(stale), { recursive: true });
+      fs.writeFileSync(stale, JSON.stringify({ mcpServers: { gone: { command: 'a server it was not given' } } }));
+      writeRun(root, {
+        name: parent,
+        state: 'completed',
+        owner: process.pid,
+        startedAt: new Date(Date.now() - 60_000).toISOString(),
+        sessionId: 'parent-session',
+        request: {},
+      });
+      fs.writeFileSync(filesOf(root, parent).out, `${JSON.stringify(result)}\n`);
+      h = await holder(root);
+      t.onTestFinished(h.close);
+      return t.end;
     });
+    const s = story(test);
+    const parent = 'ae/t0/1';
     const result = {
       type: 'result',
       subtype: 'success',
@@ -453,12 +465,7 @@ test(
       num_turns: 1,
       total_cost_usd: 0.25,
     };
-    fs.writeFileSync(filesOf(root, parent).out, `${JSON.stringify(result)}\n`);
-    const h = await holder(root);
-    t.after(h.close);
-    let seen: Sighting | undefined;
-
-    await s.test('it runs to its end, resumed from its parent', async (st) => {
+    s.test('it runs to its end, resumed from its parent', async (st) => {
       await Effect.runPromise(h.attached.ops.spawn({ ...request, resumeFrom: 'parent-session' }));
       seen = await until(
         st,
@@ -470,8 +477,7 @@ test(
         { everyMs: 50 },
       );
     });
-
-    await s.test("it is started on Claude Code's own system prompt, the agent's appended to it", () => {
+    s.test("it is started on Claude Code's own system prompt, the agent's appended to it", () => {
       const [init] = lines(dir, 'initialize.jsonl') as { systemPrompt?: unknown; appendSystemPrompt?: unknown }[];
       assert.ok(init, 'the SDK sent an initialize request');
       assert.equal(
@@ -484,8 +490,7 @@ test(
       assert.ok(!argv.includes('--append-system-prompt-file'), "the prompt is no longer a flag: the SDK carries it in the session's init");
       assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
     });
-
-    await s.test('its servers ride the child’s argv as inline JSON, strict, and the window rides the settings', () => {
+    s.test('its servers ride the child’s argv as inline JSON, strict, and the window rides the settings', () => {
       const [argv] = lines(dir, 'argv.jsonl') as string[][];
       assert.deepEqual(
         JSON.parse(sdkArgValue(argv, '--mcp-config')),
@@ -501,17 +506,14 @@ test(
         'it rides the one settings object, beside auto-memory off: `Settings.autoCompactWindow`, which the SDK spells as `--settings`',
       );
     });
-
-    await s.test('its sighting says the mode its init line said it ran in, read off its capture as a job’s stream is', () => {
+    s.test('its sighting says the mode its init line said it ran in, read off its capture as a job’s stream is', () => {
       const [argv] = lines(dir, 'argv.jsonl') as string[][];
       assert.equal(seen?.ranIn, sdkArgValue(argv, '--permission-mode'));
     });
-
-    await s.test("resuming another, it reports its own cost, its parent's left out", () => {
+    s.test("resuming another, it reports its own cost, its parent's left out", () => {
       assert.ok(Math.abs((seen?.usage?.costUsd ?? 0) - 0.15) < 1e-9, `its own cost, not ${seen?.usage?.costUsd}`);
     });
-
-    await s.test('a call that would ask a person is denied in the holder, and written as a denial', () => {
+    s.test('a call that would ask a person is denied in the holder, and written as a denial', () => {
       const [asked] = lines(dir, 'answers.jsonl') as { answer: { behavior: string; message: string } }[];
       assert.equal(asked.answer.behavior, 'deny');
       assert.deepEqual(
@@ -522,18 +524,26 @@ test(
   },
 );
 
-test(
+describe(
   'an engine that holds nothing reaches the session another holds: its words heard, refused to no session, its stop cancelling it',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const { root, dir, request } = place({ hold: true, output: {} });
-    t.after(() => fs.writeFileSync(path.join(dir, 'end'), ''));
-    const h = await holder(root);
-    t.after(h.close);
-    const other = claudeCodeOps({ root }, attachedSessions(root, STAND_IN));
-
-    await s.test('words said by an engine that holds nothing reach the session its holder runs, each heard once', async (st) => {
+  () => {
+    let root!: string;
+    let dir!: string;
+    let request!: SpawnRequest;
+    let h!: { attached: Attached; said: string[]; close: () => Promise<void> };
+    let other!: import('../src/index.ts').RunnerOps;
+    beforeAll(async () => {
+      const t = teardowns();
+      ({ root, dir, request } = place({ hold: true, output: {} }));
+      t.onTestFinished(() => fs.writeFileSync(path.join(dir, 'end'), ''));
+      h = await holder(root);
+      t.onTestFinished(h.close);
+      other = claudeCodeOps({ root }, attachedSessions(root, STAND_IN));
+      return t.end;
+    });
+    const s = story(test);
+    s.test('words said by an engine that holds nothing reach the session its holder runs, each heard once', async (st) => {
       await Effect.runPromise(h.attached.ops.spawn(request));
       await until(st, () => run(root)?.sessionId, 'the session started', { everyMs: 50 });
       await Effect.runPromise(other.say!({ name: NAME, sessionId: NAME }, 'one more thing'));
@@ -549,21 +559,19 @@ test(
       await sighted(h);
       assert.deepEqual(saidIn(dir), ['do the work', 'one more thing'], 'each word heard once');
     });
-
-    await s.test('REFUSED: words to no session are refused', async () => {
+    s.test('REFUSED: words to no session are refused', async () => {
       const refused = await Effect.runPromise(Effect.flip(h.attached.ops.say!({ name: 'ae/none/1', sessionId: 'ae/none/1' }, 'hello')));
       assert.ok(refused.message.includes('not an attached session'));
     });
-
-    await s.test('a stop from an engine that holds nothing cancels the session its holder runs', async (st) => {
+    s.test('a stop from an engine that holds nothing cancels the session its holder runs', async (st) => {
       await Effect.runPromise(other.stop(NAME));
       await until(st, async () => (await sighted(h))?.state === 'canceled', 'the session canceled', { everyMs: 50 });
     });
   },
 );
 
-test('the next holder takes up a session left behind: what it tells the session, and which process it kills', WAITED, async (t) => {
-  await t.test('a parked session is resumed under the same id, told to carry on', async (rt) => {
+describe('the next holder takes up a session left behind: what it tells the session, and which process it kills', WAITED, () => {
+  test('a parked session is resumed under the same id, told to carry on', async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } });
     writeRun(root, {
       name: NAME,
@@ -574,7 +582,7 @@ test('the next holder takes up a session left behind: what it tells the session,
       request: { ...request, brief: undefined },
     });
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     const seen = await until(
       rt,
       async () => {
@@ -591,8 +599,7 @@ test('the next holder takes up a session left behind: what it tells the session,
     assert.deepEqual(saidIn(dir), [CARRY_ON]);
     assert.deepEqual(seen.closeout, { payload: { done: 1 } });
   });
-
-  await t.test('a parked session a stop was asked of is canceled as it is taken up, and every later look reads it canceled', async (rt) => {
+  test('a parked session a stop was asked of is canceled as it is taken up, and every later look reads it canceled', async (rt) => {
     const { root, request } = place({ output: { done: 1 } });
     writeRun(root, {
       name: NAME,
@@ -604,12 +611,11 @@ test('the next holder takes up a session left behind: what it tells the session,
     });
     fs.writeFileSync(filesOf(root, NAME).stop, String(process.pid));
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     await until(rt, async () => (await sighted(h))?.state === 'canceled', 'the session canceled, never resumed', { everyMs: 50 });
     for (const look of ['second', 'third']) assert.equal((await sighted(h))?.state, 'canceled', `the ${look} look after it`);
   });
-
-  await t.test("a session cut at its holder's bound is resumed told which call did not finish", async (rt) => {
+  test("a session cut at its holder's bound is resumed told which call did not finish", async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } });
     writeRun(root, {
       name: NAME,
@@ -621,74 +627,65 @@ test('the next holder takes up a session left behind: what it tells the session,
       request: { ...request, brief: undefined },
     });
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     await sighted(h);
     await until(rt, () => saidIn(dir).length, 'the resumed session told something', { everyMs: 50 });
     assert.deepEqual(saidIn(dir), [crashNote('Agent')]);
     assert.notDeepEqual(saidIn(dir), [CARRY_ON], 'a session whose call was cut is never told to carry on');
   });
-
-  await t.test(
-    'a session whose holder died mid-call is resumed told which call did not finish, its old Claude Code killed first',
-    async (rt) => {
-      const { root, dir, request } = place({ output: { done: 1 } });
-      const dead = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
-      await new Promise((r) => dead.once('exit', r));
-      const left = squatter(rt);
-      writeRun(root, {
-        name: NAME,
-        state: 'working',
-        owner: dead.pid!,
-        startedAt: new Date().toISOString(),
-        sessionId: 'crashed-session',
-        childPid: left,
-        childStart: processStart(left),
-        calling: { tool: 'Bash', since: new Date().toISOString() },
-        request: { ...request, brief: undefined },
-      });
-      const h = await holder(root);
-      rt.after(h.close);
-      await sighted(h);
-      await until(rt, () => saidIn(dir).length, 'the resumed session told something', { everyMs: 50 });
-      assert.equal(alive(left), false, "the dead holder's Claude Code is killed before the resume");
-      assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
-      assert.deepEqual(saidIn(dir), ['the daemon stopped during its call to Bash and the call did not finish']);
-    },
-  );
-
-  await t.test(
-    'a session at work under a pid another process has taken since is adopted, its holder gone, and names the adopter’s code',
-    async (rt) => {
-      const { root, dir, request } = place({ output: { done: 1 } });
-      const taker = squatter(rt);
-      writeRun(root, {
-        name: NAME,
-        state: 'working',
-        owner: taker,
-        ownerStart: 'when its holder started, not this process',
-        image: '/store/releases/v0.9.0/packages/agent-runtime',
-        startedAt: new Date().toISOString(),
-        sessionId: 'reused-pid',
-        calling: { tool: 'Bash', since: new Date().toISOString() },
-        request: { ...request, brief: undefined },
-      });
-      const h = await holder(root);
-      rt.after(h.close);
-      await sighted(h);
-      await until(rt, () => saidIn(dir).length, 'the adopted session told something', { everyMs: 50 });
-      assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
-      assert.equal(alive(taker), true, "the process that took the pid is not the session's, and is left alone");
-      assert.equal(run(root)?.owner, thisHolder().owner);
-      assert.equal(run(root)?.ownerStart, thisHolder().ownerStart);
-      assert.equal(run(root)?.image, IMAGE, 'the new holder writes the code it runs over the one before');
-    },
-  );
-
-  await t.test("a parked session is handed its cap less what its attempt spent, its parent's carried spend left out", async (rt) => {
+  test('a session whose holder died mid-call is resumed told which call did not finish, its old Claude Code killed first', async (rt) => {
+    const { root, dir, request } = place({ output: { done: 1 } });
+    const dead = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+    await new Promise((r) => dead.once('exit', r));
+    const left = squatter(rt);
+    writeRun(root, {
+      name: NAME,
+      state: 'working',
+      owner: dead.pid!,
+      startedAt: new Date().toISOString(),
+      sessionId: 'crashed-session',
+      childPid: left,
+      childStart: processStart(left),
+      calling: { tool: 'Bash', since: new Date().toISOString() },
+      request: { ...request, brief: undefined },
+    });
+    const h = await holder(root);
+    rt.onTestFinished(h.close);
+    await sighted(h);
+    await until(rt, () => saidIn(dir).length, 'the resumed session told something', { everyMs: 50 });
+    assert.equal(alive(left), false, "the dead holder's Claude Code is killed before the resume");
+    assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
+    assert.deepEqual(saidIn(dir), ['the daemon stopped during its call to Bash and the call did not finish']);
+  });
+  test('a session at work under a pid another process has taken since is adopted, its holder gone, and names the adopter’s code', async (rt) => {
+    const { root, dir, request } = place({ output: { done: 1 } });
+    const taker = squatter(rt);
+    writeRun(root, {
+      name: NAME,
+      state: 'working',
+      owner: taker,
+      ownerStart: 'when its holder started, not this process',
+      image: '/store/releases/v0.9.0/packages/agent-runtime',
+      startedAt: new Date().toISOString(),
+      sessionId: 'reused-pid',
+      calling: { tool: 'Bash', since: new Date().toISOString() },
+      request: { ...request, brief: undefined },
+    });
+    const h = await holder(root);
+    rt.onTestFinished(h.close);
+    await sighted(h);
+    await until(rt, () => saidIn(dir).length, 'the adopted session told something', { everyMs: 50 });
+    assert.deepEqual(saidIn(dir), [crashNote('Bash')]);
+    assert.equal(alive(taker), true, "the process that took the pid is not the session's, and is left alone");
+    assert.equal(run(root)?.owner, thisHolder().owner);
+    assert.equal(run(root)?.ownerStart, thisHolder().ownerStart);
+    assert.equal(run(root)?.image, IMAGE, 'the new holder writes the code it runs over the one before');
+  });
+  test("a parked session is handed its cap less what its attempt spent, its parent's carried spend left out", async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } }, { budgetUsd: 2 });
     leftBehind(root, request, [0.75], { costUsd: 0.25 });
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     await sighted(h);
     const [argv] = await until(
       rt,
@@ -700,12 +697,11 @@ test('the next holder takes up a session left behind: what it tells the session,
     );
     assert.equal(sdkArgValue(argv, '--max-budget-usd'), '1.5', '2, less the 0.75 printed, less the 0.25 its parent carried');
   });
-
-  await t.test("a session taken up again counts its attempt's whole spend so far, off the whole cap its run file keeps", async (rt) => {
+  test("a session taken up again counts its attempt's whole spend so far, off the whole cap its run file keeps", async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } }, { budgetUsd: 2 });
     leftBehind(root, request, [0.5, 1.25]);
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     await sighted(h);
     const [argv] = await until(
       rt,
@@ -718,12 +714,11 @@ test('the next holder takes up a session left behind: what it tells the session,
     assert.equal(sdkArgValue(argv, '--max-budget-usd'), '0.75', "the cap less the last result's running total");
     assert.equal(capKept(root), 2, 'the run file keeps the whole cap, never the remainder');
   });
-
-  await t.test('a parked session with no cap is resumed with none', async (rt) => {
+  test('a parked session with no cap is resumed with none', async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } });
     leftBehind(root, request, [0.5]);
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     await sighted(h);
     const [argv] = await until(
       rt,
@@ -735,12 +730,11 @@ test('the next holder takes up a session left behind: what it tells the session,
     );
     assert.equal(sdkArgGiven(argv, '--max-budget-usd'), false);
   });
-
-  await t.test('REFUSED: a parked session that has spent its whole cap is not resumed, and ends failed at its budget', async (rt) => {
+  test('REFUSED: a parked session that has spent its whole cap is not resumed, and ends failed at its budget', async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } }, { budgetUsd: 2 });
     leftBehind(root, request, [2.25]);
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     const seen = await until(
       rt,
       async () => {
@@ -753,8 +747,7 @@ test('the next holder takes up a session left behind: what it tells the session,
     assert.equal(seen.limit, 'budget');
     assert.deepEqual(lines(dir, 'argv.jsonl'), [], 'no Claude Code is started past its cap');
   });
-
-  await t.test("adopting a session leaves alone a process that has taken its Claude Code's pid since", async (rt) => {
+  test("adopting a session leaves alone a process that has taken its Claude Code's pid since", async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } });
     const taker = squatter(rt);
     writeRun(root, {
@@ -768,14 +761,13 @@ test('the next holder takes up a session left behind: what it tells the session,
       request: { ...request, brief: undefined },
     });
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     await sighted(h);
     await until(rt, () => run(root)?.state === 'completed', 'the session resumed and completed', { everyMs: 50 });
     assert.deepEqual(saidIn(dir), [CARRY_ON]);
     assert.equal(alive(taker), true, 'the process that took the pid is not killed');
   });
-
-  await t.test('a session that cannot be taken up is said, with why, never dropped: a warning of the holder each look', async (rt) => {
+  test('a session that cannot be taken up is said, with why, never dropped: a warning of the holder each look', async (rt) => {
     const { root, request } = place({ output: { done: 1 } }, { claude: { appendSystemPromptFile: 'not-there.md' } });
     writeRun(root, {
       name: NAME,
@@ -786,7 +778,7 @@ test('the next holder takes up a session left behind: what it tells the session,
       request: { ...request, brief: undefined },
     });
     const h = await holder(root);
-    rt.after(h.close);
+    rt.onTestFinished(h.close);
     await sighted(h);
     const warned = await until(rt, () => h.said.find((l) => /^WARN/i.test(l) && l.includes(NAME)), 'the failed take-up said', {
       everyMs: 20,
@@ -795,16 +787,16 @@ test('the next holder takes up a session left behind: what it tells the session,
   });
 });
 
-test(
+describe(
   'a drain holds the new calls of the holder it names, and none of another process, a pid gone since, a nested or a sub-agent’s call',
   WAITED,
-  async (t) => {
-    await t.test('a drain naming the holder holds its new call until lifted; one naming another process holds nothing', async (rt) => {
+  () => {
+    test('a drain naming the holder holds its new call until lifted; one naming another process holds nothing', async (rt) => {
       const { root, dir, request } = place({ call: 'Read', output: {} });
       fs.writeFileSync(path.join(dir, 'release'), '');
       putDrain(root, process.pid);
       const h = await holder(root);
-      rt.after(h.close);
+      rt.onTestFinished(h.close);
       await Effect.runPromise(h.attached.ops.spawn(request));
       assert.equal(await until(rt, () => run(root)?.heldBack, 'the call held at its hook', { everyMs: 50 }), 1);
       assert.deepEqual(lines(dir, 'answers.jsonl'), [], 'the call waits at its hook while drained');
@@ -813,20 +805,18 @@ test(
       await until(rt, () => run(root)?.state === 'completed', 'the call let through and the session completed', { everyMs: 50 });
       assert.equal(run(root)?.heldBack, undefined, 'no call waits once the drain names another process');
     });
-
-    await t.test('a drain naming this pid with another start time holds nothing: it was put for a process gone since', async (rt) => {
+    test('a drain naming this pid with another start time holds nothing: it was put for a process gone since', async (rt) => {
       const { root, dir, request } = place({ call: 'Read', output: {} });
       fs.writeFileSync(path.join(dir, 'release'), '');
       putDrain(root, process.pid);
       assert.ok(JSON.parse(fs.readFileSync(holderDrainFile(root), 'utf8')).start, 'a drain says when its holder started');
       fs.writeFileSync(holderDrainFile(root), JSON.stringify({ pid: process.pid, start: 'an earlier process' }));
       const h = await holder(root);
-      rt.after(h.close);
+      rt.onTestFinished(h.close);
       await Effect.runPromise(h.attached.ops.spawn(request));
       await until(rt, () => run(root)?.state === 'completed', 'the call let through and the session completed', { everyMs: 50 });
     });
-
-    await t.test('a drain put by a process gone since holds nothing: it ends with the take-over that put it', async (rt) => {
+    test('a drain put by a process gone since holds nothing: it ends with the take-over that put it', async (rt) => {
       const { root, dir, request } = place({ call: 'Read', output: {} });
       fs.writeFileSync(path.join(dir, 'release'), '');
       putDrain(root, process.pid);
@@ -837,15 +827,14 @@ test(
       const drain = JSON.parse(fs.readFileSync(file, 'utf8'));
       fs.writeFileSync(file, JSON.stringify({ ...drain, by: { pid: gone } }));
       const h = await holder(root);
-      rt.after(h.close);
+      rt.onTestFinished(h.close);
       await Effect.runPromise(h.attached.ops.spawn(request));
       await until(rt, () => run(root)?.state === 'completed', 'the call let through and the session completed', { everyMs: 50 });
     });
-
-    await t.test('a drain answers a call nested in one in flight, so the call in flight can end and the holder can let go', async (rt) => {
+    test('a drain answers a call nested in one in flight, so the call in flight can end and the holder can let go', async (rt) => {
       const { root, dir, request } = place({ call: 'Bash', nested: 'Grep', output: {} });
       const h = await holder(root);
-      rt.after(h.close);
+      rt.onTestFinished(h.close);
       await Effect.runPromise(h.attached.ops.spawn(request));
       assert.equal((await inCall(rt, root)).tool, 'Bash');
       putDrain(root, process.pid);
@@ -860,13 +849,12 @@ test(
       fs.writeFileSync(path.join(dir, 'release'), '');
       await until(rt, () => run(root)?.state === 'completed', 'the call in flight ran to its end', { everyMs: 50 });
     });
-
-    await t.test("a drain answers a sub-agent's call, which belongs to a call it cannot see in flight", async (rt) => {
+    test("a drain answers a sub-agent's call, which belongs to a call it cannot see in flight", async (rt) => {
       const { root, dir, request } = place({ nested: 'Grep', fromSubAgent: true, output: {} });
       fs.writeFileSync(path.join(dir, 'nest'), '');
       putDrain(root, process.pid);
       const h = await holder(root);
-      rt.after(h.close);
+      rt.onTestFinished(h.close);
       await Effect.runPromise(h.attached.ops.spawn(request));
       await until(rt, () => run(root)?.state === 'completed', "the sub-agent's call let through and the session completed", {
         everyMs: 50,
@@ -881,14 +869,14 @@ test(
   },
 );
 
-test(
+describe(
   'the sessions’ drain holds an attached session’s next call, cuts a call past its grace, and tells the session the cut once lifted',
   WAITED,
-  async (t) => {
-    await t.test('a new call waits at its hook, its sighting held back after the call that ended, its process living on', async (rt) => {
+  () => {
+    test('a new call waits at its hook, its sighting held back after the call that ended, its process living on', async (rt) => {
       const { root, dir, request } = kept({ call: 'Read', next: 'Edit' });
       const h = await holder(root, 1_000);
-      rt.after(async () => {
+      rt.onTestFinished(async () => {
         liftSessionDrain(root);
         await h.close();
       });
@@ -921,42 +909,38 @@ test(
       fs.writeFileSync(path.join(dir, 'release-next'), '');
       await idle(rt, root);
     });
-
-    await t.test(
-      'a call in flight past the grace: its turn interrupted and the cut kept; once lifted it is told the cut, under the same session',
-      async (rt) => {
-        const { root, dir, request } = kept({ call: 'Bash' });
-        const h = await holder(root, 1_000);
-        rt.after(async () => {
-          liftSessionDrain(root);
-          await h.close();
-        });
-        await Effect.runPromise(h.attached.ops.spawn(request));
-        assert.equal((await inCall(rt, root)).tool, 'Bash');
-        const sessionId = await until(rt, () => run(root)?.sessionId, 'the session named', { everyMs: 50 });
-        putSessionDrain(root, { graceMs: 0 });
-        await until(rt, async () => (await sighted(h), interrupts(dir) === 1), 'the turn interrupted on a look past the grace', {
-          everyMs: 50,
-        });
-        await until(rt, () => resultsOf(root) === 1, 'the cut turn printed its result', { everyMs: 50 });
-        assert.equal(run(root)?.cut?.tool, 'Bash', 'the cut call kept on the run file');
-        const seen = await sighted(h);
-        assert.equal(seen?.state, 'working', 'a cut session is neither idle nor ended: it waits for the lift');
-        assert.ok(seen?.heldBack, 'and its sighting says it is held');
-        assert.equal(interrupts(dir), 1, 'one interrupt, however many looks');
-        assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), true, 'its Claude Code lives on');
+    test('a call in flight past the grace: its turn interrupted and the cut kept; once lifted it is told the cut, under the same session', async (rt) => {
+      const { root, dir, request } = kept({ call: 'Bash' });
+      const h = await holder(root, 1_000);
+      rt.onTestFinished(async () => {
         liftSessionDrain(root);
-        await until(rt, async () => (await sighted(h), saidIn(dir).length === 2), 'the session told the cut on a look after the lift', {
-          everyMs: 50,
-        });
-        assert.deepEqual(saidIn(dir), ['do the work', cutWords('Bash')]);
-        assert.equal(run(root)?.cut, undefined, 'the cut is cleared once told');
-        assert.equal(run(root)?.sessionId, sessionId, 'the same session');
-        assert.equal(lines(dir, 'argv.jsonl').length, 1, 'on the one Claude Code, never resumed in another');
-        fs.writeFileSync(path.join(dir, 'release'), '');
-        await idle(rt, root);
-      },
-    );
+        await h.close();
+      });
+      await Effect.runPromise(h.attached.ops.spawn(request));
+      assert.equal((await inCall(rt, root)).tool, 'Bash');
+      const sessionId = await until(rt, () => run(root)?.sessionId, 'the session named', { everyMs: 50 });
+      putSessionDrain(root, { graceMs: 0 });
+      await until(rt, async () => (await sighted(h), interrupts(dir) === 1), 'the turn interrupted on a look past the grace', {
+        everyMs: 50,
+      });
+      await until(rt, () => resultsOf(root) === 1, 'the cut turn printed its result', { everyMs: 50 });
+      assert.equal(run(root)?.cut?.tool, 'Bash', 'the cut call kept on the run file');
+      const seen = await sighted(h);
+      assert.equal(seen?.state, 'working', 'a cut session is neither idle nor ended: it waits for the lift');
+      assert.ok(seen?.heldBack, 'and its sighting says it is held');
+      assert.equal(interrupts(dir), 1, 'one interrupt, however many looks');
+      assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), true, 'its Claude Code lives on');
+      liftSessionDrain(root);
+      await until(rt, async () => (await sighted(h), saidIn(dir).length === 2), 'the session told the cut on a look after the lift', {
+        everyMs: 50,
+      });
+      assert.deepEqual(saidIn(dir), ['do the work', cutWords('Bash')]);
+      assert.equal(run(root)?.cut, undefined, 'the cut is cleared once told');
+      assert.equal(run(root)?.sessionId, sessionId, 'the same session');
+      assert.equal(lines(dir, 'argv.jsonl').length, 1, 'on the one Claude Code, never resumed in another');
+      fs.writeFileSync(path.join(dir, 'release'), '');
+      await idle(rt, root);
+    });
   },
 );
 
@@ -1012,100 +996,86 @@ const letGone = async (root: string, live: Map<string, Live>, ms: number, callsS
   return purse;
 };
 
-test(
-  'a let-go: it waits for the call in flight, and within its one budget, cuts what never ends and parks the session',
-  WAITED,
-  async (t) => {
-    await t.test('a holder let go waits for the call in flight, then parks the session, its Claude Code gone', async (rt) => {
-      const { root, dir, request } = place({ call: 'Bash', hold: true, output: { ok: true } });
-      const h = await holder(root);
-      await Effect.runPromise(h.attached.ops.spawn(request));
-      assert.equal((await inCall(rt, root)).tool, 'Bash');
-      let closed = false;
-      const closing = h.close().then(() => (closed = true));
-      await until(rt, () => lines(dir, 'answers.jsonl').length >= 1, 'the call asked its hook', { everyMs: 50 });
-      assert.equal(closed, false, 'the let-go waits for the call in flight');
-      assert.equal(run(root)?.state, 'working');
-      fs.writeFileSync(path.join(dir, 'release'), '');
-      await closing;
-      assert.deepEqual(
-        lines(dir, 'asked.jsonl'),
-        ['PreToolUse', 'PostToolUse'],
-        "the call ran to its end, its end asked of the session's hook, before the let-go parked it",
-      );
-      assert.equal(run(root)?.state, 'parked');
-      assert.equal(run(root)?.calling, undefined);
-      assert.equal(run(root)?.childPid, undefined, 'a parked session names no Claude Code: the let-go ended it');
-      assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), false, "the session's Claude Code is gone");
-    });
-
-    await t.test(
-      'a holder that cannot let go within its bound cuts the call, keeps it on the run file, and parks the session',
-      async (rt) => {
-        const { root, dir, request } = place({ call: 'Bash', output: {} });
-        const h = await holder(root, 1_000);
-        await Effect.runPromise(h.attached.ops.spawn(request));
-        assert.equal((await inCall(rt, root)).tool, 'Bash');
-        await h.close();
-        assert.equal(run(root)?.state, 'parked', 'the let-go returned rather than wait for a call that never ends');
-        assert.equal(run(root)?.calling?.tool, 'Bash', 'the call it cut is kept, so the next holder knows which did not finish');
-        assert.deepEqual(
-          (lines(dir, 'answers.jsonl') as { event: string }[]).map((a) => a.event),
-          ['PreToolUse'],
-          'the call never ended: its PostToolUse was never asked',
-        );
-        const child = Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'));
-        await until(rt, () => !alive(child), "the session's Claude Code gone: the park ended it", { everyMs: 20 });
-        assert.deepEqual(
-          h.said,
-          [
-            'Info letting go of 1 session(s): waiting at most 1000 ms for 1 call(s) in flight (ae/t1/1 Bash)',
-            'Warn ae/t1/1 is cut in its call to Bash: it did not end within 1000 ms, and the next holder resumes the session told the call ' +
-              'did not finish',
-          ],
-          'it says it is letting go and how many calls it waits for, then names each session it cut and the call it cut it in',
-        );
-      },
+describe('a let-go: it waits for the call in flight, and within its one budget, cuts what never ends and parks the session', WAITED, () => {
+  test('a holder let go waits for the call in flight, then parks the session, its Claude Code gone', async (rt) => {
+    const { root, dir, request } = place({ call: 'Bash', hold: true, output: { ok: true } });
+    const h = await holder(root);
+    await Effect.runPromise(h.attached.ops.spawn(request));
+    assert.equal((await inCall(rt, root)).tool, 'Bash');
+    let closed = false;
+    const closing = h.close().then(() => (closed = true));
+    await until(rt, () => lines(dir, 'answers.jsonl').length >= 1, 'the call asked its hook', { everyMs: 50 });
+    assert.equal(closed, false, 'the let-go waits for the call in flight');
+    assert.equal(run(root)?.state, 'working');
+    fs.writeFileSync(path.join(dir, 'release'), '');
+    await closing;
+    assert.deepEqual(
+      lines(dir, 'asked.jsonl'),
+      ['PreToolUse', 'PostToolUse'],
+      "the call ran to its end, its end asked of the session's hook, before the let-go parked it",
     );
-
-    await t.test('a let-go whose session never ends returns all the same, its three waits inside one budget', async () => {
-      const { root } = place({});
-      const purse = await letGone(root, new Map([[NAME, stuck()]]), 1_000);
-      assert.equal(purse.given.length, 3, 'each of its three waits took from the one purse, so each of them is bounded');
-      assert.ok(
-        purse.given.reduce((a, b) => a + b, 0) <= 1_000 + purse.given.length,
-        `the waits of one let-go add up to no more than its budget, not ${purse.given.join(' + ')}`,
-      );
-      assert.ok(purse.given[0] > 0 && purse.given[1] > 0, 'and the waits before the last each had something to wait with');
-      assert.equal(run(root)?.state, 'parked', 'it parked the session it could not wait out');
-      assert.equal(run(root)?.calling?.tool, 'Agent', 'keeping the call it cut');
-    });
-
-    await t.test('the wait for the calls in flight takes no more than the share it is given', async () => {
-      const { root } = place({});
-      const purse = await letGone(root, new Map([[NAME, stuck()]]), 1_000, 0.25);
-      assert.equal(purse.given.length, 3, 'each of its three waits took from the one purse');
-      assert.ok(
-        purse.given[0] > 0 && purse.given[0] <= 250,
-        `the calls in flight were given their share and no more, not ${purse.given[0]}`,
-      );
-      assert.ok(
-        purse.given.reduce((a, b) => a + b, 0) <= 1_000 + purse.given.length,
-        `the waits of one let-go add up to no more than its budget, not ${purse.given.join(' + ')}`,
-      );
-    });
-
-    await t.test("the park leaves alone a process that has taken the session's Claude Code's pid since", async (rt) => {
-      const { root } = place({});
-      const taker = squatter(rt);
-      const facts = { childPid: taker, childStart: "when the session's Claude Code started, not this process" };
-      await letGone(root, new Map([[NAME, stuck(facts)]]), 1_000);
-      assert.equal(alive(taker), true, "the process that took the pid is not the session's, and the park left it alone");
-      assert.equal(run(root)?.state, 'parked');
-      assert.equal(run(root)?.childPid, undefined, 'and the parked file names no Claude Code of its own');
-    });
-  },
-);
+    assert.equal(run(root)?.state, 'parked');
+    assert.equal(run(root)?.calling, undefined);
+    assert.equal(run(root)?.childPid, undefined, 'a parked session names no Claude Code: the let-go ended it');
+    assert.equal(alive(Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'))), false, "the session's Claude Code is gone");
+  });
+  test('a holder that cannot let go within its bound cuts the call, keeps it on the run file, and parks the session', async (rt) => {
+    const { root, dir, request } = place({ call: 'Bash', output: {} });
+    const h = await holder(root, 1_000);
+    await Effect.runPromise(h.attached.ops.spawn(request));
+    assert.equal((await inCall(rt, root)).tool, 'Bash');
+    await h.close();
+    assert.equal(run(root)?.state, 'parked', 'the let-go returned rather than wait for a call that never ends');
+    assert.equal(run(root)?.calling?.tool, 'Bash', 'the call it cut is kept, so the next holder knows which did not finish');
+    assert.deepEqual(
+      (lines(dir, 'answers.jsonl') as { event: string }[]).map((a) => a.event),
+      ['PreToolUse'],
+      'the call never ended: its PostToolUse was never asked',
+    );
+    const child = Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'));
+    await until(rt, () => !alive(child), "the session's Claude Code gone: the park ended it", { everyMs: 20 });
+    assert.deepEqual(
+      h.said,
+      [
+        'Info letting go of 1 session(s): waiting at most 1000 ms for 1 call(s) in flight (ae/t1/1 Bash)',
+        'Warn ae/t1/1 is cut in its call to Bash: it did not end within 1000 ms, and the next holder resumes the session told the call ' +
+          'did not finish',
+      ],
+      'it says it is letting go and how many calls it waits for, then names each session it cut and the call it cut it in',
+    );
+  });
+  test('a let-go whose session never ends returns all the same, its three waits inside one budget', async () => {
+    const { root } = place({});
+    const purse = await letGone(root, new Map([[NAME, stuck()]]), 1_000);
+    assert.equal(purse.given.length, 3, 'each of its three waits took from the one purse, so each of them is bounded');
+    assert.ok(
+      purse.given.reduce((a, b) => a + b, 0) <= 1_000 + purse.given.length,
+      `the waits of one let-go add up to no more than its budget, not ${purse.given.join(' + ')}`,
+    );
+    assert.ok(purse.given[0] > 0 && purse.given[1] > 0, 'and the waits before the last each had something to wait with');
+    assert.equal(run(root)?.state, 'parked', 'it parked the session it could not wait out');
+    assert.equal(run(root)?.calling?.tool, 'Agent', 'keeping the call it cut');
+  });
+  test('the wait for the calls in flight takes no more than the share it is given', async () => {
+    const { root } = place({});
+    const purse = await letGone(root, new Map([[NAME, stuck()]]), 1_000, 0.25);
+    assert.equal(purse.given.length, 3, 'each of its three waits took from the one purse');
+    assert.ok(purse.given[0] > 0 && purse.given[0] <= 250, `the calls in flight were given their share and no more, not ${purse.given[0]}`);
+    assert.ok(
+      purse.given.reduce((a, b) => a + b, 0) <= 1_000 + purse.given.length,
+      `the waits of one let-go add up to no more than its budget, not ${purse.given.join(' + ')}`,
+    );
+  });
+  test("the park leaves alone a process that has taken the session's Claude Code's pid since", async (rt) => {
+    const { root } = place({});
+    const taker = squatter(rt);
+    const facts = { childPid: taker, childStart: "when the session's Claude Code started, not this process" };
+    await letGone(root, new Map([[NAME, stuck(facts)]]), 1_000);
+    assert.equal(alive(taker), true, "the process that took the pid is not the session's, and the park left it alone");
+    assert.equal(run(root)?.state, 'parked');
+    assert.equal(run(root)?.childPid, undefined, 'and the parked file names no Claude Code of its own');
+  });
+});
 
 /** The results of the session's capture, each its `subtype` and the `total_cost_usd` it printed, in order. */
 const resultsIn = (root: string) =>
@@ -1126,16 +1096,23 @@ const sameCost = (a: number | undefined, b: number) => a !== undefined && Math.a
  */
 const CUT = { letGoMs: 20_000, callsShare: 0.05 };
 
-test("a session cut by its holder's let-go and resumed by the next holder costs what both of its processes spent", WAITED, async (t) => {
-  const s = story(t);
-  const { root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} }, { budgetUsd: 2 });
-  const first = await holder(root, CUT.letGoMs, CUT.callsShare);
-  let next: Awaited<ReturnType<typeof holder>> | undefined;
-  t.after(async () => {
-    await next?.close();
+describe("a session cut by its holder's let-go and resumed by the next holder costs what both of its processes spent", WAITED, () => {
+  let root!: string;
+  let dir!: string;
+  let request!: SpawnRequest;
+  let first!: { attached: Attached; said: string[]; close: () => Promise<void> };
+  let next!: Awaited<ReturnType<typeof holder>> | undefined;
+  beforeAll(async () => {
+    const t = teardowns();
+    ({ root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} }, { budgetUsd: 2 }));
+    first = await holder(root, CUT.letGoMs, CUT.callsShare);
+    t.onTestFinished(async () => {
+      await next?.close();
+    });
+    return t.end;
   });
-
-  await s.test('cut in its call, its Claude Code prints the turn it spent and saves its total before it is gone', async (st) => {
+  const s = story(test);
+  s.test('cut in its call, its Claude Code prints the turn it spent and saves its total before it is gone', async (st) => {
     await Effect.runPromise(first.attached.ops.spawn(request));
     assert.equal((await inCall(st, root)).tool, 'Bash');
     const child = Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'));
@@ -1147,8 +1124,7 @@ test("a session cut by its holder's let-go and resumed by the next holder costs 
     assert.equal(alive(child), false, "the session's Claude Code is gone once the let-go returns");
     assert.equal(run(root)?.childPid, undefined, 'and the parked file names it no more');
   });
-
-  await s.test("the next holder resumes it, and the attempt's cost is the sum of both processes", async (st) => {
+  s.test("the next holder resumes it, and the attempt's cost is the sum of both processes", async (st) => {
     fs.writeFileSync(path.join(dir, 'release'), '');
     next = await holder(root);
     const seen = await until(
@@ -1164,8 +1140,7 @@ test("a session cut by its holder's let-go and resumed by the next holder costs 
     assert.ok(argv.includes('--resume=stand-in-session'), 'the session is resumed by its own id');
     assert.ok(sameCost(seen.usage?.costUsd, 1), `0.5 for the cut process and 0.5 for its resume, not ${seen.usage?.costUsd}`);
   });
-
-  await s.test('the resume is handed what is left of its cap, never the whole cap again', () => {
+  s.test('the resume is handed what is left of its cap, never the whole cap again', () => {
     const [firstArgv, argv] = lines(dir, 'argv.jsonl') as string[][];
     assert.equal(sdkArgValue(firstArgv, '--max-budget-usd'), '2', 'the first process is handed the whole cap');
     assert.equal(sdkArgValue(argv, '--max-budget-usd'), '1.5', 'the resume, the cap less the 0.5 its first process spent');
@@ -1173,8 +1148,8 @@ test("a session cut by its holder's let-go and resumed by the next holder costs 
   });
 });
 
-test("what the next holder's sighting counts of a session's cost, by how its last holder ended", WAITED, async (t) => {
-  await t.test('let go between turns, its spend is counted once: carried on by the resume, never added again', async (rt) => {
+describe("what the next holder's sighting counts of a session's cost, by how its last holder ended", WAITED, () => {
+  test('let go between turns, its spend is counted once: carried on by the resume, never added again', async (rt) => {
     const { root, dir, request } = kept({ cost: 0.5, output: {} });
     const first = await holder(root);
     await Effect.runPromise(first.attached.ops.spawn(request));
@@ -1182,14 +1157,13 @@ test("what the next holder's sighting counts of a session's cost, by how its las
     await first.close();
     assert.deepEqual(costStates(dir), [0.5], 'the session parked between turns saved its total as its input ended');
     const next = await holder(root);
-    rt.after(next.close);
+    rt.onTestFinished(next.close);
     await sighted(next);
     await until(rt, () => resultsIn(root).length === 2, 'the resumed turn ended', { everyMs: 50 });
     const seen = await sighted(next);
     assert.ok(sameCost(seen?.usage?.costUsd, 1), `0.5 a turn, twice, not ${seen?.usage?.costUsd}`);
   });
-
-  await t.test('its holder killed outright, the spend of the process it cut is lost: an undercount, never a double count', async (rt) => {
+  test('its holder killed outright, the spend of the process it cut is lost: an undercount, never a double count', async (rt) => {
     const { root, request } = kept({ cost: 0.5, output: {} });
     const killed = { type: 'result', subtype: 'success', is_error: false, session_id: 'stand-in-session', total_cost_usd: 0.5 };
     fs.mkdirSync(path.dirname(filesOf(root, NAME).out), { recursive: true });
@@ -1203,7 +1177,7 @@ test("what the next holder's sighting counts of a session's cost, by how its las
       request: { ...request, brief: undefined },
     });
     const next = await holder(root);
-    rt.after(next.close);
+    rt.onTestFinished(next.close);
     await sighted(next);
     await until(rt, () => resultsIn(root).length === 2, 'the resumed turn ended', { everyMs: 50 });
     const seen = await sighted(next);
@@ -1220,7 +1194,7 @@ test('a denial is journalled while the attempt is at work, before its result', W
   const go = <A>(f: (e: Engine['Service']) => Effect.Effect<A, unknown>) =>
     Effect.runPromise(Effect.flatMap(Engine, f).pipe(Effect.provide(layer)) as Effect.Effect<A>);
   const id = await go((e) => e.file({ brief: request.brief, cwd: dir, config: request.config, restartPolicy: 'Always' }));
-  t.after(async () => {
+  t.onTestFinished(async () => {
     fs.writeFileSync(path.join(dir, 'end'), '');
     await Effect.runPromise(Scope.close(scope, Exit.void));
   });
@@ -1241,18 +1215,18 @@ test('a denial is journalled while the attempt is at work, before its result', W
   );
 });
 
-test('a spawn whose options are refused leaves no run file behind: no held sighting of a session that never started', async (t) => {
+describe('a spawn whose options are refused leaves no run file behind: no held sighting of a session that never started', () => {
   const rows: { what: string; config: SpawnRequest['config']; mcp?: string }[] = [
     { what: 'a prompt file that cannot be read', config: { claude: { appendSystemPromptFile: 'not-there.md' } } },
     { what: 'a `config.claude` flag given two values', config: { claude: { someFlag: ['one', 'two'] } } },
     { what: 'a checkout `.mcp.json` that is not JSON', config: {}, mcp: '{ not json' },
   ];
   for (const row of rows)
-    await t.test(row.what, async (rt) => {
+    test(row.what, async (rt) => {
       const { root, dir, request } = place({ output: {} }, row.config);
       if (row.mcp !== undefined) fs.writeFileSync(path.join(dir, '.mcp.json'), row.mcp);
       const h = await holder(root);
-      rt.after(h.close);
+      rt.onTestFinished(h.close);
       const exit = await Effect.runPromiseExit(h.attached.ops.spawn(request));
       assert.ok(Exit.isFailure(exit), 'the spawn is refused');
       assert.equal(fs.existsSync(filesOf(root, NAME).run), false, 'no run file is left for a session query() never started');

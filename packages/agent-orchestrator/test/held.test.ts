@@ -12,7 +12,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest as well, and throws on a difference (`verifyRest` in tick.verb.ts).
  */
-import { mock, test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -375,13 +375,13 @@ test("an answer's turn that was LOST settles its task failed, and a `nemia retry
   assert.equal(h.spawned.at(-1)!.name, h.turn);
   h.sessions.delete(h.turn);
   const read = process.hrtime.bigint.bind(process.hrtime);
-  mock.timers.enable({ apis: ['Date'], now: Date.now() + 10 * 60_000 });
-  const later = mock.method(process.hrtime, 'bigint', () => read() + 10n * 60_000_000_000n);
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 10 * 60_000 });
+  const later = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => read() + 10n * 60_000_000_000n);
   try {
     await h.pass(h.run.id);
   } finally {
-    mock.timers.reset();
-    later.mock.restore();
+    vi.useRealTimers();
+    later.mockRestore();
   }
   const last = (await stateOf(h.e, h.plan)).state.attempts.at(-1)!;
   assert.deepEqual(

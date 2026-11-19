@@ -5,7 +5,7 @@
  * each row says which check refused, by a fragment of its words that no other check says, and the harnesses its fix names, never the
  * whole sentence.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { harnessRefusalOf } from '../src/service/harness-refusal.ts';
 import type { HarnessConfig, TaskSpec } from '../src/service/options.ts';
@@ -155,10 +155,13 @@ const refusedOn = (harness: string, ask: Partial<TaskSpec>, harnesses: Record<st
 const saidBy = (said: string, check: Check) =>
   said.includes(SAYS[check]) && Object.entries(SAYS).every(([c, words]) => c === check || c === 'keepsOpen' || !said.includes(words));
 
-test('harnessRefusalOf: each ask on each kind of harness, refused by the same check, its fix naming the same harnesses', async (t) => {
-  const names = Object.keys(ALL);
+describe('harnessRefusalOf: each ask on each kind of harness, refused by the same check, its fix naming the same harnesses', () => {
+  let names!: string[];
+  beforeAll(() => {
+    names = Object.keys(ALL);
+  });
   for (const [ask, checks] of Object.entries(ON_ALL)) {
-    await t.test(ask, () => {
+    test(ask, () => {
       checks.forEach((check, i) => {
         const harness = names[i] ?? '';
         const said = refusedOn(harness, ASKS[ask] ?? {}, ALL);
@@ -170,13 +173,13 @@ test('harnessRefusalOf: each ask on each kind of harness, refused by the same ch
     });
   }
   for (const row of NARROW) {
-    await t.test(`${row.ask} on \`${row.harness}\` of ${Object.keys(row.harnesses).join(', ')}`, () => {
+    test(`${row.ask} on \`${row.harness}\` of ${Object.keys(row.harnesses).join(', ')}`, () => {
       const said = refusedOn(row.harness, ASKS[row.ask] ?? {}, row.harnesses);
       assert.ok(said !== undefined && saidBy(said, row.check), `refused by ${row.check}: ${said}`);
       assert.equal(said.includes("none of this engine's harnesses"), row.none, `its fix names a harness or none: ${said}`);
     });
   }
-  await t.test('a harness the engine has not', () => {
+  test('a harness the engine has not', () => {
     const said = refusedOn('nope', {}, ALL);
     assert.ok(said !== undefined && saidBy(said, 'unknown'), String(said));
   });

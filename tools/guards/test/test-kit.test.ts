@@ -5,7 +5,8 @@
  *   `test-kit` entry: what ships never carries test code.
  * - **A test imports no other workspace's tests.** A helper two workspaces' tests need goes in the kit; a relative path into another
  *   workspace's `test/` is a copy waiting to drift.
- * - **The kit imports only Node's built-ins and TypeScript's compiler API**, so it reaches no layer and every layer may use it.
+ * - **The kit imports only Node's built-ins, TypeScript's compiler API and Vitest, the runner**, so it reaches no layer and every layer
+ *   may use it.
  * - **The kit is a `devDependencies` entry**, never a `dependencies` one: no shipped package installs it.
  * - **Every temporary root a test makes comes from `scratch`** (`test-kit/scratch`), which takes it away with whatever runs in it: a
  *   call of `os.tmpdir` in any workspace's tests outside the kit is refused, and so is a root made with `mkdtempSync` in
@@ -14,7 +15,7 @@
  *
  * Each rule is a function over text, proven on a planted line first, then swept over the workspaces the root `package.json` names.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -63,11 +64,19 @@ const crossTestImports = (file: string, workspace: string, text: string, all: re
       : [`${file} imports ${target}, a test file of ${other}: put what both need in tools/test-kit, and import it by its entry`];
   });
 
-/** Where a file of the kit imports anything but a node built-in, TypeScript, its own files or its own entries. */
+/** Where a file of the kit imports anything but a node built-in, TypeScript, Vitest, its own files or its own entries. */
 const kitReaches = (file: string, text: string): string[] =>
   specifiersIn(withoutComments(text))
-    .filter((spec) => !spec.startsWith('node:') && spec !== 'typescript' && !spec.startsWith('.') && !isKit(spec))
-    .map((spec) => `${file} imports ${spec}: the test kit imports only node: built-ins and typescript, so every layer may use it`);
+    .filter(
+      (spec) =>
+        !spec.startsWith('node:') &&
+        spec !== 'typescript' &&
+        spec !== 'vitest' &&
+        !spec.startsWith('vitest/') &&
+        !spec.startsWith('.') &&
+        !isKit(spec),
+    )
+    .map((spec) => `${file} imports ${spec}: the test kit imports only node: built-ins, typescript and vitest, so every layer may use it`);
 
 /** Where a workspace's `package.json` lists the kit under its `dependencies`, which ship. */
 const kitDependencies = (manifest: string, text: string): string[] => {
@@ -84,16 +93,17 @@ const tmpdirCalls = (text: string): string[] =>
     .flatMap((line, i) => (/\btmpdir\s*\(|\bmkdtemp\w*\s*\(.*\bmachineTempDir\s*\(/.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
 
 /**
- * The files of a workspace's tests that make a root by hand: the fixture that shows the reaper a leak, run alone under a temp
- * directory of its own; and the e2e's runner, with the module it runs the look's tests through (`look.ts`, whose static Storybook it
- * builds into a folder of its own), and the served board's command, each a script and no test file, which `node:test`'s hooks would
- * make a test run of, and each removes its store or its folder and stops its servers on its own exit and signals.
+ * The files of a workspace's tests that make a root by hand: the fixture that shows the reaper a leak, run alone under a temp directory of
+ * its own; and the e2e's runner, with the module it runs the look's tests through (`look.ts`, whose static Storybook it builds into a
+ * folder of its own), the served board's command, and the stories' pictures (`stories/shoot.ts`), each a script and no test file, outside
+ * which Vitest's hooks throw, and each removes its store or its folder and stops its servers on its own exit and signals.
  */
 const ROOTS_BY_HAND = [
   'packages/agent-runtime/test/fixtures/leak-unguarded.ts',
   'apps/web/test/e2e/run.ts',
   'apps/web/test/e2e/look.ts',
   'apps/web/test/e2e/serve.ts',
+  'apps/web/test/e2e/stories/shoot.ts',
 ];
 
 /** The workspaces whose code and tests the sweeps read: every one the root names but the kit itself. */
@@ -132,7 +142,7 @@ test('REFUSED: a test that imports a test file of another workspace; its own, an
   assert.equal(crossTestImports('apps/cli/test/reads.test.ts', 'apps/cli', "import { app } from '../../api/src/app.ts';", all).length, 0);
 });
 
-test('REFUSED: a file of the kit that imports anything but node built-ins and typescript', () => {
+test('REFUSED: a file of the kit that imports anything but node built-ins, typescript and vitest', () => {
   assert.equal(kitReaches(`${KIT}/layout.ts`, "import { Effect } from 'effect';").length, 1);
   assert.equal(kitReaches(`${KIT}/layout.ts`, "import x from 'agent-orchestrator';").length, 1);
   assert.equal(kitReaches(`${KIT}/layout.ts`, "import fs from 'node:fs';\nimport ts from 'typescript';").length, 0);
@@ -181,7 +191,7 @@ test('no shipped file imports the kit, and no test imports another workspace’s
   assert.deepEqual(crossed, []);
 });
 
-test('the kit imports only node built-ins and typescript', () => {
+test('the kit imports only node built-ins, typescript and vitest', () => {
   const files = under(KIT, (f) => CODE.test(f));
   assert.ok(files.includes(`${KIT}/scratch.ts`) && files.includes(`${KIT}/test/layout.test.ts`), 'the scan reads the kit');
   assert.deepEqual(

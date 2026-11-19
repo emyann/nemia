@@ -2,7 +2,7 @@
  * The Event (`src/event.ts`): a run's, a step's, a daemon's and the store's event, and a page of them, as the Api's endpoints answer them,
  * every key kept; and the closed words it carries held — a reason, a kind, a type or a source out of its words refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Event } from 'objects';

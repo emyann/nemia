@@ -4,7 +4,7 @@
  * no folder built a 404 that names the build. On every store, marked exposed or not, a page needs no token, while the `Api`'s routes do.
  */
 import { NO_TOKEN, root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

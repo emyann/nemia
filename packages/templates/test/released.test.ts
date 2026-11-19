@@ -8,7 +8,7 @@
  *
  * Each refusal is first made on a scratch copy of the workspace, a byte changed or a version bumped, then the workspace as it is read.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

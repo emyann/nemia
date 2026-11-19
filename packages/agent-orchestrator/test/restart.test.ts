@@ -20,7 +20,7 @@
  * The store is the test's own, at `ROOT`, given as `ENV`; `WF_MAX_CONCURRENT` is read by `engine(ENV)`.
  * Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`WF_VERIFY_REST`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

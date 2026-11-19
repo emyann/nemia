@@ -9,7 +9,7 @@
  * The stub runs as a real process, so the file is a boundary test. The scratch-unit repro on a real systemd user manager is a by-hand
  * measure, written in the change's closeout and never in the suite.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -152,25 +152,20 @@ const restart = (host: ReturnType<typeof hostOf>) => runWith(engineOf(engine().l
 const conflict = (check: (message: string) => boolean) => (err: Error & { exitCode?: number; _tag?: string }) =>
   err._tag === 'Conflict' && err.exitCode === 2 && check(err.message);
 
-test('nemia service restart on a stub systemctl: the unit started once it has ended the old daemon, or a refusal that says so', async (t) => {
-  await t.test("the systemctl the live host runs is the stub, never the machine's own", () => {
+describe('nemia service restart on a stub systemctl: the unit started once it has ended the old daemon, or a refusal that says so', () => {
+  test("the systemctl the live host runs is the stub, never the machine's own", () => {
     assert.equal(execFileSync('sh', ['-c', 'command -v systemctl'], { encoding: 'utf8' }).trim(), path.join(BIN, 'systemctl'));
   });
-
-  await t.test(
-    'a daemon that lets the store go before it exits: the start waits for the unit to end it, and the new daemon ticks',
-    async () => {
-      const done = await restart(hostOf('run', 3));
-      assert.equal(done.did, 'restarted');
-      assert.equal(done.pid, NEW);
-      const log = stubLog();
-      assert.ok(!log.includes('start no-op'), log.join('\n'));
-      assert.ok(log.indexOf('start') > log.lastIndexOf(`show active ${OLD}`), log.join('\n'));
-      assert.equal(readPause(ROOT), null, "the first pass lifted the restart's pause");
-    },
-  );
-
-  await t.test('a start that leaves the unit with no process: Conflict naming the start command, never "was started"', async () => {
+  test('a daemon that lets the store go before it exits: the start waits for the unit to end it, and the new daemon ticks', async () => {
+    const done = await restart(hostOf('run', 3));
+    assert.equal(done.did, 'restarted');
+    assert.equal(done.pid, NEW);
+    const log = stubLog();
+    assert.ok(!log.includes('start no-op'), log.join('\n'));
+    assert.ok(log.indexOf('start') > log.lastIndexOf(`show active ${OLD}`), log.join('\n'));
+    assert.equal(readPause(ROOT), null, "the first pass lifted the restart's pause");
+  });
+  test('a start that leaves the unit with no process: Conflict naming the start command, never "was started"', async () => {
     await assert.rejects(
       restart(hostOf('none', 0)),
       conflict((m) => /systemctl --user start nemia\.service/.test(m) && !/was started/.test(m)),
@@ -179,8 +174,7 @@ test('nemia service restart on a stub systemctl: the unit started once it has en
     assert.match(readPause(ROOT)?.by ?? '', /nemia service restart/, "the restart's pause stands");
     resumePause(ROOT);
   });
-
-  await t.test("a start systemd refuses: Conflict carrying systemd's line and the start command", async () => {
+  test("a start systemd refuses: Conflict carrying systemd's line and the start command", async () => {
     await assert.rejects(
       restart(hostOf('fail', 0)),
       conflict((m) => /Job for nemia\.service failed\./.test(m) && /systemctl --user start nemia\.service/.test(m)),

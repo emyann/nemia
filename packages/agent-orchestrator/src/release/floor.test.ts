@@ -3,7 +3,7 @@
  * refused. The laws of `goingBackRefused` and `floorAfter` are the contract's (`contracts/store-floor.contract.ts`); this holds the parse
  * the upgrade reads a tag with, and the release's own floor as a version a tag names.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { goingBackRefused, parseVersion, STORE_READABLE_FROM, versionTag } from './floor.ts';
 

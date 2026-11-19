@@ -10,7 +10,7 @@
  * reads it, declares the budgets of the later steps by their shape. Quick's review note says both cases of its land, gated or not, and
  * the brief the orchestrator composes for it names the gate under the heading the note reads.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -648,9 +648,9 @@ const quickReviewBrief = (gates: string[]): string => {
   return composeBrief(steps[1], run, steps);
 };
 
-test("quick's review note says both cases of its land, and the run tells review which by the heading the note names", async (t) => {
+describe("quick's review note says both cases of its land, and the run tells review which by the heading the note names", () => {
   for (const name of ['set', 'plain'])
-    await t.test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}`, () => {
+    test(`rendered ${name === 'set' ? 'on GitHub' : 'in the checkout'}`, () => {
       const note = stepIn(treeOf(name), 'quick', 'review').body;
       assert.ok(note.includes(`With no \`${GATES_AFTER}\`, your pass lands the change`), 'the case with no gate: the pass lands');
       assert.ok(note.includes('With `land` named there, a person approves the land after your pass'), 'the case with land gated');
@@ -661,13 +661,13 @@ test("quick's review note says both cases of its land, and the run tells review 
       assert.ok(pages.includes('With `land` named there, it goes at the top of your sign-off'), 'and goes to the person at land');
       assert.ok(!/^\*\*A claim on a page you cannot read stops the landing\.\*\*/m.test(note), 'never stops it whatever the gates');
     });
-  await t.test('a run started with `--gate land` tells review so under that heading, naming land', () => {
+  test('a run started with `--gate land` tells review so under that heading, naming land', () => {
     const gated = quickReviewBrief(['land']);
     const section = gated.slice(gated.indexOf(GATES_AFTER));
     assert.ok(gated.includes(GATES_AFTER), 'the heading is in the gated brief');
     assert.ok(section.split('\n\n')[1]?.includes('`land`'), 'and names land');
   });
-  await t.test('a run with no gate tells review nothing of one', () => {
+  test('a run with no gate tells review nothing of one', () => {
     assert.equal(quickReviewBrief([]).includes(GATES_AFTER), false);
   });
 });

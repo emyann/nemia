@@ -12,7 +12,7 @@
  * which no task is filed.
  */
 import { config, root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -47,22 +47,22 @@ async function asked(method: string, url: string, body?: unknown) {
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
-test('A person sets where Nemia is: manual by default, a word that is no level refused, one act through the board and the CLI, a raise for a stretch, and her memory read', async (t) => {
-  const s = story(t);
-  await s.test('where Nemia is: manual, no task and no spend, where no level was ever set', async () => {
+describe('A person sets where Nemia is: manual by default, a word that is no level refused, one act through the board and the CLI, a raise for a stretch, and her memory read', () => {
+  const s = story(test);
+  s.test('where Nemia is: manual, no task and no spend, where no level was ever set', async () => {
     const read = await asked('GET', '/api/level');
     assert.equal(read.status, 200);
     assert.equal(read.body.level, 'manual');
     assert.equal(read.body.task, null);
     assert.equal(read.body.spend, null);
   });
-  await s.test('REFUSED: a word that is no level is a 400 naming the key, and nothing is written', async () => {
+  s.test('REFUSED: a word that is no level is a 400 naming the key, and nothing is written', async () => {
     const none = await asked('PUT', '/api/level', { level: 'on' });
     assert.equal(none.status, 400);
     assert.equal(none.body.field, 'payload.level');
     assert.equal(fs.existsSync(LEVEL_FILE), false, 'nothing written');
   });
-  await s.test(
+  s.test(
     "one act: the board's PUT and nemia level semi-auto each set her level while her folder is not trusted, with no command answered; the keeper's refusal answered as untrusted",
     async () => {
       const level = () => JSON.parse(fs.readFileSync(LEVEL_FILE, 'utf8')) as { level: string; since: string; task: string };
@@ -98,7 +98,7 @@ test('A person sets where Nemia is: manual by default, a word that is no level r
       assert.equal((await asked('PUT', '/api/level', { level: 'manual' })).status, 200);
     },
   );
-  await s.test(
+  s.test(
     'a factory raised for a stretch reads above its default until its end; a raise ended reads as its default; for with no factory a 422',
     async () => {
       addFactory({ name: 'mill', volumes: [fs.mkdtempSync(path.join(root, 'mill-'))].map((r) => `${r}:rw`) });
@@ -126,7 +126,7 @@ test('A person sets where Nemia is: manual by default, a word that is no level r
       });
     },
   );
-  await s.test(
+  s.test(
     "her memory: the facts she keeps by name, one fact's words, and a fact she does not keep a 404 naming those she does",
     async () => {
       fs.mkdirSync(path.join(NEMIA, 'memory'), { recursive: true });
@@ -142,7 +142,7 @@ test('A person sets where Nemia is: manual by default, a word that is no level r
       assert.match(String(none.body.error), /no fact named pending: she keeps feed-cursor/);
     },
   );
-  await s.test(
+  s.test(
     'her custom instructions: none at first, written to her file and read back, blank words a 422 writing nothing, and cleared',
     async () => {
       const file = path.join(root, 'custom-instructions', 'nemia.md');

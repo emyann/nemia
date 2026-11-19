@@ -4,7 +4,7 @@
  * place that refuses the start refuses it in its words, and nothing is written. A SIGINT to `nemia start` is not passed on to the
  * process group of the git `open` runs, which outlives it. Its store is its own at `ROOT`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -185,7 +185,7 @@ test('a SIGINT to nemia start is not passed on to the group of the git open runs
     env,
   );
   let pgid = 0;
-  t.after(() => {
+  t.onTestFinished(() => {
     start.child.kill('SIGKILL');
     if (pgid > 0) killGroup(pgid);
   });

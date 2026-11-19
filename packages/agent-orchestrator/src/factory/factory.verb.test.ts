@@ -3,7 +3,7 @@
  * store has, so the listing reads every record — through the memo a serving caller hands it, each run whose files have not moved is
  * answered from memory, and a warm read reads no finished run's record.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

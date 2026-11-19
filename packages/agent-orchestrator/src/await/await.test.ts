@@ -6,7 +6,7 @@
  * Every line here is of a run no other test names, so each test reads only its own lines. The live waits run on a runtime with a hub
  * (`feedHubLayer`) and no logger, as the api's do; the bound is steered (`steeredClock`), at its shipped four minutes.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { Cause, Effect, Exit, Fiber, Layer, Logger, ManagedRuntime, Metric } from 'effect';
 import { scratch } from 'test-kit/scratch';
@@ -34,7 +34,7 @@ const judged = (run: string, word: string, also: Readonly<Record<string, string>
 /** A runtime with a hub and no logger over the file's store, the process a waiter and the writer share: let go once `t` ends. */
 function hubbed(t: TestContext) {
   const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), StoreRoot.layer(ROOT)));
-  t.after(() => rt.dispose());
+  t.onTestFinished(() => rt.dispose());
   return rt;
 }
 
@@ -87,7 +87,7 @@ test(
     const fiber = rt.runFork(
       waitFeed({ selectors: parseSelectors(['run=never']), ms: bound.ms, beat: '1 hour' }).pipe(Effect.provide(clock.layer)),
     );
-    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
     await until(t, () => clock.asked.includes(240_000), 'the bound asked', { bell: clock.bell });
     await rt.runPromise(emitFeed(judged('bound-other', 'started')));
     await clock.adjust(239_999);
@@ -123,23 +123,28 @@ test(
   },
 );
 
-test('what a wait read holds the lines it took beside its cursor, so a bound that falls once they are taken still answers them', (t) => {
+describe('what a wait read holds the lines it took beside its cursor, so a bound that falls once they are taken still answers them', () => {
+  let selectors!: import('../runner.ts').Selectors;
+  let none!: import('./await.verb.ts').WaitRead;
+  let took!: import('./await.verb.ts').WaitRead;
+  beforeAll(() => {
+    selectors = parseSelectors(['run=chunk-1']);
+    none = readChunk({ cursor: 10, lines: [] }, [at('chunk-0', 20)], selectors);
+  });
   const line = (run: string) => ({
     kind: 'line' as const,
     line: { at: '2026-11-11T00:00:00.000Z', run, word: 'started' } as FeedLine,
     cursor: 0,
   });
   const at = (run: string, cursor: number) => ({ ...line(run), cursor });
-  const selectors = parseSelectors(['run=chunk-1']);
-  const none = readChunk({ cursor: 10, lines: [] }, [at('chunk-0', 20)], selectors);
-  t.test('a chunk with no line taken moves the cursor past it, and answers bound there', () => {
+  test('a chunk with no line taken moves the cursor past it, and answers bound there', () => {
     assert.deepEqual(answerOf(none), { ended: 'bound', lines: [], cursor: 20 });
   });
-  const took = readChunk(none, [at('chunk-0', 30), at('chunk-1', 40), at('chunk-0', 50)], selectors);
-  t.test('a chunk with a line taken answers matched with it, the cursor after the chunk', () => {
+  test('a chunk with a line taken answers matched with it, the cursor after the chunk', () => {
+    took = readChunk(none, [at('chunk-0', 30), at('chunk-1', 40), at('chunk-0', 50)], selectors);
     assert.deepEqual(answerOf(took), { ended: 'matched', lines: [{ line: at('chunk-1', 40).line, from: 30, to: 40 }], cursor: 50 });
   });
-  t.test('once lines are taken, a later chunk is not read: the cursor stays after the chunk they came in', () => {
+  test('once lines are taken, a later chunk is not read: the cursor stays after the chunk they came in', () => {
     assert.equal(readChunk(took, [at('chunk-1', 60)], selectors), took);
   });
 });

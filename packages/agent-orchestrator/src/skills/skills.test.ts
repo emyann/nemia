@@ -5,7 +5,7 @@
  * (`appliesMatch`) — a glob matches a path whole, `*` and `?` within one folder, `**` across folders — and what it costs a turn
  * (`skillTurnCost`). A skill written into the library, at the store, is the story of `test/skill-life.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,8 +40,8 @@ function refusal(fn: () => unknown): string {
   return assert.fail('it was not refused');
 }
 
-test('a SKILL.md written from a draft, and its preload switched: every other key as it was', async (t) => {
-  await t.test('a skill given only a description is written with no title, tags or examples, and preload writes its line', () => {
+describe('a SKILL.md written from a draft, and its preload switched: every other key as it was', () => {
+  test('a skill given only a description is written with no title, tags or examples, and preload writes its line', () => {
     const text = renderSkill({ name: 'bare', description: 'Does one thing.', body: 'Do it.', preload: true, title: '  ', tags: null });
     assert.equal(text, '---\nname: bare\ndescription: Does one thing.\npreload: true\n---\nDo it.\n');
     assert.deepEqual(skillDraftOf('SKILL.md', 'bare', text), {
@@ -54,49 +54,40 @@ test('a SKILL.md written from a draft, and its preload switched: every other key
       body: 'Do it.',
     });
   });
-
-  await t.test(
-    'an edit keeps every key the form does not write, line for line, and the preload the file had when the draft says none',
-    () => {
-      const was = [
-        '---',
-        'name: tidy-notes',
-        '# written by hand',
-        'allowed-tools: Read, Grep',
-        'description: old words',
-        'metadata:',
-        '  owner: me',
-        '  since: 2026',
-        'tags:',
-        '  - old',
-        'preload: true',
-        '---',
-        'Old body.',
-      ].join('\n');
-      const text = renderSkill({ ...DRAFT, preload: undefined }, was);
-      assert.deepEqual(splitFrontmatter('SKILL.md', text).block!.split('\n'), [
-        'name: tidy-notes',
-        'title: Tidy notes',
-        `description: 'Rewrites a folder of notes: "one fact a line".'`,
-        'tags: [ notes, writing ]',
-        'examples: [ tidy my notes, make these notes one fact a line ]',
-        '# written by hand',
-        'allowed-tools: Read, Grep',
-        'metadata:',
-        '  owner: me',
-        '  since: 2026',
-        'preload: true',
-        '',
-      ]);
-      assert.equal(skillDraftOf('SKILL.md', 'tidy-notes', text).preload, true);
-      assert.equal(
-        renderSkill({ ...DRAFT, preload: false }, was).includes('preload'),
-        false,
-        'a draft that says false takes the line away',
-      );
-    },
-  );
-
+  test('an edit keeps every key the form does not write, line for line, and the preload the file had when the draft says none', () => {
+    const was = [
+      '---',
+      'name: tidy-notes',
+      '# written by hand',
+      'allowed-tools: Read, Grep',
+      'description: old words',
+      'metadata:',
+      '  owner: me',
+      '  since: 2026',
+      'tags:',
+      '  - old',
+      'preload: true',
+      '---',
+      'Old body.',
+    ].join('\n');
+    const text = renderSkill({ ...DRAFT, preload: undefined }, was);
+    assert.deepEqual(splitFrontmatter('SKILL.md', text).block!.split('\n'), [
+      'name: tidy-notes',
+      'title: Tidy notes',
+      `description: 'Rewrites a folder of notes: "one fact a line".'`,
+      'tags: [ notes, writing ]',
+      'examples: [ tidy my notes, make these notes one fact a line ]',
+      '# written by hand',
+      'allowed-tools: Read, Grep',
+      'metadata:',
+      '  owner: me',
+      '  since: 2026',
+      'preload: true',
+      '',
+    ]);
+    assert.equal(skillDraftOf('SKILL.md', 'tidy-notes', text).preload, true);
+    assert.equal(renderSkill({ ...DRAFT, preload: false }, was).includes('preload'), false, 'a draft that says false takes the line away');
+  });
   for (const [what, draft, ...facts] of [
     ['no description', { ...DRAFT, description: '  ' }, '`description:`', 'REQUIRED'],
     ['empty tags', { ...DRAFT, tags: [] }, '`tags`', 'empty list'],
@@ -106,14 +97,13 @@ test('a SKILL.md written from a draft, and its preload switched: every other key
     ['a line break in a tag', { ...DRAFT, tags: ['a', 'b\nc'] }, '`tags`', 'line break'],
     ['a name that is no skill’s', { ...DRAFT, name: 'Tidy Notes' }, 'lowercase'],
   ] as const)
-    await t.test(`REFUSED: a draft the card reader would refuse, in its words: ${what}`, () => {
+    test(`REFUSED: a draft the card reader would refuse, in its words: ${what}`, () => {
       names(
         refusal(() => renderSkill(draft)),
         ...facts,
       );
     });
-
-  await t.test('withPreload changes that one key and nothing else of the file; a preload: inside another key is not the skill’s', () => {
+  test('withPreload changes that one key and nothing else of the file; a preload: inside another key is not the skill’s', () => {
     const was = '---\nname: x\ndescription: "Does x."\npreload: false\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n';
     const on = withPreload('SKILL.md', was, true);
     assert.equal(on, '---\nname: x\ndescription: "Does x."\npreload: true\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n');
@@ -129,8 +119,7 @@ test('a SKILL.md written from a draft, and its preload switched: every other key
     const nested = '---\ndescription: d\nmetadata:\n  preload: true\n---\n';
     assert.deepEqual(keysOf(withPreload('SKILL.md', nested, false)), keysOf(nested));
   });
-
-  await t.test("withPreload leaves every other key's reading equal: a quoted value, a YAML list, a comment", () => {
+  test("withPreload leaves every other key's reading equal: a quoted value, a YAML list, a comment", () => {
     const was = [
       '---',
       'name: x',
@@ -160,8 +149,8 @@ test('a SKILL.md written from a draft, and its preload switched: every other key
 const skill = (applies?: string) =>
   `---\nname: a\ndescription: Do it.\n${applies === undefined ? '' : `applies: ${applies}\n`}---\nDo it.\n`;
 
-test('a SKILL.md read beyond its card: the paths it applies to, a path matched against them, and what it costs a turn', async (t) => {
-  await t.test("a skill's paths are read as a list, one glob written alone or quoted as one, and as none where it declares none", () => {
+describe('a SKILL.md read beyond its card: the paths it applies to, a path matched against them, and what it costs a turn', () => {
+  test("a skill's paths are read as a list, one glob written alone or quoted as one, and as none where it declares none", () => {
     assert.deepEqual(appliesOf(skill('["apps/web/**", "src/**/*.verb.ts"]')), ['apps/web/**', 'src/**/*.verb.ts']);
     assert.deepEqual(appliesOf(skill('apps/web/x.ts')), ['apps/web/x.ts']);
     assert.deepEqual(appliesOf(skill('"apps/web/**"')), ['apps/web/**']);
@@ -171,8 +160,7 @@ test('a SKILL.md read beyond its card: the paths it applies to, a path matched a
     assert.deepEqual(appliesOf(skill('\n  - apps/web/**\n  - src/**')), ['apps/web/**', 'src/**'], 'a block sequence reads as its list');
     assert.deepEqual(appliesOf(skill('["apps/web/**"')), [], 'a list that does not read declares none');
   });
-
-  await t.test('a glob matches a path whole: `**` across folders or none, `*` and `?` within one, every other character as written', () => {
+  test('a glob matches a path whole: `**` across folders or none, `*` and `?` within one, every other character as written', () => {
     const web = ['apps/web/**'];
     assert.ok(appliesMatch('apps/web/src/routes/a.tsx', web));
     assert.ok(!appliesMatch('apps/website/a.tsx', web), 'a folder is matched by its whole name');
@@ -190,8 +178,7 @@ test('a SKILL.md read beyond its card: the paths it applies to, a path matched a
     assert.ok(appliesMatch('b.ts', ['a.ts', 'b.ts']), 'a path matches where one glob of the list does');
     assert.ok(!appliesMatch('b.ts', []));
   });
-
-  await t.test('a skill costs a turn its listing, and its body too when it is preloaded', () => {
+  test('a skill costs a turn its listing, and its body too when it is preloaded', () => {
     const named = skillTurnCost(
       'write-a-note',
       '---\nname: write-a-note\ndescription: "Writes a note."\n---\n# Write\n\nA body of some length.\n',

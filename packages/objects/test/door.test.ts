@@ -2,7 +2,7 @@
  * The door (`src/api.ts`): every kind in `KINDS` is served — its object Schema says `nemia/v1` and its kind, and the Api gets one of it —
  * and every kind has its `<Kind>List`, answered by a list endpoint of the Api.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as objects from 'objects';
 import { API_VERSION, Api, KINDS, RESOURCE_PLURALS } from 'objects';

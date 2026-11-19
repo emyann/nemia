@@ -6,7 +6,7 @@
  * `nemia config get-contexts`, and `--from` naming the store `--to` names. Refused by the target: an import it refuses exits with its
  * refusal's code, and the target lists no such factory. Each refusal asserts its code and the command it names, never its sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -24,10 +24,10 @@ const source = await servedStore('nemia-move-source-', (root) =>
     '---\nworkflow: press\nfactory: mill\nqueued: 2026-11-01T00:00:00.000Z\n---\n\nPolish it.\n',
   ),
 );
-after(source.stop);
+afterAll(source.stop);
 /** The target, another store, reached under the context `far`. */
 const target = await servedStore('nemia-move-target-', () => {});
-after(target.stop);
+afterAll(target.stop);
 
 /** `nemia <argv>` on `env`, waited on for its end. */
 function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {

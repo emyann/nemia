@@ -4,7 +4,7 @@
  * out; a refusal of the api's stays in its words. Which keys each answer has is `objects`' own. A factory and its parts are read as
  * objects, and made the board's view of a factory in one place (`factoryViewOf`); a hire is written to its `Hire`, by its joined name.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { cardQuery, inboxAllQuery, type InboxCardPage, type InboxEntry } from '../src/lib/api/inbox.ts';
@@ -46,10 +46,10 @@ import {
 } from './factory-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
-function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const before = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
 }
@@ -67,8 +67,8 @@ const rules: FactoryRules = {
   error: null,
 };
 
-test("get, the Factory's and the inbox's reads: each decodes what the api gives, keeps out what it leaves out, drops what the board does not read, and keeps a refusal of the api's", async (t) => {
-  await t.test('what the api leaves out stays out: an inbox entry never queued nor tried', async (t) => {
+describe("get, the Factory's and the inbox's reads: each decodes what the api gives, keeps out what it leaves out, drops what the board does not read, and keeps a refusal of the api's", () => {
+  test('what the api leaves out stays out: an inbox entry never queued nor tried', async (t) => {
     const { lastStart: _, ...untried } = cardObject().status;
     const { queued: __, ...unqueued } = cardObject().spec;
     answering(t, cardList({ ...cardObject(), spec: unqueued, status: untried }));
@@ -83,45 +83,39 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
     assert.equal(page.source, '---\nworkflow: build\n---\nDecode the reads\n', 'its file as written, off status.source');
     assert.equal(page.keys?.find((row) => row.key === 'queued')?.value, null, 'its keys made of the Card');
   });
-  await t.test(
-    'a key the board does not read is dropped, not refused: on a card, on a harness of the last pass, on a step it offers',
-    async (t) => {
-      answering(t, cardList({ ...cardObject(), colour: 'blue' } as never));
-      const [entry] = await readInbox();
-      assert.equal(Object.hasOwn(entry, 'colour'), false);
-      assert.deepEqual(entry, inboxEntry({ queued: { at: '2026-09-30T05:01:00.000Z', place: null } }), 'a started card has no place');
+  test('a key the board does not read is dropped, not refused: on a card, on a harness of the last pass, on a step it offers', async (t) => {
+    answering(t, cardList({ ...cardObject(), colour: 'blue' } as never));
+    const [entry] = await readInbox();
+    assert.equal(Object.hasOwn(entry, 'colour'), false);
+    assert.deepEqual(entry, inboxEntry({ queued: { at: '2026-09-30T05:01:00.000Z', place: null } }), 'a started card has no place');
 
-      const pass = passCost();
-      answering(t, ceilings({ pass: { ...pass, harnesses: { claude: { ...pass.harnesses.claude, colour: 'blue' } as never } } }));
-      const read = await readCeilings();
-      assert.equal(Object.hasOwn(read.pass?.harnesses.claude ?? {}, 'colour'), false);
-      assert.deepEqual(read, ceilings());
+    const pass = passCost();
+    answering(t, ceilings({ pass: { ...pass, harnesses: { claude: { ...pass.harnesses.claude, colour: 'blue' } as never } } }));
+    const read = await readCeilings();
+    assert.equal(Object.hasOwn(read.pass?.harnesses.claude ?? {}, 'colour'), false);
+    assert.deepEqual(read, ceilings());
 
-      answering(t, capabilities({ steps: [{ ...stepReach(), colour: 'blue' } as never] }));
-      const offered = await readCapabilities();
-      assert.equal(Object.hasOwn(offered.steps[0], 'colour'), false);
-      assert.deepEqual(offered, capabilities({ steps: [stepReach()] }));
-    },
-  );
-  await t.test(
-    'the capabilities are asked for the factory and the repository a place names, and nothing a page left undefined',
-    async (t) => {
-      const before = globalThis.fetch;
-      const asked: string[] = [];
-      globalThis.fetch = async (input) => {
-        asked.push(new URL(input instanceof Request ? input.url : String(input), 'http://board').search);
-        return new Response(JSON.stringify(capabilities()), { status: 200, headers: { 'content-type': 'application/json' } });
-      };
-      t.after(() => {
-        globalThis.fetch = before;
-      });
-      const place = { factory: 'mill', repo: undefined, bar: 'gauges' } as { factory?: string; repo?: string };
-      const read = capabilitiesQuery(place).queryFn as unknown as () => Promise<Capabilities>;
-      assert.deepEqual(await read(), capabilities(), 'a repository left undefined is no key the api refuses');
-      assert.deepEqual(asked, ['?factory=mill']);
-    },
-  );
-  await t.test("a card the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {
+    answering(t, capabilities({ steps: [{ ...stepReach(), colour: 'blue' } as never] }));
+    const offered = await readCapabilities();
+    assert.equal(Object.hasOwn(offered.steps[0], 'colour'), false);
+    assert.deepEqual(offered, capabilities({ steps: [stepReach()] }));
+  });
+  test('the capabilities are asked for the factory and the repository a place names, and nothing a page left undefined', async (t) => {
+    const before = globalThis.fetch;
+    const asked: string[] = [];
+    globalThis.fetch = async (input) => {
+      asked.push(new URL(input instanceof Request ? input.url : String(input), 'http://board').search);
+      return new Response(JSON.stringify(capabilities()), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    t.onTestFinished(() => {
+      globalThis.fetch = before;
+    });
+    const place = { factory: 'mill', repo: undefined, bar: 'gauges' } as { factory?: string; repo?: string };
+    const read = capabilitiesQuery(place).queryFn as unknown as () => Promise<Capabilities>;
+    assert.deepEqual(await read(), capabilities(), 'a repository left undefined is no key the api refuses');
+    assert.deepEqual(asked, ['?factory=mill']);
+  });
+  test("a card the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {
     answering(t, { error: 'no card x in the inbox' }, 404);
     const err: unknown = await readCard().then(
       () => assert.fail('a 404 was read'),
@@ -131,14 +125,14 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
     assert.equal(err.status, 404);
     assert.equal(err.message, 'no card x in the inbox');
   });
-  await t.test('the last pass reads with what it saw, and one an older tick wrote without it stays without', async (t) => {
+  test('the last pass reads with what it saw, and one an older tick wrote without it stays without', async (t) => {
     const seen = ceilings({ pass: passCost({ runs: 43, tasks: 3, queued: 1, admitted: 2 }) });
     answering(t, seen);
     assert.deepEqual(await readCeilings(), seen);
     answering(t, ceilings());
     assert.equal(Object.hasOwn((await readCeilings()).pass ?? {}, 'runs'), false);
   });
-  await t.test("a clear's answer reads with whether a file was removed, the FactoryRules' own key", async (t) => {
+  test("a clear's answer reads with whether a file was removed, the FactoryRules' own key", async (t) => {
     answering(t, { ...rules, words: null, removed: true });
     assert.deepEqual(await clearRules('mill'), { ...rules, words: null, removed: true });
   });
@@ -148,7 +142,7 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
 type Sent = { method: string; url: string; body: unknown };
 
 /** Every request answered by `answer` of its path, its JSON with a 200, for the length of the test; what each sent, in `sent`. */
-function serving(t: { after: (fn: () => void) => void }, answer: (url: string, method: string) => unknown): Sent[] {
+function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: string, method: string) => unknown): Sent[] {
   const sent: Sent[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -163,7 +157,7 @@ function serving(t: { after: (fn: () => void) => void }, answer: (url: string, m
     });
     return new Response(JSON.stringify(answer(url, method)), { status: 200, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   return sent;
@@ -210,8 +204,8 @@ const millView: Factory = {
   workflowRepos: {},
 };
 
-test("the factories are read as objects and made the pages' view: the Factory, its lines and its schedules", async (t) => {
-  await t.test('factoryViewOf: a key the object leaves out is null, a volume its line by name, a schedule its own', () => {
+describe("the factories are read as objects and made the pages' view: the Factory, its lines and its schedules", () => {
+  test('factoryViewOf: a key the object leaves out is null, a volume its line by name, a schedule its own', () => {
     assert.deepEqual(factoryViewOf(factoryObject(), factoryCommands(), [scheduleObject()]), millView);
     const old = scheduleObject();
     assert.deepEqual(
@@ -246,7 +240,7 @@ test("the factories are read as objects and made the pages' view: the Factory, i
     assert.deepEqual(view.schedules, [], 'no schedules read, none drawn');
     assert.equal(factoryViewOf(factoryObject({ metadata: { name: 'default' } }), factoryCommands('default')).default, true);
   });
-  await t.test("the query reads the list, then each factory's lines and, but for the default factory, its schedules", async (t) => {
+  test("the query reads the list, then each factory's lines and, but for the default factory, its schedules", async (t) => {
     const sent = serving(t, (url) => {
       if (url.startsWith('/api/factories?') || url === '/api/factories')
         return factoryList(factoryObject({ metadata: { name: 'default' }, spec: { workflows: undefined } }), factoryObject());
@@ -270,7 +264,7 @@ test("the factories are read as objects and made the pages' view: the Factory, i
       'no schedules asked of the default factory',
     );
   });
-  await t.test('an answer that is no FactoryList is unread, naming where', async (t) => {
+  test('an answer that is no FactoryList is unread, naming where', async (t) => {
     serving(t, () => ({ apiVersion: 'nemia/v1', kind: 'FactoryList', metadata: {}, items: [{ ...factoryObject(), kind: 'Card' }] }));
     await assert.rejects(readFactories(), (err: unknown) => err instanceof UnreadAnswer);
   });
@@ -309,8 +303,8 @@ test("a factory's servers are McpServer objects beside Nemia's builtin ones, eac
   });
 });
 
-test("a factory's writes: its rules, a hire and a fire, each at its own route, each name one segment", async (t) => {
-  await t.test("a factory's rules are written and cleared at the factory's own route, its name one segment", async (t) => {
+describe("a factory's writes: its rules, a hire and a fire, each at its own route, each name one segment", () => {
+  test("a factory's rules are written and cleared at the factory's own route, its name one segment", async (t) => {
     const sent = serving(t, () => rules);
     await factoryRulesQuery('the mill').queryFn?.({} as never);
     await writeRules('the mill', 'Never push.');
@@ -321,7 +315,7 @@ test("a factory's writes: its rules, a hire and a fire, each at its own route, e
       { method: 'DELETE', url: '/api/factories/the%20mill/rules', body: {} },
     ]);
   });
-  await t.test("a cost line is set and cleared at its workflow's route under the factory, and read back as the Factory", async (t) => {
+  test("a cost line is set and cleared at its workflow's route under the factory, and read back as the Factory", async (t) => {
     const sent = serving(t, () => factoryObject({ spec: { costLines: { build: 80 } } }));
     assert.deepEqual((await setCostLine('the mill', 'build', 80)).spec.costLines, { build: 80 });
     await clearCostLine('the mill', 'build');
@@ -330,7 +324,7 @@ test("a factory's writes: its rules, a hire and a fire, each at its own route, e
       { method: 'DELETE', url: '/api/factories/the%20mill/costlines/build', body: {} },
     ]);
   });
-  await t.test("a hire and a fire are sent to the step's Hire, named <workflow>.<step>, and read back as the Hire", async (t) => {
+  test("a hire and a fire are sent to the step's Hire, named <workflow>.<step>, and read back as the Hire", async (t) => {
     let answer: unknown = hireObject();
     const sent = serving(t, () => answer);
     assert.deepEqual(await hireAgent('mill', 'build/implement', 'implementer'), hireObject());

@@ -3,7 +3,7 @@
  * says, for a try over its budget and for a loop whose round waits on a step over its budget. The laws of the verdict itself are
  * `contracts/raise.contract.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Closeout } from '../closeout/closeout.ts';
 import { decision } from '../decide/decide.ts';
@@ -27,8 +27,8 @@ const reads = (phaseOf: (id: string) => TaskPhase, closeoutOf: (name: string) =>
   verdictOf: () => verdict,
 });
 
-test('decide names the raise the run page shows: one judgement, read by both', async (t) => {
-  await t.test('a try over its budget, signed off blocked: the answer line asks for a budget above the raise', () => {
+describe('decide names the raise the run page shows: one judgement, read by both', () => {
+  test('a try over its budget, signed off blocked: the answer line asks for a budget above the raise', () => {
     const steps: StepSpec[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
     const r = run({ implement: 't1', review: null });
     const spent = spends({ t1: 4 });
@@ -44,7 +44,7 @@ test('decide names the raise the run page shows: one judgement, read by both', a
     const line = answerLines(steps, r, d, settled, stuck, asked, spent).implement ?? '';
     assert.ok(line.includes(`its cap raised above ${raise?.said}:`), line);
   });
-  await t.test('a loop whose round waits on a step over its budget: raised by round, above what that step cost', () => {
+  test('a loop whose round waits on a step over its budget: raised by round, above what that step cost', () => {
     const steps: StepSpec[] = [
       { ...step('implement'), check: 'npm test', budget: 3 },
       { ...step('review', ['implement']), loop: 'implement', rounds: 3 },
@@ -80,7 +80,7 @@ test('decide names the raise the run page shows: one judgement, read by both', a
     const line = overBudgetLine(steps, r, d, spent) ?? '';
     assert.ok(line.includes(`review (held: its round would file implement again, which has cost ${raise?.said} `), line);
   });
-  await t.test('none on a run called off: cancelled, pruned or held', () => {
+  test('none on a run called off: cancelled, pruned or held', () => {
     const steps: StepSpec[] = [{ ...step('implement'), budget: 3 }];
     const stuck = (): Closeout => ({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'which' });
     const settled = phases({ t1: 'succeeded' });

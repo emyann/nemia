@@ -9,7 +9,7 @@
  * Over the app's own engine on the harness's store, the old records written by digest as the old release wrote them.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';

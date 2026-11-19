@@ -18,7 +18,7 @@
  */
 import { root } from '../../test/harness.ts';
 import { asListing, everyOrigin } from '../../test/definitions.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -166,10 +166,9 @@ const idOf = async (res: Response): Promise<string> => {
   return body.id;
 };
 
-test('a person tries an agent of theirs: a folder run fenced with a dollar, one at a time, tried again once it ended — its folder written again only when the agent moved — and removed on the board once ended', async (t) => {
-  const s = story(t);
-
-  await s.test('a try of an agent of yours writes its folder and starts a folder run of it, fenced, with a dollar to spend', async () => {
+describe('a person tries an agent of theirs: a folder run fenced with a dollar, one at a time, tried again once it ended — its folder written again only when the agent moved — and removed on the board once ended', () => {
+  const s = story(test);
+  s.test('a try of an agent of yours writes its folder and starts a folder run of it, fenced, with a dollar to spend', async () => {
     const res = await tryIt('scribe', { brief: '  Write the notes for a change that renames a flag.  ' });
     const body = (await res.json()) as { id: string; error?: string };
     assert.equal(res.status, 201, body.error);
@@ -215,41 +214,35 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
     assert.equal(summary.moving, true, 'a try nothing has filed yet moves: a tick files it');
     assert.deepEqual((await objectOf(app(), first)).spec.try, { agent: 'scribe' });
   });
-
-  await s.test('a try while one of the same agent still moves is refused', async () => {
+  s.test('a try while one of the same agent still moves is refused', async () => {
     assert.ok(first, 'the first checkpoint started a try');
     const error = await refused(tryIt('scribe', { brief: 'Once more.' }), 409, /still running/);
     assert.ok(error.includes(first), 'naming the try that runs');
   });
+  s.test('once the try has ended, the agent can be tried again, and its folder is written again only when the agent moves', async () => {
+    ended(first);
+    assert.equal((await listed()).find((r) => r.id === first)!.moving, false);
 
-  await s.test(
-    'once the try has ended, the agent can be tried again, and its folder is written again only when the agent moves',
-    async () => {
-      ended(first);
-      assert.equal((await listed()).find((r) => r.id === first)!.moving, false);
+    const folder = path.join(TRIES, 'scribe', 'try.md');
+    const was = fs.statSync(folder).mtimeMs;
+    const second = await idOf(await tryIt('scribe', { brief: 'Write them shorter.' }));
+    assert.equal(fs.statSync(folder).mtimeMs, was, 'the same version: the folder is left as it was');
+    ended(second);
+    assert.equal((await remove(second)).status, 200);
 
-      const folder = path.join(TRIES, 'scribe', 'try.md');
-      const was = fs.statSync(folder).mtimeMs;
-      const second = await idOf(await tryIt('scribe', { brief: 'Write them shorter.' }));
-      assert.equal(fs.statSync(folder).mtimeMs, was, 'the same version: the folder is left as it was');
-      ended(second);
-      assert.equal((await remove(second)).status, 200);
-
-      fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
-      const agent = asListing<AgentListing>(
-        (await (await app().request(`/api/namespaces/default/agents/scribe?origin=user&${ON_REPO}`)).json()) as never,
-      );
-      const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
-      assert.ok(
-        fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`),
-        "the agent edited, its version moves: the next try's folder is written again at the version the agent is at",
-      );
-      ended(third);
-      assert.equal((await remove(third)).status, 200);
-    },
-  );
-
-  await s.test('a try still in flight is not removed: the package says to cancel it first', async () => {
+    fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
+    const agent = asListing<AgentListing>(
+      (await (await app().request(`/api/namespaces/default/agents/scribe?origin=user&${ON_REPO}`)).json()) as never,
+    );
+    const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
+    assert.ok(
+      fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`),
+      "the agent edited, its version moves: the next try's folder is written again at the version the agent is at",
+    );
+    ended(third);
+    assert.equal((await remove(third)).status, 200);
+  });
+  s.test('a try still in flight is not removed: the package says to cancel it first', async () => {
     const id = await idOf(await tryIt('scribe', { brief: 'Still going.' }));
     const res = await remove(id);
     const body = (await res.json()) as { error: string };
@@ -259,8 +252,7 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
     ended(id);
     assert.equal((await remove(id)).status, 200);
   });
-
-  await s.test('the board removes a try: its record and the folders it worked in', async () => {
+  s.test('the board removes a try: its record and the folders it worked in', async () => {
     const workspace = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8')).workspace;
     assert.ok(fs.existsSync(workspace));
     const res = await remove(first);
@@ -283,65 +275,54 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
 const SERVERS_UNTRIED =
   "browsing names MCP servers (`mcp: playwright`), which a session loads from its checkout's `.mcp.json`, and a try runs with no repository, in a folder of its own, which has none. Delete the line to try it, and name the server on the step that needs it: a step's own `mcp:` adds to its agent's.";
 
-test('what a try refuses, and what it is fenced to: the default factory, rules outside its folder, a run that is no try, a repository agent, an agent the fence does not reach, MCP servers, a brief, a name, a place, a folder that is a link — and the listing says why in the same words', async (t) => {
-  await t.test(
-    'a try is the one start made in the default factory: as shipped, with WF_DEFAULT_FACTORY_STARTS unset, it starts and records no factory',
-    async (t) => {
-      const was = process.env.WF_DEFAULT_FACTORY_STARTS;
-      delete process.env.WF_DEFAULT_FACTORY_STARTS;
-      t.after(() => {
-        if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
-      });
-      fs.writeFileSync(path.join(YOURS, 'shipped.md'), '---\nmodel: sonnet\n---\nSay what you see.\n');
-      const id = await idOf(await tryIt('shipped', { brief: 'Say what is in the folder.' }));
-      const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8'));
-      assert.deepEqual([run.factory, run.repo, run.place], [undefined, undefined, { kind: 'folder' }]);
-    },
-  );
-
-  await t.test(
-    "REFUSED: a try never runs with its agent's rules outside its folder — an agent whose mode asks first keeps only those inside it",
-    async () => {
-      for (const [name, mode, rules] of [
-        ['careful', 'dontAsk', ['Edit(notes/**)']],
-        ['planner', 'plan', ['Read(docs/**)']],
-      ] as const) {
-        const id = await idOf(await tryIt(name, { brief: 'Write the notes.' }));
-        const lines = fs.readFileSync(path.join(TRIES, name, 'try.md'), 'utf8').split('\n');
-        assert.ok(
-          lines.includes(`    permissionMode: ${mode}`) && lines.includes('claude:'),
-          `${name}: dontAsk, or its own mode where narrower: ${lines.join('\n')}`,
-        );
-        assert.ok(
-          lines.includes(`    allowedTools: ${rules.join(', ')}`),
-          `${name}: its rules inside the folder alone: ${lines.join('\n')}`,
-        );
-        const step = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8')).workflow[0];
-        assert.equal(step.permissionMode, mode);
-        assert.deepEqual(step.allowedTools, rules, "the try's list replaces the agent's");
-        ended(id);
-        assert.equal((await remove(id)).status, 200);
-      }
-      const why = await refused(
-        tryIt('outward', { brief: 'Reach out.' }),
-        422,
-        /allows `Bash, Edit\(\/home\/\*\*\)` in a mode that asks first/,
+describe('what a try refuses, and what it is fenced to: the default factory, rules outside its folder, a run that is no try, a repository agent, an agent the fence does not reach, MCP servers, a brief, a name, a place, a folder that is a link — and the listing says why in the same words', () => {
+  test('a try is the one start made in the default factory: as shipped, with WF_DEFAULT_FACTORY_STARTS unset, it starts and records no factory', async (t) => {
+    const was = process.env.WF_DEFAULT_FACTORY_STARTS;
+    delete process.env.WF_DEFAULT_FACTORY_STARTS;
+    t.onTestFinished(() => {
+      if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
+    });
+    fs.writeFileSync(path.join(YOURS, 'shipped.md'), '---\nmodel: sonnet\n---\nSay what you see.\n');
+    const id = await idOf(await tryIt('shipped', { brief: 'Say what is in the folder.' }));
+    const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8'));
+    assert.deepEqual([run.factory, run.repo, run.place], [undefined, undefined, { kind: 'folder' }]);
+  });
+  test("REFUSED: a try never runs with its agent's rules outside its folder — an agent whose mode asks first keeps only those inside it", async () => {
+    for (const [name, mode, rules] of [
+      ['careful', 'dontAsk', ['Edit(notes/**)']],
+      ['planner', 'plan', ['Read(docs/**)']],
+    ] as const) {
+      const id = await idOf(await tryIt(name, { brief: 'Write the notes.' }));
+      const lines = fs.readFileSync(path.join(TRIES, name, 'try.md'), 'utf8').split('\n');
+      assert.ok(
+        lines.includes(`    permissionMode: ${mode}`) && lines.includes('claude:'),
+        `${name}: dontAsk, or its own mode where narrower: ${lines.join('\n')}`,
       );
-      assert.match(why, /none of those rules is inside the folder/);
-      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
-      assert.equal(agents.find((agent) => agent.name === 'outward')!.untried!.why, why, 'the listing says what the try refuses with');
-      assert.equal(agents.find((agent) => agent.name === 'careful')!.untried, null);
-      const keys = { permissionMode: 'default', allowedTools: 'Bash, Edit(/home/**)' };
-      assert.throws(
-        () => tryFolder('outward', 'v1', keys, root),
-        (err: Error) => err.message === why,
-        'the folder is refused by its writer too, not only by the route',
-      );
-      assert.ok(!fs.existsSync(path.join(TRIES, 'outward')), 'and nothing is written');
-    },
-  );
-
-  await t.test('a run that is no try says so', async () => {
+      assert.ok(lines.includes(`    allowedTools: ${rules.join(', ')}`), `${name}: its rules inside the folder alone: ${lines.join('\n')}`);
+      const step = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8')).workflow[0];
+      assert.equal(step.permissionMode, mode);
+      assert.deepEqual(step.allowedTools, rules, "the try's list replaces the agent's");
+      ended(id);
+      assert.equal((await remove(id)).status, 200);
+    }
+    const why = await refused(
+      tryIt('outward', { brief: 'Reach out.' }),
+      422,
+      /allows `Bash, Edit\(\/home\/\*\*\)` in a mode that asks first/,
+    );
+    assert.match(why, /none of those rules is inside the folder/);
+    const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
+    assert.equal(agents.find((agent) => agent.name === 'outward')!.untried!.why, why, 'the listing says what the try refuses with');
+    assert.equal(agents.find((agent) => agent.name === 'careful')!.untried, null);
+    const keys = { permissionMode: 'default', allowedTools: 'Bash, Edit(/home/**)' };
+    assert.throws(
+      () => tryFolder('outward', 'v1', keys, root),
+      (err: Error) => err.message === why,
+      'the folder is refused by its writer too, not only by the route',
+    );
+    assert.ok(!fs.existsSync(path.join(TRIES, 'outward')), 'and nothing is written');
+  });
+  test('a run that is no try says so', async () => {
     const run = await runWith(engine(), startRun({ brief: 'Write a note.', repo: '', workflowDir: other }));
     try {
       assert.equal((await listed()).find((r) => r.id === run.id)!.try, null);
@@ -357,79 +338,60 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       fs.rmSync(path.join(RUNS, run.id), { recursive: true, force: true });
     }
   });
-
-  await t.test('a repository agent is no agent of the library, which a try runs from: a 404 naming the library', async () => {
+  test('a repository agent is no agent of the library, which a try runs from: a 404 naming the library', async () => {
     await refused(tryIt('critic', { brief: 'Criticise it.' }), 404, /library/);
   });
-
-  await t.test(
-    "an agent a try's fence does not reach is refused before anything is written: codex, a remote agent, and one bridged to claude.ai",
-    async () => {
-      assert.equal(fs.existsSync(path.join(TRIES, 'coder')), false);
-      const codex = await refused(
-        tryIt('coder', { brief: 'Code it.' }),
-        422,
-        /runs on `codex`, and a try is fenced by Claude Code's permission mode/,
-      );
-      assert.match(codex, /Only an agent on Claude Code is tried here/);
-      await refused(tryIt('faraway', { brief: 'Do it there.' }), 422, /is a remote agent \(`harness: a2a:faraway`\)/);
-      await refused(tryIt('bridged', { brief: 'Do it.' }), 422, /says `remote: true`/);
-      for (const name of ['coder', 'faraway', 'bridged'])
-        assert.equal(fs.existsSync(path.join(TRIES, name)), false, `no try folder for ${name}`);
-    },
-  );
-
-  await t.test(
-    'an agent that names MCP servers is refused a try before anything is written, and its listing says the same words',
-    async () => {
-      const res = await tryIt('browsing', { brief: 'Look.' });
-      assert.equal(res.status, 422, await res.clone().text());
-      assert.equal(((await res.json()) as { error: string }).error, SERVERS_UNTRIED);
-      assert.equal(fs.existsSync(path.join(TRIES, 'browsing')), false, 'no try folder for it');
-      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
-      assert.deepEqual(agents.find((agent) => agent.from === 'user' && agent.name === 'browsing')?.untried, {
-        why: SERVERS_UNTRIED,
-        copy: null,
-      });
-    },
-  );
-
-  await t.test(
-    "an agent whose `overridable:` line leaves out `fence` is refused a try before anything is written, in the try's words, and its listing says the same; offered, it is tried",
-    async () => {
-      fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, skills\nmodel: sonnet\n---\nSay what you see.\n');
-      const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: model, skills`/);
-      assert.ok(why.includes('`fence`') && why.includes('try'), why);
-      assert.equal(fs.existsSync(path.join(TRIES, 'closed')), false, 'no try folder for it');
-      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
-      assert.equal(agents.find((agent) => agent.from === 'user' && agent.name === 'closed')?.untried?.why, why);
-      fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, fence\nmodel: sonnet\n---\nSay what you see.\n');
-      const id = await idOf(await tryIt('closed', { brief: 'Look.' }));
-      ended(id);
-      assert.equal((await remove(id)).status, 200);
-    },
-  );
-
-  await t.test('an empty brief is refused, and a brief that is no string', async () => {
+  test("an agent a try's fence does not reach is refused before anything is written: codex, a remote agent, and one bridged to claude.ai", async () => {
+    assert.equal(fs.existsSync(path.join(TRIES, 'coder')), false);
+    const codex = await refused(
+      tryIt('coder', { brief: 'Code it.' }),
+      422,
+      /runs on `codex`, and a try is fenced by Claude Code's permission mode/,
+    );
+    assert.match(codex, /Only an agent on Claude Code is tried here/);
+    await refused(tryIt('faraway', { brief: 'Do it there.' }), 422, /is a remote agent \(`harness: a2a:faraway`\)/);
+    await refused(tryIt('bridged', { brief: 'Do it.' }), 422, /says `remote: true`/);
+    for (const name of ['coder', 'faraway', 'bridged'])
+      assert.equal(fs.existsSync(path.join(TRIES, name)), false, `no try folder for ${name}`);
+  });
+  test('an agent that names MCP servers is refused a try before anything is written, and its listing says the same words', async () => {
+    const res = await tryIt('browsing', { brief: 'Look.' });
+    assert.equal(res.status, 422, await res.clone().text());
+    assert.equal(((await res.json()) as { error: string }).error, SERVERS_UNTRIED);
+    assert.equal(fs.existsSync(path.join(TRIES, 'browsing')), false, 'no try folder for it');
+    const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
+    assert.deepEqual(agents.find((agent) => agent.from === 'user' && agent.name === 'browsing')?.untried, {
+      why: SERVERS_UNTRIED,
+      copy: null,
+    });
+  });
+  test("an agent whose `overridable:` line leaves out `fence` is refused a try before anything is written, in the try's words, and its listing says the same; offered, it is tried", async () => {
+    fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, skills\nmodel: sonnet\n---\nSay what you see.\n');
+    const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: model, skills`/);
+    assert.ok(why.includes('`fence`') && why.includes('try'), why);
+    assert.equal(fs.existsSync(path.join(TRIES, 'closed')), false, 'no try folder for it');
+    const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
+    assert.equal(agents.find((agent) => agent.from === 'user' && agent.name === 'closed')?.untried?.why, why);
+    fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, fence\nmodel: sonnet\n---\nSay what you see.\n');
+    const id = await idOf(await tryIt('closed', { brief: 'Look.' }));
+    ended(id);
+    assert.equal((await remove(id)).status, 200);
+  });
+  test('an empty brief is refused, and a brief that is no string', async () => {
     await refused(tryIt('scribe', { brief: '   ' }), 422, /^The brief is empty, and a try asks the agent to do something\./);
     await refused(tryIt('scribe', { brief: '' }), 422, /^The brief is empty, and a try asks the agent to do something\./);
     for (const body of [{}, 'not json', { brief: ['Do it.'] }, ['Do it.']])
       await refused(tryIt('scribe', body), 400, /^POST \/api\/agents\/scribe\/try does not read as its route takes it/);
   });
-
-  await t.test(
-    'an agent not there, one named as a try folder cannot be, and one giving a skill only the repository has, are refused',
-    async () => {
-      await refused(tryIt('nobody', { brief: 'Do it.' }), 404, /Nothing is at that name/);
-      await refused(tryIt('agents', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
-      await refused(tryIt('skills', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
-      const error = await refused(tryIt('borrower', { brief: 'Borrow it.' }), 422, /only the repository has/);
-      assert.ok(error.includes(path.join(repo, '.claude', 'skills', 'theirs')), 'naming where the skill is');
-      assert.ok(error.includes(path.join(root, 'workflows', 'skills')), 'and the library to copy it into');
-    },
-  );
-
-  await t.test("a try's folder that is a link is refused, never written through", async () => {
+  test('an agent not there, one named as a try folder cannot be, and one giving a skill only the repository has, are refused', async () => {
+    await refused(tryIt('nobody', { brief: 'Do it.' }), 404, /Nothing is at that name/);
+    await refused(tryIt('agents', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
+    await refused(tryIt('skills', { brief: 'Do it.' }), 422, /cannot be tried: its try's folder/);
+    const error = await refused(tryIt('borrower', { brief: 'Borrow it.' }), 422, /only the repository has/);
+    assert.ok(error.includes(path.join(repo, '.claude', 'skills', 'theirs')), 'naming where the skill is');
+    assert.ok(error.includes(path.join(root, 'workflows', 'skills')), 'and the library to copy it into');
+  });
+  test("a try's folder that is a link is refused, never written through", async () => {
     const away = scratch('nemia-api-try-away-');
     fs.renameSync(path.join(TRIES, 'scribe'), path.join(TRIES, 'scribe.kept'));
     fs.symlinkSync(away, path.join(TRIES, 'scribe'));
@@ -441,23 +403,19 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       fs.renameSync(path.join(TRIES, 'scribe.kept'), path.join(TRIES, 'scribe'));
     }
   });
-
-  await t.test(
-    'the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent',
-    async () => {
-      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
-      const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
-      assert.equal(of('user', 'scribe').untried, null, 'nothing refuses a try of scribe');
-      assert.match(of('user', 'coder').untried!.why, /runs on `codex`/);
-      assert.equal(of('user', 'coder').untried!.copy, null);
-      assert.match(of('user', 'faraway').untried!.why, /remote agent/);
-      assert.match(of('user', 'bridged').untried!.why, /remote: true/);
-      assert.match(of('user', 'agents').untried!.why, /cannot be tried: its try's folder/);
-      assert.ok(of('repo', 'grader').untried!.copy!.includes('grader.schema.json'), JSON.stringify(of('repo', 'grader')));
-      assert.equal(
-        of('repo', 'critic').untried!.copy,
-        `mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`,
-      );
-    },
-  );
+  test('the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent', async () => {
+    const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
+    const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
+    assert.equal(of('user', 'scribe').untried, null, 'nothing refuses a try of scribe');
+    assert.match(of('user', 'coder').untried!.why, /runs on `codex`/);
+    assert.equal(of('user', 'coder').untried!.copy, null);
+    assert.match(of('user', 'faraway').untried!.why, /remote agent/);
+    assert.match(of('user', 'bridged').untried!.why, /remote: true/);
+    assert.match(of('user', 'agents').untried!.why, /cannot be tried: its try's folder/);
+    assert.ok(of('repo', 'grader').untried!.copy!.includes('grader.schema.json'), JSON.stringify(of('repo', 'grader')));
+    assert.equal(
+      of('repo', 'critic').untried!.copy,
+      `mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`,
+    );
+  });
 });

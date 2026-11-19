@@ -2,7 +2,7 @@
  * `assess` is the whole controller, and it is pure: hand it the engine's view of each task and it
  * decides. No disk, no engine, no clock.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {} from '../src/run.ts';
 import {

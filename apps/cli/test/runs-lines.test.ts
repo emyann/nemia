@@ -4,7 +4,7 @@
  * read off a file, an `--input` sent as text or bytes; and the lines each verb prints of what the api answered. A refusal asserts its
  * exit code and what it names, never its sentence.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

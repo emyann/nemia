@@ -10,7 +10,7 @@
  * Nothing here files a run, and nothing here touches the operator's store: what it writes is under its
  * own scratch folder, `ROOT`.
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -503,12 +503,12 @@ test('a link inside a package is copied as written and never followed: one out o
   assert.deepEqual(fs.readdirSync(outside), ['secret.txt'], 'nothing was made where it leads');
 });
 
-test("where a hardlink cannot be made — another filesystem — main's packages are linked, and the answer says why; any other failure is a failure", async (t) => {
+test("where a hardlink cannot be made — another filesystem — main's packages are linked, and the answer says why; any other failure is a failure", async () => {
   const exdev = () => {
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   };
   const { main, wt } = aCheckout();
-  const linking = t.mock.method(fs, 'linkSync', exdev);
+  const linking = vi.spyOn(fs, 'linkSync').mockImplementation(exdev);
   const got = await provisionDeps(main, wt);
   assert.equal(got.tree, 'linked');
   assert.ok(got.tree === 'linked' && (got.why ?? '').startsWith('EXDEV: cross-device link not permitted'), JSON.stringify(got));
@@ -527,10 +527,10 @@ test("where a hardlink cannot be made — another filesystem — main's packages
     { tree: 'linked', made: 0, why: 'an earlier pass linked them' },
     'a second call still says so',
   );
-  linking.mock.restore();
+  linking.mockRestore();
 
   const other = aCheckout();
-  t.mock.method(fs, 'linkSync', () => {
+  vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error('EACCES: permission denied, link'), { code: 'EACCES', syscall: 'link' });
   });
   const failed = await provisionDeps(other.main, other.wt);
@@ -712,7 +712,7 @@ const lockfileGainsY = (wt: string) => {
   npmLockfile(wt);
 };
 
-test("a worktree's own tree read against its lockfile: current as cut, as npm installed it and as linked; parted once the lockfile moves", async (t) => {
+test("a worktree's own tree read against its lockfile: current as cut, as npm installed it and as linked; parted once the lockfile moves", async () => {
   const { wt } = await aRunWorktree();
   assert.equal(worktreeParts(wt), null, 'a tree hardlinked at the cut has what its lockfile names');
   lockfileGainsY(wt);
@@ -724,7 +724,7 @@ test("a worktree's own tree read against its lockfile: current as cut, as npm in
   const lock = JSON.parse(fs.readFileSync(lockfile, 'utf8'));
   lock.packages['node_modules/third'] = { version: '2.0.0' };
   fs.writeFileSync(lockfile, JSON.stringify(lock));
-  t.mock.method(fs, 'linkSync', () => {
+  vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error('EXDEV: cross-device link not permitted'), { code: 'EXDEV', syscall: 'link' });
   });
   assert.equal((await provisionDeps(linked.main, linked.wt)).tree, 'linked');

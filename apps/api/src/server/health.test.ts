@@ -3,7 +3,7 @@
  * against; and none for a checkout, or for an app given no release.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Layer } from 'effect';
 import type { Running } from 'agent-orchestrator';

@@ -5,7 +5,7 @@
  * factory is filed with the package's own verb. Every add is read back from the factory's record of its adds.
  */
 import { root } from '../../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,9 +36,9 @@ async function answered<T>(res: Response | Promise<Response>, status = 200): Pro
 
 const tidy = { title: 'Tidy notes', description: 'Rewrites notes.', tags: ['notes'], examples: ['tidy my notes'], body: 'Tidy.' };
 
-test('a person adds a skill of the library to a factory: listed with it, served in its namespace, its removal refused naming it, missing once the library loses it, and the add taken off, no longer served there', async (t) => {
-  const s = story(t);
-  await s.test('a skill is made at the library, in no namespace, with no factory adding it', async () => {
+describe('a person adds a skill of the library to a factory: listed with it, served in its namespace, its removal refused naming it, missing once the library loses it, and the add taken off, no longer served there', () => {
+  const s = story(test);
+  s.test('a skill is made at the library, in no namespace, with no factory adding it', async () => {
     const made = await answered<Skill>(send('POST', '/api/skills', { metadata: { name: 'tidy' }, spec: tidy }), 201);
     assert.deepEqual([made.metadata.namespace, made.status.origin], [undefined, 'user']);
     const listed = await answered<SkillList>(app.request('/api/skills'));
@@ -48,7 +48,7 @@ test('a person adds a skill of the library to a factory: listed with it, served 
       'the library lists the user library and the builtins alone',
     );
   });
-  await s.test('added to the factory, the add is recorded and resolved, and the library says the factory adds it', async () => {
+  s.test('added to the factory, the add is recorded and resolved, and the library says the factory adds it', async () => {
     const add = await answered<LibraryAdd>(send('PUT', `${ADDS}/Skill.tidy`));
     assert.deepEqual([add.spec, add.status.state, add.status.recorded], [{ kind: 'Skill', name: 'tidy' }, 'resolved', true]);
     assert.ok(fs.existsSync(RECORD), 'the adds are recorded in the factory own file');
@@ -62,7 +62,7 @@ test('a person adds a skill of the library to a factory: listed with it, served 
       'the factory serves what it added',
     );
   });
-  await s.test('REFUSED: the removal of a skill a factory adds is a 409 naming each factory, and the skill is kept', async () => {
+  s.test('REFUSED: the removal of a skill a factory adds is a 409 naming each factory, and the skill is kept', async () => {
     const skill = await answered<Skill>(app.request('/api/skills/tidy'));
     const res = await app.request(`/api/skills/tidy?resourceVersion=${skill.metadata.resourceVersion}`, {
       method: 'DELETE',
@@ -72,12 +72,12 @@ test('a person adds a skill of the library to a factory: listed with it, served 
     assert.deepEqual(((await res.json()) as { users?: string[] }).users, ['shop']);
     assert.ok(fs.existsSync(path.join(root, 'workflows', 'skills', 'tidy', 'SKILL.md')));
   });
-  await s.test("REFUSED: a skill made in a factory's namespace is a 422 naming the factory's way, a proposal", async () => {
+  s.test("REFUSED: a skill made in a factory's namespace is a 422 naming the factory's way, a proposal", async () => {
     const res = await send('POST', '/api/namespaces/shop/skills', { metadata: { name: 'other' }, spec: tidy });
     assert.equal(res.status, 422);
     assert.equal(((await res.json()) as { way?: string }).way, 'factory');
   });
-  await s.test('the skill gone from the library by hand, its add shows missing, with the fix', async () => {
+  s.test('the skill gone from the library by hand, its add shows missing, with the fix', async () => {
     const kept = path.join(scratch('nemia-api-adds-kept-'), 'tidy');
     fs.renameSync(path.join(root, 'workflows', 'skills', 'tidy'), kept);
     const add = await answered<LibraryAdd>(app.request(`${ADDS}/Skill.tidy`));
@@ -85,7 +85,7 @@ test('a person adds a skill of the library to a factory: listed with it, served 
     assert.ok(add.status.message, 'a missing add says what to do');
     fs.renameSync(kept, path.join(root, 'workflows', 'skills', 'tidy'));
   });
-  await s.test('the add taken off, the skill is removed from the library', async () => {
+  s.test('the add taken off, the skill is removed from the library', async () => {
     await answered<LibraryAdd>(send('DELETE', `${ADDS}/Skill.tidy`));
     assert.equal((await app.request(`${ADDS}/Skill.tidy`)).status, 404, 'no add of that name now');
     const served = await answered<SkillList>(app.request('/api/namespaces/shop/skills'));

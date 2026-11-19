@@ -8,7 +8,7 @@
  * - A start refused is recorded on the run file (`startRefused`), by its line and field; what a look makes of it — the session
  *   unread while its process runs, failed once it has ended — is the decode-unread story's (`test/unread-session.test.ts`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -134,10 +134,10 @@ const ROWS: Row[] = [
   },
 ];
 
-test(
+describe(
   'the start event: the session id the worker reads off whole stdout lines, the first start alone, and a start refused by its line and field',
   WAITED,
-  async (t) => {
-    for (const row of ROWS) await t.test(row.name, (c) => row.holds(c));
+  () => {
+    for (const row of ROWS) test(row.name, (c) => row.holds(c));
   },
 );

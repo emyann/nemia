@@ -8,7 +8,7 @@
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

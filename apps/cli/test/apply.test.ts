@@ -3,7 +3,7 @@
  * written whole with a new `spec.from`; and the refusals, each exit 2 naming the command to type: a missing Card (`nemia inbox add`), a
  * changed Run, which the api writes no way (`nemia explain`), and an `apiVersion` other than `nemia/v1`.
  */
-import { test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,7 +25,7 @@ const store = await servedStore('nemia-cli-apply-', (root) => {
     }),
   );
 });
-test.after(() => store.stop());
+afterAll(() => store.stop());
 
 /** A Workflow of one step working in folders, whose step's note is `body`. */
 const workflow = (body: string) =>

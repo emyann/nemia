@@ -5,7 +5,7 @@
  * a run: the two gh checks are met, whatever the machine has. Either way a run needs the Chromium the steps' browser tools open
  * (`browser`), checked and fixed in the factory's repository (`scope: repository`) by the carried `needs.ts`, whose fix the server runs.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

@@ -9,7 +9,7 @@
  *
  * Each refusal asserts its exit code and the command or file it names, never its sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -27,7 +27,7 @@ const DRAFTS = scratch('nemia-writers-drafts-');
 
 /** The store the writes land in, served before any test begins: a root made while a test runs is reaped when it ends. */
 const store = await servedStore('nemia-writers-', () => {});
-after(store.stop);
+afterAll(store.stop);
 
 /** `nemia <argv>` on `env`, waited on for its end. */
 function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
@@ -174,7 +174,7 @@ const standIn = http.createServer((req, res) => {
   });
 });
 await new Promise<void>((resolve) => standIn.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   standIn.closeAllConnections();
   standIn.close();
 });
@@ -244,7 +244,7 @@ test('a draft folder written, then written again at its --version, leaving a fil
 
 test('under a remote context pointed at the served store, the same write lands there, nothing read or made on this machine', async () => {
   const exposed = await servedStore('nemia-writers-remote-', () => {}, { WF_EXPOSED: '1' });
-  after(exposed.stop);
+  afterAll(exposed.stop);
   const minted = await nemia(['token', 'add', 'laptop'], exposed.env);
   assert.equal(minted.code, 0, minted.err);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);

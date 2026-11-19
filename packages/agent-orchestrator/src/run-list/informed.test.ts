@@ -8,7 +8,7 @@
  * On a store of its own at `ROOT`, given as `ENV`, with `WF_VERIFY_REST=1`, as every test that ticks a store, and a read that counts
  * what it served turns it off for itself (`unverified`).
  */
-import { beforeEach, test } from 'node:test';
+import { beforeEach, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -228,9 +228,9 @@ const ROWS: Row[] = [
   { name: 'the workflow folder losing its step file', make: () => resting(), plant: (run) => fs.rmSync(path.join(run.dir, 'work.md')) },
 ];
 
-test('each input that changes a run object, planted, is served fresh', async (t) => {
+describe('each input that changes a run object, planted, is served fresh', () => {
   for (const { name, make, plant, pass } of ROWS)
-    await t.test(name, async () => {
+    test(name, async () => {
       fs.rmSync(RUNS_DIR, { recursive: true, force: true });
       fs.mkdirSync(RUNS_DIR, { recursive: true });
       const run = await make();

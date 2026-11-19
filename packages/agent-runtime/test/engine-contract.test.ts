@@ -4,7 +4,7 @@
  * that lies about one verb fails a walk of that verb, for every kept verb; a verb with no walk is named; each verb it does not keep
  * dies naming itself; each difference `APART` declares is what it answers; and two stand-ins share nothing.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Cause, Effect, Exit } from 'effect';
 import { testEngine } from '../src/testing.ts';

@@ -3,7 +3,7 @@
  * for and where its row opens. Which runs wait is the api's to say (`bellRows` filters none): the rows
  * are read here over the board's own rule (`waitsOnYou`), which the pages still on the whole list keep.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { RunView } from '../src/lib/api/judged.ts';
 import { listedStep, summary } from './run-fixtures.ts';
@@ -52,8 +52,8 @@ const waitOn = (onYou: boolean): RunView['waiting'] => ({
   waitingOnYou: onYou,
 });
 
-test("bellRows, bellHash: the waiting bar's rows, their order, what each waits for and where it opens", async (t) => {
-  await t.test('REFUSED: a run held until a run that may still land waits on nobody, and is not on the bell', () => {
+describe("bellRows, bellHash: the waiting bar's rows, their order, what each waits for and where it opens", () => {
+  test('REFUSED: a run held until a run that may still land waits on nobody, and is not on the bell', () => {
     const held = run('held', { holdUntil: ['p'], holding: holdOn(false) });
     assert.equal(bellRuns([held]).length, 0);
     const lifted = run('stuck', { holdUntil: ['p'], holding: holdOn(true) });
@@ -63,11 +63,11 @@ test("bellRows, bellHash: the waiting bar's rows, their order, what each waits f
       'a hold only a person lifts is',
     );
   });
-  await t.test('REFUSED: a cancelled run waits on nobody, whatever its steps last said', () => {
+  test('REFUSED: a cancelled run waits on nobody, whatever its steps last said', () => {
     assert.equal(bellRuns([atGate('gone', { cancelledAt: '2026-10-02T00:00:00.000Z' })]).length, 0);
     assert.equal(bellRuns([atGate('here')]).length, 1, 'the same run not cancelled is on the bell');
   });
-  await t.test('REFUSED: a finished run whose branch nobody merged is the floor’s to decide, not the bell’s', () => {
+  test('REFUSED: a finished run whose branch nobody merged is the floor’s to decide, not the bell’s', () => {
     const unmerged = run('done', {
       status: 'succeeded',
       moving: false,
@@ -75,35 +75,29 @@ test("bellRows, bellHash: the waiting bar's rows, their order, what each waits f
     });
     assert.equal(bellRuns([unmerged]).length, 0);
   });
-  await t.test(
-    'a run waiting on a run that never lands without a person is on the bell, with its word; one that may still land is not',
-    () => {
-      const never = run('never', { after: ['p'], waiting: waitOn(true), moving: false });
-      const may = run('may', { after: ['p'], waiting: waitOn(false) });
-      assert.deepEqual(
-        bellRuns([never, may]).map((row) => [row.run, row.waitsFor]),
-        [['never', ['waiting on p (cancelled)']]],
-      );
-    },
-  );
-  await t.test("REFUSED: a row's gate is the step that waits at its gate, wherever it stands, and its hash is that step's section", () => {
+  test('a run waiting on a run that never lands without a person is on the bell, with its word; one that may still land is not', () => {
+    const never = run('never', { after: ['p'], waiting: waitOn(true), moving: false });
+    const may = run('may', { after: ['p'], waiting: waitOn(false) });
+    assert.deepEqual(
+      bellRuns([never, may]).map((row) => [row.run, row.waitsFor]),
+      [['never', ['waiting on p (cancelled)']]],
+    );
+  });
+  test("REFUSED: a row's gate is the step that waits at its gate, wherever it stands, and its hash is that step's section", () => {
     const [row] = bellRuns([atGate('r-g')]);
     assert.equal(row.gate, 'build');
     assert.equal(bellHash(row), 'step-build');
     assert.deepEqual(row.waitsFor, ['approve build']);
     assert.equal(row.title, "r-g's brief");
   });
-  await t.test(
-    'a run that asks and is at no gate opens its page at its top, and says each step by name where the api gives no words',
-    () => {
-      const asks = run('asks', { status: 'failed', moving: false, waitingOnYou: ['plan'] });
-      const [row] = bellRuns([asks]);
-      assert.equal(row.gate, null);
-      assert.equal(bellHash(row), undefined);
-      assert.deepEqual(row.waitsFor, ['plan']);
-    },
-  );
-  await t.test('REFUSED: the bell lists its runs oldest first, whatever order the api answers', () => {
+  test('a run that asks and is at no gate opens its page at its top, and says each step by name where the api gives no words', () => {
+    const asks = run('asks', { status: 'failed', moving: false, waitingOnYou: ['plan'] });
+    const [row] = bellRuns([asks]);
+    assert.equal(row.gate, null);
+    assert.equal(bellHash(row), undefined);
+    assert.deepEqual(row.waitsFor, ['plan']);
+  });
+  test('REFUSED: the bell lists its runs oldest first, whatever order the api answers', () => {
     const newer = atGate('b-new', { createdAt: '2026-10-03T00:00:00.000Z' });
     const older = atGate('a-old', { createdAt: '2026-10-01T00:00:00.000Z' });
     const middle = atGate('c-mid', { createdAt: '2026-10-02T00:00:00.000Z' });
@@ -112,18 +106,15 @@ test("bellRows, bellHash: the waiting bar's rows, their order, what each waits f
       ['a-old', 'c-mid', 'b-new'],
     );
   });
-  await t.test(
-    'REFUSED: the bell lists every run it is handed: which runs wait is the api’s to say, and no rule of the board drops one',
-    () => {
-      const called = atGate('called', { cancelledAt: '2026-10-02T00:00:00.000Z' });
-      const quiet = run('quiet');
-      assert.deepEqual(
-        bellRows([called, quiet]).map((row) => row.run),
-        ['called', 'quiet'],
-      );
-    },
-  );
-  await t.test('a row names its factory: the one the run names, or default for one naming none', () => {
+  test('REFUSED: the bell lists every run it is handed: which runs wait is the api’s to say, and no rule of the board drops one', () => {
+    const called = atGate('called', { cancelledAt: '2026-10-02T00:00:00.000Z' });
+    const quiet = run('quiet');
+    assert.deepEqual(
+      bellRows([called, quiet]).map((row) => row.run),
+      ['called', 'quiet'],
+    );
+  });
+  test('a row names its factory: the one the run names, or default for one naming none', () => {
     assert.deepEqual(
       bellRuns([atGate('d'), atGate('n', { factory: 'nemia' })]).map((row) => row.factory),
       ['default', 'nemia'],

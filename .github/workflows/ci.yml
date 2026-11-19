@@ -55,7 +55,7 @@ jobs:
         # The orchestrator's suite is the longest of the eight (766 s for its leg's two passes, measured over 8 ci runs on 2026-10-21),
         # so it runs in two halves. An include entry whose workspace the axis above does not name cannot be added to a combination, so
         # GitHub makes a leg of its own of it: four legs here, two nodes by two halves. Each half is named <i>/2, which is what
-        # node --test-shard takes, and the fractions must tile 1..n of n or a half of the suite is run by nobody.
+        # Vitest's --shard takes, and the fractions must tile 1..n of n or a half of the suite is run by nobody.
         include:
           - workspace: agent-orchestrator
             node: '24.16.0'
@@ -98,12 +98,9 @@ jobs:
       # Both runs pass --force: turbo.json hashes no environment (envMode loose passes it through without hashing it, WF_TEST_SHARD as
       # well as TZ), so without it the second run replays the first from the cache and the second timezone is never tested.
       #
-      # The half this leg runs travels in WF_TEST_SHARD, which the orchestrator's own test script expands into --test-shard before its
-      # globs. Not as a turbo `-- --test-shard=1/2` argument: turbo appends that after the script's own arguments, where node has
-      # stopped parsing options and reads it as a file pattern instead (options.globPatterns is argv past the first positional). And
-      # not through NODE_OPTIONS, which every node child the suite spawns would inherit. On the orchestrator's four legs it reads
-      # 1/2 or 2/2 and the hole expands to --test-shard=<i>/2; on every other leg it is empty, the hole expands to nothing and that
-      # package's suite runs whole.
+      # The half this leg runs travels in WF_TEST_SHARD, which the orchestrator's own test script expands into Vitest's --shard, so
+      # one turbo command serves every leg, sharded or not. On the orchestrator's four legs it reads 1/2 or 2/2 and the hole expands
+      # to --shard=<i>/2; on every other leg it is empty, the hole expands to nothing and that package's suite runs whole.
       - name: test under TZ=UTC
         if: matrix.node != '24.16.0' || github.event_name != 'pull_request'
         run: npx turbo run test --force --filter=${{ matrix.workspace }}

@@ -4,7 +4,7 @@
  * declares denies a landing session the two commands that commit a staged merge. Git runs with no user or system configuration and a
  * fixed identity, so a machine's hooks, default branch or signing change nothing here.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -255,9 +255,9 @@ const INCLUDES: readonly { name: string; text: string | null; isolate: boolean; 
   },
 ];
 
-test('REFUSED: open, for a run that cuts worktrees, refuses a .worktreeinclude line make would refuse as written, each by name, and one that is no file', async (t) => {
+describe('REFUSED: open, for a run that cuts worktrees, refuses a .worktreeinclude line make would refuse as written, each by name, and one that is no file', () => {
   for (const { name, text, isolate, refused } of INCLUDES)
-    await t.test(name, () => {
+    test(name, () => {
       const dir = repository();
       const file = path.join(dir, '.worktreeinclude');
       if (text === null) fs.mkdirSync(file);
@@ -309,9 +309,9 @@ const UNREAD: readonly { name: string; verb: PlaceVerb; request: object; field: 
   { name: 'export with no tag', verb: 'export', request: { repo: '/', into: '/v1' }, field: 'tag' },
 ];
 
-test('a request a verb cannot read is unread, never acted on, naming the field it could not read', async (t) => {
+describe('a request a verb cannot read is unread, never acted on, naming the field it could not read', () => {
   for (const { name, verb, request, field } of UNREAD)
-    await t.test(name, () => {
+    test(name, () => {
       const outcome = run(verb, request);
       assert.ok('unread' in outcome, `unread expected, got ${JSON.stringify(outcome)}`);
       assert.equal(outcome.unread.verb, verb);
@@ -409,7 +409,7 @@ const stoppedAt = (deadlineMs: number) => `it gave no answer within ${deadlineMs
 
 test('a land held past its deadline by a hook leaves the hook running nowhere, the merge staged, and the abort answers', (t) => {
   const hooks: string[] = [];
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const hook of hooks) for (const pid of running(hook)) process.kill(pid, 'SIGKILL');
   });
   const { outcome, deadlineMs, made } = heldAsked(
@@ -435,7 +435,7 @@ test('a land held past its deadline by a hook leaves the hook running nowhere, t
 
 test('a handoff held past its deadline by a clean filter leaves no index.lock, and the next verb answers', (t) => {
   const filters: string[] = [];
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const filter of filters) for (const pid of running(filter)) process.kill(pid, 'SIGKILL');
   });
   const { outcome, deadlineMs, made } = heldAsked(
@@ -484,9 +484,9 @@ function heldPlace(on: string): { dir: string; shell: string; marker: string } {
 }
 
 /** A held handoff of `heldPlace(on)`, its shells killed once the test `t` ends. */
-const heldHandoff = (t: { after: (fn: () => void) => void }, on: string) => {
+const heldHandoff = (t: { onTestFinished: (fn: () => void) => void }, on: string) => {
   const shells: string[] = [];
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const shell of shells) for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
   });
   return heldAsked(

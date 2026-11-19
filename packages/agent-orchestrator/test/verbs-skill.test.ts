@@ -3,7 +3,7 @@
  * without regenerating it is refused, and every verb the CLI serves her is listed under its class, none out of her reach, each with the
  * tools that serve it on the MCP port or why the command line alone runs it, so either seat reads it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

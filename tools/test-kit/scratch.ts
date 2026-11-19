@@ -20,7 +20,7 @@
  * its environment names one — a PATH, an AE_ROOT a harness inherited — read from `/proc`, so the last two on Linux only.
  * Waits are for a count, under a bound, never for a length of time.
  */
-import { after, afterEach, beforeEach } from 'node:test';
+import { afterAll, afterEach, beforeEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -161,7 +161,7 @@ afterEach(async () => {
   await reap(roots.slice(marks.pop() ?? roots.length));
 });
 
-after(async () => {
+afterAll(async () => {
   const alive = await reap(roots);
   const kept: string[] = [];
   for (const root of roots) {

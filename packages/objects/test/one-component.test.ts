@@ -4,7 +4,7 @@
  * a second component, whose every field is owed again (`packages/objects/CLAUDE.md`, *Traps*): describe it where it is defined. The
  * list only shrinks: a name it holds that the document no longer makes is refused too, so it is taken off in the same commit.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { OpenApi } from 'effect/http-api';
 import { Api } from 'objects';

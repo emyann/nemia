@@ -3,7 +3,7 @@
  * the kit's 0.4.0), and the board's draw as `standard`. So an `<IconButton` in `src` outside the vendored kit writes `variant=`, and the
  * part is never imported under another name, which this reading would not follow.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -5,7 +5,7 @@
  * `DELETE /api/session` forgets it; the board never writes the cookie. `npm run e2e` presses the page on a store marked exposed
  * (`650-token.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { askToken, onTokenAsked, ReadRefusal, tokenAsked, tokenAskOf, WriteRefusal } from '../src/lib/api/read.ts';
 import { versionQuery } from '../src/lib/api/version.ts';
@@ -15,14 +15,14 @@ import { signIn, signOut } from '../src/lib/api/session.ts';
 type Sent = { method: string; path: string; headers: Headers };
 
 /** Every request answered `body` as JSON with `status`, for the length of the test; what each was sent as is kept in the list returned. */
-function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200): Sent[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200): Sent[] {
   const before = globalThis.fetch;
   const sent: Sent[] = [];
   globalThis.fetch = async (input, init) => {
     sent.push({ method: init?.method ?? 'GET', path: String(input), headers: new Headers(init?.headers) });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   return sent;
@@ -83,7 +83,7 @@ test('a read the api refuses 401 token-required asks for a token, and still reje
   answering(t, { error: 'this store is marked exposed', reason: 'token-required' }, 401);
   let told = 0;
   const stop = onTokenAsked(() => (told += 1));
-  t.after(stop);
+  t.onTestFinished(stop);
   askToken({ reason: 'unknown-token', message: '', exposed: true });
   told = 0;
   await assert.rejects(

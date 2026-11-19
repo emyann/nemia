@@ -7,7 +7,7 @@
  * the caller cannot see: the session is opened in the cwd it was given, and an ask still waiting when the bound is up is stopped
  * rather than left running.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk';
 import { mcpServersRead, MCP_STATE_MS, type McpStatusAsk } from './mcp-state.ts';
@@ -49,52 +49,40 @@ const statusOf = (name: string, status: McpServerStatus['status'], more: Partial
   ...more,
 });
 
-test('mcpServersRead: one session for a record, a failed look answered as a failure, in the cwd it was given, stopped at its bound', async (t) => {
-  await t.test(
-    'a record of three servers is read in one session, never three, and each server is handed as mcpServerOf spells it',
-    async () => {
-      const { ask, opened, at } = asking([
-        statusOf('github', 'connected', { tools: [{ name: 'get_me' }, { name: 'list_issues' }] }),
-        statusOf('docs', 'needs-auth'),
-        statusOf('feed', 'failed', { error: 'connect ECONNREFUSED' }),
-      ]);
-      const read = await mcpServersRead(THREE, '/tmp', { ask });
-      assert.equal(opened.length, 1, 'one session for the whole record: a session per server would be three CLI spawns of seconds each');
-      assert.deepEqual(
-        at,
-        ['/tmp'],
-        "opened where the caller said, which the engine's verb makes its own root and never the process's cwd",
-      );
-      assert.deepEqual(Object.keys(opened[0]), ['github', 'docs', 'feed'], 'every server of the record in that one session');
-      assert.equal(
-        JSON.stringify(opened[0].github),
-        JSON.stringify(mcpServerOf(THREE.github)),
-        'handed as the one producer spells it, so the bytes judged are the bytes a step gets and the sign-in is found',
-      );
-      assert.deepEqual(read, {
-        read: true,
-        servers: [
-          { name: 'github', status: 'connected', tools: 2 },
-          { name: 'docs', status: 'needs-auth' },
-          { name: 'feed', status: 'failed', error: 'connect ECONNREFUSED' },
-        ],
-      });
-    },
-  );
-
-  await t.test(
-    'a look that failed answers a failure, never an empty list: an absence read off a failed look is not an absence',
-    async () => {
-      const { ask, opened } = asking(new Error('spawn claude ENOENT'));
-      const read = await mcpServersRead(THREE, '/tmp', { ask });
-      assert.equal(opened.length, 1, 'the session was opened');
-      assert.equal(read.read, false, 'read: false — an empty list would read as "this factory records no server" and blank the board');
-      assert.match(read.read === false ? read.why : '', /3 server\(s\) could not be read: spawn claude ENOENT/);
-      assert.equal('servers' in read, false, 'and it names no server: there is nothing to say of one');
-    },
-  );
-
-  await t.test('a server the harness named nothing of is pending, not dropped: every server of the record is named once', async () => {
+describe('mcpServersRead: one session for a record, a failed look answered as a failure, in the cwd it was given, stopped at its bound', () => {
+  test('a record of three servers is read in one session, never three, and each server is handed as mcpServerOf spells it', async () => {
+    const { ask, opened, at } = asking([
+      statusOf('github', 'connected', { tools: [{ name: 'get_me' }, { name: 'list_issues' }] }),
+      statusOf('docs', 'needs-auth'),
+      statusOf('feed', 'failed', { error: 'connect ECONNREFUSED' }),
+    ]);
+    const read = await mcpServersRead(THREE, '/tmp', { ask });
+    assert.equal(opened.length, 1, 'one session for the whole record: a session per server would be three CLI spawns of seconds each');
+    assert.deepEqual(at, ['/tmp'], "opened where the caller said, which the engine's verb makes its own root and never the process's cwd");
+    assert.deepEqual(Object.keys(opened[0]), ['github', 'docs', 'feed'], 'every server of the record in that one session');
+    assert.equal(
+      JSON.stringify(opened[0].github),
+      JSON.stringify(mcpServerOf(THREE.github)),
+      'handed as the one producer spells it, so the bytes judged are the bytes a step gets and the sign-in is found',
+    );
+    assert.deepEqual(read, {
+      read: true,
+      servers: [
+        { name: 'github', status: 'connected', tools: 2 },
+        { name: 'docs', status: 'needs-auth' },
+        { name: 'feed', status: 'failed', error: 'connect ECONNREFUSED' },
+      ],
+    });
+  });
+  test('a look that failed answers a failure, never an empty list: an absence read off a failed look is not an absence', async () => {
+    const { ask, opened } = asking(new Error('spawn claude ENOENT'));
+    const read = await mcpServersRead(THREE, '/tmp', { ask });
+    assert.equal(opened.length, 1, 'the session was opened');
+    assert.equal(read.read, false, 'read: false — an empty list would read as "this factory records no server" and blank the board');
+    assert.match(read.read === false ? read.why : '', /3 server\(s\) could not be read: spawn claude ENOENT/);
+    assert.equal('servers' in read, false, 'and it names no server: there is nothing to say of one');
+  });
+  test('a server the harness named nothing of is pending, not dropped: every server of the record is named once', async () => {
     const { ask } = asking([statusOf('github', 'connected', { tools: [] })]);
     assert.deepEqual(await mcpServersRead(THREE, '/tmp', { ask }), {
       read: true,
@@ -105,8 +93,7 @@ test('mcpServersRead: one session for a record, a failed look answered as a fail
       ],
     });
   });
-
-  await t.test('a state word this runtime does not know is a failed look, never carried as if it were one of the five', async () => {
+  test('a state word this runtime does not know is a failed look, never carried as if it were one of the five', async () => {
     const { ask } = asking([statusOf('github', 'half-connected' as McpServerStatus['status'])]);
     const read = await mcpServersRead({ github: THREE.github }, '/tmp', { ask });
     assert.equal(read.read, false, 'a sixth word a newer Claude Code grew is not read as connected');
@@ -114,24 +101,21 @@ test('mcpServersRead: one session for a record, a failed look answered as a fail
     assert.match(read.read === false ? read.why : '', /connected, needs-auth, failed, pending, disabled/, 'the five it knows');
     assert.match(read.read === false ? read.why : '', /add it to MCP_STATES/, 'and the sentence names the fix');
   });
-
-  await t.test('a read that never answers is a failed look once its bound is past, and the bound is named in the sentence', async () => {
+  test('a read that never answers is a failed look once its bound is past, and the bound is named in the sentence', async () => {
     const ask: McpStatusAsk = () => new Promise(() => {});
     const read = await mcpServersRead({ github: THREE.github }, '/tmp', { ask, withinMs: 20 });
     assert.equal(read.read, false, 'a harness that never answers does not hold the tick for ever');
     assert.match(read.read === false ? read.why : '', /read no state within 0.02s/);
     assert.ok(MCP_STATE_MS > 5_000, 'and the shipped bound leaves the harness its 5s per server');
   });
-
-  await t.test('the session is opened in the cwd the caller named, whatever the process is in', async () => {
+  test('the session is opened in the cwd the caller named, whatever the process is in', async () => {
     const { ask, at } = asking([statusOf('docs', 'connected')]);
     const was = process.cwd();
     await mcpServersRead({ docs: THREE.docs }, '/var/empty/named-root', { ask });
     assert.deepEqual(at, ['/var/empty/named-root'], 'the caller names the folder the servers are read in');
     assert.notEqual(at[0], was, "and not the process's own, which is what a dropped argument would leave");
   });
-
-  await t.test('a read that runs past its bound stops the ask it was waiting on, as a server that hangs on connect makes one', async () => {
+  test('a read that runs past its bound stops the ask it was waiting on, as a server that hangs on connect makes one', async () => {
     let stopped: string | undefined;
     let release = () => {};
     const waited = new Promise<void>((resolve) => {
@@ -156,7 +140,7 @@ test('mcpServersRead: one session for a record, a failed look answered as a fail
   });
 });
 
-test('mcpStateRefusal: a record a state cannot be read of is refused by name, saying what to do', async (t) => {
+describe('mcpStateRefusal: a record a state cannot be read of is refused by name, saying what to do', () => {
   const rows: { name: string; given: unknown; said: readonly RegExp[] }[] = [
     {
       name: 'no record at all names what it was handed',
@@ -176,9 +160,9 @@ test('mcpStateRefusal: a record a state cannot be read of is refused by name, sa
       said: [/`local` is not a remote server/],
     },
   ];
-  await t.test('a record of remote servers is no refusal', () => assert.equal(mcpStateRefusal(THREE), undefined));
+  test('a record of remote servers is no refusal', () => assert.equal(mcpStateRefusal(THREE), undefined));
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const why = mcpStateRefusal(row.given);
       assert.equal(typeof why, 'string');
       for (const said of row.said) assert.match(why!, said);

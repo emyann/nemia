@@ -8,7 +8,7 @@
  * Its store is its own at `ROOT`, given as `ENV` with `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
  * in scratch repositories no factory holds.
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +44,7 @@ const planned = (): string => {
   return dir;
 };
 
-test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked` for one waiting on an answer — REFUSED: `failed` for either, kept for a run in which a step broke', async (t) => {
+test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked` for one waiting on an answer — REFUSED: `failed` for either, kept for a run in which a step broke', async () => {
   const b = engine();
   const e = engineOf(b.layer);
   const stopped = async (gates: string[], phase: EnginePhase, closeout?: unknown) => {
@@ -67,13 +67,13 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
     io: undefined,
   } as unknown as Engine;
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     printed.push(args.join(' '));
   });
   try {
     await main(['tick'], passing, undefined, stand().place, ENV);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
   const lines = [gated, asking, broke].map((id) => printed.find((l) => l.startsWith(`${id}  `)));
   assert.deepEqual(

@@ -10,7 +10,7 @@
  * pass. The floor was 30 while the repository kept its team under `workflows/`; with the team gone to `packages/templates/sdlc`, the
  * skills alone frame 19 files, the five role skills among them since they left `.claude/skills/` for sdlc's `skills/`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

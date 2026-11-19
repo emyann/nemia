@@ -7,7 +7,8 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -84,14 +85,18 @@ const refusedAs = (tag: string) => (err: Error & { _tag?: string; exitCode?: num
 const LQ = '---\nlabels: { area: run-core }\n---\nOne surface for the lists.\n';
 const QE = 'Say which rows a run reads.\n\nA second paragraph, as written.\n';
 
-test('nemia start --card hands the run inbox cards: copied at start, mounted read-only on every step, named on every brief', async (t) => {
-  const s = story(t);
-  fileCard('lists-lbpq', LQ);
-  fileCard('rows-qeyh', QE);
-  const repo = aRepo();
+describe('nemia start --card hands the run inbox cards: copied at start, mounted read-only on every step, named on every brief', () => {
+  let repo!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    fileCard('lists-lbpq', LQ);
+    fileCard('rows-qeyh', QE);
+    repo = aRepo();
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-
-  await s.test("the cards are copied into the run's inputs/cards byte for byte, their names frozen on the record", async () => {
+  s.test("the cards are copied into the run's inputs/cards byte for byte, their names frozen on the record", async () => {
     const started = await startedBy([
       'start',
       'untangle the lists',
@@ -116,7 +121,6 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
       'the start says the cards, in order, and where it copied them',
     );
   });
-
   const handed = (name: string) => {
     const spec = stage.board().specs.find((x) => x.id === `${id}-${name}`);
     assert.ok(spec, `${name} is filed`);
@@ -128,21 +132,18 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
       assert.ok(spec.brief.includes(`\`${card}\``), `${name}'s brief names ${card}`);
     }
   };
-
-  await s.test('the first step is filed with the inputs folder read-only, and its brief names both cards', async () => {
+  s.test('the first step is filed with the inputs folder read-only, and its brief names both cards', async () => {
     assert.deepEqual((await pass(id)).filed, ['implement']);
     handed('implement');
   });
-
-  await s.test('a card removed from the inbox still reads in the run, and the next step is handed it too', async () => {
+  s.test('a card removed from the inbox still reads in the run, and the next step is handed it too', async () => {
     fs.rmSync(path.join(inboxAt(ROOT), 'lists-lbpq.md'));
     assert.equal(fs.readFileSync(path.join(cardsDir(ROOT, runRecord(ROOT, id)), 'lists-lbpq.md'), 'utf8'), LQ);
     stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });
     assert.deepEqual((await pass(id)).filed, ['review']);
     handed('review');
   });
-
-  await s.test('a card that is not in the inbox is refused Missing, before anything is written', async () => {
+  s.test('a card that is not in the inbox is refused Missing, before anything is written', async () => {
     const before = runsNow();
     await assert.rejects(
       stage.main(['start', 'again', '--workflows', twoSteps(), '--repo', repo, '--no-worktree', '--card', 'lists-lbpq']),
@@ -150,8 +151,7 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
     );
     assert.deepEqual(runsNow(), before, 'no run is written');
   });
-
-  await s.test("a card named twice, no card's name, and an --input named cards beside a card are each refused Invalid", async () => {
+  s.test("a card named twice, no card's name, and an --input named cards beside a card are each refused Invalid", async () => {
     const before = runsNow();
     const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'cards');
     fs.writeFileSync(given, 'a file named cards\n');

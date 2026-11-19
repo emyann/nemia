@@ -2,7 +2,7 @@
  * What a harness's fence words reach (`fenceReach`): each rank held to the harness's own words, the word a task naming none runs in held
  * to the argv the runner gives it, and the models Claude Code drops `auto` on matched as named or with a suffix.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { fenceReach, unruledIn } from '../src/harness/reach.ts';
 import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
@@ -26,13 +26,13 @@ test('Claude Code drops auto on a listed model, named or with a suffix, and on n
   assert.deepEqual(fenceReach('codex', 'haiku')!.dropped, []);
 });
 
-test("fenceReach: each harness's ranks, the word a task naming none runs in, and no reach where no fence is", async (t) => {
-  await t.test('every permission mode Claude Code takes has a rank, and no other word does', () => {
+describe("fenceReach: each harness's ranks, the word a task naming none runs in, and no reach where no fence is", () => {
+  test('every permission mode Claude Code takes has a rank, and no other word does', () => {
     for (const harness of CLAUDES) {
       assert.deepEqual(Object.keys(fenceReach(harness)!.rank).sort(), [...CLAUDE_PERMISSION_MODES].sort(), harness);
     }
   });
-  await t.test("codex's sandboxes rise in rank in the order Codex lists them, narrowest first", () => {
+  test("codex's sandboxes rise in rank in the order Codex lists them, narrowest first", () => {
     const { rank, by } = fenceReach('codex')!;
     assert.equal(by, 'sandbox');
     assert.deepEqual(Object.keys(rank), [...CODEX_SANDBOXES]);
@@ -41,7 +41,7 @@ test("fenceReach: each harness's ranks, the word a task naming none runs in, and
       CODEX_SANDBOXES.map((_, i) => i),
     );
   });
-  await t.test('the word a task naming none runs in is what the runner gives it: a session of Claude Code, and Codex', () => {
+  test('the word a task naming none runs in is what the runner gives it: a session of Claude Code, and Codex', () => {
     const task = { name: 'ae/t/1', brief: 'b', cwd: '/r' };
     for (const harness of CLAUDES) {
       assert.equal(fenceReach(harness)!.by, 'mode');
@@ -49,58 +49,49 @@ test("fenceReach: each harness's ranks, the word a task naming none runs in, and
     }
     assert.equal(after(codex.command(task).args, '-s'), fenceReach('codex')!.given);
   });
-  await t.test('a harness fenced by neither a mode nor a sandbox has no reach', () => {
+  test('a harness fenced by neither a mode nor a sandbox has no reach', () => {
     for (const harness of ['command', 'a2a:x', 'nope', '', 'claude-detached']) assert.equal(fenceReach(harness), undefined, harness);
   });
 });
 
-test('unruledIn: the first character of a path a permission rule cannot carry, on a harness whose fence takes a rule', async (t) => {
-  await t.test(
-    'the first character of a path a permission rule cannot carry is answered on Claude Code, a whitespace but the space among them, and nothing on a clean path',
-    () => {
-      for (const harness of CLAUDES) {
-        assert.equal(unruledIn(harness, '/srv/my wf(1)/runs'), '(', harness);
-        assert.equal(unruledIn(harness, '/srv/wf*'), '*', harness);
-        assert.equal(unruledIn(harness, '/srv/a\\b'), '\\', harness);
-        assert.equal(unruledIn(harness, `/srv/my${String.fromCharCode(0xa0)}wf`), String.fromCharCode(0xa0), harness);
-        assert.equal(unruledIn(harness, '/srv/my wf,{a}'), undefined, harness);
-      }
-    },
-  );
-  await t.test('a harness whose fence takes no rule naming a path answers nothing, whatever the path holds', () => {
+describe('unruledIn: the first character of a path a permission rule cannot carry, on a harness whose fence takes a rule', () => {
+  test('the first character of a path a permission rule cannot carry is answered on Claude Code, a whitespace but the space among them, and nothing on a clean path', () => {
+    for (const harness of CLAUDES) {
+      assert.equal(unruledIn(harness, '/srv/my wf(1)/runs'), '(', harness);
+      assert.equal(unruledIn(harness, '/srv/wf*'), '*', harness);
+      assert.equal(unruledIn(harness, '/srv/a\\b'), '\\', harness);
+      assert.equal(unruledIn(harness, `/srv/my${String.fromCharCode(0xa0)}wf`), String.fromCharCode(0xa0), harness);
+      assert.equal(unruledIn(harness, '/srv/my wf,{a}'), undefined, harness);
+    }
+  });
+  test('a harness whose fence takes no rule naming a path answers nothing, whatever the path holds', () => {
     for (const harness of ['codex', 'command', 'a2a:x', 'nobody']) assert.equal(unruledIn(harness, '/srv/wf*(x)'), undefined, harness);
   });
 });
 
-test("fenceReach: what each mode of a harness's fence does — held, unasking, writing, refusing, unfenced and granted", async (t) => {
-  await t.test(
-    "Claude Code's held mode leads the modes that ask nobody, each one of its words; acceptEdits is the first that writes; bypassPermissions alone is widest",
-    () => {
-      const { rank, held, unasking, writes } = fenceReach('claude')!;
-      assert.equal(held, 'dontAsk');
-      assert.equal(unasking[0], held);
-      assert.deepEqual(unasking, ['dontAsk', 'bypassPermissions']);
-      for (const mode of unasking) assert.ok(CLAUDE_PERMISSION_MODES.includes(mode), mode);
-      assert.equal(writes, rank.acceptEdits);
-      assert.ok(rank.dontAsk < writes && rank.default < writes, 'the held mode and the default ask before writing');
-      const top = Math.max(...Object.values(rank));
-      assert.deepEqual(
-        Object.keys(rank).filter((m) => rank[m] === top),
-        ['bypassPermissions'],
-      );
-      assert.ok(rank.auto > rank.acceptEdits && rank.plan < rank.dontAsk);
-    },
-  );
-  await t.test(
-    'codex holds no session to a mode and asks nobody in the background; workspace-write is the first sandbox that writes',
-    () => {
-      const { rank, held, unasking, writes } = fenceReach('codex')!;
-      assert.equal(held, undefined);
-      assert.deepEqual(unasking, []);
-      assert.equal(writes, rank['workspace-write']);
-    },
-  );
-  await t.test('the modes that refuse what no allow rule reaches are those that decide by rule alone: above none, and never plan', () => {
+describe("fenceReach: what each mode of a harness's fence does — held, unasking, writing, refusing, unfenced and granted", () => {
+  test("Claude Code's held mode leads the modes that ask nobody, each one of its words; acceptEdits is the first that writes; bypassPermissions alone is widest", () => {
+    const { rank, held, unasking, writes } = fenceReach('claude')!;
+    assert.equal(held, 'dontAsk');
+    assert.equal(unasking[0], held);
+    assert.deepEqual(unasking, ['dontAsk', 'bypassPermissions']);
+    for (const mode of unasking) assert.ok(CLAUDE_PERMISSION_MODES.includes(mode), mode);
+    assert.equal(writes, rank.acceptEdits);
+    assert.ok(rank.dontAsk < writes && rank.default < writes, 'the held mode and the default ask before writing');
+    const top = Math.max(...Object.values(rank));
+    assert.deepEqual(
+      Object.keys(rank).filter((m) => rank[m] === top),
+      ['bypassPermissions'],
+    );
+    assert.ok(rank.auto > rank.acceptEdits && rank.plan < rank.dontAsk);
+  });
+  test('codex holds no session to a mode and asks nobody in the background; workspace-write is the first sandbox that writes', () => {
+    const { rank, held, unasking, writes } = fenceReach('codex')!;
+    assert.equal(held, undefined);
+    assert.deepEqual(unasking, []);
+    assert.equal(writes, rank['workspace-write']);
+  });
+  test('the modes that refuse what no allow rule reaches are those that decide by rule alone: above none, and never plan', () => {
     for (const harness of CLAUDES) {
       const { rank, refusing, writes } = fenceReach(harness)!;
       assert.deepEqual(
@@ -113,30 +104,27 @@ test("fenceReach: what each mode of a harness's fence does — held, unasking, w
       }
     }
   });
-  await t.test('the tools a session calls with no allow rule are the three that read and a skill load, and never Bash', () => {
+  test('the tools a session calls with no allow rule are the three that read and a skill load, and never Bash', () => {
     for (const harness of CLAUDES) {
       assert.deepEqual([...fenceReach(harness)!.unfenced].sort(), ['Glob', 'Grep', 'Read', 'Skill'], harness);
       assert.ok(!fenceReach(harness)!.unfenced.includes('Bash'), `${harness}: Bash takes a rule`);
     }
   });
-  await t.test(
-    'the one mode that grants a tool of its own is the one that writes unasked, and it grants the Edit family and nothing else',
-    () => {
-      for (const harness of CLAUDES) {
-        const { granted, rank, refusing, writes } = fenceReach(harness)!;
-        assert.deepEqual(
-          Object.keys(granted).sort(),
-          refusing.filter((mode) => rank[mode] >= writes).sort(),
-          `${harness}: a word grants of its own only where it writes unasked`,
-        );
-        for (const [mode, tools] of Object.entries(granted)) {
-          assert.deepEqual([...tools].sort(), ['Edit', 'MultiEdit', 'NotebookEdit', 'Write'], `${harness}: ${mode}`);
-          assert.ok(!tools.includes('Bash'), `${harness}: ${mode} asks about a command, so Bash takes a rule`);
-        }
+  test('the one mode that grants a tool of its own is the one that writes unasked, and it grants the Edit family and nothing else', () => {
+    for (const harness of CLAUDES) {
+      const { granted, rank, refusing, writes } = fenceReach(harness)!;
+      assert.deepEqual(
+        Object.keys(granted).sort(),
+        refusing.filter((mode) => rank[mode] >= writes).sort(),
+        `${harness}: a word grants of its own only where it writes unasked`,
+      );
+      for (const [mode, tools] of Object.entries(granted)) {
+        assert.deepEqual([...tools].sort(), ['Edit', 'MultiEdit', 'NotebookEdit', 'Write'], `${harness}: ${mode}`);
+        assert.ok(!tools.includes('Bash'), `${harness}: ${mode} asks about a command, so Bash takes a rule`);
       }
-    },
-  );
-  await t.test("codex's sandbox takes no allow rule, so it refuses in no word and leaves no tool unruled or granted", () => {
+    }
+  });
+  test("codex's sandbox takes no allow rule, so it refuses in no word and leaves no tool unruled or granted", () => {
     assert.deepEqual(fenceReach('codex')!.refusing, []);
     assert.deepEqual(fenceReach('codex')!.unfenced, []);
     assert.deepEqual(fenceReach('codex')!.granted, {});

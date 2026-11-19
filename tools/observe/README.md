@@ -326,7 +326,7 @@ is counted once, as its Agent tool.
   `git commit`, and a command it does not read, `./run.sh`, is `other`. No argument gets in, so it is a label.
 - **The test scope** (`otelcol.yaml`, a second transform, after the head) gives the same spans a `test_scope`, what a test command ran:
   `suite` (`turbo run test`, or `npm test` from the root), `package` (with `--filter`, `-F`, `-w` or `--workspace`, or after a `cd` into
-  `packages/<name>` or `apps/<name>`), `files` (`node --test`), `e2e: all` (`npm run e2e`) or `e2e: pages` (with `--pages`). It is read
+  `packages/<name>` or `apps/<name>`), `files` (`node --test`, or `vitest run` given a file), `e2e: all` (`npm run e2e`) or `e2e: pages` (with `--pages`). It is read
   at any command of the line, not only the head, so `npm run build && npm run e2e -- --pages time` is `e2e: pages`; a flag counts only
   in its own command, and the last statement that matches wins. Each value is a literal, so no package, file or page name gets in; a
   command that runs no tests has none. A `cd` counts only when the test command comes right after it, joined by `&&` or `;`: `cd

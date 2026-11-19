@@ -4,7 +4,8 @@
  * trust writes Claude Code's `.claude.json` in the harness's scratch `CLAUDE_CONFIG_DIR`, never the person's.
  */
 import { config } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -36,22 +37,25 @@ async function answered<T>(res: Response | Promise<Response>, status = 200): Pro
   return body;
 }
 
-test("a person trusts a factory's places again: each is trusted for Claude Code where the store runs, and a factory unknown is refused", async (t) => {
-  const s = story(t);
-  const claudeJson = path.join(config, '.claude.json');
+describe("a person trusts a factory's places again: each is trusted for Claude Code where the store runs, and a factory unknown is refused", () => {
+  let claudeJson!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    claudeJson = path.join(config, '.claude.json');
+    return t.end;
+  });
+  const s = story(test);
   const trusted = (): boolean =>
     fs.existsSync(claudeJson) &&
     Object.values(
       (JSON.parse(fs.readFileSync(claudeJson, 'utf8')) as { projects?: Record<string, { hasTrustDialogAccepted?: boolean }> }).projects ??
         {},
     ).some((p) => p.hasTrustDialogAccepted === true);
-
-  await s.test('REFUSED: a factory not filed is a 404, and nothing is trusted', async () => {
+  s.test('REFUSED: a factory not filed is a 404, and nothing is trusted', async () => {
     assert.equal((await send('POST', '/api/factories/nowhere/trust')).status, 404);
     assert.equal(trusted(), false);
   });
-
-  await s.test('a POST answers what was asked of its place, written in the scratch .claude.json; a second writes nothing', async () => {
+  s.test('a POST answers what was asked of its place, written in the scratch .claude.json; a second writes nothing', async () => {
     const first = await answered<FactoryTrusted>(send('POST', '/api/factories/mill/trust'));
     assert.equal(first.name, 'mill');
     const claude = first.trusts.find((one) => 'harness' in one && one.wrote);

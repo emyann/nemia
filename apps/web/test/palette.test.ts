@@ -4,7 +4,7 @@
  * `src/styles.css`), so one class serves both schemes. The vendored kit (`src/components/ui/ds`) is another repository's and stays out,
  * and nothing else does; the few raw colours no role gives are `KEPT`, each in its file alone, with its reason.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

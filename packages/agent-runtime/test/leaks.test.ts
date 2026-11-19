@@ -1,32 +1,37 @@
 /**
  * The guard: a test file leaves no `ae-detached-*` folder and no worker behind, failed or passed. Each fixture under
- * `fixtures/` is run as a test file of its own, in a `node --test` of its own under `timeout`, with a temp directory
+ * `fixtures/` is run as a test file of its own, in a Vitest of its own under `timeout`, with a temp directory
  * of its own, which is read after it ends: what the run left in it is what it leaked.
  *
  * A process is found in a root by its environment too: a harness a fake exec'd — `exec sleep 30` — names no root in its
  * arguments and runs elsewhere, and still has the root on its PATH, or in an AE_ROOT it inherited. Until it has exec'd, its
  * environment is its parent's, so the test waits for it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { runnerless, vitestOver } from 'test-kit/probe';
+import { suiteOf } from 'test-kit/repo';
 import { leftBehind, reap, runningIn, scratch } from 'test-kit/scratch';
 import { until, WAITED } from '../src/waits/index.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 
+/** The package's setup files, as its `vitest.config.ts` gives them. */
+const SEAT = suiteOf(PACKAGE)?.setupFiles ?? [];
+
 /**
- * Runs `fixture` as a test file with `TMPDIR` its own, bounded: its status, what it printed, and the directory. The child runs
- * without `NODE_TEST_CONTEXT`: a `node --test` under another reports to it instead of running, unless it is told it is on its own.
+ * Runs `fixture` as a test file with `TMPDIR` its own, bounded: its status, what it printed, and the directory. The child is a Vitest
+ * of its own, under the package's seat, its config in a folder apart so that `TMPDIR` holds only what the fixture left.
  */
 const run = (fixture: string) => {
   const tmp = scratch('ae-leaks-');
-  const { NODE_TEST_CONTEXT: _, ...env } = process.env;
-  const r = spawnSync('timeout', ['-k', '5', '90', process.execPath, '--test', path.join('test', 'fixtures', fixture)], {
+  const over = vitestOver(scratch('ae-leaks-config-'), PACKAGE, [path.join('test', 'fixtures', fixture)], SEAT);
+  const r = spawnSync('timeout', ['-k', '5', '90', process.execPath, ...over], {
     cwd: PACKAGE,
-    env: { ...env, TMPDIR: tmp },
+    env: { ...runnerless(process.env), TMPDIR: tmp },
     encoding: 'utf8',
   });
   return { status: r.status, out: `${r.stdout}${r.stderr}`, tmp };

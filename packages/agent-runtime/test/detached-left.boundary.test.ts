@@ -11,7 +11,7 @@
  *   to the first, so steps are never stacked.
  * - A harness that leaves processes behind in its group (`sleep 600`) is bounded by the test: its group is killed when the test ends.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -55,7 +55,7 @@ const there = (pid: number) => {
 
 /** Kills the group `pid` leads when the test ends, whatever became of it: a test that fails leaves no `sleep 600` behind. */
 const bounded = (t: TestContext, pid: number) =>
-  t.after(() => {
+  t.onTestFinished(() => {
     try {
       process.kill(-pid, 'SIGKILL');
     } catch {}
@@ -141,7 +141,7 @@ const spawnHeld = async (t: TestContext, name: string, script: string) => {
   const ops = detachedOps(sh(script), dir, { ...QUICK, scopeProgram: scope.program });
   await Effect.runPromise(ops.spawn({ name, brief: 'x', cwd: dir, resources: { limits: { memory: '256Mi' } } }));
   const launched = JSON.parse(fs.readFileSync(fileOf(dir, name, '.launched'), 'utf8')) as { pid: number };
-  t.after(() => {
+  t.onTestFinished(() => {
     scope.open();
     try {
       process.kill(launched.pid, 'SIGKILL');
@@ -150,8 +150,8 @@ const spawnHeld = async (t: TestContext, name: string, script: string) => {
   return { dir, ops, open: scope.open, held: launched.pid };
 };
 
-test('slow is not dead: a stale beat is failed only once the worker the spawn launched is gone', WAITED, async (t) => {
-  await t.test('a worker whose first beat comes 40 s late on a live pid stays working, then completes', async (sub) => {
+describe('slow is not dead: a stale beat is failed only once the worker the spawn launched is gone', WAITED, () => {
+  test('a worker whose first beat comes 40 s late on a live pid stays working, then completes', async (sub) => {
     const { dir, ops, open, held } = await spawnHeld(sub, 'ae/l1/1', 'exit 0');
     assert.equal(runOf(dir, 'ae/l1/1')?.pid, 0, 'the worker is held: the run file is the spawn’s');
     assert.ok(there(held), 'and the process the spawn launched is there');
@@ -161,16 +161,14 @@ test('slow is not dead: a stale beat is failed only once the worker the spawn la
     open();
     await settle(sub, ops, 'ae/l1/1', 'completed');
   });
-
-  await t.test('a worker whose process is gone with a stale beat reads failed', async (sub) => {
+  test('a worker whose process is gone with a stale beat reads failed', async (sub) => {
     const { ops, held } = await spawnHeld(sub, 'ae/l2/1', 'exit 0');
     process.kill(held, 'SIGKILL');
     await until(sub, () => !there(held), 'the held worker is gone', { everyMs: 20 });
     stepMono(sub, STALE_MS + 10_000);
     assert.equal((await observed(ops, 'ae/l2/1'))?.state, 'failed');
   });
-
-  await t.test('a stale beat whose recorded worker is another process now, or of another boot, reads failed', async () => {
+  test('a stale beat whose recorded worker is another process now, or of another boot, reads failed', async () => {
     const dir = scratch('ae-left-');
     const ops = detachedOps(sh('true'), dir);
     fs.mkdirSync(path.join(dir, 'runs', 'sh'), { recursive: true });
@@ -200,8 +198,8 @@ test('slow is not dead: a stale beat is failed only once the worker the spawn la
   });
 });
 
-test('what is called dead is stopped: what an ended run left in its harness group is ended', WAITED, async (t) => {
-  await t.test('a person’s stop of a run whose worker is gone ends its harness group', async (sub) => {
+describe('what is called dead is stopped: what an ended run left in its harness group is ended', WAITED, () => {
+  test('a person’s stop of a run whose worker is gone ends its harness group', async (sub) => {
     const dir = scratch('ae-left-');
     const ops = detachedOps(sh('sleep 600 & sleep 600'), dir, QUICK);
     await Effect.runPromise(ops.spawn({ name: 'ae/l4/1', brief: 'x', cwd: dir }));
@@ -215,8 +213,7 @@ test('what is called dead is stopped: what an ended run left in its harness grou
     await Effect.runPromise(ops.stop('ae/l4/1'));
     await until(sub, () => !there(-harness), 'the harness group is gone', { everyMs: 20 });
   });
-
-  await t.test('a harness group that ignores SIGTERM is killed by a stop asked again past the stop grace', async (sub) => {
+  test('a harness group that ignores SIGTERM is killed by a stop asked again past the stop grace', async (sub) => {
     const dir = scratch('ae-left-');
     const ops = detachedOps(sh("trap '' TERM; sleep 600 & sleep 600"), dir, QUICK);
     await Effect.runPromise(ops.spawn({ name: 'ae/l5/1', brief: 'x', cwd: dir }));
@@ -233,8 +230,7 @@ test('what is called dead is stopped: what an ended run left in its harness grou
     await Effect.runPromise(ops.stop('ae/l5/1'));
     await until(sub, () => !there(-harness), 'the harness group is killed', { everyMs: 20 });
   });
-
-  await t.test('release of a run that ended leaving a child fails while the child lives, ends it, and then succeeds', async (sub) => {
+  test('release of a run that ended leaving a child fails while the child lives, ends it, and then succeeds', async (sub) => {
     const dir = scratch('ae-left-');
     const ops = detachedOps(sh('(trap "" HUP; sleep 600) & exit 0'), dir, QUICK);
     await Effect.runPromise(ops.spawn({ name: 'ae/l6/1', brief: 'x', cwd: dir }));
@@ -247,35 +243,30 @@ test('what is called dead is stopped: what an ended run left in its harness grou
     await until(sub, () => !there(-harness), 'the child is gone', { everyMs: 20 });
     await Effect.runPromise(ops.release!(ended, {}));
   });
-
-  await t.test(
-    'a stale run whose worker nothing identifies is sent no signal by release or stop, and is left `.stop`, so a late worker starts nothing',
-    async (sub) => {
-      const dir = scratch('ae-left-');
-      const ops = detachedOps(sh('true'), dir, QUICK);
-      const owned = spawn('sleep', ['600'], { detached: true, stdio: 'ignore' });
-      const pid = owned.pid;
-      if (pid === undefined) throw new Error('sleep did not start: this test needs `sleep` on PATH');
-      bounded(sub, pid);
-      process.kill(pid, 'SIGSTOP');
-      await until(sub, () => stateOf(pid) === 'T', 'the owned process is stopped, so a signal sent to it stays pending', {
-        everyMs: 20,
-      });
-      const name = 'ae/l8/1';
-      fs.mkdirSync(path.join(dir, 'runs', 'sh'), { recursive: true });
-      const heartbeatAt = new Date(Date.now() - STALE_MS - 60_000).toISOString();
-      fs.writeFileSync(fileOf(dir, name, '.json'), JSON.stringify({ name, state: 'working', pid, logFile: '/dev/null', heartbeatAt }));
-      const seen = await observed(ops, name);
-      assert.equal(seen?.state, 'failed', 'with no `.launched`, the clock alone judges');
-      if (!seen) throw new Error('unreachable: the run was seen above');
-      await Effect.runPromise(ops.release!(seen, {}));
-      await Effect.runPromise(ops.stop(name));
-      assert.equal(pendingOf(pid), 0n, 'the pid on a run file nothing identifies was sent no signal');
-      assert.ok(fs.existsSync(fileOf(dir, name, '.stop')), 'and the stop is left on disk for a worker that starts late');
-    },
-  );
-
-  await t.test('release of a run whose worker still runs sends nothing: its harness ends on its own, completed', async (sub) => {
+  test('a stale run whose worker nothing identifies is sent no signal by release or stop, and is left `.stop`, so a late worker starts nothing', async (sub) => {
+    const dir = scratch('ae-left-');
+    const ops = detachedOps(sh('true'), dir, QUICK);
+    const owned = spawn('sleep', ['600'], { detached: true, stdio: 'ignore' });
+    const pid = owned.pid;
+    if (pid === undefined) throw new Error('sleep did not start: this test needs `sleep` on PATH');
+    bounded(sub, pid);
+    process.kill(pid, 'SIGSTOP');
+    await until(sub, () => stateOf(pid) === 'T', 'the owned process is stopped, so a signal sent to it stays pending', {
+      everyMs: 20,
+    });
+    const name = 'ae/l8/1';
+    fs.mkdirSync(path.join(dir, 'runs', 'sh'), { recursive: true });
+    const heartbeatAt = new Date(Date.now() - STALE_MS - 60_000).toISOString();
+    fs.writeFileSync(fileOf(dir, name, '.json'), JSON.stringify({ name, state: 'working', pid, logFile: '/dev/null', heartbeatAt }));
+    const seen = await observed(ops, name);
+    assert.equal(seen?.state, 'failed', 'with no `.launched`, the clock alone judges');
+    if (!seen) throw new Error('unreachable: the run was seen above');
+    await Effect.runPromise(ops.release!(seen, {}));
+    await Effect.runPromise(ops.stop(name));
+    assert.equal(pendingOf(pid), 0n, 'the pid on a run file nothing identifies was sent no signal');
+    assert.ok(fs.existsSync(fileOf(dir, name, '.stop')), 'and the stop is left on disk for a worker that starts late');
+  });
+  test('release of a run whose worker still runs sends nothing: its harness ends on its own, completed', async (sub) => {
     const dir = scratch('ae-left-');
     const go = path.join(dir, 'go');
     const ops = detachedOps(sh(`while [ ! -e '${go}' ]; do sleep 0.05; done; exit 0`), dir, QUICK);

@@ -20,18 +20,20 @@ holds what every change needs.
 
 ## Check your work
 
-- `npm test` — turbo runs `node --test test/*.test.ts` in every package, and `src/**/*.test.ts` where a package keeps tests beside its
-  code, in parallel, with `--continue`; each package runs two test files at a time (`--test-concurrency=2` in its `test` script,
-  chosen to keep a suite near 2 GB; `suite.test.ts` holds them equal). Not bare `node --test` from the root, nor a higher bound by
-  hand. `agent-orchestrator`'s script takes one knob besides: `WF_TEST_SHARD=<i>/<n>` runs the `<i>`th of `<n>` shards of its suite,
+- `npm test` — turbo runs `vitest run` in every package, under the package's own `vitest.config.ts`: `test/*.test.ts`, and
+  `src/**/*.test.ts` where a package keeps tests beside its code, each file in a process of its own (`pool: 'forks'`), its seats as
+  `setupFiles` (the package's own, then `test-kit/seat`), a test and a hook at 120 s; in parallel, with `--continue`; each package runs
+  two test files at a time (`maxWorkers: 2` in its config, chosen to keep a suite near 2 GB; `suite.test.ts` holds them equal). Not a
+  bare `vitest` from the root, nor a higher bound by hand. Tests keep `node:assert`; the runner is Vitest 5.1.0, pinned in each
+  workspace, and `tools/guards/test/runner.test.ts` refuses a file that imports `node:test`. `agent-orchestrator`'s script takes one
+  knob besides: `WF_TEST_SHARD=<i>/<n>` runs the `<i>`th of `<n>` shards of its suite (`--shard`),
   which `ci` sets per shard leg of that package (`.github/workflows/ci.yml`); unset — a person's run, a run's check — it runs every
   file. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:`
   first: a file marked `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.
 - **A step's session runs the tests of what it changed; the run's checks run the whole suite.** The test files about each file it
   changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
-  the tests for its path), each from its package's folder as its `test` script loads it: `node --import ./test/ambient.ts --test <file>`
-  in `packages/agent-orchestrator`, `node --import ./test/harness.ts --test <file>` in `apps/api`, `node --test <file>` in
-  `packages/agent-runtime`, `packages/objects`, `apps/web`, `apps/cli`, `packages/templates` and `tools/guards`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
+  the tests for its path), each from its package's folder, where its config loads its seats: `npx vitest run <file>` in every
+  package, and `npx vitest run --project=node <file>` in `apps/web`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
   test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
   (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
@@ -75,10 +77,10 @@ holds what every change needs.
   every workspace's tests and `comments.test.ts` over every source — are re-run the same way after a test, a doc or a name moves
   anywhere. So is `agent-orchestrator`'s `words.test.ts`, which reads every source and test file of every package for harness words,
   team names and paths into the team's workflows: due after a source or test file is added or renamed in any package, it is
-  `node --import ./test/ambient.ts --test test/words.test.ts` in `packages/agent-orchestrator`, and takes under a second.
+  `npx vitest run test/words.test.ts` in `packages/agent-orchestrator`, and takes under a second.
 - A change to tests alone shows that no source file's coverage dropped: `node tools/coverage/record.ts <package-dir> --out
   before.json` before it and `after.json` after, then `node tools/coverage/compare.ts before.json after.json`, which exits 1 naming
-  each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.
+  each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite with Vitest's v8 coverage (`@vitest/coverage-v8`).
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
   passes there and fails by hand. All of it but the telemetry, which the runtime takes out of every child that is no session, and the
   daemon's per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_MEMORY_REQUEST`, `WF_MEMORY_RESERVED`,
@@ -103,7 +105,7 @@ holds what every change needs.
   paths except those its row lists as `kept`, each with why; a rename still in flight holds its counts in
   `tools/guards/test/glossary.baseline.ts`, which only shrinks. A row cites each path from the repository's root
   (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the
-  docs' tests, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does
+  docs' tests, `npx vitest run` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does
   not find them.
 - **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
   `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.

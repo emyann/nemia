@@ -8,7 +8,7 @@
  * Each refusal is made to refuse, at shipped defaults, and each fact about the card is made to fail with the fixture that
  * breaks it: a card whose scheme is taken off makes `authOf` send no header, which is why the scheme is on it.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Cause, Effect, Exit, Stream } from 'effect';
 import type { AgentCard } from '@a2a-js/sdk';
@@ -58,16 +58,15 @@ const servedOn = (ops: RunnerOps = handOps()) => {
   return { card, inner, handler: new ServedHandler(inner, card) };
 };
 
-test("a viewer follows a holder's session: the card the holder serves, read back with its scheme, its three methods, and a seam that dials the follow alone, asked at each follow", async (t) => {
-  const s = story(t);
-  await s.test('the served card declares one JSONRPC interface at the port, at A2A 1.0, where the in-process card declares none', () => {
+describe("a viewer follows a holder's session: the card the holder serves, read back with its scheme, its three methods, and a seam that dials the follow alone, asked at each follow", () => {
+  const s = story(test);
+  s.test('the served card declares one JSONRPC interface at the port, at A2A 1.0, where the in-process card declares none', () => {
     const ops = handOps();
     const { card } = servedOn(ops);
     assert.deepEqual(card.supportedInterfaces, [{ url: URL_AT, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '1.0' }]);
     assert.deepEqual(cardOf('claude', ops).supportedInterfaces, [], 'the in-process road has no URL, so its card offers no interface');
   });
-
-  await s.test('the served card carries the bearer scheme and the requirement that names it, so a client sends the token', () => {
+  s.test('the served card carries the bearer scheme and the requirement that names it, so a client sends the token', () => {
     const { card } = servedOn();
     const asked: Array<[string, string, string]> = [];
     const auth = authOf(card, URL_AT, 'claude', (scheme, agentUrl, harness) => {
@@ -77,8 +76,7 @@ test("a viewer follows a holder's session: the card the holder serves, read back
     assert.deepEqual(auth, { headers: { authorization: 'Bearer tok-1' } });
     assert.deepEqual(asked, [[BEARER, URL_AT, 'claude']], 'the secret is asked for the scheme the card names, for this agent and harness');
   });
-
-  await s.test(
+  s.test(
     'the served card lists no method of the runtime extension and no `say`, where the in-process card lists what the driver has',
     () => {
       const ops = handOps();
@@ -91,8 +89,7 @@ test("a viewer follows a holder's session: the card the holder serves, read back
       assert.deepEqual(paramsOf(card), { methods: [], say: false }, 'the port answers no method of ours, and takes no words');
     },
   );
-
-  await s.test('the served card is read back by a viewer as the card of an agent given inline', () => {
+  s.test('the served card is read back by a viewer as the card of an agent given inline', () => {
     const { card } = servedOn();
     const json = cardJsonOf(card);
     const read = cardOfJson(json);
@@ -108,8 +105,7 @@ test("a viewer follows a holder's session: the card the holder serves, read back
     );
     assert.equal(holderAgentRefusal('claude', { card: json }), undefined);
   });
-
-  await s.test('the three served methods are the handler the runtime already had: its card, its Task and its stream', async () => {
+  s.test('the three served methods are the handler the runtime already had: its card, its Task and its stream', async () => {
     const { card, inner, handler } = servedOn();
     assert.deepEqual(await handler.getAgentCard(), card, 'the card is the served one, never the in-process one');
     assert.deepEqual(
@@ -127,8 +123,7 @@ test("a viewer follows a holder's session: the card the holder serves, read back
       'the stream is the driver’s own moments, one answer each',
     );
   });
-
-  await s.test('the viewer dials its `follow` and nothing else: every other verb is the value it was', () => {
+  s.test('the viewer dials its `follow` and nothing else: every other verb is the value it was', () => {
     const ops = handOps() as SeamOps;
     const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
     const dialled = holderSeamOf(
@@ -150,22 +145,17 @@ test("a viewer follows a holder's session: the card the holder serves, read back
       'a harness with no holder function is left as it is',
     );
   });
-
-  await s.test(
-    'a holder function answering nothing reads the session here: the follow is the ops’ own, and nothing is dialled',
-    async () => {
-      const ops = handOps() as SeamOps;
-      const seam = holderSeamOf(
-        () => undefined,
-        'claude',
-        () => 'tok-1',
-        ops,
-      );
-      assert.deepEqual(await Effect.runPromise(Stream.runCollect(seam.follow!(NAME))), MOMENTS, 'the moments are the ones the ops give');
-    },
-  );
-
-  await s.test('the holder is asked at each follow, not at the build: nothing first, a card second, on one seam', async () => {
+  s.test('a holder function answering nothing reads the session here: the follow is the ops’ own, and nothing is dialled', async () => {
+    const ops = handOps() as SeamOps;
+    const seam = holderSeamOf(
+      () => undefined,
+      'claude',
+      () => 'tok-1',
+      ops,
+    );
+    assert.deepEqual(await Effect.runPromise(Stream.runCollect(seam.follow!(NAME))), MOMENTS, 'the moments are the ones the ops give');
+  });
+  s.test('the holder is asked at each follow, not at the build: nothing first, a card second, on one seam', async () => {
     const ops = handOps() as SeamOps;
     const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
     let holding = false;
@@ -188,8 +178,8 @@ test("a viewer follows a holder's session: the card the holder serves, read back
   });
 });
 
-test("REFUSED: a card with no scheme, a viewer with no secret, a method the port does not serve, and a holder refused at the follow, before the engine builds and in the options' order", async (t) => {
-  await t.test('REFUSED: the same card with its schemes taken off asks for nothing, and a client sends no header', () => {
+describe("REFUSED: a card with no scheme, a viewer with no secret, a method the port does not serve, and a holder refused at the follow, before the engine builds and in the options' order", () => {
+  test('REFUSED: the same card with its schemes taken off asks for nothing, and a client sends no header', () => {
     const { card } = servedOn();
     const bare: AgentCard = { ...card, securitySchemes: {}, securityRequirements: [] };
     assert.deepEqual(
@@ -198,8 +188,7 @@ test("REFUSED: a card with no scheme, a viewer with no secret, a method the port
       'no requirement, no header: the port would refuse it',
     );
   });
-
-  await t.test('REFUSED: a viewer whose `credentials` answers nothing is refused in words naming the scheme and what to give', () => {
+  test('REFUSED: a viewer whose `credentials` answers nothing is refused in words naming the scheme and what to give', () => {
     const { card } = servedOn();
     const auth = authOf(card, URL_AT, 'claude', () => undefined);
     assert.ok('refusal' in auth, `a secret that is not there is a refusal: ${JSON.stringify(auth)}`);
@@ -207,60 +196,51 @@ test("REFUSED: a card with no scheme, a viewer with no secret, a method the port
     assert.match(auth.refusal, /`credentials`/);
     assert.match(auth.refusal, /Nothing was sent\.$/);
   });
-
-  await t.test(
-    'REFUSED, at shipped defaults: every method the port does not serve, each naming itself and what the port is for',
-    async () => {
-      const { handler } = servedOn();
-      const calls: Record<keyof typeof REFUSED, () => Promise<unknown>> = {
-        sendMessage: () => handler.sendMessage({} as never, ctx),
-        sendMessageStream: async () => handler.sendMessageStream({} as never, ctx).next(),
-        cancelTask: () => handler.cancelTask({} as never, ctx),
-        listTasks: () => handler.listTasks({} as never, ctx),
-        createTaskPushNotificationConfig: () => handler.createTaskPushNotificationConfig({} as never, ctx),
-        getTaskPushNotificationConfig: () => handler.getTaskPushNotificationConfig({} as never, ctx),
-        listTaskPushNotificationConfigs: () => handler.listTaskPushNotificationConfigs({} as never, ctx),
-        deleteTaskPushNotificationConfig: () => handler.deleteTaskPushNotificationConfig({} as never, ctx),
-        getAuthenticatedExtendedAgentCard: () => handler.getAuthenticatedExtendedAgentCard({} as never, ctx),
-      };
-      for (const [method, call] of Object.entries(calls)) {
-        const err = await call().then(
-          () => undefined,
-          (e: unknown) => e,
-        );
-        assert.ok(err instanceof UnsupportedOperationError, `${method} is refused in the SDK's own error: ${String(err)}`);
-        assert.match(err.message, new RegExp(`\`${method}\` is not served here`), method);
-        assert.match(err.message, /This port reads a session/, method);
-      }
-    },
-  );
-
-  await t.test(
-    'REFUSED at the follow: an entry with a key other than `card`, and a card that does not decode — and nothing is dialled',
-    async () => {
-      const ops = handOps() as SeamOps;
-      const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
-      const asked: string[] = [];
-      const credentials = (scheme: string) => {
-        asked.push(scheme);
-        return 'tok-1';
-      };
-      const failed = async (agent: unknown) => {
-        const seam = holderSeamOf(() => agent as never, 'claude', credentials, ops);
-        const exit = await Effect.runPromise(Effect.exit(Stream.runCollect(seam.follow!(NAME))));
-        assert.equal(exit._tag, 'Failure', `the follow fails: ${JSON.stringify(exit)}`);
-        return String(exit);
-      };
-      assert.match(await failed({ url: 'http://a.example' }), /takes `card` and nothing else, and was given `url`/);
-      assert.match(
-        await failed({ card: { ...card, supportedInterfaces: [] } }),
-        /has no card this runtime reads: its `supportedInterfaces` /,
+  test('REFUSED, at shipped defaults: every method the port does not serve, each naming itself and what the port is for', async () => {
+    const { handler } = servedOn();
+    const calls: Record<keyof typeof REFUSED, () => Promise<unknown>> = {
+      sendMessage: () => handler.sendMessage({} as never, ctx),
+      sendMessageStream: async () => handler.sendMessageStream({} as never, ctx).next(),
+      cancelTask: () => handler.cancelTask({} as never, ctx),
+      listTasks: () => handler.listTasks({} as never, ctx),
+      createTaskPushNotificationConfig: () => handler.createTaskPushNotificationConfig({} as never, ctx),
+      getTaskPushNotificationConfig: () => handler.getTaskPushNotificationConfig({} as never, ctx),
+      listTaskPushNotificationConfigs: () => handler.listTaskPushNotificationConfigs({} as never, ctx),
+      deleteTaskPushNotificationConfig: () => handler.deleteTaskPushNotificationConfig({} as never, ctx),
+      getAuthenticatedExtendedAgentCard: () => handler.getAuthenticatedExtendedAgentCard({} as never, ctx),
+    };
+    for (const [method, call] of Object.entries(calls)) {
+      const err = await call().then(
+        () => undefined,
+        (e: unknown) => e,
       );
-      assert.deepEqual(asked, [], 'and nothing was dialled: no credential was ever asked for');
-    },
-  );
-
-  await t.test('REFUSED before the engine builds: a holder named for a harness it does not run, and one it does not run attached', () => {
+      assert.ok(err instanceof UnsupportedOperationError, `${method} is refused in the SDK's own error: ${String(err)}`);
+      assert.match(err.message, new RegExp(`\`${method}\` is not served here`), method);
+      assert.match(err.message, /This port reads a session/, method);
+    }
+  });
+  test('REFUSED at the follow: an entry with a key other than `card`, and a card that does not decode — and nothing is dialled', async () => {
+    const ops = handOps() as SeamOps;
+    const card = cardJsonOf(servedCardOf('claude', ops, URL_AT));
+    const asked: string[] = [];
+    const credentials = (scheme: string) => {
+      asked.push(scheme);
+      return 'tok-1';
+    };
+    const failed = async (agent: unknown) => {
+      const seam = holderSeamOf(() => agent as never, 'claude', credentials, ops);
+      const exit = await Effect.runPromise(Effect.exit(Stream.runCollect(seam.follow!(NAME))));
+      assert.equal(exit._tag, 'Failure', `the follow fails: ${JSON.stringify(exit)}`);
+      return String(exit);
+    };
+    assert.match(await failed({ url: 'http://a.example' }), /takes `card` and nothing else, and was given `url`/);
+    assert.match(
+      await failed({ card: { ...card, supportedInterfaces: [] } }),
+      /has no card this runtime reads: its `supportedInterfaces` /,
+    );
+    assert.deepEqual(asked, [], 'and nothing was dialled: no credential was ever asked for');
+  });
+  test('REFUSED before the engine builds: a holder named for a harness it does not run, and one it does not run attached', () => {
     const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
     const place = { harnesses: ['claude', 'reviewer', 'stand'], claude: true };
     const held = () => ({ card });
@@ -290,8 +270,7 @@ test("REFUSED: a card with no scheme, a viewer with no secret, a method the port
     assert.equal(holderRefusal('claude', held, place), undefined, 'and a function for a harness it runs attached is taken');
     assert.equal(holderAgentRefusal('claude', { card }), undefined, 'as is the card that function answers');
   });
-
-  await t.test('REFUSED at the follow: what a holder function answers that this runtime cannot dial', () => {
+  test('REFUSED at the follow: what a holder function answers that this runtime cannot dial', () => {
     const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
     assert.match(holderAgentRefusal('claude', { url: 'http://a.example' })!, /takes `card` and nothing else, and was given `url`/);
     assert.match(holderAgentRefusal('claude', 'a-card')!, /takes `card` and nothing else, and was given a string/);
@@ -300,59 +279,55 @@ test("REFUSED: a card with no scheme, a viewer with no secret, a method the port
       /has no card this runtime reads: its `supportedInterfaces` /,
     );
   });
-
-  await t.test(
-    'REFUSED by the options, in their fixed order: a ceiling and a harness speak before a holder, and a holder before the rest',
-    () => {
-      const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
-      const harnesses = { claude: 'claude' } as const;
-      assert.equal(
-        optionsRefusalOf({ harnesses, holder: { claude: () => ({ card }) } }),
-        undefined,
-        'a holder of a harness it runs, with the card it served',
-      );
-      assert.match(
-        optionsRefusalOf({ harnesses, holder: { codex: () => ({ card }) } })!,
-        /`holder` names the `codex` harness, which this engine does not run/,
-      );
-      assert.match(
-        optionsRefusalOf({
-          harnesses: { claude: 'claude', reviewer: { url: 'https://a.example' } },
-          holder: { reviewer: () => ({ card }) },
-        })!,
-        /`holder` names the `reviewer` harness, which this engine does not run as Claude Code attached/,
-      );
-      assert.match(
-        optionsRefusalOf({ harnesses: { claude: 'claude', stand: handOps() }, holder: { stand: () => ({ card }) } })!,
-        /`holder` names the `stand` harness, which this engine does not run as Claude Code attached/,
-        'a local harness that is not Claude Code attached is no holder either: its sessions are read off the store',
-      );
-      assert.equal(
-        optionsRefusalOf({ holder: { claude: () => ({ card }) } }),
-        undefined,
-        'and an engine given no `harnesses` at all is read against the ones it will run, which have `claude` among them',
-      );
-      assert.match(
-        optionsRefusalOf({ maxConcurrent: 0, harnesses, holder: { codex: () => ({ card }) } })!,
-        /is not a ceiling/,
-        'the ceiling speaks first, before any harness or holder',
-      );
-      assert.match(
-        optionsRefusalOf({ harnesses: { claude: 'claude', other: { ...handOps(), pool: '' } }, holder: { codex: () => ({ card }) } })!,
-        /names the `pool`/,
-        'then the harnesses, before any holder',
-      );
-      assert.match(
-        optionsRefusalOf({ harnesses, holder: { codex: () => ({ card }) }, unschedulable: 'yes' as never })!,
-        /`holder` names the `codex` harness/,
-        'then the holders, before `unschedulable`, `credentials`, `missingCredential` and the telemetry',
-      );
-    },
-  );
+  test('REFUSED by the options, in their fixed order: a ceiling and a harness speak before a holder, and a holder before the rest', () => {
+    const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
+    const harnesses = { claude: 'claude' } as const;
+    assert.equal(
+      optionsRefusalOf({ harnesses, holder: { claude: () => ({ card }) } }),
+      undefined,
+      'a holder of a harness it runs, with the card it served',
+    );
+    assert.match(
+      optionsRefusalOf({ harnesses, holder: { codex: () => ({ card }) } })!,
+      /`holder` names the `codex` harness, which this engine does not run/,
+    );
+    assert.match(
+      optionsRefusalOf({
+        harnesses: { claude: 'claude', reviewer: { url: 'https://a.example' } },
+        holder: { reviewer: () => ({ card }) },
+      })!,
+      /`holder` names the `reviewer` harness, which this engine does not run as Claude Code attached/,
+    );
+    assert.match(
+      optionsRefusalOf({ harnesses: { claude: 'claude', stand: handOps() }, holder: { stand: () => ({ card }) } })!,
+      /`holder` names the `stand` harness, which this engine does not run as Claude Code attached/,
+      'a local harness that is not Claude Code attached is no holder either: its sessions are read off the store',
+    );
+    assert.equal(
+      optionsRefusalOf({ holder: { claude: () => ({ card }) } }),
+      undefined,
+      'and an engine given no `harnesses` at all is read against the ones it will run, which have `claude` among them',
+    );
+    assert.match(
+      optionsRefusalOf({ maxConcurrent: 0, harnesses, holder: { codex: () => ({ card }) } })!,
+      /is not a ceiling/,
+      'the ceiling speaks first, before any harness or holder',
+    );
+    assert.match(
+      optionsRefusalOf({ harnesses: { claude: 'claude', other: { ...handOps(), pool: '' } }, holder: { codex: () => ({ card }) } })!,
+      /names the `pool`/,
+      'then the harnesses, before any holder',
+    );
+    assert.match(
+      optionsRefusalOf({ harnesses, holder: { codex: () => ({ card }) }, unschedulable: 'yes' as never })!,
+      /`holder` names the `codex` harness/,
+      'then the holders, before `unschedulable`, `credentials`, `missingCredential` and the telemetry',
+    );
+  });
 });
 
-test('the harnesses a holder serves: the literal `claude` and no other, by default too, and none for an engine with none', async (t) => {
-  await t.test('an engine given no `harnesses` builds with a holder of the `claude` harness it runs by default', () => {
+describe('the harnesses a holder serves: the literal `claude` and no other, by default too, and none for an engine with none', () => {
+  test('an engine given no `harnesses` builds with a holder of the `claude` harness it runs by default', () => {
     const card = cardJsonOf(servedCardOf('claude', handOps(), URL_AT));
     const engine = builtEngine(
       Engine.layer({ root: scratch('ae-holder-default-'), holder: { claude: () => ({ card }) }, credentials: () => 'tok-1' }),
@@ -363,8 +338,7 @@ test('the harnesses a holder serves: the literal `claude` and no other, by defau
       'the engine built: a holder is read against the harnesses it will run, not against none',
     );
   });
-
-  await t.test('heldHarnessesOf: the harnesses configured as the literal `claude` and no other', () => {
+  test('heldHarnessesOf: the harnesses configured as the literal `claude` and no other', () => {
     assert.deepEqual(
       heldHarnessesOf({
         claude: 'claude',
@@ -378,8 +352,7 @@ test('the harnesses a holder serves: the literal `claude` and no other, by defau
     );
     assert.deepEqual(heldHarnessesOf({}), [], 'and a configuration with none holds none');
   });
-
-  await t.test('an engine with no `claude` harness serves nothing: its `hold()` answers null', async () => {
+  test('an engine with no `claude` harness serves nothing: its `hold()` answers null', async () => {
     const engine = builtEngine(Engine.layer({ root: scratch('ae-holds-none-'), harnesses: { codex, stand: handOps() } }));
     const held = await Effect.runPromise(Effect.scoped(engine.hold()));
     assert.equal(held, null, 'there is nothing one process holds attached, so there is no port to serve');
@@ -433,39 +406,28 @@ const followed = async (runner: Pick<RunnerOps, 'follow'>, name: string) => {
   return { got, exit };
 };
 
-test("a session followed through the seam: the card says it streams, each moment once and in order, and an ended Task, a driver's refusal or failure, or no follow at all refused in words", async (t) => {
-  await t.test(
-    "the card says a driver that follows sessions streams, and the seam's runner follows; one that does not, neither",
-    async () => {
-      const streaming = a2aOps('fake', driver(Stream.empty).ops, async () => []);
-      const not = a2aOps('fake', driver(undefined).ops, async () => []);
-      assert.equal(
-        (await new HarnessHandler('fake', driver(Stream.empty).ops, async () => []).getAgentCard()).capabilities?.streaming,
-        true,
-      );
-      assert.equal((await new HarnessHandler('fake', driver(undefined).ops, async () => []).getAgentCard()).capabilities?.streaming, false);
-      assert.equal(typeof streaming.follow, 'function');
-      assert.equal(not.follow, undefined);
-    },
-  );
-
-  await t.test(
-    'a session followed through the seam: each moment once, in order, the Task as it stands first, and the stream ends when the session settles',
-    async () => {
-      const d = driver(Stream.fromIterable(SAID));
-      const first = await new HarnessHandler('fake', d.ops, async () => []).resubscribe({ tenant: '', id: 'ae/t-1/1' }, ctx).next();
-      assert.equal(first.value?.payload?.$case, 'task');
-      const { got, exit } = await followed(
-        a2aOps('fake', d.ops, async () => []),
-        'ae/t-1/1',
-      );
-      assert.ok(Exit.isSuccess(exit));
-      assert.deepEqual(got, SAID);
-      assert.deepEqual(d.follows, ['ae/t-1/1', 'ae/t-1/1']);
-    },
-  );
-
-  await t.test('REFUSED: a subscription to a Task that has ended, in the words that say to read its transcript', async () => {
+describe("a session followed through the seam: the card says it streams, each moment once and in order, and an ended Task, a driver's refusal or failure, or no follow at all refused in words", () => {
+  test("the card says a driver that follows sessions streams, and the seam's runner follows; one that does not, neither", async () => {
+    const streaming = a2aOps('fake', driver(Stream.empty).ops, async () => []);
+    const not = a2aOps('fake', driver(undefined).ops, async () => []);
+    assert.equal((await new HarnessHandler('fake', driver(Stream.empty).ops, async () => []).getAgentCard()).capabilities?.streaming, true);
+    assert.equal((await new HarnessHandler('fake', driver(undefined).ops, async () => []).getAgentCard()).capabilities?.streaming, false);
+    assert.equal(typeof streaming.follow, 'function');
+    assert.equal(not.follow, undefined);
+  });
+  test('a session followed through the seam: each moment once, in order, the Task as it stands first, and the stream ends when the session settles', async () => {
+    const d = driver(Stream.fromIterable(SAID));
+    const first = await new HarnessHandler('fake', d.ops, async () => []).resubscribe({ tenant: '', id: 'ae/t-1/1' }, ctx).next();
+    assert.equal(first.value?.payload?.$case, 'task');
+    const { got, exit } = await followed(
+      a2aOps('fake', d.ops, async () => []),
+      'ae/t-1/1',
+    );
+    assert.ok(Exit.isSuccess(exit));
+    assert.deepEqual(got, SAID);
+    assert.deepEqual(d.follows, ['ae/t-1/1', 'ae/t-1/1']);
+  });
+  test('REFUSED: a subscription to a Task that has ended, in the words that say to read its transcript', async () => {
     const d = driver(Stream.fromIterable<Followed>([{ kind: 'state', state: 'completed' }]));
     const words = 'session `ae/t-1/1` has ended (completed): there is nothing to follow. Read its transcript (sessionTranscript).';
     await assert.rejects(
@@ -481,8 +443,7 @@ test("a session followed through the seam: the card says it streams, each moment
     const error = Cause.squash(exit.cause) as RunnerError;
     assert.deepEqual([error._tag, error.verb, error.message, error.refused], ['RunnerError', 'follow', words, true]);
   });
-
-  await t.test("REFUSED: a driver's refusal reaches the follower as a refusal, and its failure as a failure, in its words", async () => {
+  test("REFUSED: a driver's refusal reaches the follower as a refusal, and its failure as a failure, in its words", async () => {
     const refused = new RunnerError({ verb: 'follow', message: 'fake: this session does not stream.', refused: true });
     const failed = new RunnerError({ verb: 'follow', message: 'fake: the output cannot be read.' });
     const one = await followed(
@@ -501,8 +462,7 @@ test("a session followed through the seam: the card says it streams, each moment
     assert.deepEqual(words(two.exit), ['fake: the output cannot be read.', false]);
     assert.deepEqual(two.got, [{ kind: 'state', state: 'working' }]);
   });
-
-  await t.test('REFUSED: a subscription where the driver follows no session, asking it nothing', async () => {
+  test('REFUSED: a subscription where the driver follows no session, asking it nothing', async () => {
     await assert.rejects(
       new HarnessHandler('fake', driver(undefined).ops, async () => []).resubscribe({ tenant: '', id: 'ae/t-1/1' }, ctx).next(),
       (e) => e instanceof UnsupportedOperationError && e.message === 'this agent does not stream: poll getTask.',

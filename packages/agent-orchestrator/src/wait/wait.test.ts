@@ -7,7 +7,7 @@
  * The same waits told over a store, the test place and the engine's stand-in — a diamond plan, a parent that will not land, context
  * without a wait — are in `test/waiting.test.ts`; a hold over a store in `test/hold.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   afterRefusal,
@@ -45,8 +45,8 @@ const landedOnly = (...ids: string[]) => {
 /** Another run's record, as a parent's. */
 const record = (id: string, rest: Partial<RepositoryRun> = {}): Run => run({ implement: 'x' }, { id, ...rest });
 
-test('readiness under `after`: a run is ready once every parent landed, and a run that started, or was called off, reads none', async (t) => {
-  await t.test('a record from before there was an `after` reads as ready, and so does one started without one — no parent read', () => {
+describe('readiness under `after`: a run is ready once every parent landed, and a run that started, or was called off, reads none', () => {
+  test('a record from before there was an `after` reads as ready, and so does one started without one — no parent read', () => {
     const legacy = run({ implement: null, review: null });
     assert.equal(Object.hasOwn(legacy, 'after'), false);
     const { asked, landed } = landedOnly();
@@ -59,18 +59,15 @@ test('readiness under `after`: a run is ready once every parent landed, and a ru
       'and its first step is ready exactly as before',
     );
   });
-  await t.test(
-    'REFUSED: a parent not landed is not ready, pass after pass — every parent must land, each not landed named in order',
-    () => {
-      const child = run({ implement: null, review: null }, { after: ['a-1', 'b-2'] });
-      for (let pass = 0; pass < 3; pass++) assert.equal(runReady(child, landedOnly().landed), false);
-      assert.deepEqual(waitingOn(child, landedOnly().landed), ['a-1', 'b-2']);
-      assert.equal(runReady(child, landedOnly('a-1').landed), false, 'one of two is not enough');
-      assert.deepEqual(waitingOn(child, landedOnly('a-1').landed), ['b-2']);
-      assert.equal(runReady(child, landedOnly('a-1', 'b-2').landed), true);
-    },
-  );
-  await t.test('a run that has started is never gated again: its parents are not read — nor in a round that left no step filed', () => {
+  test('REFUSED: a parent not landed is not ready, pass after pass — every parent must land, each not landed named in order', () => {
+    const child = run({ implement: null, review: null }, { after: ['a-1', 'b-2'] });
+    for (let pass = 0; pass < 3; pass++) assert.equal(runReady(child, landedOnly().landed), false);
+    assert.deepEqual(waitingOn(child, landedOnly().landed), ['a-1', 'b-2']);
+    assert.equal(runReady(child, landedOnly('a-1').landed), false, 'one of two is not enough');
+    assert.deepEqual(waitingOn(child, landedOnly('a-1').landed), ['b-2']);
+    assert.equal(runReady(child, landedOnly('a-1', 'b-2').landed), true);
+  });
+  test('a run that has started is never gated again: its parents are not read — nor in a round that left no step filed', () => {
     const { asked, landed } = landedOnly();
     assert.equal(runReady(run({ implement: 't1', review: null }, { after: ['a-1'] }), landed), true);
     const between = run({ implement: null, review: null }, { after: ['a-1'] });
@@ -84,23 +81,26 @@ test('readiness under `after`: a run is ready once every parent landed, and a ru
       [false, true, false],
     );
   });
-  await t.test('a cancelled run waits on nothing, and reads no parent: it files nothing anyway', () => {
+  test('a cancelled run waits on nothing, and reads no parent: it files nothing anyway', () => {
     const { asked, landed } = landedOnly();
     assert.deepEqual(waitingOn(run({ implement: null }, { after: ['a-1'], cancelledAt: '2026-09-14T09:00:00Z' }), landed), []);
     assert.deepEqual(asked, []);
   });
 });
 
-test('`waitsOf` says why a parent may never land — no such run, cancelled, a result branch gone — and `waitWord` and `waitAdvice` say it', async (t) => {
+describe('`waitsOf` says why a parent may never land — no such run, cancelled, a result branch gone — and `waitWord` and `waitAdvice` say it', () => {
   const child = run({ implement: null, review: null }, { id: 'c-1', after: ['a-1', 'b-2', 'x-9', 'g-3'] });
+  let waits!: Wait[];
+  beforeAll(() => {
+    waits = waitsOf(child, (id) => parents[id] ?? { landed: false });
+  });
   const at = '2026-09-14T10:00:00Z';
   const parents: Record<string, ParentRun> = {
     'a-1': { record: record('a-1'), landed: false },
     'b-2': { record: record('b-2', { cancelledAt: at }), landed: false },
     'g-3': { record: record('g-3'), landed: false, gone: ['wf/g-3/implement'] },
   };
-  const waits = waitsOf(child, (id) => parents[id] ?? { landed: false });
-  await t.test('each wait, in the order `after` names them', () => {
+  test('each wait, in the order `after` names them', () => {
     assert.deepEqual(waits, [
       { run: 'a-1' },
       { run: 'b-2', cancelledAt: at },
@@ -108,17 +108,17 @@ test('`waitsOf` says why a parent may never land — no such run, cancelled, a r
       { run: 'g-3', gone: ['wf/g-3/implement'] },
     ]);
   });
-  await t.test('`waitWord` names each, and why it may never land', () => {
+  test('`waitWord` names each, and why it may never land', () => {
     assert.equal(waitWord(waits), 'waiting on a-1, b-2 (cancelled), x-9 (no such run), g-3 (wf/g-3/implement gone)');
   });
-  await t.test('`waitAdvice` says why each never lands, and the ways out', () => {
+  test('`waitAdvice` says why each never lands, and the ways out', () => {
     assert.equal(
       waitAdvice(child, waits),
       `b-2 was cancelled at ${at}, and a cancelled run never lands; the store has no run x-9; wf/g-3/implement is gone, and git cannot find it on main` +
         ' — yours to resolve: nemia cancel c-1, or start the work again without --after b-2 --after x-9 --after g-3',
     );
   });
-  await t.test('`waitAdvice` of parents that may still land: nothing to decide yet, one or two named', () => {
+  test('`waitAdvice` of parents that may still land: nothing to decide yet, one or two named', () => {
     assert.equal(
       waitAdvice(child, [{ run: 'a-1' }]),
       'nothing of c-1 is filed until nemia decide says a-1 has landed on main; nothing to decide yet',
@@ -130,7 +130,7 @@ test('`waitsOf` says why a parent may never land — no such run, cancelled, a r
   });
 });
 
-test('`listing` puts `waiting on <run>` on each root of a waiting run, where `waiting` would be — and on none of a run called off or started', async (t) => {
+describe('`listing` puts `waiting on <run>` on each root of a waiting run, where `waiting` would be — and on none of a run called off or started', () => {
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
   const child = run({ a: null, b: null, c: null }, { after: ['p-1'] });
   const waits: Wait[] = [{ run: 'p-1', cancelledAt: '2026-09-14T10:00:00Z' }];
@@ -179,7 +179,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
     ],
   ];
   for (const [what, r, phase, given, statuses, waiting] of rows) {
-    await t.test(what, () => {
+    test(what, () => {
       const said = listed(r, phase, given);
       assert.deepEqual(
         said.steps.map((s) => s.message),
@@ -190,31 +190,31 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
   }
 });
 
-test("a pass records the tips of a finished run's result branches — `tipBranches` and `tipsSeen`", async (t) => {
+describe("a pass records the tips of a finished run's result branches — `tipBranches` and `tipsSeen`", () => {
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
   const branched = (rest: Partial<RepositoryRun> = {}): Run => {
     const r = run({ a: 't1', b: 't2', c: 't3' }, rest);
     return { ...r, steps: Object.fromEntries(Object.entries(r.steps).map(([name, s]) => [name, { ...s, branch: `wf/r-1/${name}` }])) };
   };
-  await t.test('the result branch of a run succeeded or failed, or stopped on a person, and no other', () => {
+  test('the result branch of a run succeeded or failed, or stopped on a person, and no other', () => {
     for (const status of ['succeeded', 'failed', 'awaiting approval', 'waiting'] as const)
       assert.deepEqual(tipBranches(branched(), fan, status), ['wf/r-1/c'], status);
   });
-  await t.test('none of a run running or cancelled, --no-worktree, or that worked on its base branch', () => {
+  test('none of a run running or cancelled, --no-worktree, or that worked on its base branch', () => {
     assert.deepEqual([tipBranches(branched(), fan, 'running'), tipBranches(branched(), fan, 'cancelled')], [[], []]);
     assert.deepEqual(tipBranches(branched({ isolate: false }), fan, 'succeeded'), []);
     const branches = branched();
     const onBase = { ...branches, steps: { ...branches.steps, c: { taskId: 't3', branch: 'main' } } };
     assert.deepEqual(tipBranches(onBase, fan, 'succeeded'), []);
   });
-  await t.test('a chain on one line: its one branch', () => {
+  test('a chain on one line: its one branch', () => {
     const chain = run(
       { implement: 't1', review: 't2' },
       { steps: { implement: { taskId: 't1', branch: 'wf/r-1/implement' }, review: { taskId: 't2', branch: 'wf/r-1/implement' } } },
     );
     assert.deepEqual(tipBranches(chain, STEPS, 'succeeded'), ['wf/r-1/implement']);
   });
-  await t.test('`tipsSeen` writes what moved, nothing when none did, and keeps a tip once its branch is gone', () => {
+  test('`tipsSeen` writes what moved, nothing when none did, and keeps a tip once its branch is gone', () => {
     const seenOnce = tipsSeen(branched(), ['wf/r-1/c'], { 'wf/r-1/c': 'aaa', 'wf/r-1/a': 'zzz' });
     assert.deepEqual(seenOnce, { 'wf/r-1/c': 'aaa' });
     assert.equal(tipsSeen(branched(), ['wf/r-1/c'], {}), undefined, 'nothing seen, nothing to write');
@@ -225,7 +225,7 @@ test("a pass records the tips of a finished run's result branches — `tipBranch
   });
 });
 
-test('REFUSED by name at `nemia start --after` (`afterRefusal`), read from the record and git alone', async (t) => {
+describe('REFUSED by name at `nemia start --after` (`afterRefusal`), read from the record and git alone', () => {
   const at = '2026-09-14T10:00:00Z';
   const folderRun: Run = {
     ...record('n-1'),
@@ -281,20 +281,17 @@ test('REFUSED by name at `nemia start --after` (`afterRefusal`), read from the r
     ]) as Array<[string, readonly string[], Parameters<typeof afterRefusal>[1], string[]]>),
   ];
   for (const [what, after, child, facts] of rows) {
-    await t.test(what, () => namesFor(what, afterRefusal(after, child, parentOf), ...facts));
+    test(what, () => namesFor(what, afterRefusal(after, child, parentOf), ...facts));
   }
-  await t.test(
-    'allowed: no parent, a parent still to land, one on the same repository however it is spelled — and a folder run with none',
-    () => {
-      assert.equal(afterRefusal([], onRepo, parentOf), null);
-      assert.equal(afterRefusal(['a-1'], onRepo, parentOf), null);
-      assert.equal(afterRefusal(['a-1'], { repo: '/repo/', branch: 'main' }, parentOf), null);
-      assert.equal(afterRefusal([], folderChild, parentOf), null);
-    },
-  );
+  test('allowed: no parent, a parent still to land, one on the same repository however it is spelled — and a folder run with none', () => {
+    assert.equal(afterRefusal([], onRepo, parentOf), null);
+    assert.equal(afterRefusal(['a-1'], onRepo, parentOf), null);
+    assert.equal(afterRefusal(['a-1'], { repo: '/repo/', branch: 'main' }, parentOf), null);
+    assert.equal(afterRefusal([], folderChild, parentOf), null);
+  });
 });
 
-test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvice` say it and what is left to a person', async (t) => {
+describe('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvice` say it and what is left to a person', () => {
   const r = { id: 'r-1', branch: 'main' } as Parameters<typeof holdAdvice>[0];
   const said = { why: 'merge conflicts', by: 'operator' };
   const words: Array<[string, Wait[], Parameters<typeof holdWord>[1] | undefined, string]> = [
@@ -316,7 +313,7 @@ test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvi
     ['the words on a hold that names no run', [], said, 'held until a person lifts it (why: merge conflicts; by operator)'],
   ];
   for (const [what, waits, given, line] of words) {
-    await t.test(`holdWord: ${what}`, () => assert.equal(holdWord(waits, given), line));
+    test(`holdWord: ${what}`, () => assert.equal(holdWord(waits, given), line));
   }
   const advice: Array<[string, Wait[], string]> = [
     [
@@ -336,13 +333,13 @@ test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvi
     ],
   ];
   for (const [what, waits, line] of advice) {
-    await t.test(`holdAdvice: ${what}`, () => assert.equal(holdAdvice(r, waits), line));
+    test(`holdAdvice: ${what}`, () => assert.equal(holdAdvice(r, waits), line));
   }
-  await t.test('never that the run waits on you', () => {
+  test('never that the run waits on you', () => {
     for (const w of [[{ run: 'a-1' }], [{ run: 'a-1', missing: true as const }], [{ run: 'a-1', landed: true as const }], []])
       assert.doesNotMatch(`${holdWord(w)} ${holdAdvice(r, w)}`, /waiting on you/);
   });
-  await t.test('`holdsOf`: one run not landed is the whole of what holds it; all landed, each named as landed', () => {
+  test('`holdsOf`: one run not landed is the whole of what holds it; all landed, each named as landed', () => {
     const held = { ...r, hold: { at: 't', until: ['a-1', 'b-2'] } } as Parameters<typeof holdsOf>[0];
     assert.deepEqual(
       holdsOf(held, (id) => ({ record: { id } as never, landed: id === 'a-1' })),
@@ -356,7 +353,7 @@ test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvi
       ],
     );
   });
-  await t.test('`heldLater` says the hold at the gate it holds back, with the why and who as `holdWord` says them', () => {
+  test('`heldLater` says the hold at the gate it holds back, with the why and who as `holdWord` says them', () => {
     const later = heldLater({ at: 't', until: ['a-1'], why: 'w', by: 'b' }, 'its approval');
     assert.ok(later.startsWith('held until a-1 lands (why: w; by b); '), later);
     assert.equal(later.replace(' (why: w; by b)', ''), heldLater({ at: 't', until: ['a-1'] }, 'its approval'));

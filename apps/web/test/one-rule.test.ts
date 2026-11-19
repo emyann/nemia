@@ -2,7 +2,7 @@
  * One word for a wait and for in flight, the api's: the gauges (`atWork`), a factory's bar (`openBlockOf`) and the waiting bar
  * name the same runs on the same light answer, and no reader of the frame applies the board's own rule for the whole list to it.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -95,37 +95,34 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
 /** The name `text` binds to the data of `useQuery(frameRunsQuery(path))`, where it reads that query. */
 const frameRunsRead = (text: string): string | undefined => /const (\w+) = useQuery\(\s*frameRunsQuery\(path\)\s*\)\.data;/.exec(text)?.[1];
 
-test("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's count chip count the runs waiting off one query", async (t) => {
+describe("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's count chip count the runs waiting off one query", () => {
   const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');
-  await t.test("the frame's query at a page is the Runs page's own, every factory's at the store's level or the factory it sits in", () => {
+  test("the frame's query at a page is the Runs page's own, every factory's at the store's level or the factory it sits in", () => {
     assert.deepEqual(frameRunsQuery('/runs').queryKey, openRunsQuery(undefined, undefined).queryKey, 'every factory');
     assert.deepEqual(frameRunsQuery('/factories/kit/runs').queryKey, openRunsQuery('kit', undefined).queryKey, 'one factory');
     assert.deepEqual(frameRunsQuery('/factories/kit/inbox/c').queryKey, openRunsQuery('kit').queryKey, 'any page of the factory');
     assert.deepEqual(frameRunsQuery('/').queryKey, openRunsQuery().queryKey, 'a store page counts every factory');
     assert.notDeepEqual(frameRunsQuery('/factories/kit/runs').queryKey, openRunsQuery().queryKey, 'a key that tells them apart');
   });
-  await t.test("her cue's runs are that query's counts.waiting, never her presence's own number", () => {
+  test("her cue's runs are that query's counts.waiting, never her presence's own number", () => {
     const dock = read('components/nemia/useNemiaPresence.ts');
     const counted = frameRunsRead(dock);
     assert.ok(counted, "her presence reads the frame's query");
     assert.match(dock, new RegExp(`presenceOf\\(\\s*chat\\.state\\.presence,[^,]+,\\s*${counted}\\?\\.counts\\.waiting\\b`));
     assert.doesNotMatch(dock, /presence\.waitsOnYou/, "the api's own sum is no part of the cue");
   });
-  await t.test(
-    "the pane's Runs line reads the same query, the rail's Waiting every factory's, and the Runs page its count chip off the same list",
-    () => {
-      const pane = read('components/frame/FactoryPane.tsx');
-      assert.equal(frameRunsRead(pane), 'runs', "the pane's lines read the frame's query");
-      assert.match(pane, /runs\.counts\.waiting/);
-      const rail = read('components/frame/FrameRail.tsx');
-      assert.match(rail, /useQuery\(openRunsQuery\(\)\)/, "the rail's Waiting counts every factory");
-      assert.match(rail, /runs\.data\?\.counts\.waiting/);
-      const page = read('components/run/RunsPage.tsx');
-      assert.match(page, /useSuspenseQuery\(openRunsQuery\(at\.factory, at\.l\)\)/);
-      assert.match(page, /<CountChip count=\{counts\.waiting\}/);
-    },
-  );
-  await t.test('the scan finds a reader of another query', () => {
+  test("the pane's Runs line reads the same query, the rail's Waiting every factory's, and the Runs page its count chip off the same list", () => {
+    const pane = read('components/frame/FactoryPane.tsx');
+    assert.equal(frameRunsRead(pane), 'runs', "the pane's lines read the frame's query");
+    assert.match(pane, /runs\.counts\.waiting/);
+    const rail = read('components/frame/FrameRail.tsx');
+    assert.match(rail, /useQuery\(openRunsQuery\(\)\)/, "the rail's Waiting counts every factory");
+    assert.match(rail, /runs\.data\?\.counts\.waiting/);
+    const page = read('components/run/RunsPage.tsx');
+    assert.match(page, /useSuspenseQuery\(openRunsQuery\(at\.factory, at\.l\)\)/);
+    assert.match(page, /<CountChip count=\{counts\.waiting\}/);
+  });
+  test('the scan finds a reader of another query', () => {
     assert.equal(frameRunsRead('const counted = useQuery(openRunsQuery()).data;'), undefined);
   });
 });

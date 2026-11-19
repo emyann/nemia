@@ -5,7 +5,7 @@
  * `Invalid` before any run is judged; and only the page's runs are judged. One run is `Missing` under a namespace it is not in
  * (`runIn`). Kinds are asserted, never sentences.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import type { Run as RunObject } from 'objects';

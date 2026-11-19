@@ -10,7 +10,7 @@
  * Where the gate's step is, and how the workflow parses, is `ci-workflow.ts`; the file's agreement with the repository is held next door
  * in `ci-workflow.test.ts`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

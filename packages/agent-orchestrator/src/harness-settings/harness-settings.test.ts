@@ -3,7 +3,7 @@
  * (`filedSettings`), one table each, a row per input; and the keys and the harness `objects`' help of `nemia factory setting` names,
  * held to this table's own.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { FACTORY_SETTABLE, FACTORY_SETTINGS_HARNESS } from 'objects';
@@ -18,7 +18,7 @@ import {
 } from './harness-settings.ts';
 import { HarnessSettings } from './harness-settings.model.ts';
 
-test('a factory sets the allowed Claude Code settings alone, each of its type', async (t) => {
+describe('a factory sets the allowed Claude Code settings alone, each of its type', () => {
   const rows: { name: string; settings: unknown; refused: string | false }[] = [
     { name: 'permissions widen the fence', settings: { claude: { permissions: { allow: ['Bash(*)'] } } }, refused: 'permissions' },
     { name: 'hooks run programs', settings: { claude: { hooks: {} } }, refused: 'hooks' },
@@ -41,7 +41,7 @@ test('a factory sets the allowed Claude Code settings alone, each of its type', 
     { name: 'none', settings: undefined, refused: false },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const refusal = harnessSettingsRefusal(row.settings, 'f');
       if (row.refused === false) assert.equal(refusal, undefined);
       else assert.match(refusal ?? '', new RegExp(row.refused));
@@ -50,42 +50,34 @@ test('a factory sets the allowed Claude Code settings alone, each of its type', 
     });
 });
 
-test('a Claude Code step is filed the allowed settings, its own laid over them', async (t) => {
+describe('a Claude Code step is filed the allowed settings, its own laid over them', () => {
   const off = { attribution: { commit: '', pr: '' } };
-  await t.test('beside an agent’s output style', () =>
-    assert.deepEqual(JSON.parse(filedSettings(off, '{"outputStyle":"p:s"}') ?? ''), { ...off, outputStyle: 'p:s' }),
-  );
-  await t.test('with no settings of its own', () => assert.deepEqual(JSON.parse(filedSettings(off, undefined) ?? ''), off));
-  await t.test('the step’s own wins a key both name', () =>
-    assert.deepEqual(JSON.parse(filedSettings({ language: 'french' }, '{"language":"german"}') ?? ''), { language: 'german' }),
-  );
-  await t.test('none frozen leaves the step’s as they were', () => {
+  test('beside an agent’s output style', () =>
+    assert.deepEqual(JSON.parse(filedSettings(off, '{"outputStyle":"p:s"}') ?? ''), { ...off, outputStyle: 'p:s' }));
+  test('with no settings of its own', () => assert.deepEqual(JSON.parse(filedSettings(off, undefined) ?? ''), off));
+  test('the step’s own wins a key both name', () =>
+    assert.deepEqual(JSON.parse(filedSettings({ language: 'french' }, '{"language":"german"}') ?? ''), { language: 'german' }));
+  test('none frozen leaves the step’s as they were', () => {
     assert.equal(filedSettings(undefined, undefined), undefined);
     assert.equal(filedSettings(undefined, '{"a":1}'), '{"a":1}');
   });
-  await t.test('a hand-edited record’s widening key is never filed', () =>
-    assert.deepEqual(JSON.parse(filedSettings({ ...off, permissions: { allow: ['Bash(*)'] } }, undefined) ?? ''), off),
-  );
+  test('a hand-edited record’s widening key is never filed', () =>
+    assert.deepEqual(JSON.parse(filedSettings({ ...off, permissions: { allow: ['Bash(*)'] } }, undefined) ?? ''), off));
 });
 
-test('a setting is named <harness>.<key>, set and taken off', async (t) => {
-  await t.test('split at its first dot', () =>
-    assert.deepEqual(settingKeyOf('claude.attribution'), { harness: 'claude', key: 'attribution' }),
-  );
-  await t.test('no dot is refused', () => assert.equal(typeof settingKeyOf('attribution'), 'string'));
-  await t.test('set beside the others', () =>
+describe('a setting is named <harness>.<key>, set and taken off', () => {
+  test('split at its first dot', () => assert.deepEqual(settingKeyOf('claude.attribution'), { harness: 'claude', key: 'attribution' }));
+  test('no dot is refused', () => assert.equal(typeof settingKeyOf('attribution'), 'string'));
+  test('set beside the others', () =>
     assert.deepEqual(withSetting({ claude: { language: 'french' } }, 'claude', 'attribution', false), {
       claude: { language: 'french', attribution: false },
-    }),
-  );
-  await t.test('the last taken off leaves none', () =>
-    assert.equal(withoutSetting({ claude: { attribution: false } }, 'claude', 'attribution'), undefined),
-  );
-  await t.test('one taken off keeps the rest', () =>
+    }));
+  test('the last taken off leaves none', () =>
+    assert.equal(withoutSetting({ claude: { attribution: false } }, 'claude', 'attribution'), undefined));
+  test('one taken off keeps the rest', () =>
     assert.deepEqual(withoutSetting({ claude: { attribution: false, language: 'x' } }, 'claude', 'attribution'), {
       claude: { language: 'x' },
-    }),
-  );
+    }));
 });
 
 test("the help of `nemia factory setting` names this table's keys and harness, the words the client prints", () => {

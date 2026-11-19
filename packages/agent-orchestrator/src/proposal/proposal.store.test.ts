@@ -3,7 +3,7 @@
  * memory stand-in, each on a stand-in of its own — what the files say, the stand-in says. And what only the files can be asked: the file
  * a proposal is kept at, and a file that does not read refused `Invalid`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

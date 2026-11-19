@@ -5,7 +5,7 @@
  * older store's level file; whether she was stopped from outside and whether she rests; and a level set that names no task. On a store
  * of its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
@@ -46,29 +46,31 @@ const engineWith = (bridge: TaskView['bridge'], settled: string | null = null) =
 /** `nemia level`, bare, over `engineWith(bridge, settled)`. */
 const levelOver = (bridge: TaskView['bridge'], settled: string | null = null) => runWith(engineWith(bridge, settled), LEVEL.handler({}));
 
-test("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", async (t) => {
-  writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
-  await t.test('her bridge up: the attach line first, then the link', async () => {
+describe("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", () => {
+  beforeAll(() => {
+    writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
+  });
+  test('her bridge up: the attach line first, then the link', async () => {
     const up = await levelOver({ url: LINK });
     assert.deepEqual(up.reach, [ATTACH, LINK], 'the attach line first, then the link');
     assert.deepEqual(up.bridge, { url: LINK, why: null });
   });
-  await t.test('her bridge asked and not up: why not, never a promise', async () => {
+  test('her bridge asked and not up: why not, never a promise', async () => {
     const down = await levelOver({ url: null, why: 'its bridge is not up yet.' });
     assert.deepEqual(down.reach, [ATTACH, 'her web link is not up: its bridge is not up yet.'], 'why not, never a promise');
     assert.deepEqual(down.bridge, { url: null, why: 'its bridge is not up yet.' });
   });
-  await t.test('no bridge asked: the attach line alone', async () => {
+  test('no bridge asked: the attach line alone', async () => {
     const unasked = await levelOver(undefined);
     assert.deepEqual(unasked.reach, [ATTACH], 'not asked: no web line at all');
     assert.equal(unasked.bridge, null);
   });
-  await t.test("a settled task's reach is nothing and its bridge null, whatever its view holds", async () => {
+  test("a settled task's reach is nothing and its bridge null, whatever its view holds", async () => {
     const ended = await levelOver({ url: LINK }, 'stopped');
     assert.deepEqual(ended.reach, []);
     assert.equal(ended.bridge, null);
   });
-  await t.test("`bridgeOf` answers a task's bridge in its own words, and null for a task not filed bridged or not viewed", () => {
+  test("`bridgeOf` answers a task's bridge in its own words, and null for a task not filed bridged or not viewed", () => {
     const views = new Map<string, TaskView>([
       ['up', { bridge: { url: LINK } } as unknown as TaskView],
       ['down', { bridge: { url: null, why: 'not yet.' } } as unknown as TaskView],
@@ -82,26 +84,28 @@ test("`nemia level`'s reach: the attach line, then her web link off her task's v
   });
 });
 
-test("`nemia level` reads her task off the keeper's record, says a stop from outside apart from a rest, and a set names no task", async (t) => {
-  writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z', task: TASK });
-  fs.rmSync(sessionFile(ROOT), { force: true });
-  await t.test("an older store's level file names her task: it is hers, with no record of the keeper's", async () => {
+describe("`nemia level` reads her task off the keeper's record, says a stop from outside apart from a rest, and a set names no task", () => {
+  beforeAll(() => {
+    writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z', task: TASK });
+    fs.rmSync(sessionFile(ROOT), { force: true });
+  });
+  test("an older store's level file names her task: it is hers, with no record of the keeper's", async () => {
     assert.equal((await levelOver(undefined)).task, TASK);
   });
-  await t.test('open: neither stopped nor resting', async () => {
+  test('open: neither stopped nor resting', async () => {
     const open = await levelOver(undefined);
     assert.deepEqual([open.stopped, open.rests], [false, false]);
   });
-  await t.test("ended with no rest of the keeper's: stopped, at manual too, and resting, so a message starts her", async () => {
+  test("ended with no rest of the keeper's: stopped, at manual too, and resting, so a message starts her", async () => {
     const ended = await levelOver(undefined, 'stopped');
     assert.deepEqual([ended.stopped, ended.rests], [true, true]);
   });
-  await t.test('put to rest by the keeper: resting, never stopped', async () => {
+  test('put to rest by the keeper: resting, never stopped', async () => {
     writeSession(ROOT, { tasks: ['nemia-1', TASK], rested: '2026-10-06T09:00:00.000Z' });
     const rested = await levelOver(undefined, 'stopped');
     assert.deepEqual([rested.task, rested.stopped, rested.rests], [TASK, false, true]);
   });
-  await t.test('a level set writes when the person set it, and names no task of hers', async () => {
+  test('a level set writes when the person set it, and names no task of hers', async () => {
     fs.rmSync(sessionFile(ROOT), { force: true });
     writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z' });
     await runWith(engineWith(undefined), LEVEL.handler({ level: 'semi-auto' }));

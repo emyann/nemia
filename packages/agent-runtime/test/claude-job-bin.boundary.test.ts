@@ -17,7 +17,7 @@
  *
  * A boundary test: real processes, the bin's and the Claude Code the SDK spawns for it, and nothing of either stood in for.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -79,8 +79,8 @@ const alive = (pid: number): boolean => {
   }
 };
 
-test('the job bin, run as the worker runs it: denied by Claude Code, refused before it starts, ended by a SIGTERM', WAITED, async (t) => {
-  await t.test("a job's session is denied by Claude Code, and a session with no result leaves 1 saying so", async () => {
+describe('the job bin, run as the worker runs it: denied by Claude Code, refused before it starts, ended by a SIGTERM', WAITED, () => {
+  test("a job's session is denied by Claude Code, and a session with no result leaves 1 saying so", async () => {
     const dir = scratch('ae-job-bin-');
     const claude = standIn(dir, 'process.exit(0);');
     const at = requestFile(dir, { name: 'ae/t/1', brief: 'say it', cwd: dir, config: { tools: ['Read'] } });
@@ -96,8 +96,7 @@ test('the job bin, run as the worker runs it: denied by Claude Code, refused bef
     assert.equal(code, 1, `a session that gave no result is no session that said nothing: ${err}`);
     assert.match(err, /no result line/, err);
   });
-
-  await t.test('a request the options refuse starts no Claude Code, and the bin leaves 1 in the refusal’s words', async () => {
+  test('a request the options refuse starts no Claude Code, and the bin leaves 1 in the refusal’s words', async () => {
     const dir = scratch('ae-job-bin-');
     const claude = standIn(dir, 'process.exit(0);');
     const at = requestFile(dir, {
@@ -114,8 +113,7 @@ test('the job bin, run as the worker runs it: denied by Claude Code, refused bef
     assert.match(err, /systemPromptFile/, 'and the second');
     assert.equal(fs.existsSync(path.join(dir, 'argv.json')), false, 'and no Claude Code was started');
   });
-
-  await t.test('a rate_limit_event the session receives is kept on the heard file the runner named, read as its window', async () => {
+  test('a rate_limit_event the session receives is kept on the heard file the runner named, read as its window', async () => {
     const dir = scratch('ae-job-bin-');
     const info = {
       status: 'allowed',
@@ -139,8 +137,7 @@ test('the job bin, run as the worker runs it: denied by Claude Code, refused bef
       [['seven_day', 40, 'allowed']],
     );
   });
-
-  await t.test('a SIGTERM ends the session: the bin leaves, and the Claude Code it started is gone with it', async (t) => {
+  test('a SIGTERM ends the session: the bin leaves, and the Claude Code it started is gone with it', async (t) => {
     const dir = scratch('ae-job-bin-');
     const pidFile = path.join(dir, 'claude.pid');
     const claude = standIn(dir, `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nsetInterval(() => {}, 1000);`);

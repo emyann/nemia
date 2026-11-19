@@ -2,7 +2,7 @@
  * The table's left-out list: the entries the command line serves alone that link no endpoint of the api, so no tool of the port calls
  * them. A new one, or one the api comes to serve, is a change this list is edited for, never one that passes unseen.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { TABLE } from './commands.verb.ts';
 

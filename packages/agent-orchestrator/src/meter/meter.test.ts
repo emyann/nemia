@@ -2,7 +2,7 @@
  * What a pass costs, in words (`meter.ts`): the totals, the heaviest phases, the line `nemia up` says once an interval, the breakdown
  * `--stats` prints, and a cost read back off disk. Pure: the counting is `tally.store.ts`'s, proven on a store in tally.store.test.ts.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   addPass,
@@ -241,6 +241,6 @@ row("`nemia passes`' answer: the summary, the histogram's buckets with passes, a
   assert.deepEqual(passesRead([]).summary, null);
 });
 
-test("the meter's math: what a pass costs, in words, a row a claim", async (t) => {
-  for (const [name, claim] of ROWS) await t.test(name, claim);
+describe("the meter's math: what a pass costs, in words, a row a claim", () => {
+  for (const [name, claim] of ROWS) test(name, claim);
 });

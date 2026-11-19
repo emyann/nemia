@@ -12,7 +12,7 @@
  * same rule to GitHub: `/package.json` owns the root's manifest alone, while `package.json` reaches every workspace's — and CI's legs
  * run each workspace's own `test` script, so a package's manifest weakens the check as surely as the workflow does.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

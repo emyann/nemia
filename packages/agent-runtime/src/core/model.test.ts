@@ -2,7 +2,7 @@
  * The runtime's model: TaskId checked on create and nominal on read, AttemptNumber a whole number from 1, the task's attempts
  * numbered from 1 with no gap, the entities held to the fold's own types, and the diagram drawn from them.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
 import type { Attempt as FoldedAttempt, State } from './domain.ts';
@@ -37,15 +37,15 @@ const task = (numbers: number[]) => ({
   settled: null,
 });
 
-test('TaskId on create takes what a journal file can be named, and every id a writer mints', async (t) => {
-  await t.test('it accepts the runtime’s, the orchestrator’s, and a name of 255 bytes', () => {
+describe('TaskId on create takes what a journal file can be named, and every id a writer mints', () => {
+  test('it accepts the runtime’s, the orchestrator’s, and a name of 255 bytes', () => {
     const minted = `t-${Date.now().toString(36)}-0123abcd`;
     for (const id of [minted, 'nemia-run-1-implement', 'nemia-run-1-review, again!-try2', 'r-x-step-try3-check', 'a'.repeat(255)]) {
       assert.ok(Option.isSome(Model.TaskId.create.option(id)), id);
       assert.ok(Schema.is(Model.TaskId.OnCreate)(id), id);
     }
   });
-  await t.test('it refuses what no journal file is named', () => {
+  test('it refuses what no journal file is named', () => {
     for (const id of ['', '.', '..', 'a/b', 'a\u0000b', 'a\nb', 'a\u007fb', 'a'.repeat(256), 'é'.repeat(128)]) {
       assert.ok(Option.isNone(Model.TaskId.create.option(id)), JSON.stringify(id));
       assert.ok(!Schema.is(Model.TaskId.OnCreate)(id), JSON.stringify(id));

@@ -3,7 +3,7 @@
  * factory's path, its other keys kept, and lands where no redirect sends it again; a run's, a step's or a card's page belongs where its
  * object's namespace says; and no file of the board but that one reads a page's factory from `?factory=` or writes one into an address.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,8 +27,8 @@ const split = (href: string): { path: string; search: Record<string, string> } =
   return { path: url.pathname, search: Object.fromEntries(url.searchParams) };
 };
 
-test('factoryRedirect: each address of before the factory’s paths reaches its page under the factory’s path', async (t) => {
-  await t.test('each row of the table goes to its path, every other key kept and `factory` dropped', () => {
+describe('factoryRedirect: each address of before the factory’s paths reaches its page under the factory’s path', () => {
+  test('each row of the table goes to its path, every other key kept and `factory` dropped', () => {
     const rows: [string, string][] = [
       ['/', '/factories/kit'],
       ['/runs', '/factories/kit/runs'],
@@ -51,16 +51,16 @@ test('factoryRedirect: each address of before the factory’s paths reaches its 
       assert.deepEqual(split(href), { path: to, search: { l: 'a=b', older: 't', repo: '/r', bar: 'gauges' } }, from);
     }
   });
-  await t.test("a repository's agent or skill read in the factory says it is the repository's", () => {
+  test("a repository's agent or skill read in the factory says it is the repository's", () => {
     assert.deepEqual(split(factoryRedirect('/agents/repo/scribe', { factory: 'kit', repo: '/r' }) ?? ''), {
       path: '/factories/kit/agents/scribe',
       search: { from: 'repo', repo: '/r' },
     });
   });
-  await t.test('the factory’s name is escaped in its path', () => {
+  test('the factory’s name is escaped in its path', () => {
     assert.equal(factoryRedirect('/runs', { factory: 'a b' }), '/factories/a%20b/runs');
   });
-  await t.test('an address that names no factory, or names one with nothing or no string, is left as it is', () => {
+  test('an address that names no factory, or names one with nothing or no string, is left as it is', () => {
     for (const search of [{}, { factory: '' }, { factory: 7 }, { factory: ['kit'] }, { repo: '/r' }])
       assert.equal(factoryRedirect('/runs', search), undefined, JSON.stringify(search));
     assert.equal(
@@ -69,25 +69,22 @@ test('factoryRedirect: each address of before the factory’s paths reaches its 
       'a hire’s old spelling is no page’s',
     );
   });
-  await t.test(
-    'REFUSED: every route of the board given ?factory=x either reaches a page seated in factory x that is sent nowhere again, or is left',
-    () => {
-      const paths = routePaths();
-      assert.ok(paths.length > 30, `the route tree lists the board's routes, ${paths.length} read`);
-      const wrong = paths.flatMap((one) => {
-        const href = factoryRedirect(one, { factory: 'x' });
-        if (href === undefined) return [];
-        const to = split(href);
-        if (factoryRedirect(to.path, to.search) !== undefined) return [`${one} → ${href} is sent on again`];
-        const seat = seatOf(to.path);
-        const object = to.path === one && /^\/(runs|inbox)\/x/.test(one);
-        if (object) return [];
-        return seat?.level === 'factory' && seat.factory === 'x' ? [] : [`${one} → ${href} is no page of factory x`];
-      });
-      assert.deepEqual(wrong, []);
-      for (const one of paths) assert.equal(factoryRedirect(one, {}), undefined, `${one} without ?factory= is left`);
-    },
-  );
+  test('REFUSED: every route of the board given ?factory=x either reaches a page seated in factory x that is sent nowhere again, or is left', () => {
+    const paths = routePaths();
+    assert.ok(paths.length > 30, `the route tree lists the board's routes, ${paths.length} read`);
+    const wrong = paths.flatMap((one) => {
+      const href = factoryRedirect(one, { factory: 'x' });
+      if (href === undefined) return [];
+      const to = split(href);
+      if (factoryRedirect(to.path, to.search) !== undefined) return [`${one} → ${href} is sent on again`];
+      const seat = seatOf(to.path);
+      const object = to.path === one && /^\/(runs|inbox)\/x/.test(one);
+      if (object) return [];
+      return seat?.level === 'factory' && seat.factory === 'x' ? [] : [`${one} → ${href} is no page of factory x`];
+    });
+    assert.deepEqual(wrong, []);
+    for (const one of paths) assert.equal(factoryRedirect(one, {}), undefined, `${one} without ?factory= is left`);
+  });
 });
 
 test("objectHome: a run's, a step's or a card's page belongs where its object's namespace says", () => {
@@ -114,13 +111,13 @@ const sources = (dir: string): string[] =>
     return /\.tsx?$/.test(entry.name) ? [at] : [];
   });
 
-test("REFUSED: no file of the board but factoryAddress.ts reads a page's factory from ?factory= or writes one into an address", async (t) => {
-  await t.test('the scan names a link that writes the key, and a route that reads it', () => {
+describe("REFUSED: no file of the board but factoryAddress.ts reads a page's factory from ?factory= or writes one into an address", () => {
+  test('the scan names a link that writes the key, and a route that reads it', () => {
     assert.equal(factoryInAddress('<Link to="/runs" search={{ factory }}>').length, 1);
     assert.equal(factoryInAddress('const picked = search.factory;').length, 1);
     assert.equal(factoryInAddress(' * the old `?factory=` address').length, 0, 'a comment says it, and writes nothing');
   });
-  await t.test("the board's own files: none but the redirect's, and the api's own parameter under lib/api", () => {
+  test("the board's own files: none but the redirect's, and the api's own parameter under lib/api", () => {
     const allowed = (file: string) =>
       file === path.join(SRC, 'lib/factoryAddress.ts') || file.startsWith(path.join(SRC, 'lib/api') + path.sep);
     const found = sources(SRC)

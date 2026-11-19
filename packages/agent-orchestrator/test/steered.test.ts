@@ -5,7 +5,7 @@
  * test follows: wait for the rest asked, then move the clock. The others refuse `effect/testing` in a file of `src`, `bin` or `place`
  * that is no test, so a clock a test steers never ships.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,7 +26,7 @@ test(
   async (t) => {
     const clock = steeredClock();
     const fiber = Effect.runFork(restsAfter(new Promise((done) => setImmediate(done))).pipe(Effect.provide(clock.layer)));
-    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
     await until(t, () => clock.asked.length === 1, 'the rest is asked', { bell: clock.bell });
     assert.deepEqual(clock.asked, [5_000]);
     await clock.adjust(4_999);
@@ -41,7 +41,7 @@ test('REFUSED: a clock moved before the rest is asked wakes nothing, however far
   const clock = steeredClock();
   let release: () => void = () => undefined;
   const fiber = Effect.runFork(restsAfter(new Promise((done) => (release = done))).pipe(Effect.provide(clock.layer)));
-  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
   await until(
     t,
     () =>

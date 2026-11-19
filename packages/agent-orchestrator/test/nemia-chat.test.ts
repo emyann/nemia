@@ -14,7 +14,7 @@
  * `src/chat/chat.test.ts`; the chat's files, `src/chat/chat.store.test.ts`; the keeper delivering to her live session,
  * `test/nemia-keeper.test.ts`. The stories' store is their own, given as `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import { bell, until } from 'agent-runtime/testing';
@@ -169,9 +169,9 @@ const asksOf = (dir: string) =>
     phase: 'idle',
   });
 
-test("She is written to: the person's words kept while she is down, said once she is up, and never twice", async (t) => {
-  const s = story(t);
-  await s.test('REFUSED: a send that is empty or too long puts nothing in the outbox; one that is not is put there once', async () => {
+describe("She is written to: the person's words kept while she is down, said once she is up, and never twice", () => {
+  const s = story(test);
+  s.test('REFUSED: a send that is empty or too long puts nothing in the outbox; one that is not is put there once', async () => {
     const place = { tasks: [], dir: scratch('wf-nemia-chat-dir-'), wakes: true };
     await assert.rejects(run(chatSay(place, '  ', PERSON)), (err: Error) => {
       names(err.message, 'The message is empty');
@@ -185,7 +185,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     const sent = await run(chatSay(place, 'Go', PERSON));
     assert.deepEqual(readOutbox(place.dir), [sent]);
   });
-  await s.test(
+  s.test(
     "REFUSED: words that say they are from an agent, and an agent under a bad name; an agent's by its own token are put there with who wrote them, the person's as the person's",
     async () => {
       const place = { tasks: [], dir: scratch('wf-nemia-chat-dir-'), wakes: true };
@@ -212,14 +212,14 @@ test("She is written to: the person's words kept while she is down, said once sh
       );
     },
   );
-  await s.test('no task filed is a chat with nothing but the outbox, and she is down', async () => {
+  s.test('no task filed is a chat with nothing but the outbox, and she is down', async () => {
     const place = { tasks: [], dir: scratch('wf-nemia-chat-dir-'), wakes: true };
     await run(chatSay(place, 'Are you there?', PERSON));
     const read = await run(chatHistory(place));
     assert.deepEqual(texts(read.events), ['Are you there?']);
     assert.deepEqual(read.presence, { up: false, answering: false, waitsOnYou: 0, unread: 0, wakes: true });
   });
-  await s.test('a send while the task is down is kept, then said once when it is up, and a second delivery says nothing', async () => {
+  s.test('a send while the task is down is kept, then said once when it is up, and a second delivery says nothing', async () => {
     const { id, dir } = await filed('down');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'Hello' });
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: [], left: ['o1'] }, 'not started: nothing hears it');
@@ -230,7 +230,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     assert.deepEqual(saidTo(id), [{ taskId: id, text: framedFor({ kind: 'person' }, 'Hello') }]);
     assert.equal(outboxOwed(dir), false);
   });
-  await s.test('a word written while her turn is over, her session open to hear the next, is said on the next pass', async () => {
+  s.test('a word written while her turn is over, her session open to hear the next, is said on the next pass', async () => {
     const { id, dir } = await filed('between', 'input-required');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'Next, the two kit cards' });
     assert.deepEqual(
@@ -241,7 +241,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     assert.deepEqual(saidTo(id), [{ taskId: id, text: framedFor({ kind: 'person' }, 'Next, the two kit cards') }]);
     assert.equal(outboxOwed(dir), false);
   });
-  await s.test('REFUSED: a restart between the say and the mark is finished by the mark alone, never said twice', async () => {
+  s.test('REFUSED: a restart between the say and the mark is finished by the mark alone, never said twice', async () => {
     const { id, dir } = await filed('cut-short', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date(Date.now() - 1000).toISOString(), text: 'Ship it' });
     const heard = await run(stage.board().e.say(id, framedFor({ kind: 'person' }, 'Ship it')));
@@ -249,7 +249,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     assert.equal(saidTo(id).length, 1, 'said once, by the delivery cut short');
     assert.deepEqual(readDelivered(dir), [{ id: 'o1', said: heard.at, attempt: 1 }]);
   });
-  await s.test(
+  s.test(
     "an agent's entry is said in its own frame, never the person's, and a delivery of it cut short is finished, not said again",
     async () => {
       const { id, dir } = await filed('peer', 'working');
@@ -266,21 +266,21 @@ test("She is written to: the person's words kept while she is down, said once sh
       );
     },
   );
-  await s.test('REFUSED: words said before the entry was written are never taken for it', async () => {
+  s.test('REFUSED: words said before the entry was written are never taken for it', async () => {
     const { id, dir } = await filed('before', 'working');
     await run(stage.board().e.say(id, framedFor({ kind: 'person' }, 'Again')));
     appendOutbox(dir, { id: 'o1', at: '2999-01-01T00:00:00.000Z', text: 'Again' });
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
     assert.equal(saidTo(id).length, 2);
   });
-  await s.test('two entries of one text claim two saids in order, never one twice', async (sub) => {
-    sub.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-15T12:00:00.000Z') });
+  s.test('two entries of one text claim two saids in order, never one twice', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-15T12:00:00.000Z') });
     const { id, dir } = await filed('twice', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'yes' });
     appendOutbox(dir, { id: 'o2', at: new Date().toISOString(), text: 'yes' });
-    sub.mock.timers.tick(5);
+    vi.advanceTimersByTime(5);
     const first = await run(stage.board().e.say(id, framedFor({ kind: 'person' }, 'yes')));
-    sub.mock.timers.tick(5);
+    vi.advanceTimersByTime(5);
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: ['o1'], said: ['o2'], left: [] });
     assert.deepEqual(
       readDelivered(dir).map((m) => [m.id, m.said]),
@@ -291,7 +291,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     );
     assert.equal(saidTo(id).length, 2);
   });
-  await s.test('REFUSED: a say the task refuses stops the delivery with no mark, and the next delivers', async () => {
+  s.test('REFUSED: a say the task refuses stops the delivery with no mark, and the next delivers', async () => {
     const { id, dir } = await filed('refused', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'one' });
     appendOutbox(dir, { id: 'o2', at: new Date().toISOString(), text: 'two' });
@@ -306,11 +306,11 @@ test("She is written to: the person's words kept while she is down, said once sh
   });
 });
 
-test('Her chat read: a history across two attempts, a stream since its cursor, the read mark moved forward only, and a stopped turn', async (t) => {
-  const s = story(t);
+describe('Her chat read: a history across two attempts, a stream since its cursor, the read mark moved forward only, and a stopped turn', () => {
+  const s = story(test);
   let place = { task: '', tasks: [''], dir: '', wakes: true };
   let cursor = '';
-  await s.test('history pages back across two attempts with the line between them, and says where she is', async () => {
+  s.test('history pages back across two attempts with the line between them, and says where she is', async () => {
     place = await twoAttempts('read');
     const last = await run(chatHistory(place, { limit: 2 }));
     assert.deepEqual(texts(last.events), ['—', 'Three.']);
@@ -318,20 +318,20 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
     const older = await run(chatHistory(place, { before: last.before ?? '', limit: 5 }));
     assert.deepEqual([texts(older.events), older.before], [['One.', 'Two.'], null]);
   });
-  await s.test('REFUSED: a read from a cursor no read gave', async () => {
+  s.test('REFUSED: a read from a cursor no read gave', async () => {
     await assert.rejects(run(since(place, '9.0.0.0.0')), (err: Error) => {
       names(err.message, '9.0.0.0.0 is not a cursor a chat read gave');
       return true;
     });
   });
-  await s.test('REFUSED: a read mark on an event the chat does not hold', async () => {
+  s.test('REFUSED: a read mark on an event the chat does not hold', async () => {
     await assert.rejects(run(chatRead(place, 'm:9:z')), (err: Error) => {
       names(err.message, 'm:9:z is no event of this chat');
       return true;
     });
     assert.equal(readReadMark(place.dir), undefined);
   });
-  await s.test("a read after the history's cursor gives only what came since, and the person's words once delivered", async () => {
+  s.test("a read after the history's cursor gives only what came since, and the person's words once delivered", async () => {
     ({ cursor } = await run(chatHistory(place)));
     assert.deepEqual((await run(since(place, cursor))).events, []);
     const sent = await run(chatSay(place, 'Hi', PERSON));
@@ -345,7 +345,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
     assert.deepEqual(texts(later.events), ['Four.']);
     assert.equal((await run(since(place, undefined))).events.length, 6);
   });
-  await s.test(
+  s.test(
     "followed: her session's moments, the person's words as written and, once the follow ends, the record read on a beat, each sent once",
     async (t) => {
       const followed = await twoAttempts('follow');
@@ -407,7 +407,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
       assert.ok(follows.count >= 2, 'the follow is asked for again after it ended');
     },
   );
-  await s.test('the read mark moves forward only, and unread follows it', async () => {
+  s.test('the read mark moves forward only, and unread follows it', async () => {
     const marked = await twoAttempts('mark');
     await run(chatRead(marked, 'm:2:c'));
     assert.equal((await run(chatHistory(marked))).presence.unread, 0);
@@ -417,7 +417,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
     stage.board().plantTranscript(marked.task, 2, [event('c', 'Three.'), event('d', 'Four.')]);
     assert.equal((await run(chatHistory(marked))).presence.unread, 1);
   });
-  await s.test('a stop ends her turn through the runtime and leaves one Stopped line on the record', async () => {
+  s.test('a stop ends her turn through the runtime and leaves one Stopped line on the record', async () => {
     const stopping = await twoAttempts('stop');
     const stop = await run(chatStop(stopping));
     assert.deepEqual(
@@ -433,7 +433,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
       ['keeper:Stopped'],
     );
   });
-  await s.test('REFUSED: a stop with no session of hers filed, and one the runtime will not end, each leaves no line behind', async () => {
+  s.test('REFUSED: a stop with no session of hers filed, and one the runtime will not end, each leaves no line behind', async () => {
     const asked = stage.board().interrupts.length;
     const none = { tasks: [], dir: scratch('wf-nemia-chat-dir-'), wakes: true };
     await assert.rejects(run(chatStop(none)), (err: Error) => {
@@ -451,10 +451,10 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
   });
 });
 
-test('She asks, and the person answers: on the board, back through the call she holds open, as words once it is cut, from the record after a restart', async (t) => {
-  const s = story(t);
+describe('She asks, and the person answers: on the board, back through the call she holds open, as words once it is cut, from the record after a restart', () => {
+  const s = story(test);
   let asking = { id: '', dir: '' };
-  await s.test('the keeper copies each ask her session holds open into the chat once, and the board reads it after', async () => {
+  s.test('the keeper copies each ask her session holds open into the chat once, and the board reads it after', async () => {
     asking = await filed('asks', 'working');
     stage.board().plantAsk(asking.id, RAW);
     assert.deepEqual(await run(recordAsks(asking.id, asking.dir)), ['call-1']);
@@ -462,14 +462,14 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.deepEqual(await run(recordAsks(asking.id, asking.dir)), [], 'an ask already written down is left as it was');
     assert.deepEqual(readAsks(asking.dir), [kept]);
   });
-  await s.test('the same question open under a second call of hers is written down once: the person is asked it no twice', async () => {
+  s.test('the same question open under a second call of hers is written down once: the person is asked it no twice', async () => {
     stage.board().plantAsk(asking.id, { ...RAW, id: 'call-2' });
     assert.deepEqual(await run(recordAsks(asking.id, asking.dir)), [], 'her second call of the same words is no second ask');
     assert.deepEqual(readAsks(asking.dir), [kept], 'the chat draws the question once, and counts it once as waiting on them');
     assert.deepEqual(answeredIn(asking.id), [], 'and nothing was answered from a record that holds no answer to it');
   });
   let open = { id: '', dir: '' };
-  await s.test("the person's answer on the board is a file of their own, which her chat then draws", async () => {
+  s.test("the person's answer on the board is a file of their own, which her chat then draws", async () => {
     open = await filed('answered', 'working');
     stage.board().plantAsk(open.id, RAW);
     await run(recordAsks(open.id, open.dir));
@@ -482,7 +482,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.equal(drawn?.kind === 'question' && drawn.chose?.[QUESTION], 'Cut it on read');
     assert.equal(read.presence.waitsOnYou, 0, 'and it waits on them no longer');
   });
-  await s.test('an answer to a call she still holds open goes back through it, and is marked only once the call has taken it', async () => {
+  s.test('an answer to a call she still holds open goes back through it, and is marked only once the call has taken it', async () => {
     assert.equal(answersOwed(open.dir), true);
     const first = await run(answersDue(open.id, open.dir));
     assert.deepEqual(first.return, ['call-1']);
@@ -498,7 +498,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.equal(answersOwed(open.dir), false);
     assert.deepEqual((await run(answersDue(open.id, open.dir))).mark, [], 'and a later beat owes nothing');
   });
-  await s.test('REFUSED: an answer to a question the chat does not hold, and to one answered already', async () => {
+  s.test('REFUSED: an answer to a question the chat does not hold, and to one answered already', async () => {
     const place = { tasks: [open.id], dir: open.dir, wakes: true };
     const picks = [{ question: QUESTION, labels: ['Cut it on read'] }];
     const missing = await run(Effect.flip(chatAnswer(place, { id: 'call-9', picks })));
@@ -511,7 +511,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     const invalid = await run(Effect.flip(chatAnswer(place, { id: 'call-1', picks: [] })));
     assert.equal(invalid._tag, 'Conflict', 'an ask already answered is refused before its picks are read');
   });
-  await s.test('REFUSED: an ask of other words is no answer of the record, and waits on the person itself', async () => {
+  s.test('REFUSED: an ask of other words is no answer of the record, and waits on the person itself', async () => {
     const { id, dir } = await filed('other', 'working');
     appendAsk(dir, kept);
     appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'Cut it on read' } });
@@ -522,7 +522,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.deepEqual(await run(recordAsks(id, dir)), ['call-2'], 'a question of other words is written down and asked');
     assert.deepEqual(answeredIn(id), [], 'and no answer of the record was written into its call');
   });
-  await s.test('an answer whose call was cut is said to her as words, naming the question, exactly once across two beats', async () => {
+  s.test('an answer whose call was cut is said to her as words, naming the question, exactly once across two beats', async () => {
     const { id, dir } = await filed('words', 'working');
     appendAsk(dir, kept);
     appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'First line as it is' } });
@@ -539,7 +539,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.equal(saidTo(id).length, 1, 'said once: the mark is what finishes it');
     assert.deepEqual(answeredIn(id), [], 'and nothing was written into a call that is gone');
   });
-  await s.test('REFUSED: a say the task will not take leaves the answer owed, and the next beat says it', async () => {
+  s.test('REFUSED: a say the task will not take leaves the answer owed, and the next beat says it', async () => {
     const { id, dir } = await filed('unsaid', 'working');
     appendAsk(dir, kept);
     appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'Cut it on read' } });
@@ -549,28 +549,25 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.deepEqual((await run(answersDue(id, dir))).words, ['call-1']);
     assert.equal(saidTo(id).length, 1);
   });
-  await s.test(
-    'the same question asked again after a restart is answered from the record, and put to the person no second time',
-    async () => {
-      const { id, dir } = await filed('restart', 'working');
-      stage.board().plantAsk(id, RAW);
-      await run(recordAsks(id, dir));
-      appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'Cut it on read' } });
-      await run(answersDue(id, dir));
-      await run(answersDue(id, dir));
-      stage.board().plantAsk(id, { ...RAW, id: 'call-2' });
-      assert.deepEqual(await run(recordAsks(id, dir)), [], 'the same words asked afresh are written down as no second ask');
-      assert.deepEqual(readAsks(dir), [kept], 'the chat keeps the one ask, so nothing new waits on the person');
-      assert.deepEqual(
-        answeredIn(id).map((one) => one.id),
-        ['call-1', 'call-2'],
-        'and the answer on record is written back through the call she holds open now',
-      );
-      assert.deepEqual(answeredIn(id).at(-1)?.answers, { [QUESTION]: 'Cut it on read' });
-      assert.deepEqual(saidTo(id), [], 'nothing of it was said as words: her new call carried it');
-    },
-  );
-  await s.test(
+  s.test('the same question asked again after a restart is answered from the record, and put to the person no second time', async () => {
+    const { id, dir } = await filed('restart', 'working');
+    stage.board().plantAsk(id, RAW);
+    await run(recordAsks(id, dir));
+    appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'Cut it on read' } });
+    await run(answersDue(id, dir));
+    await run(answersDue(id, dir));
+    stage.board().plantAsk(id, { ...RAW, id: 'call-2' });
+    assert.deepEqual(await run(recordAsks(id, dir)), [], 'the same words asked afresh are written down as no second ask');
+    assert.deepEqual(readAsks(dir), [kept], 'the chat keeps the one ask, so nothing new waits on the person');
+    assert.deepEqual(
+      answeredIn(id).map((one) => one.id),
+      ['call-1', 'call-2'],
+      'and the answer on record is written back through the call she holds open now',
+    );
+    assert.deepEqual(answeredIn(id).at(-1)?.answers, { [QUESTION]: 'Cut it on read' });
+    assert.deepEqual(saidTo(id), [], 'nothing of it was said as words: her new call carried it');
+  });
+  s.test(
     'a permission answered once answers no later call of the same command: that one is written down, and waits on the person',
     async () => {
       const { id, dir } = await filed('permission', 'working');
@@ -600,10 +597,10 @@ test('She asks, and the person answers: on the board, back through the call she 
   );
 });
 
-test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it waits once more, and its answer goes to the call that holds it now', async (t) => {
-  const s = story(t);
+describe('Her call is cut: the ask stops waiting and is drawn as cut, asked again it waits once more, and its answer goes to the call that holds it now', () => {
+  const s = story(test);
   let cut = { id: '', dir: '' };
-  await s.test(
+  s.test(
     'an ask whose call her session no longer holds is closed as cut: it stops waiting on the person, and is drawn as cut',
     async () => {
       cut = await filed('cut', 'working');
@@ -628,7 +625,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
       assert.equal(closesOwed(cut.dir, []), false, 'and the keeper owes no mark once what became of the call is marked');
     },
   );
-  await s.test('a question cut and then asked again waits on the person once more, and the one ask of it is drawn once', async () => {
+  s.test('a question cut and then asked again waits on the person once more, and the one ask of it is drawn once', async () => {
     stage.board().plantAsk(cut.id, { ...RAW, id: 'call-2' });
     assert.equal(closesOwed(cut.dir, [{ ...RAW, id: 'call-2' }]), true, 'her words asked afresh are a mark the keeper owes');
     assert.deepEqual(await run(recordAsks(cut.id, cut.dir)), [], 'the same words are written down as no second ask');
@@ -645,7 +642,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
     assert.equal(asksWaiting(drawn), 1, 'and it waits on the person once, never twice and never nil');
     assert.equal(presenceOf('idle', 0, drawn, undefined).waitsOnYou, 1);
   });
-  await s.test(
+  s.test(
     'a question cut, asked again, and answered then goes to the call that is waiting for it, and is said to her no second time',
     async () => {
       const { id, dir } = await filed('again', 'working');
@@ -679,7 +676,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
       assert.equal(answersOwed(dir), false);
     },
   );
-  await s.test('her words asked under a call no mark of them names are marked as asked again, cut or not', async () => {
+  s.test('her words asked under a call no mark of them names are marked as asked again, cut or not', async () => {
     const { id, dir } = await filed('unseen', 'working');
     stage.board().plantAsk(id, RAW);
     await run(recordAsks(id, dir));
@@ -694,7 +691,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
     assert.equal(closesOwed(dir, [{ ...RAW, id: 'call-2' }]), false, 'and once the mark names the call, nothing more is owed');
     assert.equal(asksWaiting(asksOf(dir)), 1);
   });
-  await s.test(
+  s.test(
     'REFUSED: a harness that cannot say what its session holds open closes nothing, nor does a look that read no session',
     async () => {
       const { id, dir } = await filed('unsaid-asks', 'working');

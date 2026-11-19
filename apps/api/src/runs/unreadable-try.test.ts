@@ -8,7 +8,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -128,27 +128,24 @@ const listed = async () => {
   };
 };
 
-test("a check's or an earlier try's journal that does not read marks its step unreadable on the list, and refuses the run's decision as its page", async (t) => {
-  const s = story(t);
-  await s.test(
-    "the list marks unreadable the step whose check's journal, or an earlier try's, does not read, and names that task",
-    async () => {
-      const runs = await listed();
-      assert.ok(runs.judged.includes('r-good') && !runs.unreadable.has('r-good'), 'a run whose tasks read is judged');
-      for (const [id, task] of [
-        ['r-check', 'r-check-implement-check'],
-        ['r-try', 'r-try-implement'],
-      ]) {
-        const unreadable = runs.unreadable.get(id);
-        assert.ok(
-          unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),
-          unreadable ?? 'null',
-        );
-        assert.ok(unreadable?.includes('So the board does not judge the run'), unreadable ?? 'null');
-      }
-    },
-  );
-  await s.test(
+describe("a check's or an earlier try's journal that does not read marks its step unreadable on the list, and refuses the run's decision as its page", () => {
+  const s = story(test);
+  s.test("the list marks unreadable the step whose check's journal, or an earlier try's, does not read, and names that task", async () => {
+    const runs = await listed();
+    assert.ok(runs.judged.includes('r-good') && !runs.unreadable.has('r-good'), 'a run whose tasks read is judged');
+    for (const [id, task] of [
+      ['r-check', 'r-check-implement-check'],
+      ['r-try', 'r-try-implement'],
+    ]) {
+      const unreadable = runs.unreadable.get(id);
+      assert.ok(
+        unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),
+        unreadable ?? 'null',
+      );
+      assert.ok(unreadable?.includes('So the board does not judge the run'), unreadable ?? 'null');
+    }
+  });
+  s.test(
     "the decision `nemia decide` shows is refused as the run's object is, in the list's words, and answered for a run whose tasks read",
     async () => {
       const runs = await listed();

@@ -25,7 +25,7 @@
  * Every step's prompt holds sdlc's `RULES.md`, so a rule every agent keeps is written there once: the paragraph on a refused call is in
  * it and in no agent's instructions.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -6,7 +6,7 @@
  * is read off its task as it settles — passed with its answer and cost, failed for its deadline, its cap or a silent end, in the
  * harness's own words.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
@@ -88,14 +88,14 @@ test('a check turn is filed as a job of the harness on its turn model, in its he
   assert.equal((await run(latestTurnCheck(root(), HARNESS))).state, 'passed');
 });
 
-test('a turn ended at its deadline, at its cap, or with nothing said fails saying why, the last in the harness’s own words', async (t) => {
+describe('a turn ended at its deadline, at its cap, or with nothing said fails saying why, the last in the harness’s own words', () => {
   const rows = [
     { end: { reason: 'deadline' as const }, failure: 'deadline' },
     { end: { reason: 'harness' as const, limit: 'budget' }, failure: 'budget' },
     { end: { reason: 'harness' as const }, failure: 'unanswered', printed: { stderr: 'Invalid API key · Please run /login\n' } },
   ];
   for (const row of rows)
-    await t.test(row.failure, async () => {
+    test(row.failure, async () => {
       const started = await run(startTurn({ harness: HARNESS }));
       engine().settle(started.id, 'failed', { ...row.end, ...(row.printed ? { printed: row.printed } : {}) });
       const read = await run(turnOf(started.id));

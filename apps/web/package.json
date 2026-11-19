@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsrs --noEmit && tsrs --noEmit -p test/e2e",
-    "test": "node --test --test-concurrency=2 --test-timeout=120000 test/*.test.ts",
+    "test": "vitest run --project=node",
     "e2e": "node test/e2e/run.ts",
     "theme:generate": "tsx src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out theme",
     "board:serve": "node test/e2e/serve.ts serve",

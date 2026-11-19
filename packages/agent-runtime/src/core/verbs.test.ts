@@ -4,7 +4,7 @@
  * states it is taken from; its refusal lets it journal only there, and in each of them at least once; the entry it journals makes the
  * next pass read the state the data names; and it has a writer whose entry is the kind the data names. Planted fixtures make it refuse.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { fold, lifecycleOf, VERB_GUARDS, type Event, type State } from './domain.ts';
 import { STATES, VERBS, type LifecycleState, type Verb } from './lifecycle.ts';
@@ -165,6 +165,6 @@ const REFUSED: Row[] = [
   },
 ];
 
-test('REFUSED: verbBreaches says each way a verb and its data can disagree, and nothing else', async (t) => {
-  for (const row of REFUSED) await t.test(row.name, row.run);
+describe('REFUSED: verbBreaches says each way a verb and its data can disagree, and nothing else', () => {
+  for (const row of REFUSED) test(row.name, row.run);
 });

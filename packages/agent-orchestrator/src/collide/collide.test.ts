@@ -3,7 +3,7 @@
  * order (`trialsOf`), which ending reads them (`collisionsDue`), and what the place's answer says (`collisionsOf`), the semantic conflict
  * among it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { collisionsDue, collisionsOf, othersInFlight, trialsOf } from './collide.ts';
 import type { RepositoryRun, Run } from '../record/record.ts';

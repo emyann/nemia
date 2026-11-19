@@ -19,7 +19,7 @@
  * Turbo caches this package's pass by this package's files and the runtime's, so a marker is kept to a package's docs, and a change
  * elsewhere alone replays the pass: `npx turbo run test --force`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { files, REPO, textOf } from 'test-kit/repo';

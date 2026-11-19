@@ -3,7 +3,7 @@
  * reader that opened it before reads all of what it had; and a rename that fails, onto a directory planted at the target, leaving what
  * was there as it was, with no temp file behind.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

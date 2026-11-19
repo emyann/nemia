@@ -6,7 +6,7 @@
  * (a `RenderOwner` claimed for another uid, since a test cannot chown) refused `Conflict` and never served. On a
  * store of its own at `ROOT`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -74,10 +74,12 @@ const failedWith = <A, E>(program: Effect.Effect<A, E>, folder: string): string 
   return (Cause.squash(exit.cause) as { _tag?: string })._tag;
 };
 
-test('the builtin templates as objects, and their renders', async (t) => {
-  const folder = builtins();
-
-  await t.test('the list holds each builtin template by name, each decoding as a Template', () => {
+describe('the builtin templates as objects, and their renders', () => {
+  let folder!: string;
+  beforeAll(() => {
+    folder = builtins();
+  });
+  test('the list holds each builtin template by name, each decoding as a Template', () => {
     const list = Schema.decodeUnknownSync(TemplateList)(run(templateList({}), folder));
     assert.deepEqual(
       list.items.map((o) => o.metadata.name),
@@ -96,8 +98,7 @@ test('the builtin templates as objects, and their renders', async (t) => {
     assert.deepEqual(mill.spec.parameters, {});
     assert.equal(mill.spec.hires['dev/review'], 'reviewer');
   });
-
-  await t.test('a page of one, and a selector that is not one refused Invalid', () => {
+  test('a page of one, and a selector that is not one refused Invalid', () => {
     const page = run(templateList({ limit: 1 }), folder);
     assert.deepEqual(
       page.items.map((o) => o.metadata.name),
@@ -106,8 +107,7 @@ test('the builtin templates as objects, and their renders', async (t) => {
     assert.equal(page.metadata.remainingItemCount, 3);
     assert.equal(failedWith(templateList({ labelSelector: ['=='] }), folder), 'Invalid');
   });
-
-  await t.test('a template read by name; a manifest that does not read is served with its problems', () => {
+  test('a template read by name; a manifest that does not read is served with its problems', () => {
     const mill = Schema.decodeUnknownSync(Template)(run(templateObject('mill'), folder));
     assert.equal(mill.kind, 'Template');
     const torn = Schema.decodeUnknownSync(Template)(run(templateObject('torn'), folder));
@@ -120,13 +120,11 @@ test('the builtin templates as objects, and their renders', async (t) => {
     assert.ok(odd.status.problems?.some((p) => p.includes('spec.revisions')));
     assert.equal(odd.spec.hires['dev/review'], 'reviewer', 'the keys that read are kept');
   });
-
-  await t.test('an unknown name is Missing', () => {
+  test('an unknown name is Missing', () => {
     assert.equal(failedWith(templateObject('nowhere'), folder), 'Missing');
     assert.equal(failedWith(templateTree('nowhere'), folder), 'Missing');
   });
-
-  await t.test("a render is written once, as a factory's tree, and read again untouched", () => {
+  test("a render is written once, as a factory's tree, and read again untouched", () => {
     const renders = scratch('wf-template-renders-');
     const first = run(templateTree('mill'), folder, renders);
     const factoryJson = path.join(first.dir, 'factory.json');
@@ -143,8 +141,7 @@ test('the builtin templates as objects, and their renders', async (t) => {
     assert.ok(fs.statSync(path.join(first.dir, 'workflows', 'skills', 'review-a-change', 'SKILL.md')).isFile());
     assert.deepEqual(fs.readdirSync(path.join(renders, first.digest)), ['mill'], 'no staged folder is left beside it');
   });
-
-  await t.test("the folder of renders is this user's own, by uid, and made 0700", () => {
+  test("the folder of renders is this user's own, by uid, and made 0700", () => {
     const uid = process.getuid?.();
     const named = Effect.runSync(
       Effect.gen(function* () {
@@ -161,8 +158,7 @@ test('the builtin templates as objects, and their renders', async (t) => {
     run(templateTree('mill'), folder, made);
     assert.equal(fs.statSync(made).mode & 0o777, 0o700, 'one made is made 0700');
   });
-
-  await t.test('a render planted with other content is not served: it is staged again', () => {
+  test('a render planted with other content is not served: it is staged again', () => {
     const renders = scratch('wf-template-renders-');
     const { dir } = run(templateTree('mill'), folder, renders);
     fs.rmSync(dir, { recursive: true });
@@ -172,27 +168,21 @@ test('the builtin templates as objects, and their renders', async (t) => {
     assert.notEqual(fs.readFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'utf8'), 'planted\n');
     assert.ok(fs.statSync(path.join(dir, 'factory.json')).isFile());
   });
-
-  await t.test(
-    'a folder of renders owned by another user is refused Conflict, and what is planted in it is neither served nor touched',
-    (t) => {
-      const uid = process.getuid?.();
-      if (uid === undefined) return t.skip('this platform has no uid');
-      const renders = scratch('wf-template-renders-');
-      const { dir } = run(templateTree('mill'), folder, renders);
-      fs.writeFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'planted\n');
-      assert.equal(failedAs(templateTree('mill'), folder, renders, uid + 1), 'Conflict');
-      assert.equal(fs.readFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'utf8'), 'planted\n');
-    },
-  );
-
-  await t.test('a parameter with no default does not render, Invalid, and is still served as a Template', () => {
+  test('a folder of renders owned by another user is refused Conflict, and what is planted in it is neither served nor touched', (t) => {
+    const uid = process.getuid?.();
+    if (uid === undefined) return t.skip('this platform has no uid');
+    const renders = scratch('wf-template-renders-');
+    const { dir } = run(templateTree('mill'), folder, renders);
+    fs.writeFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'planted\n');
+    assert.equal(failedAs(templateTree('mill'), folder, renders, uid + 1), 'Conflict');
+    assert.equal(fs.readFileSync(path.join(dir, 'workflows', 'agents', 'reviewer.md'), 'utf8'), 'planted\n');
+  });
+  test('a parameter with no default does not render, Invalid, and is still served as a Template', () => {
     assert.equal(failedWith(templateTree('asks'), folder), 'Invalid');
     assert.equal(failedWith(templateTree('torn'), folder), 'Invalid');
     assert.equal(run(templateObject('asks'), folder).status.problems, undefined);
   });
-
-  await t.test("a template's documents are its workflows, agents and skills, by name, sorted", () => {
+  test("a template's documents are its workflows, agents and skills, by name, sorted", () => {
     assert.deepEqual(
       templateDocumentsOf([
         'nemia.yaml',

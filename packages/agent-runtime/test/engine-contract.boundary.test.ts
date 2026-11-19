@@ -5,7 +5,7 @@
  * Then that the lists are whole: every verb of the engine is walked or named unkept, each unkept verb is one the engine has, and each
  * difference `APART` declares is one.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { Engine, nameFor, testOps, type RunnerOps, type Sighting } from '../src/index.ts';

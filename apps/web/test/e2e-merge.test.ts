@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { NAMES, namesIn, PAGES_DIR, pageFiles } from './e2e/pages.ts';
 import { scratch } from 'test-kit/scratch';
 

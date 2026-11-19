@@ -2,7 +2,7 @@
  * The Subscription (`src/subscription.ts`): a subscription with a digest pending and one with nothing, and a page of them, as the Api's
  * endpoints answer them, every key kept; a scope that is no level, and another kind, refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Subscription } from 'objects';

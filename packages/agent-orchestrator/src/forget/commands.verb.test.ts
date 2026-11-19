@@ -3,7 +3,7 @@
  * throws in place of an answer that removed nothing. Their arguments refused before any run is read are rows of `REFUSALS`
  * (`command.test.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { notForgottenLine, type Forgot } from './forget.ts';
 import type { Pruning } from './prune/prune.ts';

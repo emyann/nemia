@@ -6,7 +6,7 @@
  * (`gatesAfterSection`). The functions of `status/`, `ending/` and
  * `brief/` that a gate turns on are held here, beside the verb that reads them; a gate on disk is `test/gate.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   approvalOf,
@@ -57,15 +57,15 @@ const onTry2 = (approvals: ReturnType<typeof approval>[]) =>
     approvals,
   });
 
-test('gatesOf, hasGate', async (t) => {
+describe('gatesOf, hasGate', () => {
   const steps: StepSpec[] = [step('plan'), step('implement', ['plan']), { ...step('review', ['implement']), gate: true }];
-  await t.test("a step is gated by its own `gate: true` or by the run's --gate", () => {
+  test("a step is gated by its own `gate: true` or by the run's --gate", () => {
     assert.deepEqual(gatesOf(steps, { gates: ['plan'] }), ['plan', 'review']);
   });
-  await t.test("the folder's own, on a run given none", () => {
+  test("the folder's own, on a run given none", () => {
     assert.deepEqual(gatesOf(steps, {}), ['review']);
   });
-  await t.test('a step neither gates is not gated', () => {
+  test('a step neither gates is not gated', () => {
     assert.equal(hasGate(steps[1], { gates: ['plan'] }), false);
   });
 });
@@ -73,36 +73,36 @@ test('gatesOf, hasGate', async (t) => {
 /** `implement → review → land`, as quick is: land gated by the run alone. */
 const QUICK: StepSpec[] = [step('implement'), step('review', ['implement']), step('land', ['review'])];
 
-test("gatesAfterSection: a step is told the gates after it, the run's own and its workflow's", async (t) => {
+describe("gatesAfterSection: a step is told the gates after it, the run's own and its workflow's", () => {
   const named = (section: string): string[] => [...section.matchAll(/`([a-z]+)`/g)].map((m) => m[1] ?? '').filter((n) => n !== 'nemia');
-  await t.test('a run started with `--gate land` tells each step before land of it', () => {
+  test('a run started with `--gate land` tells each step before land of it', () => {
     for (const s of QUICK.slice(0, 2)) assert.deepEqual(named(gatesAfterSection(s, { gates: ['land'] }, QUICK)), ['land'], s.name);
   });
-  await t.test('a run gated nowhere after the step tells it nothing', () => {
+  test('a run gated nowhere after the step tells it nothing', () => {
     assert.equal(gatesAfterSection(QUICK[1], {}, QUICK), '');
     assert.equal(gatesAfterSection(QUICK[1], { gates: [] }, QUICK), '');
   });
-  await t.test('nor of a gate at the step itself, or before it', () => {
+  test('nor of a gate at the step itself, or before it', () => {
     assert.equal(gatesAfterSection(QUICK[1], { gates: ['implement', 'review'] }, QUICK), '');
   });
-  await t.test("the workflow's own `gate: true` after the step, in the order the steps run", () => {
+  test("the workflow's own `gate: true` after the step, in the order the steps run", () => {
     const gated: StepSpec[] = [step('plan'), { ...step('implement', ['plan']), gate: true }, step('review', ['implement'])];
     assert.deepEqual(named(gatesAfterSection(gated[0], { gates: ['review'] }, gated)), ['implement', 'review']);
   });
 });
 
-test('approvalOf, spentApprovals', async (t) => {
-  await t.test('the approval of the try a step is on, never another step’s', () => {
+describe('approvalOf, spentApprovals', () => {
+  test('the approval of the try a step is on, never another step’s', () => {
     const r = atPlan({ approvals: [approval('plan', 1, 'ship the second reading'), approval('implement', 1)] });
     assert.deepEqual(approvalOf(r, 'plan'), approval('plan', 1, 'ship the second reading'));
   });
-  await t.test("try 2 is not approved by try 1's approval", () => {
+  test("try 2 is not approved by try 1's approval", () => {
     assert.equal(approvalOf(onTry2([approval('plan', 1)]), 'plan'), undefined);
   });
-  await t.test('nor try 1 by an approval of try 2', () => {
+  test('nor try 1 by an approval of try 2', () => {
     assert.equal(approvalOf(atPlan({ approvals: [approval('plan', 2)] }), 'plan'), undefined);
   });
-  await t.test('spent: the approvals of a try the step is past, of no other step', () => {
+  test('spent: the approvals of a try the step is past, of no other step', () => {
     assert.deepEqual(spentApprovals(onTry2([approval('plan', 1), approval('plan', 2), approval('implement', 1)])), [approval('plan', 1)]);
   });
 });
@@ -148,9 +148,9 @@ const HOLDS: Array<[string, StepSpec, Run, TaskPhase, Closeout | undefined, Task
   ['REFUSED unsigned', PLAN, at({ gates: ['plan'] }), 'succeeded', undefined, undefined, false],
 ];
 
-test('holdsOpen', async (t) => {
+describe('holdsOpen', () => {
   for (const [row, w, r, phase, closeout, checkPhase, expected] of HOLDS) {
-    await t.test(row, () => {
+    test(row, () => {
       const p = phases({ t1: phase, ...(checkPhase ? { c1: checkPhase } : {}) });
       assert.equal(
         holdsOpen(
@@ -168,34 +168,34 @@ test('holdsOpen', async (t) => {
   }
 });
 
-test('holdsOpenOn', async (t) => {
+describe('holdsOpenOn', () => {
   for (const [row, given, expected] of [
     ['the default harness, claude', {}, true],
     ['claude', { harness: 'claude' }, true],
     ['REFUSED a codex step', { harness: 'codex' }, false],
   ] as Array<[string, Parameters<typeof holdsOpenOn>[0], boolean]>) {
-    await t.test(row, () => assert.equal(holdsOpenOn(given), expected));
+    test(row, () => assert.equal(holdsOpenOn(given), expected));
   }
 });
 
-test('gateRefusal', async (t) => {
-  await t.test('steps the workflow has, each once, are no refusal', () => {
+describe('gateRefusal', () => {
+  test('steps the workflow has, each once, are no refusal', () => {
     assert.equal(gateRefusal(['plan', 'review'], PLANNED), null);
   });
-  await t.test('REFUSED a step the workflow does not have, naming the steps it has', () => {
+  test('REFUSED a step the workflow does not have, naming the steps it has', () => {
     names(gateRefusal(['desing'], PLANNED), '--gate desing', 'no step "desing"', 'plan, implement, review');
   });
-  await t.test('REFUSED a step given twice', () => {
+  test('REFUSED a step given twice', () => {
     names(gateRefusal(['plan', 'plan'], PLANNED), '--gate plan', 'twice', 'one --gate');
   });
-  await t.test('REFUSED in the words of what gave it: a card', () => {
+  test('REFUSED in the words of what gave it: a card', () => {
     const refusal = gateRefusal(['desing'], PLANNED, (s) => `idea.md: \`gate: ${s}\``);
     names(refusal, 'no step "desing"');
     assert.ok(refusal?.startsWith('idea.md: `gate: desing`'), refusal ?? '');
   });
 });
 
-test('gateLines', async (t) => {
+describe('gateLines', () => {
   for (const [row, r, p, expected] of [
     [
       'awaiting approval, with the two commands',
@@ -227,11 +227,11 @@ test('gateLines', async (t) => {
       { plan: 'not approved, and never can be: the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (nemia prune)' },
     ],
   ] as Array<[string, Run, (id: string) => TaskPhase, Record<string, string>]>) {
-    await t.test(row, () => assert.deepEqual(gateLines(PLANNED, r, p, signedDone, asked), expected));
+    test(row, () => assert.deepEqual(gateLines(PLANNED, r, p, signedDone, asked), expected));
   }
 });
 
-test('gateLines at an ending approved and not filed: the send-back of the work beside the approval, until a try of the work spends it', async (t) => {
+describe('gateLines at an ending approved and not filed: the send-back of the work beside the approval, until a try of the work spends it', () => {
   const ENDING: StepSpec[] = [step('implement'), { ...step('ship', ['implement']), workspace: 'base', gate: true }];
   const given = { ...approval('ship', 1), work: { implement: 1 } };
   const atShip = (extra: Partial<RepositoryRun> = {}) => run({ implement: 't1', ship: null }, extra);
@@ -261,7 +261,7 @@ test('gateLines at an ending approved and not filed: the send-back of the work b
       { ship: 'approved 23:10Z' },
     ],
   ] as Array<[string, Run, (id: string) => TaskPhase, Record<string, string>]>) {
-    await t.test(row, () => assert.deepEqual(gateLines(ENDING, r, p, signedDone, asked), expected));
+    test(row, () => assert.deepEqual(gateLines(ENDING, r, p, signedDone, asked), expected));
   }
 });
 
@@ -277,10 +277,10 @@ const refused = (
 
 const WORDLESS: RetryAsk = { step: 'plan', try: 2, mode: 'continue', at: '2026-09-16T23:00:00.000Z' };
 
-test('approvalRefusal: what may be approved, and what is refused before the gate is read', async (t) => {
-  await t.test('a step at its gate may be approved', () => assert.equal(refused(atPlan(), 'plan', PLAN_DONE), null));
-  await t.test('with words too', () => assert.equal(refused(atPlan(), 'plan', PLAN_DONE, signedDone, 'ship the second reading'), null));
-  await t.test('REFUSED empty words', () => {
+describe('approvalRefusal: what may be approved, and what is refused before the gate is read', () => {
+  test('a step at its gate may be approved', () => assert.equal(refused(atPlan(), 'plan', PLAN_DONE), null));
+  test('with words too', () => assert.equal(refused(atPlan(), 'plan', PLAN_DONE, signedDone, 'ship the second reading'), null));
+  test('REFUSED empty words', () => {
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, ' \n'),
       '--message is empty',
@@ -288,13 +288,13 @@ test('approvalRefusal: what may be approved, and what is refused before the gate
       'leave --message out',
     );
   });
-  await t.test('the CLI refuses empty words in the same words (approvalWordsRefusal)', () => {
+  test('the CLI refuses empty words in the same words (approvalWordsRefusal)', () => {
     assert.equal(approvalWordsRefusal(''), approvalWordsRefusal(' ', 'nemia approve <runId> <step>'));
   });
-  await t.test('REFUSED a step the run does not have', () => {
+  test('REFUSED a step the run does not have', () => {
     names(refused(atPlan(), 'desing', PLAN_DONE), 'r-1 has no step "desing"', 'plan, implement, review');
   });
-  await t.test('REFUSED a pruned run', () => {
+  test('REFUSED a pruned run', () => {
     names(
       refused(atPlan({ pruned: { at: '2026-09-17T01:00:00.000Z', worktrees: [] } }), 'plan', PLAN_DONE),
       'r-1 was pruned at 2026-09-17T01:00:00.000Z',
@@ -302,10 +302,10 @@ test('approvalRefusal: what may be approved, and what is refused before the gate
       'nemia start',
     );
   });
-  await t.test('REFUSED a cancelled run', () => {
+  test('REFUSED a cancelled run', () => {
     names(refused(atPlan(CANCELLED), 'plan', PLAN_DONE), `r-1 was cancelled at ${CANCELLED.cancelledAt}`, 'nemia start');
   });
-  await t.test('REFUSED a step not gated, naming the gates there are', () => {
+  test('REFUSED a step not gated, naming the gates there are', () => {
     const r = run({ plan: 't1', implement: 't2', review: null }, { gates: ['plan'] });
     names(
       refused(r, 'implement', phases({ t1: 'succeeded', t2: 'succeeded' })),
@@ -315,12 +315,12 @@ test('approvalRefusal: what may be approved, and what is refused before the gate
       'nemia start --gate <step>',
     );
   });
-  await t.test('REFUSED a step of a run gated at no step', () => {
+  test('REFUSED a step of a run gated at no step', () => {
     names(refused(atPlan({ gates: undefined }), 'plan', PLAN_DONE), 'plan has no gate', 'r-1 is gated at no step');
   });
 });
 
-test('approvalRefusal: a step that has not signed off, each in its own words', async (t) => {
+describe('approvalRefusal: a step that has not signed off, each in its own words', () => {
   const unfiled = atPlan({ steps: { plan: { taskId: null }, implement: { taskId: null }, review: { taskId: null } } });
   for (const [row, r, p, closeoutOf, facts] of [
     ['not filed', unfiled, phases({}), signedDone, ['plan has not signed off yet', 'not been filed', 'nemia ls r-1']],
@@ -335,7 +335,7 @@ test('approvalRefusal: a step that has not signed off, each in its own words', a
     ['ended without its closeout', atPlan(), PLAN_DONE, () => undefined, ['plan has not signed off', 'without its closeout']],
     ['its session failed first', atPlan(), phases({ t1: 'failed' }), () => undefined, ['plan has not signed off', 'session failed first']],
   ] as Array<[string, Run, (id: string) => TaskPhase, (s: string) => Closeout | undefined, string[]]>) {
-    await t.test(`REFUSED ${row}`, () => names(refused(r, 'plan', p, closeoutOf), ...facts));
+    test(`REFUSED ${row}`, () => names(refused(r, 'plan', p, closeoutOf), ...facts));
   }
   const checked: StepSpec[] = [{ ...step('plan'), check: 'test -f PLAN.md' }, ...PLANNED.slice(1)];
   const withPlanCheck = (phase: TaskPhase) =>
@@ -349,15 +349,15 @@ test('approvalRefusal: a step that has not signed off, each in its own words', a
       asked,
       () => 1,
     );
-  await t.test('REFUSED its check still due or running: a gated step is verified first, then held', () => {
+  test('REFUSED its check still due or running: a gated step is verified first, then held', () => {
     names(withPlanCheck('running'), 'plan has signed off', 'check is still due or running');
   });
-  await t.test('REFUSED its check refused: nothing to approve', () => names(withPlanCheck('failed'), 'plan has not passed its check'));
-  await t.test('its check passed, it may be approved', () => assert.equal(withPlanCheck('succeeded'), null));
+  test('REFUSED its check refused: nothing to approve', () => names(withPlanCheck('failed'), 'plan has not passed its check'));
+  test('its check passed, it may be approved', () => assert.equal(withPlanCheck('succeeded'), null));
 });
 
-test('approvalRefusal: approved already, and a send-back asked', async (t) => {
-  await t.test('REFUSED the try already approved, while it may still be sent back: the send-back is offered', () => {
+describe('approvalRefusal: approved already, and a send-back asked', () => {
+  test('REFUSED the try already approved, while it may still be sent back: the send-back is offered', () => {
     names(
       refused(atPlan({ approvals: [approval('plan', 1, 'yes')] }), 'plan', PLAN_DONE),
       'try 1 of plan is already approved',
@@ -366,7 +366,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     );
     names(refused(atPlan({ approvals: [approval('plan', 1)] }), 'plan', PLAN_DONE), 'on the next tick', 'nemia retry r-1 plan');
   });
-  await t.test('REFUSED approved, with words, and handed on: no send-back offered, and the one it no longer offers is refused', () => {
+  test('REFUSED approved, with words, and handed on: no send-back offered, and the one it no longer offers is refused', () => {
     const filed = run({ plan: 't1', implement: 't2', review: 't3' }, { gates: ['plan'], approvals: [approval('plan', 1, 'yes')] });
     const all = phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' });
     const refusal = refused(filed, 'plan', all);
@@ -375,14 +375,14 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     const sendBack = retryRefusal(PLANNED, filed, 'plan', { mode: 'continue', message: 'x' }, all, signedDone, asked);
     assert.ok(sendBack?.startsWith('plan signed off done'), sendBack ?? '');
   });
-  await t.test('REFUSED approved, and nothing waits on it: its run goes on without it', () => {
+  test('REFUSED approved, and nothing waits on it: its run goes on without it', () => {
     const one: StepSpec[] = [step('implement')];
     const r = run({ implement: 't1' }, { gates: ['implement'], approvals: [approval('implement', 1)] });
     const refusal = approvalRefusal(one, r, 'implement', undefined, phases({ t1: 'succeeded' }), signedDone, asked);
     names(refusal, 'try 1 of implement is already approved', 'nothing waits on it', 'nemia ls r-1');
     assert.ok(!refusal?.includes('nemia retry'), refusal ?? '');
   });
-  await t.test('REFUSED a send-back already asked for, of the try after', () => {
+  test('REFUSED a send-back already asked for, of the try after', () => {
     const sendBack: RetryAsk = { ...WORDLESS, message: 'store it first' };
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [sendBack]),
@@ -392,10 +392,10 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
       'the next tick sends it back',
     );
   });
-  await t.test("an ask of another step's try is not this step's: it may be approved", () => {
+  test("an ask of another step's try is not this step's: it may be approved", () => {
     assert.equal(refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [{ ...WORDLESS, step: 'review', try: 1 }]), null);
   });
-  await t.test('REFUSED a wordless ask at its gate, which no tick honours: delete it, then approve', () => {
+  test('REFUSED a wordless ask at its gate, which no tick honours: delete it, then approve', () => {
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [WORDLESS]),
       'try 2 of plan is asked for',
@@ -426,20 +426,20 @@ const planSaid = (surface: string) => (name: string) => (name === 'plan' ? { ...
 const triaged = (r: Run, p: (id: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined) =>
   approvalRefusal(ROUTED, r, 'triage', undefined, p, closeoutOf, asked);
 
-test('approvalRefusal: a gated table condition, never filed, at the gate the run reads', async (t) => {
-  await t.test('its table answered and nobody approved it: it may be approved', () => {
+describe('approvalRefusal: a gated table condition, never filed, at the gate the run reads', () => {
+  test('its table answered and nobody approved it: it may be approved', () => {
     assert.equal(triaged(atTriage(), PLAN_DONE, planSaid('web')), null);
   });
-  await t.test('REFUSED while its producer has not signed off: where the run stands is named', () => {
+  test('REFUSED while its producer has not signed off: where the run stands is named', () => {
     names(triaged(atTriage(), phases({ t1: 'running' }), planSaid('web')), 'nemia ls r-1');
   });
-  await t.test('REFUSED its table answering no route: the line that routes it by hand is named', () => {
+  test('REFUSED its table answering no route: the line that routes it by hand is named', () => {
     names(triaged(atTriage(), PLAN_DONE, planSaid('mobile')), 'nemia route r-1 triage <web|backend>');
   });
-  await t.test('REFUSED once approved: what waits on it is filed on the next tick', () => {
+  test('REFUSED once approved: what waits on it is filed on the next tick', () => {
     names(triaged(atTriage({ approvals: [approval('triage', 1)] }), PLAN_DONE, planSaid('web')), 'try 1 of triage is already approved');
   });
-  await t.test('REFUSED ungated: nothing to approve, the gates there are named', () => {
+  test('REFUSED ungated: nothing to approve, the gates there are named', () => {
     names(triaged(atTriage({ gates: undefined }), PLAN_DONE, planSaid('web')), 'triage has no gate', 'nemia start --gate <step>');
   });
 });

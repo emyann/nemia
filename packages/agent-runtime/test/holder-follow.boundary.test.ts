@@ -13,7 +13,7 @@
  *
  * A boundary test: a real store, the SDK with a real child process, a real socket and a second real engine.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -98,7 +98,7 @@ test(
     const rung = bell();
     const held = await holder();
     const { root, cwd, engine, served } = held;
-    t.after(() => {
+    t.onTestFinished(() => {
       fs.writeFileSync(path.join(cwd, 'more'), '');
       return held.close();
     });
@@ -120,7 +120,7 @@ test(
     );
     await Effect.runPromise(engine.tick());
     const live = viewer({ root, taskId, card: served.cards.claude, what: 'follow', until: 'a thought' }, served.token, rung);
-    t.after(() => live.stop());
+    t.onTestFinished(() => live.stop());
     await until(
       t,
       () => live.said.some((l) => l.includes('Half ')),
@@ -157,7 +157,7 @@ test(
 
     await held.close();
     const read = viewer({ root, taskId, card: served.cards.claude, what: 'read' }, served.token, rung);
-    t.after(() => read.stop());
+    t.onTestFinished(() => read.stop());
     assert.equal(await read.ended, 0, `the viewer still answers with the holder gone: ${read.said.join(' | ')}${read.stderr.join('')}`);
     const transcript = lineOf(read.said, 'transcript') as { events?: Array<{ text?: string }> };
     assert.ok(

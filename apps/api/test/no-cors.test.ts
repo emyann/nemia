@@ -6,7 +6,7 @@
  * a page of another site, which the guard refuses before any handler runs, and a read of the cards is answered.
  */
 import './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Api, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { app } from '../src/app.ts';

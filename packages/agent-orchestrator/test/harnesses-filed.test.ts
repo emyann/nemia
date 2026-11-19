@@ -4,7 +4,7 @@
  * harness: '<name>' … })` in the package's source: a check's, a fix's, a script condition's). The stand-in engine takes any harness,
  * so a filing on one the engine lacks is refused only on the daemon, as every fix was while `command` was missing.
  */
-import { test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,23 +31,29 @@ const literalFilings = (): { file: string; harness: string }[] =>
     [...fs.readFileSync(path.join(PACKAGE, file), 'utf8').matchAll(LITERAL_FILING)].map((m) => ({ file, harness: m[1] ?? '' })),
   );
 
-test("every harness the orchestrator files on is a key of the daemon's engine's harnesses", async (t) => {
+describe("every harness the orchestrator files on is a key of the daemon's engine's harnesses", () => {
+  beforeAll(() => {
+    assert.deepEqual(
+      [...new Set(literals.map((f) => f.harness))].sort(),
+      ['check', 'command'],
+      'the scan finds the check, the fix and the script condition, so a row is never missing for want of a match',
+    );
+  });
   const literals = literalFilings();
-  assert.deepEqual(
-    [...new Set(literals.map((f) => f.harness))].sort(),
-    ['check', 'command'],
-    'the scan finds the check, the fix and the script condition, so a row is never missing for want of a match',
-  );
   const rows = [
     ...STEP_HARNESSES.map((harness) => ({ filer: `a step on ${harness}`, harness })),
     ...literals.map((f) => ({ filer: `${f.file}'s filing`, harness: f.harness })),
   ];
   for (const { filer, harness } of rows)
-    await t.test(`${filer}: \`${harness}\``, () => {
+    test(`${filer}: \`${harness}\``, () => {
       assert.ok(Object.hasOwn(HARNESSES, harness), `${filer} files on \`${harness}\`, which the engine has not: add it to HARNESSES`);
     });
-  assert.ok(
-    ['src/needs/fix.verb.ts', 'src/script/script.verb.ts', 'src/tick/file.verb.ts'].every((file) => literals.some((f) => f.file === file)),
-    'the fix, the script condition and the check are each a row',
-  );
+  afterAll(() => {
+    assert.ok(
+      ['src/needs/fix.verb.ts', 'src/script/script.verb.ts', 'src/tick/file.verb.ts'].every((file) =>
+        literals.some((f) => f.file === file),
+      ),
+      'the fix, the script condition and the check are each a row',
+    );
+  });
 });

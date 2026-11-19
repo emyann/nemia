@@ -19,7 +19,8 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test, vi } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -66,23 +67,28 @@ const written = (id: string): Record<string, unknown> & { workflow: Array<Record
 const holdsAny = (object: unknown, ...keys: string[]): boolean => keys.some((key) => Object.hasOwn(object as object, key));
 
 /** What `nemia ls` answers (`RunsListed`), with what it says on stderr kept off the test's output. */
-const listed = async (t: { mock: test.TestContext['mock'] }): Promise<RunsListed> => {
-  const error = t.mock.method(console, 'error', () => {});
+const listed = async (): Promise<RunsListed> => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     return (await stage.main(['ls'])) as RunsListed;
   } finally {
-    error.mock.restore();
+    error.mockRestore();
   }
 };
 
-test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemia rm` over it, and each record written back under the names it has now', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemia rm` over it, and each record written back under the names it has now', () => {
+  let b!: import('./story.ts').Board;
+  let fixtureBytes!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
+    fixtureBytes = fs.readFileSync(path.join(FIXTURE, 'runs', 'tides.json'), 'utf8');
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun({ repo: ROOT }));
-  const fixtureBytes = fs.readFileSync(path.join(FIXTURE, 'runs', 'tides.json'), 'utf8');
-
-  await s.test('the old store, copied, reads every run under the names its keys have now', async () => {
+  s.test('the old store, copied, reads every run under the names its keys have now', async () => {
     const repo = path.join(ROOT, 'repo');
     fs.mkdirSync(repo, { recursive: true });
     fs.mkdirSync(path.join(ROOT, 'desk'), { recursive: true });
@@ -157,8 +163,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     for (const id of ['tides', 'notes', 'drafts'])
       assert.deepEqual(listed.find((r) => r.id === id)?.workflow, runRecord(ROOT, id).workflow, `${id} is listed as the tick reads it`);
   });
-
-  await s.test('a pass judges every run and files what is due, each step with its rules under the names they have now', async () => {
+  s.test('a pass judges every run and files what is due, each step with its rules under the names they have now', async () => {
     for (const taskId of [
       'notes-implement',
       'notes-implement-check',
@@ -199,8 +204,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
       'the step read as `place: folder` works in a folder of its own',
     );
   });
-
-  await s.test('each record the pass wrote holds the names its keys have now alone, and what a newer nemia wrote', () => {
+  s.test('each record the pass wrote holds the names its keys have now alone, and what a newer nemia wrote', () => {
     const [implement, review, ship] = written('tides').workflow;
     assert.deepEqual(
       [implement.disallowedTools, implement.allowedTools],
@@ -221,15 +225,13 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     assert.deepEqual([Reflect.get(first, 'cause'), holdsAny(first, 'then'), Reflect.get(second, 'cause')], ['retries', false, 'continue']);
     assert.equal(fs.readFileSync(path.join(FIXTURE, 'runs', 'tides.json'), 'utf8'), fixtureBytes, 'the fixture is not written');
   });
-
-  await s.test('the next pass files the codex step with the sandbox it was frozen with, as the engine calls it', async () => {
+  s.test('the next pass files the codex step with the sandbox it was frozen with, as the engine calls it', async () => {
     b.settle('tides-implement', 'succeeded', SIGNED);
     await pass();
     assert.equal(b.tasks.get('tides-review')?.spec.config?.permissionMode, 'bypassPermissions', 'not Codex’s default');
   });
-
-  await s.test('`nemia ls` lists every run of the old store, and none unreadable', async (c) => {
-    const { runs } = await listed(c);
+  s.test('`nemia ls` lists every run of the old store, and none unreadable', async () => {
+    const { runs } = await listed();
     const ids = runs.map((r) => r.run.id);
     for (const id of ['tides', 'notes', 'drafts']) assert.ok(ids.includes(id), ids.join(', '));
     assert.deepEqual(
@@ -238,13 +240,11 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
       'none left unjudged',
     );
   });
-
-  await s.test('the decision of a run of the old store is read', async () => {
+  s.test('the decision of a run of the old store is read', async () => {
     const { run } = await decidedOn(stage, 'notes');
     assert.deepEqual([run.id, run.brief], ['notes', 'take the notes']);
   });
-
-  await s.test(
+  s.test(
     '`nemia start` on a folder still on the former names starts under the new, naming each line to rename; renamed, it says nothing',
     async () => {
       const dir = path.join(ROOT, 'workflows', 'renamed');
@@ -299,8 +299,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
       assert.doesNotMatch((again.hints ?? []).join('\n'), /former name|is read as `/, 'renamed, the start answers no line to rename');
     },
   );
-
-  await s.test('`nemia rm` forgets a run of the old store, and the others stay', async () => {
+  s.test('`nemia rm` forgets a run of the old store, and the others stay', async () => {
     const forgot = await stage.runWith(b.e, RM.handler({ runId: 'notes' }));
     assert.deepEqual([forgot.id, forgot.removed], ['notes', true]);
     assert.equal(fs.existsSync(runFile(ROOT, 'notes')), false, 'its record is gone');

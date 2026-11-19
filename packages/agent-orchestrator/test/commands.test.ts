@@ -2,7 +2,7 @@
  * The shipped command table: no rule of the table broken against the CLI's runners, and each command on the CLI alone, on the api
  * alone, or on both and typed.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { CLI_VERBS, TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';

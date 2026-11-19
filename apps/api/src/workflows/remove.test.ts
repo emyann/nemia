@@ -5,7 +5,8 @@
  * leaves the folder as it was; the removal is read back from disk and from the listing.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -76,27 +77,28 @@ async function listed(name: string, from = 'user'): Promise<boolean> {
 
 const errorOf = async (res: Response): Promise<string> => ((await res.json()) as { error: string }).error;
 
-test("a person removes a folder of theirs: refused while it is stale, unsaid, still needed or the repository's, then removed whole at the version read", async (t) => {
-  const s = story(t);
-  const dir = planned('done');
-  const card = path.join(root, 'inbox', 'needing.md');
-
-  await s.test(
-    'REFUSED: a removal of a folder changed since it was read is a 409 naming both versions, and nothing is removed',
-    async () => {
-      const read = versionOf(dir);
-      write(path.join(dir, 'ship.md'), '---\nafter: build\nplace: git\n---\nShip it.\n');
-      const before = snapshot(dir);
-      const res = await remove('done', read);
-      assert.equal(res.status, 409);
-      const error = await errorOf(res);
-      for (const fact of [dir, read, versionOf(dir)]) assert.ok(error.includes(fact), `${fact}: ${error}`);
-      assert.deepEqual(snapshot(dir), before);
-      fs.rmSync(path.join(dir, 'ship.md'));
-    },
-  );
-
-  await s.test('REFUSED: a removal that does not say the version it read is a 422 naming the route, and nothing is removed', async () => {
+describe("a person removes a folder of theirs: refused while it is stale, unsaid, still needed or the repository's, then removed whole at the version read", () => {
+  let dir!: string;
+  let card!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = planned('done');
+    card = path.join(root, 'inbox', 'needing.md');
+    return t.end;
+  });
+  const s = story(test);
+  s.test('REFUSED: a removal of a folder changed since it was read is a 409 naming both versions, and nothing is removed', async () => {
+    const read = versionOf(dir);
+    write(path.join(dir, 'ship.md'), '---\nafter: build\nplace: git\n---\nShip it.\n');
+    const before = snapshot(dir);
+    const res = await remove('done', read);
+    assert.equal(res.status, 409);
+    const error = await errorOf(res);
+    for (const fact of [dir, read, versionOf(dir)]) assert.ok(error.includes(fact), `${fact}: ${error}`);
+    assert.deepEqual(snapshot(dir), before);
+    fs.rmSync(path.join(dir, 'ship.md'));
+  });
+  s.test('REFUSED: a removal that does not say the version it read is a 422 naming the route, and nothing is removed', async () => {
     const before = snapshot(dir);
     for (const version of [null, '']) {
       const res = await remove('done', version);
@@ -106,8 +108,7 @@ test("a person removes a folder of theirs: refused while it is stale, unsaid, st
     }
     assert.deepEqual(snapshot(dir), before);
   });
-
-  await s.test(
+  s.test(
     "REFUSED: a folder a queued card still needs is the package's 409, naming the card and the line that takes it back, and the folder is kept",
     async () => {
       write(card, `---\nworkflow: ${dir}\nqueued: 2026-10-01T00:00:00.000Z\n---\nAn idea.\n`);
@@ -120,8 +121,7 @@ test("a person removes a folder of theirs: refused while it is stale, unsaid, st
       fs.rmSync(card);
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED: the repository's workflow is not removed (404, none in the library), nor a name not there (404), and the folder of yours is kept",
     async () => {
       const theirs = path.join(repo, 'workflows', 'theirs');
@@ -134,8 +134,7 @@ test("a person removes a folder of theirs: refused while it is stale, unsaid, st
       assert.equal((await remove('nowhere', 'v')).status, 404);
     },
   );
-
-  await s.test(
+  s.test(
     'removed at the version it was read at, the folder is gone, the Workflow it was answered, and the listing no longer has it',
     async () => {
       assert.equal(await listed('done'), true, 'listed before');

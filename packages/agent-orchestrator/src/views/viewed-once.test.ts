@@ -3,7 +3,7 @@
  * verb that changes a task drops what was read of that task, a pass or a verb it does not know drops everything, and a view that failed is
  * asked again.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { TaskView } from 'agent-runtime';
 import { promised } from '../../test/promised.ts';

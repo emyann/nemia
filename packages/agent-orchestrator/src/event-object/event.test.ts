@@ -5,7 +5,7 @@
  * inside a line, or a namespace the event is not in, is `Missing`. And over the files, that an Event read by its byte reads its own line
  * and not the feed after it, its bytes counted by a metered pass (`meteredPass`). Kinds are asserted, never sentences.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer, Schema } from 'effect';
 import { Event, EventList } from 'objects';

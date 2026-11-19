@@ -2,7 +2,7 @@
  * The workflow feed followed (`followFeed`): the queries each event reads again, and how the stream is kept — with streams this file
  * dispatches events on, frames it flushes when it says, and timers it runs by hand.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { QueryClient, type QueryKey } from '@tanstack/react-query';
 import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/follow.ts';
@@ -112,58 +112,49 @@ function followed() {
 
 const line = (run: string, step?: string) => ({ at: '2026-09-22T21:00:00.000Z', run, ...(step ? { step } : {}), word: 'running' });
 
-test('keysOf, polled and filterOf: what each event reads again, and what is polled', async (t) => {
-  await t.test(
-    "each event names the queries it can change, and no other: a step its run, the list and the inbox, whose started cards show their run's phase, a run the cap too, a removal its record and the cap",
-    () => {
-      assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['inbox'], ['daemon']]);
-      assert.deepEqual(keysOf('run', 'r-1'), [
-        ['runs'],
-        ['runs-open'],
-        ['runs-finished'],
-        ['runs', 'r-1'],
-        ['runs', 'r-1', 'steps'],
-        ['ceilings'],
-        ['inbox'],
-        ['daemon'],
-      ]);
-      assert.deepEqual(keysOf('removed', 'r-1'), [
-        ['runs'],
-        ['runs-open'],
-        ['runs-finished'],
-        ['runs', 'r-1'],
-        ['runs', 'r-1', 'steps'],
-        ['ceilings'],
-        ['inbox'],
-        ['daemon'],
-      ]);
-      for (const event of ['step', 'run', 'removed'] as const) {
-        assert.ok(
-          keysOf(event, 'r-1').every((key) => key[2] !== 'decision' && key[2] !== 'path' && key[2] !== 'lines'),
-          `${event} names no decision, path or lines: each is keyed by the run's state, or never moves`,
-        );
-      }
-    },
-  );
-  await t.test(
-    "a daemon's line names no run and reads the daemon's standing alone: nothing of a run's record, the cap or the inbox",
-    () => {
-      assert.deepEqual(keysOf('daemon'), [['daemon']]);
-    },
-  );
-  await t.test(
-    "a factory's line, its conflicts pending or settled, reads the factories and the daemon's standing, and no key of a run",
-    () => {
-      assert.deepEqual(keysOf('factory'), [['factories'], ['daemon']]);
-      const f = followed();
-      f.stream().opens();
-      f.stream().send('factory', { at: '2026-11-11T06:00:00.000Z', factory: 'acme', word: 'conflicts pending' }, '10');
-      f.frame();
-      assert.deepEqual(f.invalidated, [[['factories'], ['daemon']]], 'read on the line, the board following its event');
-      f.stop();
-    },
-  );
-  await t.test("the store's line, its pause put or lifted, reads the pause again on the line itself, and no key of a run", () => {
+describe('keysOf, polled and filterOf: what each event reads again, and what is polled', () => {
+  test("each event names the queries it can change, and no other: a step its run, the list and the inbox, whose started cards show their run's phase, a run the cap too, a removal its record and the cap", () => {
+    assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs-open'], ['runs-finished'], ['runs', 'r-1'], ['inbox'], ['daemon']]);
+    assert.deepEqual(keysOf('run', 'r-1'), [
+      ['runs'],
+      ['runs-open'],
+      ['runs-finished'],
+      ['runs', 'r-1'],
+      ['runs', 'r-1', 'steps'],
+      ['ceilings'],
+      ['inbox'],
+      ['daemon'],
+    ]);
+    assert.deepEqual(keysOf('removed', 'r-1'), [
+      ['runs'],
+      ['runs-open'],
+      ['runs-finished'],
+      ['runs', 'r-1'],
+      ['runs', 'r-1', 'steps'],
+      ['ceilings'],
+      ['inbox'],
+      ['daemon'],
+    ]);
+    for (const event of ['step', 'run', 'removed'] as const) {
+      assert.ok(
+        keysOf(event, 'r-1').every((key) => key[2] !== 'decision' && key[2] !== 'path' && key[2] !== 'lines'),
+        `${event} names no decision, path or lines: each is keyed by the run's state, or never moves`,
+      );
+    }
+  });
+  test("a daemon's line names no run and reads the daemon's standing alone: nothing of a run's record, the cap or the inbox", () => {
+    assert.deepEqual(keysOf('daemon'), [['daemon']]);
+  });
+  test("a factory's line, its conflicts pending or settled, reads the factories and the daemon's standing, and no key of a run", () => {
+    assert.deepEqual(keysOf('factory'), [['factories'], ['daemon']]);
+    const f = followed();
+    f.stream().opens();
+    f.stream().send('factory', { at: '2026-11-11T06:00:00.000Z', factory: 'acme', word: 'conflicts pending' }, '10');
+    f.frame();
+    assert.deepEqual(f.invalidated, [[['factories'], ['daemon']]], 'read on the line, the board following its event');
+    f.stop();
+  });
+  test("the store's line, its pause put or lifted, reads the pause again on the line itself, and no key of a run", () => {
     assert.deepEqual(keysOf('store'), [['pause'], ['pause', 'now'], ['daemon']]);
     const f = followed();
     f.stream().opens();
@@ -176,33 +167,30 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
     assert.deepEqual(f.invalidated, [[['pause'], ['pause', 'now'], ['daemon']]], 'read on the line, not on the pause poll');
     f.stop();
   });
-  await t.test(
-    'the polled queries are the runs, a run, the cap, and whether a daemon ticks — never a decision, the inbox, or anything else',
-    () => {
-      for (const key of [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]) {
-        assert.equal(polled(key), true, JSON.stringify(key));
-      }
-      for (const key of [
-        ['runs', 'r-1', 'decision', 'stamp'],
-        ['runs', 'r-1', 'steps', 'a', 'tries', 'stamp'],
-        ['runs', 'r-1', 'lines'],
-        ['inbox'],
-        ['inbox', 'card'],
-        ['quota'],
-        ['workflows'],
-        ['ceilings', 'x'],
-        ['daemon', 'x'],
-      ]) {
-        assert.equal(polled(key), false, JSON.stringify(key));
-      }
-    },
-  );
-  await t.test('the light answer is polled, for every factory and for one, and no key under a factory is', () => {
+  test('the polled queries are the runs, a run, the cap, and whether a daemon ticks — never a decision, the inbox, or anything else', () => {
+    for (const key of [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]) {
+      assert.equal(polled(key), true, JSON.stringify(key));
+    }
+    for (const key of [
+      ['runs', 'r-1', 'decision', 'stamp'],
+      ['runs', 'r-1', 'steps', 'a', 'tries', 'stamp'],
+      ['runs', 'r-1', 'lines'],
+      ['inbox'],
+      ['inbox', 'card'],
+      ['quota'],
+      ['workflows'],
+      ['ceilings', 'x'],
+      ['daemon', 'x'],
+    ]) {
+      assert.equal(polled(key), false, JSON.stringify(key));
+    }
+  });
+  test('the light answer is polled, for every factory and for one, and no key under a factory is', () => {
     assert.equal(polled(['runs-open']), true);
     assert.equal(polled(['runs-open', 'harbour']), true);
     assert.equal(polled(['runs-open', 'harbour', 'x']), false);
   });
-  await t.test('every page of the finished runs is polled and read again on an event, under the one key that stands for them', async () => {
+  test('every page of the finished runs is polled and read again on an event, under the one key that stands for them', async () => {
     assert.equal(polled(['runs-finished']), true);
     assert.equal(polled(['runs-finished', null, 2]), true);
     assert.equal(polled(['runs-finished', 'harbour', 1]), true);
@@ -224,7 +212,7 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
     }
     client.clear();
   });
-  await t.test("REFUSED: an event reads a factory's light answer again with every factory's, and still no decision", async () => {
+  test("REFUSED: an event reads a factory's light answer again with every factory's, and still no decision", async () => {
     const seeded: QueryKey[] = [['runs'], ['runs', 'a'], ['runs', 'a', 'decision', 's'], ['runs-open'], ['runs-open', 'harbour']];
     const marked = async (filter: (key: QueryKey) => { queryKey: QueryKey; exact: boolean }) => {
       const client = new QueryClient();
@@ -246,57 +234,51 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
     assert.deepEqual(filterOf(['runs', 'a', 'steps']), { queryKey: ['runs', 'a', 'steps'], exact: false });
     assert.deepEqual(filterOf(['runs-open']), { queryKey: ['runs-open'], exact: false });
   });
-  await t.test(
-    "REFUSED: every read of the inbox — every card, the cards in play, a selector's, a card's page — is read again on a step's, a run's and a removal's event: a started card shows its run's phase",
-    async () => {
-      const inbox: QueryKey[] = [
-        ['inbox'],
-        ['inbox', { all: true }],
-        ['inbox', { all: true }, { selector: 'team=core' }],
-        ['inbox', { selector: 'team=core' }],
-        ['inbox', 'cache-the-views-k2q9'],
-      ];
-      const marked = async (event: 'step' | 'run' | 'removed', filter = filterOf) => {
-        const client = new QueryClient();
-        for (const key of inbox) client.setQueryData(key, {});
-        await Promise.all(keysOf(event, 'a').map((key) => client.invalidateQueries(filter(key))));
-        const keys = inbox.filter((key) => client.getQueryState(key)?.isInvalidated);
-        client.clear();
-        return keys;
-      };
-      for (const event of ['step', 'run', 'removed'] as const) assert.deepEqual(await marked(event), inbox, `a ${event} event`);
-      assert.deepEqual(
-        await marked('run', (queryKey) => ({ queryKey, exact: true })),
-        [['inbox']],
-        'invalidated exactly, the Inbox page, a label page and a card page are left as they were',
-      );
-    },
-  );
-  await t.test(
-    "a step's tries and told are read again by a run's event and a removal, by prefix, and never by a step's: it moves their stamp",
-    async () => {
-      const subs: QueryKey[] = [
-        ['runs', 'a', 'steps', 'plan', 'tries', 's'],
-        ['runs', 'a', 'steps', 'plan', 'told', 's'],
-      ];
-      const seeded: QueryKey[] = [...subs, ['runs', 'a', 'lines'], ['runs', 'b', 'steps', 'plan', 'tries', 's']];
-      const marked = async (event: 'step' | 'run' | 'removed') => {
-        const client = new QueryClient();
-        for (const key of seeded) client.setQueryData(key, {});
-        await Promise.all(keysOf(event, 'a').map((key) => client.invalidateQueries(filterOf(key))));
-        const keys = seeded.filter((key) => client.getQueryState(key)?.isInvalidated);
-        client.clear();
-        return keys;
-      };
-      assert.deepEqual(await marked('step'), [], "a step's event reads the object, whose stamp says which step moved");
-      assert.deepEqual(await marked('run'), subs, "a run's event: an artifact pruned moves no stamp");
-      assert.deepEqual(await marked('removed'), subs);
-    },
-  );
+  test("REFUSED: every read of the inbox — every card, the cards in play, a selector's, a card's page — is read again on a step's, a run's and a removal's event: a started card shows its run's phase", async () => {
+    const inbox: QueryKey[] = [
+      ['inbox'],
+      ['inbox', { all: true }],
+      ['inbox', { all: true }, { selector: 'team=core' }],
+      ['inbox', { selector: 'team=core' }],
+      ['inbox', 'cache-the-views-k2q9'],
+    ];
+    const marked = async (event: 'step' | 'run' | 'removed', filter = filterOf) => {
+      const client = new QueryClient();
+      for (const key of inbox) client.setQueryData(key, {});
+      await Promise.all(keysOf(event, 'a').map((key) => client.invalidateQueries(filter(key))));
+      const keys = inbox.filter((key) => client.getQueryState(key)?.isInvalidated);
+      client.clear();
+      return keys;
+    };
+    for (const event of ['step', 'run', 'removed'] as const) assert.deepEqual(await marked(event), inbox, `a ${event} event`);
+    assert.deepEqual(
+      await marked('run', (queryKey) => ({ queryKey, exact: true })),
+      [['inbox']],
+      'invalidated exactly, the Inbox page, a label page and a card page are left as they were',
+    );
+  });
+  test("a step's tries and told are read again by a run's event and a removal, by prefix, and never by a step's: it moves their stamp", async () => {
+    const subs: QueryKey[] = [
+      ['runs', 'a', 'steps', 'plan', 'tries', 's'],
+      ['runs', 'a', 'steps', 'plan', 'told', 's'],
+    ];
+    const seeded: QueryKey[] = [...subs, ['runs', 'a', 'lines'], ['runs', 'b', 'steps', 'plan', 'tries', 's']];
+    const marked = async (event: 'step' | 'run' | 'removed') => {
+      const client = new QueryClient();
+      for (const key of seeded) client.setQueryData(key, {});
+      await Promise.all(keysOf(event, 'a').map((key) => client.invalidateQueries(filterOf(key))));
+      const keys = seeded.filter((key) => client.getQueryState(key)?.isInvalidated);
+      client.clear();
+      return keys;
+    };
+    assert.deepEqual(await marked('step'), [], "a step's event reads the object, whose stamp says which step moved");
+    assert.deepEqual(await marked('run'), subs, "a run's event: an artifact pruned moves no stamp");
+    assert.deepEqual(await marked('removed'), subs);
+  });
 });
 
-test('followFeed: how the stream is kept, opened again, and stopped', async (t) => {
-  await t.test('the polls slow while the stream is open, and come back to their pace while it is not', () => {
+describe('followFeed: how the stream is kept, opened again, and stopped', () => {
+  test('the polls slow while the stream is open, and come back to their pace while it is not', () => {
     const f = followed();
     assert.equal(pace(5_000), 5_000, 'connecting: polled at its own pace');
     f.stream().opens();
@@ -318,27 +300,24 @@ test('followFeed: how the stream is kept, opened again, and stopped', async (t) 
     f.stop();
     assert.equal(pace(5_000), 5_000, 'stopped: nothing follows');
   });
-  await t.test(
-    'a feed cut under the cursor is closed on the `error` fired as the api ends the response — not on the event — and opened again from the end',
-    () => {
-      const f = followed();
-      f.stream().opens();
-      f.stream().send('step', line('r-1', 'plan'), '10');
-      const cut = f.stream();
-      cut.send('unreadable', { error: 'cursor 10 is past the end of the feed', retrying: false });
-      assert.equal(cut.readyState, 1, 'not closed on the event: the response is still on its way');
-      assert.equal(f.statuses.at(-1), 'down');
-      cut.drops();
-      assert.equal(cut.readyState, 2, 'closed once the api has ended the response, before the EventSource reconnects');
-      assert.equal(f.streams.length, 2, 'and opened again');
-      assert.equal(f.stream().start, 'end', 'from the feed’s end: the cursor is what the api cannot read from');
-      f.stream().opens();
-      assert.equal(f.statuses.at(-1), 'open');
-      assert.equal(f.timersSet(), 0, 'no grace left running');
-      f.stop();
-    },
-  );
-  await t.test('a cut feed whose response never ends is closed after the grace, and opened again from the end', () => {
+  test('a feed cut under the cursor is closed on the `error` fired as the api ends the response — not on the event — and opened again from the end', () => {
+    const f = followed();
+    f.stream().opens();
+    f.stream().send('step', line('r-1', 'plan'), '10');
+    const cut = f.stream();
+    cut.send('unreadable', { error: 'cursor 10 is past the end of the feed', retrying: false });
+    assert.equal(cut.readyState, 1, 'not closed on the event: the response is still on its way');
+    assert.equal(f.statuses.at(-1), 'down');
+    cut.drops();
+    assert.equal(cut.readyState, 2, 'closed once the api has ended the response, before the EventSource reconnects');
+    assert.equal(f.streams.length, 2, 'and opened again');
+    assert.equal(f.stream().start, 'end', 'from the feed’s end: the cursor is what the api cannot read from');
+    f.stream().opens();
+    assert.equal(f.statuses.at(-1), 'open');
+    assert.equal(f.timersSet(), 0, 'no grace left running');
+    f.stop();
+  });
+  test('a cut feed whose response never ends is closed after the grace, and opened again from the end', () => {
     const f = followed();
     f.stream().opens();
     f.stream().send('step', line('r-1', 'plan'), '10');
@@ -354,45 +333,42 @@ test('followFeed: how the stream is kept, opened again, and stopped', async (t) 
     );
     f.stop();
   });
-  await t.test(
-    'a stream the api refused is opened again after a while from the last event read, and from the end if that is refused before it opens',
-    () => {
-      const f = followed();
-      f.stream().opens();
-      f.stream().send('run', line('r-1'), '10');
-      f.stream().send('step', line('r-1', 'plan'), '42');
-      f.stream().refused();
-      assert.equal(f.statuses.at(-1), 'down');
-      assert.equal(pace(5_000), 5_000);
-      f.pass(REOPEN_MS - 1);
-      assert.equal(f.streams.length, 1, 'not at once');
-      f.pass(1);
-      assert.deepEqual(
-        f.streams.map((s) => s.start),
-        ['end', { after: '42' }],
-        'from the last event read',
-      );
+  test('a stream the api refused is opened again after a while from the last event read, and from the end if that is refused before it opens', () => {
+    const f = followed();
+    f.stream().opens();
+    f.stream().send('run', line('r-1'), '10');
+    f.stream().send('step', line('r-1', 'plan'), '42');
+    f.stream().refused();
+    assert.equal(f.statuses.at(-1), 'down');
+    assert.equal(pace(5_000), 5_000);
+    f.pass(REOPEN_MS - 1);
+    assert.equal(f.streams.length, 1, 'not at once');
+    f.pass(1);
+    assert.deepEqual(
+      f.streams.map((s) => s.start),
+      ['end', { after: '42' }],
+      'from the last event read',
+    );
 
-      f.stream().refused();
-      f.pass(REOPEN_MS);
-      assert.deepEqual(
-        f.streams.map((s) => s.start),
-        ['end', { after: '42' }, 'end'],
-        "refused again before it opened, the cursor may be what is refused (a 400 reads as a proxy's 5xx does): the next goes from the end",
-      );
-      f.stream().refused();
-      f.pass(REOPEN_MS);
-      assert.deepEqual(
-        f.streams.map((s) => s.start),
-        ['end', { after: '42' }, 'end', 'end'],
-        'one from the end refused too, while the api is not there yet, is tried again from the end',
-      );
-      f.stream().opens();
-      assert.equal(f.statuses.at(-1), 'open');
-      f.stop();
-    },
-  );
-  await t.test('a dropped connection is left to the EventSource, which resumes it with the last id: nothing is opened here', () => {
+    f.stream().refused();
+    f.pass(REOPEN_MS);
+    assert.deepEqual(
+      f.streams.map((s) => s.start),
+      ['end', { after: '42' }, 'end'],
+      "refused again before it opened, the cursor may be what is refused (a 400 reads as a proxy's 5xx does): the next goes from the end",
+    );
+    f.stream().refused();
+    f.pass(REOPEN_MS);
+    assert.deepEqual(
+      f.streams.map((s) => s.start),
+      ['end', { after: '42' }, 'end', 'end'],
+      'one from the end refused too, while the api is not there yet, is tried again from the end',
+    );
+    f.stream().opens();
+    assert.equal(f.statuses.at(-1), 'open');
+    f.stop();
+  });
+  test('a dropped connection is left to the EventSource, which resumes it with the last id: nothing is opened here', () => {
     const f = followed();
     f.stream().opens();
     f.stream().send('step', line('r-1', 'plan'), '10');
@@ -402,7 +378,7 @@ test('followFeed: how the stream is kept, opened again, and stopped', async (t) 
     assert.equal(f.stream().readyState, 0, 'still the EventSource’s to reconnect');
     f.stop();
   });
-  await t.test('stopping closes the stream, and cancels what was pending: the frame, the grace and the reopening', () => {
+  test('stopping closes the stream, and cancels what was pending: the frame, the grace and the reopening', () => {
     const f = followed();
     f.stream().opens();
     f.stream().send('step', line('r-1', 'plan'), '10');
@@ -428,28 +404,25 @@ test('followFeed: how the stream is kept, opened again, and stopped', async (t) 
   });
 });
 
-test("followFeed: what the stream's events read again, a frame or a second at a time", async (t) => {
-  await t.test(
-    'a run removed has its record read again, exactly: the read that finds none is how a page open on it learns it is gone',
-    () => {
-      const f = followed();
-      f.stream().opens();
-      f.stream().send('removed', line('r-1'), '10');
-      f.frame();
-      const keys = f.invalidated[0].map((k) => JSON.stringify(k));
-      assert.ok(keys.includes(JSON.stringify(['runs', 'r-1'])), `the run's record is read again: ${keys.join(' ')}`);
-      assert.deepEqual(
-        keysOf('removed', 'r-1').filter((key) => key[0] === 'runs' && key.length > 1),
-        [
-          ['runs', 'r-1'],
-          ['runs', 'r-1', 'steps'],
-        ],
-        "its record and its steps' reads, and never its decision or another run's",
-      );
-      f.stop();
-    },
-  );
-  await t.test('every event reads again whether a daemon ticks, exactly: a line on the feed is written by a tick', () => {
+describe("followFeed: what the stream's events read again, a frame or a second at a time", () => {
+  test('a run removed has its record read again, exactly: the read that finds none is how a page open on it learns it is gone', () => {
+    const f = followed();
+    f.stream().opens();
+    f.stream().send('removed', line('r-1'), '10');
+    f.frame();
+    const keys = f.invalidated[0].map((k) => JSON.stringify(k));
+    assert.ok(keys.includes(JSON.stringify(['runs', 'r-1'])), `the run's record is read again: ${keys.join(' ')}`);
+    assert.deepEqual(
+      keysOf('removed', 'r-1').filter((key) => key[0] === 'runs' && key.length > 1),
+      [
+        ['runs', 'r-1'],
+        ['runs', 'r-1', 'steps'],
+      ],
+      "its record and its steps' reads, and never its decision or another run's",
+    );
+    f.stop();
+  });
+  test('every event reads again whether a daemon ticks, exactly: a line on the feed is written by a tick', () => {
     const f = followed();
     f.stream().opens();
     for (const [event, id] of [
@@ -474,7 +447,7 @@ test("followFeed: what the stream's events read again, a frame or a second at a 
     }
     f.stop();
   });
-  await t.test("a daemon's start line is seen on the feed, not on the fallback a minute later", () => {
+  test("a daemon's start line is seen on the feed, not on the fallback a minute later", () => {
     const f = followed();
     f.stream().opens();
     f.stream().send('daemon', { at: '2026-09-22T21:00:00.000Z', daemon: 4242, word: 'daemon started' }, '10');
@@ -482,7 +455,7 @@ test("followFeed: what the stream's events read again, a frame or a second at a 
     assert.deepEqual(f.invalidated, [[['daemon']]], "the daemon's standing is read again on the line itself, and no key of a run is");
     f.stop();
   });
-  await t.test('the events that arrive together are read again once a frame, each key once, and each run named has its record read', () => {
+  test('the events that arrive together are read again once a frame, each key once, and each run named has its record read', () => {
     const f = followed();
     f.stream().opens();
     f.stream().send('step', line('r-1', 'plan'), '10');
@@ -513,41 +486,38 @@ test("followFeed: what the stream's events read again, a frame or a second at a 
     assert.equal(f.invalidated.length, 1, 'an empty frame invalidates nothing');
     f.stop();
   });
-  await t.test(
-    'a burst is read once a second: a hundred lines, one a frame, are read once when the second is up, and a line after a quiet second on the next frame',
-    () => {
-      const f = followed();
-      f.stream().opens();
-      f.stream().send('step', line('r-0', 'plan'), '1');
-      f.frame();
-      assert.equal(f.invalidated.length, 1, 'the first line, after a quiet second, is read on the next frame');
+  test('a burst is read once a second: a hundred lines, one a frame, are read once when the second is up, and a line after a quiet second on the next frame', () => {
+    const f = followed();
+    f.stream().opens();
+    f.stream().send('step', line('r-0', 'plan'), '1');
+    f.frame();
+    assert.equal(f.invalidated.length, 1, 'the first line, after a quiet second, is read on the next frame');
 
-      for (let i = 1; i <= 100; i += 1) {
-        f.stream().send('step', line(`r-${i}`, 'plan'), String(i + 1));
-        f.frame();
-      }
-      assert.equal(f.invalidated.length, 1, 'a hundred lines inside the second read nothing more, however many frames came');
-      f.pass(FLUSH_MS - 1);
-      assert.equal(f.invalidated.length, 1, 'not before the second is up');
-      f.pass(1);
-      assert.equal(f.invalidated.length, 2, 'gathered and read once, when it is up');
-      assert.equal(
-        f.invalidated[1].filter((key) => key.length === 2 && key[0] === 'runs').length,
-        100,
-        'every run the burst named has its record read, in that one read',
-      );
-
-      f.pass(FLUSH_MS);
-      assert.equal(f.invalidated.length, 2, 'a quiet second reads nothing and sets no timer');
-      assert.equal(f.timersSet(), 0);
-      f.stream().send('step', line('r-late', 'plan'), '200');
+    for (let i = 1; i <= 100; i += 1) {
+      f.stream().send('step', line(`r-${i}`, 'plan'), String(i + 1));
       f.frame();
-      assert.equal(f.invalidated.length, 3, 'a line after a quiet second is read on the next frame');
-      f.stop();
-      assert.equal(f.timersSet(), 0, 'and the gathering second is cancelled by the stop');
-    },
-  );
-  await t.test('an event a replaced stream still dispatches is not read: only the current stream counts', () => {
+    }
+    assert.equal(f.invalidated.length, 1, 'a hundred lines inside the second read nothing more, however many frames came');
+    f.pass(FLUSH_MS - 1);
+    assert.equal(f.invalidated.length, 1, 'not before the second is up');
+    f.pass(1);
+    assert.equal(f.invalidated.length, 2, 'gathered and read once, when it is up');
+    assert.equal(
+      f.invalidated[1].filter((key) => key.length === 2 && key[0] === 'runs').length,
+      100,
+      'every run the burst named has its record read, in that one read',
+    );
+
+    f.pass(FLUSH_MS);
+    assert.equal(f.invalidated.length, 2, 'a quiet second reads nothing and sets no timer');
+    assert.equal(f.timersSet(), 0);
+    f.stream().send('step', line('r-late', 'plan'), '200');
+    f.frame();
+    assert.equal(f.invalidated.length, 3, 'a line after a quiet second is read on the next frame');
+    f.stop();
+    assert.equal(f.timersSet(), 0, 'and the gathering second is cancelled by the stop');
+  });
+  test('an event a replaced stream still dispatches is not read: only the current stream counts', () => {
     const f = followed();
     f.stream().opens();
     const old = f.stream();

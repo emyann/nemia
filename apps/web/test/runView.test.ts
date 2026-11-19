@@ -5,7 +5,7 @@
  * when the step moves and with nothing else.
  */
 import type * as RunObject from 'objects';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import type { RunLines } from '../src/lib/api/run.ts';
@@ -224,13 +224,13 @@ const view = () =>
     { implement: told, review: null },
   );
 
-test('runDetailOf: the run object, its sub-resources and its lines, as the run page reads them', async (t) => {
-  await t.test("a step's closeout is the closeout of its current try, not of the first", () => {
+describe('runDetailOf: the run object, its sub-resources and its lines, as the run page reads them', () => {
+  test("a step's closeout is the closeout of its current try, not of the first", () => {
     const [implement] = view().steps;
     assert.equal(implement?.closeout?.summary, 'the current try');
     assert.equal(implement?.tries.length, 2, 'every try is kept, the current one last');
   });
-  await t.test("a step's spec is the frozen step of its name, with its fence; null for a name not frozen", () => {
+  test("a step's spec is the frozen step of its name, with its fence; null for a name not frozen", () => {
     const [implement, review] = view().steps;
     assert.equal(implement?.spec?.model, 'implement-model');
     assert.equal(review?.spec?.model, 'review-model');
@@ -245,7 +245,7 @@ test('runDetailOf: the run object, its sub-resources and its lines, as the run p
     );
     assert.equal(ran.steps[1]?.spec, null, 'a step the run froze none of has no spec');
   });
-  await t.test("a step's lines and the run's are the api's lines, never composed on the board", () => {
+  test("a step's lines and the run's are the api's lines, never composed on the board", () => {
     const v = view();
     assert.deepEqual(v.steps[0]?.commands, lines().steps.implement);
     assert.deepEqual(v.steps[1]?.commands, lines().steps.review);
@@ -253,17 +253,17 @@ test('runDetailOf: the run object, its sub-resources and its lines, as the run p
     assert.equal(v.refresh, 'nemia refresh r-1');
     assert.deepEqual(v.workflowPage, lines().workflowPage);
   });
-  await t.test('the graph holds no `input` edge: the page draws what a step waits on and its loops', () => {
+  test('the graph holds no `input` edge: the page draws what a step waits on and its loops', () => {
     assert.deepEqual(view().graph.edges, [{ from: 'implement', to: 'review', kind: 'after' }]);
   });
-  await t.test('what a step was told is read off its told, and a step with none read is told nothing, without a throw', () => {
+  test('what a step was told is read off its told, and a step with none read is told nothing, without a throw', () => {
     const [implement, review] = view().steps;
     assert.equal(implement?.body, 'Implement it.');
     assert.equal(implement?.told, 'the whole brief');
     assert.equal(review?.told, null);
     assert.equal(review?.closeout, null);
   });
-  await t.test('the run reads as its object says it: its id, brief, and where it came from only when it came from a card', () => {
+  test('the run reads as its object says it: its id, brief, and where it came from only when it came from a card', () => {
     const v = view();
     assert.equal(v.id, 'r-1');
     assert.equal(v.createdAt, '2026-11-02T10:00:00.000Z');
@@ -280,16 +280,20 @@ test('runDetailOf: the run object, its sub-resources and its lines, as the run p
   });
 });
 
-test("stepStamp: a step's tries and told are read again when it moves, and with nothing else", async (t) => {
-  const step = object().status.steps[0];
-  const stamp = stepStamp(step);
-  await t.test('its current try ending, and a try more, each move the stamp', () => {
+describe("stepStamp: a step's tries and told are read again when it moves, and with nothing else", () => {
+  let step!: RunObject.Run['status']['steps'][number];
+  let stamp!: string;
+  beforeAll(() => {
+    step = object().status.steps[0];
+    stamp = stepStamp(step);
+  });
+  test('its current try ending, and a try more, each move the stamp', () => {
     assert.notEqual(stepStamp({ ...step, current: { ...step.current!, outcome: 'done' } }), stamp, 'the current try signed off');
     assert.notEqual(stepStamp({ ...step, attempts: { ...step.attempts, count: 2 } }), stamp, 'an attempt more');
     assert.notEqual(stepStamp({ ...step, taskId: 'r-1-implement-3' }), stamp, 'another task');
     assert.notEqual(stepStamp({ ...step, current: null }), stamp, 'no try');
   });
-  await t.test('REFUSED: what it cost, and what a person said to it, move no stamp', () => {
+  test('REFUSED: what it cost, and what a person said to it, move no stamp', () => {
     assert.equal(stepStamp({ ...step, spent: { usd: 1, measured: 1, unmeasured: 0, said: '$1.00' } }), stamp);
     assert.equal(stepStamp({ ...step, said: [{ at: '2026-11-02T10:01:00.000Z', attempt: 1, text: 'hello' }] }), stamp);
   });

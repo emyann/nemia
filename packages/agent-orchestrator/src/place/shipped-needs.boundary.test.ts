@@ -4,7 +4,7 @@
  * runs a check (`checkRan`, `needsEnv`) on a scratch store whose tools folder holds a stand-in `mise`, which records each command it
  * is given and reads every tool installed once `mise install` ran: no row fetches mise or a tool.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -31,12 +31,15 @@ const needOf = (name: string) => {
   return need;
 };
 
-test("the git place's mise needs: mise found in the tools folder, and the repository's toolchain missing until mise install ran", async (t) => {
-  const home = scratch('wf-place-mise-');
-  const said = path.join(home, 'mise-said.txt');
+describe("the git place's mise needs: mise found in the tools folder, and the repository's toolchain missing until mise install ran", () => {
+  let home!: string;
+  let said!: string;
+  beforeAll(() => {
+    home = scratch('wf-place-mise-');
+    said = path.join(home, 'mise-said.txt');
+  });
   const read = (check: string) => Effect.runPromise(checkRan(home, { check }, { ms: 5_000 })).then(needStateOf);
-
-  await t.test('mise is met once a mise is in the tools folder', async () => {
+  test('mise is met once a mise is in the tools folder', async () => {
     fs.mkdirSync(toolsBinDir(home), { recursive: true });
     fs.writeFileSync(
       path.join(toolsBinDir(home), 'mise'),
@@ -45,18 +48,14 @@ test("the git place's mise needs: mise found in the tools folder, and the reposi
     );
     assert.equal(await read(needOf('mise').check), 'met');
   });
-
-  await t.test(
-    'repository-toolchain reads missing while mise says a tool is to install, and met once its fix ran mise install',
-    async () => {
-      const need = needOf('repository-toolchain');
-      assert.equal(need.scope, 'repository');
-      assert.equal(await read(need.check), 'missing');
-      const fix = need.fixes?.[0]?.command ?? '';
-      const ran = spawnSync('sh', ['-c', fix], { cwd: home, env: needsEnv(home, process.env) });
-      assert.equal(ran.status, 0, String(ran.stderr));
-      assert.ok(fs.readFileSync(said, 'utf8').split('\n').includes('install'), 'the fix ran mise install');
-      assert.equal(await read(need.check), 'met');
-    },
-  );
+  test('repository-toolchain reads missing while mise says a tool is to install, and met once its fix ran mise install', async () => {
+    const need = needOf('repository-toolchain');
+    assert.equal(need.scope, 'repository');
+    assert.equal(await read(need.check), 'missing');
+    const fix = need.fixes?.[0]?.command ?? '';
+    const ran = spawnSync('sh', ['-c', fix], { cwd: home, env: needsEnv(home, process.env) });
+    assert.equal(ran.status, 0, String(ran.stderr));
+    assert.ok(fs.readFileSync(said, 'utf8').split('\n').includes('install'), 'the fix ran mise install');
+    assert.equal(await read(need.check), 'met');
+  });
 });

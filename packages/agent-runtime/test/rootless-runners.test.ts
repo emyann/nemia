@@ -5,7 +5,7 @@
  * the typecheck (`rootlessRunners`, whose one escape says what it does not reach). The root itself comes from `scratch`
  * (`test-kit/scratch`), as every test's does.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

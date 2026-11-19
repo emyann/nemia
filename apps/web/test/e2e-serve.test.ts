@@ -3,7 +3,7 @@
  * gone read as no board, the ports a step given the browser could not open, the three lines it prints, a tree that changed over the one a
  * board was built from, a build that changed the workspace named line by line, and a file the build rewrote put back.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

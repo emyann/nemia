@@ -4,7 +4,7 @@
  * root — and the debt of
  * the module spellings `src` still calls (`test/feed-door.baseline.ts`). The partial-line and malformed-line reads are `feed.test.ts`'s.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

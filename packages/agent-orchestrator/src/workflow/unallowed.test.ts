@@ -2,7 +2,7 @@
  * A step given a tool nothing its session gets allows is refused (`unallowedRefusal`), and each fixture here breaks one rule of what
  * counts: the fence word, the allow lists a session gets, the tools the harness runs with no rule, and the place a step works in.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

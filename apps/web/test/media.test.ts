@@ -3,7 +3,7 @@
  * and where there is one.
  */
 import './tsx.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -19,7 +19,7 @@ function answer(hook: () => boolean): string {
 }
 
 /** While the test runs, a browser whose media queries match where `matches` says, and the queries it was asked; none for `undefined`. */
-function withMedia(t: { after: (fn: () => void) => void }, matches: ((query: string) => boolean) | undefined): string[] {
+function withMedia(t: { onTestFinished: (fn: () => void) => void }, matches: ((query: string) => boolean) | undefined): string[] {
   const asked: string[] = [];
   const before = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
   if (matches === undefined) Reflect.deleteProperty(globalThis, 'matchMedia');
@@ -29,15 +29,15 @@ function withMedia(t: { after: (fn: () => void) => void }, matches: ((query: str
       configurable: true,
       writable: true,
     });
-  t.after(() => {
+  t.onTestFinished(() => {
     if (before) Object.defineProperty(globalThis, 'matchMedia', before);
     else Reflect.deleteProperty(globalThis, 'matchMedia');
   });
   return asked;
 }
 
-test('useMedia: whether a media query matches, and its fallback where there is no browser', async (t) => {
-  await t.test('no browser to ask: each hook says its fallback — motion stopped, no sheet, not narrow', (t) => {
+describe('useMedia: whether a media query matches, and its fallback where there is no browser', () => {
+  test('no browser to ask: each hook says its fallback — motion stopped, no sheet, not narrow', (t) => {
     withMedia(t, undefined);
     assert.equal(
       answer(() => useMedia('(min-width: 1px)', true)),
@@ -51,7 +51,7 @@ test('useMedia: whether a media query matches, and its fallback where there is n
     assert.equal(answer(useSheetPreview), 'false');
     assert.equal(answer(useIsMobile), 'false');
   });
-  await t.test('a browser: each hook says what its own query matches', (t) => {
+  test('a browser: each hook says what its own query matches', (t) => {
     const asked = withMedia(t, () => true);
     assert.deepEqual([answer(useReducedMotion), answer(useSheetPreview), answer(useIsMobile)], ['true', 'true', 'true']);
     assert.match(asked.find((query) => query.includes('reduced-motion')) ?? '', /prefers-reduced-motion: reduce/);
@@ -62,7 +62,7 @@ test('useMedia: whether a media query matches, and its fallback where there is n
     );
     assert.ok(asked.includes('(max-width: 767px)'), 'narrow under a tablet, 768 pixels');
   });
-  await t.test('a browser where nothing matches: none of them, the fallback of motion included', (t) => {
+  test('a browser where nothing matches: none of them, the fallback of motion included', (t) => {
     withMedia(t, () => false);
     assert.deepEqual([answer(useReducedMotion), answer(useSheetPreview), answer(useIsMobile)], ['false', 'false', 'false']);
   });

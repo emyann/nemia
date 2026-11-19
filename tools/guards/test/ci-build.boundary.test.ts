@@ -14,7 +14,7 @@
  * Where the step is, and which paths it guards, is `ci-workflow.ts` (`staleStep`, `GENERATED`); the file's agreement with the repository
  * is held in `ci-workflow.test.ts`, which refuses a step that forgets one of those paths and a path this repository does not have.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

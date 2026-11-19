@@ -13,7 +13,7 @@
  * The labels a step's task is filed with are read off the engine's stand-in, in the measured run's story. The test place does not
  * model the shipped engine nor a process. Its store is its own at `ROOT`, given to each engine the client builds.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,7 +43,7 @@ const withEnv = (t: TestContext, vars: Record<string, string | undefined>) => {
     }
   };
   put(vars);
-  t.after(() => put(before));
+  t.onTestFinished(() => put(before));
 };
 
 /** Sets `OTEL_EXPORTER_OTLP_ENDPOINT` to `endpoint` for the rest of test `t`. */
@@ -64,7 +64,7 @@ const filedTrace = async () => {
  * of a task that has not settled still fails the test.
  */
 const stoppedAfter = (t: TestContext, e: ClientEngine, id: string) =>
-  t.after(() =>
+  t.onTestFinished(() =>
     Effect.runPromise(
       e
         .stop(id)
@@ -145,15 +145,15 @@ const HANDED: Row[] = [
     name: 'REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr, once, as the engine is built',
     check: async (t) => {
       withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
-      const said = t.mock.method(console, 'error', () => {});
+      const said = vi.spyOn(console, 'error').mockImplementation(() => {});
       engineNow();
-      const lines = said.mock.calls.map((c) => String(c.arguments[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
+      const lines = said.mock.calls.map((c) => String(c[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
       assert.equal(lines.length, 1, lines.join('\n'));
       assert.ok(lines[0].startsWith('nemia: ') && lines[0].includes('"true"'), lines[0]);
     },
   },
 ];
 
-test("what the client's engine hands the runtime of the process's telemetry: a collector or none, a session's tools' details, a refusal said", async (t) => {
-  for (const row of HANDED) await t.test(row.name, row.options ?? {}, row.check);
+describe("what the client's engine hands the runtime of the process's telemetry: a collector or none, a session's tools' details, a refusal said", () => {
+  for (const row of HANDED) test(row.name, row.options ?? {}, row.check);
 });

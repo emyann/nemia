@@ -4,7 +4,7 @@
  * line whole with the cursor after it.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'vitest';
 import { watchedLine } from '../src/watch/lines.ts';
 
 const at = '2026-11-11T10:02:13.000Z';

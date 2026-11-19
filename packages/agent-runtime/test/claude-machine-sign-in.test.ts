@@ -3,7 +3,7 @@
  * named by `AE_CLAUDE_EXECUTABLE`: `loggedIn: true` with exit 0 signed in, `loggedIn: false` signed out, an answer past the bound timed
  * out, and a Claude Code that does not start unknown. The bound is shortened here (the shipped one is `CLAUDE_SIGN_IN_MS`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

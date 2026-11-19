@@ -4,7 +4,7 @@
  * words and throws a plain `Error` for an `open` not heard; `trialMerges` takes a refusal, an unread outcome and a short answer for no
  * verdict; the words of a verb stopped at its deadline and of one that threw; and `sayFilled`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Cause, Effect } from 'effect';
 import { sayFilled, type PlaceAnswers, type PlaceOutcome } from './place.ts';

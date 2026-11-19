@@ -5,7 +5,7 @@
  * `claude` on PATH; one named that is not there is `missing`; and however an ask ends, its claude is gone by the time it returns.
  * A boundary test: it builds the real engine, and its ask starts a real process through the SDK.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -103,10 +103,9 @@ const PLAN = {
   subscription: 'max',
 };
 
-test("the quota asks the Claude Code the sessions run — the engine's, else the one a job inherits, never a `claude` on PATH — reads the plan and lets its claude go; one named that is not there is `missing`; and an ask timed out or interrupted leaves no claude behind", async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe("the quota asks the Claude Code the sessions run — the engine's, else the one a job inherits, never a `claude` on PATH — reads the plan and lets its claude go; one named that is not there is `missing`; and an ask timed out or interrupted leaves no claude behind", () => {
+  const s = story(test);
+  s.test(
     "the engine's quota drives the Claude Code its `claudeExecutable` names, not the `claude` on PATH, holding its query's input open until it answers, and reads the plan",
     async () => {
       const named = aStandIn(ANSWERS_IN_MS);
@@ -131,8 +130,7 @@ test("the quota asks the Claude Code the sessions run — the engine's, else the
       );
     },
   );
-
-  await s.test(
+  s.test(
     'with no Claude Code named by the engine, the quota drives the one `AE_CLAUDE_EXECUTABLE` names, which every job inherits, not the `claude` on PATH',
     async () => {
       const inherited = aStandIn(0);
@@ -145,21 +143,18 @@ test("the quota asks the Claude Code the sessions run — the engine's, else the
       assert.deepEqual([inherited.starts().length, onPath.starts().length], [1, 0], "the inherited one was asked, and PATH's never");
     },
   );
-
-  await s.test('REFUSED: a Claude Code named that is not there is `missing`, as the SDK says there is no executable to start', async () => {
+  s.test('REFUSED: a Claude Code named that is not there is `missing`, as the SDK says there is no executable to start', async () => {
     const nowhere = path.join(scratch('ae-quota-nothing-'), 'claude');
     assert.deepEqual(await Effect.runPromise(engineRunning(nowhere).quota()), { kind: 'missing' });
   });
-
-  await s.test('REFUSED: an ask that timed out leaves no claude behind, however long its claude would have taken', async () => {
+  s.test('REFUSED: an ask that timed out leaves no claude behind, however long its claude would have taken', async () => {
     const silent = aStandIn(NEVER_MS);
     const timed = await Effect.runPromise(claudeQuota({ command: silent.claude, timeoutMs: 300 }));
     assert.deepEqual(timed, { kind: 'timeout', ms: 300, program: silent.claude }, 'the silent claude outlasted the ask, which names it');
     const pid = silent.pidOf();
     assert.ok(pid !== null && gone(pid), `the timed-out ask let its claude go (pid ${pid})`);
   });
-
-  await s.test('REFUSED: an ask that was interrupted leaves no claude behind', async (sub) => {
+  s.test('REFUSED: an ask that was interrupted leaves no claude behind', async (sub) => {
     const silent = aStandIn(NEVER_MS);
     const stop = new AbortController();
     const exit = Effect.runPromiseExit(claudeQuota({ command: silent.claude }), { signal: stop.signal });

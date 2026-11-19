@@ -21,7 +21,7 @@
  * shrinks on purpose and a floor near its size would refuse a cut rather than a broken citation. The floor below only says the files were
  * read at all; that a citation is read, and a name with it, is proven by the `REFUSED:` fixture.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

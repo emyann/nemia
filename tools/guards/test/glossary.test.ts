@@ -17,7 +17,7 @@
  *   which only shrinks; any other file that says the spelling is refused, from a count of 0. Where two tables retire one spelling, its
  *   count is kept once, over the files of both.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

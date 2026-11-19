@@ -12,12 +12,12 @@
  * path a helper of another workspace builds, and a read of the repository's root with nothing after it. Those reads are named in the
  * task's inputs by hand, as a whole-repository scan's are.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { REPO, workspaces } from 'test-kit/repo';
+import { REPO, suiteOf, workspaces } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
 
 type Turbo = { tasks: Record<string, { inputs?: string[] }> };
@@ -26,15 +26,15 @@ type Manifest = { name: string; scripts?: { test?: string }; dependencies?: obje
 const manifestOf = (root: string, dir: string): Manifest =>
   JSON.parse(fs.readFileSync(path.join(root, dir, 'package.json'), 'utf8')) as Manifest;
 
-/** The files a test script runs first: each `--import` preload and each file its globs match, from the workspace's folder. */
-function entries(root: string, dir: string, script: string): string[] {
+/** The files a workspace's suite runs first: each setup file of its Vitest config and each file its `include` matches, from its folder. */
+function entries(root: string, dir: string): string[] {
   const at = path.join(root, dir);
-  const preloads = [...script.matchAll(/--import\s+(\S+)/g)].map(([, file]) => path.join(at, file));
-  const globs = [...script.matchAll(/'([^']+\.ts)'|\s((?:test|src)\/\S+\.ts)/g)].map(([, quoted, bare]) => quoted ?? bare);
+  const suite = suiteOf(at);
+  if (!suite) return [];
   const files = fs
     .readdirSync(at, { recursive: true, encoding: 'utf8' })
-    .filter((file) => !file.split(path.sep).includes('node_modules') && globs.some((glob) => path.matchesGlob(file, glob)));
-  return [...preloads, ...files.map((file) => path.join(at, file))];
+    .filter((file) => !file.split(path.sep).includes('node_modules') && suite.include.some((glob) => path.matchesGlob(file, glob)));
+  return [...suite.setupFiles.map((file) => path.join(at, file)), ...files.map((file) => path.join(at, file))];
 }
 
 const literal = (node: ts.Node): string | undefined =>
@@ -133,7 +133,7 @@ function outsideReads(root: string): Map<string, Map<string, string>> {
     const inside = [dir, ...dependencies(root, dir, folders)];
     const found = new Map<string, string>();
     const seen = new Set<string>();
-    const queue = entries(root, dir, script);
+    const queue = entries(root, dir);
     for (let file = queue.shift(); file !== undefined; file = queue.shift()) {
       if (seen.has(file) || !/\.tsx?$/.test(file) || !fs.existsSync(file)) continue;
       seen.add(file);
@@ -202,10 +202,8 @@ function planted(turbo: Turbo): string {
   };
   write('package.json', JSON.stringify({ workspaces: ['packages/*'] }));
   write('turbo.json', JSON.stringify(turbo));
-  write(
-    'packages/a/package.json',
-    JSON.stringify({ name: 'a', scripts: { test: "node --test 'test/*.test.ts'" }, dependencies: { b: '*' } }),
-  );
+  write('packages/a/package.json', JSON.stringify({ name: 'a', scripts: { test: 'vitest run' }, dependencies: { b: '*' } }));
+  write('packages/a/vitest.config.ts', "export default { test: { include: ['test/*.test.ts'] } };\n");
   write('packages/b/package.json', JSON.stringify({ name: 'b' }));
   write('packages/b/notes.md', 'b');
   write('docs/guide.md', 'guide');

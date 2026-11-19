@@ -51,8 +51,8 @@ of its kind, never from an older file that looks alike:
 - **`src/factory/servers/` is the store that already takes its root by parameter**: `servers.store.ts`'s functions take a required
   `home: string` first, read from `StoreRoot` by `servers.verb.ts`'s handlers, which take their input alone, and by
   the pass, which `advanceRun` hands to `filedAt` (`src/tick/told.verb.ts`). Copy it for a new per-factory file.
-- **Every test process starts with `WF_ROOT`, `AE_ROOT` and `HOME` pointed at throwaway folders** (`test/ambient.ts`, loaded with
-  `--import`), and the throwaway home carries a test git identity: a test that names no store of its own reads the throwaway
+- **Every test process starts with `WF_ROOT`, `AE_ROOT` and `HOME` pointed at throwaway folders** (`test/ambient.ts`, the first of
+  the config's `setupFiles`), and the throwaway home carries a test git identity: a test that names no store of its own reads the throwaway
   (`STORE`), and `os.homedir()` answers a throwaway too. The root-less helpers of `testing.ts` (`addFactory`, `readFactories`, …) read
   the process's `WF_ROOT` when called: a test with a store of its own calls their `…At(ROOT, …)` forms (`src/factory/factory.store.ts`). A test that needs the person's own home reads `REAL_HOME`.
 - **A test is given its place by name**: `const stand = eachTest(testPlace);` with `runOver(runEngine, () => stand().layer)`
@@ -67,12 +67,14 @@ of its kind, never from an older file that looks alike:
 - **A test names its engine with `const engine = eachTest(testEngine);` (`agent-runtime/testing`) and `engineOf(engine().layer)`**:
   `settle(id, phase, end)` takes what the attempt ended with as an object (`{ closeout, exitCode }`), and a `say` or a `stop` is
   refused as the runtime refuses it (say to a task settled `running` first).
-- **A person's story is told as one test, on `story` and its stage** (`test/story.ts`): `const stage = staged({ runWith, main, engineOf })`
-  at the file's head, after its environment is set, and in a test `const s = story(t)`, each checkpoint `await s.test(name, body)`, so
-  a citation of its name resolves; once one fails the rest are filed skipped, naming it. The stage is new for each test: the test
-  place, the engine's stand-in with `settle` and `e`, `runWith`, `runPlaced`, `main`, and `clock()`. A table is one test whose rows
-  are `t.test` subtests, beside its feature (`src/<feature>/<feature>.test.ts`), or in `test/assess-<area>.test.ts` for `assess`
-  across features, its builders from `test/assessed.ts`.
+- **A person's story is told as one `describe`, on `story` and its stage** (`test/story.ts`): `const stage = staged({ runWith, main,
+  engineOf })` at the file's head, after its environment is set, and in the describe `const s = story(test)`, each checkpoint
+  `s.test(name, body)`, a test of the describe, so a citation of its name resolves; once one fails the rest are filed skipped, naming
+  it. Its setup is a `beforeAll`, its teardowns through `teardowns()` (`test-kit/checkpoints`), and a `Date` it fakes is held across
+  its tests by `heldDate`, since the kit's seat restores the timers after each. The stage is new for each top-level test or describe:
+  the test place, the engine's stand-in with `settle` and `e`, `runWith`, `runPlaced`, `main`, and `clock()`. A table is one
+  `describe` whose rows are its tests, filed at collection, beside its feature (`src/<feature>/<feature>.test.ts`), or in
+  `test/assess-<area>.test.ts` for `assess` across features, its builders from `test/assessed.ts`.
 
 ## Keys, agents and folders
 

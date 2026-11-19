@@ -8,7 +8,7 @@
  *
  * Every child is bounded (`timeout`) and killed when its test is done; every wait is on the output it counts, never on a length of time.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
@@ -65,7 +65,7 @@ function child(t: TestContext, proc: ChildProcess) {
   void ended.then(tell);
   let done = false;
   void ended.then(() => (done = true));
-  t.after(() => void proc.kill('SIGKILL'));
+  t.onTestFinished(() => void proc.kill('SIGKILL'));
   const said = <T>(holds: (out: string, err: string) => T | undefined | false): Promise<T> =>
     new Promise((resolve, reject) => {
       const check = () => {

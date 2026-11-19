@@ -3,7 +3,7 @@
  * from the run's frozen workflow files with a request and an answer file in its environment, and read off its attempt — its exit and the
  * answer the runtime kept (`terminationMessage`) — as a route, or as the word its step reads instead.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

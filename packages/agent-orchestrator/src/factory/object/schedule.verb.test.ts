@@ -1,5 +1,5 @@
 /** A factory's schedules as objects (schedule.verb.ts): named by the workflow, spec of the file, status of the listing, nulls left out. */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { Schedule } from 'objects';

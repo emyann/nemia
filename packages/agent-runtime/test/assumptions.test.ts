@@ -5,7 +5,7 @@
  * call's alone, as `permission.contract.ts` declares. `npm run contracts` proves each contract
  * given these; this file is what makes them more than a claim.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { brokenOn } from '@emyann/tsverify';
 import { deadlineOf } from '../src/core/deadline.ts';

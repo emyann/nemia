@@ -2,7 +2,7 @@
  * What every kind shares (`src/meta.ts`): an object's metadata and a page of a list of it, encoded to JSON and decoded back equal, and a
  * list whose `kind` or `apiVersion` is not its own refused at decode.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, DEFAULT_NAMESPACE, ObjectMeta, listOf } from 'objects';

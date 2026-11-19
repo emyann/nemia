@@ -7,7 +7,7 @@
  * client prints it, and its tests hold the lines. Each checkpoint opens on a harness file and a store of factories of its own (`anew`), on
  * a store of its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -96,10 +96,9 @@ function takenBack(folder: string): void {
   fs.writeFileSync(file, JSON.stringify(held, null, 2));
 }
 
-test("a factory's places trusted: added, left as they are, listed and trusted by the verb, taken back by hand, and where nothing is", async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe("a factory's places trusted: added, left as they are, listed and trusted by the verb, taken back by hand, and where nothing is", () => {
+  const s = story(test);
+  s.test(
     'factory add trusts each writable volume, a repository on its root and a workspace on the repository it was cut from',
     async () => {
       anew();
@@ -131,8 +130,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       );
     },
   );
-
-  await s.test('a place already trusted is left byte for byte and nothing is said of it; --no-trust writes nothing', async () => {
+  s.test('a place already trusted is left byte for byte and nothing is said of it; --no-trust writes nothing', async () => {
     anew();
     const { repo, plain, notes } = places();
     await typed(['factory', 'add', 'one', '--volume', `${repo}:rw`]);
@@ -146,8 +144,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
     assert.ok(fs.readFileSync(file).equals(bytes));
     assert.deepEqual(trusted(), [repo]);
   });
-
-  await s.test(
+  s.test(
     'the listing says a place that is not trusted with the line that trusts it, and factory trust then does, and it says nothing',
     async () => {
       anew();
@@ -189,8 +186,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       assert.deepEqual(trusted(), [plain, repo].sort());
     },
   );
-
-  await s.test('REFUSED: factory trust of a name with no factory, as Missing, and nothing written', async () => {
+  s.test('REFUSED: factory trust of a name with no factory, as Missing, and nothing written', async () => {
     anew();
     await assert.rejects(typed(['factory', 'trust', 'nowhere']), (err: Error & { _tag?: string; exitCode?: number }) => {
       assert.equal(err._tag, 'Missing');
@@ -200,8 +196,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
     });
     assert.equal(fs.existsSync(file), false);
   });
-
-  await s.test(
+  s.test(
     'a place whose repository is not answered is neither trusted nor listed as untrusted, and the factory is filed all the same',
     async () => {
       anew();
@@ -221,8 +216,7 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       assert.deepEqual(await untrusted(deaf), []);
     },
   );
-
-  await s.test(
+  s.test(
     'a harness file that does not read refuses no add: the factory is filed, the file left as it is, and the line says what to do',
     async () => {
       anew();

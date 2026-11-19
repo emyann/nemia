@@ -7,7 +7,7 @@
  * factory trust`) are trust.boundary.test.ts's, which a real repository needs.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,55 +49,49 @@ async function refused(name: string, res: () => Response | Promise<Response>, st
   assert.equal(fileOf(name), before, `${name}'s file is left as it was`);
 }
 
-test("a person sets a factory's revisions policy: the Factory answers it, and a policy or a factory unknown is refused", async (t) => {
-  const s = story(t);
+describe("a person sets a factory's revisions policy: the Factory answers it, and a policy or a factory unknown is refused", () => {
+  const s = story(test);
   const route = '/api/factories/mill/revisions';
-
-  await s.test('a PUT of { revisions: follow } answers the Factory following, written in its file; pinned writes it back', async () => {
+  s.test('a PUT of { revisions: follow } answers the Factory following, written in its file; pinned writes it back', async () => {
     assert.equal((await answered<Factory>(send('PUT', route, { revisions: 'follow' }))).spec.revisions, 'follow');
     assert.equal(JSON.parse(fileOf('mill') ?? '{}').revisions, 'follow');
     assert.equal((await answered<Factory>(send('PUT', route, { revisions: 'pinned' }))).spec.revisions, 'pinned');
   });
-
-  await s.test('REFUSED: a policy that is neither is a 400, a factory not filed a 404, the default a 409', async () => {
+  s.test('REFUSED: a policy that is neither is a 400, a factory not filed a 404, the default a 409', async () => {
     await refused('mill', () => send('PUT', route, { revisions: 'always' }), 400);
     await refused('nowhere', () => send('PUT', '/api/factories/nowhere/revisions', { revisions: 'follow' }), 404);
     await refused('default', () => send('PUT', '/api/factories/default/revisions', { revisions: 'follow' }), 409);
   });
 });
 
-test('a person attaches a workflow to a factory and detaches it: the Factory answers each, and a name or a detach unknown is refused', async (t) => {
-  const s = story(t);
+describe('a person attaches a workflow to a factory and detaches it: the Factory answers each, and a name or a detach unknown is refused', () => {
+  const s = story(test);
   const route = '/api/factories/mill/workflows/gamma';
   const workflowsOf = (body: Factory) => body.spec.workflows;
-
-  await s.test('a PUT attaches it, written in the file; its DELETE takes it back', async () => {
+  s.test('a PUT attaches it, written in the file; its DELETE takes it back', async () => {
     assert.deepEqual(workflowsOf(await answered<Factory>(send('PUT', route))), ['alpha', 'gamma']);
     assert.deepEqual(JSON.parse(fileOf('mill') ?? '{}').workflows, ['alpha', 'gamma']);
     assert.deepEqual(workflowsOf(await answered<Factory>(send('DELETE', route))), ['alpha']);
     assert.deepEqual(JSON.parse(fileOf('mill') ?? '{}').workflows, ['alpha']);
   });
-
-  await s.test('REFUSED: a factory not filed is a 404, a detach of a workflow not attached a 404, a hidden workflow a 422', async () => {
+  s.test('REFUSED: a factory not filed is a 404, a detach of a workflow not attached a 404, a hidden workflow a 422', async () => {
     await refused('nowhere', () => send('PUT', '/api/factories/nowhere/workflows/gamma'), 404);
     await refused('mill', () => send('DELETE', route), 404);
     await refused('mill', () => send('PUT', '/api/factories/mill/workflows/.hidden'), 422);
   });
 });
 
-test('a person gives a factory a harness setting and takes it off: the Factory answers each, and a key or a value refused writes nothing', async (t) => {
-  const s = story(t);
+describe('a person gives a factory a harness setting and takes it off: the Factory answers each, and a key or a value refused writes nothing', () => {
+  const s = story(test);
   const route = '/api/factories/mill/settings/claude.language';
   const settingsOf = (body: Factory) => body.spec.harnessSettings;
-
-  await s.test('a PUT of { value } as JSON text sets it, written in the file; its DELETE takes it off', async () => {
+  s.test('a PUT of { value } as JSON text sets it, written in the file; its DELETE takes it off', async () => {
     assert.deepEqual(settingsOf(await answered<Factory>(send('PUT', route, { value: '"french"' }))), { claude: { language: 'french' } });
     assert.deepEqual(JSON.parse(fileOf('mill') ?? '{}').harnessSettings, { claude: { language: 'french' } });
     assert.equal(settingsOf(await answered<Factory>(send('DELETE', route))), undefined);
     assert.equal(JSON.parse(fileOf('mill') ?? '{}').harnessSettings, undefined);
   });
-
-  await s.test('REFUSED: a value that is not JSON or a key a factory may not set is a 422, a factory not filed a 404', async () => {
+  s.test('REFUSED: a value that is not JSON or a key a factory may not set is a 422, a factory not filed a 404', async () => {
     await refused('mill', () => send('PUT', route, { value: 'french' }), 422);
     await refused('mill', () => send('PUT', '/api/factories/mill/settings/claude.permissions', { value: '{}' }), 422);
     await refused('mill', () => send('PUT', route, { value: false }), 400);
@@ -106,24 +100,19 @@ test('a person gives a factory a harness setting and takes it off: the Factory a
   });
 });
 
-test('a person removes a factory: its file is gone and the answer says so, and a factory unknown or the default is refused', async (t) => {
-  const s = story(t);
-
-  await s.test('a DELETE removes its file, answering it, and a GET of it is a 404 after', async () => {
+describe('a person removes a factory: its file is gone and the answer says so, and a factory unknown or the default is refused', () => {
+  const s = story(test);
+  s.test('a DELETE removes its file, answering it, and a GET of it is a 404 after', async () => {
     const removed = await answered<FactoryRemoved>(send('DELETE', '/api/factories/gone'));
     assert.equal(removed.name, 'gone');
     assert.equal(removed.file, path.join(root, 'factories', 'gone.json'));
     assert.equal(fileOf('gone'), null);
     assert.equal((await app.request('/api/factories/gone')).status, 404);
   });
-
-  await s.test(
-    'REFUSED: a factory not filed is a 404, a name that is no slug a 422, the default a 409, and every other is kept',
-    async () => {
-      await refused('gone', () => send('DELETE', '/api/factories/gone'), 404);
-      await refused('kept', () => send('DELETE', '/api/factories/Not_A_Slug'), 422);
-      await refused('kept', () => send('DELETE', '/api/factories/default'), 409);
-      assert.notEqual(fileOf('kept'), null);
-    },
-  );
+  s.test('REFUSED: a factory not filed is a 404, a name that is no slug a 422, the default a 409, and every other is kept', async () => {
+    await refused('gone', () => send('DELETE', '/api/factories/gone'), 404);
+    await refused('kept', () => send('DELETE', '/api/factories/Not_A_Slug'), 422);
+    await refused('kept', () => send('DELETE', '/api/factories/default'), 409);
+    assert.notEqual(fileOf('kept'), null);
+  });
 });

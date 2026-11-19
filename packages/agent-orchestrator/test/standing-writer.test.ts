@@ -2,7 +2,7 @@
  * `standing.json` has one writer, the tick's pass (`passStanding`, in `src/standing/standing.verb.ts`): no other file of `src` names
  * `writeStanding`, the store's one way to write it, whether it imports it, re-exports it or reaches it through the module.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { sourcesUnder } from 'test-kit/debt';

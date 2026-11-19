@@ -5,7 +5,7 @@
  * (`runWords`), what a try may be (`retryable`) and where a join is cut (`ranShape`). A workflow without the routing keys assesses as it
  * always did. Pure: the engine's view of each task is handed in.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { assess } from '../src/tick/assess.ts';
 import { runWords } from '../src/route/routed/routed-words.ts';
@@ -69,20 +69,20 @@ const passOf = ({ filed = {}, surface = 'web', steps = TRIAGE, records = {} }: P
   };
 };
 
-test('route web: the backend branch is skipped, the join files after what ran, and the run succeeds', async (t) => {
-  await t.test('plan signed web: triage answers web unfiled, build-web and log are filed, build-backend skipped', () => {
+describe('route web: the backend branch is skipped, the join files after what ran, and the run succeeds', () => {
+  test('plan signed web: triage answers web unfiled, build-web and log are filed, build-backend skipped', () => {
     const { a, words } = passOf({ filed: { plan: 'succeeded' } });
     assert.deepEqual(a.ready, ['build-web', 'log'], 'a table condition is never filed as a task');
     assert.equal(words.triage, 'unverified');
     assert.equal(words['build-backend'], 'skipped');
     assert.equal(a.status, 'running');
   });
-  await t.test('the join waits while a parent runs', () => {
+  test('the join waits while a parent runs', () => {
     const { a, words } = passOf({ filed: { plan: 'succeeded', 'build-web': 'running', log: 'succeeded' } });
     assert.deepEqual(a.ready, []);
     assert.equal(words.notes, 'pending');
   });
-  await t.test('both parents that ran signed: the join is filed, after them alone', () => {
+  test('both parents that ran signed: the join is filed, after them alone', () => {
     const { a, run } = passOf({ filed: { plan: 'succeeded', 'build-web': 'succeeded', log: 'succeeded' } });
     assert.deepEqual(a.ready, ['notes']);
     const notes = TRIAGE.find((s) => s.name === 'notes');
@@ -93,7 +93,7 @@ test('route web: the backend branch is skipped, the join files after what ran, a
     assert.deepEqual(shaped.step.after, ['build-web', 'log'], 'the skipped build-backend is no line of work to merge');
     assert.deepEqual(workspacePlan(shaped.steps, shaped.step), { kind: 'merge', from: 'build-web', also: ['log'] });
   });
-  await t.test('every node satisfied or skipped: the run succeeds', () => {
+  test('every node satisfied or skipped: the run succeeds', () => {
     const { a, words } = passOf({ filed: { plan: 'succeeded', 'build-web': 'succeeded', log: 'succeeded', notes: 'succeeded' } });
     assert.equal(words['build-backend'], 'skipped');
     assert.equal(a.status, 'succeeded');
@@ -269,7 +269,7 @@ test('a workflow without the routing keys assesses exactly as before', () => {
   assert.deepEqual([broke.unreachable, broke.status], [['review'], 'failed']);
 });
 
-test("a run's listing stands no step itself: each step's standing is its assessment's, with the routing keys or without them", async (t) => {
+describe("a run's listing stands no step itself: each step's standing is its assessment's, with the routing keys or without them", () => {
   const planted = (input: ListedInput, step: string) => {
     const given = listingInput(input);
     const assessed = assess(given.read);
@@ -278,14 +278,14 @@ test("a run's listing stands no step itself: each step's standing is its assessm
     const stepWords = new Map(assessed.stepWords).set(step, { status: 'exhausted', own: 'exhausted' });
     return { l, moved: listed({ ...given, assessed: { ...assessed, stepWords } }) };
   };
-  await t.test('a workflow with none of the routing keys: the words are the standings', () => {
+  test('a workflow with none of the routing keys: the words are the standings', () => {
     const r = run({ implement: 't-implement', review: null });
     const said = (): Closeout => ({ outcome: 'done', summary: 'did implement', artifacts: [] });
     const { l, moved } = planted({ steps: STEPS, run: r, phaseOf: phases({ 't-implement': 'succeeded' }), closeoutOf: said }, 'implement');
     assert.notEqual(l.steps.find((s) => s.name === 'implement')?.message, 'rounds exhausted');
     assert.equal(moved.steps.find((s) => s.name === 'implement')?.message, 'rounds exhausted', 'the planted standing is what it says');
   });
-  await t.test('a routed workflow: its rows still routed over the standings', () => {
+  test('a routed workflow: its rows still routed over the standings', () => {
     const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
     const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
     const said = (name: string): Closeout | undefined =>

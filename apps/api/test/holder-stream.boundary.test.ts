@@ -18,7 +18,7 @@
  * A boundary test: a real store, a real second process, the SDK with a real child of its own, a real socket and a real engine.
  */
 import { config, root } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -107,7 +107,7 @@ test(
   async (t) => {
     const cwd = path.join(root, 'holder-work');
     const up = await holder(cwd);
-    t.after(() => up.stop());
+    t.onTestFinished(() => up.stop());
     assert.deepEqual(Object.keys(up.held.cards), ['claude'], `the holder serves the one harness it runs attached: ${up.said()}`);
     writeRun(up.held.taskId);
 
@@ -123,7 +123,7 @@ test(
     const said: string[] = [];
     const keeper = Logger.make(({ message }) => void said.push((Array.isArray(message) ? message : [message]).join(' ')));
     const viewer = appOf(Layer.merge(liveOf(), Logger.layer([keeper])));
-    t.after(() => viewer.runtime.dispose());
+    t.onTestFinished(() => viewer.runtime.dispose());
 
     const res = await viewer.app.request(`/api/runs/${RUN}/steps/${STEP}/transcript/stream`);
     if (res.status !== 200) assert.fail(`the viewer follows the step: ${await res.text()}`);
@@ -139,7 +139,7 @@ test(
       return pump();
     };
     const pumped = pump();
-    t.after(() => reader.cancel());
+    t.onTestFinished(() => reader.cancel());
 
     await until(
       t,
@@ -178,7 +178,7 @@ test(
     await pumped;
 
     const gone = appOf(Layer.merge(liveOf(), Logger.layer([])));
-    t.after(() => gone.runtime.dispose());
+    t.onTestFinished(() => gone.runtime.dispose());
     const read = await gone.app.request(`/api/runs/${RUN}/steps/${STEP}/transcript`);
     if (read.status !== 200) assert.fail(`the viewer still answers with the holder gone: ${await read.text()}`);
     const transcript = (await read.json()) as { events?: Array<{ text?: string }> };

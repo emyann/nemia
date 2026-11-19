@@ -5,7 +5,7 @@
  * event read while the stream is open; and a built file of the board gzipped too.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

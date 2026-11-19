@@ -11,7 +11,8 @@
  */
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -231,11 +232,10 @@ const approveByHand = (id: string, step: string, n: number) => {
   );
 };
 
-test('a run waiting on you, read and landed: its screens, and what approving its ending does', async (t) => {
-  const s = story(t);
+describe('a run waiting on you, read and landed: its screens, and what approving its ending does', () => {
+  const s = story(test);
   let a = { run: undefined as unknown as RepositoryRun, repo: '', branch: '' };
-
-  await s.test('a run of implement, checked, then review is filed with its momentum and its Remote Control', async () => {
+  s.test('a run of implement, checked, then review is filed with its momentum and its Remote Control', async () => {
     a = await awaiting('remote: true\n');
     const id = a.run.id;
     const spec = (task: string) => stage.board().tasks.get(task)!.spec;
@@ -252,8 +252,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       'filed with their Remote Control, and each with its momentum as `priority`: a first step 0, its check and the step after it 1',
     );
   });
-
-  await s.test(
+  s.test(
     'the awaiting decision: what the branch touched, the lesson, the check files in full, what each step used and where its time went',
     async () => {
       const { d, decided } = await decidable(a.run.id);
@@ -317,8 +316,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.equal(stage.place().world.tip(a.repo, 'main'), a.run.baseRef, 'and main is where the run started it');
     },
   );
-
-  await s.test(
+  s.test(
     "the decision and `nemia ls` say nothing of a run's momentum, its admission or a step's Remote Control, whether the engine's record carries them or not",
     async () => {
       const screens = async () => ({
@@ -331,8 +329,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.ok(![carried.decide, carried.ls].some((l) => /priority|momentum|remote|bridge/i.test(l)), JSON.stringify(carried));
     },
   );
-
-  await s.test('--sensitive with a glob that matches nothing reads no file in full', async () => {
+  s.test('--sensitive with a glob that matches nothing reads no file in full', async () => {
     const { d } = await decidable(a.run.id, ['nothing/**']);
     assert.deepEqual(
       d.sensitive.map((b) => [b.branch, b.files, b.error]),
@@ -345,8 +342,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       'the globs choose what is read whole, not what is true: the radius still names the check file',
     );
   });
-
-  await s.test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", async () => {
+  s.test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", async () => {
     const world = stage.place().world;
     world.branch(a.repo, 'wf/source-docs', { 'packages/x/src/docs/strings.ts': 'export const title = "Docs";\n' });
     world.branch(a.repo, 'wf/package-docs', {
@@ -360,8 +356,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
     assert.ok('error' in gone.radius && /wf\/never/.test(gone.radius.error), 'a branch that is gone is not read as nothing');
     assert.equal(lessonLine([gone]), 'lesson  not known — wf/never could not be read');
   });
-
-  await s.test(
+  s.test(
     "a measured cost on both reads: the decision's beside what each step used, with the api and tool time, and the run's; `nemia ls` beside each step's word and on the run's line — and a run nobody measured says no dollar",
     async () => {
       const run = await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
@@ -400,8 +395,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.ok(!JSON.stringify([bare.used, bare.total, bare.cost]).includes('$'), JSON.stringify(bare.used));
     },
   );
-
-  await s.test(
+  s.test(
     'a place whose report is not heard: the decision says what the run changed is not known — touched, the lesson, in full and the branch — never that it changed nothing',
     async () => {
       const deaf = placeOver(stage.place().place, { report: () => unreadBy('report', 'the place exited 1') });
@@ -428,8 +422,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       );
     },
   );
-
-  await s.test(
+  s.test(
     "the branch's standing against the base is a fact of every decision, once a pass has read it — ahead by N, landed by hand, gone",
     async () => {
       await aPass();
@@ -461,8 +454,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.equal((await standing(other.run.id, other.branch)).where, 'gone', 'a branch deleted with no tip recorded for it is gone');
     },
   );
-
-  await s.test(
+  s.test(
     "a folder whose last step is an ending: the decision, once a pass has read where its branch stands, says what that step would do in the folder's words, and the word that runs it — and offers no command of the branch, since the step is the one that merges",
     async () => {
       const run = await stage.runPlaced(
@@ -500,8 +492,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.match(stepRow(said.listing, 'ship').message, /^awaiting approval/);
     },
   );
-
-  await s.test(
+  s.test(
     "at an ending's gate, the decision, after a pass, says which runs in flight on the base its branch collides with, and in which files; REFUSED: a run still running reads none",
     async () => {
       const repo = aRepo();
@@ -546,8 +537,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.equal(running.collisions, undefined, 'a run still running is at no ending, and no trial merge is asked for it');
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED: an ending led by an agent that says `You are …` — the decision and `nemia ls` say the step's own note, or with none, that approving runs it, and never quote the agent",
     async () => {
       const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
@@ -596,8 +586,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       }
     },
   );
-
-  await s.test(
+  s.test(
     'a gate on the last step of a folder that merges nothing: approving accepts what the step did — its own prose is not offered as what happens next — and the branch keeps its commands',
     async () => {
       const repo = aRepo();
@@ -644,8 +633,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.equal(decideSaid(await listed(run.id)), `${branch} is ahead of main, and nothing has merged it — nemia decide ${run.id}`);
     },
   );
-
-  await s.test(
+  s.test(
     'a run that worked on the base branch itself says so, and still says what is to be decided: the screen that used to return before it',
     async () => {
       const run = await stage.runPlaced(
@@ -669,8 +657,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       assert.ok(!d.commands.some((x) => x.label === 'land it' || x.label === 'drop it'), 'nor a merge of the branch it is already on');
     },
   );
-
-  await s.test(
+  s.test(
     "a run whose one step works in the checkout is not shown the base branch's diff: its work is not on it, and the base moves under it",
     async () => {
       const repo = aRepo();
@@ -727,8 +714,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       );
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED at `nemia start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch',
     async () => {
       const repo = aRepo();
@@ -749,11 +735,10 @@ test('a run waiting on you, read and landed: its screens, and what approving its
   );
 });
 
-test('a step retried, answered, over its budget and nudged: what `nemia decide` and `nemia ls` say of each try', async (t) => {
-  const s = story(t);
+describe('a step retried, answered, over its budget and nudged: what `nemia decide` and `nemia ls` say of each try', () => {
+  const s = story(test);
   let id = '';
-
-  await s.test('a blocked step is told the nemia retry --message that answers it, and nothing is answered yet', async () => {
+  s.test('a blocked step is told the nemia retry --message that answers it, and nothing is answered yet', async () => {
     id = (await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }))).id;
     await tick(id);
     settle(`${id}-implement`, 'succeeded', { closeout: blocked('Rename --flag, or keep it?') });
@@ -774,8 +759,7 @@ test('a step retried, answered, over its budget and nudged: what `nemia decide` 
     );
     assert.deepEqual(asking.answers, {}, 'nothing answered yet');
   });
-
-  await s.test('the try a person answered is asked, and the next tick files it', async () => {
+  s.test('the try a person answered is asked, and the next tick files it', async () => {
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue', message: 'Keep it.\nThe flag is public.' }));
     const d = await decidedOn(stage, id);
     const step = d.steps.find((x) => x.name === 'implement');
@@ -785,61 +769,52 @@ test('a step retried, answered, over its budget and nudged: what `nemia decide` 
       ['try 2 asked (--continue, with your answer) — the next tick files it'],
     );
   });
-
-  await s.test(
-    'on the answered try its note says so, and beside it what the try before needed and your answer, read off the ask',
-    async () => {
-      await tick(id);
-      settle(`${id}-implement-try2`, 'succeeded', { closeout: blocked('And the README, too?') });
-      await tick(id);
-      const d = await decidedOn(stage, id);
-      const step = d.steps.find((x) => x.name === 'implement');
-      assert.ok(step, 'implement is a step of the run');
-      assert.equal(tryNote(step, d.run.steps.implement, d.steps, Boolean(d.answers.implement)), 'try 2, continued on your word, answered');
-      assert.deepEqual(d.answers.implement, { try: 2, message: 'Keep it.\nThe flag is public.', needs: 'Rename --flag, or keep it?' });
-      const closeout = d.closeouts.implement;
-      assert.deepEqual(
-        closeout && !('error' in closeout) ? [closeout.outcome, closeout.needs] : closeout,
-        ['blocked', 'And the README, too?'],
-        'and what the try made of them',
-      );
-      assert.ok(
-        !fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8').includes('The flag is public'),
-        'composed on read: the record keeps no message',
-      );
-    },
-  );
-
-  await s.test(
-    'what a step consumed is summed over its attempts — one that never started left out, the one in flight read off the view',
-    () => {
-      const views: Record<string, unknown> = {
-        t1: {
-          usage: { responses: 1, toolCalls: 1, inputTokens: 5, outputTokens: 1 },
-          state: {
-            attempts: [
-              { reason: 'unstartable', endedAt: '2026-09-13T00:00:00Z', usage: null },
-              {
-                reason: 'harness',
-                endedAt: '2026-09-13T00:01:00Z',
-                usage: { responses: 2, toolCalls: 3, inputTokens: 10, outputTokens: 1 },
-              },
-              { reason: null, endedAt: null, usage: null },
-            ],
-          },
+  s.test('on the answered try its note says so, and beside it what the try before needed and your answer, read off the ask', async () => {
+    await tick(id);
+    settle(`${id}-implement-try2`, 'succeeded', { closeout: blocked('And the README, too?') });
+    await tick(id);
+    const d = await decidedOn(stage, id);
+    const step = d.steps.find((x) => x.name === 'implement');
+    assert.ok(step, 'implement is a step of the run');
+    assert.equal(tryNote(step, d.run.steps.implement, d.steps, Boolean(d.answers.implement)), 'try 2, continued on your word, answered');
+    assert.deepEqual(d.answers.implement, { try: 2, message: 'Keep it.\nThe flag is public.', needs: 'Rename --flag, or keep it?' });
+    const closeout = d.closeouts.implement;
+    assert.deepEqual(
+      closeout && !('error' in closeout) ? [closeout.outcome, closeout.needs] : closeout,
+      ['blocked', 'And the README, too?'],
+      'and what the try made of them',
+    );
+    assert.ok(
+      !fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8').includes('The flag is public'),
+      'composed on read: the record keeps no message',
+    );
+  });
+  s.test('what a step consumed is summed over its attempts — one that never started left out, the one in flight read off the view', () => {
+    const views: Record<string, unknown> = {
+      t1: {
+        usage: { responses: 1, toolCalls: 1, inputTokens: 5, outputTokens: 1 },
+        state: {
+          attempts: [
+            { reason: 'unstartable', endedAt: '2026-09-13T00:00:00Z', usage: null },
+            {
+              reason: 'harness',
+              endedAt: '2026-09-13T00:01:00Z',
+              usage: { responses: 2, toolCalls: 3, inputTokens: 10, outputTokens: 1 },
+            },
+            { reason: null, endedAt: null, usage: null },
+          ],
         },
-        t2: { state: { attempts: [{ reason: 'lost', endedAt: '2026-09-13T00:00:00Z', usage: null }] } },
-      };
-      const run = { steps: { implement: { taskId: 't1' }, review: { taskId: 't2' }, respond: {} } } as unknown as Run;
-      assert.deepEqual(
-        consumption(new Map(Object.entries(views)) as unknown as Parameters<typeof consumption>[0], run),
-        { implement: { responses: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 }, review: undefined },
-        'review, whose session was lost before its runner measured anything, sums nothing: nobody counted',
-      );
-    },
-  );
-
-  await s.test(
+      },
+      t2: { state: { attempts: [{ reason: 'lost', endedAt: '2026-09-13T00:00:00Z', usage: null }] } },
+    };
+    const run = { steps: { implement: { taskId: 't1' }, review: { taskId: 't2' }, respond: {} } } as unknown as Run;
+    assert.deepEqual(
+      consumption(new Map(Object.entries(views)) as unknown as Parameters<typeof consumption>[0], run),
+      { implement: { responses: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 }, review: undefined },
+      'review, whose session was lost before its runner measured anything, sums nothing: nobody counted',
+    );
+  });
+  s.test(
     'REFUSED to hide why a step stopped past its budget: a session that failed after spending its budget is failed, and one that ended unsigned is unsigned, each beside the OVER BUDGET line — and the offer names both',
     async () => {
       const budgeted = () => {
@@ -869,8 +844,7 @@ test('a step retried, answered, over its budget and nudged: what `nemia decide` 
       }
     },
   );
-
-  await s.test(
+  s.test(
     "UNSIGNED after the run's own nudge: the decision and `nemia ls` say the run nudged it to sign off once, and that it ended unsigned again — the nudge spent, the step yours",
     async () => {
       const run = await stage.runPlaced(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
@@ -893,12 +867,16 @@ test('a step retried, answered, over its budget and nudged: what `nemia decide` 
   );
 });
 
-test('a run on two branches, side by side: each read, each in full, the longer note kept whole, and both dropped together', async (t) => {
-  const s = story(t);
+describe('a run on two branches, side by side: each read, each in full, the longer note kept whole, and both dropped together', () => {
+  let read!: { d: Decidable; read: DecisionRead; decided: Decided };
+  beforeAll(() => {
+    const t = teardowns();
+    read = undefined as unknown as Awaited<ReturnType<typeof decidable>>;
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-  let read = undefined as unknown as Awaited<ReturnType<typeof decidable>>;
-
-  await s.test('implement and docs work side by side, each committing on the branch the place cut for it', async () => {
+  s.test('implement and docs work side by side, each committing on the branch the place cut for it', async () => {
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
     fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
@@ -914,8 +892,7 @@ test('a run on two branches, side by side: each read, each in full, the longer n
     settle(`${id}-docs`, 'succeeded', { closeout: SIGNED });
     await tick(id);
   });
-
-  await s.test(
+  s.test(
     'the decision, once a pass has read where the branches stand, reads what each branch touched, and the check files in full on each',
     async () => {
       await aPass();
@@ -941,8 +918,7 @@ test('a run on two branches, side by side: each read, each in full, the longer n
       );
     },
   );
-
-  await s.test('a note a branch added is read whole, beside its counts, for a reader to cut', () => {
+  s.test('a note a branch added is read whole, beside its counts, for a reader to cut', () => {
     const results = read.read.results.map((r) => [
       r.branch,
       'error' in r.radius ? r.radius.error : countsLine(r.radius),
@@ -953,8 +929,7 @@ test('a run on two branches, side by side: each read, each in full, the longer n
       [`wf/${id}/implement`, '1 file: +1 −0', []],
     ]);
   });
-
-  await s.test('both branches stand ahead of main; the run branch is landed, and both are dropped together', () => {
+  s.test('both branches stand ahead of main; the run branch is landed, and both are dropped together', () => {
     assert.deepEqual(
       read.d.standings.map((x) => [x.branch, x.said]),
       [

@@ -3,7 +3,7 @@
  * finished, its outcome, a run's wall time and the instant its clock is read at, and the factory kept. Pure: hand-built summaries, no
  * store. The order of the finished runs and their page are run-list.ts's (`finishedBefore`, `finishedPageOf`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { clockUntilOf, finishedAtOf, runInFactory, kindOf, type Listed, outcomeOf, wallMsOf } from './run-state.ts';
 

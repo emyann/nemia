@@ -8,7 +8,7 @@
  * the test place, declaring one need here; the machine's facts the read asks are the test's own (`Facts`), so it runs no command.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';

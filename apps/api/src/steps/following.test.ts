@@ -6,7 +6,7 @@
  * ends it.
  */
 import { root } from '../../test/harness.ts';
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -130,7 +130,7 @@ test('the beat these tests read again on is shorter than shipped, never longer',
 /** An app over the engine `e`, on the short beat, its runtime let go once the test `t` ends. */
 function appOver(t: TestContext, e: ReturnType<typeof engine>) {
   const own = appOf(Layer.mergeAll(liveOf(), Layer.succeed(Engine)(e), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: BEAT_MS })));
-  t.after(() => own.runtime.dispose());
+  t.onTestFinished(() => own.runtime.dispose());
   return own;
 }
 
@@ -188,12 +188,12 @@ const line = (own: ReturnType<typeof appOver>, step: string, word: string) =>
     emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: step, word }] }]])).pipe(Effect.provide(Logger.layer([]))),
   );
 
-test(
+describe(
   "Boards follow a step live: two share one upstream, one joins mid-message, a held task's stream stays open across the person's answer, and a try not pushed is sent from its start",
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       'two followers of a step share one upstream, both handed each moment; another step opens its own; both gone, it is let go',
       async (t) => {
         const implement = working([said('a-1')]);
@@ -234,7 +234,7 @@ test(
         await other.leave();
       },
     );
-    await s.test(
+    s.test(
       'a follower who joins mid-message is handed the text so far as one piece, then the rest live, then the whole message',
       async (t) => {
         const late = working([said('a-1')]);
@@ -264,7 +264,7 @@ test(
         await joiner.leave();
       },
     );
-    await s.test(
+    s.test(
       "a held task's stream stays open while it waits on a person, then says moved and follows its next turn to its end",
       async (t) => {
         const held = working([said('a-1')]);
@@ -296,7 +296,7 @@ test(
         ]);
       },
     );
-    await s.test(
+    s.test(
       "a held task's stream opened once its attempt has ended says following and its history, then moved and its next turn from the start",
       async (t) => {
         const opened = working([said('a-1')]);
@@ -323,7 +323,7 @@ test(
         ]);
       },
     );
-    await s.test(
+    s.test(
       'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable` retrying: the stream stays open and reads the try again on a beat',
       async (t) => {
         const first = working([said('a-1')]);
@@ -335,7 +335,7 @@ test(
           ]),
         );
         const own = appOver(t, e);
-        t.after(() => writeRun());
+        t.onTestFinished(() => writeRun());
         const f = await follower(t, own.app, 'tried');
         await f.wait((s) => s.length >= 2, 'following, then the history');
         Queue.endUnsafe(first.attempts[0]);
@@ -379,7 +379,7 @@ test(
       ]),
     );
     const own = appOver(t, e);
-    t.after(() => writeRun());
+    t.onTestFinished(() => writeRun());
     const f = await follower(t, own.app, 'drifted');
     await f.wait((s) => s.some((b) => b.event === 'unreadable'), 'not pushed: read again on a beat');
     delete first.unstreamed;

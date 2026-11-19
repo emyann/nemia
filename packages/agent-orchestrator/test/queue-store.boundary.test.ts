@@ -8,7 +8,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -222,7 +222,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
   const cwd = process.cwd();
   process.chdir(broken);
-  t.after(() => process.chdir(cwd));
+  t.onTestFinished(() => process.chdir(cwd));
   aCard('odd-include-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
   aCard('behind-c3d4', { workflow: 'dev', queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
 
@@ -251,13 +251,13 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
     return inner();
   });
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     printed.push(args.join(' '));
   });
   try {
     await assert.rejects(main(['up', '1'], up.e, undefined, undefined, ENV), (err) => err === stop);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
   const named = printed.filter((l) => l.includes('odd-include-a1b2'));
   assert.equal(
@@ -304,11 +304,11 @@ test("REFUSED at shipped defaults: a queued card on a daemon whose folder is no 
   fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const cwd = process.cwd();
   process.chdir(bare);
-  t.after(() => process.chdir(cwd));
+  t.onTestFinished(() => process.chdir(cwd));
   aCard('no-git-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
 
   const said: string[] = [];
-  const stderr = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
+  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
     said.push(String(chunk));
     return true;
   });
@@ -316,7 +316,7 @@ test("REFUSED at shipped defaults: a queued card on a daemon whose folder is no 
   try {
     pass = await runWith(b.e, tickRun());
   } finally {
-    stderr.mock.restore();
+    stderr.mockRestore();
   }
   assert.deepEqual(
     said,
@@ -341,7 +341,7 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
   fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
   const cwd = process.cwd();
   process.chdir(broken);
-  t.after(() => process.chdir(cwd));
+  t.onTestFinished(() => process.chdir(cwd));
   aCard('odd-include-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
   const before = await runWith(b.e, tickRun());
   assert.ok(
@@ -359,13 +359,13 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
     return inner();
   });
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     printed.push(args.join(' '));
   });
   try {
     await assert.rejects(main(['up', '1'], b.e, undefined, undefined, ENV), (err) => err === stop);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
 
   const named = printed.filter((l) => l.includes('odd-include-a1b2'));

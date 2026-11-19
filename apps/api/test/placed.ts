@@ -11,7 +11,7 @@
  * `<what>.boundary.test.ts`. `eachTest` is a copy of the orchestrator's (`packages/agent-orchestrator/test/placed.ts`), not an import
  * of it: a package's test reaches into no other package's files.
  */
-import { afterEach, beforeEach } from 'node:test';
+import { afterEach, beforeAll, beforeEach } from 'vitest';
 import { Effect, Layer } from 'effect';
 import {
   engineOf,
@@ -55,23 +55,72 @@ export const engineFor = (engine: TestEngine): ReturnType<typeof engineOf> => en
 export const appOver = (engine: TestEngine, stand: TestPlace, ...more: Layer.Layer<never>[]): ReturnType<typeof appOf>['app'] =>
   appOf(Layer.mergeAll(liveOf(), Engine.over(engine.layer), stand.layer, ...more)).app;
 
+/** The makers `eachTest` was given in this file, in order, each with what it made for the test or `describe` running now. */
+const makers: { make: () => unknown; now?: { readonly made: unknown } }[] = [];
 /**
- * What `make` makes, new for each test of the file that calls this at its head: the function answers the one made for the test running
- * now, which its subtests share. It throws before the first test, where none is made yet.
+ * Where the makers stand: the test or `describe` at the file's head they made for, whether the file's tests have begun (its collection
+ * over), and whether a test runs now.
+ */
+const at: { head?: unknown; started: boolean; running: boolean; making: boolean; early: boolean } = {
+  started: false,
+  running: false,
+  making: false,
+  early: false,
+};
+
+/** Every maker made anew, in the order given, so a later one reads the earlier ones' new makes. */
+const makeAll = (): void => {
+  at.making = true;
+  try {
+    for (const m of makers) m.now = { made: m.make() };
+  } finally {
+    at.making = false;
+  }
+};
+
+/** The test or `describe` at the head of the file that `task` belongs to. */
+const headOf = (task: { suite?: unknown; file: unknown }): unknown => {
+  let top: { suite?: unknown } = task;
+  while (top.suite && top.suite !== task.file) top = top.suite;
+  return top;
+};
+
+/**
+ * What `make` makes, new for each test at the head of the file that calls this, a `describe` being one with all its tests: the function
+ * answers the one made for the test or `describe` running now, which the tests of a `describe` share. Every maker of the file is made
+ * anew together, in the order given, when the next test or `describe` at the head begins: at its first test, or where a `describe`'s
+ * `beforeAll` asks first, there. Asked while the file is collected, before any test, it throws.
+ *
+ * @param make what is made anew for each test or `describe` at the head of the file
  */
 export function eachTest<A>(make: () => A): () => A {
-  let now: { readonly made: A } | undefined;
-  let depth = 0;
-  beforeEach(() => {
-    if (depth === 0) now = { made: make() };
-    depth += 1;
-  });
-  afterEach(() => {
-    depth -= 1;
-  });
+  const mine: { make: () => unknown; now?: { readonly made: unknown } } = { make };
+  makers.push(mine);
+  if (makers.length === 1) {
+    beforeAll(() => {
+      at.started = true;
+    });
+    beforeEach(({ task }) => {
+      const head = headOf(task);
+      if (head !== at.head) {
+        at.head = head;
+        if (!at.early) makeAll();
+        at.early = false;
+      }
+      at.running = true;
+    });
+    afterEach(() => {
+      at.running = false;
+    });
+  }
   return () => {
-    if (!now) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
-    return now.made;
+    if (!at.started) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
+    if (!at.running && !at.making && !at.early) {
+      makeAll();
+      at.early = true;
+    }
+    if (!mine.now) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
+    return mine.now.made as A;
   };
 }
 

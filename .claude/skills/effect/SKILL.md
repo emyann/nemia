@@ -183,7 +183,7 @@ version, and the version above must be the pin. An upgrade re-measures the table
 
 ## Tests
 
-`node:test`, with `Effect.runPromise` and the layers provided in the test (`const run` in
+Vitest, its `test` and `describe` with `node:assert`, with `Effect.runPromise` and the layers provided in the test (`const run` in
 `packages/agent-runtime/test/engine.test.ts`). No `@effect/vitest`, though `ai-docs/src/09_testing` uses it.
 
 ## Why

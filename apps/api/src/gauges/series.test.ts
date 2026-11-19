@@ -4,7 +4,7 @@
  * them; and GET /api/stats saying the system's health off the hour lines.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -30,9 +30,9 @@ const series = async (query = ''): Promise<{ status: number; body: unknown }> =>
   return { status: res.status, body: await res.json() };
 };
 
-test("The board reads the system's series and health off the lines the tick keeps: none, a day by the minute, a line since, all of it by the day, a range refused, and health null where no hour was kept", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("The board reads the system's series and health off the lines the tick keeps: none, a day by the minute, a line since, all of it by the day, a range refused, and health null where no hour was kept", () => {
+  const s = story(test);
+  s.test(
     'GET /api/series answers the last day a point a minute by default, all of it a point a day, and a line written since',
     async () => {
       fs.rmSync(METRICS, { recursive: true, force: true });
@@ -61,13 +61,13 @@ test("The board reads the system's series and health off the lines the tick keep
       );
     },
   );
-  await s.test('REFUSED: GET /api/series with a range it does not take, as Invalid: 422, naming the ranges', async () => {
+  s.test('REFUSED: GET /api/series with a range it does not take, as Invalid: 422, naming the ranges', async () => {
     const { status, body } = await series('?range=2w');
     assert.equal(status, 422);
     const { error } = body as { error: string };
     for (const fact of ['--range', '24h, 7d, 30d, all', '"2w"']) assert.ok(error.includes(fact), `names ${fact}: ${error}`);
   });
-  await s.test("GET /api/stats says the system's health over its days off the hour lines, and null where none was kept", async () => {
+  s.test("GET /api/stats says the system's health over its days off the hour lines, and null where none was kept", async () => {
     fs.rmSync(METRICS, { recursive: true, force: true });
     const empty = (await (await app.request('/api/stats?from=2026-09-01&to=2026-09-02')).json()) as Stats;
     assert.equal(empty.health.runs, null);

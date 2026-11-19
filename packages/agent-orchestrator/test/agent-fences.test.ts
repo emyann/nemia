@@ -45,7 +45,7 @@
  * and lets the rest through (`misjudged`); her admission asks every answer to what waits on the person, whatever the person allows
  * (`verdictOf`); and an edit of the store outside her folder is denied her (`editVerdictOf`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

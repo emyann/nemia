@@ -11,7 +11,7 @@
  * (`/otel-lgtm/tempo-config.yaml`, read by its Tempo; a second `--config` merged by its collector) are its pinned digest's, as
  * measured (`tools/observe/README.md`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -134,9 +134,9 @@ function scopeOf(config: Collector, command: string): string | undefined {
 }
 
 /**
- * Commands and their scopes, undefined where none is set: the whole suite from the root, one package by a filter, a workspace or a
- * `cd` into it, some files by `node --test`, and e2e on every page or some; read at any command of the line, past its wrappers, the
- * last match winning, and never inside a quote, a script's longer name or another flag.
+ * Commands and their scopes, undefined where none is set: the whole suite from the root, one package by a filter, a workspace or a `cd`
+ * into it, some files by `node --test` or `vitest run`, and e2e on every page or some; read at any command of the line, past its wrappers,
+ * the last match winning, and never inside a quote, a script's longer name or another flag.
  */
 const SCOPE_ROWS: [string, string | undefined][] = [
   ['npx turbo run test --force --continue', 'suite'],
@@ -159,6 +159,10 @@ const SCOPE_ROWS: [string, string | undefined][] = [
   ['cd apps/web && cd ../.. && npx turbo run test --force --continue', 'suite'],
   ['node --test test/a.test.ts', 'files'],
   ['timeout --foreground 60 node --test test/a.test.ts', 'files'],
+  ['npx vitest run test/a.test.ts', 'files'],
+  ['cd packages/agent-orchestrator && npx vitest run test/observe-time.test.ts', 'files'],
+  ['cd apps/web && npx vitest run --project=node test/a.test.ts', 'files'],
+  ['npx vitest run', undefined],
   ['cd packages/agent-orchestrator && node --import ./test/ambient.ts --test test/observe-time.test.ts', 'files'],
   ['npm run e2e', 'e2e: all'],
   ['npm run build && npm run e2e -- --photos', 'e2e: all'],
@@ -457,6 +461,9 @@ test('REFUSED: the scope after the batch, on every span, copied from the command
       'no statement sets the scope files',
       '"node --test test/a.test.ts" has the scope files: test/a.test.ts, not files',
       '"timeout --foreground 60 node --test test/a.test.ts" has the scope files: test/a.test.ts, not files',
+      '"npx vitest run test/a.test.ts" has the scope files: test/a.test.ts, not files',
+      '"cd packages/agent-orchestrator && npx vitest run test/observe-time.test.ts" has the scope files: test/a.test.ts, not files',
+      '"cd apps/web && npx vitest run --project=node test/a.test.ts" has the scope files: test/a.test.ts, not files',
       '"cd packages/agent-orchestrator && node --import ./test/ambient.ts --test test/observe-time.test.ts" has the scope files: test/a.test.ts, not files',
     ],
   );

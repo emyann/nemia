@@ -2,13 +2,13 @@
  * Which run of this store a process is of, by its environment (`runOfEnvironment`): the rows of what a session and a check are given,
  * and of what another store's process, a path that climbs out, and a process of no run carry.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { runOfEnvironment } from './prune.ts';
 
 const HOME = '/srv/ann/.agent-workflows';
 
-test('runOfEnvironment: the run a process is of, by a WF_STEP_FILES, else a WF_ARTIFACTS, under this store', async (t) => {
+describe('runOfEnvironment: the run a process is of, by a WF_STEP_FILES, else a WF_ARTIFACTS, under this store', () => {
   const rows: ReadonlyArray<{ name: string; env: Record<string, string>; run: string | undefined }> = [
     {
       name: 'a WF_STEP_FILES under this home wins over another WF_RUN beside it',
@@ -41,8 +41,7 @@ test('runOfEnvironment: the run a process is of, by a WF_STEP_FILES, else a WF_A
     { name: 'the runs folder with no run', env: { WF_STEP_FILES: `${HOME}/runs/` }, run: undefined },
     { name: 'neither variable', env: { PATH: '/usr/bin' }, run: undefined },
   ];
-  for (const row of rows) await t.test(row.name, () => assert.equal(runOfEnvironment(row.env, HOME), row.run));
-  await t.test('a home given with a trailing slash reads the same', () =>
-    assert.equal(runOfEnvironment({ WF_STEP_FILES: `${HOME}/runs/r-1/artifacts` }, `${HOME}/`), 'r-1'),
-  );
+  for (const row of rows) test(row.name, () => assert.equal(runOfEnvironment(row.env, HOME), row.run));
+  test('a home given with a trailing slash reads the same', () =>
+    assert.equal(runOfEnvironment({ WF_STEP_FILES: `${HOME}/runs/r-1/artifacts` }, `${HOME}/`), 'r-1'));
 });

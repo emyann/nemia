@@ -2,7 +2,7 @@
  * The Workflow (`src/workflow.ts`): a workflow and a page of them as the Api's endpoints answer them, every key kept; its graph typed,
  * every node with its kind, its nodes always there; its origin one of the four words; and the write bodies the Api takes.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, DEFINITION_ORIGINS, EDGE_KINDS, GraphEdge, Workflow, WorkflowCreate } from 'objects';

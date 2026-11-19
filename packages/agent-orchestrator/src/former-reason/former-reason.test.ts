@@ -2,7 +2,7 @@
  * The former reason codes (`former-reason.ts`): a line on disk under one reads back under its current codes, a selector that names one
  * selects what it did, and a person who types one is told the new spelling.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { formerHints, formerOf, FORMER_REASONS } from './former-reason.ts';
 import { upgraded, FEED_VERSION, type Codes, type FeedLine, type InvolvedKind } from '../feed/index.ts';
@@ -45,27 +45,27 @@ const codesOfLine = (line: FeedLine): Codes => ({
   ...(line.via ? { via: line.via } : {}),
 });
 
-test('a signed line on disk under a former reason reads back under its current one, its waits as written', async (t) => {
+describe('a signed line on disk under a former reason reads back under its current one, its waits as written', () => {
   for (const [former, kind, now] of CONVERTED)
-    await t.test(`${kind} ${former}`, () => {
+    test(`${kind} ${former}`, () => {
       const read = upgraded(signed(kind, { reason: former }, true));
       assert.deepEqual(codesOfLine(read), now);
       assert.equal(read.waits, 'person', 'its waits is its writer’s, kept');
       assert.equal(formerOf(now, kind), former, 'and the code it was written under is what a former selector reads it by');
     });
-  await t.test("a step's Waiting written before on was reads as Pending", () => {
+  test("a step's Waiting written before on was reads as Pending", () => {
     assert.deepEqual(codesOfLine(upgraded(signed('Step', { reason: 'Waiting' }))), { reason: 'Pending' });
   });
-  await t.test('a line under a current code is read as written', () => {
+  test('a line under a current code is read as written', () => {
     const line = signed('Step', { reason: 'Waiting', on: 'run' });
     assert.equal(upgraded(line), line);
   });
-  await t.test('the table holds every former code the card retired, and no other', () => {
+  test('the table holds every former code the card retired, and no other', () => {
     assert.deepEqual(Object.keys(FORMER_REASONS).sort(), [...new Set(CONVERTED.map(([former]) => former))].sort());
   });
 });
 
-test('a selector naming a former reason selects the lines that code was written for, current or former', async (t) => {
+describe('a selector naming a former reason selects the lines that code was written for, current or former', () => {
   const lines: FeedLine[] = [
     ...CONVERTED.map(([, kind, now]) => signed(kind, now)),
     signed('Step', { reason: 'Running' }),
@@ -73,7 +73,7 @@ test('a selector naming a former reason selects the lines that code was written 
     signed('Run', { reason: 'OverBudget' }),
   ];
   for (const [former, kind] of CONVERTED)
-    await t.test(`reason=${former} and reason notin (${former})`, () => {
+    test(`reason=${former} and reason notin (${former})`, () => {
       const was = lines.filter((line) => formerOf(codesOfLine(line), line.involved!.kind) === former);
       assert.ok(
         was.some((line) => line.involved!.kind === kind),
@@ -88,17 +88,17 @@ test('a selector naming a former reason selects the lines that code was written 
         lines.filter((line) => !was.includes(line)),
       );
     });
-  await t.test("a run's every stop on a person was Blocked, whatever step it names now", () => {
+  test("a run's every stop on a person was Blocked, whatever step it names now", () => {
     assert.ok(selects(parseSelectors(['kind=Run,reason=Blocked']), signed('Run', { reason: 'OverBudget' })));
   });
-  await t.test('a former code and a current one in one list select both', () => {
+  test('a former code and a current one in one list select both', () => {
     const selector = parseSelectors(['reason in (WaitingForSlot,Running)']);
     assert.deepEqual(lines.filter((line) => selects(selector, line)).map(codesOfLine), [
       { reason: 'Waiting', on: 'limit' },
       { reason: 'Running' },
     ]);
   });
-  await t.test('on and via are keys a selector names', () => {
+  test('on and via are keys a selector names', () => {
     assert.deepEqual(lines.filter((line) => selects(parseSelectors(['on=limit']), line)).map(codesOfLine), [
       { reason: 'Waiting', on: 'limit' },
     ]);

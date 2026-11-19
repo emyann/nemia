@@ -4,7 +4,7 @@
  * refused for a file the api keeps no more forgets that file's id (`files.unkept`), so the next press uploads it again. The api's answers
  * are stubbed on the fetch the objects' client calls.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { WriteRefusal } from '../src/lib/api/read.ts';
 import { files } from '../src/lib/api/objects.ts';
@@ -17,7 +17,7 @@ const kept = (id: string, name: string) => ({ id, name, mediaType: 'image/png', 
  * @param t The test, whose end puts the fetch back.
  * @param answers What each request is answered, in order.
  */
-function answering(t: { after: (fn: () => void) => void }, answers: Array<[number, unknown]>): string[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, answers: Array<[number, unknown]>): string[] {
   const before = globalThis.fetch;
   const asked: string[] = [];
   globalThis.fetch = async (url: string | URL | Request) => {
@@ -25,7 +25,7 @@ function answering(t: { after: (fn: () => void) => void }, answers: Array<[numbe
     const [status, body] = answers[asked.length - 1] ?? [500, { error: 'no answer stubbed' }];
     return new Response(JSON.stringify(body), { status });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   return asked;

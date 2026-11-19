@@ -10,7 +10,7 @@
  * seeds; driven by the SDK's own `Client`, as `port.test.ts` drives it.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

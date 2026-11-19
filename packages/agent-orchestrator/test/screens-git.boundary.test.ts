@@ -9,7 +9,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -350,10 +350,9 @@ const checked = () => {
   return dir;
 };
 
-test("what a step is told and what it shows, in the git place's words: a fan-in's conflicts, and a call its job was denied", async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe("what a step is told and what it shows, in the git place's words: a fan-in's conflicts, and a call its job was denied", () => {
+  const s = story(test);
+  s.test(
     "a fan-in whose two parents wrote one file differently is filed told the path its place's make left conflicted and the place's words for seeing it; a clean one is told of no conflict",
     async () => {
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -385,8 +384,7 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
       assert.doesNotMatch(clean, /conflict|`git status` shows them/i, 'a merge that left none is told of none');
     },
   );
-
-  await s.test(
+  s.test(
     'a step whose job was denied a call says so — on `nemia ls` beside its line and in the decision under it — and its status is unchanged',
     async () => {
       const run = await started(folder());
@@ -444,10 +442,9 @@ const onMaster = {
   run: ['run not measured', '—', '—', 'not known'],
 };
 
-test('the whole decisions of a run in the checkout, on master, by how its step ended', async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe('the whole decisions of a run in the checkout, on master, by how its step ended', () => {
+  const s = story(test);
+  s.test(
     'the whole decision of a run from an inbox card, given a file, whose step its harness waits on and is told a word, and then denied a call',
     async () => {
       const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.txt');
@@ -507,8 +504,7 @@ test('the whole decisions of a run in the checkout, on master, by how its step e
       });
     },
   );
-
-  await s.test('the whole decision of a step its harness ended at its budget', async () => {
+  s.test('the whole decision of a step its harness ended at its budget', async () => {
     const run = await started(folder());
     const b = board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -527,8 +523,7 @@ test('the whole decisions of a run in the checkout, on master, by how its step e
       commands: [['once more', `nemia retry ${run.id} implement`]],
     });
   });
-
-  await s.test('the whole decision of a step that says `denials: fail`, denied a call', async () => {
+  s.test('the whole decision of a step that says `denials: fail`, denied a call', async () => {
     const run = await started(folder('denials: fail'));
     const b = board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -548,8 +543,7 @@ test('the whole decisions of a run in the checkout, on master, by how its step e
       commands: [['once more', `nemia retry ${run.id} implement --fresh`]],
     });
   });
-
-  await s.test('the whole decision of a step whose closeout does not read, never nudged', async () => {
+  s.test('the whole decision of a step whose closeout does not read, never nudged', async () => {
     const run = await started(folder());
     const b = board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -569,8 +563,7 @@ test('the whole decisions of a run in the checkout, on master, by how its step e
       commands: [['once more', `nemia retry ${run.id} implement`]],
     });
   });
-
-  await s.test('the whole decision of a run whose every step passed its check', async () => {
+  s.test('the whole decision of a run whose every step passed its check', async () => {
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
     const run = await started(dir);
@@ -646,11 +639,10 @@ const waiting = (run: RepositoryRun, branch: string, inFull: unknown[]) => ({
   ],
 });
 
-test("a run waiting on you, on git: its whole decisions, what its branches touched in the place's report, and what `nemia ls` costs", async (t) => {
-  const s = story(t);
+describe("a run waiting on you, on git: its whole decisions, what its branches touched in the place's report, and what `nemia ls` costs", () => {
+  const s = story(test);
   let a = { run: undefined as unknown as RepositoryRun, repo: '', branch: '', b: timed() };
-
-  await s.test(
+  s.test(
     'the whole decision of a run waiting on you, once a pass has read where its branch stands: verdicts, touched with a binary file, lesson, in full, each step, the totals, the branch and its notes, and land and drop — each task viewed once and the feed never read',
     async () => {
       const repo = aPackage();
@@ -697,12 +689,10 @@ test("a run waiting on you, on git: its whole decisions, what its branches touch
       assert.ok(git(repo, 'branch', '--list', branch).trim(), 'the branch is still there');
     },
   );
-
-  await s.test('the whole decision with --sensitive naming nothing: no file in full, in place of the check files', async () => {
+  s.test('the whole decision with --sensitive naming nothing: no file in full, in place of the check files', async () => {
     assert.deepEqual(await whole(a.b.e, a.run, ['nothing/**']), waiting(a.run, a.branch, []));
   });
-
-  await s.test(
+  s.test(
     "what a branch touched is the place's report: a rename at both ends, a binary file, a file in no directory, today's lines — and a branch that is gone is not read as nothing",
     () => {
       branchOff(a.repo, 'wf/moved', () => {
@@ -745,8 +735,7 @@ test("a run waiting on you, on git: its whole decisions, what its branches touch
       assert.deepEqual(gone, { branch: 'wf/never', radius: { error: notKnown }, inFull: { error: notKnown }, notes: { error: notKnown } });
     },
   );
-
-  await s.test("a branch that touched a lint config lists it as check-affecting, with its whole diff from the place's diffs", () => {
+  s.test("a branch that touched a lint config lists it as check-affecting, with its whole diff from the place's diffs", () => {
     branchOff(a.repo, 'wf/lint', () => {
       write(a.repo, '.oxlintrc.json', '{ "rules": { "no-console": "off" } }\n');
       write(a.repo, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b + 0;\n');
@@ -757,8 +746,7 @@ test("a run waiting on you, on git: its whole decisions, what its branches touch
     assert.match(lint.inFull as string, /^\+\{ "rules": \{ "no-console": "off" \} \}$/m);
     assert.doesNotMatch(lint.inFull as string, /add\.ts/, 'a file no glob names is not printed in full');
   });
-
-  await s.test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async () => {
+  s.test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async () => {
     const { e, viewed, settle } = a.b;
     const ls = async () => {
       viewed.clear();
@@ -812,10 +800,9 @@ const blockedOnMain = (run: RepositoryRun, implement: Record<string, unknown>, t
   commands: [['once more', `nemia retry ${run.id} implement`]],
 });
 
-test('the whole decisions of a run through its tries and on two branches', async (t) => {
-  const s = story(t);
-
-  await s.test(
+describe('the whole decisions of a run through its tries and on two branches', () => {
+  const s = story(test);
+  s.test(
     'the whole decision of a running run, of a try asked for, of a step blocked with its question, and of a try a person answered',
     async () => {
       const run = repositoryRunOf(
@@ -880,8 +867,7 @@ test('the whole decisions of a run through its tries and on two branches', async
       );
     },
   );
-
-  await s.test(
+  s.test(
     'the whole decision of a run on two branches, once a pass has read where they stand, one with a note longer than a screen shows',
     async () => {
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));

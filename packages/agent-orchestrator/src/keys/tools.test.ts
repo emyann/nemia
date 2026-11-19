@@ -2,7 +2,7 @@
  * The rules `nemia decide` words for a call the harness denied: `allowRuleOf`, the rule a folder's `allowedTools:` takes for it, and
  * `disallowedBy`, the step's own deny rule that may have denied it, which no allow rule overrides. One table, a row a call.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { allowRuleOf, disallowedBy, type DeniedAt } from './tools.ts';
 import { parseWorkflow } from '../workflow/step-file.ts';
@@ -15,7 +15,7 @@ const AT: DeniedAt = { cwd: '/w/r-7/implement', runId: 'r-7' };
 /** A step whose `allowedTools:` is `rule`, as a folder reads it: refused when the parser would not take the rule. */
 const allowedAs = (rule: string) => parseWorkflow('review', `---\nplace: git\nallowedTools: ${rule}\n---\nDo it.\n`).allowedTools;
 
-test('`allowRuleOf` and `disallowedBy`: the rule a denied call is allowed by, and the deny rule that denied it', async (t) => {
+describe('`allowRuleOf` and `disallowedBy`: the rule a denied call is allowed by, and the deny rule that denied it', () => {
   const allows: Array<[row: string, denied: string, at: DeniedAt | undefined, rule: string]> = [
     ['a Write as Edit, from the root', 'Write(/tmp/w/notes.md)', undefined, 'Edit(//tmp/w/notes.md)'],
     ['a MultiEdit as Edit', 'MultiEdit(/tmp/w/a.ts)', undefined, 'Edit(//tmp/w/a.ts)'],
@@ -52,12 +52,11 @@ test('`allowRuleOf` and `disallowedBy`: the rule a denied call is allowed by, an
     ['a command, in a run', 'Bash(pytest)', RUN, 'Bash(pytest:*)'],
   ];
   for (const [row, denied, at, rule] of allows)
-    await t.test(`allow: ${row}`, () => {
+    test(`allow: ${row}`, () => {
       assert.equal(allowRuleOf(denied, at), rule);
       const oneParenthesisPair = !/\(.*\(/.test(rule);
       if (oneParenthesisPair) assert.deepEqual(allowedAs(rule), [rule], 'a rule `allowedTools:` takes');
     });
-
   const denies: Array<[row: string, denied: string, rules: string[], at: DeniedAt | undefined, by: string | undefined]> = [
     ['a bare tool', 'SendMessage', ['Bash(npm run build)', 'SendMessage'], undefined, 'SendMessage'],
     ["the command's first word is all the call keeps", 'Bash(npm)', ['Bash(npm run build)'], undefined, 'Bash(npm run build)'],
@@ -95,7 +94,7 @@ test('`allowRuleOf` and `disallowedBy`: the rule a denied call is allowed by, an
     ['none: no rules', 'SendMessage', [], undefined, undefined],
   ];
   for (const [row, denied, rules, at, by] of denies)
-    await t.test(`deny: ${row}`, () => {
+    test(`deny: ${row}`, () => {
       assert.equal(disallowedBy(denied, rules, at), by);
     });
 });

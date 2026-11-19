@@ -2,7 +2,7 @@
  * The JSONL files another process writes beside an attached session (its asks, its answers) are decoded by their schema on read: a
  * line that does not parse, or parses to a shape the file never holds, is counted unread, never cast into a line the runtime acts on.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

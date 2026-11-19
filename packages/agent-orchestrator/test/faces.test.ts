@@ -13,7 +13,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, and no cap is set on runs or sessions.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -239,8 +239,8 @@ const viewPrograms = async () => {
 const tickOn = (engine: Engine, options: Parameters<typeof tickRun>[0] = {}) =>
   runPlaced(tickRun(options).pipe(Effect.provide(Service.layer(engine))));
 
-test("each verb's program, given its services, answers what its plain face answers; a refusal is its typed failure, anything else a defect", async (t) => {
-  await t.test("the tick's program and its plain face each meter their pass over every phase the meter has", async () => {
+describe("each verb's program, given its services, answers what its plain face answers; a refusal is its typed failure, anything else a defect", () => {
+  test("the tick's program and its plain face each meter their pass over every phase the meter has", async () => {
     const b = stage.board();
     const e = ticking(b);
     const repo = aRepo();
@@ -263,163 +263,146 @@ test("each verb's program, given its services, answers what its plain face answe
     assert.deepEqual(Object.keys(programCost?.phases ?? {}), [...PHASES], 'the program meters its pass as the face does');
     assert.deepEqual(Object.keys(faceCost?.phases ?? {}), [...PHASES]);
   });
-
-  await t.test(
-    "REFUSED: the tick's refusal is its program's `Invalid`, picked out by its tag, and its face's rejection, exit code 2",
-    async () => {
-      const e = ticking(stage.board());
-      ENV.WF_MAX_CONCURRENT = '-3';
-      try {
-        const said = await tickOn(e, { repo: ROOT }).then(
-          () => 'answered',
-          (x: unknown) => x,
-        );
-        assert.ok(said instanceof Invalid, `the program fails with an Invalid, not ${String(said)}`);
-        const caught = await runPlaced(
-          tickRun({ repo: ROOT }).pipe(
-            Effect.catchTag('Invalid', (r) => Effect.succeed(r.message)),
-            Effect.provide(Service.layer(e)),
-          ),
-        );
-        assert.match(String(caught), /WF_MAX_CONCURRENT=-3/);
-        const err = await rejection(runWith(e, tickRun({ repo: ROOT })), 'a pass under a ceiling that does not read');
-        assert.ok(err instanceof Invalid, `an Invalid, not ${String(err)}`);
-        assert.equal(err.exitCode, 2);
-        assert.equal(err.message, caught);
-      } finally {
-        ENV.WF_MAX_CONCURRENT = undefined;
-      }
-    },
-  );
-
-  await t.test(
-    "REFUSED: what is not a refusal is a defect the tick's program dies of, recovered by no catch, and its face rethrows it",
-    async () => {
-      const e = ticking(stage.board());
-      const boom = new Error('boom');
-      const failing = { ...e, tick: () => Effect.die(boom) };
-      const caught = await runPlaced(
-        tickRun({ repo: ROOT }).pipe(
-          Effect.catch(() => Effect.succeed('caught')),
-          Effect.provide(Service.layer(failing)),
-        ),
-      ).then(
-        (x) => x,
+  test("REFUSED: the tick's refusal is its program's `Invalid`, picked out by its tag, and its face's rejection, exit code 2", async () => {
+    const e = ticking(stage.board());
+    ENV.WF_MAX_CONCURRENT = '-3';
+    try {
+      const said = await tickOn(e, { repo: ROOT }).then(
+        () => 'answered',
         (x: unknown) => x,
       );
-      assert.equal(caught, boom, 'the catch of failures left the defect alone');
-      assert.equal(await rejection(runWith(failing, tickRun({ repo: ROOT })), 'a pass whose runtime rejected'), boom);
-      assert.equal((await tickOn(e, { repo: ROOT })).runs.length, 1, 'the next pass reads the store as before');
-    },
-  );
-
-  await t.test(
-    'the programs of `nemia retry`, with `--round` and without, `nemia approve`, of a loop and at a gate, `nemia say` and `nemia cancel` answer what their plain faces answer',
-    async (tt: TestContext) => {
-      const at = Date.parse('2026-09-30T08:00:00.000Z');
-      const same = async <A extends object>(what: string, program: () => Promise<A>, face: () => Promise<A>) => {
-        tt.mock.timers.enable({ apis: ['Date'], now: at });
-        try {
-          const ran = await program();
-          if ('file' in ran) fs.rmSync(String(ran.file));
-          assert.deepStrictEqual(ran, await face(), what);
-        } finally {
-          tt.mock.timers.reset();
-        }
-      };
-
-      const run = await started(loopedThenShip());
-      const b = stage.board();
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      for (const n of [1, 2]) {
-        await toReview(b, run.id, n, true);
-        assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).looped, ['review'], `round ${n + 1}`);
+      assert.ok(said instanceof Invalid, `the program fails with an Invalid, not ${String(said)}`);
+      const caught = await runPlaced(
+        tickRun({ repo: ROOT }).pipe(
+          Effect.catchTag('Invalid', (r) => Effect.succeed(r.message)),
+          Effect.provide(Service.layer(e)),
+        ),
+      );
+      assert.match(String(caught), /WF_MAX_CONCURRENT=-3/);
+      const err = await rejection(runWith(e, tickRun({ repo: ROOT })), 'a pass under a ceiling that does not read');
+      assert.ok(err instanceof Invalid, `an Invalid, not ${String(err)}`);
+      assert.equal(err.exitCode, 2);
+      assert.equal(err.message, caught);
+    } finally {
+      ENV.WF_MAX_CONCURRENT = undefined;
+    }
+  });
+  test("REFUSED: what is not a refusal is a defect the tick's program dies of, recovered by no catch, and its face rethrows it", async () => {
+    const e = ticking(stage.board());
+    const boom = new Error('boom');
+    const failing = { ...e, tick: () => Effect.die(boom) };
+    const caught = await runPlaced(
+      tickRun({ repo: ROOT }).pipe(
+        Effect.catch(() => Effect.succeed('caught')),
+        Effect.provide(Service.layer(failing)),
+      ),
+    ).then(
+      (x) => x,
+      (x: unknown) => x,
+    );
+    assert.equal(caught, boom, 'the catch of failures left the defect alone');
+    assert.equal(await rejection(runWith(failing, tickRun({ repo: ROOT })), 'a pass whose runtime rejected'), boom);
+    assert.equal((await tickOn(e, { repo: ROOT })).runs.length, 1, 'the next pass reads the store as before');
+  });
+  test('the programs of `nemia retry`, with `--round` and without, `nemia approve`, of a loop and at a gate, `nemia say` and `nemia cancel` answer what their plain faces answer', async () => {
+    const at = Date.parse('2026-09-30T08:00:00.000Z');
+    const same = async <A extends object>(what: string, program: () => Promise<A>, face: () => Promise<A>) => {
+      vi.useFakeTimers({ toFake: ['Date'], now: at });
+      try {
+        const ran = await program();
+        if ('file' in ran) fs.rmSync(String(ran.file));
+        assert.deepStrictEqual(ran, await face(), what);
+      } finally {
+        vi.useRealTimers();
       }
-      await toReview(b, run.id, 3, true);
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      await same(
-        'nemia retry --round',
-        () => over(b.e, roundRun(run.id)),
-        () => runWith(b.e, roundRun(run.id)),
-      );
-      fs.rmSync(path.join(asksDir(run.id), 'round-review-4'));
-      await same(
-        'nemia approve of a loop',
-        () => over(b.e, acceptRun(run.id, undefined, ENOUGH)),
-        () => runWith(b.e, acceptRun(run.id, undefined, ENOUGH)),
-      );
-      assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).filed, ['ship']);
-      b.settle(`${run.id}-ship`, 'succeeded', SIGNED);
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      await same(
-        'nemia approve',
-        () => over(b.e, approveRun(run.id, 'ship', 'land it')),
-        () => runWith(b.e, approveRun(run.id, 'ship', 'land it')),
-      );
+    };
 
-      const failed = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(ROOT, failed.id)));
-      b.settle(`${failed.id}-implement`, 'failed');
-      await runWith(b.e, advanceRun(runRecord(ROOT, failed.id)));
-      await same(
-        'nemia retry',
-        () => over(b.e, retryRun(failed.id, 'implement', { mode: 'fresh' })),
-        () => runWith(b.e, retryRun(failed.id, 'implement', { mode: 'fresh' })),
-      );
+    const run = await started(loopedThenShip());
+    const b = stage.board();
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    for (const n of [1, 2]) {
+      await toReview(b, run.id, n, true);
+      assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).looped, ['review'], `round ${n + 1}`);
+    }
+    await toReview(b, run.id, 3, true);
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    await same(
+      'nemia retry --round',
+      () => over(b.e, roundRun(run.id)),
+      () => runWith(b.e, roundRun(run.id)),
+    );
+    fs.rmSync(path.join(asksDir(run.id), 'round-review-4'));
+    await same(
+      'nemia approve of a loop',
+      () => over(b.e, acceptRun(run.id, undefined, ENOUGH)),
+      () => runWith(b.e, acceptRun(run.id, undefined, ENOUGH)),
+    );
+    assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).filed, ['ship']);
+    b.settle(`${run.id}-ship`, 'succeeded', SIGNED);
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    await same(
+      'nemia approve',
+      () => over(b.e, approveRun(run.id, 'ship', 'land it')),
+      () => runWith(b.e, approveRun(run.id, 'ship', 'land it')),
+    );
 
-      const running = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
-      const taskId = `${running.id}-implement`;
-      b.settle(taskId, 'working');
-      const told = await over(b.e, sayRun(running.id, 'implement', 'Start with the parser.', { caller: PERSON }));
-      const face = await runWith(b.e, sayRun(running.id, 'implement', 'Start with the parser.', { caller: PERSON }));
-      const journalled = b.tasks.get(taskId)!.said;
-      assert.deepStrictEqual(
-        [told, face],
-        journalled.map((said) => ({ ...face, said })),
-        'nemia say: each journalled once, in turn',
-      );
+    const failed = await started(folder());
+    await runWith(b.e, advanceRun(runRecord(ROOT, failed.id)));
+    b.settle(`${failed.id}-implement`, 'failed');
+    await runWith(b.e, advanceRun(runRecord(ROOT, failed.id)));
+    await same(
+      'nemia retry',
+      () => over(b.e, retryRun(failed.id, 'implement', { mode: 'fresh' })),
+      () => runWith(b.e, retryRun(failed.id, 'implement', { mode: 'fresh' })),
+    );
 
-      await same(
-        'nemia cancel',
-        async () => {
-          const cancelled = await over(b.e, cancelRun(running.id));
-          fs.rmSync(cancelFile(ROOT, running.id));
-          b.tasks.get(taskId)!.stopRequested = false;
-          return cancelled;
-        },
-        () => runWith(b.e, cancelRun(running.id)),
-      );
-      assert.deepEqual(b.stopped.slice(-2), [taskId, taskId], 'each asked the engine to stop the step');
-    },
-  );
+    const running = await started(folder());
+    await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
+    const taskId = `${running.id}-implement`;
+    b.settle(taskId, 'working');
+    const told = await over(b.e, sayRun(running.id, 'implement', 'Start with the parser.', { caller: PERSON }));
+    const face = await runWith(b.e, sayRun(running.id, 'implement', 'Start with the parser.', { caller: PERSON }));
+    const journalled = b.tasks.get(taskId)!.said;
+    assert.deepStrictEqual(
+      [told, face],
+      journalled.map((said) => ({ ...face, said })),
+      'nemia say: each journalled once, in turn',
+    );
 
-  await t.test(
-    'REFUSED as a typed failure: a run not there is a `Missing`, and a state that forbids the verb a `Conflict`, in the words its face rejects with',
-    async () => {
-      const b = stage.board();
-      assert.match(await recovered(b.e, approveRun('no-such-run', 'x'), 'Missing'), /no such run: no-such-run/);
-      assert.match(await recovered(b.e, acceptRun('no-such-run', undefined, ENOUGH), 'Missing'), /no such run: no-such-run/);
+    await same(
+      'nemia cancel',
+      async () => {
+        const cancelled = await over(b.e, cancelRun(running.id));
+        fs.rmSync(cancelFile(ROOT, running.id));
+        b.tasks.get(taskId)!.stopRequested = false;
+        return cancelled;
+      },
+      () => runWith(b.e, cancelRun(running.id)),
+    );
+    assert.deepEqual(b.stopped.slice(-2), [taskId, taskId], 'each asked the engine to stop the step');
+  });
+  test('REFUSED as a typed failure: a run not there is a `Missing`, and a state that forbids the verb a `Conflict`, in the words its face rejects with', async () => {
+    const b = stage.board();
+    assert.match(await recovered(b.e, approveRun('no-such-run', 'x'), 'Missing'), /no such run: no-such-run/);
+    assert.match(await recovered(b.e, acceptRun('no-such-run', undefined, ENOUGH), 'Missing'), /no such run: no-such-run/);
 
-      const run = await started(looped());
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      b.settle(`${run.id}-implement`, 'working');
-      const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, Promise<unknown>]> = [
-        ['nemia retry', retryRun(run.id, 'implement', { mode: 'fresh' }), runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }))],
-        ['nemia retry --round', roundRun(run.id), runWith(b.e, roundRun(run.id))],
-        ['nemia approve', approveRun(run.id, 'implement', 'ok'), runWith(b.e, approveRun(run.id, 'implement', 'ok'))],
-      ];
-      for (const [what, program, face] of refusals) {
-        const err = await rejection(face, what);
-        assert.ok(err instanceof Conflict, `${what}: a Conflict, not ${String(err)}`);
-        assert.equal(err.exitCode, 2, what);
-        assert.equal(await recovered(b.e, program, 'Conflict'), err.message, what);
-      }
-      assert.ok(!fs.existsSync(asksDir(run.id)), 'nothing written');
-    },
-  );
-
-  await t.test("REFUSED as a typed failure: a record the store refuses to read is each program's `Invalid`, not a defect", async () => {
+    const run = await started(looped());
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    b.settle(`${run.id}-implement`, 'working');
+    const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, Promise<unknown>]> = [
+      ['nemia retry', retryRun(run.id, 'implement', { mode: 'fresh' }), runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }))],
+      ['nemia retry --round', roundRun(run.id), runWith(b.e, roundRun(run.id))],
+      ['nemia approve', approveRun(run.id, 'implement', 'ok'), runWith(b.e, approveRun(run.id, 'implement', 'ok'))],
+    ];
+    for (const [what, program, face] of refusals) {
+      const err = await rejection(face, what);
+      assert.ok(err instanceof Conflict, `${what}: a Conflict, not ${String(err)}`);
+      assert.equal(err.exitCode, 2, what);
+      assert.equal(await recovered(b.e, program, 'Conflict'), err.message, what);
+    }
+    assert.ok(!fs.existsSync(asksDir(run.id)), 'nothing written');
+  });
+  test("REFUSED as a typed failure: a record the store refuses to read is each program's `Invalid`, not a defect", async () => {
     const e = stage.board().e;
     fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
     try {
@@ -437,226 +420,196 @@ test("each verb's program, given its services, answers what its plain face answe
       fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
     }
   });
+  test('a journal that does not read is a defect of each program, which no `Effect.catch` recovers, and its plain face rejects with it; nothing written', async () => {
+    const b = stage.board();
+    const run = await started(folder());
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const boom = new Error('journal');
+    const broken = { ...b.e, view: () => Effect.die(boom) };
+    const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, () => Promise<unknown>]> = [
+      ['nemia retry --round', roundRun(run.id), () => runWith(broken, roundRun(run.id))],
+      ['nemia approve of a loop', acceptRun(run.id, undefined, ENOUGH), () => runWith(broken, acceptRun(run.id, undefined, ENOUGH))],
+      [
+        'nemia retry',
+        retryRun(run.id, 'implement', { mode: 'fresh' }),
+        () => runWith(broken, retryRun(run.id, 'implement', { mode: 'fresh' })),
+      ],
+      ['nemia approve', approveRun(run.id, 'implement', 'ok'), () => runWith(broken, approveRun(run.id, 'implement', 'ok'))],
+      [
+        'nemia say',
+        sayRun(run.id, 'implement', 'hello', { caller: PERSON }),
+        () => runWith(broken, sayRun(run.id, 'implement', 'hello', { caller: PERSON })),
+      ],
+      ['nemia cancel', cancelRun(run.id), () => runWith(broken, cancelRun(run.id))],
+    ];
+    for (const [what, program, face] of verbs) {
+      const uncaught = await rejection(over(broken, program.pipe(Effect.catch(() => Effect.succeed('caught')))), what);
+      assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
+      assert.equal(await rejection(face(), what), boom, `${what}: its face rejects with the error itself`);
+    }
+    assert.ok(!fs.existsSync(asksDir(run.id)) && !runRecord(ROOT, run.id).cancelledAt, 'nothing written');
+  });
+  test("REFUSED as a typed failure: `nemia say`'s engine refusing is its program's `Conflict`; words not delivered are a defect its face rejects with", async () => {
+    const b = stage.board();
+    const run = await started(folder());
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const taskId = `${run.id}-implement`;
+    const unheard = await recovered(b.e, sayRun(run.id, 'implement', 'Start with the parser.', { caller: PERSON }), 'Conflict');
+    assert.ok(unheard.startsWith(`say: \`${taskId}\``) && unheard.includes('has not started an attempt'), unheard);
 
-  await t.test(
-    'a journal that does not read is a defect of each program, which no `Effect.catch` recovers, and its plain face rejects with it; nothing written',
-    async () => {
-      const b = stage.board();
-      const run = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      const boom = new Error('journal');
-      const broken = { ...b.e, view: () => Effect.die(boom) };
-      const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, () => Promise<unknown>]> = [
-        ['nemia retry --round', roundRun(run.id), () => runWith(broken, roundRun(run.id))],
-        ['nemia approve of a loop', acceptRun(run.id, undefined, ENOUGH), () => runWith(broken, acceptRun(run.id, undefined, ENOUGH))],
-        [
-          'nemia retry',
-          retryRun(run.id, 'implement', { mode: 'fresh' }),
-          () => runWith(broken, retryRun(run.id, 'implement', { mode: 'fresh' })),
-        ],
-        ['nemia approve', approveRun(run.id, 'implement', 'ok'), () => runWith(broken, approveRun(run.id, 'implement', 'ok'))],
-        [
-          'nemia say',
-          sayRun(run.id, 'implement', 'hello', { caller: PERSON }),
-          () => runWith(broken, sayRun(run.id, 'implement', 'hello', { caller: PERSON })),
-        ],
-        ['nemia cancel', cancelRun(run.id), () => runWith(broken, cancelRun(run.id))],
-      ];
-      for (const [what, program, face] of verbs) {
-        const uncaught = await rejection(over(broken, program.pipe(Effect.catch(() => Effect.succeed('caught')))), what);
-        assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
-        assert.equal(await rejection(face(), what), boom, `${what}: its face rejects with the error itself`);
-      }
-      assert.ok(!fs.existsSync(asksDir(run.id)) && !runRecord(ROOT, run.id).cancelledAt, 'nothing written');
-    },
-  );
+    b.settle(taskId, 'working');
+    const lost = new Error(`say: ae/${taskId}/1 was not given the words`);
+    const deaf = { ...b.e, say: () => Effect.die(lost) };
+    const program = sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON }).pipe(Effect.catch(() => Effect.succeed('caught')));
+    assert.equal(await rejection(over(deaf, program), 'nemia say'), lost, 'a defect, which no `Effect.catch` recovers');
+    assert.equal(await rejection(runWith(deaf, sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON })), 'nemia say'), lost);
+    assert.deepEqual(b.tasks.get(taskId)!.said, [], 'nothing said');
+  });
+  test('who says words to a step: a session by its token as its own agent, framed; an agent by a standing token as its own agent, framed; the person as ever. REFUSED: words that say they are from an agent (`Invalid`), nothing said', async () => {
+    const b = stage.board();
+    const run = await started(folder());
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const taskId = `${run.id}-implement`;
+    b.settle(taskId, 'working');
+    const heard = () => b.tasks.get(taskId)!.said.map((s) => s.text);
+    const session = { kind: 'agent', agent: 'implement', factory: null } as const;
+    const standing = { kind: 'agent', agent: 'operator', factory: null, token: 'ops', narrowed: null } as const;
+    const operator = { kind: 'agent', name: 'operator' } as const;
 
-  await t.test(
-    "REFUSED as a typed failure: `nemia say`'s engine refusing is its program's `Conflict`; words not delivered are a defect its face rejects with",
-    async () => {
-      const b = stage.board();
-      const run = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      const taskId = `${run.id}-implement`;
-      const unheard = await recovered(b.e, sayRun(run.id, 'implement', 'Start with the parser.', { caller: PERSON }), 'Conflict');
-      assert.ok(unheard.startsWith(`say: \`${taskId}\``) && unheard.includes('has not started an attempt'), unheard);
+    const told = await runWith(b.e, sayRun(run.id, 'implement', 'Start with the parser.', { caller: session }));
+    assert.deepEqual(told.from, { kind: 'agent', name: 'implement' }, "a session's words are its agent's");
+    assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.'], 'handed in its frame');
 
-      b.settle(taskId, 'working');
-      const lost = new Error(`say: ae/${taskId}/1 was not given the words`);
-      const deaf = { ...b.e, say: () => Effect.die(lost) };
-      const program = sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON }).pipe(
-        Effect.catch(() => Effect.succeed('caught')),
-      );
-      assert.equal(await rejection(over(deaf, program), 'nemia say'), lost, 'a defect, which no `Effect.catch` recovers');
-      assert.equal(await rejection(runWith(deaf, sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON })), 'nemia say'), lost);
-      assert.deepEqual(b.tasks.get(taskId)!.said, [], 'nothing said');
-    },
-  );
+    const named = await rejection(
+      runWith(b.e, SAY.handler({ runId: run.id, step: 'implement', text: 'Cut it.', caller: PERSON, from: operator })),
+      'words that say they are from an agent',
+    );
+    assert.ok(named instanceof Invalid && named.exitCode === 2, String(named));
+    assert.equal(heard().length, 1, 'nothing said');
 
-  await t.test(
-    'who says words to a step: a session by its token as its own agent, framed; an agent by a standing token as its own agent, framed; the person as ever. REFUSED: words that say they are from an agent (`Invalid`), nothing said',
-    async () => {
-      const b = stage.board();
-      const run = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      const taskId = `${run.id}-implement`;
-      b.settle(taskId, 'working');
-      const heard = () => b.tasks.get(taskId)!.said.map((s) => s.text);
-      const session = { kind: 'agent', agent: 'implement', factory: null } as const;
-      const standing = { kind: 'agent', agent: 'operator', factory: null, token: 'ops', narrowed: null } as const;
-      const operator = { kind: 'agent', name: 'operator' } as const;
+    const byToken = await runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: standing }));
+    assert.deepEqual(byToken.from, operator);
+    assert.equal(heard()[1], 'The agent operator writes, not the person: Cut it.', "an agent's standing token under its name");
 
-      const told = await runWith(b.e, sayRun(run.id, 'implement', 'Start with the parser.', { caller: session }));
-      assert.deepEqual(told.from, { kind: 'agent', name: 'implement' }, "a session's words are its agent's");
-      assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.'], 'handed in its frame');
+    const person = await runWith(
+      b.e,
+      SAY.handler({ runId: run.id, step: 'implement', text: 'Widen the scope.', caller: PERSON, from: { kind: 'person' } }),
+    );
+    assert.equal(person.from, undefined, "the person's words carry no speaker");
+    assert.equal(heard()[2], 'Widen the scope.', "the person's words as they always were, in no frame");
+  });
+  test('`nemia cancel` asks the engine to stop before it marks the run: a stop the engine rejects leaves the run uncancelled, and its face rejects with it', async () => {
+    const b = stage.board();
+    const run = await started(folder());
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const refused = new Error('stop: the engine is not listening');
+    const deaf = { ...b.e, stop: () => Effect.die(refused) };
+    assert.equal(await rejection(runWith(deaf, cancelRun(run.id)), 'nemia cancel'), refused);
+    assert.equal(runRecord(ROOT, run.id).cancelledAt, undefined, 'not marked: asking again does both');
+    assert.ok((await runWith(b.e, cancelRun(run.id))).run.cancelledAt, 'asked again, it stops and marks');
+  });
+  test('the programs of the views, given the engine as a service, answer what their plain faces answer on the same store', async () => {
+    const v = await viewPrograms();
+    const { run, b } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
+    const e = b.e;
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+    b.settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+    const check = `${run.id}-implement-try2-check`;
+    b.end(check, 'failed', {
+      exitCode: 1,
+      printed: { stdout: 'not ok 1 - parses a trailing comma\n# fail 1\n', stderr: 'npm error Test failed.\n' },
+    });
+    const record = runRecord(ROOT, run.id);
+    const earlier = `${run.id}-implement`;
+    assert.deepEqual(record.steps.implement.tries?.[0].taskId, earlier, 'an earlier try, whose task only every try reads');
 
-      const named = await rejection(
-        runWith(b.e, SAY.handler({ runId: run.id, step: 'implement', text: 'Cut it.', caller: PERSON, from: operator })),
-        'words that say they are from an agent',
-      );
-      assert.ok(named instanceof Invalid && named.exitCode === 2, String(named));
-      assert.equal(heard().length, 1, 'nothing said');
+    for (const how of [{}, { earlierTries: false }]) {
+      const ran = await v.over(e, v.taskPhasesRead(record, how));
+      assert.equal(ran.views.has(earlier), how.earlierTries !== false, JSON.stringify(how));
+    }
 
-      const byToken = await runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: standing }));
-      assert.deepEqual(byToken.from, operator);
-      assert.equal(heard()[1], 'The agent operator writes, not the person: Cut it.', "an agent's standing token under its name");
+    const { phaseOf } = await v.over(e, v.taskPhasesRead(record));
+    const steps = stepsOf(record);
+    const failed = (p: TaskPhase) => p === 'failed' || p === 'stopped';
+    const reports = await v.over(e, v.checkReportsRead(record, steps, phaseOf, failed));
+    assert.deepStrictEqual(reports.get('implement'), {
+      passed: false,
+      command: 'npm test',
+      verdict: 1,
+      stdout: 'not ok 1 - parses a trailing comma\n# fail 1',
+      stderr: 'npm error Test failed.',
+    });
+    await v.over(e, v.refusalRead('npm test', check));
 
-      const person = await runWith(
-        b.e,
-        SAY.handler({ runId: run.id, step: 'implement', text: 'Widen the scope.', caller: PERSON, from: { kind: 'person' } }),
-      );
-      assert.equal(person.from, undefined, "the person's words carry no speaker");
-      assert.equal(heard()[2], 'Widen the scope.', "the person's words as they always were, in no frame");
-    },
-  );
+    const repo = aRepo();
+    const landed = await aParent(repo, b);
+    b.settle(`${landed.run.id}-implement`, 'succeeded', SIGNED);
+    const running = await aParent(repo, b);
+    const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [landed.run.id, running.run.id] }));
+    const ids = [landed.run.id, running.run.id, 'no-such-run'];
+    const git = await v.live(ids);
+    const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id, git))));
+    assert.deepEqual(
+      read.map((p) => p.landed),
+      [true, false, false],
+    );
+    const lookup = await v.over(b.e, v.parentsRead(runRecord(ROOT, child.id), git));
+    assert.deepStrictEqual(ids.map(lookup), read);
+  });
+  test("REFUSED as a death in the runtime's words: a refusal the engine's view, logs or feed fails with is each views program's death, exit code 2; a refusal of the store is still its failure", async () => {
+    const v = await viewPrograms();
+    const { run, b } = await throughCheck('check: npm test', 'failed', 1);
+    const e = b.e;
+    const record = runRecord(ROOT, run.id);
+    const check = `${run.id}-implement-check`;
+    const repo = aRepo();
+    const parent = await aParent(repo, b);
+    b.settle(`${parent.run.id}-implement`, 'succeeded', SIGNED);
+    const child = runRecord(
+      ROOT,
+      (await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id,
+    );
+    const failed = (): TaskPhase => 'failed';
+    const live = await v.live([parent.run.id]);
+    const reads = (err: unknown) => {
+      const refuse = () => Effect.fail(err);
+      return [
+        ['taskPhases', 'view', v.taskPhasesRead(record), { ...e, view: refuse }],
+        ['checkReports', 'logs', v.checkReportsRead(record, stepsOf(record), failed, () => true), { ...e, logs: refuse }],
+        ['refusalOf', 'logs', v.refusalRead('npm test', check), { ...e, logs: refuse }],
+        ['parentOf', 'view', v.parentRead(parent.run.id, live), { ...e, view: refuse }],
+        ['parentsOf', 'view', v.parentsRead(child, live), { ...e, view: refuse }],
+      ] as unknown as Array<[string, string, EffectOf<unknown, Refusal, EngineService>, Engine]>;
+    };
 
-  await t.test(
-    '`nemia cancel` asks the engine to stop before it marks the run: a stop the engine rejects leaves the run uncancelled, and its face rejects with it',
-    async () => {
-      const b = stage.board();
-      const run = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      const refused = new Error('stop: the engine is not listening');
-      const deaf = { ...b.e, stop: () => Effect.die(refused) };
-      assert.equal(await rejection(runWith(deaf, cancelRun(run.id)), 'nemia cancel'), refused);
-      assert.equal(runRecord(ROOT, run.id).cancelledAt, undefined, 'not marked: asking again does both');
-      assert.ok((await runWith(b.e, cancelRun(run.id))).run.cancelledAt, 'asked again, it stops and marks');
-    },
-  );
+    const refused = new StopRefused({ message: 'no such task' });
+    for (const [what, verb, program, broken] of reads(refused)) {
+      const died = (await rejection(v.over(broken, program), what)) as Error & { exitCode?: number };
+      assert.ok(died.message.startsWith(`${verb}: `) && died.message.includes('no such task'), `${what}: led by its verb: ${died.message}`);
+      assert.equal(died.exitCode, 2, what);
+      const uncaught = await rejection(v.over(broken, program.pipe(Effect.catch(() => Effect.succeed('caught')))), what);
+      assert.equal((uncaught as Error).message, died.message, `${what}: a death, which no \`Effect.catch\` recovers`);
+    }
 
-  await t.test(
-    'the programs of the views, given the engine as a service, answer what their plain faces answer on the same store',
-    async () => {
-      const v = await viewPrograms();
-      const { run, b } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
-      const e = b.e;
-      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-      b.settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
-      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-      const check = `${run.id}-implement-try2-check`;
-      b.end(check, 'failed', {
-        exitCode: 1,
-        printed: { stdout: 'not ok 1 - parses a trailing comma\n# fail 1\n', stderr: 'npm error Test failed.\n' },
-      });
-      const record = runRecord(ROOT, run.id);
-      const earlier = `${run.id}-implement`;
-      assert.deepEqual(record.steps.implement.tries?.[0].taskId, earlier, 'an earlier try, whose task only every try reads');
+    const boom = new Error('journal');
+    for (const [what, , program, broken] of reads(boom)) {
+      const uncaught = await rejection(v.over(broken, program.pipe(Effect.catch(() => Effect.succeed('caught')))), what);
+      assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
+      assert.equal(await rejection(v.over(broken, program), what), boom, `${what}: the program rejects with the error itself`);
+    }
 
-      for (const how of [{}, { earlierTries: false }]) {
-        const ran = await v.over(e, v.taskPhasesRead(record, how));
-        assert.equal(ran.views.has(earlier), how.earlierTries !== false, JSON.stringify(how));
-      }
-
-      const { phaseOf } = await v.over(e, v.taskPhasesRead(record));
-      const steps = stepsOf(record);
-      const failed = (p: TaskPhase) => p === 'failed' || p === 'stopped';
-      const reports = await v.over(e, v.checkReportsRead(record, steps, phaseOf, failed));
-      assert.deepStrictEqual(reports.get('implement'), {
-        passed: false,
-        command: 'npm test',
-        verdict: 1,
-        stdout: 'not ok 1 - parses a trailing comma\n# fail 1',
-        stderr: 'npm error Test failed.',
-      });
-      await v.over(e, v.refusalRead('npm test', check));
-
-      const repo = aRepo();
-      const landed = await aParent(repo, b);
-      b.settle(`${landed.run.id}-implement`, 'succeeded', SIGNED);
-      const running = await aParent(repo, b);
-      const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [landed.run.id, running.run.id] }));
-      const ids = [landed.run.id, running.run.id, 'no-such-run'];
-      const git = await v.live(ids);
-      const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id, git))));
-      assert.deepEqual(
-        read.map((p) => p.landed),
-        [true, false, false],
-      );
-      const lookup = await v.over(b.e, v.parentsRead(runRecord(ROOT, child.id), git));
-      assert.deepStrictEqual(ids.map(lookup), read);
-    },
-  );
-
-  await t.test(
-    "REFUSED as a death in the runtime's words: a refusal the engine's view, logs or feed fails with is each views program's death, exit code 2; a refusal of the store is still its failure",
-    async () => {
-      const v = await viewPrograms();
-      const { run, b } = await throughCheck('check: npm test', 'failed', 1);
-      const e = b.e;
-      const record = runRecord(ROOT, run.id);
-      const check = `${run.id}-implement-check`;
-      const repo = aRepo();
-      const parent = await aParent(repo, b);
-      b.settle(`${parent.run.id}-implement`, 'succeeded', SIGNED);
-      const child = runRecord(
-        ROOT,
-        (await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id,
-      );
-      const failed = (): TaskPhase => 'failed';
-      const live = await v.live([parent.run.id]);
-      const reads = (err: unknown) => {
-        const refuse = () => Effect.fail(err);
-        return [
-          ['taskPhases', 'view', v.taskPhasesRead(record), { ...e, view: refuse }],
-          ['checkReports', 'logs', v.checkReportsRead(record, stepsOf(record), failed, () => true), { ...e, logs: refuse }],
-          ['refusalOf', 'logs', v.refusalRead('npm test', check), { ...e, logs: refuse }],
-          ['parentOf', 'view', v.parentRead(parent.run.id, live), { ...e, view: refuse }],
-          ['parentsOf', 'view', v.parentsRead(child, live), { ...e, view: refuse }],
-        ] as unknown as Array<[string, string, EffectOf<unknown, Refusal, EngineService>, Engine]>;
-      };
-
-      const refused = new StopRefused({ message: 'no such task' });
-      for (const [what, verb, program, broken] of reads(refused)) {
-        const died = (await rejection(v.over(broken, program), what)) as Error & { exitCode?: number };
-        assert.ok(
-          died.message.startsWith(`${verb}: `) && died.message.includes('no such task'),
-          `${what}: led by its verb: ${died.message}`,
-        );
-        assert.equal(died.exitCode, 2, what);
-        const uncaught = await rejection(v.over(broken, program.pipe(Effect.catch(() => Effect.succeed('caught')))), what);
-        assert.equal((uncaught as Error).message, died.message, `${what}: a death, which no \`Effect.catch\` recovers`);
-      }
-
-      const boom = new Error('journal');
-      for (const [what, , program, broken] of reads(boom)) {
-        const uncaught = await rejection(v.over(broken, program.pipe(Effect.catch(() => Effect.succeed('caught')))), what);
-        assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
-        assert.equal(await rejection(v.over(broken, program), what), boom, `${what}: the program rejects with the error itself`);
-      }
-
-      const unreadable = new Missing({ message: 'git has no such repository' });
-      const git: BranchReader = {
-        ...live,
-        has: () => {
-          throw unreadable;
-        },
-      };
-      const caught = await v.over(b.e, v.parentRead(parent.run.id, git).pipe(Effect.catchTag('Missing', (r) => Effect.succeed(r))));
-      assert.equal(caught, unreadable, 'a refusal of git is the program’s failure, recovered by its tag');
-    },
-  );
-
-  await t.test("`nemia decide`'s program, given the engine as a service, answers what its plain face answers", async () => {
+    const unreadable = new Missing({ message: 'git has no such repository' });
+    const git: BranchReader = {
+      ...live,
+      has: () => {
+        throw unreadable;
+      },
+    };
+    const caught = await v.over(b.e, v.parentRead(parent.run.id, git).pipe(Effect.catchTag('Missing', (r) => Effect.succeed(r))));
+    assert.equal(caught, unreadable, 'a refusal of git is the program’s failure, recovered by its tag');
+  });
+  test("`nemia decide`'s program, given the engine as a service, answers what its plain face answers", async () => {
     const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
     const b = stage.board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -676,112 +629,94 @@ test("each verb's program, given its services, answers what its plain face answe
     );
     assert.deepStrictEqual(program, face);
   });
-
-  await t.test(
-    "REFUSED: `nemia decide` of a run that is not there is its program's `Missing`, picked out by its tag, and its face's rejection, exit code 2",
-    async () => {
-      const e = stage.board().e;
-      const err = await rejection(runWith(e, decideRun('no-such-run')), 'decide of no run');
-      assert.ok(err instanceof Missing, `a Missing, not ${String(err)}`);
-      assert.equal(err.exitCode, 2);
-      assert.match(err.message, /no such run: no-such-run/);
-      const caught = await runPlaced(
-        decideRun('no-such-run').pipe(
-          Effect.catchTag('Missing', (r) => Effect.succeed(r.message)),
-          Effect.provide(Service.layer(e)),
-        ),
-      );
-      assert.equal(caught, err.message);
-    },
-  );
-
-  await t.test(
-    'the start program answers what its plain face answers on the same store: a repository run with an input, a gate and a parent, and a folder run',
-    async () => {
-      const repo = aRepo();
-      const parent = await runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep() }));
-      const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
-      fs.writeFileSync(input, 'the notes\n');
-      const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
-        ['a repository run', { brief: 'the child', repo, workflowDir: TEAM_DEV, inputs: [input], gates: ['review'], after: [parent.id] }],
-        ['a folder run', { brief: 'the note', repo: ROOT, workflowDir: folderTeam(), inputs: [input] }],
-      ];
-      const differ = ['id', 'workspace', 'branch', 'baseRef', 'createdAt'];
-      const same = (r: Run) => Object.fromEntries(Object.entries(r).filter(([k]) => !differ.includes(k)));
-      const written = (r: Run) => JSON.parse(JSON.stringify(r)) as Run;
-      for (const [what, opts] of cases) {
-        const ran = await Effect.runPromise(placed(startRun(opts)));
-        const face = await runPlaced(startRun(opts));
-        assert.deepStrictEqual(written(ran), runRecord(ROOT, ran.id), `${what}: the program's run is on the record`);
-        assert.deepStrictEqual(written(face), runRecord(ROOT, face.id), `${what}: the face's run is on the record`);
-        assert.deepStrictEqual(same(written(ran)), same(written(face)), what);
-        assert.ok(fs.existsSync(path.join(inputsDir(ROOT, ran), 'notes.md')), `${what}: its input copied`);
-        assert.ok(fs.statSync(path.join(runsDir(ROOT), ran.id, 'agents')).isDirectory(), `${what}: its agents rendered`);
-      }
-    },
-  );
-
-  await t.test(
-    "REFUSED as a typed failure at `nemia start`: each refusal is the start program's `Invalid`, its face's, exit 2, and nothing is written",
-    async () => {
-      const repo = aRepo();
-      const fan = fs.mkdtempSync(path.join(ROOT, 'fan-'));
-      fs.writeFileSync(path.join(fan, 'a.md'), '---\nplace: git\n---\nside a\n');
-      fs.writeFileSync(path.join(fan, 'b.md'), '---\nplace: git\n---\nside b\n');
-      const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
-        ['--repo on a folder team', { brief: 'x', repo, repoNamed: true, workflowDir: folderTeam() }],
-        ['a gate naming no step', { brief: 'x', repo, workflowDir: folder(), gates: ['nowhere'] }],
-        ['an input not there', { brief: 'x', repo, workflowDir: folder(), inputs: [path.join(ROOT, 'no-such-input.md')] }],
-        ['after an unknown run', { brief: 'x', repo, workflowDir: folder(), after: ['no-such-run'] }],
-        ['--no-worktree on a fan-out', { brief: 'x', repo, workflowDir: fan, isolate: false }],
-      ];
-      for (const [what, opts] of cases) {
-        const before = fs.readdirSync(runsDir(ROOT)).sort();
-        const caught = Effect.runSync(placed(startRun(opts)).pipe(Effect.catchTag('Invalid', (r) => Effect.succeed(r))));
-        assert.ok(caught instanceof Invalid, `${what}: an Invalid, recovered by its tag`);
-        const err = await rejection(runPlaced(startRun(opts)), what);
-        assert.ok(err instanceof Invalid, `${what}: the face throws the Invalid itself, not ${String(err)}`);
-        assert.equal(err.exitCode, 2, what);
-        assert.equal(caught.message, err.message, what);
-        assert.deepEqual(fs.readdirSync(runsDir(ROOT)).sort(), before, `${what}: nothing written`);
-      }
-    },
-  );
-
-  await t.test(
-    'a run whose inputs cannot be copied is what the start program dies of, not a refusal: its face throws the same exit-1 Error, and nothing is left',
-    async (tt: TestContext) => {
-      const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
-      fs.writeFileSync(input, 'the notes\n');
-      const opts = { brief: 'unwritable', repo: aRepo(), workflowDir: folder(), inputs: [input] };
+  test("REFUSED: `nemia decide` of a run that is not there is its program's `Missing`, picked out by its tag, and its face's rejection, exit code 2", async () => {
+    const e = stage.board().e;
+    const err = await rejection(runWith(e, decideRun('no-such-run')), 'decide of no run');
+    assert.ok(err instanceof Missing, `a Missing, not ${String(err)}`);
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /no such run: no-such-run/);
+    const caught = await runPlaced(
+      decideRun('no-such-run').pipe(
+        Effect.catchTag('Missing', (r) => Effect.succeed(r.message)),
+        Effect.provide(Service.layer(e)),
+      ),
+    );
+    assert.equal(caught, err.message);
+  });
+  test('the start program answers what its plain face answers on the same store: a repository run with an input, a gate and a parent, and a folder run', async () => {
+    const repo = aRepo();
+    const parent = await runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep() }));
+    const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+    fs.writeFileSync(input, 'the notes\n');
+    const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
+      ['a repository run', { brief: 'the child', repo, workflowDir: TEAM_DEV, inputs: [input], gates: ['review'], after: [parent.id] }],
+      ['a folder run', { brief: 'the note', repo: ROOT, workflowDir: folderTeam(), inputs: [input] }],
+    ];
+    const differ = ['id', 'workspace', 'branch', 'baseRef', 'createdAt'];
+    const same = (r: Run) => Object.fromEntries(Object.entries(r).filter(([k]) => !differ.includes(k)));
+    const written = (r: Run) => JSON.parse(JSON.stringify(r)) as Run;
+    for (const [what, opts] of cases) {
+      const ran = await Effect.runPromise(placed(startRun(opts)));
+      const face = await runPlaced(startRun(opts));
+      assert.deepStrictEqual(written(ran), runRecord(ROOT, ran.id), `${what}: the program's run is on the record`);
+      assert.deepStrictEqual(written(face), runRecord(ROOT, face.id), `${what}: the face's run is on the record`);
+      assert.deepStrictEqual(same(written(ran)), same(written(face)), what);
+      assert.ok(fs.existsSync(path.join(inputsDir(ROOT, ran), 'notes.md')), `${what}: its input copied`);
+      assert.ok(fs.statSync(path.join(runsDir(ROOT), ran.id, 'agents')).isDirectory(), `${what}: its agents rendered`);
+    }
+  });
+  test("REFUSED as a typed failure at `nemia start`: each refusal is the start program's `Invalid`, its face's, exit 2, and nothing is written", async () => {
+    const repo = aRepo();
+    const fan = fs.mkdtempSync(path.join(ROOT, 'fan-'));
+    fs.writeFileSync(path.join(fan, 'a.md'), '---\nplace: git\n---\nside a\n');
+    fs.writeFileSync(path.join(fan, 'b.md'), '---\nplace: git\n---\nside b\n');
+    const cases: Array<[string, Parameters<typeof startRun>[0]]> = [
+      ['--repo on a folder team', { brief: 'x', repo, repoNamed: true, workflowDir: folderTeam() }],
+      ['a gate naming no step', { brief: 'x', repo, workflowDir: folder(), gates: ['nowhere'] }],
+      ['an input not there', { brief: 'x', repo, workflowDir: folder(), inputs: [path.join(ROOT, 'no-such-input.md')] }],
+      ['after an unknown run', { brief: 'x', repo, workflowDir: folder(), after: ['no-such-run'] }],
+      ['--no-worktree on a fan-out', { brief: 'x', repo, workflowDir: fan, isolate: false }],
+    ];
+    for (const [what, opts] of cases) {
       const before = fs.readdirSync(runsDir(ROOT)).sort();
-      fs.chmodSync(runsDir(ROOT), 0o555);
-      tt.after(() => fs.chmodSync(runsDir(ROOT), 0o755));
-      const died = thrown(() => Effect.runSync(placed(startRun(opts)).pipe(Effect.catch(() => Effect.succeed('caught')))), 'the program');
-      const face = await rejection(runPlaced(startRun(opts)), 'the face');
-      fs.chmodSync(runsDir(ROOT), 0o755);
-      for (const [what, err] of [
-        ['the program', died],
-        ['the face', face],
-      ] as const) {
-        assert.ok(err instanceof Error && !isRefusal(err), `${what}: an Error, not a refusal: ${String(err)}`);
-        assert.equal((err as Error & { exitCode?: number }).exitCode, 1, what);
-        assert.match(err.message, /^--input: /, what);
-      }
-      const anyId = (err: unknown) => (err as Error).message.replaceAll(/unwritable-[a-z0-9]+/g, '<id>');
-      assert.equal(anyId(died), anyId(face), 'in the same words, but for the run id');
-      assert.deepEqual(fs.readdirSync(runsDir(ROOT)).sort(), before, 'no record, and no run directory');
-    },
-  );
-
-  await t.test(
+      const caught = Effect.runSync(placed(startRun(opts)).pipe(Effect.catchTag('Invalid', (r) => Effect.succeed(r))));
+      assert.ok(caught instanceof Invalid, `${what}: an Invalid, recovered by its tag`);
+      const err = await rejection(runPlaced(startRun(opts)), what);
+      assert.ok(err instanceof Invalid, `${what}: the face throws the Invalid itself, not ${String(err)}`);
+      assert.equal(err.exitCode, 2, what);
+      assert.equal(caught.message, err.message, what);
+      assert.deepEqual(fs.readdirSync(runsDir(ROOT)).sort(), before, `${what}: nothing written`);
+    }
+  });
+  test('a run whose inputs cannot be copied is what the start program dies of, not a refusal: its face throws the same exit-1 Error, and nothing is left', async (tt: TestContext) => {
+    const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+    fs.writeFileSync(input, 'the notes\n');
+    const opts = { brief: 'unwritable', repo: aRepo(), workflowDir: folder(), inputs: [input] };
+    const before = fs.readdirSync(runsDir(ROOT)).sort();
+    fs.chmodSync(runsDir(ROOT), 0o555);
+    tt.onTestFinished(() => fs.chmodSync(runsDir(ROOT), 0o755));
+    const died = thrown(() => Effect.runSync(placed(startRun(opts)).pipe(Effect.catch(() => Effect.succeed('caught')))), 'the program');
+    const face = await rejection(runPlaced(startRun(opts)), 'the face');
+    fs.chmodSync(runsDir(ROOT), 0o755);
+    for (const [what, err] of [
+      ['the program', died],
+      ['the face', face],
+    ] as const) {
+      assert.ok(err instanceof Error && !isRefusal(err), `${what}: an Error, not a refusal: ${String(err)}`);
+      assert.equal((err as Error & { exitCode?: number }).exitCode, 1, what);
+      assert.match(err.message, /^--input: /, what);
+    }
+    const anyId = (err: unknown) => (err as Error).message.replaceAll(/unwritable-[a-z0-9]+/g, '<id>');
+    assert.equal(anyId(died), anyId(face), 'in the same words, but for the run id');
+    assert.deepEqual(fs.readdirSync(runsDir(ROOT)).sort(), before, 'no record, and no run directory');
+  });
+  test.skipIf(process.getuid?.() === 0 && 'root reads a file of mode 000')(
     'a run that dies once its own directory is made takes that directory with it: an input that cannot be read, a skill that cannot be rendered — exit 1, and nothing of it is left',
-    { skip: process.getuid?.() === 0 && 'root reads a file of mode 000' },
     async (tt: TestContext) => {
       const unreadable = (at: string) => {
         fs.writeFileSync(at, 'kept from the run\n');
         fs.chmodSync(at, 0o000);
-        tt.after(() => fs.chmodSync(at, 0o644));
+        tt.onTestFinished(() => fs.chmodSync(at, 0o644));
       };
       const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
       unreadable(input);

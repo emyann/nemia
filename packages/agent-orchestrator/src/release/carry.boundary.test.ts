@@ -4,7 +4,7 @@
  * (`adoptBundled`) brings it back from a tree that still carries it, until its install, even one that fails, takes the mark away. The
  * fixes are the real commands, so the shell is this file's subject; installs run against a stand-in `npm` first on the PATH.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

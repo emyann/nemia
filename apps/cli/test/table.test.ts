@@ -3,7 +3,7 @@
  * (`tableAsked`), and a list answered where its table was asked (`tableOf`). The lines it prints are `objects`' `tableLines`, held in its
  * own tests.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Table } from 'objects';
 import { Refused } from '../src/refused.ts';

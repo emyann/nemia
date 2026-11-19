@@ -5,7 +5,7 @@
  * (`claudeMdExcludes`), which `test/live.test.ts` measures Claude Code honouring.
  */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { describe, test } from 'vitest';
 import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { memorylessSettings } from '../src/harness/claude/memory.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
@@ -22,8 +22,8 @@ const taskOf = (cwd: string, claude?: ClaudeFlags): SpawnRequest => ({
 
 const OWN = JSON.stringify({ outputStyle: 'nemia-x:no-coding', env: { CI: '1' } });
 
-test('auto-memory: every Claude Code session is given it off in the one settings it carries, the task keys kept', async (t) => {
-  await t.test("a task's own settings keep every key they hold, and auto-memory is off beside them", () => {
+describe('auto-memory: every Claude Code session is given it off in the one settings it carries, the task keys kept', () => {
+  test("a task's own settings keep every key they hold, and auto-memory is off beside them", () => {
     assert.deepEqual(attachedOptions(taskOf('/r', { settings: OWN })).settings, {
       outputStyle: 'nemia-x:no-coding',
       env: { CI: '1' },
@@ -31,7 +31,6 @@ test('auto-memory: every Claude Code session is given it off in the one settings
       claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'],
     });
   });
-
   const dir = scratch('auto-memory');
   const ATTACHED: readonly { name: string; task: SpawnRequest; settings: unknown }[] = [
     {
@@ -56,18 +55,16 @@ test('auto-memory: every Claude Code session is given it off in the one settings
     },
   ];
   for (const row of ATTACHED)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       assert.deepEqual(attachedOptions(row.task).settings, row.settings);
     });
-
-  await t.test('REFUSED: excludes that are no list of globs, which the runtime would add its own to', () => {
+  test('REFUSED: excludes that are no list of globs, which the runtime would add its own to', () => {
     assert.throws(
       () => attachedOptions(taskOf('/r', { settings: JSON.stringify({ claudeMdExcludes: '/x/CLAUDE.md' }) })),
       (err: Error) => err.message.includes('claudeMdExcludes'),
     );
   });
-
-  await t.test('settings given as a file are handed over as they are: the runtime rewrites no file', () => {
+  test('settings given as a file are handed over as they are: the runtime rewrites no file', () => {
     assert.equal(memorylessSettings('/a/settings.json'), undefined);
     assert.equal(attachedOptions(taskOf('/r', { settings: '/a/settings.json' })).settings, '/a/settings.json');
   });

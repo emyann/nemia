@@ -6,7 +6,7 @@
  * finished run's timeline as facts (`timelineFacts`). One table per function, each row a `t.test`. The tick that hands them over, once
  * across a daemon started again, is told on a store in `test/measured-run.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Metric, Tracer } from 'effect';
 import { OtlpExporter } from 'effect/observability';
@@ -276,8 +276,8 @@ const TL_VIEWS = new Map([
   ['review', timed('10:28', '10:29', '10:35')],
 ]);
 
-test("`stepAttributes` and `boundedAttributes`: a step's metric is kept by its factory, workflow, step, agent and outcome alone", async (t) => {
-  await t.test("a step's attributes are its factory, workflow, step, agent and outcome, and nothing of the run", () => {
+describe("`stepAttributes` and `boundedAttributes`: a step's metric is kept by its factory, workflow, step, agent and outcome alone", () => {
+  test("a step's attributes are its factory, workflow, step, agent and outcome, and nothing of the run", () => {
     assert.deepEqual(stepAttributes(RUN, WORK, 'done'), {
       factory: 'nemia',
       workflow: 'build',
@@ -293,14 +293,14 @@ test("`stepAttributes` and `boundedAttributes`: a step's metric is kept by its f
       outcome: 'passed',
     });
   });
-  await t.test("REFUSED: attributes that carry a run's id or a task's are not a step's", () => {
+  test("REFUSED: attributes that carry a run's id or a task's are not a step's", () => {
     for (const key of ['run', 'task'])
       assert.throws(() => boundedAttributes({ factory: 'nemia', step: 'work', [key]: 'r-1' }), refusedInvalid);
   });
 });
 
-test('`settledFacts`, `tryOutcome`, `checkOutcome` and `roundsGranted`: the facts of the tasks that settled, and the rounds a loop was granted or ran out of', async (t) => {
-  await t.test('the facts of the tasks that settled: a session with its cost, tokens and time, a check by its verdict', () => {
+describe('`settledFacts`, `tryOutcome`, `checkOutcome` and `roundsGranted`: the facts of the tasks that settled, and the rounds a loop was granted or ran out of', () => {
+  test('the facts of the tasks that settled: a session with its cost, tokens and time, a check by its verdict', () => {
     const facts = settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check', 'r-2-work']), reads());
     const attrs = (outcome: string) => ({ factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada', outcome });
     assert.deepEqual(facts, [
@@ -308,50 +308,41 @@ test('`settledFacts`, `tryOutcome`, `checkOutcome` and `roundsGranted`: the fact
       { metric: 'check', attributes: attrs('refused') },
     ]);
   });
-  await t.test(
-    "`tryOutcome` and `checkOutcome`: a session is `blocked` only as the step's current try signed it, else `done`, `failed` or `stopped`; a check passed, refused or unfinished",
-    () => {
-      const blocked: Closeout = { outcome: 'blocked', summary: '', artifacts: [] };
-      assert.deepEqual(
-        [
-          tryOutcome(view('succeeded'), true, blocked),
-          tryOutcome(view('succeeded'), false, blocked),
-          tryOutcome(view('failed'), true, blocked),
-        ],
-        ['blocked', 'done', 'failed'],
-        "an earlier try that signed is done, whatever the current try's closeout says",
-      );
-      assert.deepEqual(
-        [checkOutcome(view('succeeded', 0)), checkOutcome(view('failed', 1)), checkOutcome(view('failed'))],
-        ['passed', 'refused', 'unfinished'],
-      );
-    },
-  );
-  await t.test(
-    'an earlier try is read by how its session ended, never off the closeout of the try after it; nothing settled, no fact',
-    () => {
-      const [earlier] = settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work']), reads({ signedOff: () => undefined }));
-      assert.equal(earlier.attributes.outcome, 'stopped');
-      assert.equal('costUsd' in earlier, false, 'no cost measured, none said');
-      assert.deepEqual(settledFacts(RUN, [WORK, REVIEW], new Set(), reads()), []);
-    },
-  );
-  await t.test(
-    'a round exhausted once for a step one of its settled tasks leaves out of rounds, and one granted for each loop taken again',
-    () => {
-      const exhausted = reads({ statusOf: (s) => (s.name === 'work' ? 'exhausted' : 'running') });
-      const facts = settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check']), exhausted);
-      assert.deepEqual(
-        facts.filter((f) => f.metric === 'round').map((f) => f.attributes.outcome),
-        ['exhausted'],
-      );
-      assert.deepEqual(
-        roundsGranted(RUN, [WORK, REVIEW], ['review']).map((f) => [f.attributes.step, f.attributes.outcome]),
-        [['review', 'granted']],
-      );
-    },
-  );
-  await t.test("a session held open and answered, the step's task and one of its tries', is one try fact with its cost once", () => {
+  test("`tryOutcome` and `checkOutcome`: a session is `blocked` only as the step's current try signed it, else `done`, `failed` or `stopped`; a check passed, refused or unfinished", () => {
+    const blocked: Closeout = { outcome: 'blocked', summary: '', artifacts: [] };
+    assert.deepEqual(
+      [
+        tryOutcome(view('succeeded'), true, blocked),
+        tryOutcome(view('succeeded'), false, blocked),
+        tryOutcome(view('failed'), true, blocked),
+      ],
+      ['blocked', 'done', 'failed'],
+      "an earlier try that signed is done, whatever the current try's closeout says",
+    );
+    assert.deepEqual(
+      [checkOutcome(view('succeeded', 0)), checkOutcome(view('failed', 1)), checkOutcome(view('failed'))],
+      ['passed', 'refused', 'unfinished'],
+    );
+  });
+  test('an earlier try is read by how its session ended, never off the closeout of the try after it; nothing settled, no fact', () => {
+    const [earlier] = settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work']), reads({ signedOff: () => undefined }));
+    assert.equal(earlier.attributes.outcome, 'stopped');
+    assert.equal('costUsd' in earlier, false, 'no cost measured, none said');
+    assert.deepEqual(settledFacts(RUN, [WORK, REVIEW], new Set(), reads()), []);
+  });
+  test('a round exhausted once for a step one of its settled tasks leaves out of rounds, and one granted for each loop taken again', () => {
+    const exhausted = reads({ statusOf: (s) => (s.name === 'work' ? 'exhausted' : 'running') });
+    const facts = settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check']), exhausted);
+    assert.deepEqual(
+      facts.filter((f) => f.metric === 'round').map((f) => f.attributes.outcome),
+      ['exhausted'],
+    );
+    assert.deepEqual(
+      roundsGranted(RUN, [WORK, REVIEW], ['review']).map((f) => [f.attributes.step, f.attributes.outcome]),
+      [['review', 'granted']],
+    );
+  });
+  test("a session held open and answered, the step's task and one of its tries', is one try fact with its cost once", () => {
     const held = {
       ...RUN,
       steps: { work: { status: 'running', taskId: 'r-1-work-try2', tries: [{ taskId: 'r-1-work-try2' }] } },
@@ -373,8 +364,8 @@ test('`settledFacts`, `tryOutcome`, `checkOutcome` and `roundsGranted`: the fact
   });
 });
 
-test("`settlesDue` and `settledOnce`: a settle is handed over once, by the run's mark, and a record with no mark counts none", async (t) => {
-  await t.test('a settle is due once: a task its view says settled that the mark does not hold, a check like a session', () => {
+describe("`settlesDue` and `settledOnce`: a settle is handed over once, by the run's mark, and a record with no mark counts none", () => {
+  test('a settle is due once: a task its view says settled that the mark does not hold, a check like a session', () => {
     const marked = (settlesCounted: string[]) => ({ ...RUN, settlesCounted }) as Run;
     const views = new Map<string, FactView>([
       ['r-1-work-try2', view('succeeded')],
@@ -398,7 +389,7 @@ test("`settlesDue` and `settledOnce`: a settle is handed over once, by the run's
       marks: {},
     });
   });
-  await t.test('REFUSED: a record with no mark counts no settle and gets none', () => {
+  test('REFUSED: a record with no mark counts no settle and gets none', () => {
     const views = new Map<string, FactView>([
       ['r-1-work-try2', view('succeeded')],
       ['r-1-work-try2-check', view('failed', 1)],
@@ -409,8 +400,8 @@ test("`settlesDue` and `settledOnce`: a settle is handed over once, by the run's
   });
 });
 
-test("`queueWait`, `checkWait` and `settledWaits`: a session's queue and a check's run, the timeline's own", async (t) => {
-  await t.test("each settled session's queue is filed to first spawn and each check's run spawned to ended: the timeline's own", () => {
+describe("`queueWait`, `checkWait` and `settledWaits`: a session's queue and a check's run, the timeline's own", () => {
+  test("each settled session's queue is filed to first spawn and each check's run spawned to ended: the timeline's own", () => {
     const settled = new Set(CLOCKED.keys());
     const waits = settledWaits(RUN, [WORK, REVIEW], settled, reads({ views: CLOCKED }));
     const attrs = (outcome: string) => ({ factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada', outcome });
@@ -427,31 +418,28 @@ test("`queueWait`, `checkWait` and `settledWaits`: a session's queue and a check
       [first.session?.queuedMs, second.session?.queuedMs, second.check?.ranMs],
     );
   });
-  await t.test(
-    "a session's queue ends at its first attempt's spawn: neither when that attempt started, nor a later attempt's spawn",
-    () => {
-      const attempt = (started: string, spawned: string, ended: string) => ({
-        startedAt: `${DAY}T${started}:00.000Z`,
-        spawnedAt: `${DAY}T${spawned}:00.000Z`,
-        endedAt: `${DAY}T${ended}:00.000Z`,
-        reason: null,
-        usage: null,
-      });
-      const retried: FactView = {
-        state: {
-          brief: 'Do it.',
-          settled: 'succeeded',
-          filedAt: `${DAY}T10:00:00.000Z`,
-          attempts: [attempt('10:03', '10:04', '10:05'), attempt('10:06', '10:07', '10:09')],
-        },
-      };
-      assert.deepEqual(queueWait(retried), { from: `${DAY}T10:00:00.000Z`, to: `${DAY}T10:04:00.000Z`, ms: 240_000 });
-      const views = new Map([['r-1-work', retried]]);
-      const tl = timeline({ ...RUN, steps: { work: { status: 'done', taskId: 'r-1-work' } } } as unknown as Run, views, [WORK]);
-      assert.equal(queueWait(retried)?.ms, tl.steps.work[0].session?.queuedMs, "the timeline's own");
-    },
-  );
-  await t.test('REFUSED: a task not settled, one never spawned, one with no filing and a recheck sharing a session are no wait', () => {
+  test("a session's queue ends at its first attempt's spawn: neither when that attempt started, nor a later attempt's spawn", () => {
+    const attempt = (started: string, spawned: string, ended: string) => ({
+      startedAt: `${DAY}T${started}:00.000Z`,
+      spawnedAt: `${DAY}T${spawned}:00.000Z`,
+      endedAt: `${DAY}T${ended}:00.000Z`,
+      reason: null,
+      usage: null,
+    });
+    const retried: FactView = {
+      state: {
+        brief: 'Do it.',
+        settled: 'succeeded',
+        filedAt: `${DAY}T10:00:00.000Z`,
+        attempts: [attempt('10:03', '10:04', '10:05'), attempt('10:06', '10:07', '10:09')],
+      },
+    };
+    assert.deepEqual(queueWait(retried), { from: `${DAY}T10:00:00.000Z`, to: `${DAY}T10:04:00.000Z`, ms: 240_000 });
+    const views = new Map([['r-1-work', retried]]);
+    const tl = timeline({ ...RUN, steps: { work: { status: 'done', taskId: 'r-1-work' } } } as unknown as Run, views, [WORK]);
+    assert.equal(queueWait(retried)?.ms, tl.steps.work[0].session?.queuedMs, "the timeline's own");
+  });
+  test('REFUSED: a task not settled, one never spawned, one with no filing and a recheck sharing a session are no wait', () => {
     const unspawned: FactView = { state: { brief: 'Do it.', settled: 'stopped', filedAt: '2026-10-06T10:00:00.000Z', attempts: [] } };
     const unfiled = clocked('10:00', '10:04', '10:05');
     delete unfiled.state.filedAt;
@@ -477,8 +465,8 @@ test("`queueWait`, `checkWait` and `settledWaits`: a session's queue and a check
   });
 });
 
-test("`gateWaits`: a gate's wait from its try's end to its approval, once, as `gateWaitOf` reads it", async (t) => {
-  await t.test("a gate's wait is from its try's end to its approval, the one `nemia stats` reads, at a gated step alone", () => {
+describe("`gateWaits`: a gate's wait from its try's end to its approval, once, as `gateWaitOf` reads it", () => {
+  test("a gate's wait is from its try's end to its approval, the one `nemia stats` reads, at a gated step alone", () => {
     const [wait, ...others] = gateWaits(GATED, [PLAN, BUILD], GATED_VIEWS);
     assert.deepEqual(wait, {
       metric: 'wait',
@@ -503,27 +491,24 @@ test("`gateWaits`: a gate's wait from its try's end to its approval, once, as `g
       'a gate the run was started with is timed too',
     );
   });
-  await t.test(
-    "a gate approved before its step was filed waits from its after step's end to the approval, as `nemia stats` reads it",
-    () => {
-      const waits = gateWaits(PRE_APPROVED, [UNGATED_PLAN, SHIP], PRE_APPROVED_VIEWS);
-      assert.deepEqual(waits, [
-        {
-          metric: 'wait',
-          wait: 'gate',
-          attributes: { factory: 'default', workflow: 'build', step: 'ship', agent: 'none', outcome: 'approved' },
-          run: 'r-3',
-          try: 1,
-          from: '2026-10-06T09:50:00.000Z',
-          to: '2026-10-06T10:25:00.000Z',
-          ms: 2_100_000,
-        },
-      ]);
-      const tl = timeline(PRE_APPROVED, PRE_APPROVED_VIEWS, [UNGATED_PLAN, SHIP]);
-      assert.equal(waits[0].ms, gateWaitOf(PRE_APPROVED, tl, SHIP, tl.steps.ship[0]));
-    },
-  );
-  await t.test('REFUSED: a gate already timed, a record with no gatesTimed and an approval with no try on the clock are no wait', () => {
+  test("a gate approved before its step was filed waits from its after step's end to the approval, as `nemia stats` reads it", () => {
+    const waits = gateWaits(PRE_APPROVED, [UNGATED_PLAN, SHIP], PRE_APPROVED_VIEWS);
+    assert.deepEqual(waits, [
+      {
+        metric: 'wait',
+        wait: 'gate',
+        attributes: { factory: 'default', workflow: 'build', step: 'ship', agent: 'none', outcome: 'approved' },
+        run: 'r-3',
+        try: 1,
+        from: '2026-10-06T09:50:00.000Z',
+        to: '2026-10-06T10:25:00.000Z',
+        ms: 2_100_000,
+      },
+    ]);
+    const tl = timeline(PRE_APPROVED, PRE_APPROVED_VIEWS, [UNGATED_PLAN, SHIP]);
+    assert.equal(waits[0].ms, gateWaitOf(PRE_APPROVED, tl, SHIP, tl.steps.ship[0]));
+  });
+  test('REFUSED: a gate already timed, a record with no gatesTimed and an approval with no try on the clock are no wait', () => {
     assert.deepEqual(gateWaits({ ...GATED, gatesTimed: [{ step: 'plan', try: 1 }] }, [PLAN, BUILD], GATED_VIEWS), []);
     const older = { ...GATED };
     delete older.gatesTimed;
@@ -531,41 +516,35 @@ test("`gateWaits`: a gate's wait from its try's end to its approval, once, as `g
     const unfiled = { ...GATED, steps: { build: GATED.steps.build } } as Run;
     assert.deepEqual(gateWaits(unfiled, [PLAN, BUILD], GATED_VIEWS), [], 'the try approved is not on the timeline yet');
   });
-  await t.test(
-    "a gate approved on a try that answered a session is timed from that answer's end, on a run whose timeline is still due",
-    () => {
-      assert.deepEqual(gateWaits(ANSWERED, [ASK], ANSWERED_VIEWS), [
-        {
-          metric: 'wait',
-          wait: 'gate',
-          attributes: { factory: 'default', workflow: 'intake', step: 'ask', agent: 'none', outcome: 'approved' },
-          run: 'r-4',
-          try: 2,
-          from: '2026-10-06T10:20:00.000Z',
-          to: '2026-10-06T10:29:00.000Z',
-          ms: 540_000,
-        },
-      ]);
-      const once = onceFacts(ANSWERED, [ASK], ANSWERED_VIEWS, callOf);
-      assert.deepEqual([once.facts.length, once.marks], [1, { gatesTimed: [{ step: 'ask', try: 2 }] }]);
-    },
-  );
-  await t.test(
-    'REFUSED: a gate approved on an answered try is never timed on a run already handed over, nor on one started before the mark',
-    () => {
-      const older = { ...ANSWERED };
-      delete older.runTimed;
-      for (const run of [{ ...ANSWERED, runTimed: true }, older]) {
-        assert.deepEqual(gateWaits(run, [ASK], ANSWERED_VIEWS), [], `runTimed: ${run.runTimed}`);
-        assert.deepEqual(
-          onceFacts(run, [ASK], ANSWERED_VIEWS, callOf),
-          { facts: [], marks: { gatesTimed: [] } },
-          `runTimed: ${run.runTimed}`,
-        );
-      }
-    },
-  );
-  await t.test('the opposite: a gate approved on the try that owns its session is timed whatever the run says of its timeline', () => {
+  test("a gate approved on a try that answered a session is timed from that answer's end, on a run whose timeline is still due", () => {
+    assert.deepEqual(gateWaits(ANSWERED, [ASK], ANSWERED_VIEWS), [
+      {
+        metric: 'wait',
+        wait: 'gate',
+        attributes: { factory: 'default', workflow: 'intake', step: 'ask', agent: 'none', outcome: 'approved' },
+        run: 'r-4',
+        try: 2,
+        from: '2026-10-06T10:20:00.000Z',
+        to: '2026-10-06T10:29:00.000Z',
+        ms: 540_000,
+      },
+    ]);
+    const once = onceFacts(ANSWERED, [ASK], ANSWERED_VIEWS, callOf);
+    assert.deepEqual([once.facts.length, once.marks], [1, { gatesTimed: [{ step: 'ask', try: 2 }] }]);
+  });
+  test('REFUSED: a gate approved on an answered try is never timed on a run already handed over, nor on one started before the mark', () => {
+    const older = { ...ANSWERED };
+    delete older.runTimed;
+    for (const run of [{ ...ANSWERED, runTimed: true }, older]) {
+      assert.deepEqual(gateWaits(run, [ASK], ANSWERED_VIEWS), [], `runTimed: ${run.runTimed}`);
+      assert.deepEqual(
+        onceFacts(run, [ASK], ANSWERED_VIEWS, callOf),
+        { facts: [], marks: { gatesTimed: [] } },
+        `runTimed: ${run.runTimed}`,
+      );
+    }
+  });
+  test('the opposite: a gate approved on the try that owns its session is timed whatever the run says of its timeline', () => {
     const owner = { ...ANSWERED, approvals: [{ step: 'ask', try: 1, at: '2026-10-06T10:29:00.000Z' }] } as Run;
     for (const runTimed of [true, false]) {
       assert.deepEqual(
@@ -589,8 +568,8 @@ test("`gateWaits`: a gate's wait from its try's end to its approval, once, as `g
   });
 });
 
-test("`deniedCalls` and `onceFacts`: each call denied, once past the run's mark, and the marks moved past what is handed over", async (t) => {
-  await t.test('each call of each ended attempt is one denied fact, in order, a call denied twice two, whatever the attempt signed', () => {
+describe("`deniedCalls` and `onceFacts`: each call denied, once past the run's mark, and the marks moved past what is handed over", () => {
+  test('each call of each ended attempt is one denied fact, in order, a call denied twice two, whatever the attempt signed', () => {
     assert.deepEqual(denied(DENIED_RUN), [
       ['r-1-work-try2', 1, 'Glob', 'Glob', '10:00:59'],
       ['r-1-work-try2', 2, 'Bash', 'Bash(git push)', '10:10:59'],
@@ -600,27 +579,24 @@ test("`deniedCalls` and `onceFacts`: each call denied, once past the run's mark,
     assert.deepEqual(fact.attributes, { factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada' }, "the step's labels, no outcome");
     assert.equal(fact.run, 'r-1');
   });
-  await t.test(
-    "REFUSED: an attempt still running, one before its task's mark, a check's task and a record with no deniedCounted give no fact",
-    () => {
-      const running = new Map([['r-1-work-try2', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], null))]]);
-      assert.deepEqual(denied(DENIED_RUN, running), [], 'counted once its attempt ends, never while it runs');
-      const marked = { ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 1 }] } as Run;
-      assert.deepEqual(
-        denied(marked).map(([, attempt]) => attempt),
-        [2, 2],
-        'the first attempt is counted already',
-      );
-      assert.deepEqual(denied({ ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] }), []);
-      assert.equal(
-        denied(DENIED_RUN).some(([task]) => task === 'r-1-work-try2-check'),
-        false,
-        "a check's task is never read",
-      );
-      assert.deepEqual(denied(RUN), [], 'a record written before the tick counted denials');
-    },
-  );
-  await t.test("what a pass hands over once comes with the run's marks moved past it, and a record without a mark keeps none", () => {
+  test("REFUSED: an attempt still running, one before its task's mark, a check's task and a record with no deniedCounted give no fact", () => {
+    const running = new Map([['r-1-work-try2', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], null))]]);
+    assert.deepEqual(denied(DENIED_RUN, running), [], 'counted once its attempt ends, never while it runs');
+    const marked = { ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 1 }] } as Run;
+    assert.deepEqual(
+      denied(marked).map(([, attempt]) => attempt),
+      [2, 2],
+      'the first attempt is counted already',
+    );
+    assert.deepEqual(denied({ ...DENIED_RUN, deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] }), []);
+    assert.equal(
+      denied(DENIED_RUN).some(([task]) => task === 'r-1-work-try2-check'),
+      false,
+      "a check's task is never read",
+    );
+    assert.deepEqual(denied(RUN), [], 'a record written before the tick counted denials');
+  });
+  test("what a pass hands over once comes with the run's marks moved past it, and a record without a mark keeps none", () => {
     const first = onceFacts({ ...GATED, steps: DENIED_RUN.steps, deniedCounted: [] }, [WORK, REVIEW], DENIED_VIEWS, callOf);
     assert.equal(first.facts.length, 3);
     assert.deepEqual(first.marks, { gatesTimed: [], deniedCounted: [{ task: 'r-1-work-try2', attempts: 2 }] });
@@ -630,7 +606,7 @@ test("`deniedCalls` and `onceFacts`: each call denied, once past the run's mark,
     assert.deepEqual([gate.facts.length, gate.marks], [1, { gatesTimed: [{ step: 'plan', try: 1 }] }], 'no deniedCounted, none made');
     assert.deepEqual(onceFacts(RUN, [WORK, REVIEW], DENIED_VIEWS, callOf), { facts: [], marks: {} });
   });
-  await t.test("a task that is the step's and one of its tries' is read once", () => {
+  test("a task that is the step's and one of its tries' is read once", () => {
     const held = {
       ...DENIED_RUN,
       steps: { work: { status: 'running', taskId: 'r-1-work', tries: [{ taskId: 'r-1-work' }] } },
@@ -640,68 +616,65 @@ test("`deniedCalls` and `onceFacts`: each call denied, once past the run's mark,
   });
 });
 
-test("`timelineFacts`: a finished run's timeline as facts, each a row of `timelineRows` with bounded attributes", async (t) => {
-  await t.test(
-    "each fact is a row of the run's timeline with bounded attributes: a step's on its rows, the run's alone on a round's and the run's",
-    () => {
-      const facts = timelineFacts(TL_RUN, TL_STEPS, TL_VIEWS, 'succeeded');
-      assert.ok(facts, 'a run with nothing in flight');
-      const rows = timelineRows(TL_RUN, timeline(TL_RUN, TL_VIEWS, TL_STEPS), TL_STEPS);
-      assert.deepEqual(
-        facts.map((f) => [f.of, f.row, f.part, f.value, f.try ?? null]),
-        rows.map((r) => [r.of, r.row, r.part, r.value, r.try]),
-      );
-      for (const f of facts) {
-        assert.deepEqual(boundedAttributes(f.attributes), f.attributes);
-        assert.equal(f.run, 'r-1');
-        assert.equal('try' in f, f.of === 'try' || f.of === 'check', `${f.row}: a try only on a try's and a check's row`);
-      }
-      const answer = facts.filter((f) => f.part === 'answer');
-      assert.deepEqual(
-        answer.map((f) => [f.of, f.row, f.value]),
-        [['run', 'run', rows.find((r) => r.part === 'answer')!.value]],
-        "the run's wait on a person's answer is one fact, with its row's value",
-      );
-      const attributesOf = (row: string) => facts.find((f) => f.row === row)?.attributes;
-      assert.deepEqual(attributesOf('01 work'), {
-        factory: 'nemia',
-        workflow: 'flow',
-        step: 'work',
-        agent: 'worker',
-        outcome: 'succeeded',
-      });
-      assert.deepEqual(attributesOf('01 work check'), {
-        factory: 'nemia',
-        workflow: 'flow',
-        step: 'work',
-        agent: 'worker',
-        outcome: 'succeeded',
-      });
-      assert.deepEqual(attributesOf('02 review'), {
-        factory: 'nemia',
-        workflow: 'flow',
-        step: 'review',
-        agent: 'none',
-        outcome: 'succeeded',
-      });
-      assert.deepEqual(attributesOf('review round 01'), { factory: 'nemia', workflow: 'flow', outcome: 'succeeded' });
-      assert.deepEqual(attributesOf('run'), { factory: 'nemia', workflow: 'flow', outcome: 'succeeded' });
-      assert.equal(facts.find((f) => f.row === 'run' && f.part === 'wall')?.value, 35 * 60_000);
-      assert.equal(
-        timelineFacts(TL_RUN, TL_STEPS, TL_VIEWS, 'cancelled')?.every((f) => f.attributes.outcome === 'cancelled'),
-        true,
-      );
-    },
-  );
-  await t.test('REFUSED: with one task in flight there is no fact at all, and a run nothing was filed of has none to hand over', () => {
+describe("`timelineFacts`: a finished run's timeline as facts, each a row of `timelineRows` with bounded attributes", () => {
+  test("each fact is a row of the run's timeline with bounded attributes: a step's on its rows, the run's alone on a round's and the run's", () => {
+    const facts = timelineFacts(TL_RUN, TL_STEPS, TL_VIEWS, 'succeeded');
+    assert.ok(facts, 'a run with nothing in flight');
+    const rows = timelineRows(TL_RUN, timeline(TL_RUN, TL_VIEWS, TL_STEPS), TL_STEPS);
+    assert.deepEqual(
+      facts.map((f) => [f.of, f.row, f.part, f.value, f.try ?? null]),
+      rows.map((r) => [r.of, r.row, r.part, r.value, r.try]),
+    );
+    for (const f of facts) {
+      assert.deepEqual(boundedAttributes(f.attributes), f.attributes);
+      assert.equal(f.run, 'r-1');
+      assert.equal('try' in f, f.of === 'try' || f.of === 'check', `${f.row}: a try only on a try's and a check's row`);
+    }
+    const answer = facts.filter((f) => f.part === 'answer');
+    assert.deepEqual(
+      answer.map((f) => [f.of, f.row, f.value]),
+      [['run', 'run', rows.find((r) => r.part === 'answer')!.value]],
+      "the run's wait on a person's answer is one fact, with its row's value",
+    );
+    const attributesOf = (row: string) => facts.find((f) => f.row === row)?.attributes;
+    assert.deepEqual(attributesOf('01 work'), {
+      factory: 'nemia',
+      workflow: 'flow',
+      step: 'work',
+      agent: 'worker',
+      outcome: 'succeeded',
+    });
+    assert.deepEqual(attributesOf('01 work check'), {
+      factory: 'nemia',
+      workflow: 'flow',
+      step: 'work',
+      agent: 'worker',
+      outcome: 'succeeded',
+    });
+    assert.deepEqual(attributesOf('02 review'), {
+      factory: 'nemia',
+      workflow: 'flow',
+      step: 'review',
+      agent: 'none',
+      outcome: 'succeeded',
+    });
+    assert.deepEqual(attributesOf('review round 01'), { factory: 'nemia', workflow: 'flow', outcome: 'succeeded' });
+    assert.deepEqual(attributesOf('run'), { factory: 'nemia', workflow: 'flow', outcome: 'succeeded' });
+    assert.equal(facts.find((f) => f.row === 'run' && f.part === 'wall')?.value, 35 * 60_000);
+    assert.equal(
+      timelineFacts(TL_RUN, TL_STEPS, TL_VIEWS, 'cancelled')?.every((f) => f.attributes.outcome === 'cancelled'),
+      true,
+    );
+  });
+  test('REFUSED: with one task in flight there is no fact at all, and a run nothing was filed of has none to hand over', () => {
     const running = new Map([...TL_VIEWS, ['review', timed('10:28', '10:29', null)]]);
     assert.equal(timelineFacts(TL_RUN, TL_STEPS, running, 'succeeded'), null);
     assert.deepEqual(timelineFacts({ ...TL_RUN, steps: {} }, TL_STEPS, new Map(), 'cancelled'), []);
   });
 });
 
-test('`recordStepMetrics`: each fact into its series by the five attributes, born at zero first, a wait and a denied call a span of its own, and a fact naming a run or a task recorded nowhere', async (t) => {
-  await t.test('a session that settled with a cost records its cost once, by the five attributes and no run', async () => {
+describe('`recordStepMetrics`: each fact into its series by the five attributes, born at zero first, a wait and a denied call a span of its own, and a fact naming a run or a task recorded nowhere', () => {
+  test('a session that settled with a cost records its cost once, by the five attributes and no run', async () => {
     const facts = settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2']), reads());
     const snapshot = await recorded(facts);
     const cost = snapshot.filter((m) => m.id === 'step.cost');
@@ -719,197 +692,174 @@ test('`recordStepMetrics`: each fact into its series by the five attributes, bor
     assert.equal(count('step.duration'), 1);
     assert.ok(snapshot.every((m) => !('run' in (m.attributes ?? {}))));
   });
-  await t.test(
-    "a try's input by kind where every attempt measured it, and a step of a run counted as one task at its first try alone",
-    async () => {
-      const twice = {
-        ...RUN,
-        steps: { work: { status: 'running', taskId: 'r-1-work-try2', tries: [{ taskId: 'r-1-work' }] } },
-      } as unknown as Run;
-      const views = new Map<string, FactView>([
-        ['r-1-work', kindedView({ cacheReadTokens: 900, cacheWriteTokens: 250, uncachedTokens: 50 })],
-        ['r-1-work-try2', kindedView({ cacheReadTokens: 100, cacheWriteTokens: 20, uncachedTokens: 5 }, { cacheReadTokens: 7 })],
-      ]);
-      const facts = settledFacts(twice, [WORK], new Set(views.keys()), reads({ views }));
-      const kinds = facts.map((f) =>
-        f.metric === 'try' ? [f.inputTokens, f.cacheReadTokens, f.cacheWriteTokens, f.uncachedTokens, f.task ?? false] : [],
-      );
-      assert.deepEqual(kinds, [
-        [132, 107, undefined, undefined, false],
-        [1200, 900, 250, 50, true],
-      ]);
-      assert.equal('cacheWriteTokens' in facts[0], false, 'a kind one attempt did not measure is said nowhere, never as 0');
+  test("a try's input by kind where every attempt measured it, and a step of a run counted as one task at its first try alone", async () => {
+    const twice = {
+      ...RUN,
+      steps: { work: { status: 'running', taskId: 'r-1-work-try2', tries: [{ taskId: 'r-1-work' }] } },
+    } as unknown as Run;
+    const views = new Map<string, FactView>([
+      ['r-1-work', kindedView({ cacheReadTokens: 900, cacheWriteTokens: 250, uncachedTokens: 50 })],
+      ['r-1-work-try2', kindedView({ cacheReadTokens: 100, cacheWriteTokens: 20, uncachedTokens: 5 }, { cacheReadTokens: 7 })],
+    ]);
+    const facts = settledFacts(twice, [WORK], new Set(views.keys()), reads({ views }));
+    const kinds = facts.map((f) =>
+      f.metric === 'try' ? [f.inputTokens, f.cacheReadTokens, f.cacheWriteTokens, f.uncachedTokens, f.task ?? false] : [],
+    );
+    assert.deepEqual(kinds, [
+      [132, 107, undefined, undefined, false],
+      [1200, 900, 250, 50, true],
+    ]);
+    assert.equal('cacheWriteTokens' in facts[0], false, 'a kind one attempt did not measure is said nowhere, never as 0');
 
-      const snapshot = await recorded(facts);
-      const count = (id: string) => snapshot.filter((m) => m.id === id).reduce((n, m) => n + (m.state as { count: number }).count, 0);
-      assert.deepEqual(
-        ['step.tokens.cache_read', 'step.tokens.cache_write', 'step.tokens.uncached', 'step.tokens.input'].map(count),
-        [1007, 250, 50, 1332],
-      );
-      assert.equal(count('step.tries'), 2, 'two tries');
-      const tasks = snapshot.filter((m) => m.id === 'step.tasks');
-      assert.equal(count('step.tasks'), 1, 'REFUSED: the try after the first is no task of its own');
-      assert.deepEqual(tasks[0].attributes, { factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada' }, 'no outcome');
-    },
-  );
-  await t.test(
-    'each series a fact writes is exported at zero, then at its value: two exports, and none where no fact writes a metric',
-    async () => {
-      const registry = new Map();
-      const own = <A, E>(program: Effect.Effect<A, E>) =>
-        Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
-      const exports: Record<string, number>[] = [];
-      const flusher = OtlpExporter.Flusher.of({
-        flush: Effect.map(Metric.snapshot, (snapshot) => {
-          exports.push(Object.fromEntries(snapshot.map((m) => [`${m.id} ${m.attributes?.outcome}`, (m.state as { count: number }).count])));
-        }),
-        register: () => Effect.void,
-      });
-      const exported = (facts: readonly StepFact[]) =>
-        own(recordStepMetrics(facts).pipe(Effect.provideService(OtlpExporter.Flusher, flusher)));
-      const wait: WaitFact = {
-        metric: 'wait',
-        wait: 'queue',
-        attributes: stepAttributes(RUN, WORK, 'blocked'),
-        run: 'r-1',
-        try: 2,
-        from: '2026-10-06T10:00:00.000Z',
-        to: '2026-10-06T10:00:02.000Z',
-        ms: 2000,
-      };
-      await exported([...settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check']), reads()), wait]);
-      const names = [
-        'tries blocked',
-        'duration blocked',
-        'cost blocked',
-        'tokens.input blocked',
-        'tokens.output blocked',
-        'checks refused',
-      ];
-      const series = (values: number[], queue: number) =>
-        Object.fromEntries([...names.map((name, i) => [`step.${name}`, values[i]]), ['step.queue.duration blocked', queue]]);
-      assert.deepEqual(exports, [series([0, 0, 0, 0, 0, 0], 0), series([1, 1, 1.25, 1200, 300, 1], 1)]);
+    const snapshot = await recorded(facts);
+    const count = (id: string) => snapshot.filter((m) => m.id === id).reduce((n, m) => n + (m.state as { count: number }).count, 0);
+    assert.deepEqual(
+      ['step.tokens.cache_read', 'step.tokens.cache_write', 'step.tokens.uncached', 'step.tokens.input'].map(count),
+      [1007, 250, 50, 1332],
+    );
+    assert.equal(count('step.tries'), 2, 'two tries');
+    const tasks = snapshot.filter((m) => m.id === 'step.tasks');
+    assert.equal(count('step.tasks'), 1, 'REFUSED: the try after the first is no task of its own');
+    assert.deepEqual(tasks[0].attributes, { factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada' }, 'no outcome');
+  });
+  test('each series a fact writes is exported at zero, then at its value: two exports, and none where no fact writes a metric', async () => {
+    const registry = new Map();
+    const own = <A, E>(program: Effect.Effect<A, E>) =>
+      Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+    const exports: Record<string, number>[] = [];
+    const flusher = OtlpExporter.Flusher.of({
+      flush: Effect.map(Metric.snapshot, (snapshot) => {
+        exports.push(Object.fromEntries(snapshot.map((m) => [`${m.id} ${m.attributes?.outcome}`, (m.state as { count: number }).count])));
+      }),
+      register: () => Effect.void,
+    });
+    const exported = (facts: readonly StepFact[]) =>
+      own(recordStepMetrics(facts).pipe(Effect.provideService(OtlpExporter.Flusher, flusher)));
+    const wait: WaitFact = {
+      metric: 'wait',
+      wait: 'queue',
+      attributes: stepAttributes(RUN, WORK, 'blocked'),
+      run: 'r-1',
+      try: 2,
+      from: '2026-10-06T10:00:00.000Z',
+      to: '2026-10-06T10:00:02.000Z',
+      ms: 2000,
+    };
+    await exported([...settledFacts(RUN, [WORK, REVIEW], new Set(['r-1-work-try2', 'r-1-work-try2-check']), reads()), wait]);
+    const names = ['tries blocked', 'duration blocked', 'cost blocked', 'tokens.input blocked', 'tokens.output blocked', 'checks refused'];
+    const series = (values: number[], queue: number) =>
+      Object.fromEntries([...names.map((name, i) => [`step.${name}`, values[i]]), ['step.queue.duration blocked', queue]]);
+    assert.deepEqual(exports, [series([0, 0, 0, 0, 0, 0], 0), series([1, 1, 1.25, 1200, 300, 1], 1)]);
 
-      await exported([{ metric: 'check', attributes: stepAttributes(RUN, WORK, 'refused') }]);
-      assert.equal(exports.length, 4, 'a series that is there is exported as it stands, then with its value');
-      assert.deepEqual(
-        [exports[2]['step.checks refused'], exports[3]['step.checks refused']],
-        [1, 2],
-        'born for nothing: it loses no count',
-      );
+    await exported([{ metric: 'check', attributes: stepAttributes(RUN, WORK, 'refused') }]);
+    assert.equal(exports.length, 4, 'a series that is there is exported as it stands, then with its value');
+    assert.deepEqual([exports[2]['step.checks refused'], exports[3]['step.checks refused']], [1, 2], 'born for nothing: it loses no count');
 
-      const [denial] = denied(DENIED_RUN);
-      assert.ok(denial, 'a denied call to hand over');
-      await exported(deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf));
-      assert.equal(exports.length, 4, 'REFUSED: facts that are spans alone ask for no export');
-    },
-  );
-  await t.test("REFUSED: a fact whose attributes carry a run's id is recorded nowhere", async () => {
+    const [denial] = denied(DENIED_RUN);
+    assert.ok(denial, 'a denied call to hand over');
+    await exported(deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf));
+    assert.equal(exports.length, 4, 'REFUSED: facts that are spans alone ask for no export');
+  });
+  test("REFUSED: a fact whose attributes carry a run's id is recorded nowhere", async () => {
     const fact: StepFact = { metric: 'check', attributes: { factory: 'nemia', step: 'work', outcome: 'passed', run: 'r-1' } };
     await assert.rejects(recorded([fact]), refusedInvalid);
   });
-  await t.test(
-    'a wait is recorded into its histogram by the five attributes, and as a span from its start to its end with its run and try',
-    async () => {
-      const spans: Tracer.NativeSpan[] = [];
-      const tracer = Tracer.make({
-        span(options) {
-          const span = new Tracer.NativeSpan(options);
-          spans.push(span);
-          return span;
-        },
-      });
-      const registry = new Map();
-      const facts: WaitFact[] = [
-        ...settledWaits(RUN, [WORK, REVIEW], new Set(CLOCKED.keys()), reads({ views: CLOCKED })),
-        ...gateWaits(GATED, [PLAN, BUILD], GATED_VIEWS),
-      ];
-      await Effect.runPromise(
-        recordStepMetrics(facts).pipe(Effect.withTracer(tracer), Effect.provideService(Metric.MetricRegistry, registry)),
-      );
-      const snapshot = await Effect.runPromise(Metric.snapshot.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
-      const counted = (id: string) =>
-        snapshot.filter((m) => m.id === id).map((m) => [m.attributes?.outcome, (m.state as { count: number; sum: number }).sum]);
-      assert.deepEqual(counted('step.queue.duration'), [
-        ['stopped', 120_000],
-        ['blocked', 240_000],
-      ]);
-      assert.deepEqual(counted('step.check.duration'), [['refused', 180_000]]);
-      assert.deepEqual(counted('step.gate.wait'), [['approved', 1_200_000]]);
-      assert.ok(snapshot.every((m) => !('run' in (m.attributes ?? {})) && !('try' in (m.attributes ?? {}))));
-      const waits = spans.filter((s) => s.name !== 'recordStepMetrics');
-      assert.deepEqual(
-        waits.map((s) => s.name),
-        [WAIT_SPANS.queue, WAIT_SPANS.queue, WAIT_SPANS.check, WAIT_SPANS.gate],
-      );
-      const check = waits[2];
-      const ns = (at: string) => BigInt(Date.parse(at)) * 1_000_000n;
-      assert.equal(check.status._tag, 'Ended');
-      assert.equal(check.status.startTime, ns('2026-10-06T10:06:00.000Z'));
-      assert.equal(check.status._tag === 'Ended' ? check.status.endTime : null, ns('2026-10-06T10:09:00.000Z'));
-      assert.deepEqual(Object.fromEntries(check.attributes), {
-        run: 'r-1',
-        try: 2,
-        factory: 'nemia',
-        workflow: 'build',
-        step: 'work',
-        agent: 'ada',
-        outcome: 'refused',
-      });
-      assert.ok(
-        spans.every((s) => s.parent._tag === 'None'),
-        'each a root of its own',
-      );
-    },
-  );
-  await t.test(
-    "a denied call is recorded as a span at its attempt's end with its run, task, tool and call, and into no metric",
-    async () => {
-      const spans: Tracer.NativeSpan[] = [];
-      const tracer = Tracer.make({
-        span(options) {
-          const span = new Tracer.NativeSpan(options);
-          spans.push(span);
-          return span;
-        },
-      });
-      const registry = new Map();
-      const facts = deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf);
-      await Effect.runPromise(
-        recordStepMetrics(facts).pipe(Effect.withTracer(tracer), Effect.provideService(Metric.MetricRegistry, registry)),
-      );
-      const snapshot = await Effect.runPromise(Metric.snapshot.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
-      assert.deepEqual(
-        snapshot.filter((m) => m.id.startsWith('step.')),
-        [],
-        'no metric of a step',
-      );
-      const calls = spans.filter((s) => s.name === DENIED_SPAN);
-      assert.equal(calls.length, 3);
-      const last = calls[2];
-      assert.deepEqual(Object.fromEntries(last.attributes), {
-        run: 'r-1',
-        task: 'r-1-work-try2',
-        tool: 'Bash',
-        call: 'Bash(git push)',
-        factory: 'nemia',
-        workflow: 'build',
-        step: 'work',
-        agent: 'ada',
-      });
-      assert.deepEqual(
-        [...last.attributes.keys()].filter((key) => !['factory', 'workflow', 'step', 'agent'].includes(key)),
-        [...DENIED_SPAN_KEYS],
-      );
-      const at = BigInt(Date.parse('2026-10-06T10:10:59.000Z')) * 1_000_000n;
-      assert.deepEqual([last.status.startTime, last.status._tag === 'Ended' ? last.status.endTime : null], [at, at]);
-      assert.ok(
-        calls.every((s) => s.parent._tag === 'None'),
-        'each a root of its own',
-      );
-    },
-  );
-  await t.test("REFUSED: a denied call whose attributes carry a task's id is recorded nowhere", async () => {
+  test('a wait is recorded into its histogram by the five attributes, and as a span from its start to its end with its run and try', async () => {
+    const spans: Tracer.NativeSpan[] = [];
+    const tracer = Tracer.make({
+      span(options) {
+        const span = new Tracer.NativeSpan(options);
+        spans.push(span);
+        return span;
+      },
+    });
+    const registry = new Map();
+    const facts: WaitFact[] = [
+      ...settledWaits(RUN, [WORK, REVIEW], new Set(CLOCKED.keys()), reads({ views: CLOCKED })),
+      ...gateWaits(GATED, [PLAN, BUILD], GATED_VIEWS),
+    ];
+    await Effect.runPromise(
+      recordStepMetrics(facts).pipe(Effect.withTracer(tracer), Effect.provideService(Metric.MetricRegistry, registry)),
+    );
+    const snapshot = await Effect.runPromise(Metric.snapshot.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+    const counted = (id: string) =>
+      snapshot.filter((m) => m.id === id).map((m) => [m.attributes?.outcome, (m.state as { count: number; sum: number }).sum]);
+    assert.deepEqual(counted('step.queue.duration'), [
+      ['stopped', 120_000],
+      ['blocked', 240_000],
+    ]);
+    assert.deepEqual(counted('step.check.duration'), [['refused', 180_000]]);
+    assert.deepEqual(counted('step.gate.wait'), [['approved', 1_200_000]]);
+    assert.ok(snapshot.every((m) => !('run' in (m.attributes ?? {})) && !('try' in (m.attributes ?? {}))));
+    const waits = spans.filter((s) => s.name !== 'recordStepMetrics');
+    assert.deepEqual(
+      waits.map((s) => s.name),
+      [WAIT_SPANS.queue, WAIT_SPANS.queue, WAIT_SPANS.check, WAIT_SPANS.gate],
+    );
+    const check = waits[2];
+    const ns = (at: string) => BigInt(Date.parse(at)) * 1_000_000n;
+    assert.equal(check.status._tag, 'Ended');
+    assert.equal(check.status.startTime, ns('2026-10-06T10:06:00.000Z'));
+    assert.equal(check.status._tag === 'Ended' ? check.status.endTime : null, ns('2026-10-06T10:09:00.000Z'));
+    assert.deepEqual(Object.fromEntries(check.attributes), {
+      run: 'r-1',
+      try: 2,
+      factory: 'nemia',
+      workflow: 'build',
+      step: 'work',
+      agent: 'ada',
+      outcome: 'refused',
+    });
+    assert.ok(
+      spans.every((s) => s.parent._tag === 'None'),
+      'each a root of its own',
+    );
+  });
+  test("a denied call is recorded as a span at its attempt's end with its run, task, tool and call, and into no metric", async () => {
+    const spans: Tracer.NativeSpan[] = [];
+    const tracer = Tracer.make({
+      span(options) {
+        const span = new Tracer.NativeSpan(options);
+        spans.push(span);
+        return span;
+      },
+    });
+    const registry = new Map();
+    const facts = deniedCalls(DENIED_RUN, [WORK, REVIEW], DENIED_VIEWS, callOf);
+    await Effect.runPromise(
+      recordStepMetrics(facts).pipe(Effect.withTracer(tracer), Effect.provideService(Metric.MetricRegistry, registry)),
+    );
+    const snapshot = await Effect.runPromise(Metric.snapshot.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+    assert.deepEqual(
+      snapshot.filter((m) => m.id.startsWith('step.')),
+      [],
+      'no metric of a step',
+    );
+    const calls = spans.filter((s) => s.name === DENIED_SPAN);
+    assert.equal(calls.length, 3);
+    const last = calls[2];
+    assert.deepEqual(Object.fromEntries(last.attributes), {
+      run: 'r-1',
+      task: 'r-1-work-try2',
+      tool: 'Bash',
+      call: 'Bash(git push)',
+      factory: 'nemia',
+      workflow: 'build',
+      step: 'work',
+      agent: 'ada',
+    });
+    assert.deepEqual(
+      [...last.attributes.keys()].filter((key) => !['factory', 'workflow', 'step', 'agent'].includes(key)),
+      [...DENIED_SPAN_KEYS],
+    );
+    const at = BigInt(Date.parse('2026-10-06T10:10:59.000Z')) * 1_000_000n;
+    assert.deepEqual([last.status.startTime, last.status._tag === 'Ended' ? last.status.endTime : null], [at, at]);
+    assert.ok(
+      calls.every((s) => s.parent._tag === 'None'),
+      'each a root of its own',
+    );
+  });
+  test("REFUSED: a denied call whose attributes carry a task's id is recorded nowhere", async () => {
     const fact: DeniedFact = {
       metric: 'denied',
       attributes: { factory: 'nemia', step: 'work', task: 'r-1-work' },

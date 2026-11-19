@@ -4,7 +4,7 @@
  * typecheck of the packages that import them, its map by `test/contract.test.ts`, and what the vocabulary door loads by
  * `test/vocabulary-door.test.ts`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 test('every name the vocabulary door exports is the same value on the root', async () => {

@@ -41,7 +41,7 @@
       "error",
       {
         "allowForKnownSafeCalls": [
-          { "from": "package", "name": ["test", "it", "describe", "suite"], "package": "node:test" }
+          { "from": "package", "name": ["test", "it", "describe"], "package": "vitest" }
         ]
       }
     ],

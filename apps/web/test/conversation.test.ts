@@ -8,7 +8,7 @@
  * family's other parts reach the look's door, which Node refuses — so they are held to it here, by their text. The folder holds the
  * shared family alone: what is one conversation's own is in `components/chat` or `components/session`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,20 +74,17 @@ test('REFUSED: a family part that names a conversation itself; a mark built from
     );
 });
 
-test("the family's pure rules: a mark under its caller's prefix, a line's trace state, the words it says, and how much is drawn", async (t) => {
-  await t.test(
-    'a family part writes its mark under the prefix its caller names, so each conversation keeps the names its pages read',
-    () => {
-      assert.deepEqual(mark('chat', 'talk', 'latest'), { 'data-chat-talk': 'latest' });
-      assert.deepEqual(mark('session', 'talk', 'latest'), { 'data-session-talk': 'latest' });
-      assert.deepEqual(mark('chat', 'step', 'running'), { 'data-chat-step': 'running' });
-      assert.deepEqual(mark('session', 'step', 'running'), { 'data-session-step': 'running' });
-      assert.deepEqual(mark('chat', 'empty'), { 'data-chat-empty': true }, 'a mark with no value is what React writes for a bare one');
-      assert.deepEqual(mark('session', 'jump'), { 'data-session-jump': true });
-      assert.notDeepEqual(mark('session', 'talk', 'latest'), mark('chat', 'talk', 'latest'), 'two prefixes are two attributes');
-    },
-  );
-  await t.test('a line draws in the state its own state maps to: done plain, and the one that waits on a person in the look’s own', () => {
+describe("the family's pure rules: a mark under its caller's prefix, a line's trace state, the words it says, and how much is drawn", () => {
+  test('a family part writes its mark under the prefix its caller names, so each conversation keeps the names its pages read', () => {
+    assert.deepEqual(mark('chat', 'talk', 'latest'), { 'data-chat-talk': 'latest' });
+    assert.deepEqual(mark('session', 'talk', 'latest'), { 'data-session-talk': 'latest' });
+    assert.deepEqual(mark('chat', 'step', 'running'), { 'data-chat-step': 'running' });
+    assert.deepEqual(mark('session', 'step', 'running'), { 'data-session-step': 'running' });
+    assert.deepEqual(mark('chat', 'empty'), { 'data-chat-empty': true }, 'a mark with no value is what React writes for a bare one');
+    assert.deepEqual(mark('session', 'jump'), { 'data-session-jump': true });
+    assert.notDeepEqual(mark('session', 'talk', 'latest'), mark('chat', 'talk', 'latest'), 'two prefixes are two attributes');
+  });
+  test('a line draws in the state its own state maps to: done plain, and the one that waits on a person in the look’s own', () => {
     const states: ConversationState[] = ['done', 'running', 'error', 'pending', 'waits'];
     assert.deepEqual(
       states.map((state) => traceStatusOf(state)),
@@ -95,7 +92,7 @@ test("the family's pure rules: a mark under its caller's prefix, a line's trace 
     );
     assert.notEqual(traceStatusOf('waits'), 'pending', 'a line that waits on a person is never drawn at rest');
   });
-  await t.test('the words the family says: a folded turn, the pill over the talk, and the line over what is new', () => {
+  test('the words the family says: a folded turn, the pill over the talk, and the line over what is new', () => {
     assert.equal(turnWords(134_000, 2, 'call'), 'Worked for 2m 14s · 2 calls');
     assert.equal(turnWords(134_000, 1, 'call'), 'Worked for 2m 14s · 1 call');
     assert.equal(turnWords(134_000, 2, 'step'), 'Worked for 2m 14s · 2 steps');
@@ -109,7 +106,7 @@ test("the family's pure rules: a mark under its caller's prefix, a line's trace 
     assert.equal(newWords(2), '2 new');
     assert.equal(newWords(1), '1 new');
   });
-  await t.test('a talk follows its latest by how much is drawn, which a turn grows a line at a time without growing the items', () => {
+  test('a talk follows its latest by how much is drawn, which a turn grows a line at a time without growing the items', () => {
     const said = (id: string): ConversationItem => ({
       kind: 'said',
       id,

@@ -15,7 +15,7 @@
  * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
 import { configGiven } from './config-given.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -224,12 +224,12 @@ async function shipped(id: string, repo: string) {
 /** What `nemia ls` answers (`RunsListed`) over the stage's engine. */
 const listed = async (): Promise<RunsListed> => (await stage.main(['ls'], engine())) as RunsListed;
 
-test(
+describe(
   'after a landing, the sweeps free what is finished and leave what is not \u2014 and the daemon frees and measures with no person',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       'a run lands by its ending, and a later sweep frees its worktree: marked, said, and its record, branch and files kept',
       async () => {
         const { id, repo } = await started(ENDING);
@@ -283,8 +283,7 @@ test(
         );
       },
     );
-
-    await s.test(
+    s.test(
       'a cancelled run whose tasks have settled is freed; one cancelled with a task still at work is left whole, and its place asked nothing',
       async () => {
         const settled = await started(ENDING);
@@ -304,8 +303,7 @@ test(
         assert.equal(runRecord(ROOT, settled.id).pruned?.worktrees.length, 1);
       },
     );
-
-    await s.test(
+    s.test(
       'REFUSED at shipped defaults: a run at its gate, a run that signed off blocked and a run in flight are each left whole by three sweeps, and nothing is asked of their place',
       async () => {
         const gated = await started(ENDING);
@@ -330,8 +328,7 @@ test(
         assert.deepEqual(ids.map(whole), [true, true, true]);
       },
     );
-
-    await s.test(
+    s.test(
       'a run held, then cancelled at its gate — as ebky was — is freed at shipped defaults, and nemia ls says its gate can never be approved',
       async () => {
         const { id } = await started(GATED);
@@ -350,8 +347,7 @@ test(
         assert.equal(runRecord(ROOT, id).pruned?.worktrees.length, 1);
       },
     );
-
-    await s.test(
+    s.test(
       'REFUSED at shipped defaults: the same run held at its gate and not cancelled is left whole by three sweeps, and nothing is asked of its place or said',
       async () => {
         const { id } = await started(GATED);
@@ -368,8 +364,7 @@ test(
         assert.ok(whole(id));
       },
     );
-
-    await s.test(
+    s.test(
       'REFUSED at shipped defaults: a held run whose work is done is no finished run, and nothing is said of it; a finished run whose record froze no workflow is left, said once across three sweeps, and freed by hand',
       async () => {
         const { id, repo } = await started(WORK);
@@ -412,8 +407,7 @@ test(
         assert.ok(gone(id), 'the prune the line names frees it');
       },
     );
-
-    await s.test(
+    s.test(
       "REFUSED at shipped defaults: a run that succeeded with a person's merge left is judged, left whole and nothing is said; merged by hand, a later sweep frees it",
       async () => {
         const { id, repo } = await started(WORK);
@@ -433,8 +427,7 @@ test(
         assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true], 'on its base now, it is finished');
       },
     );
-
-    await s.test(
+    s.test(
       "REFUSED at shipped defaults: a finished run that stays, judged while another merge is staged in its repository's checkout, has the checkout's status asked off the loop",
       async () => {
         const { id, repo } = await started(CHECKED);
@@ -456,8 +449,7 @@ test(
         world().takeBack(repo);
       },
     );
-
-    await s.test(
+    s.test(
       'a restart between the landing and the sweep changes nothing: a daemon that remembers nothing frees the run on its first pass and sweep',
       async () => {
         const { id, repo } = await started(ENDING);
@@ -468,8 +460,7 @@ test(
         assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true]);
       },
     );
-
-    await s.test(
+    s.test(
       'a removal cut short — the run marked pruned, its worktree still on disk — is finished by the next sweep, and the mark lists it',
       async () => {
         const { id } = await merged();
@@ -483,8 +474,7 @@ test(
         );
       },
     );
-
-    await s.test('a chain: a run waiting --after a landed, freed run starts from main, lands, and is freed in its turn', async () => {
+    s.test('a chain: a run waiting --after a landed, freed run starts from main, lands, and is freed in its turn', async () => {
       const a = await started(ENDING);
       const b = await started(ENDING, a.repo, { after: [a.id] });
       await worked(a.id);
@@ -505,8 +495,7 @@ test(
       );
       assert.ok(gone(b.id));
     });
-
-    await s.test(
+    s.test(
       'REFUSED at shipped defaults: a store with more finished runs than a sweep may free is freed over several, one remove a repository; a run that stays is judged once a sweep at most',
       async () => {
         const repo = aRepo();
@@ -540,8 +529,7 @@ test(
         assert.ok(whole(kept.id));
       },
     );
-
-    await s.test('runs of two repositories freed by one sweep: the place is asked one remove each', async () => {
+    s.test('runs of two repositories freed by one sweep: the place is asked one remove each', async () => {
       const [here, there] = [aRepo(), aRepo()];
       const ids = [(await merged(here)).id, (await merged(here)).id, (await merged(there)).id];
       const done = await sweep(await tick(), ids, freshFreeMemory());
@@ -552,27 +540,22 @@ test(
         [`${here} 2`, `${there} 1`].sort((a, b) => a.localeCompare(b)),
       );
     });
-
-    await s.test(
-      'REFUSED at shipped defaults: with WF_KEEP_WORKTREES=1 a sweep asks nothing and frees nothing; unset, it frees',
-      async (t) => {
-        const { id } = await merged();
-        const pass = await tick();
-        ENV.WF_KEEP_WORKTREES = '1';
-        t.after(() => {
-          ENV.WF_KEEP_WORKTREES = undefined;
-        });
-        const keptWhole = await sweep(pass, [id], freshFreeMemory());
-        assert.deepEqual([keptWhole.verbs, keptWhole.freed, whole(id)], [[], [], true]);
+    s.test('REFUSED at shipped defaults: with WF_KEEP_WORKTREES=1 a sweep asks nothing and frees nothing; unset, it frees', async (t) => {
+      const { id } = await merged();
+      const pass = await tick();
+      ENV.WF_KEEP_WORKTREES = '1';
+      t.onTestFinished(() => {
         ENV.WF_KEEP_WORKTREES = undefined;
-        assert.deepEqual(
-          (await sweep(pass, [id], freshFreeMemory())).freed.map((p) => p.id),
-          [id],
-        );
-      },
-    );
-
-    await s.test('the daemon frees a finished run with no person: `up` forks the sweep beside its passes', async (t) => {
+      });
+      const keptWhole = await sweep(pass, [id], freshFreeMemory());
+      assert.deepEqual([keptWhole.verbs, keptWhole.freed, whole(id)], [[], [], true]);
+      ENV.WF_KEEP_WORKTREES = undefined;
+      assert.deepEqual(
+        (await sweep(pass, [id], freshFreeMemory())).freed.map((p) => p.id),
+        [id],
+      );
+    });
+    s.test('the daemon frees a finished run with no person: `up` forks the sweep beside its passes', async (t) => {
       const { id } = await merged();
       assert.ok(whole(id));
       const daemon = Effect.runFork(
@@ -582,12 +565,11 @@ test(
           Effect.provide(Logger.layer([])),
         ),
       );
-      t.after(() => Effect.runPromise(Fiber.interrupt(daemon)));
+      t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(daemon)));
       await until(t, () => gone(id), `the daemon frees ${id}`, { everyMs: 50 });
       assert.equal(runRecord(ROOT, id).pruned?.worktrees.length, 1);
     });
-
-    await s.test(
+    s.test(
       'the daemon measures the store with no person: `up` forks the sweep once its first pass answered, and hands each pass after its reading',
       async (t) => {
         const { id } = await started(WORK);
@@ -601,7 +583,7 @@ test(
             Effect.provide(Logger.layer([])),
           ),
         );
-        t.after(() => Effect.runPromise(Fiber.interrupt(daemon)));
+        t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(daemon)));
         const kept = () => recentPasses(ROOT).filter((pass) => pass.at >= from);
         const read = await until(t, () => kept().find((pass) => pass.disk), 'a pass of the daemon keeps a reading of the disk', {
           everyMs: 20,
@@ -640,7 +622,7 @@ test(
       return pass.runs.filter((a) => a.run.id === id);
     };
     ENV.WF_KEEP_WORKTREES = 'yes';
-    t.after(() => {
+    t.onTestFinished(() => {
       ENV.WF_KEEP_WORKTREES = undefined;
     });
     const clock = steeredClock();
@@ -653,7 +635,7 @@ test(
         Effect.provide(clock.layer),
       ),
     );
-    t.after(() => Effect.runPromise(Fiber.interrupt(loop)));
+    t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(loop)));
     const ended = Effect.runPromise(Fiber.join(loop)).then(() => assert.fail('the loop ended'));
     const rested = (times: number) =>
       Promise.race([until(t, () => clock.asked.length === times, `the loop is at rest ${times}`, { bell: clock.bell }), ended]);
@@ -683,13 +665,13 @@ test(
   },
 );
 
-test('the rule as data: which answers are candidates, which a sweep takes, and what is said of one left', async (t) => {
+describe('the rule as data: which answers are candidates, which a sweep takes, and what is said of one left', () => {
   const answer = (id: string, status: RunStatusWord, atRest: boolean, repo = true) => ({
     run: (repo ? { id, repo: '/r' } : { id, place: { kind: 'folder' } }) as never,
     status,
     feed: atRest ? { atRest: true as const } : {},
   });
-  await t.test('`freeable`: the runs at rest that succeeded or were cancelled, of a repository', () => {
+  test('`freeable`: the runs at rest that succeeded or were cancelled, of a repository', () => {
     assert.deepEqual(
       freeable([
         answer('landed', 'succeeded', true),
@@ -702,8 +684,7 @@ test('the rule as data: which answers are candidates, which a sweep takes, and w
       ['landed', 'cancelled'],
     );
   });
-
-  await t.test('`freeTurn`: the bound of those not judged, then one already judged in its turn', () => {
+  test('`freeTurn`: the bound of those not judged, then one already judged in its turn', () => {
     const all = ['a', 'b', 'c', 'd', 'e'];
     assert.deepEqual(freeTurn(all, new Set(), 2, 0), ['a', 'b'], 'the bound, of those not judged');
     assert.deepEqual(freeTurn(all, new Set(['a', 'b', 'c', 'd']), 2, 7), ['e'], 'what is left of them');
@@ -714,8 +695,7 @@ test('the rule as data: which answers are candidates, which a sweep takes, and w
     );
     assert.deepEqual(freeTurn([], new Set(), 2, 0), []);
   });
-
-  await t.test('`freeSaid`: what is said of a run a sweep left — a place unread or a hold of git, never a rule of the run', () => {
+  test('`freeSaid`: what is said of a run a sweep left — a place unread or a hold of git, never a rule of the run', () => {
     const facts = { decided: 'landed' as const, held: null, owed: [], worktrees: [] };
     assert.equal(freeSaid(undefined, 'the place did not answer'), 'the place did not answer');
     assert.equal(freeSaid(facts, 'locked'), 'locked');

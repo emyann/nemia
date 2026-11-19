@@ -750,7 +750,7 @@ measured of Claude Code.
   run file's argv, which a job on the SDK's `query()` has none of: it reads `Options.maxBudgetUsd` off the attempt's spawn
   request. The $0.01 budget test raced the price: haiku read all 2000 lines for $0.0099 and succeeded. It caps at $0.00001,
   which the first response crosses ($0.00013), and ended `failed`, limit `budget`, exit 1, no attempt 2. Then
-  `AE_LIVE=1 node --test test/live.test.ts test/live-sdk.boundary.test.ts`, three passes in a row.
+  `AE_LIVE=1 npx vitest run test/live.test.ts test/live-sdk.boundary.test.ts`, three passes in a row.
 
 ## Verified by tests, not by a live run
 

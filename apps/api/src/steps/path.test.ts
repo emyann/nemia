@@ -6,7 +6,7 @@
  * The path is read off the journal alone, so no harness is asked.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -94,8 +94,8 @@ const get = async (url: string) => {
 };
 const words = (p: StepPath) => p.path.map((s) => `${s.state} <- ${s.event}`);
 
-test('REFUSED: a path asked of a try that is not a whole number or not yet, a run or a step there is not, a journal that does not read', async (t) => {
-  await t.test('REFUSED: a try that is not a whole number from 1 is 400, and one past the current is 404', async () => {
+describe('REFUSED: a path asked of a try that is not a whole number or not yet, a run or a step there is not, a journal that does not read', () => {
+  test('REFUSED: a try that is not a whole number from 1 is 400, and one past the current is 404', async () => {
     for (const asked of ['x', '0', '1.5', '-1', '01']) {
       const { status, body } = await get(`/api/runs/r-retried/steps/implement/path?try=${asked}`);
       assert.equal(status, 400, asked);
@@ -105,25 +105,25 @@ test('REFUSED: a path asked of a try that is not a whole number or not yet, a ru
     assert.equal(status, 404);
     assert.match(body.error ?? '', /has had 2 tries, so it has no try 3/);
   });
-  await t.test('REFUSED: a run or a step there is not is 404', async () => {
+  test('REFUSED: a run or a step there is not is 404', async () => {
     assert.equal((await get('/api/runs/r-none/steps/implement/path')).status, 404);
     assert.equal((await get('/api/runs/r-retried/steps/review/path')).status, 404);
   });
-  await t.test('REFUSED: a journal that does not read is 502, naming the task', async () => {
+  test('REFUSED: a journal that does not read is 502, naming the task', async () => {
     const { status, body } = await get('/api/runs/r-spoiled/steps/implement/path');
     assert.equal(status, 502);
     assert.match(body.error ?? '', /Could not read the journal of task r-spoiled-1 \(step 'implement', try 1\)/);
   });
 });
 
-test("A person reads a step's path, try by try: none before it is filed, the current try's states, an earlier try to its end, and a held try to the answer that reopened it", async (t) => {
-  const s = story(t);
-  await s.test('a step not filed yet has no task and an empty path', async () => {
+describe("A person reads a step's path, try by try: none before it is filed, the current try's states, an earlier try to its end, and a held try to the answer that reopened it", () => {
+  const s = story(test);
+  s.test('a step not filed yet has no task and an empty path', async () => {
     const { status, body } = await get('/api/runs/r-unfiled/steps/implement/path');
     assert.equal(status, 200);
     assert.deepEqual(body, { taskId: null, try: 1, path: [], lifecycle: lifecycleGraph() });
   });
-  await s.test("the current try's path by default: each state the journal says, the entry that moved it and when", async () => {
+  s.test("the current try's path by default: each state the journal says, the entry that moved it and when", async () => {
     const { status, body } = await get('/api/runs/r-retried/steps/implement/path');
     assert.equal(status, 200);
     assert.deepEqual([body.taskId, body.try], ['r-retried-2', 2]);
@@ -138,7 +138,7 @@ test("A person reads a step's path, try by try: none before it is filed, the cur
       "and the lifecycle it walks, as the runtime's code has it, for the board to draw it on",
     );
   });
-  await s.test('an earlier try by number is its own task, to its end', async () => {
+  s.test('an earlier try by number is its own task, to its end', async () => {
     const { status, body } = await get('/api/runs/r-retried/steps/implement/path?try=1');
     assert.equal(status, 200);
     assert.deepEqual([body.taskId, body.try], ['r-retried-1', 1]);
@@ -152,7 +152,7 @@ test("A person reads a step's path, try by try: none before it is filed, the cur
     const current = await get('/api/runs/r-retried/steps/implement/path?try=2');
     assert.deepEqual(current.body, (await get('/api/runs/r-retried/steps/implement/path')).body, 'the current try, asked by number');
   });
-  await s.test('an earlier try of a task held open runs to the answer that opened the next turn; a recheck is the same turn', async () => {
+  s.test('an earlier try of a task held open runs to the answer that opened the next turn; a recheck is the same turn', async () => {
     const first = (await get('/api/runs/r-held/steps/implement/path?try=1')).body;
     assert.deepEqual(words(first), ['submitted <- filed', 'starting <- starting', 'working <- spawned', 'input-required <- ended']);
     const second = (await get('/api/runs/r-held/steps/implement/path?try=2')).body;

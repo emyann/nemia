@@ -3,14 +3,14 @@
  * package's own OpenAPI document — the Card's `spec` and `status`, `spec.from` with the meaning the package gives it
  * (`CARD_KEY_MEANINGS`) — and a path the kind has no field at refused exit 2, naming the fields there are.
  */
-import { test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { CARD_KEY_MEANINGS } from 'objects';
 import { fieldRowsOf } from '../src/objects/explain.ts';
 import { servedStore } from './served.ts';
 
 const store = await servedStore('nemia-cli-explain-', () => {});
-test.after(() => store.stop());
+afterAll(() => store.stop());
 
 test('`nemia explain cards` says the kind, its version, scope and verbs, and lists spec and status among its fields', async () => {
   const said = await store.nemia(['explain', 'cards']);

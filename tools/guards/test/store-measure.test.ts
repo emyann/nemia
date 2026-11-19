@@ -9,7 +9,7 @@
  * the rest are its functions, called here. The loop's measure (`loop.ts`) beside it: what it refuses to be called with, and its report
  * on an empty store, spawned the same way, with the passes, the loop's delay and the level's reads while they ran.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

@@ -1,5 +1,5 @@
 /** The merge check's words (`mergeWord`), and a place's trial merge read as one (`mergeWordOf`). */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mergeWord, mergeWordOf } from './merges.ts';
 

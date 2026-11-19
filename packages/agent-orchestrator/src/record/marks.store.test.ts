@@ -3,7 +3,7 @@
  * of marks leaves its files as `runMarkMove` answers — moved, as they stood, or untouched where it refuses — so a move the machine
  * does not make is one the store does not write; and no file of `src` outside this folder names a mark's file.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,10 +33,10 @@ const BROUGHT: Readonly<Record<RunMarkEvent, (home: string) => unknown>> = {
   unprune: (home) => filesStoreAt(home).runs.prune(ID, undefined),
 };
 
-test('the store writes the moves the marks machine makes and no other: each event on each set of marks leaves the files where runMarkMove says', async (t) => {
+describe('the store writes the moves the marks machine makes and no other: each event on each set of marks leaves the files where runMarkMove says', () => {
   for (const from of RUN_MARKS)
     for (const event of Object.keys(RUN_MARK_EVENTS) as RunMarkEvent[])
-      await t.test(`${event} on a run ${from}`, () => {
+      test(`${event} on a run ${from}`, () => {
         const home = arranged(from);
         assert.equal(marksAt(home, ID), from, 'the run carries the marks arranged');
         const move = runMarkMove(from, event);

@@ -6,7 +6,7 @@
  * this machine's context; and `nemia template export --factory` writes the factory's rules and instruction as that daemon serves them,
  * read through its api and handed to the export here.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -35,7 +35,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
 }
 
 const exposed = await servedStore('nemia-remote-', () => {}, { WF_EXPOSED: '1' });
-after(exposed.stop);
+afterAll(exposed.stop);
 
 /** A token of the person's for the exposed store, minted there by a verb of its machine. */
 const minted = await nemia(['token', 'add', 'laptop'], exposed.env);

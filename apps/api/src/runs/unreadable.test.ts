@@ -9,7 +9,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -110,9 +110,9 @@ writeRun('r-child', {}, { after: ['r-bad'] });
 writeRun('r-sibling', {}, { after: ['r-good'] });
 await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
 
-test('a run whose task journal holds an entry no runtime wrote is answered off its record on the list, refused on its page in those words, and counted in flight', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a run whose task journal holds an entry no runtime wrote is answered off its record on the list, refused on its page in those words, and counted in flight', () => {
+  const s = story(test);
+  s.test(
     'GET /api/runs answers every run while one task journal holds an entry no runtime wrote, and says of the runs that read it why',
     async () => {
       const list = await runListOf(app);
@@ -156,23 +156,20 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
       );
     },
   );
-  await s.test(
-    "a run a task of which does not read has its page refused in the list's words, and every other run answered in full",
-    async () => {
-      const list = new Map(((await runListOf(app)).unjudged ?? []).map((entry) => [entry.name, entry.error]));
-      for (const id of ['r-bad', 'r-child']) {
-        const res = await app.request(`/api/runs/${id}`);
-        const body = (await res.json()) as { error?: string };
-        assert.equal(res.status, 502, JSON.stringify(body));
-        assert.equal(body.error, list.get(id), `${id}'s page and the list say one thing`);
-      }
-      for (const id of ['r-good', 'r-sibling']) {
-        const res = await app.request(`/api/runs/${id}`);
-        assert.equal(res.status, 200, await res.clone().text());
-      }
-    },
-  );
-  await s.test(
+  s.test("a run a task of which does not read has its page refused in the list's words, and every other run answered in full", async () => {
+    const list = new Map(((await runListOf(app)).unjudged ?? []).map((entry) => [entry.name, entry.error]));
+    for (const id of ['r-bad', 'r-child']) {
+      const res = await app.request(`/api/runs/${id}`);
+      const body = (await res.json()) as { error?: string };
+      assert.equal(res.status, 502, JSON.stringify(body));
+      assert.equal(body.error, list.get(id), `${id}'s page and the list say one thing`);
+    }
+    for (const id of ['r-good', 'r-sibling']) {
+      const res = await app.request(`/api/runs/${id}`);
+      assert.equal(res.status, 200, await res.clone().text());
+    }
+  });
+  s.test(
     'GET /api/ceilings answers while a task journal does not read, and counts the runs that read it in flight, as the tick does',
     async () => {
       const was = process.env.WF_MAX_RUNS;

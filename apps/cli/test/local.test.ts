@@ -7,7 +7,7 @@
  * before the in-process parser reads the words.
  * Each `nemia` is this checkout's bin, run as a child on a scratch store, waited on for its exit.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';

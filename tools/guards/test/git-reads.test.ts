@@ -10,7 +10,7 @@
  * every session in the checkout, including a person's own in a shell they did not fence, and this list has no deny beside it. The
  * agents allow it and deny the pager option in every spelling git takes, which is why they may.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

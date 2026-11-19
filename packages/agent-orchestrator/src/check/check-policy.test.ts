@@ -4,7 +4,7 @@
  * policy decides of a verdict is proved by contracts/check-failure-policy.contract.ts, and what the run does on it by
  * src/retry/retry.test.ts.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { checkFailurePolicyLine, checkFailurePolicyOf, type CheckFailurePolicy } from './check-policy.ts';
 import { parseWorkflow, renderStep } from '../workflow/step-file.ts';
@@ -15,8 +15,8 @@ const step = (lines: string): string => `---\nplace: git\n${lines}\n---\nDo the 
 
 const PERSONS: CheckFailurePolicy = { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [78] } }] };
 
-test('a check failure policy is read from its line, and each shape it cannot take is refused at load', async (t) => {
-  await t.test('read: the rules in order, each code a number', () => {
+describe('a check failure policy is read from its line, and each shape it cannot take is refused at load', () => {
+  test('read: the rules in order, each code a number', () => {
     const read = parseWorkflow(
       'implement',
       step(
@@ -30,7 +30,7 @@ test('a check failure policy is read from its line, and each shape it cannot tak
       ],
     });
   });
-  await t.test('absent: no policy, every refusal counted', () => {
+  test('absent: no policy, every refusal counted', () => {
     assert.equal(parseWorkflow('implement', step('check: npm test')).checkFailurePolicy, undefined);
   });
   const refused: [row: string, line: string][] = [
@@ -82,7 +82,7 @@ test('a check failure policy is read from its line, and each shape it cannot tak
     ],
   ];
   for (const [row, lines] of refused)
-    await t.test(`REFUSED: ${row}`, () => {
+    test(`REFUSED: ${row}`, () => {
       assert.throws(
         () => parseWorkflow('implement', step(lines)),
         (e: unknown) => e instanceof WorkflowError && e.exitCode === 2 && e.message.includes('checkFailurePolicy'),

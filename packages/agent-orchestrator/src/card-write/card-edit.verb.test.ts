@@ -4,7 +4,7 @@
  * byte: a started card, a key that does not read, a factory moved, labels changed, a `queued:` changed, a stale version, no body, a
  * `from:` naming a run the store lacks, and a card in another namespace. A text the card already reads as writes nothing.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import type { CardEdit } from 'objects';
@@ -82,7 +82,7 @@ test('a card retitled and cut keeps its name and labels, and takes the text: its
   assert.notEqual(cardVersion(text ?? ''), cardVersion(PLANTED), 'its version moved');
 });
 
-test("a text in the card's own words is written: its factory or its labels sent back as the card has them", async (t) => {
+describe("a text in the card's own words is written: its factory or its labels sent back as the card has them", () => {
   const rows: { name: string; source: string; planted?: string }[] = [
     { name: 'its factory named as its namespace', source: card(['workflow: build', 'factory: default']) },
     { name: 'its labels sent back', source: card(['workflow: build', 'labels:', '  team: core']) },
@@ -90,7 +90,7 @@ test("a text in the card's own words is written: its factory or its labels sent 
     { name: 'a queued card, its queued: left out, stays queued', source: card(['workflow: build']), planted: QUEUED_CARD },
   ];
   for (const row of rows) {
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const { exit, text } = over(editCard('add-a-cache-x1y2', 'default', edit(row.source)), { text: row.planted ?? PLANTED });
       assert.equal(Exit.isSuccess(exit), true, String(exit));
       assert.match(text ?? '', /team: core/);
@@ -109,7 +109,7 @@ test('a text the card already reads as writes nothing, and its version stays', (
   assert.equal(text, PLANTED);
 });
 
-test('REFUSED, each by its kind, and the file left as it was', async (t) => {
+describe('REFUSED, each by its kind, and the file left as it was', () => {
   const rows: {
     name: string;
     source: string;
@@ -163,7 +163,7 @@ test('REFUSED, each by its kind, and the file left as it was', async (t) => {
     { name: 'a card in another namespace is Missing', source: card(['workflow: build']), namespace: 'alpha', says: ['Missing', 2] },
   ];
   for (const row of rows) {
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const planted = row.planted ?? PLANTED;
       const { exit, text } = over(editCard('add-a-cache-x1y2', row.namespace ?? 'default', edit(row.source, row.version)), {
         text: planted,

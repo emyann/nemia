@@ -5,7 +5,7 @@
  * the grace the ask gave and named, and the next question answered; an ask interrupted leaves nothing running; and the shipped place
  * counts each question, and each git process it starts, in the pass's `place` phase.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -131,7 +131,7 @@ test('REFUSED: a git held past its deadline, asked while the process waits, is u
   let deadlineMs = FIRST_DEADLINE_MS;
   for (let tries = 1; ; tries++, deadlineMs *= 2) {
     const { dir, child, marker } = heldByDeaf();
-    t.after(() => {
+    t.onTestFinished(() => {
       for (const pid of running(child)) process.kill(pid, 'SIGKILL');
     });
     const said = saidOf(PLACE.askNow('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs, graceMs: GRACE_MS }), 'handoff');
@@ -153,7 +153,7 @@ test('REFUSED: a git held past its deadline, asked off the loop, is unread in th
   let deadlineMs = FIRST_DEADLINE_MS;
   for (let tries = 1; ; tries++, deadlineMs *= 2) {
     const { dir, child, marker } = heldByDeaf();
-    t.after(() => {
+    t.onTestFinished(() => {
       for (const pid of running(child)) process.kill(pid, 'SIGKILL');
     });
     const asked = PLACE.ask('handoff', { workspace: dir, step: 'build', why: '' }, { deadlineMs, graceMs: GRACE_MS });
@@ -177,7 +177,7 @@ test(
   WAITED,
   async (t) => {
     const { dir, child, marker } = heldByDeaf();
-    t.after(() => {
+    t.onTestFinished(() => {
       for (const pid of running(child)) process.kill(pid, 'SIGKILL');
     });
     const fiber = Effect.runFork(

@@ -3,7 +3,7 @@
  * `a2a/map.ts`): pure, so each A2A state and each place a closing statement can be is one case here, with no agent behind
  * it. The agent itself is `remote-agent.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
 import {
@@ -45,52 +45,40 @@ const taskIn = (state: TaskState, artifacts: Artifact[] = []): Task => ({
   metadata: undefined,
 });
 
-test("the map: a remote agent's Task in the runtime's words, and a spawn, words and logs in A2A's", async (t) => {
-  await t.test(
-    'each A2A state is passed through as its own name, an interrupted one says what it waits for, and no state or one no version of A2A this runtime knows is working, which the deadline bounds',
-    () => {
-      const cases: Array<[TaskState, SessionState, string | undefined]> = [
-        [TaskState.TASK_STATE_SUBMITTED, 'submitted', undefined],
-        [TaskState.TASK_STATE_WORKING, 'working', undefined],
-        [TaskState.TASK_STATE_INPUT_REQUIRED, 'input-required', 'input'],
-        [TaskState.TASK_STATE_AUTH_REQUIRED, 'auth-required', 'authentication'],
-        [TaskState.TASK_STATE_COMPLETED, 'completed', undefined],
-        [TaskState.TASK_STATE_FAILED, 'failed', undefined],
-        [TaskState.TASK_STATE_REJECTED, 'rejected', undefined],
-        [TaskState.TASK_STATE_CANCELED, 'canceled', undefined],
-        [TaskState.TASK_STATE_UNSPECIFIED, 'working', undefined],
-        [99 as TaskState, 'working', undefined],
-      ];
-      for (const [state, observed, waiting] of cases) {
-        const s = sightingOfTask(taskIn(state));
-        assert.equal(s.state, observed, TaskState[state] ?? String(state));
-        assert.equal(s.waitingFor, waiting, TaskState[state] ?? String(state));
-        assert.equal(s.sessionId, 't-1');
-        assert.equal(s.nativeId, 'c-1', 'the context is the conversation a later turn continues');
-        assert.equal(s.closeout, undefined, 'no artifact, no statement');
-      }
-      assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), status: undefined }).state, 'working');
-      assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), contextId: '' }).nativeId, undefined);
-    },
-  );
-
-  await t.test(
-    "the closing statement is the data part of the last artifact that has one, with no time: the Task is this attempt's own",
-    () => {
-      const done = (...artifacts: Artifact[]) => sightingOfTask(taskIn(TaskState.TASK_STATE_COMPLETED, artifacts)).closeout;
-      assert.deepEqual(done(artifact(data({ n: 1 })), artifact(data({ n: 2 }))), { payload: { n: 2 } }, 'in the last artifact');
-      assert.deepEqual(done(artifact(data({ n: 1 })), artifact(text('words, no data'))), { payload: { n: 1 } }, 'in an earlier one');
-      assert.deepEqual(
-        done(artifact(data({ n: 1 }), text('and a line'), data({ n: 3 }))),
-        { payload: { n: 3 } },
-        'the last data part of it',
-      );
-      assert.equal(done(artifact(text('only words'))), undefined, 'none: the end is recorded `closedOut: false`');
-      assert.equal(done(), undefined);
-    },
-  );
-
-  await t.test('a statement published while the Task is not complete is not read: it would end the attempt early', () => {
+describe("the map: a remote agent's Task in the runtime's words, and a spawn, words and logs in A2A's", () => {
+  test('each A2A state is passed through as its own name, an interrupted one says what it waits for, and no state or one no version of A2A this runtime knows is working, which the deadline bounds', () => {
+    const cases: Array<[TaskState, SessionState, string | undefined]> = [
+      [TaskState.TASK_STATE_SUBMITTED, 'submitted', undefined],
+      [TaskState.TASK_STATE_WORKING, 'working', undefined],
+      [TaskState.TASK_STATE_INPUT_REQUIRED, 'input-required', 'input'],
+      [TaskState.TASK_STATE_AUTH_REQUIRED, 'auth-required', 'authentication'],
+      [TaskState.TASK_STATE_COMPLETED, 'completed', undefined],
+      [TaskState.TASK_STATE_FAILED, 'failed', undefined],
+      [TaskState.TASK_STATE_REJECTED, 'rejected', undefined],
+      [TaskState.TASK_STATE_CANCELED, 'canceled', undefined],
+      [TaskState.TASK_STATE_UNSPECIFIED, 'working', undefined],
+      [99 as TaskState, 'working', undefined],
+    ];
+    for (const [state, observed, waiting] of cases) {
+      const s = sightingOfTask(taskIn(state));
+      assert.equal(s.state, observed, TaskState[state] ?? String(state));
+      assert.equal(s.waitingFor, waiting, TaskState[state] ?? String(state));
+      assert.equal(s.sessionId, 't-1');
+      assert.equal(s.nativeId, 'c-1', 'the context is the conversation a later turn continues');
+      assert.equal(s.closeout, undefined, 'no artifact, no statement');
+    }
+    assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), status: undefined }).state, 'working');
+    assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), contextId: '' }).nativeId, undefined);
+  });
+  test("the closing statement is the data part of the last artifact that has one, with no time: the Task is this attempt's own", () => {
+    const done = (...artifacts: Artifact[]) => sightingOfTask(taskIn(TaskState.TASK_STATE_COMPLETED, artifacts)).closeout;
+    assert.deepEqual(done(artifact(data({ n: 1 })), artifact(data({ n: 2 }))), { payload: { n: 2 } }, 'in the last artifact');
+    assert.deepEqual(done(artifact(data({ n: 1 })), artifact(text('words, no data'))), { payload: { n: 1 } }, 'in an earlier one');
+    assert.deepEqual(done(artifact(data({ n: 1 }), text('and a line'), data({ n: 3 }))), { payload: { n: 3 } }, 'the last data part of it');
+    assert.equal(done(artifact(text('only words'))), undefined, 'none: the end is recorded `closedOut: false`');
+    assert.equal(done(), undefined);
+  });
+  test('a statement published while the Task is not complete is not read: it would end the attempt early', () => {
     for (const state of [
       TaskState.TASK_STATE_WORKING,
       TaskState.TASK_STATE_INPUT_REQUIRED,
@@ -100,8 +88,7 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
       assert.equal(sightingOfTask(taskIn(state, [artifact(data({ early: true }))])).closeout, undefined, TaskState[state]);
     }
   });
-
-  await t.test('a spawn is a plain user message: the brief, the context it continues, the schema under the extension, and no mark', () => {
+  test('a spawn is a plain user message: the brief, the context it continues, the schema under the extension, and no mark', () => {
     const m = remoteMessageOf(
       { name: 'ae/t/1', brief: 'do it', cwd: '/w', config: { model: 'x' }, resumeFrom: 'c-9', closeoutSchema: { type: 'object' } },
       'm-1',
@@ -126,8 +113,7 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
       "handed to the runtime's own agent as a spawn, it is refused: it names no session to start",
     );
   });
-
-  await t.test('words for a waiting Task are a user message on that Task, in its context', () => {
+  test('words for a waiting Task are a user message on that Task, in its context', () => {
     const m = remoteFollowUpOf('t-1', 'c-1', 'blue', 'm-3');
     assert.deepEqual([m.taskId, m.contextId, m.messageId, m.role], ['t-1', 'c-1', 'm-3', Role.ROLE_USER]);
     assert.deepEqual(
@@ -135,8 +121,7 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
       [{ $case: 'text', value: 'blue' }],
     );
   });
-
-  await t.test("a Task's logs are its messages, its state and its artifacts, as text", () => {
+  test("a Task's logs are its messages, its state and its artifacts, as text", () => {
     const t: Task = {
       ...taskIn(TaskState.TASK_STATE_COMPLETED, [artifact(data({ ok: true }))]),
       status: {
@@ -168,8 +153,7 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
     };
     assert.equal(logsOfTask(t), 'user: do it\nartifact a1: {"ok":true}\nCOMPLETED — finished');
   });
-
-  await t.test("a remote agent's logs are bounded, say when they were cut, and end on the Task's state", async (t) => {
+  describe("a remote agent's logs are bounded, say when they were cut, and end on the Task's state", () => {
     const message = (role: Role, words: string, id = 'm'): Message => ({
       messageId: id,
       contextId: 'c-1',
@@ -224,14 +208,14 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
       },
     ];
     for (const row of ROWS) {
-      await t.test(row.name, () => {
+      test(row.name, () => {
         const logs = logsOfTask(row.task, row.asked);
         assert.ok(logs.length <= LOGS_CHARS, `${logs.length} characters`);
         assert.equal(logs.startsWith(`${LOGS_CUT}\n`), row.cut);
         assert.equal(logs.split('\n').at(-1), row.last);
       });
     }
-    await t.test('a 100,000-character reply', () => {
+    test('a 100,000-character reply', () => {
       const logs = logsOfReply(flood);
       assert.equal(logs.length, LOGS_CHARS);
       assert.ok(logs.startsWith(`${LOGS_CUT}\n`));

@@ -5,7 +5,8 @@
  * unit, signal and start are the test's, as `service.verb.test.ts`'s are, so no test starts a service or signals a process. The store is
  * the test's own at `ROOT`, named by `ENV`; the repository is the test place's.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -237,12 +238,16 @@ const leftovers = (): string[] => fs.readdirSync(releasesDir(ROOT)).filter((f) =
 const V1 = tagged('v1', 'one');
 const V2 = tagged('v2', 'two');
 
-test('two tags: v1 built on its trial store, v2 switched in with the service on the pointer restarted, back to v1 beside a hand daemon', async (t) => {
-  const s = story(t);
-  const pointer = path.join(releasesDir(ROOT), 'current');
-  let first: { built: boolean; release: { builtAt: string } } | undefined;
-
-  await s.test('v1 is exported, built and checked on a trial store, then pointed at by a relative link', async () => {
+describe('two tags: v1 built on its trial store, v2 switched in with the service on the pointer restarted, back to v1 beside a hand daemon', () => {
+  let pointer!: string;
+  let first!: { built: boolean; release: { builtAt: string } } | undefined;
+  beforeAll(() => {
+    const t = teardowns();
+    pointer = path.join(releasesDir(ROOT), 'current');
+    return t.end;
+  });
+  const s = story(test);
+  s.test('v1 is exported, built and checked on a trial store, then pointed at by a relative link', async () => {
     assert.equal(currentRelease(ROOT), null, 'no pointer yet');
     const home = '/home/me';
     const { WF_ROOT: _wf, ...person } = ENV;
@@ -278,8 +283,7 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
     assert.deepEqual(runningAt(REPO), { kind: 'checkout', root: REPO }, 'a root with no release.json is a checkout');
     assert.deepEqual(leftovers(), [], 'the trial store is taken away with the build');
   });
-
-  await s.test(
+  s.test(
     'v2 is switched in by a rename, and the service on the pointer paused, waited, signalled, started and resumed in order',
     async () => {
       unitOn(pointer);
@@ -301,8 +305,7 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
       fs.rmSync(UNIT, { force: true });
     },
   );
-
-  await s.test('back to v1 without a rebuild, and a daemon started by hand named and never signalled', async () => {
+  s.test('back to v1 without a rebuild, and a daemon started by hand named and never signalled', async () => {
     const inode = fs.statSync(path.join(releaseDir('v1', ROOT), 'release.json')).ino;
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     const back = await run({ tag: 'v1', repo: REPO }, host);
@@ -320,8 +323,7 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
     );
     assert.deepEqual(leftovers(), []);
   });
-
-  await s.test('REFUSED: v2 again once its tag names another commit is a Conflict, and the pointer stays on v1', async () => {
+  s.test('REFUSED: v2 again once its tag names another commit is a Conflict, and the pointer stays on v1', async () => {
     const moved = tagged('v2', 'two again');
     const { tag, message } = await refusalOf({ tag: 'v2', repo: REPO }, idle().host);
     assert.equal(tag, 'Conflict');
@@ -332,8 +334,8 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
   });
 });
 
-test('REFUSED: an upgrade that cannot build, check or restart changes what it says it does, and nothing else', async (t) => {
-  await t.test('a check that fails: the pointer stays, no release nor build folder remains, and the log is kept', async () => {
+describe('REFUSED: an upgrade that cannot build, check or restart changes what it says it does, and nothing else', () => {
+  test('a check that fails: the pointer stays, no release nor build folder remains, and the log is kept', async () => {
     await run({ tag: 'v1', repo: REPO }, idle().host);
     tagged('v3', 'three', scripts({ check: 1 }));
     const { tag, message } = await refusalOf({ tag: 'v3', repo: REPO }, idle().host);
@@ -346,8 +348,7 @@ test('REFUSED: an upgrade that cannot build, check or restart changes what it sa
     assert.equal(fs.existsSync(releaseDir('v3', ROOT)), false);
     assert.deepEqual(leftovers(), []);
   });
-
-  await t.test('a build that fails beside the service on the pointer: its check never runs, nothing paused nor signalled', async () => {
+  test('a build that fails beside the service on the pointer: its check never runs, nothing paused nor signalled', async () => {
     unitOn(path.join(ROOT, 'releases', 'current'));
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: OLD });
     tagged('v4', 'four', scripts({ build: 3 }));
@@ -363,30 +364,26 @@ test('REFUSED: an upgrade that cannot build, check or restart changes what it sa
     assert.deepEqual(leftovers(), []);
     fs.rmSync(UNIT, { force: true });
   });
-
-  await t.test('a tag with no release:check script is Invalid, naming the script, and builds nothing', async () => {
+  test('a tag with no release:check script is Invalid, naming the script, and builds nothing', async () => {
     tagged('v5', 'five', scripts({ check: null }));
     const { tag, message } = await refusalOf({ tag: 'v5', repo: REPO }, idle().host);
     assert.equal(tag, 'Invalid');
     assert.match(message, /has no release:check script/);
     assert.equal(fs.existsSync(releaseDir('v5', ROOT)), false);
   });
-
-  await t.test('a tag the repository lacks is Missing, naming it', async () => {
+  test('a tag the repository lacks is Missing, naming it', async () => {
     const { tag, message } = await refusalOf({ tag: 'v9', repo: REPO }, idle().host);
     assert.equal(tag, 'Missing');
     assert.ok(message.includes(`${REPO} has no tag v9`), message);
   });
-
-  await t.test('a tag no release folder can be named by is Invalid, before anything is built', async () => {
+  test('a tag no release folder can be named by is Invalid, before anything is built', async () => {
     const { tag, message } = await refusalOf({ tag: '../x', repo: REPO }, idle().host);
     assert.equal(tag, 'Invalid');
     assert.match(message, /is not a tag a release folder/);
     assert.equal(fs.existsSync(path.join(ROOT, 'x')), false);
     assert.deepEqual(leftovers(), []);
   });
-
-  await t.test('a new daemon that ends before its first pass is a Conflict naming its log, and the store stays paused', async () => {
+  test('a new daemon that ends before its first pass is a Conflict naming its log, and the store stays paused', async () => {
     unitOn(path.join(ROOT, 'releases', 'current'));
     const world: World = { lease: lease(OLD), unitPid: OLD };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
@@ -426,8 +423,17 @@ test("nemia upgrade is classed ask and is the CLI's alone; Nemia's fence asks fo
   assert.ok(nemiaFence(TABLE).allow.includes('Bash(nemia version)'), 'version is a read');
 });
 
-test('an upgrade removes the releases no one needs: not the two newest, not one a session runs on, nothing while a build is under way', async (t) => {
-  const s = story(t);
+describe('an upgrade removes the releases no one needs: not the two newest, not one a session runs on, nothing while a build is under way', () => {
+  beforeAll(async () => {
+    const t = teardowns();
+    await run({ tag: 'v1', repo: REPO }, idle().host);
+    await run({ tag: 'v2', repo: REPO }, idle().host);
+    tagged('v6', 'six');
+    tagged('v7', 'seven');
+    tagged('v8', 'eight');
+    return t.end;
+  });
+  const s = story(test);
   const e = () => engineOf(engine().layer);
   const runOn = (args: Args) => runWith(e(), upgrade(args, idle().host, ENV));
   const installed = () =>
@@ -435,13 +441,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
       .readdirSync(releasesDir(ROOT))
       .filter((f) => !f.startsWith('.') && f !== 'current')
       .sort();
-  await run({ tag: 'v1', repo: REPO }, idle().host);
-  await run({ tag: 'v2', repo: REPO }, idle().host);
-  tagged('v6', 'six');
-  tagged('v7', 'seven');
-  tagged('v8', 'eight');
-
-  await s.test('v6 built after v1 and v2 removes v1, which is neither of the two newest nor run on', async () => {
+  s.test('v6 built after v1 and v2 removes v1, which is neither of the two newest nor run on', async () => {
     const done = await runOn({ tag: 'v6', repo: REPO });
     assert.deepEqual(done.removed, ['v1']);
     assert.equal(fs.existsSync(releaseDir('v1', ROOT)), false);
@@ -451,8 +451,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
     );
     assert.deepEqual(installed(), ['v2', 'v6']);
   });
-
-  await s.test('a session at work on v2 keeps it when v7 makes it the oldest', async () => {
+  s.test('a session at work on v2 keeps it when v7 makes it the oldest', async () => {
     const engineNow = e();
     await Effect.runPromise(engineNow.file({ id: 'on-v2', brief: 'b', cwd: '/r', harness: 'claude' }));
     engine().settle('on-v2', 'working', { image: path.join(fs.realpathSync(releasesDir(ROOT)), 'v2', 'packages', 'agent-runtime') });
@@ -460,8 +459,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
     assert.deepEqual(done.removed, []);
     assert.deepEqual(installed(), ['v2', 'v6', 'v7']);
   });
-
-  await s.test('a build under way in another upgrade holds every removal', async () => {
+  s.test('a build under way in another upgrade holds every removal', async () => {
     const building = path.join(releasesDir(ROOT), `.building-vx-${process.pid}`);
     fs.mkdirSync(building);
     try {
@@ -472,8 +470,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
       fs.rmSync(building, { recursive: true, force: true });
     }
   });
-
-  await s.test('once nothing holds, a rollback to v7 removes v2 and v6', async () => {
+  s.test('once nothing holds, a rollback to v7 removes v2 and v6', async () => {
     engine().settle('on-v2', 'succeeded', {});
     const done = await runOn({ tag: 'v7', repo: REPO });
     assert.equal(done.built, false);
@@ -481,8 +478,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
     assert.deepEqual(installed(), ['v7', 'v8']);
     assert.deepEqual(leftovers(), []);
   });
-
-  await s.test(
+  s.test(
     "a crashed upgrade's build folder is removed by the next upgrade, which says so, and only a log over 30 days old goes",
     async () => {
       const crashed = path.join(releasesDir(ROOT), `.building-v9-${DEAD}`);
@@ -510,11 +506,15 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   );
 });
 
-test("the new tree's nemia doctor carry runs on the store before the switch: its failure switches nothing, its pass switches", async (t) => {
-  const s = story(t);
-  const before = currentRelease(ROOT)?.tag;
-
-  await s.test('a carry that exits 1 is Invalid, and releases/current stays where it was with no release placed', async () => {
+describe("the new tree's nemia doctor carry runs on the store before the switch: its failure switches nothing, its pass switches", () => {
+  let before!: string | undefined;
+  beforeAll(() => {
+    const t = teardowns();
+    before = currentRelease(ROOT)?.tag;
+    return t.end;
+  });
+  const s = story(test);
+  s.test('a carry that exits 1 is Invalid, and releases/current stays where it was with no release placed', async () => {
     tagged('v10', 'ten', scripts(), 1);
     fs.rmSync(CARRIED, { force: true });
     const { tag, message } = await refusalOf({ tag: 'v10', repo: REPO }, idle().host);
@@ -525,8 +525,7 @@ test("the new tree's nemia doctor carry runs on the store before the switch: its
     assert.deepEqual(leftovers(), []);
     assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry ${ROOT}`], 'run once, on the store');
   });
-
-  await s.test('a carry that exits 0, from a tree whose cli refuses --local on every verb, lets the upgrade switch to it', async () => {
+  s.test('a carry that exits 0, from a tree whose cli refuses --local on every verb, lets the upgrade switch to it', async () => {
     tagged('v11', 'eleven');
     fs.rmSync(CARRIED, { force: true });
     const done = await run({ tag: 'v11', repo: REPO }, idle().host);
@@ -536,9 +535,16 @@ test("the new tree's nemia doctor carry runs on the store before the switch: its
   });
 });
 
-test('an upgrade onto a release whose read is not ready says each missing piece a run waits on and its fix, and still succeeds', async (t) => {
-  const s = story(t);
-  const pointer = path.join(releasesDir(ROOT), 'current');
+describe('an upgrade onto a release whose read is not ready says each missing piece a run waits on and its fix, and still succeeds', () => {
+  let pointer!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    pointer = path.join(releasesDir(ROOT), 'current');
+    tagged('v12', 'twelve');
+    tagged('v13', 'thirteen');
+    return t.end;
+  });
+  const s = story(test);
   const onPointer = () => {
     unitOn(pointer);
     const world: World = { lease: lease(OLD), unitPid: OLD };
@@ -564,10 +570,7 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
     fixes: [],
     cost: 'server',
   };
-  tagged('v12', 'twelve');
-  tagged('v13', 'thirteen');
-
-  await s.test(
+  s.test(
     'restarted onto a release that reads two pieces missing: each is said with its fix, after the restart, and it succeeds',
     async () => {
       readAs({ ready: false, pieces: [piece('mise'), piece('repository-toolchain'), linger] });
@@ -596,8 +599,7 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
       }
     },
   );
-
-  await s.test(
+  s.test(
     "a person whose context is a remote server still has this machine's store read: the read runs under the context local",
     async () => {
       fs.rmSync(CARRIED, { force: true });
@@ -611,8 +613,7 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
       }
     },
   );
-
-  await s.test(
+  s.test(
     'restarted onto a release whose doctor finds memory-fit missing: the piece and its fix are said last, and it succeeds',
     async () => {
       const fit: ReadinessPiece = {
@@ -639,8 +640,7 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
       }
     },
   );
-
-  await s.test('restarted onto a release that reads ready: one line, last, says the machine and its service miss nothing', async () => {
+  s.test('restarted onto a release that reads ready: one line, last, says the machine and its service miss nothing', async () => {
     try {
       const done = await run({ tag: 'v13', repo: REPO }, onPointer());
       const restart = done.lines.findIndex((l) => l.includes(`onto v13: the service ticks the store as pid ${NEW}`));
@@ -653,8 +653,7 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
       fs.rmSync(UNIT, { force: true });
     }
   });
-
-  await s.test(
+  s.test(
     "a read the server refused, the client's token missing, says no run is held: one line naming the token's fix, and it succeeds",
     async () => {
       const client = (name: string, cost: ReadinessPiece['cost'], command?: string): ReadinessPiece => ({
@@ -685,8 +684,7 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
       }
     },
   );
-
-  await s.test('a read that does not answer is one line naming nemia doctor, and the upgrade still succeeds', async () => {
+  s.test('a read that does not answer is one line naming nemia doctor, and the upgrade still succeeds', async () => {
     fs.writeFileSync(READ, 'not json');
     try {
       const done = await run({ tag: 'v12', repo: REPO }, onPointer());

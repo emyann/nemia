@@ -4,7 +4,7 @@
  * refusal from a crash. The verbs' own tests read `exitCode` off what `main` throws; only a process shows what `nemia` exits with.
  * A fake `claude` and `codex` first on PATH, so nothing real is asked.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

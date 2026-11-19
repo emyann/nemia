@@ -8,7 +8,7 @@
  * record, both through the Factory door at the root the handler is given as it is typed (`StoreRoot`, `storeConfigLayer` of the
  * process's environment), which is what that test pins. `default` has a record and no file, so the test plants only the record.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -109,24 +109,24 @@ const typedIn =
   async (t: TestContext, e: Engine, ...argv: string[]) => {
     const out: string[] = [];
     const err: string[] = [];
-    const log = t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
-    const error = t.mock.method(console, 'error', (...a: unknown[]) => err.push(a.join(' ')));
+    const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => out.push(a.join(' ')));
+    const error = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => err.push(a.join(' ')));
     try {
       await main(argv, e, undefined, stand().place, env);
     } finally {
-      log.mock.restore();
-      error.mock.restore();
+      log.mockRestore();
+      error.mockRestore();
     }
     return { out, err };
   };
 /** `typedIn` this file's store, `ENV`. */
 const typed = typedIn(ENV);
 
-test('wf, the alias, writes its one hint line on stderr before the help, and nothing of it on stdout', async (t: TestContext) => {
+test('wf, the alias, writes its one hint line on stderr before the help, and nothing of it on stdout', async () => {
   const out: string[] = [];
   const err: string[] = [];
-  t.mock.method(process.stderr, 'write', (chunk: string) => err.push(chunk) > 0);
-  t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
+  vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string) => err.push(chunk) > 0) as never);
+  vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => out.push(a.join(' ')));
   await aliased([]);
   assert.deepEqual(err, [`${WF_HINT}\n`]);
   assert.deepEqual(out, [HELP]);
@@ -269,26 +269,61 @@ test('nemia logs: a step that has not run, and the output of one that has, from 
   assert.deepEqual(await answered(b.e, 'logs', run.id, 'deploy'), {}, 'a step the run lacks has not run');
 });
 
-test("REFUSED at shipped defaults, by a store verb's own words: a word or a flag where a verb takes none, Invalid with exit 2, and nothing done", async (t) => {
-  const b = board();
-  const run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
-  const rows: Array<[string, string[], string[]]> = [
-    ["cancel, a word after the run's id", ['cancel', run.id, 'extra'], ['nemia cancel', "one run's id", 'not extra.']],
-    ["cancel, a flag after the run's id", ['cancel', run.id, '--now'], ['nemia cancel', "one run's id", 'not --now.']],
-    ['logs, a flag where the run stands', ['logs', '--x', 'implement'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
-    ['logs, a flag where the step stands', ['logs', 'r-1', '--x'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
-    ["cancel, a flag before the run's id", ['cancel', '--now', run.id], ['nemia cancel', "one run's id", 'not --now.']],
+describe("REFUSED at shipped defaults, by a store verb's own words: a word or a flag where a verb takes none, Invalid with exit 2, and nothing done", () => {
+  let b!: ReturnType<typeof board>;
+  let run!: import('../start/start.verb.ts').StartedRun;
+  beforeAll(async () => {
+    b = board();
+    run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
+  });
+  const rows: Array<[string, () => [string[], string[]]]> = [
+    [
+      "cancel, a word after the run's id",
+      () => [
+        ['cancel', run.id, 'extra'],
+        ['nemia cancel', "one run's id", 'not extra.'],
+      ],
+    ],
+    [
+      "cancel, a flag after the run's id",
+      () => [
+        ['cancel', run.id, '--now'],
+        ['nemia cancel', "one run's id", 'not --now.'],
+      ],
+    ],
+    [
+      'logs, a flag where the run stands',
+      () => [
+        ['logs', '--x', 'implement'],
+        ['nemia logs', "one run's id and one step's name", 'not --x.'],
+      ],
+    ],
+    [
+      'logs, a flag where the step stands',
+      () => [
+        ['logs', 'r-1', '--x'],
+        ['nemia logs', "one run's id and one step's name", 'not --x.'],
+      ],
+    ],
+    [
+      "cancel, a flag before the run's id",
+      () => [
+        ['cancel', '--now', run.id],
+        ['nemia cancel', "one run's id", 'not --now.'],
+      ],
+    ],
   ];
-  for (const [row, argv, said] of rows)
-    await t.test(row, () =>
-      assert.rejects(answered(b.e, ...argv), (err: Error & { _tag?: string; exitCode?: number }) => {
+  for (const [row, later] of rows)
+    test(row, () => {
+      const [argv, said] = later();
+      return assert.rejects(answered(b.e, ...argv), (err: Error & { _tag?: string; exitCode?: number }) => {
         assert.equal(err._tag, 'Invalid');
         assert.equal(err.exitCode, 2);
         for (const fix of said) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
         return true;
-      }),
-    );
-  await t.test('nothing cancelled', () => assert.equal(runRecord(ROOT, run.id).cancelledAt, undefined));
+      });
+    });
+  test('nothing cancelled', () => assert.equal(runRecord(ROOT, run.id).cancelledAt, undefined));
 });
 
 test('nemia approve of a loop out of rounds: what it accepted, and the file it wrote', async () => {

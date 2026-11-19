@@ -5,7 +5,7 @@
  * page that breaks nothing passes, pictured by no one unless `--photos` asks. checks.test.ts proves the
  * watch hears each problem; this proves hearing one fails the run. Needs Chromium, like checks.test.ts.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';

@@ -1,5 +1,5 @@
 /** A test file whose one test files on an engine it holds unasked (`heldUnasked`): run as a child, it must fail. */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { Effect } from 'effect';
 import { Engine } from 'agent-runtime';
 import { testEngine } from 'agent-runtime/testing';

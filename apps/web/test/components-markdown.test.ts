@@ -11,7 +11,7 @@
  * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one. Registered before
  * the components are imported, so every import of one below is dynamic. `npm run e2e` looks at the same components on the pages.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
 

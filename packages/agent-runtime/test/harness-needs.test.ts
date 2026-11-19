@@ -9,7 +9,7 @@
  * The order a Claude Code is found in is read on folders planted here: the one named, then `<harnessBin>/claude` where it exists, read
  * at every call, then the SDK's bundled one, then `claude` on PATH.
  */
-import test from 'node:test';
+import { afterAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -40,9 +40,9 @@ test("Claude Code's pin is the Claude Code the pinned Agent SDK bundles, install
   assert.ok(needs.install.includes(`${SDK}-`), "the install takes the SDK's platform package");
 });
 
-test('each harness that runs a brief declares what it needs on a machine, and a command needs nothing', async (t) => {
+describe('each harness that runs a brief declares what it needs on a machine, and a command needs nothing', () => {
   for (const [name, declared] of Object.entries(HARNESS_DECLARATIONS)) {
-    await t.test(name, () => {
+    test(name, () => {
       if (declared.runsBrief !== true) return assert.equal(declared.needs, undefined, `${name} runs no brief and needs nothing`);
       const needs = declared.needs;
       assert.ok(needs, `${name} runs a brief and declares its needs`);
@@ -56,7 +56,9 @@ test('each harness that runs a brief declares what it needs on a machine, and a 
       assert.ok(needs.signIn.fixes.length > 0, `${name} says how to sign in`);
     });
   }
-  assert.equal(HARNESS_DECLARATIONS.command?.needs, undefined);
+  afterAll(() => {
+    assert.equal(HARNESS_DECLARATIONS.command?.needs, undefined);
+  });
 });
 
 /** An executable file at `at`, its folder made. */
@@ -96,7 +98,7 @@ const withPath = <A>(dir: string, run: () => A): A => {
   }
 };
 
-test('claudeExecutableOf: the one named, then the harnessBin, then the SDK bundled, then PATH', async (t) => {
+describe('claudeExecutableOf: the one named, then the harnessBin, then the SDK bundled, then PATH', () => {
   const bin = scratch('ae-harness-needs-bin-');
   const inBin = planted(path.join(bin, 'claude'));
   const emptyBin = scratch('ae-harness-needs-empty-bin-');
@@ -121,13 +123,13 @@ test('claudeExecutableOf: the one named, then the harnessBin, then the SDK bundl
     { case: 'none anywhere: none', harnessBin: emptyBin, from: none.from, path: emptyPath, found: undefined },
   ];
   for (const row of rows)
-    await t.test(row.case, () => {
+    test(row.case, () => {
       assert.equal(
         withPath(row.path, () => claudeExecutableOf(row.named, row.harnessBin, row.from)),
         row.found,
       );
     });
-  await t.test('the harnessBin is read at every call: a claude put there after the first is found by the next', () => {
+  test('the harnessBin is read at every call: a claude put there after the first is found by the next', () => {
     const later = scratch('ae-harness-needs-later-');
     assert.equal(
       withPath(emptyPath, () => claudeExecutableOf(undefined, later, none.from)),

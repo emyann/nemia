@@ -5,7 +5,7 @@
  * (`factoryDoorMemory`), which the command is given: nothing here reads the disk. A run freezing the line at its start, and the lines
  * typed at the command line, are a person's story in `test/factory-start.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Schema } from 'effect';
 import { scratch } from 'test-kit/scratch';
@@ -49,9 +49,14 @@ function planted() {
   };
 }
 
-test('a cost line set, replaced and taken back, each write moving the generation', async (t) => {
-  const { door, set, rm } = planted();
-  await t.test('set: written into the factory, its generation moved', async () => {
+describe('a cost line set, replaced and taken back, each write moving the generation', () => {
+  let door!: import('../door/factories.store.ts').FactoryDoorShape;
+  let set!: (input: SetInput) => Promise<import('./cost-line.verb.ts').CostLineSet>;
+  let rm!: (input: CostLineRmInput) => Promise<import('./cost-line.verb.ts').CostLineRemoved>;
+  beforeAll(() => {
+    ({ door, set, rm } = planted());
+  });
+  test('set: written into the factory, its generation moved', async () => {
     const before = readFiled(door, 'mill').generation ?? 1;
     const said = await set({ factory: 'mill', workflow: 'build', usd: 80 });
     assert.deepEqual([said.usd, said.replaced], [80, null]);
@@ -59,12 +64,12 @@ test('a cost line set, replaced and taken back, each write moving the generation
     assert.deepEqual(after.costLines, { build: 80 });
     assert.equal(after.generation, before + 1);
   });
-  await t.test('a second set of the workflow replaces the first, and another workflow has its own', async () => {
+  test('a second set of the workflow replaces the first, and another workflow has its own', async () => {
     assert.equal((await set({ factory: 'mill', workflow: 'build', usd: 95 })).replaced, 80);
     await set({ factory: 'mill', workflow: 'intake', usd: 5 });
     assert.deepEqual(readFiled(door, 'mill').costLines, { build: 95, intake: 5 });
   });
-  await t.test('rm takes one back, and the key goes once none is left', async () => {
+  test('rm takes one back, and the key goes once none is left', async () => {
     await rm({ factory: 'mill', workflow: 'build' });
     assert.deepEqual(readFiled(door, 'mill').costLines, { intake: 5 });
     await rm({ factory: 'mill', workflow: 'intake' });
@@ -72,9 +77,11 @@ test('a cost line set, replaced and taken back, each write moving the generation
   });
 });
 
-test('REFUSED: `nemia factory cost-line set` and `rm`, by kind and exit 2, nothing written', async (t) => {
+describe('REFUSED: `nemia factory cost-line set` and `rm`, by kind and exit 2, nothing written', () => {
+  beforeAll(async () => {
+    await set({ factory: 'mill', workflow: 'build', usd: 80 });
+  });
   const { door, set, rm } = planted();
-  await set({ factory: 'mill', workflow: 'build', usd: 80 });
   const rows: Array<[string, () => Promise<unknown>, 'Invalid' | 'Missing']> = [
     ['a line of no dollars', () => set({ factory: 'mill', workflow: 'build', usd: 0 }), 'Invalid'],
     ['a line below zero', () => set({ factory: 'mill', workflow: 'build', usd: -1 }), 'Invalid'],
@@ -88,7 +95,7 @@ test('REFUSED: `nemia factory cost-line set` and `rm`, by kind and exit 2, nothi
     ['an rm of a line not set', () => rm({ factory: 'mill', workflow: 'intake' }), 'Missing'],
   ];
   for (const [row, act, tag] of rows)
-    await t.test(row, async () => {
+    test(row, async () => {
       await assert.rejects(act(), (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
         return true;
@@ -98,13 +105,12 @@ test('REFUSED: `nemia factory cost-line set` and `rm`, by kind and exit 2, nothi
     });
 });
 
-test('the command line: an amount in digits is taken and decoded to dollars; anything else is refused by the check, before anything is read', async (t) => {
-  await t.test('80 and 12.50 taken, and decoded', () => {
+describe('the command line: an amount in digits is taken and decoded to dollars; anything else is refused by the check, before anything is read', () => {
+  test('80 and 12.50 taken, and decoded', () => {
     assert.equal(FACTORY_COST_LINE_SET.check?.({ factory: 'mill', workflow: 'build', usd: '80' }), null);
     assert.equal(Schema.decodeUnknownSync(CostLineSetInput)({ factory: 'mill', workflow: 'build', usd: '12.50' }).usd, 12.5);
   });
   for (const usd of ['abc', '0', '$80', '1e3'])
-    await t.test(`REFUSED: ${usd}`, () =>
-      assert.equal(typeof FACTORY_COST_LINE_SET.check?.({ factory: 'mill', workflow: 'build', usd }), 'string'),
-    );
+    test(`REFUSED: ${usd}`, () =>
+      assert.equal(typeof FACTORY_COST_LINE_SET.check?.({ factory: 'mill', workflow: 'build', usd }), 'string'));
 });

@@ -11,7 +11,8 @@
  * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run of its
  * store, at `ROOT`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -172,11 +173,15 @@ const through = (memo: ReturnType<typeof freshStatsMemo>) => runWith(e, rooted(s
 /** A call with no memo, which reads every run afresh: what every call through the memo must answer. */
 const afresh = () => runWith(e, rooted(statsRun({}, NOW)));
 
-test("A serving process's memo: each call reads again only the runs whose inputs changed, and answers what a fresh read answers", async (t) => {
-  const s = story(t);
-  const memo = freshStatsMemo();
-
-  await s.test('the first call reads every run, and keeps every finished run and nothing of the one in flight', async () => {
+describe("A serving process's memo: each call reads again only the runs whose inputs changed, and answers what a fresh read answers", () => {
+  let memo!: import('./stats.verb.ts').StatsMemo;
+  beforeAll(() => {
+    const t = teardowns();
+    memo = freshStatsMemo();
+    return t.end;
+  });
+  const s = story(test);
+  s.test('the first call reads every run, and keeps every finished run and nothing of the one in flight', async () => {
     const first = await through(memo);
     assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
     assert.equal(memo.runs.has('s-moving'), false, 'nothing kept of the run in flight');
@@ -187,18 +192,13 @@ test("A serving process's memo: each call reads again only the runs whose inputs
     assert.deepStrictEqual(first, await afresh());
     viewedRuns();
   });
-
-  await s.test(
-    'a second call on a store whose runs are as they were views no task of a finished run, and reads the one in flight',
-    async () => {
-      const second = await through(memo);
-      assert.deepEqual(viewedRuns(), ['s-moving']);
-      assert.deepStrictEqual(second, await afresh());
-      viewedRuns();
-    },
-  );
-
-  await s.test('a run whose files in the store changed is read again, and no other', async () => {
+  s.test('a second call on a store whose runs are as they were views no task of a finished run, and reads the one in flight', async () => {
+    const second = await through(memo);
+    assert.deepEqual(viewedRuns(), ['s-moving']);
+    assert.deepStrictEqual(second, await afresh());
+    viewedRuns();
+  });
+  s.test('a run whose files in the store changed is read again, and no other', async () => {
     fs.writeFileSync(path.join(ROOT, 'runs', 's-b.cancelled'), `${ended}\n`);
     const answer = await through(memo);
     assert.deepEqual(viewedRuns(), ['s-b', 's-moving']);
@@ -207,16 +207,14 @@ test("A serving process's memo: each call reads again only the runs whose inputs
     await through(memo);
     viewedRuns();
   });
-
-  await s.test("a line on the engine's feed for a run's task takes the run out of the memo, and no other", async () => {
+  s.test("a line on the engine's feed for a run's task takes the run out of the memo, and no other", async () => {
     await journal.append('s-c-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 5 } });
     const answer = await through(memo);
     assert.deepEqual(viewedRuns(), ['s-c', 's-moving']);
     assert.deepStrictEqual(answer, await afresh());
     viewedRuns();
   });
-
-  await s.test('a run gone from the store is gone from the memo and from the answer', async () => {
+  s.test('a run gone from the store is gone from the memo and from the answer', async () => {
     await aRun('s-gone', 7);
     await through(memo);
     assert.equal(memo.runs.has('s-gone'), true);
@@ -227,8 +225,7 @@ test("A serving process's memo: each call reads again only the runs whose inputs
     assert.equal(answer.all.total.runs, FINISHED.length, 's-gone no longer counted');
     viewedRuns();
   });
-
-  await s.test(
+  s.test(
     'a run whose workflow is not frozen on its record is never kept: its steps are read off its folder, which no stamp covers',
     async () => {
       const folder = path.join(ROOT, 'unfrozen');
@@ -244,8 +241,7 @@ test("A serving process's memo: each call reads again only the runs whose inputs
       viewedRuns();
     },
   );
-
-  await s.test(
+  s.test(
     'a run a journal of which does not read is left out and named, what it froze still compared, never kept, and counted again once it reads, with no line on the feed',
     async () => {
       await aRun('s-spoiled', 5, true, undefined, 'Implement it again.');
@@ -269,8 +265,7 @@ test("A serving process's memo: each call reads again only the runs whose inputs
       viewedRuns();
     },
   );
-
-  await s.test('verify reads every run the memo answers afresh, and refuses one that differs, naming it', async () => {
+  s.test('verify reads every run the memo answers afresh, and refuses one that differs, naming it', async () => {
     const fresh = await through(memo);
     const kept = memo.runs.get('s-a')?.read;
     assert.ok(kept, 's-a is kept');
@@ -283,16 +278,14 @@ test("A serving process's memo: each call reads again only the runs whose inputs
     );
     viewedRuns();
   });
-
-  await s.test('a feed that went back empties the memo, and the next call reads every run', async () => {
+  s.test('a feed that went back empties the memo, and the next call reads every run', async () => {
     memo.cursor = Number.MAX_SAFE_INTEGER - 1;
     const answer = await through(memo);
     assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
     assert.deepStrictEqual(answer, await afresh(), 'the stale s-a read is gone with the rest');
     viewedRuns();
   });
-
-  await s.test('an engine whose feed does not read, or with no feed, answers nothing from memory, and keeps nothing', async () => {
+  s.test('an engine whose feed does not read, or with no feed, answers nothing from memory, and keeps nothing', async () => {
     const unfed = { ...e, feed: () => Effect.fail(new Error('the feed does not read') as never) };
     await runWith(unfed, rooted(statsRun({}, NOW, { memo, ...unverified })));
     assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);

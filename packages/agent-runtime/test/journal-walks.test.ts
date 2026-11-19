@@ -3,7 +3,7 @@
  * keeping each event whole. Then that the table bites: a door that lets a refused append through fails every invariant's walk, and a
  * method no walk asks is named.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, type Layer } from 'effect';
 import { Journal } from '../src/core/engine/journal.ts';

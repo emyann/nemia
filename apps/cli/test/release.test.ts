@@ -6,7 +6,7 @@
  * (`contracts/release.contract.ts`). A daemon let through whose answer does not decode by the `Api`'s Schema is refused all the same,
  * exit 2, naming its release and `nemia version` (`undecoded`, `src/objects.ts`): the decode guards what an unsaid release lets through.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -35,7 +35,7 @@ const shapeless = http.createServer((req, res) => {
 });
 const servers = [v9, unsaid, shapeless];
 for (const server of servers) await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   for (const server of servers) {
     server.closeAllConnections();
     server.close();

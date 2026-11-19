@@ -4,7 +4,7 @@
  * (`root`).
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { afterEach, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,12 +72,12 @@ const passAt = (at: string, unobserved?: string[]): PassCostRead => ({
 
 const UNREAD = ['harness `claude`: claude agents: timed out'];
 
-test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it, and the file never written', async (t) => {
-  t.afterEach(() => {
+describe('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it, and the file never written', () => {
+  afterEach(() => {
     fs.rmSync(FILE, { recursive: true, force: true });
     fs.rmSync(STATS, { force: true });
   });
-  await t.test('with no daemon.json, nothing ticks the store, and the api makes none', async () => {
+  test('with no daemon.json, nothing ticks the store, and the api makes none', async () => {
     const d = await get();
     assert.equal(d.kind, 'none');
     assert.equal(d.ticking, false);
@@ -89,7 +89,7 @@ test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it
     assert.deepEqual([d.by, d.url, d.start], [null, null, 'npm start in apps/api']);
     assert.equal(fs.existsSync(FILE), false);
   });
-  await t.test('a live nemia up heard from recently is ticking: its pid, where, since when, and its last pass', async () => {
+  test('a live nemia up heard from recently is ticking: its pid, where, since when, and its last pass', async () => {
     const file = written(3_000);
     put(file);
     const d = await get();
@@ -107,30 +107,27 @@ test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it
     assert.match(d.line, new RegExp(`^nemia up: ticking, pid ${process.pid}, every 4000ms — last pass `));
     assert.deepEqual([d.by, d.url], ['nemia up', null], 'a file that names no holder is a nemia up');
   });
-  await t.test('a live api holding the store is ticking as the api, at the url it serves the board on', async () => {
+  test('a live api holding the store is ticking as the api, at the url it serves the board on', async () => {
     put(written(3_000, { by: 'api', url: 'http://127.0.0.1:8787' }));
     const d = await get();
     assert.equal(d.ticking, true);
     assert.deepEqual([d.by, d.url, d.start], ['api', 'http://127.0.0.1:8787', 'npm start in apps/api']);
     assert.match(d.line, new RegExp(`^api: ticking, pid ${process.pid} at http://127\\.0\\.0\\.1:8787, every 4000ms — `));
   });
-  await t.test('a pass that runs long is still ticking: silence is measured from the beat, not from the last pass', async () => {
+  test('a pass that runs long is still ticking: silence is measured from the beat, not from the last pass', async () => {
     put(written(3_000, { passedAt: ago(30 * MIN) }));
     const d = await get();
     assert.equal(d.kind, 'ticking');
     assert.equal(d.ticking, true);
   });
-  await t.test(
-    'a live nemia up is judged on the monotonic clock: wall stamps a stepped clock left twenty minutes behind are still ticking',
-    async () => {
-      const boot = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
-      const mono = { boot, ms: Number(process.hrtime.bigint() / 1_000_000n) };
-      put(written(20 * MIN, { startedMono: mono, passedMono: mono, beatMono: mono }));
-      const d = await get();
-      assert.equal(d.kind, 'ticking', d.line);
-    },
-  );
-  await t.test('REFUSED: a live nemia up silent past the stale mark is stalled, not ticking', async () => {
+  test('a live nemia up is judged on the monotonic clock: wall stamps a stepped clock left twenty minutes behind are still ticking', async () => {
+    const boot = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    const mono = { boot, ms: Number(process.hrtime.bigint() / 1_000_000n) };
+    put(written(20 * MIN, { startedMono: mono, passedMono: mono, beatMono: mono }));
+    const d = await get();
+    assert.equal(d.kind, 'ticking', d.line);
+  });
+  test('REFUSED: a live nemia up silent past the stale mark is stalled, not ticking', async () => {
     const at = ago(20 * MIN);
     const file = written(20 * MIN, { passedAt: at, beatAt: at });
     put(file);
@@ -145,7 +142,7 @@ test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it
     assert.equal(silent, lastPass, 'beat and pass at the same instant, judged at the same now: the same silence');
     assert.equal(passedAt, file.passedAt, "the file's last pass, as written");
   });
-  await t.test('REFUSED: a nemia up that said it stopped is stopped, though its process lives', async () => {
+  test('REFUSED: a nemia up that said it stopped is stopped, though its process lives', async () => {
     const stoppedAt = ago(5 * MIN);
     put(written(5 * MIN, { stoppedAt }));
     const d = await get();
@@ -153,7 +150,7 @@ test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it
     assert.equal(d.ticking, false);
     assert.equal(d.stoppedAt, stoppedAt);
   });
-  await t.test('REFUSED: a nemia up whose process is gone is gone, however recently it passed', async () => {
+  test('REFUSED: a nemia up whose process is gone is gone, however recently it passed', async () => {
     put(written(1_000, { pid: NO_PID }));
     const d = await get();
     assert.equal(d.kind, 'gone');
@@ -161,14 +158,14 @@ test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it
     assert.equal(d.pid, NO_PID);
     assert.equal(d.identity, 'gone');
   });
-  await t.test("REFUSED: a daemon.json that does not read as a nemia up's is unreadable, and the api leaves it as it is", async () => {
+  test("REFUSED: a daemon.json that does not read as a nemia up's is unreadable, and the api leaves it as it is", async () => {
     put('{"pid": "not a pid"}\n');
     const d = await get();
     assert.equal(d.kind, 'unreadable');
     assert.equal(d.ticking, false);
     assert.equal(d.pid, null);
   });
-  await t.test('REFUSED: a daemon.json that cannot be read is a 500 that says why, and not a store called free', async () => {
+  test('REFUSED: a daemon.json that cannot be read is a 500 that says why, and not a store called free', async () => {
     fs.mkdirSync(FILE);
     const res = await app.request('/api/daemon');
     assert.equal(res.status, 500);
@@ -176,28 +173,25 @@ test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it
     assert.match(error, /EISDIR/);
     assert.equal(fs.statSync(FILE).isDirectory(), true);
   });
-  await t.test(
-    'a ticking daemon whose last pass could not read a harness says why; nobody else says it, nor a pass from before it started',
-    async () => {
-      put(written(0));
-      fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString(), UNREAD)));
-      assert.deepEqual((await get()).unobserved, UNREAD);
-      fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString())));
-      assert.deepEqual((await get()).unobserved, [], 'a pass that read every harness says nothing');
-      fs.writeFileSync(STATS, JSON.stringify(passAt(ago(41 * MIN), UNREAD)));
-      assert.deepEqual((await get()).unobserved, [], 'REFUSED: the last pass of a daemon before this one');
-      fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString(), UNREAD)));
-      put(written(0, { stoppedAt: new Date().toISOString() }));
-      assert.equal((await get()).kind, 'stopped');
-      assert.deepEqual((await get()).unobserved, [], 'REFUSED: a daemon that stopped reads nothing now');
-      fs.rmSync(FILE);
-      assert.deepEqual((await get()).unobserved, [], 'nor where none ever ran');
-    },
-  );
+  test('a ticking daemon whose last pass could not read a harness says why; nobody else says it, nor a pass from before it started', async () => {
+    put(written(0));
+    fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString(), UNREAD)));
+    assert.deepEqual((await get()).unobserved, UNREAD);
+    fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString())));
+    assert.deepEqual((await get()).unobserved, [], 'a pass that read every harness says nothing');
+    fs.writeFileSync(STATS, JSON.stringify(passAt(ago(41 * MIN), UNREAD)));
+    assert.deepEqual((await get()).unobserved, [], 'REFUSED: the last pass of a daemon before this one');
+    fs.writeFileSync(STATS, JSON.stringify(passAt(new Date().toISOString(), UNREAD)));
+    put(written(0, { stoppedAt: new Date().toISOString() }));
+    assert.equal((await get()).kind, 'stopped');
+    assert.deepEqual((await get()).unobserved, [], 'REFUSED: a daemon that stopped reads nothing now');
+    fs.rmSync(FILE);
+    assert.deepEqual((await get()).unobserved, [], 'nor where none ever ran');
+  });
 });
 
-test("daemonOf: the standing as facts, nemia ls's line with them, and what the last pass could not read", async (t) => {
-  await t.test("daemonOf: the standing as facts, and nemia ls's line with them", () => {
+describe("daemonOf: the standing as facts, nemia ls's line with them, and what the last pass could not read", () => {
+  test("daemonOf: the standing as facts, and nemia ls's line with them", () => {
     const now = Date.parse('2026-09-22T10:00:00.000Z');
     const file: DaemonFile = {
       pid: 42,
@@ -239,7 +233,7 @@ test("daemonOf: the standing as facts, nemia ls's line with them, and what the l
       );
     }
   });
-  await t.test("daemonOf: nemia ls's line on where the branches stand, none while a ticking daemon read them lately", () => {
+  test("daemonOf: nemia ls's line on where the branches stand, none while a ticking daemon read them lately", () => {
     const now = Date.parse('2026-09-22T10:00:00.000Z');
     const file: DaemonFile = {
       pid: 42,
@@ -256,7 +250,7 @@ test("daemonOf: the standing as facts, nemia ls's line with them, and what the l
     assert.ok(stale?.includes('1h00m'), 'read an hour ago, past the floor, says how long ago');
     assert.ok(daemonOf({ kind: 'none' }, now, null, { none: true }).branchesLine, 'no pass read them');
   });
-  await t.test('daemonOf: what the last pass could not read is said only of a ticking daemon, by a pass since its start', () => {
+  test('daemonOf: what the last pass could not read is said only of a ticking daemon, by a pass since its start', () => {
     const now = Date.parse('2026-09-22T10:00:00.000Z');
     const file: DaemonFile = {
       pid: 42,

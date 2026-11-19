@@ -3,7 +3,7 @@
  * taken with it, a key removed, an absent one said as no change (the verb reads no status, so a finished run is labelled as any), a
  * card's other keys and body kept, and the refusals — each by its kind, exit 2 and the facts it names.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import { names } from '../../test/assessed.ts';
@@ -83,7 +83,7 @@ test('`nemia label inbox`: its labels: written, every other key and the body kep
   assert.deepEqual(read.again.labels, { team: 'core' });
 });
 
-test('REFUSED: an unknown run, an unknown card, a malformed edit, a reserved key, no edit at all — by kind, exit 2 and the facts named', async (t) => {
+describe('REFUSED: an unknown run, an unknown card, a malformed edit, a reserved key, no edit at all — by kind, exit 2 and the facts named', () => {
   const rows: Record<string, [Effect.Effect<unknown, unknown>, tag: string, facts: string[]]> = {
     'a run the store does not have': [labelRun('r-gone', ['team=core']), 'Missing', ['r-gone', 'nemia ls']],
     'a card the inbox does not have': [labelCard('gone-b2', ['team=core']), 'Missing', ['gone-b2', 'nemia inbox', 'cache-a1']],
@@ -94,7 +94,7 @@ test('REFUSED: an unknown run, an unknown card, a malformed edit, a reserved key
     'an id that is not a run’s': [labelRun('R 1', ['team=core']), 'Invalid', ['"R 1"']],
   };
   for (const [row, [program, tag, facts]] of Object.entries(rows))
-    await t.test(row, () => {
+    test(row, () => {
       const err = refusal(over(program));
       assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
       names(err.message, ...facts);

@@ -3,7 +3,7 @@
  * memory stand-in, each on a stand-in of its own. And what only the files can be asked: the file a delegation is kept at, and a file
  * that does not read refused `Invalid`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -3,7 +3,7 @@
  * from `src/routeTree.gen.ts`, has a seat, and each route under `/factories/<name>` sits in that factory at a place of its pane; a route
  * with no seat is refused, named.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

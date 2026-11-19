@@ -8,7 +8,7 @@
  * The resync beat is shortened (`Beats.watch`), never waited out.
  */
 import { root } from '../../test/harness.ts';
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -115,7 +115,7 @@ test('a watch reads its list through every page: over more cards than a page hol
   );
   const names = ['wp-1', 'wp-2', 'wp-3', 'wp-4', 'wp-5'];
   for (const name of names) card(name, { pages: 'yes' });
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const name of names) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
   });
   const w = await watch(t, '/api/namespaces/default/cards?watch=true&labelSelector=pages%3Dyes', paged.app);
@@ -199,7 +199,7 @@ const doneTask = (taskId: string) => {
 
 /** A run of `default` waiting at its `design` gate, its task done, its record laid by hand and taken away after `t`. */
 const gatedRun = (t: TestContext, id: string, createdAt = '2026-11-05T06:00:00.000Z') => {
-  t.after(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
+  t.onTestFinished(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
   doneTask(`t-${id}`);
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(

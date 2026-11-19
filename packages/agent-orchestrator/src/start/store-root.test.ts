@@ -2,7 +2,7 @@
  * The store's refusal of a root its steps' permission rules cannot carry (`storeRootRefusal`): asked of each local step whose first filing
  * names a folder under the store in a rule, by the character its harness's rules cannot carry, and in the store's words.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import type { StepSpec } from '../step/step.ts';

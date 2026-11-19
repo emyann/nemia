@@ -5,7 +5,7 @@
  * memory reads its agents there, never the disk. The oracle reads `.md` and `.json` alone, as the version did: every other file of the
  * folder now counts too, a script by its text and a picture by its bytes, while a folder of `.md` and `.json` keeps a digest pinned.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -89,13 +89,13 @@ const doorVersion = (dir: string, places: Places, root = ROOT): string =>
 /** A step file naming `agent`, and `skills` where given. */
 const step = (agent: string, skills?: string) => `---\nagent: ${agent}\n${skills ? `skills: ${skills}\n` : ''}---\nDo it.\n`;
 
-test("the version over the files doors is the synchronous reader's, byte for byte, in each case", async (t) => {
-  await t.test("an agent in the folder's own root", () => {
+describe("the version over the files doors is the synchronous reader's, byte for byte, in each case", () => {
+  test("an agent in the folder's own root", () => {
     const team = teamCopy();
     const dir = path.join(team, 'dev');
     assert.equal(doorVersion(dir, {}), syncVersion(dir, {}));
   });
-  await t.test("an agent only in home's", () => {
+  test("an agent only in home's", () => {
     const team = teamCopy();
     const home = scratch('wf-version-home-');
     fs.mkdirSync(path.join(home, 'workflows', 'agents'), { recursive: true });
@@ -103,34 +103,34 @@ test("the version over the files doors is the synchronous reader's, byte for byt
     const dir = path.join(team, 'dev');
     assert.equal(doorVersion(dir, { home }), syncVersion(dir, { home }));
   });
-  await t.test('one agent named by two steps', () => {
+  test('one agent named by two steps', () => {
     const team = teamCopy();
     const dir = path.join(team, 'dev');
     fs.writeFileSync(path.join(dir, 'again.md'), step('implementer'));
     assert.equal(doorVersion(dir, {}), syncVersion(dir, {}));
   });
-  await t.test('an agent no root has', () => {
+  test('an agent no root has', () => {
     const team = teamCopy();
     const dir = path.join(team, 'dev');
     fs.writeFileSync(path.join(dir, 'ghost.md'), step('nobody-here'));
     assert.equal(doorVersion(dir, {}), syncVersion(dir, {}));
   });
-  await t.test('a skill a step adds, and one no root has', () => {
+  test('a skill a step adds, and one no root has', () => {
     const team = teamCopy();
     const dir = path.join(team, 'dev');
     fs.writeFileSync(path.join(dir, 'extra.md'), step('implementer', 'review-a-change, no-such-skill'));
     assert.equal(doorVersion(dir, {}), syncVersion(dir, {}));
   });
-  await t.test('a step file that cannot be read', (t) => {
+  test('a step file that cannot be read', (t) => {
     if (process.getuid?.() === 0) return t.skip('root reads a file whatever its mode');
     const team = teamCopy();
     const dir = path.join(team, 'dev');
     fs.writeFileSync(path.join(dir, 'locked.md'), step('implementer'));
     fs.chmodSync(path.join(dir, 'locked.md'), 0o000);
-    t.after(() => fs.chmodSync(path.join(dir, 'locked.md'), 0o644));
+    t.onTestFinished(() => fs.chmodSync(path.join(dir, 'locked.md'), 0o644));
     assert.equal(doorVersion(dir, {}), syncVersion(dir, {}));
   });
-  await t.test("an agent's name the Agent door refuses reads as missing, so its digest moves from the old reader's", () => {
+  test("an agent's name the Agent door refuses reads as missing, so its digest moves from the old reader's", () => {
     const team = teamCopy();
     const dir = path.join(team, 'dev');
     fs.writeFileSync(path.join(dir, 'odd.md'), step('README'));
@@ -139,7 +139,7 @@ test("the version over the files doors is the synchronous reader's, byte for byt
     fs.rmSync(path.join(team, 'agents', 'README.md'));
     assert.equal(doorVersion(dir, {}), syncVersion(dir, {}), 'with no file there either, both read it missing');
   });
-  await t.test("an added skill whose SKILL.md is a link, followed in a checkout's own skills, reads as null, so its digest moves", () => {
+  test("an added skill whose SKILL.md is a link, followed in a checkout's own skills, reads as null, so its digest moves", () => {
     const repo = scratch('wf-version-repo-');
     const skill = path.join(repo, '.claude', 'skills', 'linked');
     fs.mkdirSync(skill, { recursive: true });

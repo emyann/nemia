@@ -3,7 +3,8 @@
  * (`quotaOfRefusal`), the options an ask opens its query with (`usageOptions`), the ask itself (`claudeQuota`), here over a stand-in for
  * the SDK's call, and the engine's `quota` verb, which answers for a harness that has one and refuses in words for one that has none.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -94,89 +95,77 @@ const PLAN = {
   subscription: 'max',
 };
 
-test("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — Claude Code 2.1.278's recorded answers, a shape this code does not read, and how the SDK named a refusal", async (t) => {
-  await t.test(
-    "Claude Code 2.1.278's recorded answers read as what they were: the plan's limits, no plan, nothing from the usage service",
-    () => {
-      assert.deepEqual(quotaOfUsage(usageOf('plan')), PLAN);
-      assert.deepEqual(quotaOfUsage(usageOf('no-plan')), { kind: 'no-plan', program: null });
-      assert.deepEqual(quotaOfUsage(usageOf('unanswered')), { kind: 'unanswered', subscription: 'max' });
-    },
-  );
-  await t.test(
-    "no plan limits, asked of a Claude Code signed in by a token of `claude setup-token`, is the token's: it cannot read the plan, which is not no plan",
-    () => {
-      const token = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
-      assert.deepEqual(
-        quotaOfUsage(usageOf('no-plan'), token, '/opt/claude'),
-        { kind: 'token', program: '/opt/claude', heard: null },
-        'naming the Claude Code asked, to sign in otherwise, and no session heard of the plan',
-      );
-      assert.deepEqual(
-        quotaOfUsage(usageOf('no-plan'), { CLAUDE_CODE_OAUTH_TOKEN: '' }),
-        { kind: 'no-plan', program: null },
-        'an empty variable signs in nothing',
-      );
-      assert.deepEqual(quotaOfUsage(usageOf('plan'), token), PLAN, 'a token whose Claude Code reads the plan reads as the plan');
-    },
-  );
-  await t.test(
-    'REFUSED: an answer in a shape this code does not read is unknown, and says what it found; a limit with no number is left out',
-    () => {
-      assert.deepEqual(quotaOfUsage('nope'), { kind: 'unknown', what: 'its response is not an object' });
-      assert.deepEqual(quotaOfUsage({}), { kind: 'unknown', what: 'it has no rate_limits_available' });
-      assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: [] }), {
-        kind: 'unknown',
-        what: 'its rate_limits are not an object',
-      });
-      const limits = { five_hour: { utilization: null }, seven_day: { utilization: Infinity }, day: { utilization: 7, resets_at: 'soon' } };
-      assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: limits }), {
-        kind: 'windows',
-        limits: [{ key: 'day', usedPercentage: 7, resetsAt: null }],
-        subscription: null,
-      });
-    },
-  );
-  await t.test(
-    'REFUSED: a refusal reads by what the SDK named it: the question refused, no Claude Code to ask, or how the process went',
-    () => {
-      const refused = recorded('unsupported').error!;
-      assert.deepEqual(quotaOfRefusal(thrown(refused, { errorClass: 'control_request_failed' })), {
-        kind: 'unknown',
-        what: 'it refused the request (Unsupported control request subtype: get_usage_nope)',
-      });
-      assert.deepEqual(quotaOfRefusal(thrown('Claude Code executable not found at /nope.', { errorClass: 'executable_not_found' })), {
-        kind: 'missing',
-      });
-      assert.deepEqual(
-        quotaOfRefusal(
-          thrown('Claude Code process exited with code 3. stderr: claude: the harness was told to fail', {
-            errorClass: 'process_exited_nonzero',
-            exitCode: 3,
-          }),
-        ),
-        { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail', program: null },
-        "what the child said is the stderr tail the SDK joins to its message, not the SDK's own sentence about the exit",
-      );
-      assert.deepEqual(
-        quotaOfRefusal(
-          thrown('Claude Code process terminated by signal SIGKILL. stderr: out of memory', {
-            errorClass: 'process_killed_by_signal',
-            signal: 'SIGKILL',
-          }),
-        ),
-        { kind: 'failed', code: null, signal: 'SIGKILL', said: 'out of memory', program: null },
-        "the signal is a field of the SDK's error, read as one",
-      );
-      assert.deepEqual(quotaOfRefusal('nope', '/opt/claude'), {
-        kind: 'failed',
-        code: null,
-        signal: null,
-        said: 'nope',
-        program: '/opt/claude',
-      });
-    },
-  );
+describe("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — Claude Code 2.1.278's recorded answers, a shape this code does not read, and how the SDK named a refusal", () => {
+  test("Claude Code 2.1.278's recorded answers read as what they were: the plan's limits, no plan, nothing from the usage service", () => {
+    assert.deepEqual(quotaOfUsage(usageOf('plan')), PLAN);
+    assert.deepEqual(quotaOfUsage(usageOf('no-plan')), { kind: 'no-plan', program: null });
+    assert.deepEqual(quotaOfUsage(usageOf('unanswered')), { kind: 'unanswered', subscription: 'max' });
+  });
+  test("no plan limits, asked of a Claude Code signed in by a token of `claude setup-token`, is the token's: it cannot read the plan, which is not no plan", () => {
+    const token = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
+    assert.deepEqual(
+      quotaOfUsage(usageOf('no-plan'), token, '/opt/claude'),
+      { kind: 'token', program: '/opt/claude', heard: null },
+      'naming the Claude Code asked, to sign in otherwise, and no session heard of the plan',
+    );
+    assert.deepEqual(
+      quotaOfUsage(usageOf('no-plan'), { CLAUDE_CODE_OAUTH_TOKEN: '' }),
+      { kind: 'no-plan', program: null },
+      'an empty variable signs in nothing',
+    );
+    assert.deepEqual(quotaOfUsage(usageOf('plan'), token), PLAN, 'a token whose Claude Code reads the plan reads as the plan');
+  });
+  test('REFUSED: an answer in a shape this code does not read is unknown, and says what it found; a limit with no number is left out', () => {
+    assert.deepEqual(quotaOfUsage('nope'), { kind: 'unknown', what: 'its response is not an object' });
+    assert.deepEqual(quotaOfUsage({}), { kind: 'unknown', what: 'it has no rate_limits_available' });
+    assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: [] }), {
+      kind: 'unknown',
+      what: 'its rate_limits are not an object',
+    });
+    const limits = { five_hour: { utilization: null }, seven_day: { utilization: Infinity }, day: { utilization: 7, resets_at: 'soon' } };
+    assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: limits }), {
+      kind: 'windows',
+      limits: [{ key: 'day', usedPercentage: 7, resetsAt: null }],
+      subscription: null,
+    });
+  });
+  test('REFUSED: a refusal reads by what the SDK named it: the question refused, no Claude Code to ask, or how the process went', () => {
+    const refused = recorded('unsupported').error!;
+    assert.deepEqual(quotaOfRefusal(thrown(refused, { errorClass: 'control_request_failed' })), {
+      kind: 'unknown',
+      what: 'it refused the request (Unsupported control request subtype: get_usage_nope)',
+    });
+    assert.deepEqual(quotaOfRefusal(thrown('Claude Code executable not found at /nope.', { errorClass: 'executable_not_found' })), {
+      kind: 'missing',
+    });
+    assert.deepEqual(
+      quotaOfRefusal(
+        thrown('Claude Code process exited with code 3. stderr: claude: the harness was told to fail', {
+          errorClass: 'process_exited_nonzero',
+          exitCode: 3,
+        }),
+      ),
+      { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail', program: null },
+      "what the child said is the stderr tail the SDK joins to its message, not the SDK's own sentence about the exit",
+    );
+    assert.deepEqual(
+      quotaOfRefusal(
+        thrown('Claude Code process terminated by signal SIGKILL. stderr: out of memory', {
+          errorClass: 'process_killed_by_signal',
+          signal: 'SIGKILL',
+        }),
+      ),
+      { kind: 'failed', code: null, signal: 'SIGKILL', said: 'out of memory', program: null },
+      "the signal is a field of the SDK's error, read as one",
+    );
+    assert.deepEqual(quotaOfRefusal('nope', '/opt/claude'), {
+      kind: 'failed',
+      code: null,
+      signal: null,
+      said: 'nope',
+      program: '/opt/claude',
+    });
+  });
 });
 
 test("REFUSED: an ask's query is opened for the question alone: in the temporary directory, without the user's settings, writing no session", () => {
@@ -220,7 +209,7 @@ test("REFUSED: an ask's query is opened for the question alone: in the temporary
   assert.equal(usageOptions('/bin/claude').pathToClaudeCodeExecutable, '/bin/claude', 'the Claude Code named is the one asked');
 });
 
-test("the Claude Code an ask drives is the one the sessions run: the engine's where it names one, else the one a job inherits, else the SDK's own — never resolved on PATH", async (t) => {
+describe("the Claude Code an ask drives is the one the sessions run: the engine's where it names one, else the one a job inherits, else the SDK's own — never resolved on PATH", () => {
   const PATH = scratch('ae-quota-path-');
   const rows: Array<[string, string | undefined, NodeJS.ProcessEnv, string | undefined]> = [
     [
@@ -239,14 +228,14 @@ test("the Claude Code an ask drives is the one the sessions run: the engine's wh
     ["the SDK's own where the variable is empty, as a job reads it", undefined, { [EXECUTABLE_VARIABLE]: '', PATH }, undefined],
   ];
   for (const [name, named, env, asked] of rows)
-    await t.test(name, async () => {
+    test(name, async () => {
       assert.equal(quotaExecutable(named, env), asked);
       const stand = standIn(async () => usageOf('plan'));
       assert.deepEqual(await Effect.runPromise(claudeQuota({ ...(named ? { command: named } : {}), env, ask: stand.ask })), PLAN);
       assert.equal(stand.seen.command, asked, 'the ask was opened over that Claude Code');
       assert.equal(usageOptions(asked, env).pathToClaudeCodeExecutable, asked, "and the SDK's query is given it, or nothing");
     });
-  await t.test("the one in the engine's `harnessBin` where neither names one, before the SDK's own; the one named over it", async () => {
+  test("the one in the engine's `harnessBin` where neither names one, before the SDK's own; the one named over it", async () => {
     const harnessBin = scratch('ae-quota-harness-bin-');
     const inBin = path.join(harnessBin, 'claude');
     fs.writeFileSync(inBin, '#!/bin/sh\n', { mode: 0o755 });
@@ -275,37 +264,34 @@ const HEARD_INFO = {
 
 const HEARD_AT = Date.parse('2026-11-12T09:00:00.000Z');
 
-test("what a session heard of the plan: the newest rate_limit_event, decoded, kept in one file of the store, and carried by a token's quota", async (t) => {
+describe("what a session heard of the plan: the newest rate_limit_event, decoded, kept in one file of the store, and carried by a token's quota", () => {
   const SEVEN_DAY = { key: 'seven_day', usedPercentage: 40, resetsAt: new Date(1794999600 * 1000).toISOString(), status: 'allowed' };
-  await t.test('the measured event reads as its window: its use in percent, its reset, its status, and when it was received', () => {
+  test('the measured event reads as its window: its use in percent, its reset, its status, and when it was received', () => {
     assert.deepEqual(heardOf(HEARD_INFO, HEARD_AT), { at: '2026-11-12T09:00:00.000Z', limits: [SEVEN_DAY] });
   });
-  await t.test('REFUSED: an event that names no window, or whose window does not decode, is unread, never 0%', () => {
+  test('REFUSED: an event that names no window, or whose window does not decode, is unread, never 0%', () => {
     assert.equal(heardOf({ status: 'allowed', rateLimitType: 'seven_day' }, HEARD_AT), null, 'no unifiedWindows');
     assert.equal(heardOf({ ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 'high', status: 'allowed' } } }, HEARD_AT), null);
     assert.equal(heardOf({ ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.4, status: 'blocked' } } }, HEARD_AT), null);
   });
-  await t.test(
-    'the store keeps the newest event of any session, one file for all; an older one received later in turn order is not kept',
-    () => {
-      const file = claudeHeardFile(scratch('ae-heard-'));
-      assert.equal(readHeard(file), null, 'none heard yet');
-      keepHeard(file, HEARD_INFO, HEARD_AT);
-      const newer = { ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.41, resetsAt: 1794999600, status: 'allowed' } } };
-      keepHeard(file, newer, HEARD_AT + 60_000);
-      keepHeard(file, HEARD_INFO, HEARD_AT + 30_000);
-      assert.deepEqual(
-        readHeard(file)?.limits.map((l) => l.usedPercentage),
-        [41],
-      );
-      assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString());
-      keepHeard(file, { status: 'allowed' }, HEARD_AT + 90_000);
-      assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString(), 'an event with no window leaves the reading as it was');
-      fs.writeFileSync(file, JSON.stringify({ at: 'soon', limits: [] }));
-      assert.equal(readHeard(file), null, 'REFUSED: a file that does not decode is unread');
-    },
-  );
-  await t.test("a token's ask carries what the store's sessions heard, and null while none has", async () => {
+  test('the store keeps the newest event of any session, one file for all; an older one received later in turn order is not kept', () => {
+    const file = claudeHeardFile(scratch('ae-heard-'));
+    assert.equal(readHeard(file), null, 'none heard yet');
+    keepHeard(file, HEARD_INFO, HEARD_AT);
+    const newer = { ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.41, resetsAt: 1794999600, status: 'allowed' } } };
+    keepHeard(file, newer, HEARD_AT + 60_000);
+    keepHeard(file, HEARD_INFO, HEARD_AT + 30_000);
+    assert.deepEqual(
+      readHeard(file)?.limits.map((l) => l.usedPercentage),
+      [41],
+    );
+    assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString());
+    keepHeard(file, { status: 'allowed' }, HEARD_AT + 90_000);
+    assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString(), 'an event with no window leaves the reading as it was');
+    fs.writeFileSync(file, JSON.stringify({ at: 'soon', limits: [] }));
+    assert.equal(readHeard(file), null, 'REFUSED: a file that does not decode is unread');
+  });
+  test("a token's ask carries what the store's sessions heard, and null while none has", async () => {
     const file = claudeHeardFile(scratch('ae-heard-'));
     const env = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
     const ask = () =>
@@ -322,14 +308,14 @@ test("what a session heard of the plan: the newest rate_limit_event, decoded, ke
   });
 });
 
-test('REFUSED: an ask whose query cannot be opened — the SDK throwing in words, with no errorClass, as it does when its platform package is not installed — answers, never dies: with no Claude Code named, the SDK found none of its own, `missing`; with one named, a refusal in its words', async (t) => {
+describe('REFUSED: an ask whose query cannot be opened — the SDK throwing in words, with no errorClass, as it does when its platform package is not installed — answers, never dies: with no Claude Code named, the SDK found none of its own, `missing`; with one named, a refusal in its words', () => {
   const throwing: OpenUsage = () => {
     throw new Error('Native CLI binary for linux-x64 not found. Reinstall @anthropic-ai/claude-agent-sdk without --omit=optional.');
   };
-  await t.test("none named and none inherited: the SDK's own is not installed, so there is no Claude Code to ask", async () => {
+  test("none named and none inherited: the SDK's own is not installed, so there is no Claude Code to ask", async () => {
     assert.deepEqual(await Effect.runPromise(claudeQuota({ env: {}, ask: throwing })), { kind: 'missing' });
   });
-  await t.test('one named: the throw is read as any refusal, with what it said', async () => {
+  test('one named: the throw is read as any refusal, with what it said', async () => {
     const asked = await Effect.runPromise(claudeQuota({ command: '/bin/claude', env: {}, ask: throwing }));
     assert.deepEqual([asked.kind, asked.kind === 'failed' && asked.program], ['failed', '/bin/claude'], 'naming the Claude Code asked');
   });
@@ -357,21 +343,27 @@ test('REFUSED: an ask that threw, timed out or was interrupted closes its query 
   assert.deepEqual(held.seen.closes, 1, 'an interrupted ask closed its query before the interruption returned');
 });
 
-test("the engine's quota: asked of its default harness or the one named, the same either way, one span with its harness; refused for a harness that has none, one it has not, or other arguments, asking nothing and tracing nothing", async (t) => {
-  const s = story(t);
-  const stand = standIn(async () => usageOf('plan'));
-  const engine = engineOver(stand.ask);
-  const spans: Tracer.NativeSpan[] = [];
-  const tracer = Tracer.make({
-    span(options) {
-      const span = new Tracer.NativeSpan(options);
-      spans.push(span);
-      return span;
-    },
+describe("the engine's quota: asked of its default harness or the one named, the same either way, one span with its harness; refused for a harness that has none, one it has not, or other arguments, asking nothing and tracing nothing", () => {
+  let stand!: { ask: OpenUsage; seen: { asks: number; closes: number; command: string | undefined; skipBehaviors: boolean | undefined } };
+  let engine!: EngineShape;
+  let tracer!: Tracer.Tracer;
+  beforeAll(() => {
+    const t = teardowns();
+    stand = standIn(async () => usageOf('plan'));
+    engine = engineOver(stand.ask);
+    tracer = Tracer.make({
+      span(options) {
+        const span = new Tracer.NativeSpan(options);
+        spans.push(span);
+        return span;
+      },
+    });
+    return t.end;
   });
+  const s = story(test);
+  const spans: Tracer.NativeSpan[] = [];
   const traced = <A, E>(asked: Effect.Effect<A, E>) => Effect.runPromise(Effect.exit(asked).pipe(Effect.withTracer(tracer)));
-
-  await s.test(
+  s.test(
     "an ask puts the question once, skipping the behaviours scan, and closes its query on the answer; the command it was given is the query's",
     async () => {
       const stand = standIn(async () => usageOf('plan'));
@@ -379,8 +371,7 @@ test("the engine's quota: asked of its default harness or the one named, the sam
       assert.deepEqual(stand.seen, { asks: 1, closes: 1, command: '/bin/claude', skipBehaviors: true });
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED: a quota asked of a harness that has none, of one the engine has not, or with other arguments — and no refused quota asked anything',
     async () => {
       const untyped = <F>(f: F) => f as (...args: unknown[]) => EngineShape['quota'] extends (...a: never[]) => infer R ? R : never;
@@ -400,8 +391,7 @@ test("the engine's quota: asked of its default harness or the one named, the sam
       assert.equal(stand.seen.asks, 0, 'no refused quota asked anything');
     },
   );
-
-  await s.test('a quota refused for a harness that reports none makes no span, and no error on a trace', async () => {
+  s.test('a quota refused for a harness that reports none makes no span, and no error on a trace', async () => {
     assert.equal(Exit.isFailure(await traced(engine.quota('fake'))), true, 'still refused');
     assert.deepEqual(
       spans.map((x) => x.name),
@@ -409,21 +399,17 @@ test("the engine's quota: asked of its default harness or the one named, the sam
       'a refusal asks nothing, and traces nothing',
     );
   });
-
-  await s.test(
-    'asked of its default harness, or the one named, it answers the same, an ask one span with its harness, ended well',
-    async () => {
-      assert.deepEqual(await Effect.runPromise(engine.quota()), PLAN);
-      const named = await traced(engine.quota('claude'));
-      assert.deepEqual(Exit.isSuccess(named) ? named.value : named, PLAN, 'the harness named answers its plan, as the default does');
-      assert.deepEqual(
-        spans.map((x) => [x.name, x.attributes.get('harness'), x.status._tag === 'Ended' && Exit.isSuccess(x.status.exit)]),
-        [['Engine.quota', 'claude', true]],
-        'the ask of a harness that reports a quota is one span, ended well',
-      );
-      assert.deepEqual(stand.seen.asks, 2, 'each asked once');
-      const asking = engineOver(standIn(async () => usageOf('unanswered')).ask);
-      assert.deepEqual(await Effect.runPromise(asking.quota('claude')), await Effect.runPromise(asking.quota()));
-    },
-  );
+  s.test('asked of its default harness, or the one named, it answers the same, an ask one span with its harness, ended well', async () => {
+    assert.deepEqual(await Effect.runPromise(engine.quota()), PLAN);
+    const named = await traced(engine.quota('claude'));
+    assert.deepEqual(Exit.isSuccess(named) ? named.value : named, PLAN, 'the harness named answers its plan, as the default does');
+    assert.deepEqual(
+      spans.map((x) => [x.name, x.attributes.get('harness'), x.status._tag === 'Ended' && Exit.isSuccess(x.status.exit)]),
+      [['Engine.quota', 'claude', true]],
+      'the ask of a harness that reports a quota is one span, ended well',
+    );
+    assert.deepEqual(stand.seen.asks, 2, 'each asked once');
+    const asking = engineOver(standIn(async () => usageOf('unanswered')).ask);
+    assert.deepEqual(await Effect.runPromise(asking.quota('claude')), await Effect.runPromise(asking.quota()));
+  });
 });

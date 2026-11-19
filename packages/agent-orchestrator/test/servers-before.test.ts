@@ -10,7 +10,7 @@
  * A store of its own at `ROOT`; the servers store itself takes this file's root by parameter, as every caller of it
  * does.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

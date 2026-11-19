@@ -43,7 +43,7 @@
  * The test reads files outside this package: `turbo.json` makes the apps' sources and tests, the runtime and the templates inputs of
  * this package's tests; after a change to sdlc's agents or workflows, `npx turbo run test --force`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

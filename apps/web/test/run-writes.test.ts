@@ -3,7 +3,7 @@
  * one call, and no file that makes such a write invalidates the whole list or a run's record by hand, which would leave the frame to the
  * feed.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,8 +64,8 @@ const byHandIn = (dir: string): Array<{ file: string; times: number }> =>
     }))
     .filter((found) => found.times > 0);
 
-test("runsMoved: a write that changes a run reads the frame's answer and each page of the finished runs again", async (t) => {
-  await t.test('a write that changes a run reads each page of the finished runs again', WAITED, async (t) => {
+describe("runsMoved: a write that changes a run reads the frame's answer and each page of the finished runs again", () => {
+  test('a write that changes a run reads each page of the finished runs again', WAITED, async (t) => {
     const asked: string[] = [];
     const rang = bell();
     const before = globalThis.fetch;
@@ -79,7 +79,7 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
     const page = new QueryObserver(client, finishedRunsQuery('harbour', ['f.a']));
     const seen = bell();
     const stop = page.subscribe(seen.ring);
-    t.after(() => {
+    t.onTestFinished(() => {
       stop();
       client.clear();
       globalThis.fetch = before;
@@ -99,7 +99,7 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
       Array(2).fill('/api/namespaces/harbour/runs?limit=9&continue=f.a&fieldSelector=status.state=finished'),
     );
   });
-  await t.test("REFUSED: a write that changes a run reads the frame's answer again at once, a factory's with it", WAITED, async (t) => {
+  test("REFUSED: a write that changes a run reads the frame's answer again at once, a factory's with it", WAITED, async (t) => {
     const asked: string[] = [];
     const rang = bell();
     const before = globalThis.fetch;
@@ -115,7 +115,7 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
     const one = new QueryObserver(client, openRunsQuery('harbour'));
     const seen = bell();
     const stops = [every.subscribe(seen.ring), one.subscribe(seen.ring)];
-    t.after(() => {
+    t.onTestFinished(() => {
       for (const stop of stops) stop();
       client.clear();
       globalThis.fetch = before;
@@ -164,8 +164,8 @@ test("runsMoved with a run: the run's own record, and its steps' reads, since a 
   client.clear();
 });
 
-test('the writes that change a run, in src: none invalidates the whole list by hand', async (t) => {
-  await t.test('no write that changes a run invalidates the whole list by hand: each calls runsMoved', () => {
+describe('the writes that change a run, in src: none invalidates the whole list by hand', () => {
+  test('no write that changes a run invalidates the whole list by hand: each calls runsMoved', () => {
     for (const file of WRITES) {
       const text = fs.readFileSync(path.join(SRC, file), 'utf8');
       assert.ok(text.includes('runsMoved('), `${file} calls runsMoved`);
@@ -173,7 +173,7 @@ test('the writes that change a run, in src: none invalidates the whole list by h
     }
     assert.deepEqual(byHandIn(SRC), [], 'no file spells the key of the whole list, which no page reads: a write calls runsMoved');
   });
-  await t.test('REFUSED: the scan reads every folder of the source, not the components alone', () => {
+  test('REFUSED: the scan reads every folder of the source, not the components alone', () => {
     assert.deepEqual(byHandIn(COMPONENTS), [], 'no component spells the key');
     const planted = scratch('web-run-writes-');
     fs.mkdirSync(path.join(planted, 'lib', 'api'), { recursive: true });
@@ -184,25 +184,22 @@ test('the writes that change a run, in src: none invalidates the whole list by h
       'the scan is not deaf: it finds the key in a folder under lib',
     );
   });
-  await t.test(
-    "REFUSED: a hand-written invalidation of the whole list is found, across a line break too; a run's own record is not",
-    () => {
-      assert.equal(byHand("void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });"), true);
-      assert.equal(byHand("queryClient.invalidateQueries({\n  queryKey:\n    ['runs'],\n});"), true);
-      assert.equal(byHand("void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });"), false);
-    },
-  );
+  test("REFUSED: a hand-written invalidation of the whole list is found, across a line break too; a run's own record is not", () => {
+    assert.equal(byHand("void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });"), true);
+    assert.equal(byHand("queryClient.invalidateQueries({\n  queryKey:\n    ['runs'],\n});"), true);
+    assert.equal(byHand("void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });"), false);
+  });
 });
 
-test("the writes that change a run, in src: none refreshes a run's record by hand, without the list", async (t) => {
-  await t.test("every write that refreshes a run's record does it through runsMoved, in one call, whichever file it is in", () => {
+describe("the writes that change a run, in src: none refreshes a run's record by hand, without the list", () => {
+  test("every write that refreshes a run's record does it through runsMoved, in one call, whichever file it is in", () => {
     assert.deepEqual(
       recordByHandIn(SRC),
       RECORD_ALONE,
       "a write that changes a run calls runsMoved(queryClient, id), which reads the run's record and the list: never the record by hand",
     );
   });
-  await t.test("REFUSED: a planted write hook that refreshes a run's record alone is found, across a line break too", () => {
+  test("REFUSED: a planted write hook that refreshes a run's record alone is found, across a line break too", () => {
     const planted = `export function useNudge(runId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -235,7 +232,7 @@ test("useRound: a round asked for reads the run's record and the run list again,
     });
   };
   const client = new QueryClient();
-  t.after(() => {
+  t.onTestFinished(() => {
     client.clear();
     globalThis.fetch = before;
   });

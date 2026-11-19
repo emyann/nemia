@@ -4,7 +4,8 @@
  * listed past a read passes it, and the lock passes to another tab when the holder goes, which opens the stream again from the last
  * cursor it was handed — and the cursor's order (`covers`) as a table.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { story } from 'test-kit/checkpoints';
 import { covers, sharedStream, type Channel, type Locks, type Sharing } from '../src/lib/sharedStream.ts';
@@ -85,14 +86,22 @@ function tab(at: ReturnType<typeof browser>) {
 
 const settle = () => new Promise((r) => setImmediate(r));
 
-test('tabs share one stream: one holds it and hands each read on, a tab that listed past a read passes it, and the lock passes on', async (t) => {
-  const s = story(t);
-  const at = browser();
-  const { opened } = at;
-  const a = tab(at);
-  const b = tab(at);
+describe('tabs share one stream: one holds it and hands each read on, a tab that listed past a read passes it, and the lock passes on', () => {
+  let at!: { opened: Opened[]; sharing: { locks: Locks; channel: () => Channel }; open: (url: string) => Opened };
+  let opened!: Opened[];
+  let a!: { shared: StreamLike & { from: (after: string) => StreamLike }; got: string[] };
+  let b!: { shared: StreamLike & { from: (after: string) => StreamLike }; got: string[] };
   let c!: ReturnType<typeof tab>;
-  await s.test('two tabs started from their reads: the first holds the one stream, opened from its cursor', async () => {
+  beforeAll(() => {
+    const t = teardowns();
+    at = browser();
+    ({ opened } = at);
+    a = tab(at);
+    b = tab(at);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('two tabs started from their reads: the first holds the one stream, opened from its cursor', async () => {
     a.shared.from('1.1');
     b.shared.from('1.1');
     await settle();
@@ -101,33 +110,30 @@ test('tabs share one stream: one holds it and hands each read on, a tab that lis
       ['/stream?after=1.1'],
     );
   });
-  await s.test('each read the holder is sent reaches both tabs, its events in order and its id on the last', async () => {
+  s.test('each read the holder is sent reaches both tabs, its events in order and its id on the last', async () => {
     opened[0]?.send('presence', 'p');
     opened[0]?.send('chat', 'x');
     opened[0]?.send('chat', 'y', '1.3');
     opened[0]?.send('unreadable', 'u');
     for (const one of [a, b]) assert.deepEqual(one.got, ['presence p', 'chat x', 'chat y #1.3', 'unreadable u']);
   });
-  await s.test(
-    'a tab reading its history passes what was handed on meanwhile that its read covers, and takes what came after',
-    async () => {
-      c = tab(at);
-      opened[0]?.send('chat', 'z', '1.4');
-      c.shared.from('1.4');
-      assert.equal(c.got.length, 0, 'its read held 1.4 already');
-      opened[0]?.send('chat', 'w', '1.5');
-      assert.deepEqual(c.got, ['chat w #1.5']);
-      assert.equal(opened.length, 1, 'still one stream for the three tabs');
-    },
-  );
-  await s.test(
+  s.test('a tab reading its history passes what was handed on meanwhile that its read covers, and takes what came after', async () => {
+    c = tab(at);
+    opened[0]?.send('chat', 'z', '1.4');
+    c.shared.from('1.4');
+    assert.equal(c.got.length, 0, 'its read held 1.4 already');
+    opened[0]?.send('chat', 'w', '1.5');
+    assert.deepEqual(c.got, ['chat w #1.5']);
+    assert.equal(opened.length, 1, 'still one stream for the three tabs');
+  });
+  s.test(
     'a read that moves only her presence, under the cursor every tab holds, reaches every tab: a presence replaces, so it is taken again',
     () => {
       opened[0]?.send('presence', 'q', '1.5');
       for (const one of [b, c]) assert.deepEqual(one.got.at(-1), 'presence q #1.5');
     },
   );
-  await s.test('the holder closed, another tab takes the lock and opens the stream again from the last cursor it was handed', async () => {
+  s.test('the holder closed, another tab takes the lock and opens the stream again from the last cursor it was handed', async () => {
     a.shared.close();
     await settle();
     assert.deepEqual(
@@ -141,7 +147,7 @@ test('tabs share one stream: one holds it and hands each read on, a tab that lis
     assert.deepEqual(b.got.at(-1), 'chat v #1.6');
     assert.deepEqual(c.got.at(-1), 'chat v #1.6', 'and hands it to the tab that is left');
   });
-  await s.test('a tab closed before it started asks for no lock and opens nothing', async () => {
+  s.test('a tab closed before it started asks for no lock and opens nothing', async () => {
     const late = tab(at);
     late.shared.close();
     for (const one of [b, c]) one.shared.close();
@@ -150,7 +156,7 @@ test('tabs share one stream: one holds it and hands each read on, a tab that lis
   });
 });
 
-test('`covers`: a cursor covers one each of whose counts it has reached', async (t) => {
+describe('`covers`: a cursor covers one each of whose counts it has reached', () => {
   const rows: [string, string, string, boolean][] = [
     ['the same cursor', '1.3.0', '1.3.0', true],
     ['one count behind', '1.3.0', '1.4.0', false],
@@ -158,5 +164,5 @@ test('`covers`: a cursor covers one each of whose counts it has reached', async 
     ['one ahead, one behind', '1.5.0', '1.4.1', false],
     ['a cursor of fewer counts reads the rest as none', '1.4', '1.4.0', true],
   ];
-  for (const [name, seen, id, says] of rows) await t.test(name, () => assert.equal(covers(seen, id), says));
+  for (const [name, seen, id, says] of rows) test(name, () => assert.equal(covers(seen, id), says));
 });

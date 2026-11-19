@@ -14,7 +14,8 @@
  * volume mounted and taken off (`nemia factory volume add`, `rm`), a factory made from a template (`nemia factory apply`), a hand-made one
  * taken over (`nemia factory adopt`), either previewed (`nemia factory diff`), an upgrade filed (`nemia factory upgrade`) and a
  * conflict's choice, sent as its text (`nemia factory resolve`); and a factory exported whole and filed from another store's export, the
- * two halves of `nemia factory move`. A repository's or a volume's path names a folder of this machine by its
+ * two halves of `nemia factory move`; and a factory's home read whole for a client to render (`factoryHomeOf`, `nemia factory
+ * home`). A repository's or a volume's path names a folder of this machine by its
  * whole path, and a repository may be a git URL instead, which this machine clones under its store with its own git credentials
  * (`cloneTarget`, then the verb's clone, refused on the spot with the setup to do); a template sent packed is kept under the store
  * while a factory is made from it (`withTemplateTaken`), and a preview's or a refused request's is removed as the request ends.
@@ -25,6 +26,7 @@ import {
   cloneTarget,
   factoryTable,
   factoryCommandsOf,
+  factoryHomeOf,
   factoryList,
   factoryObject,
   FACTORY_ATTACH,
@@ -364,6 +366,12 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
     .handle('removeVolume', ({ params: { factory }, query: { path: at } }) => volumeRemoved(factory, at))
     .handle('apply', ({ params: { name }, payload }) => applied(name, payload))
     .handle('export', ({ params: { name }, query }) => exported(name, query.cards))
+    .handle('home', ({ params: { name } }) =>
+      answered((s) => {
+        factoryNamed(`GET /api/factories/${name}/home`, name);
+        return s.inRequest(factoryHomeOf(name));
+      }),
+    )
     .handle('import', ({ params: { name }, payload }) => imported(name, payload))
     .handle('adopt', ({ params: { factory }, payload }) => adopted(factory, payload))
     .handle('diff', ({ params: { factory }, payload }) => previewed(factory, payload))

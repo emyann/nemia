@@ -36,6 +36,7 @@ import {
   FactorySettingWrite,
   FactoryTrusted,
 } from './factory.ts';
+import { FactoryHome } from './factory-home.ts';
 import { FactoryExport, FactoryImported, FactoryImportWrite, MOVE_CARDS } from './factory-move.ts';
 import { Hire, HireList, HireWrite } from './hire.ts';
 import { LibraryAdd, LibraryAddList } from './library.ts';
@@ -269,6 +270,14 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   }).annotate(
     OpenApi.Description,
     'Reads a factory whole for another store to file, its cards following it unless ?cards=stay; nothing of the source is written. Answers FactoryExport.',
+  ),
+  HttpApiEndpoint.get('home', '/api/factories/:name/home', {
+    params: factoryParams,
+    success: FactoryHome.annotate({ identifier: 'FactoryHome' }),
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads a factory's home whole, as a run copies it: every file of its tree's home/ and the digest a run's copy is named by, for a client to render read-only. Answers FactoryHome.",
   ),
   HttpApiEndpoint.post('import', '/api/factories/:name/import', {
     params: factoryParams,

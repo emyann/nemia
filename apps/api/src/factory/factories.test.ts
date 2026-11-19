@@ -35,6 +35,7 @@ type WorkflowStepPage = import('objects').WorkflowStepPage;
 type Factory = import('objects').Factory;
 type FactoryList = import('objects').FactoryList;
 type FactoryCommands = import('objects').FactoryCommands;
+type FactoryHome = import('objects').FactoryHome;
 type VolumeList = import('objects').VolumeList;
 type Schedule = import('objects').Schedule;
 type ScheduleList = import('objects').ScheduleList;
@@ -808,4 +809,32 @@ test('the factories asked as a Table answer the columns of a factory, the defaul
     ),
     'its repositories',
   );
+});
+
+describe("GET /api/factories/:name/home: a factory's home read whole, for a client to render it as a run's copy", () => {
+  test('a templated factory whose tree holds home/ answers its files and digest; one with no home and a name no factory has are 404s', async () => {
+    const name = 'homed';
+    const file = path.join(root, 'factories', `${name}.json`);
+    const folder = path.join(root, 'factories', name);
+    write(file, JSON.stringify({ volumes: [], template: { source: '/templates/homed', version: '1.0.0', params: {} } }));
+    write(path.join(folder, 'tree', 'factory.json'), JSON.stringify({ workflows: [], hires: {} }));
+    try {
+      const bare = await get<unknown>(`/api/factories/${name}/home`);
+      assert.equal(bare.status, 404, 'a tree with no home/ is no home to open');
+      write(path.join(folder, 'tree', 'home', 'CLAUDE.md'), '# the home\n');
+      const { status, body } = await get<FactoryHome>(`/api/factories/${name}/home`);
+      assert.equal(status, 200);
+      assert.equal(body.name, name);
+      assert.match(body.digest, /^[0-9a-f]{64}$/);
+      assert.deepEqual(
+        body.files.map((f) => [f.path, Buffer.from(f.content, 'base64').toString()]),
+        [['CLAUDE.md', '# the home\n']],
+      );
+      assert.equal((await get<unknown>('/api/factories/solo/home')).status, 404, 'a factory made by hand has no home');
+      assert.equal((await get<unknown>('/api/factories/nobody/home')).status, 404, 'no factory of the name');
+    } finally {
+      fs.rmSync(file, { force: true });
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
+  });
 });

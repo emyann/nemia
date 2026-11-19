@@ -455,6 +455,18 @@ describe("followFeed: what the stream's events read again, a frame or a second a
     assert.deepEqual(f.invalidated, [[['daemon']]], "the daemon's standing is read again on the line itself, and no key of a run is");
     f.stop();
   });
+  test("REFUSED: an event whose data does not decode by objects' schema is left out, read neither as a line nor as a failed read", () => {
+    const f = followed();
+    f.stream().opens();
+    f.stream().send('step', { run: 'r-1', step: 'plan' }, '10');
+    f.stream().send('unreadable', { error: 'EIO' });
+    f.frame();
+    f.pass(END_GRACE_MS);
+    assert.deepEqual(f.invalidated, [], 'a line with no time and no word moves no query');
+    assert.deepEqual(f.statuses, ['connecting', 'open'], 'a failed read that does not say whether it retries is not said down');
+    assert.equal(f.streams.length, 1, 'nor is the stream closed and opened again as a cut feed');
+    f.stop();
+  });
   test('the events that arrive together are read again once a frame, each key once, and each run named has its record read', () => {
     const f = followed();
     f.stream().opens();

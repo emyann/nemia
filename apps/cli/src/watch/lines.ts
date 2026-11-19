@@ -3,36 +3,16 @@
  * the bookmark of where it has read to (`bookmarkLine`), the pause standing (`pausedWords`), and the liveness of the api it follows
  * (`livenessWords`), said when its stream drops or cannot connect and when it opens again. Pure.
  */
-import { Schema } from 'effect';
-import type { Paused } from 'objects';
-
-/**
- * What the watch prints of a line of the feed, which the stream sends as its JSON (`FeedStreamEvent`'s `data`): a run's (`run`, its
- * `step`), the store's (`store`, `by`, `why`), a factory's (`factory`) or a daemon's (`daemon`, its pid), each with its time and its word.
- * Read by this Schema where it is printed in words; printed whole, every key it carries, under `--json`.
- */
-export const FeedLineSaid = Schema.Struct({
-  at: Schema.String,
-  word: Schema.String,
-  note: Schema.optionalKey(Schema.String),
-  run: Schema.optionalKey(Schema.String),
-  step: Schema.optionalKey(Schema.String),
-  store: Schema.optionalKey(Schema.String),
-  by: Schema.optionalKey(Schema.String),
-  why: Schema.optionalKey(Schema.String),
-  daemon: Schema.optionalKey(Schema.Number),
-  factory: Schema.optionalKey(Schema.String),
-});
-type FeedLine = typeof FeedLineSaid.Type;
+import type { FeedStreamLine, Paused } from 'objects';
 
 /** How the watch prints: as JSON (`--json`), else in words. */
 export type Watched = { json?: boolean };
 
 /**
  * What one line of the feed says, without its time: a run's, the store's, a factory's, or a daemon's.
- * @param l The feed's line, decoded by `FeedLineSaid`.
+ * @param l The feed's line, decoded by `FeedStreamLine`.
  */
-export const feedSaidWords = (l: FeedLine): string => {
+export const feedSaidWords = (l: FeedStreamLine): string => {
   const store = l.store !== undefined ? l : undefined;
   const who = store?.by ? ` by ${store.by}` : '';
   const notes = [store?.why, l.note].filter((n) => n);
@@ -49,23 +29,19 @@ export const feedSaidWords = (l: FeedLine): string => {
 
 /**
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`.
- * @param l The feed's line, decoded by `FeedLineSaid`.
+ * @param l The feed's line, decoded by `FeedStreamLine`.
  */
-export const feedLineWords = (l: FeedLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
+export const feedLineWords = (l: FeedStreamLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
 
 /**
- * A line as the watch prints it, `data` its JSON and `cursor` the byte just after it: in words, or the line whole with its cursor as one
- * JSON object.
- * @param data The line's JSON, as the stream sends it.
+ * A line as the watch prints it, `line` as the stream's event decoded it and `cursor` the byte just after it: in words, or the line whole
+ * with its cursor as one JSON object.
+ * @param line The line, decoded by `FeedStreamLine`: every key it carries kept.
  * @param cursor The feed's offset just after the line, in bytes.
  * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
-export const watchedLine = (data: string, cursor: number, how: Watched): string => {
-  const line: unknown = JSON.parse(data);
-  return how.json === true
-    ? JSON.stringify({ ...(typeof line === 'object' && line !== null ? line : {}), cursor })
-    : feedLineWords(Schema.decodeUnknownSync(FeedLineSaid)(line));
-};
+export const watchedLine = (line: FeedStreamLine, cursor: number, how: Watched): string =>
+  how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
 
 /**
  * The bookmark at `cursor`: under `--json` a line carrying the cursor alone; in words, nothing.

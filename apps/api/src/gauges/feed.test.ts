@@ -18,7 +18,8 @@ import path from 'node:path';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
-import { type Duration, Effect, Layer, Logger, Metric, Stream } from 'effect';
+import { type Duration, Effect, Layer, Logger, Metric, Schema, Stream } from 'effect';
+import { FeedStreamEvent } from 'objects';
 import { app, appOf, liveOf, runtime } from '../app.ts';
 import { Beats } from '../layer.ts';
 import { StoreRoot } from '../store.ts';
@@ -700,11 +701,14 @@ const sentOf = (said: Block[]) => said.map((b) => ({ data: b.data!, id: b.id! })
 const labelOf = (line: FeedLine, key: string) => (line as { labels?: Record<string, string> }).labels?.[key] satisfies string | undefined;
 
 /**
- * What `feedEvents` sends from `from` under `selectors`, up to and including the first bookmark, at a cadence of the test's own. The wait
- * is the stream's: it ends on the event it counts, never on a length of time.
+ * What `feedEvents` sends from `from` under `selectors`, up to and including the first bookmark, at a cadence of the test's own, each
+ * encoded by `objects`' `FeedStreamEvent` as the endpoint's `StreamSse` writes it. The wait is the stream's: it ends on the event it
+ * counts, never on a length of time.
  */
-const untilBookmark = (from: number, selectors: Selectors, every: Duration.Input) =>
-  runtime.runPromise(Stream.runCollect(Stream.takeUntil(feedEvents(from, selectors, every), (m) => m.event === 'bookmark')));
+const untilBookmark = async (from: number, selectors: Selectors, every: Duration.Input): Promise<Block[]> =>
+  (await runtime.runPromise(Stream.runCollect(Stream.takeUntil(feedEvents(from, selectors, every), (m) => m.event === 'bookmark')))).map(
+    (m) => Schema.encodeSync(FeedStreamEvent)(m),
+  );
 
 describe(
   'A board follows the feed through selectors: only the lines they take, a comma and a second selector, a bare key, and a bookmark that says where it has read to',

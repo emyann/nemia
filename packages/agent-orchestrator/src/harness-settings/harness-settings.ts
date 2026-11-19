@@ -10,6 +10,7 @@
  * unjudged. A key that widens keeps its own field or fence (`OWNED_ELSEWHERE`), which the refusal names. Pure.
  */
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { isObject } from 'effect/Predicate';
 
 /** The harness a factory may name settings of: the default one, whose settings the runtime carries to its sessions. */
 export const SETTINGS_HARNESS = DEFAULT_HARNESS;
@@ -63,8 +64,6 @@ const OWNED_ELSEWHERE: Readonly<Record<string, string>> = {
   outputStyle: "a step's agent, which renders it",
   autoMemoryEnabled: 'the runtime, which turns it off for every session',
 };
-
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** Why `value` is no `attribution`: neither a boolean nor an object of `commit`, `pr` (strings) and `sessionUrl` (a boolean). */
 function attributionRefusal(value: unknown): string | undefined {

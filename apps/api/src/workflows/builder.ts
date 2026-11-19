@@ -20,7 +20,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Schema } from 'effect';
+import { Effect, Predicate, Schema } from 'effect';
 import { AgentDoor, HARNESS_CHOICES, remoteAgents, SkillDoor, WORKFLOWS_WRITE, workflowVersion } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
@@ -169,8 +169,6 @@ export function stepsNamed(message: string, names: readonly string[]): string[] 
   return opens === undefined ? [] : [opens];
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-
 /**
  * A step as a request sends it, its keys in the order they are refused. Each key of `spec` is typed by its form (objects'
  * `STEP_KEY_FORM`, in `draftOf`), and a key no step has is passed on as it came, for the package to refuse in its words.
@@ -298,7 +296,7 @@ function judgedWith(
         steps: namingSchema(steps, file),
       };
     }
-    if (!isObject(schema))
+    if (!Predicate.isObject(schema))
       return {
         error: `${file} is ${JSON.stringify(schema)}, and a schema is a JSON object — \`{ "type": "object", "properties": { … } }\`.`,
         steps: namingSchema(steps, file),

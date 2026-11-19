@@ -9,7 +9,7 @@
  */
 import os from 'node:os';
 import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import { Effect } from 'effect';
+import { Effect, Predicate } from 'effect';
 import type { HarnessQuota, HeardQuota, QuotaLimit } from '../seam.ts';
 import { readHeard } from './heard.ts';
 import { claudeExecutableOf } from '../mcp-sign-in.ts';
@@ -132,12 +132,10 @@ const sdkUsageAsk =
     };
   };
 
-const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
-
 /** Every limit of Claude Code's `rate_limits` with a finite `utilization` in percent, in its order: null ones and the rest are left out. */
 function limitsOf(limits: Record<string, unknown>): QuotaLimit[] {
   return Object.entries(limits).flatMap(([key, w]) => {
-    if (!isObject(w) || typeof w.utilization !== 'number' || !Number.isFinite(w.utilization)) return [];
+    if (!Predicate.isObject(w) || typeof w.utilization !== 'number' || !Number.isFinite(w.utilization)) return [];
     const at = typeof w.resets_at === 'string' ? Date.parse(w.resets_at) : NaN;
     return [{ key, usedPercentage: w.utilization, resetsAt: Number.isFinite(at) ? new Date(at).toISOString() : null }];
   });
@@ -170,11 +168,11 @@ export function quotaOfUsage(
   program: string | null = null,
   heard: HeardQuota | null = null,
 ): HarnessQuota {
-  if (!isObject(usage)) return { kind: 'unknown', what: 'its response is not an object' };
+  if (!Predicate.isObject(usage)) return { kind: 'unknown', what: 'its response is not an object' };
   if (usage.rate_limits_available === false) return env[TOKEN_VARIABLE] ? { kind: 'token', program, heard } : { kind: 'no-plan', program };
   if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
   if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) };
-  if (!isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
+  if (!Predicate.isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
   return { kind: 'windows', limits: limitsOf(usage.rate_limits), subscription: subscriptionOf(usage) };
 }
 
@@ -208,7 +206,7 @@ const saidIn = (message: string): string => {
  * @param program The Claude Code asked, as a path a person types to run it by hand; null where none can be named.
  */
 export function quotaOfRefusal(error: unknown, program: string | null = null): HarnessQuota {
-  const { errorClass, exitCode, signal, message } = (isObject(error) ? error : {}) as SdkError;
+  const { errorClass, exitCode, signal, message } = (Predicate.isObject(error) ? error : {}) as SdkError;
   const said = saidIn(typeof message === 'string' ? message : String(error));
   if (errorClass === 'executable_not_found') return { kind: 'missing' };
   if (errorClass === 'control_request_failed') return { kind: 'unknown', what: `it refused the request (${said || 'no error given'})` };

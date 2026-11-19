@@ -44,7 +44,7 @@ const NO_FACTORY: ReadinessPiece = {
   area: 'factory',
   state: 'missing',
   message: 'no factory is filed: a run starts in one',
-  fixes: [{ message: 'file one from a template, on a repository', command: 'nemia factory add <name> --template <template> --repo <url>', startable: false, kind: 'typed' }],
+  fixes: [{ message: 'file one from a template', command: 'nemia factory add <name> --template <template>', startable: false, kind: 'typed' }],
   cost: 'run',
 };
 
@@ -144,7 +144,7 @@ export const checkFailed = answering([
 export const harnessReady = answering([install('met', [VERSION, TURN_PASSED]), signIn('met'), NO_FACTORY], {
   milestones: [
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
-    { name: 'factory', state: 'next', message: 'file a factory from a template, on a repository' },
+    { name: 'factory', state: 'next', message: 'file a factory from a template: it may start with no volume' },
     { name: 'volume', state: 'later', message: 'give a factory a volume' },
     { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
   ],

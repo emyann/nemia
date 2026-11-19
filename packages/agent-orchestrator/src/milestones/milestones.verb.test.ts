@@ -51,14 +51,11 @@ test('a store meets its milestones in order, each read from what it holds now', 
     const root = scratch('wf-milestones-');
     assert.equal(statesOf(root, 'met').harness, 'done');
     assert.equal(statesOf(root, 'met').factory, 'next');
-    const repo = path.join(root, 'repo');
-    fs.mkdirSync(repo);
-    createFactoryAt(root, { name: 'acme', repos: [repo], workflows: [], hires: {}, schedules: {} });
+    createFactoryAt(root, { name: 'acme', volumes: [], workflows: [], hires: {}, schedules: {} });
     assert.deepEqual(statesOf(root, 'met'), { harness: 'done', factory: 'done', volume: 'next', landed: 'later' });
     const shelf = scratch('wf-milestones-volume-');
     createFactoryAt(root, {
       name: 'shelved',
-      repos: [repo],
       workflows: [],
       hires: {},
       schedules: {},
@@ -71,15 +68,14 @@ test('a store meets its milestones in order, each read from what it holds now', 
   });
   await t.test('REFUSED: a volume a mount would refuse is no milestone', () => {
     const root = scratch('wf-milestones-');
-    const repo = path.join(root, 'repo');
-    fs.mkdirSync(repo);
+    const inStore = path.join(root, 'kept');
+    fs.mkdirSync(inStore);
     createFactoryAt(root, {
       name: 'acme',
-      repos: [repo],
       workflows: [],
       hires: {},
       schedules: {},
-      volumes: [{ path: repo, readOnly: true }],
+      volumes: [{ path: inStore, readOnly: true }],
     });
     assert.equal(statesOf(root, 'met').volume, 'next');
   });

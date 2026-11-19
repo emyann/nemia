@@ -34,7 +34,7 @@ export const MILESTONE_WORDS: Readonly<Record<Milestone, Readonly<Record<Milesto
   },
   factory: {
     done: 'a factory is filed',
-    next: 'file a factory from a template, on a repository',
+    next: 'file a factory from a template: it may start with no volume',
     later: 'file a factory',
   },
   volume: {

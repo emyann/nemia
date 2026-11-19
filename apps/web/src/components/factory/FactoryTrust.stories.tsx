@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, within } from 'storybook/test';
 import type { Factory } from '@/lib/api/factories';
+import { ACME_COMMANDS } from '../../../.storybook/fixtures/folders';
 import { FactoryTrust } from './FactoryTrust';
+
+/** The lines a person types for `acme`, as the api answers them. */
+const { attach, rm, add, schedule, trust, volume } = ACME_COMMANDS;
 
 /** A factory one of whose places a harness does not trust: its name, the place, and the lines it types. */
 const UNTRUSTED: Pick<Factory, 'name' | 'untrusted' | 'commands'> = {
@@ -9,14 +13,7 @@ const UNTRUSTED: Pick<Factory, 'name' | 'untrusted' | 'commands'> = {
   untrusted: [
     { place: '/home/you/code/acme', harness: 'the harness', withheld: "the folder's own settings, hooks and MCP servers", never: null },
   ],
-  commands: {
-    attach: 'nemia factory attach acme <workflow>',
-    rm: 'nemia factory rm acme',
-    add: 'nemia factory add acme',
-    schedule: 'nemia factory schedule acme <workflow>',
-    trust: 'nemia factory trust acme',
-    volume: 'nemia factory volume add acme <path>:rw',
-  },
+  commands: { attach, rm, add, schedule, trust, volume },
 };
 
 /** What a story of the caution draws: the factory, and the presses where the page asks the trust itself. */

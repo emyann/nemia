@@ -18,7 +18,7 @@ export const FOLDER_NAMES_MOST = 50;
 export const REPOSITORIES = 'repositories';
 
 /** Whether the absolute path `inner` is `outer` or under it, by whole segments. */
-const under = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer.endsWith('/') ? outer : `${outer}/`);
+const under = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer.endsWith('/') ? outer : outer + '/');
 
 /**
  * Where the folder `real` stands for the listing: in a store, under a root, or outside every root.
@@ -39,10 +39,10 @@ export const folderReach: FolderReachOf = (real: string, roots: readonly string[
  * @param most The most names answered.
  */
 export const folderNamesShown: FolderNamesShownOf = (entries: readonly FolderEntry[], prefix: string, most: number): FolderNamesShown => {
-  const named = entries
+  const found = entries
     .filter((e) => e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.')))
-    .map((e) => e.name)
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    .map((e) => e.name);
+  const named = [...found].sort();
   return { names: named.slice(0, most), more: named.length > most };
 };
 

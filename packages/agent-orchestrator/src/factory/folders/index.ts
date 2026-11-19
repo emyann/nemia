@@ -1,3 +1,2 @@
-/** The face of `factory/folders/`: the person's folder listing and the repositories it makes. */
-export { foldersNamed, repositoryMade, repositoryNew, type FolderNamesRead, type RepositoryMadeRead } from './folders.verb.ts';
-export { FOLDER_NAMES_MOST, REPOSITORIES } from './folders.ts';
+/** The face of `factory/folders/`: what the person's folder listing judges, pure; its verbs are `folders.verb.ts`'s. */
+export { FOLDER_NAMES_MOST, REPOSITORIES, folderReach, folderNamesShown, repositoryNameRefusal, typedFolder } from './folders.ts';

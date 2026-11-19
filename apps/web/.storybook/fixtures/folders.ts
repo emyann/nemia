@@ -41,8 +41,8 @@ const WITHHELD = "the folder's own settings, hooks and MCP servers";
 /** Each write a story's handlers were sent, its route and its body, in order: a play reads what the page sent. */
 export const sent: { route: string; body: unknown }[] = [];
 
-/** The lines a person types for `acme`. */
-const COMMANDS: FactoryCommands = {
+/** The lines a person types for `acme`, as the api answers them: a story that draws them takes these. */
+export const ACME_COMMANDS: FactoryCommands = {
   attach: `nemia factory attach ${ACME} <workflow>`,
   rm: `nemia factory rm ${ACME}`,
   add: `nemia factory add ${ACME}`,
@@ -126,7 +126,7 @@ export const volumeStore = ({ held = false, keepsTrust = true }: { held?: boolea
       } satisfies FactoryList),
     ),
     http.get('/api/factories/:name', () => HttpResponse.json(factoryOf(store))),
-    http.get('/api/factories/:name/commands', () => HttpResponse.json(COMMANDS)),
+    http.get('/api/factories/:name/commands', () => HttpResponse.json(ACME_COMMANDS)),
     http.get('/api/readiness/milestones', () =>
       HttpResponse.json(milestones(done() ? 'done' : 'next', store.volumes.some((v) => !v.readOnly))),
     ),

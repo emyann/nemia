@@ -21,7 +21,7 @@ const ascending = (names: readonly string[]): boolean => names.every((n, i) => i
 
 const folderNamesShownSpec = spec<(entries: readonly FolderEntry[], prefix: string, most: number) => FolderNamesShown>({
   requires: ({ input: [entries, , most] }) =>
-    Number.isInteger(most) && most > 0 && entries.every((e, i) => entries.findIndex((f) => f.name === e.name) === i),
+    Number.isInteger(most) && most > 0 && entries.every((e, i) => entries.slice(0, i).every((f) => f.name !== e.name)),
   ensures: {
     onlyFoldersTyped: {
       description: 'Every name answered is a folder of the entries that begins with what was typed, never a file',

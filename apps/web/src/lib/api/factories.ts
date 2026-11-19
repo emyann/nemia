@@ -179,7 +179,7 @@ export const factoriesQuery = queryOptions({
  * The volume `volume` given to the factory `name`, a writable one left untrusted for the page to ask its trust: what the api answered.
  * Rejects with a `WriteRefusal` in the package's words.
  * @param name The factory's name.
- * @param volume The volume as `nemia factory volume add` spells it: a path or a git URL, marked `:ro` or `:rw`.
+ * @param volume The volume as the factory's volume line spells it: a path or a git URL, marked `:ro` or `:rw`.
  */
 export const addVolumeUntrusted = (name: string, volume: string): Promise<VolumeAdded> =>
   factories.addVolume(name, { volume, noTrust: true });

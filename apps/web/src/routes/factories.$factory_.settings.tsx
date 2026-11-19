@@ -2,6 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryCostLines } from '@/components/factory/FactoryCostLines';
 import { FactoryDelegations } from '@/components/factory/FactoryDelegations';
+import { FactoryHome } from '@/components/factory/FactoryHome';
 import { FactoryInstruction } from '@/components/factory/FactoryInstruction';
 import { FactoryRules } from '@/components/factory/FactoryRules';
 import { TemplateCard } from '@/components/factory/TemplateCard';
@@ -52,9 +53,10 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
 const OPENED = { enter: 0, stay: Infinity } as const;
 
 /**
- * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); then a place of it
- * that is not trusted, with the line that trusts it (`FactoryTrust`); the folders its runs reach beside its repositories, each with the
- * line that takes it back (`FactoryVolumes`); the cost line it sets per workflow it offers, which a gate whose caps pass it says
+ * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); the line that
+ * opens their own session in its home, where it has one (`FactoryHome`); then a place of it that is not trusted, with the line that
+ * trusts it (`FactoryTrust`); the folders its runs reach beside its repositories, each with its two switches and the line that takes it
+ * back (`FactoryVolumes`); the cost line it sets per workflow it offers, which a gate whose caps pass it says
  * (`FactoryCostLines`); its rules, what every agent hired into it is told (`FactoryRules`); the agents it lets approve its proposals
  * (`FactoryDelegations`); its instruction, what Nemia is to know about it (`FactoryInstruction`); then its schedules, shown as the
  * factories' read answers them (`FactorySchedules`). The default factory, and a name no factory has, have no settings to keep, and say so:
@@ -84,6 +86,7 @@ function SettingsPage() {
       ) : (
         <>
           {factory.template ? <TemplateCard template={factory.template} /> : null}
+          {factory.commands.home === null ? null : <FactoryHome name={name} line={factory.commands.home} />}
           <FactoryTrust factory={factory} />
           <FactoryVolumes factory={factory} />
           <p data-volume-again className="-mt-4 text-body-medium">

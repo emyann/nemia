@@ -57,6 +57,8 @@ import {
   VolumeAdded,
   VolumeRemoved,
   type VolumeWrite,
+  Volume,
+  type VolumeSwitchesWrite,
   Hire,
   HireList,
   LibraryAdd,
@@ -716,6 +718,13 @@ export const hires = {
   /** The agent hired into the step the hire `name` is of fired: answers the hire as it then reads. */
   delete: (namespace: string, name: string): Promise<Hire> =>
     call((c) => c.hires.delete({ params: { namespace, name } }), write(Hire, HIRE_WRITTEN)),
+};
+
+/** A factory's volumes, each by its stored name in the factory's namespace. */
+export const volumes = {
+  /** The switches given set on the volume `name` of the factory `namespace`, the other kept: answers it as it then reads. */
+  patch: (namespace: string, name: string, switches: VolumeSwitchesWrite): Promise<Volume> =>
+    call((c) => c.volumes.patch({ params: { namespace, name }, payload: switches }), write(Volume, SETTINGS_WRITTEN)),
 };
 
 /** What an approval or a decline may have done, and what to look at before sending it again. */

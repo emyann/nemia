@@ -30,13 +30,14 @@ holds what every change needs.
   which `ci` sets per shard leg of that package (`.github/workflows/ci.yml`); unset — a person's run, a run's check — it runs every
   file. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:`
   first: a file marked `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.
-- **The run's checks and CI run the whole suite.** One test file runs from its package's folder, where its config loads its seats:
+- **CI runs each job the change reaches** (`tools/guards/due.ts`, `tools/guards/CLAUDE.md`), and every job on a dispatch or when a path
+  every job runs on changes (the lockfile, `turbo.json`, `.github/workflows/ci.yml`). One test file runs from its package's folder, where its config loads its seats:
   `npx vitest run <file>` in every package, and `npx vitest run --project=node <file>` in `apps/web`; the tests that read a doc, a
   skill or a workflow file are found by grepping the tests for its path. One package runs by
   `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
   (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Implement's round check runs the
-  declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
-  suite on it (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
+  declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs on it every
+  job the change reaches (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
   the pull request `ci` judged was merged (`packages/templates/sdlc/carried/landing.ts`), then a wait on main's own `ci` at the
   merge commit, so a landing that turns main red fails its land step — so no step's suite reads the merged tree, and main's own `ci`
   is the last word on it. A failing test is the check's refusal, answered in the next try. Outside a run no check
@@ -202,7 +203,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).
 - `tools/guards/` — the repository's own guards, never shipped: the tests that hold its CI, docs, workflows and test infrastructure
   rather than a layer's code, a workspace of their own (`guards`) whose `ci` job runs them only when `tools/guards/due.ts` says a push
-  touched what they read (`tools/guards/CLAUDE.md`), the repository-wide ones among them (`names`, `others`, `local-paths`,
+  touched what they read, as it says for every job of `ci` (`tools/guards/CLAUDE.md`), the repository-wide ones among them (`names`, `others`, `local-paths`,
   `comments`, `limits`). A config guard that imports the orchestrator past its three entries stays in it.
 - `tools/test-kit/` — the test kit (`test-kit`), never shipped: what every workspace's tests share, each by its own entry —
   `test-kit/scratch` (every temporary root, reaped with what runs in it), `test-kit/checkpoints` (a story's checkpoints), `test-kit/repo`

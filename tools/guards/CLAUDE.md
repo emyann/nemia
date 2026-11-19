@@ -5,13 +5,20 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
 
 - **Its suite is its `test` script**: `npm test` from `tools/guards`, or `npx turbo run test --force --filter=guards`. One file:
   `npx vitest run test/<file>` from `tools/guards`.
-- **CI runs its suite only when it is due**: the `guards` job of `.github/workflows/ci.yml` runs `due.ts`, which reads the range a push
-  or a pull request changed and says `due=true` when a path is named by the `guards#test` task's `inputs` in `turbo.json`, or lies
-  under the folder of a workspace package the guards depend on (`agent-orchestrator`, and through it `agent-runtime`). It fails
-  closed: an event with no range, a branch's first push and a range git cannot resolve are due. An input of a shape it does not read
-  (`{a,b}`, `**/x`, `?`, `[`) is refused, so a new path a guard reads goes in those `inputs` in a shape it reads — turbo's cache and
-  CI's filter are one list, and `test/due.test.ts` reads the real one. The apps' whole `src/`, their `.ts` beside their manifest, the
-  board's `.storybook/` and their `glossary.json` are in it, for the glossary guard, so a change to the board's code makes them due.
+- **Every job of CI runs its work only when it is due**, its own suite's job among them: each job of `.github/workflows/ci.yml` but the
+  gate and gitleaks runs `node tools/guards/due.ts <job>` (a matrix leg's `LEG` beside it) before `npm ci`, and conditions every later
+  step on its answer. `due.ts` reads the range a push or a pull request changed and says `due=true` when a path is named by one of the
+  job's claims: for a job that runs a turbo task, that task's `inputs` in `turbo.json` and the folders of the workspaces its workspace
+  depends on (the guards': `guards#test`, `agent-orchestrator` and through it `agent-runtime`), and for `typecheck` each workspace's
+  `test` inputs besides, since it checks the tests and what they import; for `lint`, `e2e`, `e2e-look` and each
+  `contracts <leg>`, the table in `due.ts` (`WRITTEN`, `LINT_SKIPS`, `LINT_CONFIGS`, `LINT_READS`: every tsconfig and manifest, which the type-aware rules resolve through), which `test/due.test.ts` holds to
+  `tools/contracts/legs.ts` and `.oxfmtrc.json`. It fails closed: a path in its `EVERYWHERE` (the lockfile, `turbo.json`, `ci.yml`,
+  `due.ts` itself), a path no job claims, an event with no range, a branch's first push and a range git cannot resolve are due for
+  every job. An input of a shape it does not read (`{a,b}`, `?`, `[`, a `**` inside a name) is refused, so a new path a test reads goes
+  in its `inputs` in a shape it reads (`**` as a whole segment is read anywhere) — turbo's cache and CI's filter are one list, and
+  `test/due.test.ts` reads the real one. `test/ci-workflow.test.ts`'s `dueDrift` holds every job to it. The apps' whole `src/`, their
+  `.ts` beside their manifest, the board's `.storybook/` and their `glossary.json` are in the guards' inputs, for the glossary guard,
+  so a change to the board's code makes them due.
 - **It reaches the orchestrator only through its three entries** (rule 1, `docs/architecture.md`; `contract.test.ts` holds it, here
   too): `team-words` takes `splitFrontmatter` from `agent-orchestrator/workflow`, and `store-measure` its `Place` type, which is why
   `package.json` declares `agent-orchestrator`. `team-words` reads sdlc's role skills (`packages/templates/sdlc/skills`); sdlc's

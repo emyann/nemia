@@ -529,6 +529,7 @@ export const filed = (name: string, extra: Partial<import('../src/lib/api/factor
       schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
       trust: `nemia factory trust ${name}`,
       volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
+      home: null,
     },
     untrusted: [],
     volumes: [],

@@ -119,6 +119,14 @@ test("the Api's commands answer the old route's lines, with unschedule by workfl
     unschedule: {},
     volumeRm: {},
   });
+  const homed = { ...commands, home: 'nemia factory home mill' };
+  assert.deepEqual(answered('factories', 'commands', homed), homed);
+});
+
+test("a volume's switches write takes either switch alone and answers the Volume; REFUSED: a switch given as words", () => {
+  assert.deepEqual(taken('volumes', 'patch', { claudeMd: true }), { claudeMd: true });
+  assert.deepEqual(taken('volumes', 'patch', { skills: false }), { skills: false });
+  assert.equal(taken('volumes', 'patch', { claudeMd: 'on' }), undefined);
 });
 
 test('REFUSED: a condition, a status, a reason, a level or a revisions policy off its words, and another kind', () => {

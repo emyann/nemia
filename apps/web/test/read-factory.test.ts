@@ -185,12 +185,29 @@ const millView: Factory = {
     schedule: 'nemia schedule mill <workflow> <cron>',
     trust: 'nemia factory trust mill',
     volume: 'nemia factory volume mill <path>',
+    home: null,
   },
   template: null,
   untrusted: [],
   volumes: [
-    { path: '/home/me/notes', readOnly: true, origin: null, commands: { rm: 'nemia factory volume rm mill notes' } },
-    { path: '/work/mill', readOnly: false, origin: null, commands: { rm: 'nemia factory volume rm mill mill' } },
+    {
+      path: '/home/me/notes',
+      name: 'notes',
+      readOnly: true,
+      origin: null,
+      claudeMd: false,
+      skills: true,
+      commands: { rm: 'nemia factory volume rm mill notes' },
+    },
+    {
+      path: '/work/mill',
+      name: 'mill',
+      readOnly: false,
+      origin: null,
+      claudeMd: false,
+      skills: true,
+      commands: { rm: 'nemia factory volume rm mill mill' },
+    },
   ],
   costLines: {},
   workflowRepos: {},
@@ -209,6 +226,19 @@ describe("the factories are read as objects and made the pages' view: the Factor
       factoryViewOf(factoryObject({ spec: { costLines: { build: 80 } } }), factoryCommands()).costLines,
       { build: 80 },
       'the cost line it sets per workflow is carried on the view',
+    );
+    const switched = factoryObject({
+      spec: { volumes: [{ name: 'notes', path: '/home/me/notes', readOnly: true, claudeMd: true, skills: false }] },
+    });
+    assert.deepEqual(
+      factoryViewOf(switched, factoryCommands()).volumes.map((v) => [v.claudeMd, v.skills]),
+      [[true, false]],
+      "a volume's switches as its spec sets them; one it leaves out is off for CLAUDE.md and on for skills (millView)",
+    );
+    assert.equal(
+      factoryViewOf(factoryObject(), factoryCommands('mill', { home: 'nemia factory home mill' })).commands.home,
+      'nemia factory home mill',
+      'the line that opens its home, where the api answers one; null where it answers none (millView)',
     );
     const templated = factoryObject({
       spec: { template: { source: 'sdlc', version: '1.0.0', params: {} }, workflows: undefined },

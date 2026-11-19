@@ -68,6 +68,7 @@ export const factoryView = (name: string, isDefault = false): Factory => ({
     schedule: `nemia schedule add <workflow> -n ${name}`,
     trust: `nemia factory trust ${name}`,
     volume: `nemia volume add <name> -n ${name}`,
+    home: null,
   },
   template: null,
   untrusted: [],

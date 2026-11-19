@@ -98,14 +98,19 @@ test("a factory's sub-resources are served under its path: rules, instruction, i
     );
 });
 
-test("the namespaced kinds a person writes take PUT and DELETE by name; a Volume is read-only in its namespace, mounted and taken off under its factory's path", () => {
+test("the namespaced kinds a person writes take PUT and DELETE by name; a Volume's switches alone are written in its namespace, by PATCH, and it is mounted and taken off under its factory's path", () => {
   for (const kind of ['mcpservers', 'schedules', 'hires'])
     for (const method of ['PUT', 'DELETE'])
       assert.ok(
         endpoints.some((e) => e.method === method && e.path === `/api/namespaces/:namespace/${kind}/:name`),
         `${method} ${kind}`,
       );
-  assert.ok(!endpoints.some((e) => e.method !== 'GET' && e.path.startsWith('/api/namespaces/') && e.path.includes('/volumes')));
+  assert.deepEqual(
+    endpoints
+      .filter((e) => e.method !== 'GET' && e.path.startsWith('/api/namespaces/') && e.path.includes('/volumes'))
+      .map((e) => `${e.method} ${e.path}`),
+    ['PATCH /api/namespaces/:namespace/volumes/:name'],
+  );
   for (const method of ['POST', 'DELETE'])
     assert.ok(
       endpoints.some((e) => e.method === method && e.path === '/api/factories/:factory/volumes'),

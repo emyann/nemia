@@ -206,7 +206,11 @@ type UntrustWritten = { readonly took: readonly string[]; readonly refused: stri
  * @param file The `.claude.json` to read and write; Claude Code's own (`claudeConfigFile`) unless given.
  * @param read What reads the file's bytes, null where it is not there; the file's own bytes unless a test hands its own.
  */
-export function claudeUntrust(folder: string, file: string = claudeConfigFile(), read: (file: string) => Buffer | null = bytesOf): UntrustWritten {
+export function claudeUntrust(
+  folder: string,
+  file: string = claudeConfigFile(),
+  read: (file: string) => Buffer | null = bytesOf,
+): UntrustWritten {
   const byHand = `remove each key of its \`projects\` at or under ${folder} by hand, or make the file read as a JSON object and ask again`;
   for (let attempt = 0; attempt < WRITES; attempt += 1) {
     const target = fs.existsSync(file) ? fs.realpathSync(file) : file;

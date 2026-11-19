@@ -241,7 +241,7 @@ describe('untrustFolder: the records of a folder and of every folder inside it a
         const file = configWith({ [HOME]: { hasTrustDialogAccepted: true }, [`${HOME}/abc`]: { lastCost: 1 }, ...BESIDE });
         const before = held(file);
         const taken = untrustFolder('claude', `${HOME}/x/..`, file);
-        assert.deepEqual([taken?.took.toSorted(), taken?.refused], [[HOME, `${HOME}/abc`], null]);
+        assert.deepEqual([[...(taken?.took ?? [])].sort(), taken?.refused], [[HOME, `${HOME}/abc`], null]);
         assert.deepEqual(held(file), { ...before, projects: BESIDE });
         assert.deepEqual(beside(file), ['.claude.json']);
       },

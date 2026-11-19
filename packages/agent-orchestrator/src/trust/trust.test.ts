@@ -4,10 +4,11 @@
  * factory (`untrustedLines`): its own places alone, each with the line that repairs it, or why nothing can. And the second thing a
  * refusal that counted a repository's own allow rules says of the trust those rules wait on (`untrustedNote`): said only where the
  * trust is withheld, and repaired by the factory's verb where the run has a factory and by a person at the harness where it has none.
+ * And why a run's home could not be trusted (`homeTrustRefused`): the home, the harness's file and a fix, never the hand step.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { trustedLines, untrustedLines, untrustedNote, type PlaceTrust, type Untrusted } from './trust.ts';
+import { homeTrustRefused, trustedLines, untrustedLines, untrustedNote, type PlaceTrust, type Untrusted } from './trust.ts';
 
 const asked = (over: Partial<Extract<PlaceTrust, { harness: string }>>) => ({
   place: '/code/one',
@@ -85,4 +86,29 @@ describe("a place's trust in words: the lines of each place asked, a factory's l
     assert.equal(untrustedNote(undefined, 'ours'), undefined);
     assert.equal(untrustedNote(undefined), undefined);
   });
+});
+
+describe("a run's home its harness did not trust, in words: each names the harness's file and a fix, and none the hand step", () => {
+  const not = { harness: 'A harness', folder: '/store/runs/r-1/home/abc', file: '/me/.config.json', never: null, refused: null };
+  const rows: { name: string; words: string }[] = [
+    {
+      name: 'a file that does not read',
+      words: homeTrustRefused({
+        ...not,
+        refused:
+          '/me/.config.json was left as it is, since it is not JSON: run A harness in /store/runs/r-1/home/abc once and accept its prompt',
+      }),
+    },
+    { name: 'a write that threw', words: homeTrustRefused(not, 'EACCES: permission denied') },
+    {
+      name: 'a folder the harness never keeps',
+      words: homeTrustRefused({ ...not, never: 'A harness keeps no trust of a home directory' }),
+    },
+  ];
+  for (const row of rows)
+    test(row.name, () => {
+      assert.ok(row.words.includes(not.folder), `the home is named: ${row.words}`);
+      assert.ok(row.words.includes(not.file), `the file is named: ${row.words}`);
+      assert.ok(!row.words.includes('once and accept'), `no hand step is offered: ${row.words}`);
+    });
 });

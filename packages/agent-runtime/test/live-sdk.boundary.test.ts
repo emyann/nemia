@@ -312,7 +312,6 @@ const PROBE_BRIEF = `Run exactly this command with the Bash tool, once: ${PROBE}
 
 test.skipIf(skip)(
   "a home's `permissions.allow` is refused while Claude Code was never asked to trust it, and applies once `trustFolder` trusts it",
-  { timeout: 10 * 60_000 },
   async () => {
     const settings = { '.claude/settings.json': `${JSON.stringify({ permissions: { allow: [`Bash(${PROBE}:*)`] } })}\n` };
     const untrusted = fs.realpathSync(folderOf('ae-live-allow-untrusted-', settings));
@@ -324,14 +323,21 @@ test.skipIf(skip)(
         jobRun('ae/live/allow-untrusted', config, { cwd: untrusted, brief: PROBE_BRIEF }),
         jobRun('ae/live/allow-trusted', config, { cwd: trusted, brief: PROBE_BRIEF }),
       ]);
-      const resultOf = (stdout: string) => linesOf(stdout).filter((line) => line.type === 'result').at(-1);
+      const resultOf = (stdout: string) =>
+        linesOf(stdout)
+          .filter((line) => line.type === 'result')
+          .at(-1);
       const results = { untrusted: resultOf(refused.stdout), trusted: resultOf(ran.stdout) };
       handOver(`sdk-${SDK_VERSION}-trusted-home.json`, `${JSON.stringify(results)}\n`);
       assert.ok(
         (results.untrusted?.permission_denials?.length ?? 0) > 0,
         `the untrusted home's allow is dropped, and the command refused (the control): ${JSON.stringify(results.untrusted)} ${refused.err}`,
       );
-      assert.deepEqual(results.trusted?.permission_denials ?? [], [], `the trusted home's allow applies: ${JSON.stringify(results.trusted)} ${ran.err}`);
+      assert.deepEqual(
+        results.trusted?.permission_denials ?? [],
+        [],
+        `the trusted home's allow applies: ${JSON.stringify(results.trusted)} ${ran.err}`,
+      );
       assert.match(answerOf(ran.stdout), /nemia-trust-probe/, 'and the command ran');
       assert.equal(trustFolder('claude', trusted)?.wrote, false, 'the record still reads trusted after the session');
     } finally {

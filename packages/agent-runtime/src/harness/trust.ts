@@ -93,7 +93,10 @@ export function trustFolder(harness: string, dir: string, file?: string, reposit
 export const trustedFolder = (harness: string, dir: string, file?: string, repository?: string): boolean | undefined =>
   folderTrust(harness, dir, file, repository)?.trusted;
 
-/** A taking back asked for: the harness's name, the file it keeps its trust in, the keys removed, and why it could not where it removed none. */
+/**
+ * A taking back asked for: the harness's name, the file it keeps its trust in, the keys removed, and why it could not where it removed
+ * none.
+ */
 export type FolderUntrusted = {
   readonly harness: string;
   readonly file: string;

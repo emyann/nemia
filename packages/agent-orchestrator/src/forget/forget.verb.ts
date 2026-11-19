@@ -36,6 +36,7 @@ import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingLive, standingReader } from '../standing/standing.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import { merging, resolved, sayLeft } from './prune/prune.verb.ts';
+import { untrustRunHome } from '../trust/home.verb.ts';
 import { taskPhasesRead } from '../views/views.verb.ts';
 import { readAndAdopt } from '../adopt/run-adopt.verb.ts';
 import { readersOf } from '../tick/told.verb.ts';
@@ -334,12 +335,16 @@ function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead,
 }
 
 /**
- * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: what the run store keeps under it
- * first (the Run door's `runs.forget`: its record, cancellation, pruning, hold, asks and own directory of inputs and artifacts), its check
- * logs (`checkLogsOf`, by the steps `names`, or without them any under its id that is no other stored run's), and `worktrees/<id>` once
- * it is empty. Nothing else, and never the engine's, which `forgetTasks` asks the engine to forget.
+ * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: first every record a harness
+ * keeps of its home (`untrustRunHome`), said where one stays and the removal going on, so a `nemia rm` typed again takes them again;
+ * then what the run store keeps under it (the Run door's `runs.forget`: its record, cancellation, pruning, hold, asks and own directory
+ * of inputs and artifacts), its check logs (`checkLogsOf`, by the steps `names`, or without them any under its id that is no other
+ * stored run's), and `worktrees/<id>` once it is empty. Nothing else, and never the engine's, which `forgetTasks` asks the engine to
+ * forget.
  */
 function removeKeyed(home: string, id: string, names: readonly string[] | undefined): string[] {
+  const kept = untrustRunHome(home, id);
+  if (kept) sayLeft(kept);
   const removed = runsAtOnce(home).runs.forget(id);
   const remove = (at: string) => {
     const st = lstatOf(at);

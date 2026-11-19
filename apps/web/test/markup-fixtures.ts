@@ -356,7 +356,7 @@ export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Part
     status: 'awaiting approval',
     phase: 'waiting',
     waitingOnYouWords: ['approve review'],
-    gates: ['review'],
+    gates: [{ step: 'review', at: 'after' }],
     ...run,
     steps: [
       {
@@ -445,7 +445,7 @@ export function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     waitingOnYou: ['ship'],
     waitingOnYouWords: ['approve ship'],
     toDecide: toShip,
-    gates: ['ship'],
+    gates: [{ step: 'ship', at: 'before' }],
     graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
     steps: [implement, ship],
     ...over,

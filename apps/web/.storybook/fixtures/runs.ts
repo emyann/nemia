@@ -201,8 +201,14 @@ const GRAPH_OF = Object.fromEntries(
   (Object.keys(STEPS_OF) as Array<keyof typeof STEPS_OF>).map((workflow) => [workflow, chainOf(STEPS_OF[workflow])]),
 ) as Record<keyof typeof STEPS_OF, Run['status']['graph']>;
 
-/** Each workflow's gates: build's design and land; quick's none. */
-const GATES_OF: Record<keyof typeof STEPS_OF, string[]> = { build: ['design', 'land'], quick: [] };
+/** Each workflow's gates: build's design, approved after it, and land, approved before it runs; quick's none. */
+const GATES_OF: Record<keyof typeof STEPS_OF, Run['status']['gates']> = {
+  build: [
+    { step: 'design', at: 'after' },
+    { step: 'land', at: 'before' },
+  ],
+  quick: [],
+};
 
 /** A run of the targets: its id, title, workflow, labels, its steps (each step not named in `now` done), and its status over them. */
 type Staged = {

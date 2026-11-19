@@ -58,7 +58,7 @@ export function labelRules(given: string): Rules {
   for (const rule of given.split(/\s+/).filter(Boolean)) {
     const named = RULE.exec(rule);
     if (!named) return { kind: 'refused', rule };
-    rules.push({ key: named[1]!, value: named[2]!, label: named[3]! });
+    rules.push({ key: named[1], value: named[2], label: named[3] });
   }
   return { kind: 'rules', rules };
 }
@@ -228,7 +228,7 @@ function rulesOf(args: readonly string[]): LabelRule[] {
       'the check gives cards.ts the factory\'s label rules, `--labels "<rules>"`, after the closeout and nothing else: ' +
         "give them as the janitor's check line does, empty where the factory names none",
     );
-  const read = labelRules(args[1]!);
+  const read = labelRules(args[1]);
   if (read.kind === 'refused')
     throw new Refusal(
       `\`${read.rule}\` is no label rule, which is each \`<key>=<value>:<label>\`, the rules apart by spaces: ` +
@@ -315,7 +315,7 @@ function main(): void {
   try {
     cards.forEach((card, i) => {
       if (there.has(normal(card.title))) return console.log(`nemia janitor: already in the inbox: ${card.title.trim()}`);
-      const { labels, dropped } = labelled[i]!;
+      const { labels, dropped } = labelled[i];
       file(card, labels, textOf(card, periods), dir, i);
       if (dropped && (card.labels.length || rules.length))
         console.log(`nemia janitor: "${card.title.trim()}" is filed with no labels: ${dropped}`);

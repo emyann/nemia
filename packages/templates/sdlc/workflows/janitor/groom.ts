@@ -146,7 +146,7 @@ const OUTPUT_BYTES = 64 << 20;
 /** `nemia <args>`, its stdout parsed as JSON; refuses, naming the command, when it fails or prints more than `OUTPUT_BYTES`. */
 function nemia(args: readonly string[]): unknown {
   const ran = spawnSync('nemia', args, { cwd: workspace(), encoding: 'utf8', timeout: 60_000, maxBuffer: OUTPUT_BYTES });
-  if ((ran.error as NodeJS.ErrnoException | undefined)?.code === 'ENOBUFS')
+  if (ran.error && 'code' in ran.error && ran.error.code === 'ENOBUFS')
     throw new Refusal(
       `nemia ${args.join(' ')} printed more than the ${OUTPUT_BYTES >> 20} MiB the groom reads, and running it again prints as much: ` +
         'take the cards that are done or replaced out of the inbox with `nemia inbox rm <card>`, ' +

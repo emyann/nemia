@@ -293,6 +293,16 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
 
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
+/**
+ * The tag of a catch-all member beside a tagged union: a string that is none of `known`'s discriminants, so a value that names one of
+ * them is decoded by that member or refused, never taken by the catch-all. Effect has no "string except these" schema, and a union
+ * keeps a member with no literal tag as a fallback, so the catch-all keeps this filter; its list is `known`'s own.
+ * @param known The tagged union (`Schema.toTaggedUnion`) whose tags the catch-all must not take.
+ * @param refused The words that refuse a value whose tag `tag` is one of `known`'s.
+ */
+export const noneOf = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }, refused: (tag: string) => string) =>
+  Schema.String.check(Schema.makeFilter((tag: string) => !known.discriminants.includes(tag) || refused(tag)));
+
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
 const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefined');
 

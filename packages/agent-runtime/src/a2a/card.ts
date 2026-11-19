@@ -15,7 +15,7 @@
  */
 import { Result, Schema } from 'effect';
 import { AgentCard, type SecurityScheme } from '@a2a-js/sdk';
-import { firstRefusal, quote } from '../core/index.ts';
+import { firstRefusal, noneOf, quote } from '../core/index.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -24,15 +24,6 @@ const held = <const F extends Schema.Struct.Fields>(fields: F) => Schema.StructW
 
 /** A key the card must not have: the snake_case spelling of one the runtime reads. */
 const absent = Schema.optional(Schema.Never);
-
-/** The kinds of security scheme A2A 1.0 defines, by their key in its JSON and their `$case` in the SDK's objects. */
-export const SCHEME_KINDS: readonly string[] = [
-  'httpAuthSecurityScheme',
-  'apiKeySecurityScheme',
-  'oauth2SecurityScheme',
-  'openIdConnectSecurityScheme',
-  'mtlsSecurityScheme',
-];
 
 /** The camelCase key each snake_case key the SDK's parser also reads stands for. */
 const CAMEL: Record<string, string> = {
@@ -61,15 +52,20 @@ const HttpAuth = held({ scheme: Schema.String });
 const ApiKey = held({ location: Schema.String, name: Schema.String });
 const Unread = held({});
 
-/** A scheme in the SDK's objects: one of the five kinds with its fields, or a kind none of them is. */
-const SdkSchemeSchema = Schema.Union([
+/** A scheme in the SDK's objects of one of the five kinds A2A 1.0 defines, with its fields, by its `$case`. */
+const SdkSchemes = Schema.Union([
   held({ $case: Schema.Literal('httpAuthSecurityScheme'), value: HttpAuth }),
   held({ $case: Schema.Literal('apiKeySecurityScheme'), value: ApiKey }),
   held({ $case: Schema.Literal('oauth2SecurityScheme'), value: Unread }),
   held({ $case: Schema.Literal('openIdConnectSecurityScheme'), value: Unread }),
   held({ $case: Schema.Literal('mtlsSecurityScheme'), value: Unread }),
-  held({ $case: Schema.String.check(Schema.makeFilter((k: string) => !SCHEME_KINDS.includes(k) || `Expected the fields of ${k}`)) }),
-]);
+]).pipe(Schema.toTaggedUnion('$case'));
+
+/** The kinds of security scheme A2A 1.0 defines, by their key in its JSON and their `$case` in the SDK's objects. */
+export const SCHEME_KINDS: readonly string[] = SdkSchemes.discriminants;
+
+/** A scheme in the SDK's objects: one of the five kinds with its fields, or a kind none of them is. */
+const SdkSchemeSchema = Schema.Union([SdkSchemes, held({ $case: noneOf(SdkSchemes, (k) => `Expected the fields of ${k}`) })]);
 
 /**
  * A security scheme: in A2A's JSON, one key per kind; in the SDK's objects, `scheme`. An object with neither is a kind this

@@ -8,19 +8,20 @@
  * first wrong field and the fix (`decodeLine`): a refused line is never read as saying nothing.
  */
 import { Result, Schema } from 'effect';
-import { firstRefusal } from '../../core/index.ts';
+import { firstRefusal, noneOf } from '../../core/index.ts';
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
 
-/** A block whose `type` is none of `known`: only its `type` is checked. */
-const otherThan = (known: readonly string[]) =>
-  Schema.Struct({
-    type: Schema.String.check(Schema.makeFilter((t: string) => !known.includes(t) || `Expected the fields of a ${t} block`)),
-  });
+/** A block whose `type` is none of `known`'s: only its `type` is checked. */
+const otherThan = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }) =>
+  Schema.Struct({ type: noneOf(known, (t) => `Expected the fields of a ${t} block`) });
 
 const TextBlock = Schema.Struct({ type: Schema.Literal('text'), text: Schema.optional(Schema.String) });
+
+/** The blocks of a tool's result the runtime reads, its text: `ResultTexts.guards` narrows a decoded block to one. */
+export const ResultTexts = Schema.Union([TextBlock]).pipe(Schema.toTaggedUnion('type'));
 
 /** A block of thinking, `thinking` or `redacted_thinking`: one struct each, so a union picks the one its `type` names. */
 const thinkingBlock = <T extends string>(type: T) =>
@@ -36,18 +37,20 @@ const ToolUseBlock = Schema.Struct({
 const ToolResultBlock = Schema.Struct({
   type: Schema.Literal('tool_result'),
   tool_use_id: Schema.optional(Schema.String),
-  content: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.Union([TextBlock, otherThan(['text'])]))])),
+  content: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.Union([ResultTexts, otherThan(ResultTexts)]))])),
   is_error: Schema.optional(Schema.Boolean),
 });
 
-const Block = Schema.Union([
+/** The content blocks the runtime reads, by `type`: `Blocks.guards` narrows a decoded block to one of them. */
+export const Blocks = Schema.Union([
   TextBlock,
   thinkingBlock('thinking'),
   thinkingBlock('redacted_thinking'),
   ToolUseBlock,
   ToolResultBlock,
-  otherThan(['text', 'thinking', 'redacted_thinking', 'tool_use', 'tool_result']),
-]);
+]).pipe(Schema.toTaggedUnion('type'));
+
+const Block = Schema.Union([Blocks, otherThan(Blocks)]);
 
 /** A content block of a conversation line, as `Block` decodes it. */
 export type ContentBlock = typeof Block.Type;
@@ -97,6 +100,9 @@ const BudgetUsd = Schema.Struct({
   remaining: Schema.Finite,
 });
 
+/** The attachments the runtime reads, by `type`: `Attachments.guards` narrows a decoded attachment to one of them. */
+export const Attachments = Schema.Union([QueuedCommand, BudgetUsd]).pipe(Schema.toTaggedUnion('type'));
+
 /**
  * The lines of a Claude Code transcript the runtime reads, by `type`, in what it reads of each; every other key is not checked. A
  * field the runtime starts reading is added here.
@@ -124,7 +130,7 @@ export const LINES = {
   attachment: Schema.Struct({
     type: Schema.Literal('attachment'),
     ...Said,
-    attachment: Schema.optional(Schema.Union([QueuedCommand, BudgetUsd, otherThan(['queued_command', 'budget_usd'])])),
+    attachment: Schema.optional(Schema.Union([Attachments, otherThan(Attachments)])),
   }),
   'cost-state': Schema.Struct({
     type: Schema.Literal('cost-state'),

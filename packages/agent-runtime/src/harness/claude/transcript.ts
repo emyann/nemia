@@ -9,7 +9,7 @@ import path from 'node:path';
 import type { SpentSoFar, Usage } from '../../core/index.ts';
 import { originOf, type TranscriptEvent, type TranscriptOriginKind } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
-import { type ContentBlock, decodeLine, type Line, lineOf, writtenAt } from './lines.ts';
+import { Attachments, Blocks, type ContentBlock, decodeLine, type Line, lineOf, ResultTexts, writtenAt } from './lines.ts';
 
 /** The folder Claude Code writes its transcripts under, one folder per project: `projects` in `CLAUDE_CONFIG_DIR` or `~/.claude`. */
 const PROJECTS = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
@@ -87,12 +87,6 @@ const lineAt = (i: number, file?: string) => `line ${i + 1} of ${file ? `the tra
 
 type BlockOf<T extends string> = Extract<ContentBlock, { type: T }>;
 
-/** Whether a content block is of `type`, as its schema decoded it. */
-const isBlock =
-  <T extends string>(type: T) =>
-  (block: ContentBlock): block is BlockOf<T> =>
-    block.type === type;
-
 /**
  * A Claude Code session's transcript file, for the runners that read one by a spec (`claudeJobSpec`).
  * @param sessionId The Claude Code session's id, its transcript's file name.
@@ -110,7 +104,7 @@ const resultText = (content: BlockOf<'tool_result'>['content']): string =>
   typeof content === 'string'
     ? content
     : Array.isArray(content)
-      ? content.map((b) => (b.type === 'text' && 'text' in b && typeof b.text === 'string' ? b.text : `[${b.type}]`)).join('\n')
+      ? content.map((b) => (ResultTexts.guards.text(b) && b.text !== undefined ? b.text : `[${b.type}]`)).join('\n')
       : '';
 
 /**
@@ -133,14 +127,14 @@ const blockEvents = (
     text,
     ...(origin ? { origin } : {}),
   });
-  if (isBlock('text')(block)) return [said(block.text ?? '')];
-  if (isBlock('thinking')(block) || isBlock('redacted_thinking')(block)) {
+  if (Blocks.guards.text(block)) return [said(block.text ?? '')];
+  if (Blocks.guards.thinking(block) || Blocks.guards.redacted_thinking(block)) {
     return [{ id: `${id}:${i}`, at, role, kind: 'thinking', ...(block.thinking ? { text: block.thinking } : {}) }];
   }
-  if (isBlock('tool_use')(block)) {
+  if (Blocks.guards.tool_use(block)) {
     return [{ id: block.id ?? `${id}:${i}`, at, role, kind: 'tool_use', tool: { name: String(block.name), input: block.input } }];
   }
-  if (isBlock('tool_result')(block)) {
+  if (Blocks.guards.tool_result(block)) {
     return [
       {
         id: block.tool_use_id ?? `${id}:${i}`,
@@ -157,18 +151,13 @@ const blockEvents = (
 /** A `queued_command` attachment as events: words sent in by a peer as `system`, the session's own user's as `user`, anything else none. */
 const queuedEvents = (line: Line<'attachment'>, id: string, at: string): TranscriptEvent[] => {
   const a = line.attachment;
-  if (a === undefined || !isQueued(a) || typeof a.prompt !== 'string') return [];
+  if (a === undefined || !Attachments.guards.queued_command(a) || typeof a.prompt !== 'string') return [];
   const from = a.origin?.kind;
   if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }];
   return a.commandMode === 'prompt' && (from === 'human' || from === undefined)
     ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }]
     : [];
 };
-
-type Attached = NonNullable<Line<'attachment'>['attachment']>;
-
-/** Whether an attachment is a queued command, as its schema decoded it. */
-const isQueued = (a: Attached): a is Extract<Attached, { type: 'queued_command' }> => a.type === 'queued_command';
 
 /**
  * One line of a Claude Code transcript as events. A `user` or `assistant` line gives one per content
@@ -463,7 +452,7 @@ const tookSaid = (a: Attempt, text: string, since: number, where: () => string):
   if (!response?.message.id || !(Date.parse(response.timestamp ?? '') >= since)) return;
   a.responses.set(response.message.id, responseOf(response));
   const content = response.message.content;
-  for (const call of Array.isArray(content) ? content.filter(isBlock('tool_use')) : []) if (call.id) a.toolCalls.add(call.id);
+  for (const call of Array.isArray(content) ? content.filter(Blocks.guards.tool_use) : []) if (call.id) a.toolCalls.add(call.id);
 };
 
 /**

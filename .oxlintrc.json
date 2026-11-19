@@ -540,10 +540,10 @@
         "landmines-testing/no-flake-masking": "off"
       }
     },
-    // apps/web/test/waits.ts is the runtime's src/waits/waits.ts byte for byte (the board imports no package, and waits.test.ts holds
-    // the copy): its return types are source's, which keeps them.
+    // apps/web/test/waits.ts and apps/docs/test/waits.ts are the runtime's src/waits/waits.ts byte for byte (neither imports a package;
+    // waits.test.ts holds the copies): their return types are source's, which keeps them.
     {
-      "files": ["apps/web/test/waits.ts"],
+      "files": ["apps/web/test/waits.ts", "apps/docs/test/waits.ts"],
       "rules": {
         "landmines-types/no-explicit-return-types": "off"
       }

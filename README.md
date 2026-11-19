@@ -22,7 +22,10 @@ work.
 Dependencies point down this table, never up. The web app imports no package: the engine spawns
 processes and reads your home directory, so it lives behind the API.
 
-## Getting started
+## Running from the repository
+
+To use Nemia, install a release: [Getting started](apps/docs/src/content/docs/getting-started.mdx) in the docs takes one line to a
+first landed change. This section is for working on Nemia itself, from a checkout.
 
 ```bash
 npm install

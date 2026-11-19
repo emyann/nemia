@@ -1,70 +1,86 @@
 ---
 title: Getting started
-description: Install Nemia, start its daemon and its board, make a factory, and start a first run in it.
+description: Install Nemia with one line, open the board, and follow its milestones to a first landed change.
 ---
 
-Nemia runs from its repository today: there is no package to install from a registry yet. These are the commands, in the order you
-would type them the first time.
+From one line in a terminal to a first change landed in your repository, on your own laptop. The board walks you through it in
+milestones: a harness, a first factory, a first volume, and a first card. Each one is read from what the store holds now (a harness
+activated and signed in, a factory filed, a trusted volume, a run landed), so a milestone you do at a terminal shows as done on the board.
+Every page has a way past it.
 
 ## Install
 
 ```bash
-npm install
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
 ```
 
-The command `nemia` is linked at the root of the repository, so `npx nemia` runs it from there. It is the orchestrator's CLI,
-`packages/agent-orchestrator/src/cli/main.ts`; `wf` is its older name, and runs the same thing.
+It works on macOS (Apple silicon or Intel), on Linux (x64 or arm64), and on Windows in a WSL terminal. On a laptop it asks nothing: it
+lays the release down, starts Nemia on this machine alone, opens the board's welcome page in your browser, and ends on the link to it,
+under `http://localhost:8787/welcome`. The link signs that browser in to the board, once, within ten minutes. Where no browser opened,
+open the link yourself. Later, `nemia open` opens the board signed in at any time. [Install](/install/) says what the installer does,
+its flags, and the server's path.
 
-## Start the daemon
+## A harness
 
-One process per store moves every run: it holds `~/.agent-workflows/daemon.json` (`WF_ROOT`) while it ticks, and a second one is
-refused, naming the first one's pid. You start it one of two ways:
+The welcome page asks first which harness to activate, Claude Code or Codex: the harness runs Nemia's own agent and every session in
+your factories, and a release carries none. Press _Activate_, and the page follows the install of the version this release was tested
+with, then checks its version. Once it is signed in (the page says how where it is not), _Run the check_ sends one real turn
+through it, at a capped cost, and your plan's quota shows once that turn passed.
 
-- **With the board**: `npm start` in `apps/api`. It is the daemon and the board's api at once, on port 8787.
-- **Without a board**: `nemia up`, the same daemon on a machine that serves no board.
+At a terminal, `nemia doctor fix claude` does the same install. The board's _Setup_ page shows every harness and every other piece the
+machine needs ([Activate a harness](/install/#activate-a-harness)). Once both checks passed, _Next_ leads to the next
+milestone not done.
 
-Where no daemon ticks, a command that files work, such as `nemia start` or `nemia approve`, starts one for you, and says where it logs.
+## A first factory
 
-## Open the board
+A factory is where your workflows run, with the agents it hires ([Factories](/factories/)). The page asks how you want to make it, three
+ways:
 
-The board is the web app's server. In `apps/web`, build it, then serve it:
+- **Talk to Nemia**, recommended: her chat opens beside the page; tell her what you build and she makes the factory with you. The page
+  moves on by itself once she has filed it.
+- **From a template**: pick a team built into Nemia, such as sdlc, see its workflows and agents, give the factory a name, and it is
+  made with every setting at its default.
+- **From scratch**: give it a name, and an empty factory is made, with a short guide to what goes in it: a workflow, an agent, a hire.
 
-```bash
-npm run build
-npm run preview
-```
+A factory may start with no volume: that is the next milestone. At a terminal, `nemia factory apply <name> --template <template>` makes
+one from a template and `nemia factory add <name>` an empty one.
 
-It sends its `/api` calls on to the daemon on port 8787.
+## A first volume
 
-To work on the board itself, `npm run dev` at the root runs an api on port 8788 that ticks nothing, and the web on port 5173.
+_Where is the work?_ A factory's runs work in a git repository, its volume. Give it one of three ways:
 
-## Make a factory
+- **A folder on this machine**: type its path, and the folders under what you type are offered as you go. A folder that is no git
+  repository yet is offered `git init`: Nemia makes it one with one empty first commit, and commits none of your files.
+- **A repository by its address**, on GitHub, GitLab or any git host: Nemia clones it, with this machine's own git credentials
+  ([A repository by its URL](/install/#a-repository-by-its-url)).
+- **A new repository**: give it a name, and Nemia makes an empty one in its store.
 
-A run is started in a [factory](/factories/): a name for its volumes, the repositories the work is on (`:rw`), the workflows it offers and the agents it
-hires into their steps.
+The volume is added writable, and the page then asks you to trust it: no run starts in a folder until a harness trusts it. _Not now_
+leaves the factory waiting on that trust, which you give later from its Settings. At a terminal, `nemia factory volume add <factory>
 
-```bash
-nemia factory add pipao --volume ~/code/pipao:rw
-nemia factory attach pipao build
-nemia factory hire pipao ada --step build/implement
-```
+<path>:rw` adds a volume and trusts it, and `nemia factory trust <factory>` asks the trust again.
 
-The workflow you attach is a folder of markdown in the repository, its `build` here (see [Workflows](/workflows/)), and the
-agent you hire is a file of its `agents` folder (see [Agents](/agents/)). Neither is built into Nemia: a factory's are its own.
+## A first card
 
-## Start a first run
+_What first?_ A card says what you want, a workflow does it in steps, and a gate waits on you before it lands. Pick one of three small
+changes (say what the repository is in its README, ignore editor files, fix a typo), or write your own. The card runs in the factory's
+quick workflow where it has one, else in a workflow of the factory's you pick. Above _Start_, the page says what a small run costs and
+takes: what one took on this machine once one has landed, else an estimate.
 
-```bash
-nemia start "add a --quiet flag to the export command" --workflows build --factory pipao
-nemia ls
-```
+_Start, gated before it lands_ files the card and starts its run, then opens the run's page, where a hint says where the run stands:
+the card filed, each step an agent at work, then the gate, which waits on you. Read the work, then approve it to land, or send it back.
+Once it has landed, the hint leads to _You are set_, the welcome's last page, which offers what comes next: raising Nemia's level so she
+watches your runs for you, landing through your git host where the factory's template follows one, and Nemia from a terminal or a coding
+agent.
 
-The brief is the first argument, words or a markdown file. `nemia ls` lists the runs, and the board shows the same run, step by step.
-When it stops at a gate, `nemia approve` lets it go on. [How a run lives](/how-a-run-lives/) follows it to its landing.
+[How a run lives](/how-a-run-lives/) follows a run from its start to its landing.
 
-When you would rather not watch each run yourself, put [Nemia](/nemia/) on: `nemia level semi-auto`.
+## From the repository
+
+To work on Nemia itself, run it from a checkout of its repository: the repository's `README.md` says how, under _Running from the
+repository_.
 
 ## Sources
 
-This page is written from `README.md` (_Getting started_), `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the
-store_, _One daemon per store_), `apps/api/package.json`, `apps/web/package.json` and `packages/agent-orchestrator/package.json`.
+This page is written from `tools/release/install.sh`, `apps/web/src/components/welcome/` (the welcome's pages, one a milestone),
+`packages/objects/src/milestones.ts` and `apps/web/src/lib/firstCard.ts`.

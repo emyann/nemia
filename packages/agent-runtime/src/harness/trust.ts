@@ -4,11 +4,10 @@
  * act of taking it back from a folder its caller made and is removing, with every folder inside it (`untrustFolder`). Each answers
  * `undefined` for a harness that keeps no trust of a folder, which is given nothing.
  */
-import os from 'node:os';
 import path from 'node:path';
 import {
   claudeConfigFile,
-  claudeKeyUnder,
+  claudeHoldsHome,
   claudeNeverKeeps,
   claudeTrust,
   claudeTrustKey,
@@ -117,7 +116,7 @@ export function untrustFolder(harness: string, dir: string, file?: string): Fold
   if (!keepsTrust(harness)) return undefined;
   const folder = path.resolve(dir);
   const at = file ?? claudeConfigFile();
-  if (claudeKeyUnder(path.resolve(os.homedir()), folder))
+  if (claudeHoldsHome(folder))
     return {
       harness: 'Claude Code',
       file: at,

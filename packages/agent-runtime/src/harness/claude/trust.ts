@@ -169,6 +169,12 @@ export function claudeTrust(key: string, file: string = claudeConfigFile(), read
  */
 export const claudeKeyUnder: ClaudeKeyUnder = (key, folder) => key === folder || key.startsWith(folder + '/');
 
+/**
+ * Whether the folder `folder` is the home directory or holds it: whose records in Claude Code's file are a person's, never taken back.
+ * @param folder The folder taken back, resolved.
+ */
+export const claudeHoldsHome = (folder: string): boolean => claudeKeyUnder(path.resolve(os.homedir()), folder);
+
 /** What `claudeUntrustText` answers: no record under the folder, the text without them and the keys it took, or why it cannot be read. */
 type UntrustText = { readonly none: true } | { readonly text: string; readonly took: readonly string[] } | { readonly unread: string };
 

@@ -74,12 +74,12 @@ const MILESTONES_ROUTE = '**/api/readiness/milestones';
 const MADE = 'first-factory';
 
 /** `method` of the api at `route`, from Node, presenting the seat's token: its status and its JSON, none where it answered none. */
-async function asked(page: Page, method: 'GET' | 'DELETE', route: string): Promise<{ status: number; body: unknown }> {
+async function asked(page: Page, method: 'GET' | 'DELETE', route: string) {
   const res = await fetch(
     new URL(route, page.url()),
     method === 'GET' ? { headers: bearer() } : { method, headers: { ...bearer(), 'content-type': 'application/json' }, body: '{}' },
   );
-  return { status: res.status, body: await res.json().catch(() => undefined) };
+  return { status: res.status, body: (await res.json().catch(() => undefined)) as unknown };
 }
 
 /**
@@ -87,7 +87,7 @@ async function asked(page: Page, method: 'GET' | 'DELETE', route: string): Promi
  * Make pressed applies it through the real api, and the step shows the factory made, with Next. The factory is read from the api: made
  * from sdlc, with no volume. Its skip leaves for `/`.
  */
-async function makesFromTemplate(page: Page): Promise<void> {
+async function makesFromTemplate(page: Page) {
   await page.locator('article[data-welcome] [data-welcome-next]').click();
   await page.waitForURL((url) => url.pathname === '/welcome/factory');
   await idle(page);
@@ -187,7 +187,8 @@ export default {
         : route.fallback();
     const milestones = (route: Route) =>
       route.request().method() === 'GET'
-        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FACTORY_NEXT) })
+        ? // oxlint-disable-next-line landmines-testing/no-test-doubles -- milestones planted: the seat's machine has its own
+          route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FACTORY_NEXT) })
         : route.fallback();
     await page.route(READINESS_ROUTE, answer);
     await page.route(MILESTONES_ROUTE, milestones);

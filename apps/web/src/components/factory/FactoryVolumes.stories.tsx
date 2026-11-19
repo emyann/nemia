@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { FactoryVolumes } from './FactoryVolumes';
 import { factoryView, FACTORY } from '../../../.storybook/fixtures/proposals';
 import { volumes } from '../../../.storybook/fixtures/factories';
+import { settled } from '../../../.storybook/play';
 
 const VOLUMES = '/api/factories/:factory/volumes';
 const VOLUME = '/api/namespaces/:namespace/volumes/:name';
@@ -94,6 +95,7 @@ export const Switched: Story = {
     await userEvent.click(notes);
     await waitFor(() => expect(switchOf(canvasElement, '/srv/scratch', 'claudeMd')).toBeEnabled());
     await expect(canvasElement.querySelector('[data-volume-refused]')).toBeNull();
+    await settled(canvasElement);
   },
 };
 
@@ -113,6 +115,7 @@ export const SwitchRefused: Story = {
     await userEvent.click(skills);
     await waitFor(() => expect(canvasElement.querySelector('[data-volume-refused]')).not.toBeNull());
     await expect(canvasElement.querySelector('[data-volume-refused]')).toHaveTextContent('Not changed');
+    await settled(canvasElement);
   },
 };
 
@@ -139,6 +142,7 @@ export const Added: Story = {
     await userEvent.click(page.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(page.getByRole('button', { name: 'Add' })).toBeEnabled());
     await expect(canvasElement.querySelector('[data-volume-refused]')).toBeNull();
+    await settled(canvasElement);
   },
 };
 
@@ -157,6 +161,7 @@ export const Refused: Story = {
     await userEvent.click(page.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(canvasElement.querySelector('[data-volume-refused]')).not.toBeNull());
     await expect(canvasElement.querySelector('[data-volume-refused]')).toHaveTextContent('in no git repository');
+    await settled(canvasElement);
   },
 };
 
@@ -169,5 +174,6 @@ export const Removing: Story = {
     await userEvent.click(page.getByRole('button', { name: 'Remove /srv/notes' }));
     await waitFor(() => expect(page.getByRole('button', { name: 'Remove /srv/scratch' })).toBeDisabled());
     await expect(switchOf(canvasElement, '/srv/scratch', 'skills')).toBeDisabled();
+    await settled(canvasElement);
   },
 };

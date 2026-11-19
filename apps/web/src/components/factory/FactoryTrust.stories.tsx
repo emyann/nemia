@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, within } from 'storybook/test';
 import type { Factory } from '@/lib/api/factories';
 import { ACME_COMMANDS } from '../../../.storybook/fixtures/folders';
+import { settled } from '../../../.storybook/play';
 import { FactoryTrust } from './FactoryTrust';
 
 /** The lines a person types for `acme`, as the api answers them. */
@@ -50,6 +51,7 @@ export const Asked: Story = {
     await expect(args.onTrust).toHaveBeenCalledOnce();
     await userEvent.click(canvas.getByRole('button', { name: 'Not now' }));
     await expect(args.onLater).toHaveBeenCalledOnce();
+    await settled(canvasElement);
   },
 };
 

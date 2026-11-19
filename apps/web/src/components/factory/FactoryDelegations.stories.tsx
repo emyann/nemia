@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { delegableAgentsQuery, delegationsQuery, type DelegableAgent } from '@/lib/api/proposals';
 import { FactoryDelegations } from './FactoryDelegations';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
+import { settled } from '../../../.storybook/play';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** The agents the factory serves, as its agents page names them: three with a role, and one whose file says none. */
@@ -120,6 +121,7 @@ export const Unlisted: Story = {
     await sent(canvasElement, 'nemia');
     await waitFor(() => expect(written).toEqual(['nemia']));
     await expect(canvasElement.querySelector('[data-delegation-refused]')).toBeNull();
+    await settled(canvasElement);
   },
 };
 
@@ -137,5 +139,6 @@ export const Refused: Story = {
     });
     await expect(refused.textContent).toContain('nobody');
     await expect(within(canvasElement).getByRole('combobox', { name: 'Agent' })).toHaveValue('nobody');
+    await settled(canvasElement);
   },
 };

@@ -33,7 +33,7 @@ const rgbOf = (hsl: string): Rgb => {
 
 /** The colour roles a block of the theme writes, by their name after `--md-sys-color-`. */
 const rolesIn = (css: string): Map<string, Rgb> =>
-  new Map([...css.matchAll(/--md-sys-color-([a-z-]+):\s*(hsl\([^)]*\))\s*;/g)].map((m) => [m[1]!, rgbOf(m[2]!)]));
+  new Map([...css.matchAll(/--md-sys-color-([a-z-]+):\s*(hsl\([^)]*\))\s*;/g)].map((m) => [m[1], rgbOf(m[2])]));
 
 const css = fs.readFileSync(THEME, 'utf8');
 const at = css.indexOf(DARK);
@@ -48,10 +48,18 @@ for (const scheme of ['light', 'dark'] as const)
   test(`every ink the kit pairs reads on its ground at ${CONTRAST_THRESHOLD}:1 at least, in the ${scheme} scheme`, () => {
     const roles = SCHEMES[scheme];
     const unwritten = CONTRAST_PAIRS.flat().filter((role) => !roles.has(role));
-    assert.deepEqual([...new Set(unwritten)], [], `roles the ${scheme} scheme does not write: regenerate the theme, npm run theme:generate`);
+    assert.deepEqual(
+      [...new Set(unwritten)],
+      [],
+      `roles the ${scheme} scheme does not write: regenerate the theme, npm run theme:generate`,
+    );
     const under = CONTRAST_PAIRS.flatMap(([ink, ground]) => {
       const read = ratio(roles.get(ink)!, roles.get(ground)!);
       return read < CONTRAST_THRESHOLD ? [`${ink} on ${ground}: ${read.toFixed(2)}:1`] : [];
     });
-    assert.deepEqual(under, [], `under ${CONTRAST_THRESHOLD}:1 in the ${scheme} scheme: change DESIGN.md's colours, then npm run theme:generate`);
+    assert.deepEqual(
+      under,
+      [],
+      `under ${CONTRAST_THRESHOLD}:1 in the ${scheme} scheme: change DESIGN.md's colours, then npm run theme:generate`,
+    );
   });

@@ -1,6 +1,7 @@
 /**
  * What every story of the look is drawn in, in Storybook and in `npm run stories` alike: the board's styles, in the theme the toolbar
- * picks (dark, Nemia's default, unless a person switches it: the class it sets on `<html>`, `scheme.ts`), the look's ground, and a router of its own over a history kept in memory, so a link of a story leads somewhere and moves no address but its
+ * picks (dark, Nemia's default, unless a person switches it: the class it sets on `<html>`, `scheme.ts`), the look's ground, and a router
+ * of its own over a history kept in memory, so a link of a story leads somewhere and moves no address but its
  * own. Where that router stands is written on the story's wrapper (`data-at`), and how many times it moved (`data-moves`). A story's
  * parameters say `at`, the address it opens on, and `scrollMark: false`, for a story nothing marks the scrolls of.
  *

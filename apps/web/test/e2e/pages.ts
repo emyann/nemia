@@ -133,12 +133,14 @@ export const themesOf: ThemesOf = (asked) => (asked.light || asked.contrast ? ['
 
 /**
  * What a run of the e2e does, read from its command line: the pages it `visit`s, in their order; the `themes` it visits them in; whether a
- * page is `pictured`; whether it asked for `photos` and for `light`, which run.ts hands its workers; how many `workers` it asks for, if it does; and whether it is `whole` — every page, in the dark theme alone, the run
+ * page is `pictured`; whether it asked for `photos` and for `light`, which run.ts hands its workers; how many `workers` it asks for, if
+ * it does; and whether it is `whole` — every page, in the dark theme alone, the run
  * a check makes, which is held to the e2e's bound (`overBound`, timing.ts). With no flag, every page in the dark theme, pictured by none:
  * the assertions alone. `--photos` pictures each page visited, in the dark theme alone; `--light`, with `--photos`, visits light first
  * and pictures it too, and is refused without it (`themesOf`); `--pages <name,…>` visits only the pages
  * named, in the order of the pages, and with `--photos` pictures them; `--contrast`, with `--photos`, has each picture's text pairs
- * `measured` beside it (contrast.ts), in both themes, light then dark, and is refused without it; `--workers <n>` sets how many workers visit them; and
+ * `measured` beside it (contrast.ts), in both themes, light then dark, and is refused without it; `--workers <n>` sets how many workers
+ * visit them; and
  * `--shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist (`shardOf`). A shard is no whole run either, so its
  * pages are never summed against their bound: a reporter sums every shard's instead (pages-bound.ts). Refuses a flag it does not know, a
  * name that is no page (listing the pages there are), `--pages` with no name after it, `--workers` with no whole number of one or more,
@@ -215,7 +217,9 @@ export function planOf<P extends { name: string }>(
   if (measured && !photos)
     throw new Error('--contrast measures what is pictured, and nothing is without --photos: npm run e2e -- --photos --contrast');
   if (light && !photos)
-    throw new Error('--light pictures the pages in the light theme too, and nothing is pictured without --photos: npm run e2e -- --photos --light');
+    throw new Error(
+      '--light pictures the pages in the light theme too, and nothing is pictured without --photos: npm run e2e -- --photos --light',
+    );
   const themes: Theme[] = [...themesOf({ photos, light, contrast: measured })];
   if (shard !== undefined && of !== undefined) {
     if (named) throw new Error('--shard deals the pages itself and --pages names them: give one of the two, not both (--shard 1 --of 4)');

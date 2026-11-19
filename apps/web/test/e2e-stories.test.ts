@@ -196,7 +196,12 @@ const pairsOf = (matches: readonly Match[] | undefined) => (matches ?? []).map((
 
 test("a target is set beside its story's approved picture: the dark one, and a canary's light one, the named theme winning", () => {
   const { matches, unknown, lightless } = matchesOf(
-    targetsOf(['target-run-card--wide.png', 'target-run-card--narrow-one-dark.png', 'target-look-tag--plain.png', 'target-look-tag--plain-dark.png']),
+    targetsOf([
+      'target-run-card--wide.png',
+      'target-run-card--narrow-one-dark.png',
+      'target-look-tag--plain.png',
+      'target-look-tag--plain-dark.png',
+    ]),
     [...CARD_STORIES, 'look-tag--plain'],
     ['look-tag--plain'],
   );
@@ -270,7 +275,13 @@ const EARLIER_PASS = [
   'match-run-card--wide-dark.png',
 ];
 
-const NOT_ITS_OWN = ['notes.md', 'target-run-card--wide.png', 'story-run-card--wide-dark.png', 'stories.json', 'e2e/after-run-card--wide.png'];
+const NOT_ITS_OWN = [
+  'notes.md',
+  'target-run-card--wide.png',
+  'story-run-card--wide-dark.png',
+  'stories.json',
+  'e2e/after-run-card--wide.png',
+];
 
 test('a pass clears the pictures and approved.json an earlier pass wrote in --out, and no other file or folder of it', () => {
   const { root } = planted();
@@ -311,10 +322,14 @@ test('the approved pictures the work added, changed and removed, by name, a ligh
   commit(root, "main's own picture");
   git(root, 'checkout', '-q', 'work');
   git(root, 'merge', '-q', '--no-ff', '--no-edit', '-X', 'ours', 'main');
-  assert.deepEqual(listed(root, '--base', 'main').said?.changed, ['look-tag--plain-light', 'run-card--wide'], "main's, merged, is not the work's");
+  assert.deepEqual(
+    listed(root, '--base', 'main').said?.changed,
+    ['look-tag--plain-light', 'run-card--wide'],
+    "main's, merged, is not the work's",
+  );
 });
 
-test('an approved picture is named by its story, a light canary\'s with -light, and nothing else under the folder is one', () => {
+test("an approved picture is named by its story, a light canary's with -light, and nothing else under the folder is one", () => {
   assert.equal(approvedName('apps/web/test/approved/run-card--wide.png'), 'run-card--wide');
   assert.equal(approvedName('apps/web/test/approved/light/run-card--wide.png'), 'run-card--wide-light');
   assert.equal(approvedName('apps/web/test/approved/notes.md'), undefined);

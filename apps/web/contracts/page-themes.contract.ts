@@ -9,7 +9,10 @@ import { type Implementation, spec } from '@emyann/tsverify';
 /** A theme a page is visited in. */
 export type PageTheme = 'light' | 'dark';
 
-/** What the command line asked of the themes: pictures (`--photos`), light pictures besides (`--light`), the contrast's measure (`--contrast`). */
+/**
+ * What the command line asked of the themes: pictures (`--photos`), light pictures besides (`--light`), the contrast's measure
+ * (`--contrast`).
+ */
 export type ThemesAsked = { readonly photos: boolean; readonly light: boolean; readonly contrast: boolean };
 
 const themesOfSpec = spec<(asked: ThemesAsked) => readonly PageTheme[]>({

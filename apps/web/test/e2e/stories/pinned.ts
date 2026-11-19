@@ -31,11 +31,7 @@ const WEB = path.resolve(import.meta.dirname, '..', '..', '..');
  * @param platform The machine's platform and architecture, as Node names them.
  * @param browser Whether the lockfile's Chromium is installed.
  */
-const unpinnedBecause = (
-  osRelease: string | undefined,
-  platform: { os: string; arch: string },
-  browser: boolean,
-): string | undefined => {
+const unpinnedBecause = (osRelease: string | undefined, platform: { os: string; arch: string }, browser: boolean): string | undefined => {
   const field = (name: string) => new RegExp(`^${name}="?([^"\\n]*)"?$`, 'm').exec(osRelease ?? '')?.[1];
   if (platform.os !== 'linux' || platform.arch !== 'x64') return `this is ${platform.os} on ${platform.arch}, not Linux on x64`;
   if (field('ID') !== SYSTEM.id || field('VERSION_ID') !== SYSTEM.version)
@@ -58,7 +54,8 @@ const why = unpinnedBecause(
   fs.existsSync(chromium.executablePath()),
 );
 if (why) console.warn(`stories: compared against no approved picture, since ${why}; CI's e2e-look job compares them`);
-else if (update) console.log('stories: in the pinned place, writing the approved pictures that differ (test/approved): commit them with the change');
+else if (update)
+  console.log('stories: in the pinned place, writing the approved pictures that differ (test/approved): commit them with the change');
 const ran = spawnSync('npx', ['vitest', 'run', '--project=storybook', ...files, ...(update && !why ? ['--update'] : [])], {
   cwd: WEB,
   stdio: 'inherit',

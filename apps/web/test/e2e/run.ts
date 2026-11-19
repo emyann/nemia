@@ -13,8 +13,10 @@
  *  4. Makes an empty store for each, refusing two that are one (`apart`), and starts each worker (worker.ts), which seeds its store,
  *     serves it with an api and `vite preview` of its own, and visits the pages it is handed in its own Chromium, in the dark theme: no
  *     console error, no failed request, the page in the theme asked for, and the elements the page must have. With `--pages`, only the
- *     pages named; with `--light` or `--contrast` (each beside `--photos`), each in a light and then a dark theme. Each worker's lines are said as it says them, after `[w<i>]`.
- *  5. Takes no picture but a failing page's. With `--photos`, screenshots each page visited in each theme it visits (the dark alone, light too with `--light`), with the pictures the page
+ *     pages named; with `--light` or `--contrast` (each beside `--photos`), each in a light and then a dark theme. Each worker's lines
+ *     are said as it says them, after `[w<i>]`.
+ *  5. Takes no picture but a failing page's. With `--photos`, screenshots each page visited in each theme it visits (the dark alone,
+ *  light too with `--light`), with the pictures the page
  *     takes of itself, into $WF_ARTIFACTS when a run gives one — the step's files directory — and into `.e2e/` at the repository root
  *     otherwise.
  *  6. Reads what each worker wrote, refusing two that served one store, api or app (`apart`); and says last the ten slowest pages, what

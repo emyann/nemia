@@ -30,7 +30,9 @@ const once = (list: readonly string[]): boolean => list.every((one, at) => !list
 const exactly = (out: readonly string[], from: readonly string[], keep: (one: string) => boolean): boolean =>
   from.every((one) => out.includes(one) === keep(one)) && out.every((one) => from.includes(one));
 
-const unapprovedSpec = spec<(stories: readonly string[], dark: readonly string[], light: readonly string[], canaries: readonly string[]) => Unapproved>({
+const unapprovedSpec = spec<
+  (stories: readonly string[], dark: readonly string[], light: readonly string[], canaries: readonly string[]) => Unapproved
+>({
   ensures: {
     unpicturedExactly: {
       description: 'A story is owed its dark picture exactly when the folder holds none of it',
@@ -45,7 +47,7 @@ const unapprovedSpec = spec<(stories: readonly string[], dark: readonly string[]
       condition: ({ input: [, , light, canaries], output }) => exactly(output.lightUnpictured, canaries, (id) => !light.includes(id)),
     },
     lightStrayExactly: {
-      description: 'A light picture is stray exactly when it is no canary\'s',
+      description: "A light picture is stray exactly when it is no canary's",
       condition: ({ input: [, , light, canaries], output }) => exactly(output.lightStray, light, (id) => !canaries.includes(id)),
     },
     notAStoryExactly: {

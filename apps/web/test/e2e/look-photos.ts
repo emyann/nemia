@@ -1,7 +1,9 @@
 /**
- * Pictures the look's parts for a person who reviews them: `node test/e2e/look-photos.ts [--light]` from `apps/web` builds Nemia's Storybook
+ * Pictures the look's parts for a person who reviews them: `node test/e2e/look-photos.ts [--light]` from `apps/web` builds Nemia's
+ * Storybook
  * into a scratch folder, says what the build took and its largest process held, and opens each story alone in it
- * (`iframe.html?id=<id>`, `stories/built.ts`), in dark, Nemia's default, and first in light where `--light` asks, writing into the e2e's folder of pictures (`OUT`, the run's
+ * (`iframe.html?id=<id>`, `stories/built.ts`), in dark, Nemia's default, and first in light where `--light` asks, writing into the e2e's
+ * folder of pictures (`OUT`, the run's
  * files where `WF_ARTIFACTS` names them) a picture of every story but a page body's (`parts-<id>-<theme>.png`); then, enlarged for a
  * person's eye, the cut button at rest and with the keyboard's focus, as a link and as a press, and disabled, six times, the corner of
  * a frame that waits on a person, four times, the rail of a run whose steps are done, a page's name over its rule, short and long, a

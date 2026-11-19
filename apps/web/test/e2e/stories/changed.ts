@@ -15,7 +15,8 @@
  * through every import of the board's own (`src` and `.storybook`), is one of them, or a file every story is drawn in.
  *
  * Of the changed paths, each approved picture is `added` (the base has none), `changed`, or `removed`, by its name: the story's id, and
- * `<id>-light` for a canary's light picture. With `--list` it prints `{ "stories", "bare", "added", "changed", "removed" }` as JSON, `stories` the ids of the stories the
+ * `<id>-light` for a canary's light picture. With `--list` it prints `{ "stories", "bare", "added", "changed", "removed" }` as JSON,
+ * `stories` the ids of the stories the
  * change reaches, (and `matches`
  * with `--targets`) and writes nothing. Without it, it writes into `--out`, for each changed picture, `before-<name>.png` (the base's,
  * from git), `after-<name>.png` (the head's) and `diff-<name>.png` (each pixel that differs red, in Chromium), and last
@@ -157,7 +158,8 @@ export const idsOf = (source: string): string[] => {
  * Every story id of the workspace at `root`, read off its story files, in path order.
  * @param root The workspace root.
  */
-export const knownIds = (root: string): string[] => storyFiles(root).flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8')));
+export const knownIds = (root: string): string[] =>
+  storyFiles(root).flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8')));
 
 /**
  * The matches the targets in `dir` ask for; refuses where `dir` is no folder, a target names no story of the workspace at `root`, or
@@ -349,7 +351,11 @@ async function main(): Promise<number> {
   const changed = named ?? changedSince(root, mergeBase ?? 'HEAD');
   const { stories, bare } = touchedOf(root, changed);
   const pictures = picturesOf(root, changed, named === undefined ? mergeBase : undefined);
-  const listed = { stories, bare, ...Object.fromEntries(Object.entries(pictures).map(([kind, list]) => [kind, list.map((one) => one.name)])) };
+  const listed = {
+    stories,
+    bare,
+    ...Object.fromEntries(Object.entries(pictures).map(([kind, list]) => [kind, list.map((one) => one.name)])),
+  };
   const targetsDir = values.targets === undefined ? undefined : path.resolve(values.targets);
   const matches = targetsDir === undefined ? [] : matchesIn(root, targetsDir);
   if (values.list) process.stdout.write(`${JSON.stringify(targetsDir === undefined ? listed : { ...listed, matches })}\n`);

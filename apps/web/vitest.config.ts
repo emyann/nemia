@@ -3,7 +3,8 @@
  * workspace's suite runs: each file in a process of its own, two files at a time (`tools/guards/test/suite.test.ts` holds every package's
  * bound equal, reading this project's, named first), a test and a hook timed out at 120 s, and the kit's `seat.ts` loaded before each
  * file; Material's colour utilities, which the kit's theme module imports by paths Node does not resolve, transformed rather than
- * loaded as Node would (`test/theme-contrast.test.ts`). `look`, the look's browser tests under `test/e2e/`, bounded as `node` is, which `npm run e2e -- --look` runs (`e2e/look.ts`). And
+ * loaded as Node would (`test/theme-contrast.test.ts`). `look`, the look's browser tests under `test/e2e/`, bounded as `node` is, which
+ * `npm run e2e -- --look` runs (`e2e/look.ts`). And
  * `storybook`, which runs every story Storybook finds (`.storybook/main.ts`) in Playwright's Chromium, headless: each a smoke test that it
  * renders, its play function where it has one, and axe as the preview sets it (`error`). `npm run stories` runs it alone
  * (`--project=storybook`), and `npm run e2e -- --look` after the look's tests (`e2e/look.ts`), so CI's `e2e-look` job runs it; `npm test`
@@ -69,7 +70,9 @@ export default mergeConfig(
             browser: {
               enabled: true,
               headless: true,
-              provider: playwright({ contextOptions: { colorScheme: 'dark', reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }),
+              provider: playwright({
+                contextOptions: { colorScheme: 'dark', reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' },
+              }),
               instances: [{ browser: 'chromium' }],
               viewport: { width: 1280, height: 800 },
               commands: { scheme },
@@ -78,7 +81,8 @@ export default mergeConfig(
                   comparatorName: 'pixelmatch',
                   comparatorOptions: { threshold: 0.1, includeAA: false, allowedMismatchedPixels: 0 },
                   resolveScreenshotPath: ({ arg, ext, root }) => path.join(root, APPROVED, `${pictureFile(arg)}${ext}`),
-                  resolveDiffPath: ({ arg, ext, root, attachmentsDir }) => path.join(root, attachmentsDir, 'approved', `${pictureFile(arg)}${ext}`),
+                  resolveDiffPath: ({ arg, ext, root, attachmentsDir }) =>
+                    path.join(root, attachmentsDir, 'approved', `${pictureFile(arg)}${ext}`),
                 },
               },
             },

@@ -8,7 +8,8 @@
  * The clock is faked and stands at one instant, so a relative or absolute time draws the same on every run, and the browser's zone and
  * locale are the config's, and it asks for reduced motion, which stops the canvases' one animation. Before each picture the pointer is
  * moved off the story, as the addon does before each test (`resetMousePosition`), since Chromium may keep a hover where nothing moved,
- * and a read still out draws its skeleton at once. The comparison runs only in the pinned place (`test/e2e/stories/pinned.ts`, which provides `approvedCompare`):
+ * and a read still out draws its skeleton at once. The comparison runs only in the pinned place (`test/e2e/stories/pinned.ts`, which
+ * provides `approvedCompare`):
  * anywhere else the stories run as before, and the first one says that nothing was compared.
  */
 import { afterEach, expect, inject, vi } from 'vitest';
@@ -19,6 +20,9 @@ import { SCHEME_CLASSES, type Scheme } from './scheme.ts';
 declare module 'vitest' {
   interface ProvidedContext {
     approvedCompare: boolean;
+  }
+  interface TaskMeta {
+    storyId?: string;
   }
 }
 

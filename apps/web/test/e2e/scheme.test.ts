@@ -30,8 +30,8 @@ const STORY = 'look-run--every-state';
 /** The value `theme/theme.css` gives the background role in each scheme: its root's, and its dark media's. */
 const BACKGROUND = (() => {
   const css = fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'theme', 'theme.css'), 'utf8');
-  const [light, dark] = [...css.matchAll(/--md-sys-color-background:\s*([^;]+);/g)].map((m) => m[1]!.trim());
-  return { light: light!, dark: dark! };
+  const [light = '', dark = ''] = [...css.matchAll(/--md-sys-color-background:\s*([^;]+);/g)].map((m) => m[1].trim());
+  return { light, dark };
 })();
 
 /** The colour a value computes to, read off a probe that paints with it. */

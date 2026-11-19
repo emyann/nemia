@@ -54,7 +54,9 @@ function argsOf(argv: readonly string[]): { worker: number; store: string; resul
   }
   const worker = Number(own['--worker']);
   if (!Number.isInteger(worker) || !own['--store'] || !own['--result'])
-    throw new Error('usage: node test/e2e/worker.ts --worker <i> --store <empty dir> --result <file> [--pages <name,…>] [--photos [--light] [--contrast]]');
+    throw new Error(
+      'usage: node test/e2e/worker.ts --worker <i> --store <empty dir> --result <file> [--pages <name,…>] [--photos [--light] [--contrast]]',
+    );
   return { worker, store: own['--store'], result: own['--result'], rest };
 }
 

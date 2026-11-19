@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { PROPOSAL_PHASES } from 'objects';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
@@ -117,7 +117,7 @@ function wiringOfText(file: string, text: string) {
   }
   const decoded = Schema.decodeUnknownResult(TreeWiringSchema)(raw);
   if (Result.isSuccess(decoded)) return { wiring: decoded.success };
-  const { path: where, words } = firstRefusal(raw, decoded.failure);
+  const { path: where, words } = firstRefusal(TreeWiringSchema, raw);
   const field = where.length ? `\`${where.map(String).join('.')}\`` : 'the whole';
   return { error: `${file} does not read as a tree's wiring: ${field} ${words}. Fix it by hand.` };
 }
@@ -207,8 +207,7 @@ export const readStatus = (home: string, name: string) =>
 /** The status a factory's `file` holds, or none where it is not there or does not read. */
 function statusIn(file: string) {
   try {
-    const decoded = Schema.decodeUnknownResult(StatusSchema)(JSON.parse(fs.readFileSync(file, 'utf8')));
-    return Result.isSuccess(decoded) ? decoded.success : undefined;
+    return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(StatusSchema))(fs.readFileSync(file, 'utf8')));
   } catch {
     return undefined;
   }
@@ -391,8 +390,8 @@ export const resolutionsFile = (home: string, name: string) => path.join(folderA
  */
 export function readResolutions(home: string, name: string) {
   try {
-    const decoded = Schema.decodeUnknownResult(ResolutionsSchema)(JSON.parse(fs.readFileSync(resolutionsFile(home, name), 'utf8')));
-    return Result.isSuccess(decoded) ? decoded.success : undefined;
+    const text = fs.readFileSync(resolutionsFile(home, name), 'utf8');
+    return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(ResolutionsSchema))(text));
   } catch {
     return undefined;
   }

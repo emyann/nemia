@@ -22,6 +22,8 @@ const WORDS: readonly RunStatus[] = RUN_STATUSES;
 /** The files of `src` that compare a run's status to one of its words, each with what it asks of it. */
 const READERS: Readonly<Record<string, string>> = {
   'lib/decide.ts': 'whether there is something to decide: not cancelled, and not running unless a step waits on you',
+  'lib/firstCard.ts':
+    "where a first card's run stands, for its hint: waiting on you, landed once succeeded, ended once failed or cancelled",
   'lib/factory.ts': 'whether the run is in flight: running, or still moving',
   'lib/hold.ts': 'whether a hold is offered, and what a hold may wait on: not succeeded, not cancelled',
   'lib/prune.ts': 'whether a prune is offered: not running',

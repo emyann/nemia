@@ -5,7 +5,7 @@
  * (`seenOf`), and the answer (`admissionOf`) printed as JSON, or nothing for none. A controller over `EngineService`, run by the command
  * line's runner with the table it decides by.
  */
-import { Effect, Result } from 'effect';
+import { Effect, Option, Result, Schema } from 'effect';
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { retryable, waitsOnPerson } from '../retry/index.ts';
@@ -78,15 +78,15 @@ export const waitRead = Effect.fnUntraced(function* (runId: string, stepName: st
   );
 });
 
-/** The call `given` names, or undefined where it is no JSON of a tool and its input. */
-function callOf(given: string) {
-  try {
-    const call = JSON.parse(given) as Partial<AdmissionCall> | null;
-    return typeof call?.tool === 'string' && typeof call.input === 'object' && call.input !== null ? (call as AdmissionCall) : undefined;
-  } catch {
-    return undefined;
-  }
-}
+/** What a call is, as the runtime's adapter hands it: a tool, its input, the folder it runs in. */
+const CallSchema: Schema.Decoder<AdmissionCall> = Schema.Struct({
+  tool: Schema.String,
+  input: Schema.Record(Schema.String, Schema.Unknown),
+  cwd: Schema.String,
+});
+
+/** The call `given` names, or undefined where it is no JSON of a tool, its input and its folder. */
+const callOf = (given: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(CallSchema))(given));
 
 /**
  * The scope of a call at least at `atLeast`, each run the line `line` names read for its factory and level, and each factory it names

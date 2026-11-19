@@ -238,7 +238,7 @@ const READINESS_READ_MS = 60_000;
 /** The readiness read `nemia doctor --json` printed, or why there is none. */
 function readinessOfJson(out: string) {
   try {
-    return Schema.decodeUnknownSync(Readiness)(JSON.parse(out));
+    return Schema.decodeUnknownSync(Schema.fromJsonString(Readiness))(out);
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
   }

@@ -31,7 +31,7 @@ const Measure = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 
 /** A block whose `type` is none of `known`'s: only its `type` is checked. */
 const otherThan = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }) =>
-  Schema.Struct({ type: noneOf(known, (t) => `Expected the fields of a ${t} block`) });
+  Schema.Struct({ type: noneOf(known, (t) => `the fields of a ${t} block`) });
 
 /** Every key of `T`, of each of its members when it is a union. */
 type KeyOfAny<T> = T extends unknown ? keyof T : never;
@@ -243,13 +243,10 @@ const kindOf = (value: unknown, kinds: readonly PrintedKind[]) => {
 };
 
 /** The JSON object `text` holds, when it parses: `undefined` for a line torn mid-write, stderr, or prose. */
-const parsed = (text: string) => {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
-};
+const parsed = (text: string) => Option.getOrUndefined(jsonOf(text));
+
+/** A line's text decoded as JSON, or none where it is not. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /**
  * The kind of the line `text`: one of `PRINTED`'s when it is a JSON object of that kind, `'other'` for a JSON object of another kind
@@ -263,8 +260,8 @@ export const printedKindOf = (text: string) => {
 };
 
 /** Why `value`, a `kind` line at line `at`, is refused: the line, its kind, its first wrong field, what is there, and the fix. */
-const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.SchemaError) => {
-  const { path, words } = firstRefusal(value, error, 'Claude Code prints');
+const refusal = (at: number, kind: PrintedKind, value: unknown) => {
+  const { path, words } = firstRefusal(PRINTED[kind], value, 'Claude Code prints');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
     .split(' ')
@@ -290,7 +287,7 @@ export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]) =>
     if (kind === undefined) continue;
     const decoded = DECODERS[kind](value);
     if (Result.isFailure(decoded))
-      return { wrong: refusal(at + 1, kind, value, decoded.failure) } satisfies { lines: PrintedLine[] } | { wrong: string } as
+      return { wrong: refusal(at + 1, kind, value) } satisfies { lines: PrintedLine[] } | { wrong: string } as
         | { lines: PrintedLine[] }
         | { wrong: string };
     lines.push({ kind, line: decoded.success } as PrintedLine);

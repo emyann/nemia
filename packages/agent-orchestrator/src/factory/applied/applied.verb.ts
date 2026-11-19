@@ -18,6 +18,7 @@ import { Invalid } from '../../refusal/refusal.ts';
 import { clonesOf, FactoryDoor, factoryOrNone, refuseName, volumesGiven } from '../door/factories.store.ts';
 import { volumesTrusted, writableRooted } from '../volume/volume.verb.ts';
 import { cloned } from '../clones/clones.verb.ts';
+import { originSetsAt } from './declared.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate, Volume } from '../factory.ts';
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../../template/template.store.ts';
@@ -703,7 +704,8 @@ const manyOf = (args: Args, key: string) => {
 type Applied = { name: string; volumes: readonly Volume[]; file: string; template: FactoryTemplate; place: string; tree: string };
 
 /**
- * The factory `args` name, made from the template in `--template` with `--set`'s parameters. Refused, before anything is written: no
+ * The factory `args` name, made from the template in `--template` with `--set`'s parameters, after those its first writable volume sets
+ * (`originSetsAt`), so a person's own win. Refused, before anything is written: no
  * `--template` (`Invalid`); the volumes (`volumesGiven`); a template that does not pass its check, a parameter not declared, of the
  * wrong type or required and not given, and what the render refuses (`Invalid`, every one at once); then as `addFactory` refuses.
  */
@@ -722,7 +724,7 @@ const applied = Effect.fn('applied')(function* (args: Args) {
     return volumesGiven(home, name, manyOf(args, 'volumes'), process.cwd());
   });
   const source = sourceGiven(given);
-  const read = yield* renderedAt(source, manyOf(args, 'sets'));
+  const read = yield* renderedAt(source, [...(yield* originSetsAt(source, volumes)), ...manyOf(args, 'sets')]);
   if ('problems' in read)
     return yield* Effect.fail(
       new Invalid({

@@ -4,7 +4,10 @@
  */
 import path from 'node:path';
 import fs from 'node:fs';
+import { Result, Schema } from 'effect';
 import { replaceFile } from '../core/replace.ts';
+import { MemoryUseSchema, UsageSchema, firstRefusal } from '../core/event-schema.ts';
+import { StatementRead } from '../harness/detached/said.ts';
 import { formerStateOf, isSessionState, type Sighting } from '../core/index.ts';
 import { forgetFiles, keptOf, type RunnerOps } from '../harness/index.ts';
 import type { Monotonic } from '../core/clock.ts';
@@ -39,18 +42,90 @@ export type Entry = {
   whole?: number;
 };
 
+/** The keys a newer runtime wrote, kept when the entry is written back. */
+const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
+
+/** How a session was last seen, as an entry holds it: its state in any runtime's words, which `upgraded` reads in A2A's. */
+const SightingOnDisk: Schema.Decoder<Omit<Sighting, 'state'> & { state: string }> = Schema.StructWithRest(
+  Schema.Struct({
+    sessionId: Schema.String,
+    state: Schema.String,
+    busy: Schema.optional(Schema.Boolean),
+    nativeId: Schema.optional(Schema.String),
+    usage: Schema.optional(UsageSchema),
+    spent: Schema.optional(Schema.Struct({ usd: Schema.Finite, capUsd: Schema.Finite, at: Schema.String })),
+    exitCode: Schema.optional(Schema.Finite),
+    terminationMessage: Schema.optional(Schema.String),
+    memory: Schema.optional(MemoryUseSchema),
+    ...StatementRead,
+    quietMs: Schema.optional(Schema.Finite),
+    waitingFor: Schema.optional(Schema.String),
+    limit: Schema.optional(Schema.String),
+    denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),
+    skills: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+    files: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+    ranOn: Schema.optional(Schema.String),
+    ranIn: Schema.optional(Schema.String),
+  }),
+  Rest,
+);
+
+/** An entry as a runtime wrote it to `remote/<name>.json`: an `Entry`, but how it was last seen in any runtime's words. */
+export const EntrySchema: Schema.Decoder<Omit<Entry, 'seen'> & { seen?: Schema.Schema.Type<typeof SightingOnDisk> }> =
+  Schema.StructWithRest(
+    Schema.Struct({
+      name: Schema.String,
+      agent: Schema.String,
+      messageId: Schema.String,
+      contextId: Schema.optional(Schema.String),
+      sentAt: Schema.String,
+      taskId: Schema.optional(Schema.String),
+      seen: Schema.optional(SightingOnDisk),
+      ended: Schema.optional(Schema.Literal(true)),
+      reply: Schema.optional(Schema.String),
+      sending: Schema.optional(
+        Schema.Struct({
+          pid: Schema.Finite,
+          until: Schema.String,
+          mono: Schema.optional(Schema.Struct({ boot: Schema.String, ms: Schema.Finite })),
+        }),
+      ),
+      refused: Schema.optional(Schema.String),
+      doubt: Schema.optional(Schema.String),
+      whole: Schema.optional(Schema.Finite),
+    }),
+    Rest,
+  );
+
+/** An entry as a runtime wrote it, read. */
+type EntryOnDisk = typeof EntrySchema.Type;
+
 /**
  * An entry as this code reads it. An entry an older runtime wrote may say how it was last seen in the runtime's former
  * words — `done`, `blocked`, `stopped` — and is read in A2A's, as the Task it was seen in said them (`blocked` waiting for
  * `authentication` is `AUTH_REQUIRED`, `WAITS`). The file keeps its words until it is next written. A word neither
  * vocabulary has is `failed`, as the other drivers read one: no session the runtime can wait on.
  */
-const upgraded = (e: Entry) => {
-  const seen = e.seen as (Omit<Sighting, 'state'> & { state: string }) | undefined;
-  if (!seen || isSessionState(seen.state)) return e satisfies Entry;
-  const state =
-    seen.state === 'blocked' && seen.waitingFor === 'authentication' ? 'auth-required' : (formerStateOf(seen.state) ?? 'failed');
-  return { ...e, seen: { ...seen, state } } satisfies Entry;
+const upgraded = (e: EntryOnDisk) => {
+  const { seen, ...rest } = e;
+  if (!seen) return rest;
+  const state = isSessionState(seen.state)
+    ? seen.state
+    : seen.state === 'blocked' && seen.waitingFor === 'authentication'
+      ? 'auth-required'
+      : (formerStateOf(seen.state) ?? 'failed');
+  return { ...rest, seen: { ...seen, state } };
+};
+
+/** The entry `text`, read from `file`, decoded; refused, naming the file, its first wrong field and the fix, where it does not read. */
+const entryIn = (file: string, text: string) => {
+  const json = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text);
+  const read = Result.isSuccess(json) ? Schema.decodeUnknownResult(EntrySchema)(json.success) : json;
+  if (Result.isSuccess(read)) return read.success;
+  const where = Result.isSuccess(json) ? firstRefusal(EntrySchema, json.success) : { path: [], words: 'is not JSON' };
+  throw new Error(
+    `${file}${where.path.length ? `: its ${where.path.map(String).join('.')}` : ''} ${where.words}: it is no entry of the remote agents' registry. Remove the file; its Task stays the remote agent's.`,
+  );
 };
 
 /** The file of the session `name`'s entry in the registry folder `under`. */
@@ -62,7 +137,7 @@ const entryFileOf = (under: string, name: string) => path.join(under, `${encodeU
  */
 export const readEntry = (file: string) => {
   try {
-    return upgraded(JSON.parse(fs.readFileSync(file, 'utf8')) as Entry) satisfies Entry | undefined;
+    return upgraded(entryIn(file, fs.readFileSync(file, 'utf8')));
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw e;
@@ -136,15 +211,17 @@ export const registryOf = (harness: string, root: string) => {
     entryNames(under).flatMap((f) => {
       const e = readEntry(path.join(under, f));
       return e?.agent === harness ? [e] : [];
-    }) satisfies Entry[];
-  const open = () => entriesIn(dir) satisfies Entry[];
+    }) satisfies Entry[] as Entry[];
+  const open = () => entriesIn(dir);
   const bySession = (sessionId: string) => {
     const all = [...entriesIn(dir), ...entriesIn(done)];
-    return (all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId) ??
+    return (
+      all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId) ??
       all
         .filter((e) => e.contextId === sessionId && e.taskId)
         .sort((a, b) => a.sentAt.localeCompare(b.sentAt))
-        .at(-1)) satisfies Entry | undefined;
+        .at(-1)
+    );
   };
   return { dir, done, fileOf, write, open, bySession };
 };

@@ -6,11 +6,15 @@
  * after it was last written (`filesPruned`, which each upload asks first): a run copies what it is handed into its own `inputs/`, so a
  * file let go of takes nothing from a run.
  */
+import { Option, Schema } from 'effect';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FILE_ID_PREFIX, FILE_KEPT_FOR, type FileObject } from 'objects';
+import { FILE_ID_PREFIX, FILE_KEPT_FOR, FileObject } from 'objects';
 import { FACTORY_NAME } from '../factory/factory.ts';
+
+/** A kept file's record, `<id>.json`, decoded: none where it does not read as a file. */
+const fileIn = Schema.decodeUnknownOption(Schema.fromJsonString(FileObject));
 
 /** A file's id: the prefix, then 32 hexadecimal digits of a random number, so no id is guessed from another. */
 const FILE_ID = new RegExp(`^${FILE_ID_PREFIX}[0-9a-f]{32}$`);
@@ -118,11 +122,12 @@ export function fileAt(home: string, namespace: string, id: string) {
   if (!FILE_ID.test(id) || !namespaceKept(namespace)) return undefined;
   const dir = filesDir(home, namespace);
   const bytes = path.join(dir, id);
-  let file: FileObject;
+  let file: FileObject | undefined;
   try {
-    file = JSON.parse(fs.readFileSync(path.join(dir, `${id}.json`), 'utf8')) as FileObject;
+    file = Option.getOrUndefined(fileIn(fs.readFileSync(path.join(dir, `${id}.json`), 'utf8')));
   } catch {
     return undefined;
   }
+  if (file === undefined) return undefined;
   return fs.statSync(bytes, { throwIfNoEntry: false })?.isFile() ? { file, path: bytes } : undefined;
 }

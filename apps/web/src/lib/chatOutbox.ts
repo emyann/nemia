@@ -7,6 +7,7 @@
  *
  * Pure, apart from the storage calls, so a node test proves each rule.
  */
+import { Option, Schema } from 'effect';
 import { WriteRefusal } from './api/read.ts';
 import { forgetStored, readStored, store } from './stored.ts';
 
@@ -19,21 +20,19 @@ export const CHAT_OUTBOX_KEY = 'nemia:chat-outbox';
  */
 export type ChatKept = { text: string; at: string; refused?: string };
 
+/** A kept message as it is stored: its text, when it was written, and the api's words where it refused it. */
+const Kept = Schema.fromJsonString(Schema.Struct({ text: Schema.String, at: Schema.String, refused: Schema.optional(Schema.Unknown) }));
+
 /**
  * What `raw` names: a kept message, or null for storage that holds none, or words that are not one.
  * @param raw What storage holds under the key, or null where it holds nothing.
  */
 export function parseKept(raw: string | null) {
   if (raw === null) return null;
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (typeof value !== 'object' || value === null) return null;
-  const { text, at, refused } = value as Record<string, unknown>;
-  if (typeof text !== 'string' || text === '' || typeof at !== 'string') return null;
+  const kept = Schema.decodeUnknownOption(Kept)(raw);
+  if (Option.isNone(kept)) return null;
+  const { text, at, refused } = kept.value;
+  if (text === '') return null;
   return typeof refused === 'string' && refused !== '' ? { text, at, refused } : { text, at };
 }
 

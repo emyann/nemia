@@ -233,6 +233,7 @@ export {
   MOVE_CARDS,
   type MoveCards,
 } from './factory-move.ts';
+export { FactoryHome, FactoryHomeFile } from './factory-home.ts';
 /** What a write of a factory or of one of its parts did, on its answer alone. */
 export { FactoryWritten } from './written.ts';
 export {
@@ -404,7 +405,7 @@ export {
   type TranscriptRole,
 } from './words.ts';
 export { BaseHold, RunHolding, RunWaiting } from './run.ts';
-export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState } from './words.ts';
+export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,
   Decidable,
@@ -566,7 +567,6 @@ export {
   AgentSources,
 } from './agent.ts';
 export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
-export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   NEED_STATES,
   type NeedState,
@@ -769,7 +769,6 @@ export {
 } from './commands-factories-templated.ts';
 export { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FACTORY_RULES_WORDS } from './commands-factories-words.ts';
 export { FACTORY_MANUAL } from './commands-factories-manual.ts';
-export { FACTORY_MOVE_WORDS } from './commands-factories-move.ts';
 export {
   DEFINITION_WORDS,
   POLICY_CONFIRM_WORDS,
@@ -800,3 +799,4 @@ export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-
 export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';
 export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
 export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
+export { refusedIn, type RefusedPlace } from './refused.ts';

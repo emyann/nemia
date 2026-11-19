@@ -34,7 +34,7 @@ export const RateLimitInfoSchema = Schema.Struct({
 
 /** The kept reading, as its file holds it (`HeardQuota`). */
 const HeardSchema = Schema.Struct({
-  at: Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time')),
+  at: Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)), { expected: 'a date and time' })),
   limits: Schema.Array(
     Schema.Struct({ key: Schema.String, usedPercentage: Schema.Finite, resetsAt: Schema.NullOr(Schema.String), status: Status }),
   ),

@@ -3,6 +3,7 @@
  * its `.claude.json` as `projects["<path>"].hasTrustDialogAccepted`. Read by `claudeTrusts`, and written by `claudeTrust` alone, which
  * sets that one key and leaves every other as it was: the file is Claude Code's, rewritten by every session on the machine.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,6 +34,14 @@ export const claudeNeverKeeps = (key: string) => key === path.resolve(os.homedir
 const record = (value: unknown) =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 
+/** A `.claude.json`'s projects, as `claudeTrusts` reads them: each entry by the folder's path, whatever it holds. */
+const projectsIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ projects: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) })),
+);
+
+/** Whether a `projects` entry says its folder's trust dialog was accepted. */
+const accepted = Schema.is(Schema.Struct({ hasTrustDialogAccepted: Schema.Literal(true) }));
+
 /**
  * Whether `file` (Claude Code's `.claude.json` by default) says the folder `dir` was trusted: its `projects` entry for the folder's
  * resolved path with `hasTrustDialogAccepted: true`. False for a file that is not there or does not read as such an object.
@@ -40,16 +49,15 @@ const record = (value: unknown) =>
  * @param file The `.claude.json` to read; Claude Code's own (`claudeConfigFile`) unless given.
  */
 export const claudeTrusts = (dir: string, file: string = claudeConfigFile()) => {
-  let parsed: unknown;
+  let text: string;
   try {
-    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    text = fs.readFileSync(file, 'utf8');
   } catch {
     return false;
   }
-  const projects = typeof parsed === 'object' && parsed !== null ? (parsed as { projects?: unknown }).projects : undefined;
-  if (typeof projects !== 'object' || projects === null) return false;
-  const entry = (projects as Record<string, unknown>)[path.resolve(dir)];
-  return typeof entry === 'object' && entry !== null && (entry as { hasTrustDialogAccepted?: unknown }).hasTrustDialogAccepted === true;
+  const projects = Option.getOrUndefined(projectsIn(text))?.projects;
+  const key = path.resolve(dir);
+  return projects !== undefined && Object.hasOwn(projects, key) && accepted(projects[key]);
 };
 
 /** What `claudeTrustText` answers: the key is already set, the text that sets it, or why the text given cannot be rewritten. */
@@ -65,12 +73,9 @@ type TrustText = { readonly trusted: true } | { readonly text: string } | { read
  * @param key The path the trust is kept under (`claudeTrustKey`).
  */
 export function claudeTrustText(text: string, key: string) {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return { unread: 'it is not JSON' } satisfies TrustText as TrustText;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return { unread: 'it is not JSON' } satisfies TrustText as TrustText;
+  const parsed = json.value;
   const config = record(parsed);
   if (!config) return { unread: 'it holds no JSON object' } satisfies TrustText as TrustText;
   const projects = config.projects === undefined ? {} : record(config.projects);

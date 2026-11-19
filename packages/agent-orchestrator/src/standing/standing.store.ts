@@ -7,7 +7,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { StandingSchema } from '../place/place.store.ts';
@@ -63,18 +63,15 @@ export function readStanding(home: string) {
   try {
     text = fs.readFileSync(standingFile(home), 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined satisfies StandingFile | undefined as StandingFile | undefined;
     throw err;
   }
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${standingFile(home)} is not JSON: ${REWRITTEN}` });
-  }
+  const parsed = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(parsed)) throw new Invalid({ message: `${standingFile(home)} is not JSON: ${REWRITTEN}` });
+  const json = parsed.value;
   const decoded = Schema.decodeUnknownResult(StandingFileSchema)(json);
   if (Result.isSuccess(decoded)) return decoded.success satisfies StandingFile | undefined as StandingFile | undefined;
-  const { path: at, words } = firstRefusal(json, decoded.failure);
+  const { path: at, words } = firstRefusal(StandingFileSchema, json);
   throw new Invalid({ message: `${standingFile(home)}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${REWRITTEN}` });
 }
 

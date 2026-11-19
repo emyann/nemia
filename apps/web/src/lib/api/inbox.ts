@@ -228,10 +228,25 @@ type CardRef = Pick<InboxEntry, 'name' | 'factory'>;
  * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --factory <name>` does: in `factory`'s namespace when it names
  * one, in `default` when it is left out (the Card's `create`). Never a repository nor an origin: the factory places the card's run and
  * finds its workflow by name. Resolves with the card's name; rejects with the api's refusal in full — the package's words for an idea with
- * nothing in it or a factory the store does not have, or the api's own about the request or a workflow it has none of.
+ * nothing in it or a factory the store does not have, or the api's own about the request or a workflow it has none of. `label`, where
+ * given, are the labels the card is filed with, each `key=value`, which its run is started with too.
  */
-export const fileCard = async ({ factory, body, workflow }: { body: string; workflow?: string; factory?: string }) => {
-  const filed = await cards.create(namespaceOf(factory), { body, ...(workflow === undefined ? {} : { workflow }) });
+export const fileCard = async ({
+  factory,
+  body,
+  workflow,
+  label,
+}: {
+  body: string;
+  workflow?: string;
+  factory?: string;
+  label?: readonly string[];
+}) => {
+  const filed = await cards.create(namespaceOf(factory), {
+    body,
+    ...(workflow === undefined ? {} : { workflow }),
+    ...(label === undefined ? {} : { label }),
+  });
   return { name: filed.metadata.name };
 };
 
@@ -261,13 +276,21 @@ export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}
  * wiring for the workflow and finds the workflow by its name. Resolves with the new run; rejects with the api's refusal in full — a card
  * not there, one started already, a workflow its factory does not offer, one its factory wires to no repository.
  * @param card The card to start: its name and its factory.
- * @param start Its run's workflow by name and its brief, the runs it waits on (`after`), the runs it reads as context and the files it is
- *   handed (`files`, each uploaded first into the card's namespace and named among its inputs by its id), each when given.
+ * @param start Its run's workflow by name and its brief, the runs it waits on (`after`), the runs it reads as context, the files it is
+ *   handed (`files`, each uploaded first into the card's namespace and named among its inputs by its id) and the steps gated in it
+ *   (`gates`), each when given.
  * @param factory The factory to start it in, for a card that names none; null, undefined or the default namespace for the default factory.
  */
 export const startCard = (
   card: CardRef,
-  start: { workflow: string; brief: string; after?: readonly string[]; context?: readonly string[]; files?: StartFiles },
+  start: {
+    workflow: string;
+    brief: string;
+    after?: readonly string[];
+    context?: readonly string[];
+    files?: StartFiles;
+    gates?: readonly string[];
+  },
   factory?: string | null,
 ) => {
   const namespace = namespaceOf(card.factory);
@@ -283,6 +306,7 @@ export const startCard = (
           ...(start.after === undefined ? {} : { after: start.after }),
           ...(start.context === undefined ? {} : { context: start.context }),
           ...(inputs.length === 0 ? {} : { inputs }),
+          ...(start.gates === undefined ? {} : { gates: start.gates }),
         },
         factory && factory !== DEFAULT_NAMESPACE ? factory : undefined,
       ),

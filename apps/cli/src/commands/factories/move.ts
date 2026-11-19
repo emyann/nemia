@@ -9,7 +9,7 @@
  * sent as the target's machine reads it (`repoSent`, `pathSent` under the target's context).
  */
 import type { Args, FactoryExport, FactoryImported } from 'objects';
-import { CONTEXT_VARIABLE, configRead, contextOf, LOCAL_CONTEXT, unheld } from '../../context.ts';
+import { CONTEXT_VARIABLE, configRead, contextOf, inUse, unheld } from '../../context.ts';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { listArg, pathSent, said, textArg } from '../requests.ts';
@@ -17,12 +17,6 @@ import { repoSent, textOf } from './lines.ts';
 
 /** The command a person types next, under the context `context`. */
 const under = (context: string, command: string) => `${CONTEXT_VARIABLE}=${context} ${command}`;
-
-/** The context in use, by its name: `NEMIA_CONTEXT`, else the config's, else this machine's. */
-function inUse(env: NodeJS.ProcessEnv) {
-  const named = env[CONTEXT_VARIABLE]?.trim();
-  return named !== undefined && named !== '' ? named : (configRead(env).current ?? LOCAL_CONTEXT);
-}
 
 /** `env` with the context `name` in use, which the config holds; refused naming `nemia config get-contexts` where it holds none. */
 function envOf(name: string, env: NodeJS.ProcessEnv) {
@@ -33,13 +27,13 @@ function envOf(name: string, env: NodeJS.ProcessEnv) {
 /** The `<key>=<value>` words of `key`, by their key, each value sent as `sent` makes it; the objects' check has refused one with no `=`. */
 function pairsOf(args: Args, key: string, sent: (value: string) => string) {
   const words = listArg(args, key);
-  if (!words.length) return undefined satisfies Record<string, string> | undefined as Record<string, string> | undefined;
+  if (!words.length) return undefined;
   return Object.fromEntries(
     words.map((word) => {
       const at = word.indexOf('=');
       return [word.slice(0, at), sent(word.slice(at + 1))];
     }),
-  ) satisfies Record<string, string> | undefined as Record<string, string> | undefined;
+  );
 }
 
 /**

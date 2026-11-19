@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -53,15 +53,12 @@ function levelIn(file: string, name: string) {
     throw err;
   }
   const fix = `set its level again with nemia level manual --factory ${name}`;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  const raw = json.value;
   const read = Schema.decodeUnknownResult(FactoryLevelSchema)(raw);
   if (Result.isFailure(read)) {
-    const { path: at, words } = firstRefusal(raw, read.failure);
+    const { path: at, words } = firstRefusal(FactoryLevelSchema, raw);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
   const { level, since, raise } = read.success;

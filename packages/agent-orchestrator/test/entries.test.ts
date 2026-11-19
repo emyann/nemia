@@ -179,6 +179,7 @@ const PINNED: Record<string, string[]> = {
     'FACTORY_APPLY',
     'factoryExported',
     'factoryImported',
+    'factoryHomeOf',
     'FACTORY_PLAN',
     'FACTORY_RESOLVE',
     'FACTORY_UPGRADE',

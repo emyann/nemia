@@ -9,19 +9,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import type { Settings } from '../config/config.store.ts';
 import { reservedFor } from '../service/index.ts';
-import {
-  PHASES,
-  RECENT_KEPT,
-  recentOf,
-  type AlsoKept,
-  type PassCost,
-  type Phase,
-  type RecentPass,
-  type PassCostRead,
-} from '../meter/index.ts';
+import { PHASES, RECENT_KEPT, recentOf, type AlsoKept, type PassCost, type Phase, type RecentPass } from '../meter/index.ts';
 import {
   DAEMON_FILE,
   daemonStanding as standingOf,
@@ -41,13 +32,7 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { alive } from '../process/alive.store.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
-const jsonOr = (text: string) => {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined as unknown;
-  }
-};
+const jsonOr = (text: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** A count as the meter writes one: a number, never below zero. */
 const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
@@ -101,12 +86,10 @@ export function lastCeilings(home: string) {
   try {
     text = fs.readFileSync(tickFile(home), 'utf8');
   } catch {
-    return undefined satisfies { sessions: number; runs: number } | undefined as { sessions: number; runs: number } | undefined;
+    return undefined;
   }
   const c = jsonOr(text);
-  return (isCeilings(c) ? { sessions: c.sessions, runs: c.runs } : undefined) satisfies { sessions: number; runs: number } | undefined as
-    | { sessions: number; runs: number }
-    | undefined;
+  return isCeilings(c) ? { sessions: c.sessions, runs: c.runs } : undefined;
 }
 
 /**
@@ -170,7 +153,7 @@ const isPassCost = Schema.is(
  */
 export const parsePassCost = (text: string) => {
   const c = jsonOr(text);
-  return (isPassCost(c) ? c : undefined) satisfies PassCostRead | undefined as PassCostRead | undefined;
+  return isPassCost(c) ? c : undefined;
 };
 
 /**
@@ -182,9 +165,9 @@ export function lastPassCost(home: string) {
   try {
     text = fs.readFileSync(statsFile(home), 'utf8');
   } catch {
-    return undefined satisfies PassCostRead | undefined as PassCostRead | undefined;
+    return undefined;
   }
-  return parsePassCost(text) satisfies PassCostRead | undefined as PassCostRead | undefined;
+  return parsePassCost(text);
 }
 
 /**
@@ -373,8 +356,7 @@ function stamped(file: DaemonFile, stamp: keyof typeof MONO_OF, now: Instant) {
  * @param home The store's directory (`WF_ROOT`).
  * @param now The instant to judge at, on both clocks; now by default.
  */
-export const daemonStanding = (home: string, now: Instant = instantNow()) =>
-  standingOf(readDaemon(home), { now, identify }) satisfies DaemonStanding;
+export const daemonStanding = (home: string, now: Instant = instantNow()) => standingOf(readDaemon(home), { now, identify });
 
 /** The file written whole, through a hidden file renamed over it, so a reader never reads half of it. */
 function writeDaemon(home: string, file: DaemonFile) {
@@ -432,13 +414,13 @@ export function takeStore(
     if (holder) throw new Conflict({ message: holdRefusal(holder, by === 'api' ? 'api' : 'up', home, now.at) });
     if (replaced.kind !== 'none') {
       writeDaemon(home, held);
-      return { held, replaced } satisfies TakenStore;
+      return { held, replaced };
     }
     const hidden = path.join(home, `.${DAEMON_FILE}.${process.pid}`);
     fs.writeFileSync(hidden, daemonText(held));
     try {
       fs.linkSync(hidden, daemonFile(home));
-      return { held, replaced } satisfies TakenStore;
+      return { held, replaced };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || tries >= 2) throw err;
     } finally {
@@ -639,10 +621,10 @@ const recentText = (home: string) => {
  */
 export function recentPasses(home: string) {
   const text = recentText(home);
-  if (text === undefined) return [] satisfies RecentPass[] as RecentPass[];
+  if (text === undefined) return [];
   const { passes, unread } = parseRecentPasses(text);
   if (unread) process.stderr.write(`${recentFile(home)}: ${unread} of its passes did not read as one and were left out.\n`);
-  return passes satisfies RecentPass[] as RecentPass[];
+  return passes;
 }
 
 /**

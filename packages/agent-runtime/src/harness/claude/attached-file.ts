@@ -9,7 +9,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import type { AskQuestion, PermissionFacts, SessionAsk } from '../../core/index.ts';
 import { BridgeFactsSchema } from './session-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
@@ -112,8 +112,6 @@ const RunFileSchema = Schema.StructWithRest(
 
 /** An attached session's run file, as its holder wrote it. */
 export type AttachedRun = typeof RunFileSchema.Type;
-
-const decode = Schema.decodeUnknownOption(RunFileSchema);
 
 /** The folder of an engine's attached sessions: the store's drains' folder too (`drainFolder`), where they are kept beside them. */
 const attachedDir = (root: string) => drainFolder(root);
@@ -228,13 +226,12 @@ const jsonLines = <A>(file: string, schema: Schema.Decoder<A>) => {
   let unread = 0;
   for (const line of text.split('\n')) {
     if (line.trim() === '') continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
+    const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(line);
+    if (Option.isNone(json)) {
       unread++;
       continue;
     }
+    const parsed = json.value;
     const decoded = decode(parsed);
     if (decoded._tag === 'Some') lines.push(decoded.value);
     else unread++;
@@ -327,12 +324,7 @@ export const readRun = (file: string) => {
   } catch {
     return undefined;
   }
-  try {
-    const run = decode(JSON.parse(text));
-    return run._tag === 'Some' ? run.value : undefined;
-  } catch {
-    return undefined;
-  }
+  return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(RunFileSchema))(text));
 };
 
 /**
@@ -354,11 +346,12 @@ export const everyRun = (root: string) => {
       .readdirSync(dir)
       .filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN_FILE && f !== SESSION_DRAIN_FILE);
   } catch {
-    return new Map<string, AttachedRun>();
+    return new Map() satisfies Map<string, AttachedRun> as Map<string, AttachedRun>;
   }
-  return new Map<string, AttachedRun>(
-    names.flatMap((f) => [readRun(path.join(dir, f)) ?? []].flat().map((run) => [run.name, run] as const)),
-  );
+  return new Map(names.flatMap((f) => [readRun(path.join(dir, f)) ?? []].flat().map((run) => [run.name, run] as const))) satisfies Map<
+    string,
+    AttachedRun
+  > as Map<string, AttachedRun>;
 };
 
 /** The spawn as a run file keeps it: everything but the brief, which a resume does not say again. */

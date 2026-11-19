@@ -1,18 +1,25 @@
 /**
  * The factories as objects (factory.verb.ts), off a listing as `nemia factory` reads it, its file beside it, and the controller's status
  * file in a scratch store: the default factory listed first and got, a stray file listed with its error, the generation and the status
- * read, and the commands a person types for it. Their page and selection are `src/object/listed.verb.test.ts`'s.
+ * read, and the commands a person types for it; and a factory's home read whole (`factoryHomeOf`), on the Factory door's memory
+ * stand-in, named by the digest a run's copy takes, and its refusals. Their page and selection are `src/object/listed.verb.test.ts`'s.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Factory as FactorySchema } from 'objects';
-import { Schema } from 'effect';
+import { Cause, Effect, Exit, Schema } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import type { FactoryListing } from '../factory.ts';
-import { factoryCommands, factoryObjectsOf, type FactoryListed } from './factory.verb.ts';
+import { factoryCommands, factoryObjectsOf, followOf, type FactoryListed } from './factory.verb.ts';
 import { volumeBase } from '../volume/volume.ts';
+import { doorFrom, done } from '../../../test/door-walks.ts';
+import { FactoryDoor } from '../door/factories.store.ts';
+import { factoryDoorMemory } from '../door/memory.store.ts';
+import type { Factory } from '../factory.ts';
+import { freezeHomeFiles } from '../../frozen/frozen.store.ts';
+import { factoryHomeOf } from './factory.verb.ts';
 
 const home = scratch('nemia-factory-object-');
 const repo = scratch('nemia-factory-object-repo-');
@@ -148,6 +155,16 @@ test("a factory's commands are the lines a person types for it, with each schedu
   assert.match(factoryCommands(m, []).attach, /^nemia factory attach acme/);
 });
 
+test('a factory whose template declares a boolean that follows a host is told how to follow it, and one whose template declares none is not', () => {
+  const follow = followOf('acme', '4.9.0', {
+    model: { type: 'string', description: 'a model', whenOrigin: 'example.org' },
+    lands: { type: 'boolean', description: 'whether it lands there', default: false, whenOrigin: 'example.org' },
+  });
+  assert.deepEqual([follow?.host, follow?.parameter], ['example.org', 'lands']);
+  assert.match(follow?.line ?? '', /^nemia factory diff acme --to 4\.9\.0 --set lands=true$/);
+  assert.equal(followOf('acme', '4.9.0', { lands: { type: 'boolean', description: 'whether it lands', default: false } }), undefined);
+});
+
 test("a cloned volume's origin is on its spec, and a volume given no URL has none", () => {
   const into = path.join(home, 'clones', 'h', 'o', 'r');
   const mill: FactoryListing = {
@@ -166,4 +183,77 @@ test("a cloned volume's origin is on its spec, and a volume given no URL has non
     false,
     'a volume given no URL serves none',
   );
+});
+
+/** A store of its own: the Factory door over memory, and `shop` filed in it on `tree`, where one is given. */
+function homeStore(tree: string | undefined) {
+  const layer = factoryDoorMemory();
+  const factory: Factory = {
+    name: 'shop',
+    volumes: [],
+    workflows: [],
+    hires: {},
+    schedules: {},
+    ...(tree === undefined ? {} : { template: { source: '/templates/shop', version: '1.0.0', params: {} }, tree }),
+  };
+  done(doorFrom(FactoryDoor, layer).factories.create(factory));
+  return (name: string) => Effect.runPromiseExit(factoryHomeOf(name).pipe(Effect.provide(layer)));
+}
+
+/** A tree whose home holds a memory file, a skill and an executable script. */
+function treeWithHome() {
+  const tree = path.join(scratch('wf-home-tree-'), 'tree');
+  fs.mkdirSync(path.join(tree, 'home', '.claude', 'skills', 'x'), { recursive: true });
+  fs.mkdirSync(path.join(tree, 'home', 'bin'), { recursive: true });
+  fs.writeFileSync(path.join(tree, 'home', 'CLAUDE.md'), '# the home\n');
+  fs.writeFileSync(path.join(tree, 'home', '.claude', 'skills', 'x', 'SKILL.md'), '---\nname: x\n---\n');
+  fs.writeFileSync(path.join(tree, 'home', 'bin', 'run.sh'), '#!/bin/sh\n', { mode: 0o755 });
+  fs.chmodSync(path.join(tree, 'home', 'CLAUDE.md'), 0o644);
+  fs.chmodSync(path.join(tree, 'home', '.claude', 'skills', 'x', 'SKILL.md'), 0o644);
+  fs.chmodSync(path.join(tree, 'home', 'bin', 'run.sh'), 0o755);
+  return tree;
+}
+
+/** The kind of the refusal `exit` failed with. */
+const refusedAs = <A, E>(exit: Exit.Exit<A, E>) => {
+  if (Exit.isSuccess(exit)) return assert.fail('it was not refused');
+  const failed = exit.cause.reasons.find(Cause.isFailReason);
+  return (failed?.error as { _tag?: string } | undefined)?._tag ?? Cause.pretty(exit.cause);
+};
+
+test("a factory's home answers its files sorted by path, with their modes and bytes, named by the digest a run's copy takes", async () => {
+  const tree = treeWithHome();
+  const exit = await homeStore(tree)('shop');
+  if (!Exit.isSuccess(exit)) return assert.fail(Cause.pretty(exit.cause));
+  const answered = exit.value;
+  assert.equal(answered.name, 'shop');
+  assert.deepEqual(
+    answered.files.map((f) => [f.path, f.mode, Buffer.from(f.content, 'base64').toString()]),
+    [
+      ['.claude/skills/x/SKILL.md', 0o644, '---\nname: x\n---\n'],
+      ['CLAUDE.md', 0o644, '# the home\n'],
+      ['bin/run.sh', 0o755, '#!/bin/sh\n'],
+    ],
+  );
+  assert.equal(answered.digest, freezeHomeFiles(scratch('wf-home-store-'), { id: 'r-1' }, tree));
+});
+
+test('a factory with no tree is refused Missing: it has no home to open', async () => {
+  assert.equal(refusedAs(await homeStore(undefined)('shop')), 'Missing');
+});
+
+test('a tree with no home/ is refused Missing', async () => {
+  const tree = path.join(scratch('wf-home-bare-'), 'tree');
+  fs.mkdirSync(tree, { recursive: true });
+  assert.equal(refusedAs(await homeStore(tree)('shop')), 'Missing');
+});
+
+test('a link in the home is refused Invalid, as a run refuses it', async () => {
+  const tree = treeWithHome();
+  fs.symlinkSync('/etc/hostname', path.join(tree, 'home', 'linked'));
+  assert.equal(refusedAs(await homeStore(tree)('shop')), 'Invalid');
+});
+
+test('a name no factory has is refused Missing', async () => {
+  assert.equal(refusedAs(await homeStore(treeWithHome())('other')), 'Missing');
 });

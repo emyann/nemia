@@ -6,6 +6,7 @@
  *
  * Beneath the controllers: it imports only the bottom of the store's tree.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -53,13 +54,13 @@ export function machineOf() {
 const daemonNamed = (dir: string) => {
   const text = textOf(path.join(dir, 'package.json'));
   if (text === null) return undefined;
-  try {
-    const named = (JSON.parse(text) as { nemia?: { daemon?: unknown } }).nemia?.daemon;
-    return typeof named === 'string' ? named : undefined;
-  } catch {
-    return undefined;
-  }
+  return Option.getOrUndefined(daemonIn(text))?.nemia?.daemon;
 };
+
+/** A `package.json`'s `nemia.daemon`, as `daemonNamed` reads it: a string, or none. */
+const daemonIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ nemia: Schema.optional(Schema.Struct({ daemon: Schema.optional(Schema.String) })) })),
+);
 
 /** The first folder at or above `from` whose `package.json` names its daemon, with what it names, or undefined. */
 function checkoutAbove(from: string) {

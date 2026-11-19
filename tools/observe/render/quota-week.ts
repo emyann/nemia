@@ -22,7 +22,7 @@ const WEEK_RUN_MS = 2.6 * DAY_MS;
 const WINDOW_MS: Record<string, number> = { seven_day: 7 * DAY_MS, five_hour: 5 * HOUR_MS };
 
 /** The ms of `from` to `to` (since the week's window began) that fall in a working day, 08:00 to 20:00 of each day after that start. */
-const workedMs = (from: number, to: number) => {
+const workedMs = (from: number, to: number): number => {
   let worked = 0;
   for (let day = Math.floor(from / DAY_MS) * DAY_MS; day < to; day += DAY_MS)
     worked += Math.max(0, Math.min(to, day + 20 * HOUR_MS) - Math.max(from, day + 8 * HOUR_MS));
@@ -33,7 +33,7 @@ const workedMs = (from: number, to: number) => {
  * The seeded quota `ago` ms before the stamp, for a window: its start and its reset, in ms since the week's window began, and the percent
  * used at the reading before it, ninety percent of a window that is worked through, twelve hours a day.
  */
-function quotaAt(window: string, ago: number) {
+function quotaAt(window: string, ago: number): { used: number; resetsAt: number } {
   const t = Math.floor((WEEK_RUN_MS - ago) / READING_MS) * READING_MS;
   const length = WINDOW_MS[window];
   const start = Math.floor(t / length) * length;
@@ -46,16 +46,15 @@ function quotaAt(window: string, ago: number) {
 const QUOTA_WEEK = { every: 5 * 60_000, count: (7 * DAY_MS) / (5 * 60_000) + 1 };
 
 /** The seeded quota of the week and of the five-hour window, each a gauge `quota.used` or `quota.resets_at`. */
-export const quota = (name: 'quota.used' | 'quota.resets_at') =>
-  ({
-    name,
-    kind: 'gauge',
-    series: ['seven_day', 'five_hour'].map((window) => [{ harness: 'claude', window }, 0] satisfies [Record<string, string>, number]),
-    sampled: {
-      ...QUOTA_WEEK,
-      at: ({ window }, ago, now) => {
-        const at = quotaAt(window, ago);
-        return name === 'quota.used' ? at.used : (now - WEEK_RUN_MS + at.resetsAt) / 1000;
-      },
+export const quota = (name: 'quota.used' | 'quota.resets_at'): MetricSeed => ({
+  name,
+  kind: 'gauge',
+  series: ['seven_day', 'five_hour'].map((window): [Record<string, string>, number] => [{ harness: 'claude', window }, 0]),
+  sampled: {
+    ...QUOTA_WEEK,
+    at: ({ window }, ago, now) => {
+      const at = quotaAt(window, ago);
+      return name === 'quota.used' ? at.used : (now - WEEK_RUN_MS + at.resetsAt) / 1000;
     },
-  }) satisfies MetricSeed;
+  },
+});

@@ -65,7 +65,7 @@ const SdkSchemes = Schema.Union([
 export const SCHEME_KINDS: readonly string[] = SdkSchemes.discriminants;
 
 /** A scheme in the SDK's objects: one of the five kinds with its fields, or a kind none of them is. */
-const SdkSchemeSchema = Schema.Union([...SdkSchemes.members, held({ $case: noneOf(SdkSchemes, (k) => `Expected the fields of ${k}`) })]);
+const SdkSchemeSchema = Schema.Union([...SdkSchemes.members, held({ $case: noneOf(SdkSchemes, (k) => `the fields of ${k}`) })]);
 
 /**
  * A security scheme: in A2A's JSON, one key per kind; in the SDK's objects, `scheme`. An object with neither is a kind this
@@ -92,7 +92,7 @@ const RequirementSchema = held({
 
 /** An A2A 1.0 agent card, in what the runtime reads of it. */
 const CardSchema = held({
-  supportedInterfaces: Schema.Array(InterfaceSchema).check(Schema.isMinLength(1, { message: 'Expected at least one interface' })),
+  supportedInterfaces: Schema.Array(InterfaceSchema).check(Schema.isMinLength(1, { expected: 'at least one interface' })),
   securitySchemes: Schema.optional(Schema.Record(Schema.String, SchemeSchema)),
   securityRequirements: Schema.optional(Schema.Array(RequirementSchema)),
   supported_interfaces: absent,
@@ -110,23 +110,25 @@ const hasKey = (value: unknown, key: string) => typeof value === 'object' && val
  * The first thing wrong with `json` as a card, in words: its dotted path, and what is there; a key in snake_case by the one to write.
  * Each key of the path is quoted, since a served card is another party's, which may name a key of any length.
  */
-const wrongOf = (json: unknown, error: Schema.SchemaError) => {
-  const { path, words } = firstRefusal(json, error, HOLDER);
+const wrongOf = (json: unknown) => {
+  const { path, words } = firstRefusal(CardSchema, json, HOLDER);
   const keys = path.map(String);
   const shown = keys.map((k) => quote(k));
   const last = keys.at(-1);
-  if (last === undefined) return `it ${words}`;
+  if (last === undefined) return `it ${words}` satisfies string;
   const parent = keys.slice(0, -1).reduce<unknown>((at, k) => (hasKey(at, k) ? (at as Record<string, unknown>)[k] : undefined), json);
   const camel = CAMEL[last];
   if (camel && words.endsWith(`${HOLDER} never`)) {
     const at = [...shown.slice(0, -1), camel].join('.');
-    return hasKey(parent, camel)
-      ? `its \`${at}\` is also written \`${last}\`: write \`${camel}\` alone, as A2A's JSON does`
-      : `its \`${at}\` is written \`${last}\`: write \`${camel}\`, as A2A's JSON does`;
+    return (
+      hasKey(parent, camel)
+        ? `its \`${at}\` is also written \`${last}\`: write \`${camel}\` alone, as A2A's JSON does`
+        : `its \`${at}\` is written \`${last}\`: write \`${camel}\`, as A2A's JSON does`
+    ) satisfies string;
   }
   const snake = Object.keys(CAMEL).find((k) => CAMEL[k] === last && hasKey(parent, k));
   const hint = snake && words === 'is missing' ? `, and \`${snake}\` is there: write \`${last}\`, as A2A's JSON does` : '';
-  return `its \`${shown.join('.')}\` ${words}${hint}`;
+  return `its \`${shown.join('.')}\` ${words}${hint}` satisfies string;
 };
 
 /**
@@ -137,9 +139,7 @@ const wrongOf = (json: unknown, error: Schema.SchemaError) => {
 export const cardOfJson = (json: unknown) => {
   const decoded = decodeCard(json);
   if (Result.isFailure(decoded))
-    return { wrong: wrongOf(json, decoded.failure) } satisfies { card: AgentCard } | { wrong: string } as
-      | { card: AgentCard }
-      | { wrong: string };
+    return { wrong: wrongOf(json) } satisfies { card: AgentCard } | { wrong: string } as { card: AgentCard } | { wrong: string };
   const parsed = AgentCard.fromJSON(decoded.success);
   const sdk = Object.entries(decoded.success.securitySchemes ?? {}).filter(([, s]) => s.scheme !== undefined);
   if (!sdk.length) return { card: parsed } satisfies { card: AgentCard } | { wrong: string } as { card: AgentCard } | { wrong: string };

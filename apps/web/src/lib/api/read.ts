@@ -4,7 +4,7 @@
  * client (`objects.ts`), which reads a refusal's words once.
  */
 import { Result, Schema, SchemaIssue } from 'effect';
-import type { TokenRefusal } from 'objects';
+import { refusedIn, type RefusedPlace, type TokenRefusal } from 'objects';
 
 /** A read the api answered with an error: its words, and its status, which is how a run gone from the store is told apart (`readGone`). */
 export class ReadRefusal extends Error {
@@ -39,11 +39,6 @@ export class WriteRefusal extends Error {
   }
 }
 
-const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
-
-/** One issue of a failed decode, as the formatter words it: where, by its path, and what was expected there. */
-type Issue = ReturnType<typeof formatter>['issues'][number];
-
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
 const shown = (value: unknown) => {
   const json = JSON.stringify(value) ?? 'undefined';
@@ -54,29 +49,23 @@ const shown = (value: unknown) => {
 const pathWords = (path: readonly PropertyKey[]) =>
   path.length ? path.map((key, i) => (typeof key === 'number' ? `[${key}]` : `${i ? '.' : ''}${String(key)}`)).join('') : 'the answer';
 
-/** The value at `path` in `value`, or undefined where a key on the way is not there. */
-const valueAt = (value: unknown, path: readonly PropertyKey[]) =>
-  path.reduce<unknown>(
-    (at, key) => (typeof at === 'object' && at !== null && Object.hasOwn(at, key) ? Reflect.get(at, key) : undefined),
-    value,
-  );
-
 /**
- * Why `route` answered `value` with what the board does not read, from the deepest issue of its failed decode — the first, where they
+ * Why `route` answered what the board does not read, from the deepest place `issue` refused of its failed decode — the first, where they
  * are as deep: a union answers an issue for each member, and the one that read furthest is the member the answer meant. Sentences ending
  * on the fix, with `may` before it: what a write may have done, and what to look at before sending it again.
  */
-function unreadWords(route: string, value: unknown, issue: SchemaIssue.Issue, may?: string) {
-  const deepest = formatter(issue).issues.reduce<Issue | undefined>(
-    (found, next) => (found && (next.path?.length ?? 0) <= (found.path?.length ?? 0) ? found : next),
+function unreadWords(route: string, issue: SchemaIssue.Issue, may?: string) {
+  const deepest = refusedIn(issue).reduce<RefusedPlace | undefined>(
+    (found, next) => (found && next.path.length <= found.path.length ? found : next),
     undefined,
   );
-  const path = (deepest?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
-  const message = deepest?.message ?? 'Expected what the board reads';
+  const path = deepest?.path ?? [];
   const what =
-    message === 'Missing key'
-      ? 'is missing'
-      : `is ${shown(valueAt(value, path))}, where the board reads ${message.replace(/^Expected /, '').replace(/ \| undefined$/, '')}`;
+    deepest === undefined
+      ? 'is not what the board reads'
+      : deepest._tag === 'MissingKey'
+        ? 'is missing'
+        : `is ${shown(deepest.input)}, where the board reads ${deepest.message ?? deepest.expected}`;
   return `${route} answered what this board does not read: at ${pathWords(path)}, the value ${what}.${may ? ` ${may}` : ''} The board and the api were built apart: restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.`;
 }
 
@@ -89,9 +78,9 @@ function unreadWords(route: string, value: unknown, issue: SchemaIssue.Issue, ma
  * @param may What a write may have done, said before the fix; none for a read.
  */
 export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unknown, may?: string) {
-  const result = Schema.decodeUnknownResult(schema)(value);
+  const result = Schema.decodeUnknownResult(schema)(value, { reportInput: true });
   if (Result.isSuccess(result)) return result.success;
-  throw new UnreadAnswer(route, unreadWords(route, value, result.failure.issue, may));
+  throw new UnreadAnswer(route, unreadWords(route, result.failure.issue, may));
 }
 
 /**

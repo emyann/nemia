@@ -40,7 +40,7 @@ export function writeTurnRecord(home: string, record: TurnRecord) {
 export function readTurnRecord(home: string, id: string) {
   if (id === '' || id.includes('/') || id.startsWith('.')) return undefined;
   try {
-    return Schema.decodeUnknownSync(TurnRecord)(JSON.parse(fs.readFileSync(path.join(turnsDir(home), `${id}.json`), 'utf8')));
+    return Schema.decodeUnknownSync(Schema.fromJsonString(TurnRecord))(fs.readFileSync(path.join(turnsDir(home), `${id}.json`), 'utf8'));
   } catch {
     return undefined;
   }

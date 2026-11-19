@@ -9,7 +9,7 @@
  */
 import type { ResolutionKind, ResolutionOf, ResolutionOwner, ResolvedBy } from '../../../contracts/resolution.contract.ts';
 import { textIn } from '../../folder/folder.ts';
-import { resolveLine, type Choice, type Conflict, type TreeFile } from './merge.ts';
+import { isJsonObject, resolveLine, type Choice, type Conflict, type TreeFile } from './merge.ts';
 
 /** The folders beside the workflows in a tree's `workflows/` that hold no workflow: its agents, its skills, the carried files. */
 const HELD_FOLDERS: readonly string[] = ['agents', 'skills', 'carried'];
@@ -147,7 +147,7 @@ const wiringOf = (file: TreeFile | undefined) => {
   if (text === null) return null;
   try {
     const value: unknown = JSON.parse(text);
-    return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+    return isJsonObject(value) ? value : null;
   } catch {
     return null;
   }

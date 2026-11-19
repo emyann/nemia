@@ -7,7 +7,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
 import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal } from './pause.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
@@ -36,12 +36,7 @@ export function timeoutAt(home: string) {
   } catch {
     return { ms: DEFAULT_TIMEOUT_MS, set: false };
   }
-  let read: unknown;
-  try {
-    read = JSON.parse(text);
-  } catch {
-    read = undefined;
-  }
+  const read = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
   const ms = isTimeoutFile(read) ? timeoutOf(read.timeout) : undefined;
   if (!isTimeoutFile(read) || ms === undefined)
     throw new Invalid({

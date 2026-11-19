@@ -7,16 +7,16 @@
  * has to the reader. A field that is there has the shape the runtime reads, or the line is refused with words that name it, its
  * first wrong field and the fix (`decodeLine`): a refused line is never read as saying nothing.
  */
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
 
 const Count = Schema.Natural;
 
-const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
+const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)), { expected: 'a date and time' }));
 
 /** A block whose `type` is none of `known`'s: only its `type` is checked. */
 const otherThan = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }) =>
-  Schema.Struct({ type: noneOf(known, (t) => `Expected the fields of a ${t} block`) });
+  Schema.Struct({ type: noneOf(known, (t) => `the fields of a ${t} block`) });
 
 const TextBlock = Schema.Struct({ type: Schema.Literal('text'), text: Schema.optional(Schema.String) });
 
@@ -160,7 +160,9 @@ const DECODERS = Object.fromEntries(KINDS.map((k) => [k, Schema.decodeUnknownRes
   (entry: unknown) => Result.Result<unknown, Schema.SchemaError>
 >;
 
-const TIMED = Schema.decodeUnknownResult(Schema.Struct({ timestamp: Schema.optional(Time) }));
+const Timed = Schema.Struct({ timestamp: Schema.optional(Time) });
+
+const TIMED = Schema.decodeUnknownResult(Timed);
 
 const FIX =
   'A transcript that holds it is not read until it decodes, never read as saying nothing: run a Claude Code whose transcript' +
@@ -174,8 +176,8 @@ const kindOf = <K extends LineKind>(entry: unknown, kinds: readonly K[]) => {
 };
 
 /** Why `entry`, a `kind` line at `where`, is refused: the line, its first wrong field, what is there, and the fix. */
-const refusal = (where: string, kind: LineKind, entry: unknown, error: Schema.SchemaError) => {
-  const { path, words } = firstRefusal(entry, error, 'Claude Code writes');
+const refusal = (where: string, kind: LineKind, entry: unknown, schema: Schema.Decoder<unknown>) => {
+  const { path, words } = firstRefusal(schema, entry, 'Claude Code writes');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   return `${where} is ${kind.startsWith('a') ? 'an' : 'a'} \`${kind}\` line whose ${field} ${words}. ${FIX}`;
 };
@@ -194,7 +196,7 @@ export const decodeLine = <K extends LineKind>(entry: unknown, kinds: readonly K
   const decoded = DECODERS[kind](entry);
   const read: { line: Line<K> } | { wrong: string } = Result.isSuccess(decoded)
     ? { line: decoded.success as Line<K> }
-    : { wrong: refusal(where, kind, entry, decoded.failure) };
+    : { wrong: refusal(where, kind, entry, LINES[kind]) };
   return read;
 };
 
@@ -206,12 +208,9 @@ export const decodeLine = <K extends LineKind>(entry: unknown, kinds: readonly K
  * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
 export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], where: string) => {
-  let entry: unknown;
-  try {
-    entry = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return undefined;
+  const entry = json.value;
   const read = decodeLine(entry, kinds, where);
   if (read && 'wrong' in read) throw new Error(read.wrong);
   return read?.line;
@@ -225,17 +224,14 @@ export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], wh
  * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
 export const writtenAt = (text: string, where: string) => {
-  let entry: unknown;
-  try {
-    entry = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return undefined;
+  const entry = json.value;
   if (typeof entry !== 'object' || entry === null) return undefined;
   const kind = kindOf(entry, KINDS);
   if (kind !== undefined) {
     const timed = TIMED(entry);
-    if (Result.isFailure(timed)) throw new Error(refusal(where, kind, entry, timed.failure));
+    if (Result.isFailure(timed)) throw new Error(refusal(where, kind, entry, Timed));
   }
   const { timestamp } = entry as { timestamp?: unknown };
   const at = typeof timestamp === 'string' ? Date.parse(timestamp) : NaN;

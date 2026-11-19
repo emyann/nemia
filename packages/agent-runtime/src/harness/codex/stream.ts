@@ -10,7 +10,7 @@
  *
  * Its first line is its start, `thread.started`, whose `thread_id` the worker reads as the session's own id (`CODEX_START`).
  */
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { firstRefusal, own, type Usage } from '../../core/index.ts';
 import type { StartEvent } from '../detached/detached.ts';
 import type { PartialMark } from '../detached/follow.ts';
@@ -55,8 +55,10 @@ const CodexEventSchema = Schema.Union([
 /** An event of a Codex stream as `CodexEventSchema` decodes it. */
 type CodexEvent = typeof CodexEventSchema.Type;
 
-const DECODERS: Readonly<Record<string, (line: unknown) => Result.Result<CodexEvent, Schema.SchemaError>>> = Object.fromEntries(
-  CodexEventSchema.members.map((m) => [m.fields.type.literal, Schema.decodeUnknownResult(m)]),
+type Member = { schema: Schema.Decoder<CodexEvent>; decode: (line: unknown) => Result.Result<CodexEvent, Schema.SchemaError> };
+
+const DECODERS: Readonly<Record<string, Member>> = Object.fromEntries(
+  CodexEventSchema.members.map((m) => [m.fields.type.literal, { schema: m, decode: Schema.decodeUnknownResult(m) }]),
 );
 
 const FIX =
@@ -69,16 +71,13 @@ const FIX =
  */
 const ours = (line: string) => {
   if (!line.includes('"type"')) return undefined;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(line);
-  } catch {
-    return undefined;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(line);
+  if (Option.isNone(json)) return undefined;
+  const parsed = json.value;
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
   const { type } = parsed as { type?: unknown };
-  const decode = typeof type === 'string' ? own(DECODERS, type) : undefined;
-  return decode === undefined ? undefined : { event: parsed as Record<string, unknown> & { type: string }, decode };
+  const member = typeof type === 'string' ? own(DECODERS, type) : undefined;
+  return member === undefined ? undefined : { event: parsed as Record<string, unknown> & { type: string }, member };
 };
 
 /** The sum of `key` over `turns`, or `undefined` where there are no turns to count or one of them did not say it. */
@@ -106,13 +105,13 @@ export const codexEventsOf = (output: string) => {
   for (const [at, line] of lines.entries()) {
     const read = ours(line);
     if (!read) continue;
-    const { event, decode } = read;
-    const decoded = decode(event);
+    const { event, member } = read;
+    const decoded = member.decode(event);
     if (Result.isSuccess(decoded)) {
       events.push(decoded.success);
       continue;
     }
-    const { path, words } = firstRefusal(event, decoded.failure, 'Codex prints');
+    const { path, words } = firstRefusal(member.schema, event, 'Codex prints');
     const field = path.map(String).join('.');
     return {
       wrong: `line ${at + 1} of the \`codex exec --json\` stream is a \`${event.type}\` event whose \`${field}\` ${words}. ${FIX}`,

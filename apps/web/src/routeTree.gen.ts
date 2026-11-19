@@ -26,7 +26,9 @@ import { Route as FactoriesFactoryRouteImport } from './routes/factories.$factor
 import { Route as InboxNameRouteImport } from './routes/inbox_.$name'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as WelcomeCardRouteImport } from './routes/welcome_.card'
 import { Route as WelcomeFactoryRouteImport } from './routes/welcome_.factory'
+import { Route as WelcomeNextRouteImport } from './routes/welcome_.next'
 import { Route as WelcomeVolumeRouteImport } from './routes/welcome_.volume'
 import { Route as AgentsFromAgentRouteImport } from './routes/agents_.$from.$agent'
 import { Route as AgentsSkillsNewRouteImport } from './routes/agents_.skills.new'
@@ -137,9 +139,19 @@ const RunsRunIdRoute = RunsRunIdRouteImport.update({
   path: '/runs/$runId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WelcomeCardRoute = WelcomeCardRouteImport.update({
+  id: '/welcome_/card',
+  path: '/welcome/card',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WelcomeFactoryRoute = WelcomeFactoryRouteImport.update({
   id: '/welcome_/factory',
   path: '/welcome/factory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeNextRoute = WelcomeNextRouteImport.update({
+  id: '/welcome_/next',
+  path: '/welcome/next',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WelcomeVolumeRoute = WelcomeVolumeRouteImport.update({
@@ -293,7 +305,9 @@ export interface FileRoutesByFullPath {
   '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/welcome/card': typeof WelcomeCardRoute
   '/welcome/factory': typeof WelcomeFactoryRoute
+  '/welcome/next': typeof WelcomeNextRoute
   '/welcome/volume': typeof WelcomeVolumeRoute
   '/runs/': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
@@ -337,7 +351,9 @@ export interface FileRoutesByTo {
   '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/welcome/card': typeof WelcomeCardRoute
   '/welcome/factory': typeof WelcomeFactoryRoute
+  '/welcome/next': typeof WelcomeNextRoute
   '/welcome/volume': typeof WelcomeVolumeRoute
   '/runs': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
@@ -382,7 +398,9 @@ export interface FileRoutesById {
   '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox_/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/welcome_/card': typeof WelcomeCardRoute
   '/welcome_/factory': typeof WelcomeFactoryRoute
+  '/welcome_/next': typeof WelcomeNextRoute
   '/welcome_/volume': typeof WelcomeVolumeRoute
   '/runs/': typeof RunsIndexRoute
   '/agents_/$from/$agent': typeof AgentsFromAgentRoute
@@ -428,7 +446,9 @@ export interface FileRouteTypes {
     | '/factories/$factory'
     | '/inbox/$name'
     | '/runs/$runId'
+    | '/welcome/card'
     | '/welcome/factory'
+    | '/welcome/next'
     | '/welcome/volume'
     | '/runs/'
     | '/agents/$from/$agent'
@@ -472,7 +492,9 @@ export interface FileRouteTypes {
     | '/factories/$factory'
     | '/inbox/$name'
     | '/runs/$runId'
+    | '/welcome/card'
     | '/welcome/factory'
+    | '/welcome/next'
     | '/welcome/volume'
     | '/runs'
     | '/agents/$from/$agent'
@@ -516,7 +538,9 @@ export interface FileRouteTypes {
     | '/factories/$factory'
     | '/inbox_/$name'
     | '/runs/$runId'
+    | '/welcome_/card'
     | '/welcome_/factory'
+    | '/welcome_/next'
     | '/welcome_/volume'
     | '/runs/'
     | '/agents_/$from/$agent'
@@ -561,7 +585,9 @@ export interface RootRouteChildren {
   FactoriesFactoryRoute: typeof FactoriesFactoryRoute
   InboxNameRoute: typeof InboxNameRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
+  WelcomeCardRoute: typeof WelcomeCardRoute
   WelcomeFactoryRoute: typeof WelcomeFactoryRoute
+  WelcomeNextRoute: typeof WelcomeNextRoute
   WelcomeVolumeRoute: typeof WelcomeVolumeRoute
   RunsIndexRoute: typeof RunsIndexRoute
   AgentsFromAgentRoute: typeof AgentsFromAgentRoute
@@ -710,11 +736,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsRunIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/welcome_/card': {
+      id: '/welcome_/card'
+      path: '/welcome/card'
+      fullPath: '/welcome/card'
+      preLoaderRoute: typeof WelcomeCardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/welcome_/factory': {
       id: '/welcome_/factory'
       path: '/welcome/factory'
       fullPath: '/welcome/factory'
       preLoaderRoute: typeof WelcomeFactoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome_/next': {
+      id: '/welcome_/next'
+      path: '/welcome/next'
+      fullPath: '/welcome/next'
+      preLoaderRoute: typeof WelcomeNextRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/welcome_/volume': {
@@ -905,7 +945,9 @@ const rootRouteChildren: RootRouteChildren = {
   FactoriesFactoryRoute: FactoriesFactoryRoute,
   InboxNameRoute: InboxNameRoute,
   RunsRunIdRoute: RunsRunIdRoute,
+  WelcomeCardRoute: WelcomeCardRoute,
   WelcomeFactoryRoute: WelcomeFactoryRoute,
+  WelcomeNextRoute: WelcomeNextRoute,
   WelcomeVolumeRoute: WelcomeVolumeRoute,
   RunsIndexRoute: RunsIndexRoute,
   AgentsFromAgentRoute: AgentsFromAgentRoute,

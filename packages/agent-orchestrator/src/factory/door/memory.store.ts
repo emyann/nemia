@@ -10,7 +10,7 @@
  * and instruction as the maps hold them now, at the paths the files keep them at; a folder placed sets those maps from its files.
  */
 import path from 'node:path';
-import { Layer } from 'effect';
+import { Layer, Option, Schema } from 'effect';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { factoryNameRefusal, noFactoryLine, takenFactoryRefusal, unrenderedTreeRefusal, type Factory } from '../factory.ts';
 import { factoryRulesRefusal, FACTORY_RULES_FILE } from '../rules/rules.ts';
@@ -127,11 +127,9 @@ const isMapped = (path: string) => [LEVEL_FILE, SERVERS_FILE, FACTORY_RULES_FILE
 
 /** The JSON of the file `file` of the folder of `name`, refused `Invalid` where it does not read. */
 const jsonOf = (name: string, file: TreeFile) => {
-  try {
-    return JSON.parse(textOf(file)) as unknown;
-  } catch {
-    throw new Invalid({ message: `${factoriesAt(name, file.path)} is not JSON. Nothing was placed.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(textOf(file));
+  if (Option.isNone(json)) throw new Invalid({ message: `${factoriesAt(name, file.path)} is not JSON. Nothing was placed.` });
+  return json.value;
 };
 
 /** The folders of `kept`, as a layer's: read with what its maps hold, placed into them, removed from them. */

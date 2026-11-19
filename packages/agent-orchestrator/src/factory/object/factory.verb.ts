@@ -10,7 +10,9 @@
  * a write of its spec does, so a proposal read before either goes stale, and a controller's pass, which writes only the status, moves
  * nothing, so a Factory proposal recorded in that status stays fresh. That is Kubernetes' `metadata.generation`, which counts changes to
  * an object's desired state and which a status write never moves; a watch tells a change of the status by the status itself. And
- * `factoryCommands`, the lines a person types for one factory, built off the command table as the board read them before.
+ * `factoryCommands`, the lines a person types for one factory, built off the command table as the board read them before. And
+ * `factoryHomeOf`, a factory's home read whole for a client to render (`GET /api/factories/<name>/home`): every file of its tree's
+ * `home/`, read and refused as a run's start reads it (`homeFilesOf`), and the digest the run's copy of the same files is named by.
  *
  * Every kind of a factory's parts is listed the one way (`objectsListed`, `src/object/listed.verb.ts`).
  */
@@ -19,18 +21,23 @@ import {
   API_VERSION,
   DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
+  type FactoryHome,
   type FactoryList,
   type FactoryStatus,
   type ObjectMeta,
 } from 'objects';
 import { readStatus } from '../applied/applied.store.ts';
+import { declaredAt } from '../applied/declared.verb.ts';
+import type { Parameter } from '../../template/index.ts';
 import { commandLine } from '../../command/command.ts';
 import { COMMANDS } from '../../command/commands.verb.ts';
 import { generationOf } from '../door/generation.ts';
 import type { FactoryListing } from '../factory.ts';
 import type { InstructionRead } from '../instruction.store.ts';
 import type { RulesRead } from '../rules/rules.store.ts';
-import { doorAt, doorAtOnce } from '../door/factories.store.ts';
+import { doorAt, doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
+import { fromThrow as tried } from '../../door/door.store.ts';
+import { homeFilesOf, workflowFilesDigest } from '../../frozen/frozen.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { untrustedPlaces } from '../../trust/untrusted.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
@@ -201,10 +208,7 @@ export const defaultFactoryObject = (home: string) =>
  * @param home The store's root.
  */
 export const factoryObjectsOf = (listed: FactoryListed, home: string) =>
-  [
-    defaultFactoryObject(home),
-    ...listed.factories.map((l) => factoryObjectOf(l, listed, home)),
-  ] satisfies FactoryObject[] as FactoryObject[];
+  [defaultFactoryObject(home), ...listed.factories.map((l) => factoryObjectOf(l, listed, home))] satisfies FactoryObject[];
 
 /**
  * The refusal of a factory no object has the name of: it names the list.
@@ -310,5 +314,55 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
 export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home: string, name: string) {
   const { factory, listing } = yield* factoryFiled(home, name);
   const scheduled = listing === undefined || 'error' in listing ? [] : Object.keys(listing.schedules).sort(byText);
-  return factoryCommands(factory, scheduled);
+  const commands = factoryCommands(factory, scheduled);
+  const template = listing === undefined || 'error' in listing ? undefined : listing.template;
+  if (template === undefined) return commands;
+  const declared = yield* declaredAt(template.source).pipe(Effect.orElseSucceed(() => ({})));
+  const follow = followOf(name, template.version, declared);
+  return follow === undefined ? commands : { ...commands, follow };
+});
+
+/**
+ * The first parameter of `declared` that follows a host (`whenOrigin`), with the line that previews the factory `name` at `version` with it
+ * set true (`nemia factory diff`), which prints the upgrade's line to type; none where no boolean of it follows one.
+ * @param name The factory's name.
+ * @param version The template's version the factory is applied at.
+ * @param declared The parameters its template declares, by name.
+ */
+export const followOf = (name: string, version: string, declared: Readonly<Record<string, Parameter>>) => {
+  const found = Object.entries(declared)
+    .sort(([a], [b]) => byText(a, b))
+    .find(([, p]) => p.type === 'boolean' && p.whenOrigin !== undefined);
+  if (found === undefined || found[1].whenOrigin === undefined) return undefined;
+  const [parameter, { whenOrigin: host }] = found;
+  return { host, parameter, line: commandLine(named('factory diff'), { factory: name }, { to: version, sets: `${parameter}=true` }) };
+};
+
+/**
+ * The home of the factory `name`: its files sorted by path, each its permission bits and its bytes in base64, and their digest. Refused
+ * `Missing` where no factory has the name, where it has no tree (made by hand, or the default factory) and where its tree holds no
+ * `home/`, each naming what to type; `Invalid` where the home holds a link or what is neither a file nor a folder, as a run's start is.
+ */
+export const factoryHomeOf = Effect.fn('factoryHomeOf')(function* (name: string) {
+  const door = yield* FactoryDoor;
+  const record = yield* door.factories.read(FactoryName.read(name));
+  const tree = isDefaultFactory(record) ? undefined : record.tree;
+  if (tree === undefined)
+    return yield* Effect.fail(
+      new Missing({
+        message: `${name} has no home: it was not made from a template, and a home is a template's. Take it over by one that gives a home/ (nemia factory diff ${name} --template <folder|archive>, then nemia factory adopt), then open it again.`,
+      }),
+    );
+  const files = yield* tried(() => homeFilesOf(tree));
+  if (files === undefined)
+    return yield* Effect.fail(
+      new Missing({
+        message: `${name} has no home: its tree (${tree}) holds no home/, which its template does not give. Upgrade it onto a version of its template that does (nemia factory upgrade ${name} --to <x.y.z>), then open it again.`,
+      }),
+    );
+  return {
+    name,
+    digest: workflowFilesDigest(files),
+    files: files.map((f) => ({ path: f.path, mode: f.mode, content: Buffer.from(f.bytes).toString('base64') })),
+  } satisfies FactoryHome;
 });

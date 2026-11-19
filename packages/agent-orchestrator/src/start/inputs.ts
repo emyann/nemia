@@ -11,7 +11,7 @@ import { CARDS_FOLDER, type Mount, type Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import type { FiledFolders, HandedRunFolders } from '../filed/filed.ts';
 import type { CardsRefusal, NamedTwice } from '../../contracts/handed-runs.contract.ts';
-import { volumeMounts } from '../factory/volume/volume.ts';
+import { volumeMounts } from '../factory/volume/index.ts';
 import type { Fenced } from '../workflow/index.ts';
 import { HANDED_CLOSEOUT, type HandedFiles } from '../artifacts/artifacts.ts';
 

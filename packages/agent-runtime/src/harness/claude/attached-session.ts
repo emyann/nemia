@@ -8,6 +8,7 @@
  * is held open while it waits on one and let through with their answers, and a call Claude Code would prompt for is held the same way
  * as a permission (`permission.ts`) and run or refused as they answer; denied otherwise, as no person is there.
  */
+import { Option, Schema } from 'effect';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -554,12 +555,16 @@ const turnEnded = (root: string, live: Live, m: Extract<SDKMessage, { type: 'res
   rewrite(root, live, { state: m.is_error ? 'failed' : 'completed', sessionId: m.session_id });
 };
 
+/** A line of a say file, decoded: the words said. */
+const saidLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ text: Schema.String })));
+
 /**
  * Hands the session the words said to it since it last heard (its say file, past `heard`), each a user message on its input, and
  * writes how far it heard. Nothing once its input is closed or it is let go: the next holder hears them.
  *
  * Words pushed on an open session's input begin a turn, so its run file is written `working` with them: a session that heard and stayed
- * `idle` would be read as waiting on a person while it answers, and no turn of it could be ended.
+ * `idle` would be read as waiting on a person while it answers, and no turn of it could be ended. A line that does not decode as words
+ * said is passed over and counted heard, and said on stderr with its byte in the file, so the words not heard can be found.
  * @param root The engine's store root, where the session's say file and run file are.
  * @param live The session at work in this process.
  */
@@ -574,8 +579,18 @@ export const hear = (root: string, live: Live) => {
   const from = live.run.heard ?? 0;
   const end = said.lastIndexOf(10) + 1;
   if (end <= from) return;
-  for (const line of said.subarray(from, end).toString('utf8').split('\n').filter(Boolean))
-    live.unanswered.add(live.input.push((JSON.parse(line) as { text: string }).text));
+  const say = filesOf(root, live.run.name).say;
+  for (let at = from; at < end;) {
+    const next = said.indexOf(10, at) + 1;
+    const line = said.subarray(at, next - 1).toString('utf8');
+    const words = line ? saidLine(line) : Option.none();
+    if (Option.isSome(words)) live.unanswered.add(live.input.push(words.value.text));
+    else if (line)
+      process.stderr.write(
+        `${say}: the line at byte ${at} is no words said ({"text": "…"}), and the session is not told it: the words are in the file, at that byte.\n`,
+      );
+    at = next;
+  }
   rewrite(root, live, { heard: end, ...(live.open ? { state: 'working' as const } : {}) });
 };
 

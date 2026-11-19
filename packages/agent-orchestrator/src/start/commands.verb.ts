@@ -21,7 +21,7 @@ import { frozenStepsOf } from '../steps/steps.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
 import { modelsOf } from './models.ts';
-import { volumeMounts } from '../factory/volume/volume.ts';
+import { volumeMounts } from '../factory/volume/index.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import type { Paused } from '../pause/pause.ts';

@@ -14,7 +14,8 @@ import { clonesOf, FactoryDoor, filedFactory, refuseName } from '../door/factori
 import { tried } from '../../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { isDirectory } from '../../record/record.store.ts';
-import { factoryVolumes, folderName, volumeEntry, workedOn, type Factory, type Volume } from '../factory.ts';
+import { factoryVolumes, folderName, volumeEntry, workedOn, type Factory, type FactoryTemplate, type Volume } from '../factory.ts';
+import { originSetsAt } from '../applied/declared.verb.ts';
 import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
 import { cloned } from '../clones/clones.verb.ts';
 import { PlaceService } from '../../place/place.store.ts';
@@ -54,7 +55,25 @@ const switchOf = (args: Args, key: 'claudeMd' | 'skills', flag: string) => {
  * A volume added: the factory's file written, the volume, what one of its path was marked before (`null` for none), and what was asked
  * of its trust.
  */
-type Added = { file: string; volume: Volume; was: boolean | null; trusts: readonly PlaceTrust[] };
+type Added = { file: string; volume: Volume; was: boolean | null; trusts: readonly PlaceTrust[]; params?: readonly string[] };
+
+/**
+ * The template parameters of `factory` the volume `volume` sets (`originSetsAt`): where it is the factory's first writable volume and the
+ * factory is made from a template, each boolean that follows a host; none otherwise.
+ */
+const originSets = Effect.fn('originSets')(function* (factory: Factory, volume: Volume) {
+  if (factory.template === undefined || volume.readOnly || factory.volumes.some((v) => !v.readOnly)) return [];
+  return yield* originSetsAt(factory.template.source, [volume]);
+});
+
+/** `template`'s parameters with each boolean `--set` word of `sets` written over them. */
+const withSets = (template: FactoryTemplate, sets: readonly string[]) => ({
+  ...template,
+  params: {
+    ...template.params,
+    ...Object.fromEntries(sets.map((set) => [set.slice(0, set.indexOf('=')), set.slice(set.indexOf('=') + 1) === 'true'])),
+  },
+});
 
 /**
  * Each writable one of `volumes` that the place answers is in no git repository, refused `Invalid` naming the read-only spelling that
@@ -118,7 +137,8 @@ const workedOnStill = Effect.fn('workedOnStill')(function* (factory: Factory, at
  * written: a spelling with no mark or another, or a URL `cloneTarget` refuses (`volumeOf`), the default factory and a name with no
  * factory, each `Invalid`; a writable one given again read-only while it is still worked on (`workedOnStill`, `Conflict`); a folder that
  * is no directory, a writable one inside another or holding one, or one that reaches the store (`volumeRefusal`, `Invalid`); then a
- * clone the place does not make, and a writable one in no git repository.
+ * clone the place does not make, and a writable one in no git repository. A templated factory's first writable volume also sets the
+ * template's booleans that follow a host (`originSets`), filed as its parameters at the same version, which the controller renders.
  */
 export const FACTORY_VOLUME_ADD: Served<Added> = {
   ...FACTORY_VOLUME_ADD_WORDS,
@@ -146,11 +166,13 @@ export const FACTORY_VOLUME_ADD: Served<Added> = {
       if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
       yield* cloned(clonesOf([volume]));
       yield* writableRooted([volume], 'Nothing was changed.');
+      const sets = yield* originSets(factory, volume);
       const { volumes, was } = withVolume(factory, volume);
-      const file = yield* door.factories.rewrite({ ...factory, volumes });
+      const template = factory.template === undefined || !sets.length ? {} : { template: withSets(factory.template, sets) };
+      const file = yield* door.factories.rewrite({ ...factory, volumes, ...template });
       const trusts = yield* volumesTrusted([volume], args.noTrust === true);
       const stored = volumes.find((v) => path.resolve(v.path) === volume.path) ?? volume;
-      return { file, volume: volumeEntry(stored), was, trusts };
+      return { file, volume: volumeEntry(stored), was, trusts, ...(sets.length ? { params: sets } : {}) };
     });
   },
 };

@@ -4,7 +4,7 @@
  * person's, asked of them every time an agent calls it (`POLICY_CONFIRM`, `POLICY_DROP`). Any agent's: the name is the one given.
  */
 import { StoreRoot } from '../config/root.store.ts';
-import { Effect, Schema } from 'effect';
+import { Effect, Option, Schema } from 'effect';
 import { POLICY_CONFIRM_WORDS, POLICY_PROPOSE_WORDS, POLICY_RM_WORDS, POLICY_WORDS, PolicyProposal, PolicyRuleConfirm } from 'objects';
 import { tried } from '../runtime-client.ts';
 import type { Served } from '../command/entry.verb.ts';
@@ -141,12 +141,9 @@ const proposalRefusal = (why: string) =>
  * @param words The proposal's text, JSON.
  */
 export function proposalOf(words: string) {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(words);
-  } catch {
-    throw proposalRefusal('the proposal is not JSON');
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(words);
+  if (Option.isNone(json)) throw proposalRefusal('the proposal is not JSON');
+  const raw = json.value;
   const { rules, guidance = [] } = (typeof raw === 'object' && raw !== null ? raw : {}) as { rules?: unknown; guidance?: unknown };
   if (!Array.isArray(rules)) throw proposalRefusal('the proposal has no list of rules');
   const bad = rules.map((rule, i) => ruleRefusal(rule, `rule ${i + 1}`)).find((why) => why !== undefined);

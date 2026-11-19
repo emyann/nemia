@@ -7,7 +7,7 @@
  *
  * It is a service (not an import) so tests run against memory and spend no filesystem.
  */
-import { Context, Effect, Layer, Result, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Event } from '../domain.ts';
@@ -185,10 +185,6 @@ export type JournalShape = Omit<PlainJournalOps, 'append' | 'read' | 'list' | 'f
 
 const isEvent = Schema.is(StoredEventSchema);
 const isFeedEntry = Schema.is(StoredFeedEntrySchema);
-const refusalOf = (schema: typeof StoredEventSchema | typeof StoredFeedEntrySchema, entry: unknown) => {
-  const decoded = Schema.decodeUnknownResult(schema)(entry);
-  return Result.isFailure(decoded) ? decoded.failure : undefined;
-};
 
 /**
  * A store's entries as events, the very objects it gave: a decoded struct comes back with its keys in the schema's order, and
@@ -200,8 +196,7 @@ const decodeEvents = (taskId: string, raw: readonly unknown[], located: StoreOps
   if (Schema.is(StoredEventsSchema)(raw)) return Effect.succeed(raw);
   const index = raw.findIndex((entry) => !isEvent(entry));
   const where = `${taskId}'s journal${located ? ` (${located.journal(taskId)})` : ''}, entry ${index + 1}`;
-  const error = refusalOf(StoredEventSchema, raw[index]);
-  const message = error ? entryWords(where, raw[index], error, false) : `${where} is not what the runtime writes.`;
+  const message = entryWords(where, raw[index], StoredEventSchema, false);
   return Effect.fail(new JournalError({ taskId, message }));
 };
 
@@ -210,11 +205,10 @@ type Resolve = ReturnType<typeof resolver>;
 
 /** Why the feed entry `entry`, at `where`, is no runtime's, and the task it names when it names one. */
 const feedRefusalOf = (where: string, entry: unknown) => {
-  const error = refusalOf(StoredFeedEntrySchema, entry);
   const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
   return {
     ...(typeof taskId === 'string' ? { taskId } : {}),
-    why: error ? entryWords(where, entry, error, true) : `${where} is not what the runtime writes.`,
+    why: entryWords(where, entry, StoredFeedEntrySchema, true),
   };
 };
 
@@ -406,13 +400,10 @@ const formerArgsOut = (config: Record<string, unknown>, claude: object | undefin
 };
 
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
-const parsed = (line: string) => {
-  try {
-    return JSON.parse(line) as unknown;
-  } catch {
-    return line;
-  }
-};
+const parsed = (line: string) => Option.getOrElse(jsonOf(line), () => line);
+
+/** A line's text decoded as JSON, or none where it is not. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /** The bytes of `file` from `from` to `to`, in one positioned read, counted. */
 const span = (file: string, from: number, to: number) => {

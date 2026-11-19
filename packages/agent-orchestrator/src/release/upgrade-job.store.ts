@@ -53,7 +53,7 @@ export function writeUpgradeRecord(home: string, record: UpgradeRecord) {
 export function readUpgradeRecord(home: string, id: string) {
   if (id === '' || id.includes('/') || id.includes('\\') || id.startsWith('.')) return undefined;
   try {
-    return Schema.decodeUnknownSync(UpgradeRecord)(JSON.parse(fs.readFileSync(upgradeFile(home, id), 'utf8')));
+    return Schema.decodeUnknownSync(Schema.fromJsonString(UpgradeRecord))(fs.readFileSync(upgradeFile(home, id), 'utf8'));
   } catch {
     return undefined;
   }

@@ -1,12 +1,13 @@
 /** The configuration a step's task is filed with, built in one place for its first filing, a try, a round, and the asks before them. */
 import path from 'node:path';
+import { isObject } from 'effect/Predicate';
 import { modeOf, sessionContext, type StepSpec } from '../workflow.ts';
 import { isFolderTeam, sandboxed, writesNothing, writesOutsideByRule } from '../workflow/index.ts';
 import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
 import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
-import { volumeMounts } from '../factory/volume/volume.ts';
+import { volumeMounts } from '../factory/volume/index.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, declarationOf, isRemoteHarness } from '../harness/harness.ts';
 import { addedFolderReadsOf, fenceReach, unruledIn } from 'agent-runtime/vocabulary';
@@ -261,12 +262,13 @@ function inHomeOwn<Own extends object>(
 const settingsObject = (given: unknown) => {
   if (given === undefined) return {};
   if (typeof given !== 'string') return undefined;
+  let read: unknown;
   try {
-    const parsed: unknown = JSON.parse(given);
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
+    read = JSON.parse(given);
   } catch {
     return undefined;
   }
+  return isObject(read) ? read : undefined;
 };
 
 /**

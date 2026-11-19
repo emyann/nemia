@@ -298,21 +298,6 @@ export function isLesson(file: string, workspaces: readonly string[] = []) {
 }
 
 /**
- * The npm `workspaces` of a repository's root `package.json` text, as written — its list, or its `packages` — and none when there is no
- * file or it does not read: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` (`workspaceGlob`, `deepWorkspaces`).
- * @param packageJson The root `package.json`'s text; null or undefined where there is no file.
- */
-export function workspacesIn(packageJson: string | null | undefined) {
-  try {
-    const { workspaces } = JSON.parse(packageJson ?? '{}') as { workspaces?: unknown };
-    const globs: unknown = Array.isArray(workspaces) ? workspaces : (workspaces as { packages?: unknown } | undefined)?.packages;
-    return Array.isArray(globs) ? globs.filter((g): g is string => typeof g === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-/**
  * What a branch touched, grouped by blast radius, from the files the place's `report` says it changed. A file counts in every group it
  * touched — a move from one package to another is a change to both — and a binary file counts as a file, with no lines.
  * @param files The files the branch changed, each with its lines added and removed.

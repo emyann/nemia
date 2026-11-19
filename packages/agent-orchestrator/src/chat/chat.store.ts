@@ -13,7 +13,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
 import type { AnswerMark, Ask, AskAnswer, AskClose, DeliveredMark, OutboxEntry, ReadMark, SourceStop } from './chat.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
@@ -131,30 +131,23 @@ const textOf = (file: string) => {
   }
 };
 
-/** `raw` decoded by `schema`, or refused (`Invalid`) naming `where` and that the file is the chat's. */
-function decoded<S extends Schema.Top>(schema: S, raw: unknown, where: string) {
-  const read = Schema.decodeUnknownResult(schema as never)(raw) as Result.Result<S['Type'], unknown>;
-  if (Result.isSuccess(read)) return read.success;
-  throw new Invalid({ message: `${where} is not a line of the chat's record: move the file aside and the chat reads without it.` });
-}
+/** The refusal of what `where` holds, which does not read: it names the place, and that the file is the chat's. */
+const unreadLine = (where: string) =>
+  new Invalid({ message: `${where} is not a line of the chat's record: move the file aside and the chat reads without it.` });
 
 /**
  * The lines of a JSONL file, each decoded by `schema`: none where there is no file, and a last line not yet ended left out, as an append
  * still being written. Refused (`Invalid`) for a line that does not decode, naming the file and the line.
  */
-function linesOf<S extends Schema.Top>(file: string, schema: S) {
+function linesOf<S extends Schema.Decoder<unknown>>(file: string, schema: S) {
   const text = textOf(file);
   if (text === undefined) return [];
   const lines = text.split('\n').slice(0, -1);
   return lines.flatMap((line, i) => {
     if (line.trim() === '') return [];
-    let raw: unknown;
-    try {
-      raw = JSON.parse(line);
-    } catch {
-      raw = undefined;
-    }
-    return [decoded(schema, raw, `${file}:${i + 1}`)];
+    const read = Schema.decodeUnknownOption(Schema.fromJsonString(schema))(line);
+    if (Option.isNone(read)) throw unreadLine(`${file}:${i + 1}`);
+    return [read.value];
   });
 }
 
@@ -169,9 +162,9 @@ const appendLine = (file: string, value: unknown) => {
  * @param dir The folder the chat is kept in, which holds its folder `chat/`.
  */
 export const readOutbox = (dir: string) =>
-  linesOf(outboxFile(dir), OutboxSchema).map(({ from, ...e }) =>
+  linesOf(outboxFile(dir), OutboxSchema).map<OutboxEntry>(({ from, ...e }) =>
     from === undefined ? { ...e } : { ...e, from: { ...from } },
-  ) satisfies OutboxEntry[] as OutboxEntry[];
+  );
 
 /**
  * The keeper's marks of what it delivered, in the order it delivered them.
@@ -192,13 +185,9 @@ export const readStops = (dir: string) => linesOf(stopsFile(dir), StopSchema).ma
 export function readReadMark(dir: string) {
   const text = textOf(readMarkFile(dir));
   if (text === undefined) return undefined;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    raw = undefined;
-  }
-  return { ...decoded(ReadSchema, raw, readMarkFile(dir)) };
+  const read = Schema.decodeUnknownOption(Schema.fromJsonString(ReadSchema))(text);
+  if (Option.isNone(read)) throw unreadLine(readMarkFile(dir));
+  return { ...read.value };
 }
 
 /**

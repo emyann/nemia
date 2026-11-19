@@ -12,7 +12,7 @@ import { textIn } from '../../folder/folder.ts';
 import { parseAgent, skillTurnCost } from '../../agents/agents.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../../step/step.ts';
 import { agentSpecOf, skillSpecOf, workflowSpecOf } from '../../propose/index.ts';
-import { compose, type Choice, type TreeMerge } from './merge.ts';
+import { compose, isJsonObject, type Choice, type TreeMerge } from './merge.ts';
 import { WIRING_FILE } from './resolution.ts';
 import type { ResolutionOwner } from '../../../contracts/resolution.contract.ts';
 
@@ -36,7 +36,7 @@ export function composedTexts(merge: TreeMerge, choices: Readonly<Record<string,
       const text = textIn(entry.bytes);
       return text === null ? [] : [[entry.path, text] as const];
     }),
-  ) satisfies Texts as Texts;
+  );
 }
 
 /** The files of `texts` under `prefix`, each by its path after it, at any depth, or directly in it alone (`direct`). */
@@ -108,8 +108,8 @@ function hireOf(factory: string, owner: ResolutionOwner, texts: Texts) {
   const cut = owner.name.indexOf('.');
   const [workflow, step] = [owner.name.slice(0, cut), owner.name.slice(cut + 1)];
   const wiring = readOrRefused(factory, owner, () => JSON.parse(texts.get(WIRING_FILE) ?? '{}'));
-  const hires = typeof wiring === 'object' && wiring !== null ? (wiring as { hires?: unknown }).hires : undefined;
-  const agent = typeof hires === 'object' && hires !== null ? (hires as Record<string, unknown>)[`${workflow}/${step}`] : undefined;
+  const hires = isJsonObject(wiring) ? wiring.hires : undefined;
+  const agent = isJsonObject(hires) ? hires[`${workflow}/${step}`] : undefined;
   return { workflow, step, ...(typeof agent === 'string' && { agent }) };
 }
 
@@ -142,15 +142,15 @@ export function ownerSpec(
   const texts = composedTexts(merge, choices);
   switch (owner.kind) {
     case 'Workflow':
-      return workflowOf(factory, owner, texts);
+      return workflowOf(factory, owner, texts) as unknown;
     case 'Agent':
-      return agentOf(factory, owner, texts);
+      return agentOf(factory, owner, texts) as unknown;
     case 'Skill':
-      return skillOf(factory, owner, texts);
+      return skillOf(factory, owner, texts) as unknown;
     case 'Hire':
-      return hireOf(factory, owner, texts);
+      return hireOf(factory, owner, texts) as unknown;
     case 'Factory':
-      return factoryOf(factory, owner, texts, ours);
+      return factoryOf(factory, owner, texts, ours) as unknown;
   }
   return undefined;
 }

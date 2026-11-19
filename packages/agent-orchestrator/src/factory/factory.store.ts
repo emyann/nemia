@@ -14,7 +14,7 @@ import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import {
   ambiguousFactoryRefusal,
   takenFactoryRefusal,
@@ -39,7 +39,6 @@ import {
   type FactoryTemplate,
   type FactoryWrite,
   type InstructionAt,
-  type Schedule,
   type Volume,
   volumeEntry,
 } from './factory.ts';
@@ -171,7 +170,7 @@ function factoryFile(home: string, name: string) {
     } satisfies FileRead as FileRead;
   const decoded = Schema.decodeUnknownResult(FactoryFileSchema)(raw);
   if (Result.isSuccess(decoded)) return { file, content: decoded.success } satisfies FileRead as FileRead;
-  const { path: where, words } = firstRefusal(raw, decoded.failure);
+  const { path: where, words } = firstRefusal(FactoryFileSchema, raw);
   const field = where.length ? `\`${where.map(String).join('.')}\`` : 'the whole';
   return {
     file,
@@ -185,23 +184,15 @@ function factoryFile(home: string, name: string) {
  */
 function treeWiringOf(home: string, name: string) {
   const read = readTreeWiring(home, name);
-  if ('absent' in read)
-    return { workflows: [], hires: {} } satisfies
-      | Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'>
-      | { error: string } as Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'> | { error: string };
-  if ('error' in read)
-    return read satisfies Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'> | { error: string } as
-      | Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'>
-      | { error: string };
+  if ('absent' in read) return { workflows: [], hires: {} };
+  if ('error' in read) return read;
   const { workflows, hires, revisions, workflowRepos } = read.wiring;
   return {
     workflows,
     hires,
     ...(revisions === undefined ? {} : { revisions }),
     ...(workflowRepos === undefined ? {} : { workflowRepos }),
-  } satisfies Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'> | { error: string } as
-    | Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'>
-    | { error: string };
+  };
 }
 
 /**
@@ -447,7 +438,7 @@ export function readFactoryAt(home: string, name: string, notDone = 'Nothing was
   if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error}` });
   const factory = factoryOf(home, name, read.content);
   if ('error' in factory) throw new Invalid({ message: `the factory ${name}: ${factory.error}` });
-  return factory satisfies Factory as Factory;
+  return factory;
 }
 
 /**
@@ -502,13 +493,13 @@ export const factoryNamesAt = (home: string) => readable(home).factories.map((f)
  */
 export function startFactoryAt(home: string, named: string | undefined, at: string, fix: string, defaultStarts: boolean) {
   if (named === DEFAULT_NAMESPACE) throw new Invalid({ message: defaultStartRefusal(fix, factoryNamesAt(home)) });
-  if (named !== undefined) return { factory: readFactoryAt(home, named) } satisfies { factory?: Factory; repo?: string };
+  if (named !== undefined) return { factory: readFactoryAt(home, named) };
   const { factories, unread } = readable(home);
   const holding = factoriesHolding(factories, at);
   const [only] = holding;
-  if (holding.length === 1 && only !== undefined) return only satisfies { factory?: Factory; repo?: string };
+  if (holding.length === 1 && only !== undefined) return only;
   if (holding.length > 1) throw new Invalid({ message: ambiguousFactoryRefusal(at, holding, fix) });
-  if (defaultStarts) return {} satisfies { factory?: Factory; repo?: string };
+  if (defaultStarts) return {};
   throw new Invalid({
     message: noFactoryRefusal(
       at,
@@ -603,7 +594,7 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
  */
 function toChange(home: string, name: string, verb: Rewrite) {
   refuseName(name, verb);
-  return readFactoryAt(home, name, `Nothing was ${DONE[verb]}.`) satisfies Factory as Factory;
+  return readFactoryAt(home, name, `Nothing was ${DONE[verb]}.`);
 }
 
 /**
@@ -636,7 +627,7 @@ export function wiringChecked(factory: Factory, change: WiringChange, onDisk: (f
   if (judged) throw judged.kind === 'Missing' ? new Missing({ message: judged.message }) : new Invalid({ message: judged.message });
   const bad = onDisk(factory);
   if (bad) throw bad;
-  return rewired(factory, change) satisfies Factory as Factory;
+  return rewired(factory, change);
 }
 
 /**
@@ -648,8 +639,8 @@ function wiredAt(home: string, name: string, change: WiringChange, onDisk?: (fac
   const notDone = `Nothing was ${DONE[change.verb]}.`;
   const was = readFactoryAt(home, name, notDone);
   const now = wiringChecked(was, change, onDisk);
-  if (now === was) return { was, now, file: wiringFileAt(home, was) } satisfies { was: Factory; now: Factory; file: string };
-  return { was, now, file: rewriteFactoryAt(home, now, notDone) } satisfies { was: Factory; now: Factory; file: string };
+  if (now === was) return { was, now, file: wiringFileAt(home, was) };
+  return { was, now, file: rewriteFactoryAt(home, now, notDone) };
 }
 
 /**
@@ -763,11 +754,7 @@ export function setScheduleAt(
     scheduleRefused(factory, opts),
   );
   const replaced = was.schedules[opts.workflow];
-  return { file, schedule, ...(replaced ? { replaced } : {}) } satisfies { file: string; schedule: Schedule; replaced?: Schedule } as {
-    file: string;
-    schedule: Schedule;
-    replaced?: Schedule;
-  };
+  return { file, schedule, ...(replaced ? { replaced } : {}) };
 }
 
 /**
@@ -841,12 +828,15 @@ export function volumesMovedAt(home: string) {
   const left: { file: string; why: string }[] = [];
   for (const name of names.filter((n) => n.endsWith('.json') && !n.startsWith('.')).sort()) {
     const file = path.join(factoriesDirAt(home), name);
-    let raw: unknown;
+    let text: string;
     try {
-      raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+      text = fs.readFileSync(file, 'utf8');
     } catch {
       continue;
     }
+    const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+    if (Option.isNone(json)) continue;
+    const raw = json.value;
     if (!isFormer(raw)) continue;
     const keys = Schema.decodeUnknownResult(FormerKeysSchema)(raw);
     if (Result.isFailure(keys)) {

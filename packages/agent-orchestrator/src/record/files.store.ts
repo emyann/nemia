@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import { pauseStands, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { AskKey, AskOf, AskWritten, PersonRequest, Pruned, Run, RunStore } from './record.ts';
@@ -209,13 +209,12 @@ function removeRunFiles(home: string, id: string) {
 /** The card the record of the run `id` says it was started from, or undefined: none, no record, or one that does not read. */
 function cardOf(home: string, id: string) {
   try {
-    const record: unknown = JSON.parse(fs.readFileSync(runFile(home, id), 'utf8'));
-    return isFromCard(record) ? record.from.inbox : undefined;
+    return Option.getOrUndefined(fromCardIn(fs.readFileSync(runFile(home, id), 'utf8')))?.from.inbox;
   } catch {
     return undefined;
   }
 }
-const isFromCard = Schema.is(Schema.Struct({ from: Schema.Struct({ inbox: Schema.String }) }));
+const fromCardIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ from: Schema.Struct({ inbox: Schema.String }) })));
 
 /** Whether an id names something of a run in the store: its record, a person's file beside it, its asks or its own directory. */
 function runIdTaken(home: string, id: string) {
@@ -251,20 +250,21 @@ function runIds(home: string) {
  */
 export const labelsFile = (home: string, id: string) => path.join(runsDir(home), `${id}.labels`);
 
-const isLabels = Schema.is(Schema.Record(Schema.String, Schema.String));
+const labelsIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)));
 
 /**
  * The run's labels, read: undefined for a run nobody labelled. A file that does not read as a JSON object of strings labels the run with
  * nothing, and is said once on stderr, naming the file and the verb that writes it whole again.
  */
 function readLabels(home: string, id: string) {
-  let json: unknown;
+  let text = '';
   try {
-    json = JSON.parse(fs.readFileSync(labelsFile(home, id), 'utf8'));
+    text = fs.readFileSync(labelsFile(home, id), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
   }
-  if (isLabels(json) && !Array.isArray(json)) return Object.keys(json).length ? json : undefined;
+  const json = labelsIn(text);
+  if (Option.isSome(json) && !Array.isArray(json.value)) return Object.keys(json.value).length ? json.value : undefined;
   sayOnce(
     `run ${id}: its labels, ${labelsFile(home, id)}, are no JSON object of strings, and are read as none: write them again with nemia label run ${id} <key>=<value> --overwrite, or remove the file`,
   );
@@ -379,7 +379,9 @@ const forgettingDir = (home: string) => path.join(home, 'forgetting');
 const forgettingFile = (home: string, id: string) => path.join(forgettingDir(home), `${id}.json`);
 
 /** A marker as `nemia rm` writes it; any key beside these is left unread. */
-const isForgetting = Schema.is(Schema.Struct({ run: Schema.String, taskIds: Schema.Array(Schema.String) }));
+const forgettingIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ run: Schema.String, taskIds: Schema.Array(Schema.String) })),
+);
 
 /** The marker of the run `id` written whole, through a hidden file renamed over it, the folder made first. */
 function writeForgetting(home: string, id: string, taskIds: readonly string[]) {
@@ -396,11 +398,8 @@ function readForgetting(home: string, id: string) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  try {
-    const marker: unknown = JSON.parse(text);
-    if (isForgetting(marker) && marker.run === id) return [...marker.taskIds];
-  } catch {}
-  return undefined;
+  const marker = forgettingIn(text);
+  return Option.isSome(marker) && marker.value.run === id ? [...marker.value.taskIds] : undefined;
 }
 
 /** The runs a marker stands for: each `<id>.json` of the folder, none when there is no folder. */
@@ -460,13 +459,12 @@ const startedDir = (home: string) => path.join(path.dirname(runsDir(home)), 'sta
 /** The run the claim at `file` names, or undefined: none there, or one that does not read as a claim. */
 function claimedAt(file: string) {
   try {
-    const claim: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return isClaim(claim) ? claim.run : undefined;
+    return Option.getOrUndefined(claimIn(fs.readFileSync(file, 'utf8')))?.run;
   } catch {
     return undefined;
   }
 }
-const isClaim = Schema.is(Schema.Struct({ run: Schema.String }));
+const claimIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ run: Schema.String })));
 
 /**
  * Claim the card `card` for the run `id`: `started/<card>.json`, created exclusively (`wx`), so that of two processes starting one card
@@ -593,5 +591,5 @@ export const keptRuns = <P>(home: string, memo: RecordMemo<P> | undefined, proje
   const listed = new Set(runIds(home));
   const pause = readPause(home);
   const find = (id: string) => (listed.has(id) ? runListed(home, id, sayOnce, pause) : undefined);
-  return keptRecords(memo, { stamps: restStamps(home), find, verify }, project) satisfies P[] as P[];
+  return keptRecords(memo, { stamps: restStamps(home), find, verify }, project);
 };

@@ -11,13 +11,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { MCP_TRANSPORTS } from 'objects';
 import { factoryNameRefusal } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
 import { Invalid } from '../../refusal/refusal.ts';
 import { factoryServerRefusal, serverNameRefusal } from './servers.ts';
-import type { FactoryServer, FactoryServers, BuiltinServer } from './servers.ts';
+import type { FactoryServers } from './servers.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
 /**
@@ -80,15 +80,12 @@ export function readServersAt(file: string, fix: string) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  const raw = json.value;
   const read = Schema.decodeUnknownResult(FactoryServersSchema)(raw);
   if (Result.isFailure(read)) {
-    const { path: at, words } = firstRefusal(raw, read.failure);
+    const { path: at, words } = firstRefusal(FactoryServersSchema, raw);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
   return read.success;
@@ -157,18 +154,19 @@ export const builtinServers = (dir: string) => {
   try {
     files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
   } catch {
-    return [] satisfies readonly BuiltinServer[] as readonly BuiltinServer[];
+    return [];
   }
   return files.flatMap((file) => {
     const name = file.slice(0, -'.json'.length);
     if (serverNameRefusal(name) !== undefined) return [];
-    let read: unknown;
+    let text: string;
     try {
-      read = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      text = fs.readFileSync(path.join(dir, file), 'utf8');
     } catch {
       return [];
     }
-    if (factoryServerRefusal(read) !== undefined) return [];
-    return [{ name, ...(read as FactoryServer) }];
-  }) satisfies readonly BuiltinServer[] as readonly BuiltinServer[];
+    const read = Schema.decodeUnknownOption(Schema.fromJsonString(FactoryServerSchema))(text);
+    if (Option.isNone(read) || factoryServerRefusal(read.value) !== undefined) return [];
+    return [{ name, ...read.value }];
+  });
 };

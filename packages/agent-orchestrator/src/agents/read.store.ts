@@ -61,13 +61,7 @@ export function readCopyRecord(home: string, name: string) {
   } catch {
     return null;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    raw = undefined;
-  }
-  const decoded = Schema.decodeUnknownResult(CopyRecordSchema)(raw);
+  const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(CopyRecordSchema))(text);
   if (Result.isSuccess(decoded)) return decoded.success;
   process.stderr.write(`${file} does not read as the record of a copy, { source, version, at }: read as none. Copy the agent again.\n`);
   return null;

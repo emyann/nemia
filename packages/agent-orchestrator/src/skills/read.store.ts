@@ -10,7 +10,8 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema, SchemaIssue } from 'effect';
+import { Result, Schema } from 'effect';
+import { refusedIn } from 'objects';
 import { AGENTS_FOLDER, SKILLS_FOLDER, splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { agentsDir } from '../folder/folder.ts';
@@ -331,7 +332,8 @@ function followed(walk: Walked, at: string, named: string, held: readonly string
 }
 
 /** The files of the real folder `dir`, each by its path in the skill from `under`, a followed linked folder walked as the folder it is. */
-function filesUnder(walk: Walked, dir: string, under: string, held: readonly string[]) {
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
+function filesUnder(walk: Walked, dir: string, under: string, held: readonly string[]): SkillFile[] {
   // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry): SkillFile[] => {
     const file = path.join(under, entry.name);
@@ -433,14 +435,14 @@ const RULES_SHAPE =
   'Write it as { "rules": [{ "id", "says", "breaks" }] }: an id once each, what the rule says, and the calls that break it, each a ' +
   '`disallowedTools:` rule such as `Bash(cat:*)` — or delete the file.';
 
-/** Why a skill's rules do not read: the first field the schema refuses, by its path. */
-function rulesFieldRefusal(error: Schema.SchemaError) {
-  const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
-  const at = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p)).map(String);
+/** Why `value` does not read as a skill's rules: the first field the schema refuses, by its path, read by its `_tag` (`refusedIn`). */
+function rulesFieldRefusal(value: unknown) {
+  const decoded = Schema.decodeUnknownResult(SkillRulesSchema)(value, { reportInput: true });
+  const place = Result.isFailure(decoded) ? refusedIn(decoded.failure.issue)[0] : undefined;
+  const at = (place?.path ?? []).map(String);
   const field = at.length ? `\`${at.join('.')}\`` : 'shape';
-  return first?.message === 'Missing key'
-    ? `its ${field} is missing`
-    : `its ${field} is wrong (${first?.message ?? "not a skill's rules"})`;
+  if (place === undefined) return `its ${field} is wrong (not a skill's rules)`;
+  return place._tag === 'MissingKey' ? `its ${field} is missing` : `its ${field} is wrong (${place.message ?? place.expected})`;
 }
 
 /**
@@ -466,7 +468,7 @@ export function readSkillRules(skillDir: string) {
   }
   const decoded = Schema.decodeUnknownResult(SkillRulesSchema)(raw);
   if (Result.isFailure(decoded))
-    throw new WorkflowError(`${file} does not read as a skill's rules: ${rulesFieldRefusal(decoded.failure)}. ${RULES_SHAPE}`);
+    throw new WorkflowError(`${file} does not read as a skill's rules: ${rulesFieldRefusal(raw)}. ${RULES_SHAPE}`);
   const rules = decoded.success.rules.map((r) => ({ id: r.id, says: r.says, breaks: [...r.breaks] }));
   rules.forEach((r, i) => {
     const before = rules.findIndex((other) => other.id === r.id);

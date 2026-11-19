@@ -18,6 +18,7 @@
  * A rotation renames the sealed file into place before the head, and a reader opens the head before the sealed file, so a reader
  * sees either both before a rotation, or a sealed file at least as new as its head, whose lines it skips in the head by cursor.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -61,13 +62,10 @@ const headerLine = (key: 'feedBase' | 'sealedTo', value: number) => {
 };
 
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
-const parsed = (line: string) => {
-  try {
-    return JSON.parse(line) as unknown;
-  } catch {
-    return line;
-  }
-};
+const parsed = (line: string) => Option.getOrElse(jsonOf(line), () => line);
+
+/** A line's text decoded as JSON, or none where it is not. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /** `length` bytes of `fd` from `from`, in one positioned read, counted. */
 const bytesAt = (fd: number, from: number, length: number) => {

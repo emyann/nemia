@@ -23,7 +23,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
+import { Cause, Context, Effect, Exit, Layer, Option, Schema } from 'effect';
 import { countRead, within } from '../meter/tally.store.ts';
 import { brokenBy, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import {
@@ -277,8 +277,7 @@ export const FeedDoor = Context.Reference<FeedDoorShape>('agent-orchestrator/Fee
  * The Feed door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
  * @param root The store's root folder.
  */
-export const feedDoorFiles = (root: string) =>
-  Layer.succeed(FeedDoor)(feedDoorOver(feedFiles(root))) satisfies Layer.Layer<never> as Layer.Layer<never>;
+export const feedDoorFiles = (root: string) => Layer.succeed(FeedDoor)(feedDoorOver(feedFiles(root)));
 
 /**
  * One pass's words written on `door` where they are not what the feed said of them last: the lines written, and where their bytes went
@@ -531,13 +530,9 @@ const isFeedLine = Schema.is(FeedLineSchema);
  * the word and the note every key that is missing, and passes on a line a newer `nemia` signed as its writer judged it.
  */
 function parseLine(text: string) {
-  if (!text) return [] satisfies FeedLine[];
-  try {
-    const line: unknown = JSON.parse(text);
-    return (isFeedLine(line) ? [lineAsRead(line)] : []) satisfies FeedLine[];
-  } catch {
-    return [] satisfies FeedLine[];
-  }
+  if (!text) return [];
+  const line = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
+  return isFeedLine(line) ? [lineAsRead(line)] : [];
 }
 
 const refused = (message: string) => new Invalid({ message });

@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -139,19 +139,17 @@ function jsonIn(file: string, fix: string) {
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined as unknown;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const raw = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(raw)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  return raw.value;
 }
 
-/** The refusal of `raw`, read from `file`, that its schema refused with `error`: its first wrong field, and `fix`. */
-function unread(file: string, raw: unknown, error: Schema.SchemaError, fix: string) {
-  const { path: at, words } = firstRefusal(raw, error);
+/** The refusal of `raw`, read from `file`, that `schema` refused: its first wrong field, and `fix`. */
+function unread(file: string, raw: unknown, schema: Schema.ConstraintDecoder<unknown>, fix: string) {
+  const { path: at, words } = firstRefusal(schema, raw);
   return new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
 }
 
@@ -173,7 +171,7 @@ export function readConfirmed(home: string, agent: string) {
   const raw = jsonIn(file, fix);
   if (raw === undefined) return undefined;
   const read = Schema.decodeUnknownResult(ConfirmedSchema)(raw);
-  if (Result.isFailure(read)) throw unread(file, raw, read.failure, fix);
+  if (Result.isFailure(read)) throw unread(file, raw, ConfirmedSchema, fix);
   return { since: read.success.since, rules: read.success.rules.map(ruleOf) };
 }
 
@@ -188,7 +186,7 @@ export function readProposed(home: string, agent: string) {
   const raw = jsonIn(file, fix);
   if (raw === undefined) return undefined;
   const read = Schema.decodeUnknownResult(ProposedSchema)(raw);
-  if (Result.isFailure(read)) throw unread(file, raw, read.failure, fix);
+  if (Result.isFailure(read)) throw unread(file, raw, ProposedSchema, fix);
   const { at, rules, guidance, digest } = read.success;
   return { at, rules: rules.map(ruleOf), guidance: [...guidance], digest };
 }

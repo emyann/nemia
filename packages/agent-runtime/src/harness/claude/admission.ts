@@ -10,7 +10,7 @@ import path from 'node:path';
 import { ADMISSION_DECISIONS, type Admission, type AdmissionAnswer, type AdmissionCall } from '../admission.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { withoutTelemetry } from '../telemetry.ts';
-import { settingsObject } from './vocabulary.ts';
+import { isJsonObject, settingsObject } from './vocabulary.ts';
 
 /** The runtime's own CLI, run by the node that runs this runtime: the hook's command, whatever the session's `PATH` holds. */
 const AE = [process.execPath, path.join(import.meta.dirname, '..', '..', '..', 'bin', 'ae.ts')];
@@ -78,15 +78,17 @@ const hookOutput = (answer: AdmissionAnswer) =>
  * the spelling `message` took the place of, which a command written before the rename still prints.
  */
 const answerOf = (printed: string) => {
+  let read: unknown;
   try {
-    const read = JSON.parse(printed) as (Partial<AdmissionAnswer> & { reason?: unknown }) | null;
-    if (read === null || !ADMISSION_DECISIONS.includes(read.decision as never)) return undefined;
-    const decision = read.decision as AdmissionAnswer['decision'];
-    if (typeof read.message === 'string') return { answer: { decision, message: read.message }, retired: false };
-    return typeof read.reason === 'string' ? { answer: { decision, message: read.reason }, retired: true } : undefined;
+    read = JSON.parse(printed);
   } catch {
     return undefined;
   }
+  if (!isJsonObject(read)) return undefined;
+  const decision = ADMISSION_DECISIONS.find((d) => d === read.decision);
+  if (decision === undefined) return undefined;
+  if (typeof read.message === 'string') return { answer: { decision, message: read.message }, retired: false };
+  return typeof read.reason === 'string' ? { answer: { decision, message: read.reason }, retired: true } : undefined;
 };
 
 /** Asks the person, saying why admission could not answer. */
@@ -108,14 +110,14 @@ export const admitCall = (
   run: typeof runAdmission = runAdmission,
   warn: (line: string) => void = (line) => process.stderr.write(`${line}\n`),
 ) => {
-  let given: { tool_name?: unknown; tool_input?: unknown; cwd?: unknown };
+  let given: unknown;
   try {
-    given = JSON.parse(hookInput) as typeof given;
+    given = JSON.parse(hookInput);
   } catch {
     return askFor('the call was not JSON');
   }
-  if (typeof given?.tool_name !== 'string') return askFor('the call names no tool');
-  const input = typeof given.tool_input === 'object' && given.tool_input !== null ? (given.tool_input as Record<string, unknown>) : {};
+  if (!isJsonObject(given) || typeof given.tool_name !== 'string') return askFor('the call names no tool');
+  const input = isJsonObject(given.tool_input) ? given.tool_input : {};
   const call: AdmissionCall = { tool: given.tool_name, input, cwd: typeof given.cwd === 'string' ? given.cwd : '' };
   const ran = run(command, JSON.stringify(call));
   if (ran.failed) return askFor(`${command[0]} did not start or ran past ${ADMISSION_BOUND_MS / 1000}s`);

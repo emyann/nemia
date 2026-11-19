@@ -259,6 +259,10 @@ const REFUSALS: readonly Refused[] = [
   ['factory move, --volume with no path', 'factory move', ['f', '--to', 'b', '--volume', 'data='], ['--volume <name>=<path>']],
   ['factory move, --from as --to', 'factory move', ['f', '--to', 'b', '--from', 'b'], ['--from', '--to', 'nemia config get-contexts']],
   ['factory move, --cards neither word', 'factory move', ['f', '--to', 'b', '--cards', 'some'], ['--cards follow|stay']],
+  ['factory home, --claude-md neither word', 'factory home', ['acme', '--claude-md', 'maybe'], ['--claude-md on|off']],
+  ['factory home, no factory', 'factory home', [], ['nemia factory home <factory>']],
+  ['factory home, a third word', 'factory home', ['acme', '/r', 'x'], ['nemia factory home <factory>']],
+  ['factory home, every word', 'factory home', ['acme', '/r', '--claude-md', 'on'], null],
   [
     'factory move, every flag',
     'factory move',

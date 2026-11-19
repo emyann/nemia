@@ -7,7 +7,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import type { Settings } from '../config/config.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { FORMER_PHASE_WORDS, FORMER_PHASES, isPhase, PHASES, RECENT_KEPT, type RecentPass } from '../meter/index.ts';
@@ -126,12 +126,7 @@ const linesIn = (text: string) => {
   let unread = 0;
   for (const raw of text.split('\n')) {
     if (!raw.trim()) continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      value = undefined;
-    }
+    const value = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(raw));
     if (!isLine(value)) unread++;
     else {
       const { phase, ...l } = value.l;

@@ -137,13 +137,9 @@ async function opened(base: string, asked: Asked, from: number, signal?: AbortSi
   }
   if (response.ok && response.body !== null) return { kind: 'open', body: response.body } satisfies Opened as Opened;
   const text = await response.text();
-  let said: string | undefined;
-  try {
-    const body: unknown = JSON.parse(text);
-    if (typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string') said = body.error;
-  } catch {
-    said = undefined;
-  }
+  const said = Option.getOrUndefined(
+    Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ error: Schema.String })))(text),
+  )?.error;
   return {
     kind: 'refused',
     status: response.status,

@@ -3,7 +3,7 @@
  * with, and the one schema of the `unreadable` event both streams send. A sibling that imports no sibling but the reads every file
  * shares.
  */
-import { Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import { decoded, UnreadAnswer } from './read.ts';
 
 /** What a stream's `unreadable` event says: why the api could not read it, and whether it reads it again on its own beat. */
@@ -22,15 +22,14 @@ export function streamDataOf<D, K extends keyof D & string>(
   event: K,
   data: string,
 ) {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(data);
-  } catch {
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(data);
+  if (Option.isNone(json)) {
     return new UnreadAnswer(
       event,
       `${event} sent what this board does not read: its data is no JSON. The board and the api were built apart: restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.`,
     );
   }
+  const parsed = json.value;
   try {
     return decoded(event, schemas[event], parsed);
   } catch (error) {

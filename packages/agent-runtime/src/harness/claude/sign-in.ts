@@ -43,12 +43,9 @@ const decodeStatus = Schema.decodeUnknownOption(AuthStatusSchema);
  * @param stdout What `auth status` printed on its stdout.
  */
 export const authStatusOf = (stdout: string) => {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch {
-    return undefined;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(stdout);
+  if (Option.isNone(json)) return undefined;
+  const parsed = json.value;
   return Option.getOrUndefined(decodeStatus(parsed));
 };
 

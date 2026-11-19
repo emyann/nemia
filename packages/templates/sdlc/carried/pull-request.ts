@@ -53,6 +53,11 @@
  *   naming the command to type. A dispatched run's entry links its run, not a job: its failing jobs are read from the run, re-run and read
  *   as any other.
  *
+ * - `declares-ci`, which the round's check asks before it waits: exit 0 where `HEAD`'s tree, or else the remote default branch's as
+ *   fetched now, declares a CI workflow under `.github/workflows` (`declaresCi`, `ci-log.ts`), and 1 where neither does, so the check
+ *   runs the factory's local check in place of a wait on a context no CI will report. A change that removes the base's CI workflow is
+ *   still waited on: the gate is the base's, and no change turns it off.
+ *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
  * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no `gh`
@@ -72,7 +77,7 @@
  * the base's. A hint, never a verdict: a read that fails, or a base pending, green or unreported, adds nothing, and the refusal stays
  * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
-import { PASSED, type Seen, JOBS, failures, latest, linkOf, listing, nameOf, pending, seenOf, verdict } from './ci-log.ts';
+import { PASSED, type Seen, JOBS, declaresCi, failures, latest, linkOf, listing, nameOf, pending, seenOf, verdict } from './ci-log.ts';
 import {
   PERSONS_EXIT,
   POLL_SECONDS,
@@ -429,19 +434,21 @@ function jobLog(id: string) {
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
  * --log-failed` prints nothing), headed by the job's name: the lines that failed it with what tells why (`failures`), or its tail where it
- * names none, bounded by `LOG_LINES` in all. The `check` context itself, which may only gather the others, comes last. No agent of this
+ * names none, bounded by `LOG_LINES` in all; where gh gives no log (it refuses, or GitHub expired it), one line saying so, with the job's
+ * URL a person reads it at. The `check` context itself, which may only gather the others, comes last. No agent of this
  * team may call `gh`, so this is the whole of what the next try is handed.
  */
 function why(entries: readonly Entry[], check: string) {
   const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED).flatMap(jobsFailing);
-  const jobs = new Map<string, string>();
+  const jobs = new Map<string, Entry>();
   const ordered = [...failed.filter((entry) => nameOf(entry) !== check), ...failed.filter((entry) => nameOf(entry) === check)];
   for (const entry of ordered.slice(0, JOBS)) {
     const id = jobIdOf(entry);
-    if (id && !jobs.has(id)) jobs.set(id, nameOf(entry));
+    if (id && !jobs.has(id)) jobs.set(id, entry);
   }
   const logs: string[] = [];
-  for (const [id, name] of jobs) {
+  for (const [id, entry] of jobs) {
+    const name = nameOf(entry);
     const left = LOG_LINES - logs.length;
     if (left <= 1) {
       logs.push(`… the logs of the other jobs are cut: \`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs\` reads each`);
@@ -450,7 +457,8 @@ function why(entries: readonly Entry[], check: string) {
     const api = `gh api repos/{owner}/{repo}/actions/jobs/${id}/logs`;
     const log = jobLog(id);
     if (log.status !== 0 || !log.out.trim()) {
-      logs.push(`${name} (job ${id}): \`${api}\` gave no log${log.err ? `: ${log.err.split('\n')[0]}` : ''}`);
+      const refused = log.err ? `: ${log.err.split('\n')[0]}` : '';
+      logs.push(`${name} (job ${id}): \`${api}\` gave no log${refused}; read it at ${linkOf(entry)}`);
       continue;
     }
     const said = failures(log.out);
@@ -896,11 +904,35 @@ function wait(args: string[]) {
   }
 }
 
+/**
+ * `declares-ci`: passes where `HEAD`'s tree declares a CI workflow (`declaresCi`), or else the remote default branch's, fetched now, so
+ * the round's check waits on its context, and refuses, exit 1, where neither declares one, so the check judges the round by the factory's
+ * local check in place of a wait on a context that will not come. The base is read only where the head declares none.
+ */
+function declaresCiAtHead(args: string[]) {
+  if (args.length) throw new Refusal(`declares-ci takes nothing, and was given ${args.join(' ')}: type it alone`);
+  if (declaresCi(workflowsAt('HEAD'))) return ['HEAD declares a CI workflow in .github/workflows: its context judges the round'];
+  const onto = base('the round', gh);
+  git(`the remote default branch \`${onto}\``, 'fetch', '-q', 'origin', onto);
+  if (declaresCi(workflowsAt('FETCH_HEAD')))
+    return [
+      `HEAD declares no CI workflow, and \`${onto}\` does: the base's context judges the round, which a change that removes its ` +
+        'workflow does not turn off',
+    ];
+  throw new Refusal(
+    `neither HEAD nor \`${onto}\` declares a CI workflow under .github/workflows, so no context will come: the local check judges it`,
+  );
+}
+
+/** The paths under `.github/workflows` in the tree of `rev`, a revision of this checkout. */
+const workflowsAt = (rev: string) => git(`the files of ${rev}`, 'ls-tree', '-r', '--name-only', rev, '--', '.github/workflows').split('\n');
+
 /** The verbs, by name, each with the tag its lines are printed under. */
 const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> = {
   open: { tag: 'nemia pr', act: open },
   push: { tag: 'nemia pr', act: push },
   wait: { tag: 'nemia ci', act: wait },
+  'declares-ci': { tag: 'nemia ci', act: declaresCiAtHead },
 };
 
 /**
@@ -912,7 +944,7 @@ function main() {
   const named = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
   const tag = named?.tag ?? 'nemia pr';
   try {
-    if (!named) throw new Refusal(`\`${verb}\` is no verb: give open, push or wait`);
+    if (!named) throw new Refusal(`\`${verb}\` is no verb: give open, push, wait or declares-ci`);
     for (const line of named.act(args)) process.stdout.write(`${tag}: ${line}\n`);
     return 0;
   } catch (err) {

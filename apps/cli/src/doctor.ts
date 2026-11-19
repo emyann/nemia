@@ -296,7 +296,7 @@ async function answersOf(fix: ReadinessFix | undefined, typed: FixTyped) {
   return answers;
 }
 
-const decodeFix = Schema.decodeUnknownSync(Fix);
+const decodeFix = Schema.decodeUnknownSync(Schema.fromJsonString(Fix));
 
 /** A pattern of a code, as a fix declares it; none where it is not one. */
 const patternOf = (code: string | undefined) => {
@@ -350,7 +350,7 @@ async function followed(base: string, id: string, code: RegExp | undefined, env:
         if (s.event === 'output') line = printed(s.data, line, code);
         if (s.event === 'ended') {
           shown(line, code);
-          return decodeFix(JSON.parse(s.data));
+          return decodeFix(s.data);
         }
       }
     }

@@ -175,7 +175,7 @@ function notesOf(notes: unknown) {
  */
 export function latestOf(text: string) {
   try {
-    const decoded = Schema.decodeUnknownResult(LatestSchema)(JSON.parse(text));
+    const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(LatestSchema))(text);
     if (Result.isFailure(decoded) || parseVersion(decoded.success.tag) === null) return undefined;
     const notes = notesOf(decoded.success.notes);
     return { tag: decoded.success.tag, version: decoded.success.version, ...(notes === undefined ? {} : { notes }) };
@@ -258,7 +258,7 @@ export function readStoreFloor(home: string) {
     return null;
   }
   try {
-    const decoded = Schema.decodeUnknownResult(StoreFileSchema)(JSON.parse(text));
+    const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(StoreFileSchema))(text);
     return Result.isFailure(decoded) ? null : parseVersion(decoded.success.readableFrom);
   } catch {
     return null;

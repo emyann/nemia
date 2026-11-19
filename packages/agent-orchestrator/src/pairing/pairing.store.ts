@@ -17,8 +17,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
-import type { PairingAsked, TicketState } from 'objects';
+import { Option, Schema } from 'effect';
+import type { TicketState } from 'objects';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { codeRead, codeShown, LINK_TTL_MS, PAIRING_TTL_MS, shortCode, ticketState } from './ticket.ts';
@@ -72,17 +72,14 @@ const ClaimFiled = Schema.Struct({ claimedAtMs: Schema.Number });
 /** An id a pairing is filed under: what `pairingAsked` makes, letters, digits, `_` and `-`. */
 const PAIRING_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** `text` read as JSON through `schema`, or undefined where it does not read. */
-function decoded<T>(schema: Schema.Decoder<T>, text: string) {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-  const read = Schema.decodeUnknownResult(schema)(raw);
-  return Result.isSuccess(read) ? read.success : undefined;
-}
+/** A pairing's file read, or none where its text does not decode as one. */
+const pairingIn = (text: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(PairingFiled))(text));
+
+/** A link's file read, or none where its text does not decode as one. */
+const linkIn = (text: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(LinkFiled))(text));
+
+/** A claim's mark read, or none where its text does not decode as one. */
+const claimIn = (text: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(ClaimFiled))(text));
 
 /** The text of `file`, or undefined where there is none. */
 function textOf(file: string) {
@@ -107,7 +104,7 @@ const markOf = (file: string) => file.replace(/\.json$/, '.claimed');
 const claimedAt = (file: string) => {
   const text = textOf(markOf(file));
   if (text === undefined) return undefined;
-  return decoded(ClaimFiled, text)?.claimedAtMs ?? 0;
+  return claimIn(text)?.claimedAtMs ?? 0;
 };
 
 /**
@@ -155,7 +152,7 @@ function pairingsKept(home: string) {
     .flatMap((name) => {
       const file = path.join(dir, name);
       const text = textOf(file);
-      const pairing = text === undefined ? undefined : decoded(PairingFiled, text);
+      const pairing = text === undefined ? undefined : pairingIn(text);
       return pairing === undefined ? [] : [{ file, pairing, claimed: claimedAt(file) }];
     });
 }
@@ -166,7 +163,7 @@ function swept(dir: string, nowMs: number) {
   for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.json') && !n.startsWith('.'))) {
     const file = path.join(dir, name);
     const text = textOf(file);
-    const times = text === undefined ? undefined : decoded(LinkFiled, text);
+    const times = text === undefined ? undefined : linkIn(text);
     if (times !== undefined && nowMs >= times.createdAtMs + times.ttlMs + KEPT_MS) {
       fs.rmSync(markOf(file), { force: true });
       fs.rmSync(file, { force: true });
@@ -208,7 +205,7 @@ export function pairingAsked(home: string, client: string, nowMs: number) {
     ttlMs: PAIRING_TTL_MS,
   };
   filed(pairingFile(home, id), record);
-  return { id, code: codeShown(code), secret, expiresAt: iso(nowMs + PAIRING_TTL_MS) } satisfies PairingAsked as PairingAsked;
+  return { id, code: codeShown(code), secret, expiresAt: iso(nowMs + PAIRING_TTL_MS) };
 }
 
 /** A ticket's claim marked: the name its token is to be minted under, and how the mark is taken back where the mint is refused. */
@@ -232,7 +229,7 @@ const markTaken = (file: string, name: string, nowMs: number) => {
 export function pairingMarked(home: string, id: string, secret: string, nowMs: number) {
   const file = PAIRING_ID.test(id) ? pairingFile(home, id) : undefined;
   const text = file === undefined ? undefined : textOf(file);
-  const pairing = text === undefined ? undefined : decoded(PairingFiled, text);
+  const pairing = text === undefined ? undefined : pairingIn(text);
   if (file === undefined || pairing === undefined || !same(pairing.secretDigest, ticketDigest(secret)))
     throw new Missing({ message: `no pairing ${id} is kept with that secret: ask for a new one, as nemia pair <url> does.` });
   const phase = ticketState(pairingTicket(pairing, claimedAt(file)), nowMs);
@@ -324,7 +321,7 @@ const boardName = (nowMs: number) => `board-${iso(nowMs).slice(0, 10)}`;
 export function linkMarked(home: string, secret: string, nowMs: number) {
   const file = linkFile(home, ticketDigest(secret));
   const text = textOf(file);
-  const link = text === undefined ? undefined : decoded(LinkFiled, text);
+  const link = text === undefined ? undefined : linkIn(text);
   if (link === undefined)
     throw new Missing({ message: 'no first-visit link is kept under that secret: nemia board link, at the server, prints a new one.' });
   const phase = ticketState({ createdAtMs: link.createdAtMs, ttlMs: link.ttlMs, needsApproval: false, ...claimedOf(file) }, nowMs);

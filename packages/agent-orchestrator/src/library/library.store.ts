@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { LIBRARY_KINDS } from 'objects';
 import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal } from '../record/record.store.ts';
@@ -48,7 +48,7 @@ export function libraryAddsFile(home: string, name: string) {
  * The JSON of `file` decoded by `schema`, or undefined where the file is not there. Refused (`Invalid`), naming the file, its first wrong
  * field and `fix`, where it does not read.
  */
-function readJson<T>(file: string, decode: (raw: unknown) => Result.Result<T, Schema.SchemaError>, fix: string) {
+function readJson<S extends Schema.ConstraintDecoder<unknown>>(file: string, schema: S, fix: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -56,15 +56,12 @@ function readJson<T>(file: string, decode: (raw: unknown) => Result.Result<T, Sc
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
-  const read = decode(raw);
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  const raw = json.value;
+  const read = Schema.decodeUnknownResult(schema)(raw);
   if (Result.isFailure(read)) {
-    const { path: at, words } = firstRefusal(raw, read.failure);
+    const { path: at, words } = firstRefusal(schema, raw);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
   return read.success;
@@ -80,7 +77,7 @@ export function readLibraryAdds(home: string, name: string) {
   const file = libraryAddsFile(home, name);
   const read = readJson(
     file,
-    Schema.decodeUnknownResult(AddsSchema),
+    AddsSchema,
     `remove it to read the factory's adds from its workflows again, or write it with nemia library add`,
   );
   return read?.adds.map(({ kind, name: item }) => ({ kind, name: item }));
@@ -97,7 +94,7 @@ export function writeLibraryAdds(home: string, name: string, adds: readonly Libr
   const file = libraryAddsFile(home, name);
   let kept: Record<string, unknown> = {};
   try {
-    const { adds: _gone, ...rest } = readJson(file, Schema.decodeUnknownResult(AddsSchema), '') ?? { adds: [] };
+    const { adds: _gone, ...rest } = readJson(file, AddsSchema, '') ?? { adds: [] };
     kept = rest;
   } catch {
     kept = {};
@@ -135,11 +132,8 @@ export const writeLibraryServers = (home: string, servers: FactoryServers) =>
  * @param home The store's root.
  */
 export const builtinCopies = (home: string) =>
-  readJson(
-    path.join(libraryDir(home), 'copies.json'),
-    Schema.decodeUnknownResult(CopiesSchema),
-    'remove it: a copy is then no longer compared with its builtin',
-  )?.copies ?? {};
+  readJson(path.join(libraryDir(home), 'copies.json'), CopiesSchema, 'remove it: a copy is then no longer compared with its builtin')
+    ?.copies ?? {};
 
 /**
  * Records the digest of the builtin `key` copied now, keeping every other copy.

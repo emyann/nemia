@@ -3,6 +3,7 @@
  * complete, and where a person left the nodes — a run's steps, or the Factory's runs and which are open. Pure, apart
  * from the storage calls at the end, each of which survives a browser that refuses storage.
  */
+import { Option, Schema } from 'effect';
 import type { GraphEdge, RunGraph } from './api/graph.ts';
 import type { StepAttempts } from './api/tries.ts';
 import type { Point } from './layout';
@@ -272,26 +273,20 @@ export function place(names: readonly string[], computed: ReadonlyMap<string, Po
   return new Map(names.map((name) => [name, saved?.get(name) ?? computed.get(name) ?? { x: 0, y: 0 }]));
 }
 
+/** A layout as it is saved: each node's point by its name. */
+const Layout = Schema.Record(Schema.String, Schema.Struct({ x: Schema.Finite, y: Schema.Finite }));
+
 /**
  * A layout as it was saved, or null for anything that is not an object of finite points.
  * @param raw What storage holds under the layout's key, or null where it holds nothing.
  */
 export function parseLayout(raw: string | null) {
   if (raw === null) return null;
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const at = new Map<string, Point>();
-  for (const [name, point] of Object.entries(value)) {
-    const { x, y } = (point ?? {}) as { x?: unknown; y?: unknown };
-    if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-    at.set(name, { x, y });
-  }
-  return at;
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(raw);
+  if (Option.isNone(json) || Array.isArray(json.value)) return null;
+  const layout = Schema.decodeUnknownOption(Layout)(json.value);
+  if (Option.isNone(layout)) return null;
+  return new Map(Object.entries(layout.value).map(([name, { x, y }]) => [name, { x, y }]));
 }
 
 /**
@@ -362,11 +357,8 @@ export const forgetFactoryOpen = () => forgetStored(FACTORY_OPEN_KEY);
  */
 export function parseOpen(raw: string | null) {
   if (raw === null) return [];
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(raw);
+  if (Option.isNone(json)) return [];
+  const value = json.value;
   return Array.isArray(value) && value.every((id) => typeof id === 'string' && id !== '') ? [...new Set<string>(value)] : [];
 }

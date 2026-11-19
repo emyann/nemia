@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { Actor } from 'objects';
 import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -70,13 +70,7 @@ const isHolder = Schema.is(Schema.Struct({ pid: Schema.Int.check(Schema.isGreate
 const timeoutRead = (value: unknown) => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined);
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
-const jsonOr = (text: string) => {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined as unknown;
-  }
-};
+const jsonOr = (text: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** The pause's file as one read gave it: the pause, the process that holds it where the file names one, and the text read. */
 export type PauseFileRead = { pause: Pause; heldBy?: PauseHolder; text: string };
@@ -116,7 +110,7 @@ export function readPauseFile(home: string) {
  * The store's pause, or null when none stands (`readPauseFile`, its holder left in the file).
  * @param home The store's root.
  */
-export const readPause = (home: string) => (readPauseFile(home)?.pause ?? null) satisfies Pause | null as Pause | null;
+export const readPause = (home: string) => readPauseFile(home)?.pause ?? null;
 
 /**
  * The mode the store's pause stands in, read from its file now (`pauseModeOf`).

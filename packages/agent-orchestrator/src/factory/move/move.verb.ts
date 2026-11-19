@@ -9,7 +9,7 @@
  * The template is the caller's to take under the store before (`withTemplateTaken`, `'made'`), as `nemia factory apply`'s is.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Option, Schema } from 'effect';
 import type { FactoryExport, FactoryImported, FactoryImportWrite, MoveCards } from 'objects';
 import { brokenBy, fromThrow as tried } from '../../door/door.store.ts';
 import { Conflict, Invalid, isRefusal } from '../../refusal/refusal.ts';
@@ -116,12 +116,9 @@ const oneList = (raw: object) => {
  */
 function factorySent(name: string, text: string) {
   const again = `Export it again from its store: nemia factory move ${name} --to <context>. Nothing was filed.`;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `the factory sent is not JSON. ${again}` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `the factory sent is not JSON. ${again}` });
+  const raw = json.value;
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw))
     throw new Invalid({ message: `the factory sent is no factory's file. ${again}` });
   const sent: object = { volumes: [], workflows: [], hires: {}, schedules: {}, ...oneList(raw), name };

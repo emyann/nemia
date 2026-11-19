@@ -201,7 +201,7 @@ test('REFUSED: open with no title or no body file, and a verb the script has not
   }
   const unknown = pr(at, 'merge');
   assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /`merge` is no verb: give open, push or wait/);
+  assert.match(unknown.err, /`merge` is no verb: give open, push, wait or declares-ci/);
   assert.deepEqual(unknown.calls, []);
 });
 
@@ -774,6 +774,56 @@ test("a red job's failing lines reach the step, without their colour codes, on a
   }
 });
 
+test("a red ci hands each failed Vitest job's failing lines, and names the URL of a job whose log cannot be read", () => {
+  const at = placed();
+  const TESTS_URL = CI_URL.replace('/job/5678', '/job/9012');
+  const GONE_URL = CI_URL.replace('/job/5678', '/job/3456');
+  const vitest = stamped([
+    `cli:test:  ${ESC}[31m❯${ESC}[39m test/verbs.test.ts (2 tests | 1 failed) 9ms`,
+    `cli:test:    ${ESC}[31m❯${ESC}[39m the verbs`,
+    `cli:test:      ${ESC}[32m✓${ESC}[39m a verb passes 1ms`,
+    `cli:test: ${ESC}[31m      × start takes a card${ESC}[39m${ESC}[2m 3ms${ESC}[22m`,
+    'cli:test:        → expected 1 to be 0',
+    'cli:test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯',
+    `cli:test: ${ESC}[41m${ESC}[1m FAIL ${ESC}[22m${ESC}[49m ${ESC}[30m${ESC}[42m node ${ESC}[49m${ESC}[39m test/verbs.test.ts > the verbs > start takes a card`,
+    'cli:test: AssertionError: expected 1 to be 0',
+    'cli:test:  ❯ test/verbs.test.ts:21:5',
+    'cli:test: ⎯⎯⎯⎯⎯⎯⎯[1/1]⎯',
+    'cli:test:  Test Files  1 failed | 8 passed (9)',
+    'Process completed with exit code 1.',
+  ]);
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    {
+      when: 'pr view',
+      out: rollup(
+        { status: 'COMPLETED', conclusion: 'FAILURE' },
+        { name: 'test cli', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: TESTS_URL },
+        { name: 'lint', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: GONE_URL },
+      ),
+    },
+    { when: 'actions/jobs/9012/logs', out: vitest },
+    { when: 'actions/jobs/3456/logs', status: 1, err: 'HTTP 410: Gone (https://api.github.com/repos/o/r/actions/jobs/3456/logs)' },
+    { when: 'actions/jobs/5678/logs', out: stamped(['Process completed with exit code 1.']) },
+  ]);
+  const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
+  assert.equal(r.code, 1, `a red the work answers exits as it did:\n${r.out}`);
+  assert.match(r.err, /test cli \(job 9012\), the lines that failed it:/, r.err);
+  for (const told of [
+    'test/verbs.test.ts > the verbs > start takes a card',
+    'AssertionError: expected 1 to be 0',
+    '❯ test/verbs.test.ts:21:5',
+  ])
+    assert.ok(r.err.includes(told), `the failing test, its error and its frame: ${told}\n${r.err}`);
+  assert.equal(r.err.split('start takes a card').length - 1, 1, `the test told once:\n${r.err}`);
+  for (const noise of ['✓', 'Test Files', '(2 tests | 1 failed)']) assert.ok(!r.err.includes(noise), `${noise} is no reason:\n${r.err}`);
+  assert.ok(!r.err.includes(ESC), `no colour code reaches the step:\n${JSON.stringify(r.err)}`);
+  const unread = r.err.split('\n').filter((line) => line.startsWith('lint (job 3456)'));
+  assert.equal(unread.length, 1, `a log that cannot be read is said in one line:\n${r.err}`);
+  assert.ok(unread[0].includes(GONE_URL), `naming the job's URL:\n${r.err}`);
+  assert.ok(r.err.includes(RETRY), r.err);
+});
+
 /** The calls of the stub `gh` that ask GitHub how a head stands to the base (`compare/<base>...<head>`). */
 const compared = (calls: readonly Called[]) => asked(calls, 'api').filter((call) => call.argv.some((arg) => arg.includes('/compare/')));
 
@@ -918,6 +968,38 @@ test('wait reads the CI context --check names and no other: a green `ci` is no v
   const passed = pr(gated, 'wait', ['--check', 'gate'], quick);
   assert.equal(passed.code, 0, `a red \`ci\` beside a green \`gate\` is not what --check gate reads:\n${passed.err}`);
   assert.match(passed.out, /nemia ci: `gate` passed on/);
+});
+
+test('declares-ci passes where HEAD or the remote default branch declares a CI workflow, the base read only where HEAD declares none; REFUSED where neither does', () => {
+  const withCi = (repo: string) => {
+    fs.mkdirSync(path.join(repo, '.github', 'workflows'), { recursive: true });
+    fs.writeFileSync(path.join(repo, '.github', 'workflows', 'ci.yml'), 'name: ci\n');
+    gitIn(repo, 'add', '-A');
+    gitIn(repo, 'commit', '-qm', 'ci');
+  };
+  const baseOf = (at: ReturnType<typeof placed>, ci: boolean) => {
+    gitIn(at.repo, 'switch', '-q', '-c', 'main');
+    if (ci) withCi(at.repo);
+    else commit(at.repo, 'm.ts');
+    gitIn(at.repo, 'push', '-q', 'origin', 'main');
+    gitIn(at.repo, 'switch', '-q', at.branch);
+  };
+
+  const head = placed();
+  withCi(head.repo);
+  const own = pr(head, 'declares-ci');
+  assert.equal(own.code, 0, own.err);
+  assert.equal(head.gh.calls().length, 0, 'a head that declares CI asks nothing of the base');
+
+  const removed = placed();
+  baseOf(removed, true);
+  const kept = pr(removed, 'declares-ci');
+  assert.equal(kept.code, 0, kept.err);
+
+  const none = placed();
+  baseOf(none, false);
+  const local = pr(none, 'declares-ci');
+  assert.equal(local.code, 1, local.out);
 });
 
 test('REFUSED: a wait with no --check, a --check with no name, or more after it, before anything calls gh', () => {
@@ -1233,10 +1315,16 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;
-  const clauses = [...frozen.matchAll(/node\s+"\$\{WF_CARRIED_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(
+  const clauses = [...frozen.matchAll(/node\s+"\$\{WF_CARRIED_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(check|push|declares-ci|wait)?/g)].map(
     ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
-  assert.deepEqual(clauses, ['probe.ts check', 'parts.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, [
+    'probe.ts check',
+    'parts.ts check',
+    'pull-request.ts push',
+    'pull-request.ts declares-ci',
+    'pull-request.ts wait',
+  ]);
   const round = frozen.indexOf('{ round-check --all; }');
   assert.ok(round > 0, `the round check the factory set is a clause of its own:\n${frozen}`);
   assert.ok(

@@ -11,7 +11,7 @@ import { HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
 import { MILESTONES, type Milestones } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
-import { factoryVolumesNamed, volumeRefusal } from '../factory/volume/volume.ts';
+import { factoryVolumesNamed, volumeRefusal } from '../factory/volume/index.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { tried } from '../runtime-client.ts';

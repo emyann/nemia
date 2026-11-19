@@ -2,8 +2,8 @@
  * A detached run's file, as the worker (`bin/ae-worker.ts`) and the spawn write it: its schema, its read, the first one a spawn
  * writes, and its state as a sighting says it, the lease of its heartbeat included.
  */
-import { Result, Schema, SchemaIssue } from 'effect';
-import type { SessionState } from '../../core/index.ts';
+import { Result, Schema } from 'effect';
+import { firstRefusal, type SessionState } from '../../core/index.ts';
 import { instantNow } from '../../core/engine/now.ts';
 import type { LeaseWord } from '../../../contracts/lease.contract.ts';
 import { IMAGE } from '../image.ts';
@@ -247,12 +247,10 @@ export const runFileIn = (text: string) => {
   if (isRunFile(parsed)) return parsed;
   const decoded = Schema.decodeUnknownResult(RunFileSchema)(parsed);
   if (Result.isSuccess(decoded)) return decoded.success;
-  const [first] = formatter(decoded.failure.issue).issues;
-  const key = first?.path?.map((p) => (typeof p === 'object' && p !== null && 'key' in p ? String(p.key) : String(p))).join('.');
-  return key ? `its \`${key}\` is not what a worker writes (${first?.message ?? 'refused'})` : 'it is no run file a worker writes';
+  const { path, words } = firstRefusal(RunFileSchema, parsed, 'a worker writes');
+  const key = path.map(String).join('.');
+  return key ? `its \`${key}\` is not what a worker writes (${words})` : 'it is no run file a worker writes';
 };
-
-const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
 /**
  * The run file the spawn writes before its worker starts: `plan`, working, with no pid yet, its first beat on both clocks, and the

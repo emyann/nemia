@@ -22,7 +22,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Effect, Layer, Result, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 import { firstRefusal } from '../record/record.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { FeedLineSchema } from '../feed/feed.store.ts';
@@ -220,15 +220,12 @@ const textOf = (file: string) => {
 
 /** `text` decoded by `schema`, or why it does not read: not JSON, or its first field that is not what nemia writes. */
 function decoded<S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string) {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return { error: 'is not JSON' };
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return { error: 'is not JSON' };
+  const raw = json.value;
   const read = Schema.decodeUnknownResult(schema)(raw);
   if (Result.isSuccess(read)) return { value: read.success };
-  const { path: at, words } = firstRefusal(raw, read.failure);
+  const { path: at, words } = firstRefusal(schema, raw);
   return { error: `${at.length ? `its ${at.join('.')} ` : ''}${words}` };
 }
 

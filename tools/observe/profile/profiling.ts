@@ -29,7 +29,7 @@ export type Profiling = {
  * `DEFAULT_SERVICE`), wall time with its CPU time beside it, and the heap at the profiler's own sampling interval.
  * @returns `undefined` when `PYROSCOPE_SERVER_ADDRESS` is unset or blank, so nothing is started.
  */
-export function profilingOf(env: Readonly<Record<string, string | undefined>>) {
+export function profilingOf(env: Readonly<Record<string, string | undefined>>): Profiling | undefined {
   const endpoint = env[ENDPOINT_KEY]?.trim().replace(/\/+$/, '');
   if (!endpoint) return undefined;
   return {

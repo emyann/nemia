@@ -55,7 +55,10 @@ type World = {
 
 /** Commit `files` in `repo` with `subject`: its sha. */
 function commit(repo: string, files: Record<string, string>, subject: string) {
-  for (const [file, text] of Object.entries(files)) fs.writeFileSync(path.join(repo, file), text);
+  for (const [file, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(repo, file), text);
+  }
   gitIn(repo, 'add', '-A');
   gitIn(repo, 'commit', '-qm', subject);
   return gitIn(repo, 'rev-parse', 'HEAD').trim();
@@ -65,7 +68,11 @@ function commit(repo: string, files: Record<string, string>, subject: string) {
 function world(moved: Moved, { worktree = true }: { worktree?: boolean } = {}) {
   const repo = scratch('wf-refresh-repo-');
   gitIn(repo, 'init', '-q', '-b', 'main');
-  const base = commit(repo, { 'a.ts': 'export const a = 1;\n', [DERIVED]: '{ "v": 0 }\n', 'other.txt': 'zero\n' }, 'base');
+  const base = commit(
+    repo,
+    { 'a.ts': 'export const a = 1;\n', [DERIVED]: '{ "v": 0 }\n', 'other.txt': 'zero\n', '.github/workflows/ci.yml': 'name: ci\n' },
+    'base',
+  );
   const bare = bareOrigin(repo);
   gitIn(repo, 'push', '-q', 'origin', 'main');
   gitIn(repo, 'switch', '-q', '-c', RESULT);

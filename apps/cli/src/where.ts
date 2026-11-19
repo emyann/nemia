@@ -5,6 +5,7 @@
  * it shows comes from the api. Read only where the context in use is this machine's (`context.ts`): under a remote one, or one the
  * config does not hold, this machine may have no store at all.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,14 +37,12 @@ export function servedAt(env: NodeJS.ProcessEnv = process.env) {
   } catch {
     return undefined;
   }
-  try {
-    const lease: unknown = JSON.parse(text);
-    if (typeof lease !== 'object' || lease === null || !('url' in lease)) return undefined;
-    return typeof lease.url === 'string' && lease.url !== '' ? lease.url : undefined;
-  } catch {
-    return undefined;
-  }
+  const url = Option.getOrUndefined(leaseIn(text))?.url;
+  return url === '' ? undefined : url;
 }
+
+/** A daemon's lease, as `servedAt` reads it: the url it serves at. */
+const leaseIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ url: Schema.String })));
 
 /**
  * The person's credential the store keeps for this machine (`CREDENTIAL_FILE`), trimmed, or none: no file, an empty one, one this user

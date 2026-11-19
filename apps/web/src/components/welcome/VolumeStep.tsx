@@ -21,7 +21,7 @@ import { VolumeWays } from './VolumeWays';
  */
 export function VolumeStep({ factory: given, again = false }: { factory?: string; again?: boolean }) {
   const step = useVolumeStep(given, again);
-  const choosing = given === undefined && step.names.length > 1 && step.screen !== 'done' && step.body.added === undefined;
+  const choosing = given === undefined && step.names.length > 1 && step.body.added === undefined;
   return (
     <article
       data-volume-step={step.noFactory ? 'no-factory' : step.screen}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pending } from '@/components/look';
 import { Button, ComboBox, ComboBoxItem } from '@/components/ui/ds';
 import { folderNamesQuery } from '@/lib/api/folders';
@@ -35,6 +35,7 @@ export function FolderPick({
   pending?: boolean;
   refused?: string | undefined;
 }) {
+  const queryClient = useQueryClient();
   const [typed, setTyped] = useState('');
   const settled = useSettled(typed);
   const listed = useQuery(folderNamesQuery(settled));
@@ -47,7 +48,11 @@ export function FolderPick({
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        if (path.startsWith('/')) onUse(path, read?.folder ? read.repository : undefined);
+        if (!path.startsWith('/')) return;
+        void queryClient.fetchQuery(folderNamesQuery(path)).then(
+          (asked) => onUse(path, asked.folder ? asked.repository : undefined),
+          () => onUse(path, undefined),
+        );
       }}
     >
       <ComboBox

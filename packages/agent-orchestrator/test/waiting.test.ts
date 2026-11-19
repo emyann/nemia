@@ -1175,21 +1175,20 @@ describe('REFUSED by name at `nemia start --after`, as the store and git stand: 
       'pending',
     ]);
   });
-  const refusals: Array<[string, string, string[]]> = [
+  const refusals: Array<[string, () => [string, string[]]]> = [
     [
       'a parent dropped unmerged after its tip was recorded',
-      dropped.run.id,
-      [dropped.branch, 'is gone', 'on main', `without --after ${dropped.run.id}`],
+      () => [dropped.run.id, [dropped.branch, 'is gone', 'on main', `without --after ${dropped.run.id}`]],
     ],
     [
       'a parent merged and deleted before any pass saw it finish',
-      unseen.run.id,
-      [unseen.branch, 'is gone', 'on main', `without --after ${unseen.run.id}`],
+      () => [unseen.run.id, [unseen.branch, 'is gone', 'on main', `without --after ${unseen.run.id}`]],
     ],
-    ['a run the store does not have', 'nobody-x9', ['no run nobody-x9', 'nemia ls']],
+    ['a run the store does not have', () => ['nobody-x9', ['no run nobody-x9', 'nemia ls']]],
   ];
-  for (const [what, id, facts] of refusals) {
+  for (const [what, later] of refusals) {
     test(`REFUSED: ${what}`, async () => {
+      const [id, facts] = later();
       const before = runsWritten();
       await assert.rejects(
         stage.runPlaced(startRun({ brief: 'another child', repo, workflowDir: twoSteps(), after: [id] })),

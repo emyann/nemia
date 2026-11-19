@@ -404,25 +404,30 @@ describe('REFUSED: `nemia retry --answer` that does not fit the questions the st
     none = await asking({ open: [] });
   });
   const retry = (run: string, ...answers: string[]) => stage.main(['retry', run, 'plan', ...answers.flatMap((a) => ['--answer', a])]);
-  const rows: Array<[string, () => Promise<unknown>, string[]]> = [
-    ['a number past them', () => retry(id, '1=a', '3=a'), ['--answer 3=a', 'question 3', '2', `nemia decide ${id}`]],
-    ['a letter not offered', () => retry(id, '1=d', '2=a'), ['--answer 1=d', 'How is the card cut?', 'a (one card)']],
-    ['a question answered twice', () => retry(id, '1=a', '1=b', '2=a'), ['"How is the card cut?"', 'twice']],
-    ['a question left out', () => retry(id, '1=a'), ['"Where do the answers go?"', 'not answered']],
-    ['two options where one is taken', () => retry(id, '1=a,b', '2=a'), ['"How is the card cut?"', 'one option']],
-    ['no answer at all', () => retry(id, 'one=a'), ['--answer one=a']],
+  const rows: Array<[string, () => [() => Promise<unknown>, string[]]]> = [
+    ['a number past them', () => [() => retry(id, '1=a', '3=a'), ['--answer 3=a', 'question 3', '2', `nemia decide ${id}`]]],
+    ['a letter not offered', () => [() => retry(id, '1=d', '2=a'), ['--answer 1=d', 'How is the card cut?', 'a (one card)']]],
+    ['a question answered twice', () => [() => retry(id, '1=a', '1=b', '2=a'), ['"How is the card cut?"', 'twice']]],
+    ['a question left out', () => [() => retry(id, '1=a'), ['"Where do the answers go?"', 'not answered']]],
+    ['two options where one is taken', () => [() => retry(id, '1=a,b', '2=a'), ['"How is the card cut?"', 'one option']]],
+    ['no answer at all', () => [() => retry(id, 'one=a'), ['--answer one=a']]],
     [
       'a step that asks no questions, naming --message instead',
-      () => retry(none, '1=a'),
-      ['asks no questions', '--message "<words>", without --answer'],
+      () => [() => retry(none, '1=a'), ['asks no questions', '--message "<words>", without --answer']],
     ],
     [
       '--answer with --recheck, before a run is read',
-      () => stage.main(['retry', 'no-such-run-zz9z', 'plan', '--recheck', '--answer', '1=a']),
-      ['--answer', '--recheck', '--answer <n>=<letter>'],
+      () => [
+        () => stage.main(['retry', 'no-such-run-zz9z', 'plan', '--recheck', '--answer', '1=a']),
+        ['--answer', '--recheck', '--answer <n>=<letter>'],
+      ],
     ],
   ];
-  for (const [name, typed, facts] of rows) test(name, () => assert.rejects(typed(), refusedAs('Invalid', ...facts)));
+  for (const [name, later] of rows)
+    test(name, () => {
+      const [typed, facts] = later();
+      return assert.rejects(typed(), refusedAs('Invalid', ...facts));
+    });
   test('nothing written', () => {
     assert.deepEqual(asksOf(id), []);
     assert.deepEqual(asksOf(none), []);
@@ -994,12 +999,19 @@ describe('`nemia retry --model` on a Claude Code step in `auto` (F21): a model t
 
 describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name, and no ask written', () => {
   let b!: import('./story.ts').Board;
-  let rows!: Array<[string, () => Promise<{ id: string; refused: () => Promise<unknown>; facts: string[] }>]>;
   beforeAll(async () => {
     b = stage.board();
-    rows = [
-      [
-        'a running step, asked through the API',
+  });
+  const settledAs = async (lines: string[], phase: EnginePhase, end: TestEnd = {}) => {
+    const run = await startedRun(implementThenReview(lines));
+    await tick(run.id);
+    ended(`${run.id}-implement`, phase, end);
+    return run.id;
+  };
+  const rows: Array<[string, () => [() => Promise<{ id: string; refused: () => Promise<unknown>; facts: string[] }>]]> = [
+    [
+      'a running step, asked through the API',
+      () => [
         async () => {
           const id = await settledAs(['check: npm test'], 'working');
           return {
@@ -1009,8 +1021,10 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-      [
-        'a running step, as typed, naming how to read it and how to call it off',
+    ],
+    [
+      'a running step, as typed, naming how to read it and how to call it off',
+      () => [
         async () => {
           const id = await settledAs([], 'working');
           return {
@@ -1020,15 +1034,19 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-      [
-        'a running step, typed with --fresh',
+    ],
+    [
+      'a running step, typed with --fresh',
+      () => [
         async () => {
           const id = await settledAs([], 'working');
           return { id, refused: () => stage.main(['retry', id, 'implement', '--fresh']), facts: ['implement is still running'] };
         },
       ],
-      [
-        'a session its harness blocked, asked through the API without stopping it first',
+    ],
+    [
+      'a session its harness blocked, asked through the API without stopping it first',
+      () => [
         async () => {
           const id = await settledAs([], 'needs-human');
           return {
@@ -1038,8 +1056,10 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-      [
-        '--recheck of a session its harness blocked: no check of it failed',
+    ],
+    [
+      '--recheck of a session its harness blocked: no check of it failed',
+      () => [
         async () => {
           const id = await settledAs([], 'needs-human');
           return {
@@ -1049,15 +1069,19 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-      [
-        'a step that signed off and runs on',
+    ],
+    [
+      'a step that signed off and runs on',
+      () => [
         async () => {
           const id = await settledAs([], 'needs-human', { closeout: SIGNED });
           return { id, refused: () => stage.main(['retry', id, 'implement']), facts: ['implement is still running'] };
         },
       ],
-      [
-        'a cancelled run',
+    ],
+    [
+      'a cancelled run',
+      () => [
         async () => {
           const { id } = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
           markCancelled(ROOT, id);
@@ -1068,8 +1092,10 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-      [
-        'a step the run tries again itself',
+    ],
+    [
+      'a step the run tries again itself',
+      () => [
         async () => {
           const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', { exitCode: 1 });
           return {
@@ -1079,8 +1105,10 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-      [
-        'an empty --message',
+    ],
+    [
+      'an empty --message',
+      () => [
         async () => {
           const { id } = await throughCheck(['check: npm test'], 'stopped');
           return {
@@ -1090,8 +1118,10 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-      [
-        '--message on --recheck, naming the recheck and the answer to give instead',
+    ],
+    [
+      '--message on --recheck, naming the recheck and the answer to give instead',
+      () => [
         async () => {
           const { id } = await throughCheck(['check: npm test'], 'stopped');
           return {
@@ -1101,16 +1131,11 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
           };
         },
       ],
-    ];
-  });
-  const settledAs = async (lines: string[], phase: EnginePhase, end: TestEnd = {}) => {
-    const run = await startedRun(implementThenReview(lines));
-    await tick(run.id);
-    ended(`${run.id}-implement`, phase, end);
-    return run.id;
-  };
-  for (const [name, made] of rows)
+    ],
+  ];
+  for (const [name, later] of rows)
     test(name, async () => {
+      const [made] = later();
       const { id, refused, facts } = await made();
       await assert.rejects(refused(), refusedAs('Conflict', ...facts));
       assert.deepEqual([retryAsks(id), b.stopped], [[], []], 'no ask written, nothing stopped');

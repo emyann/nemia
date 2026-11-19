@@ -359,7 +359,7 @@ describe('REFUSED at shipped defaults: a writer, by its kind and exit 2, naming 
   });
   const archivist = agentDraft('archivist', '---\ndescription: Use this to file things away.\n---\nFile it.\n');
   const sweep = skillChange('sweep', TIDY.replace('name: tidy', 'name: sweep'));
-  const skillAt = 'version' in sweepMade ? sweepMade.version : assert.fail('a written skill says its version');
+  const skillAt = () => ('version' in sweepMade ? sweepMade.version : assert.fail('a written skill says its version'));
   const repo = (what: string) => [`refuses`, `the repository's ${what}`];
   type Act = (sub: TestContext) => () => Promise<Refused>;
   const handler =
@@ -372,108 +372,137 @@ describe('REFUSED at shipped defaults: a writer, by its kind and exit 2, naming 
     (sub) =>
     () =>
       typed(sub, ...argv);
-  const table: ReadonlyArray<[string, 'Invalid' | 'Conflict' | 'Missing', Act, ...string[]]> = [
+  const table: Array<[string, () => ['Invalid' | 'Conflict' | 'Missing', Act, ...string[]]]> = [
     [
       'an agent written where one is, naming its version',
-      'Conflict',
-      handler(AGENTS_WRITE.handler({ from: 'user', draft: archivist, schema: null })),
-      'agents/archivist.md is there already',
-      `version ${agentAt}`,
+      () => [
+        'Conflict',
+        handler(AGENTS_WRITE.handler({ from: 'user', draft: archivist, schema: null })),
+        'agents/archivist.md is there already',
+        `version ${agentAt}`,
+      ],
     ],
     [
       'an agent written at a version it moved on from',
-      'Conflict',
-      handler(AGENTS_WRITE.handler({ from: 'user', name: 'archivist', draft: archivist, schema: null, version: '0000000000000000' })),
-      `version 0000000000000000, now ${agentAt}`,
+      () => [
+        'Conflict',
+        handler(AGENTS_WRITE.handler({ from: 'user', name: 'archivist', draft: archivist, schema: null, version: '0000000000000000' })),
+        `version 0000000000000000, now ${agentAt}`,
+      ],
     ],
     [
       'an agent written into the repository',
-      'Invalid',
-      handler(AGENTS_WRITE.handler({ from: 'repo', draft: archivist, schema: null })),
-      'nemia agents write',
-      ...repo('agents'),
-      'only yours is written',
-      'copy the file into',
+      () => [
+        'Invalid',
+        handler(AGENTS_WRITE.handler({ from: 'repo', draft: archivist, schema: null })),
+        'nemia agents write',
+        ...repo('agents'),
+        'only yours is written',
+        'copy the file into',
+      ],
     ],
     [
       'an agent removed with no version, naming the one it is at',
-      'Invalid',
-      typedAt(['agents', 'remove', 'user', 'archivist']),
-      `agents/archivist.md is at version ${agentAt}`,
-      'Give that version to remove it',
+      () => [
+        'Invalid',
+        typedAt(['agents', 'remove', 'user', 'archivist']),
+        `agents/archivist.md is at version ${agentAt}`,
+        'Give that version to remove it',
+      ],
     ],
     [
       'an agent removed at a version it moved on from',
-      'Conflict',
-      typedAt(['agents', 'remove', 'user', 'archivist', '--version', '0000000000000000']),
-      'changed since it was read',
+      () => ['Conflict', typedAt(['agents', 'remove', 'user', 'archivist', '--version', '0000000000000000']), 'changed since it was read'],
     ],
-    ['an agent removed that is not there', 'Missing', typedAt(['agents', 'remove', 'user', 'nobody', '--version', agentAt]), 'nobody'],
+    [
+      'an agent removed that is not there',
+      () => ['Missing', typedAt(['agents', 'remove', 'user', 'nobody', '--version', agentAt]), 'nobody'],
+    ],
     [
       'an agent removed from the repository',
-      'Invalid',
-      typedAt(['agents', 'remove', 'repo', 'archivist', '--version', agentAt]),
-      'nemia agents rm',
-      ...repo('agents'),
-      'only yours is written',
-      'copy the file into',
+      () => [
+        'Invalid',
+        typedAt(['agents', 'remove', 'repo', 'archivist', '--version', agentAt]),
+        'nemia agents rm',
+        ...repo('agents'),
+        'only yours is written',
+        'copy the file into',
+      ],
     ],
     [
       'a skill written where one is, naming its version',
-      'Conflict',
-      handler(SKILLS_WRITE.handler({ from: 'user', change: sweep })),
-      'skills/sweep is there already',
-      `version ${skillAt}`,
+      () => [
+        'Conflict',
+        handler(SKILLS_WRITE.handler({ from: 'user', change: sweep })),
+        'skills/sweep is there already',
+        `version ${skillAt()}`,
+      ],
     ],
     [
       'a skill written at a version it moved on from',
-      'Conflict',
-      handler(SKILLS_WRITE.handler({ from: 'user', name: 'sweep', change: sweep, version: '0000000000000000' })),
-      '0000000000000000',
+      () => [
+        'Conflict',
+        handler(SKILLS_WRITE.handler({ from: 'user', name: 'sweep', change: sweep, version: '0000000000000000' })),
+        '0000000000000000',
+      ],
     ],
     [
       'a skill written into the repository',
-      'Invalid',
-      handler(SKILLS_WRITE.handler({ from: 'repo', change: sweep })),
-      'nemia skills write',
-      ...repo('skills'),
-      'only your library is written',
-      'copy its folder into the repository',
+      () => [
+        'Invalid',
+        handler(SKILLS_WRITE.handler({ from: 'repo', change: sweep })),
+        'nemia skills write',
+        ...repo('skills'),
+        'only your library is written',
+        'copy its folder into the repository',
+      ],
     ],
     [
       'a workflow written by a bad name',
-      'Invalid',
-      handler(WORKFLOWS_WRITE.handler({ from: 'user', name: '../review', ...triage })),
-      'nemia workflows write',
-      "`../review` is not a workflow's name",
+      () => [
+        'Invalid',
+        handler(WORKFLOWS_WRITE.handler({ from: 'user', name: '../review', ...triage })),
+        'nemia workflows write',
+        "`../review` is not a workflow's name",
+      ],
     ],
     [
       'a workflow written into the repository',
-      'Invalid',
-      handler(WORKFLOWS_WRITE.handler({ from: 'repo', name: 'review', ...triage })),
-      'nemia workflows write',
-      ...repo('workflows'),
-      'only yours is written',
-      'copy the folder into',
+      () => [
+        'Invalid',
+        handler(WORKFLOWS_WRITE.handler({ from: 'repo', name: 'review', ...triage })),
+        'nemia workflows write',
+        ...repo('workflows'),
+        'only yours is written',
+        'copy the folder into',
+      ],
     ],
     [
       'a workflow removed from the agents’ folder',
-      'Invalid',
-      typedAt(['workflows', 'remove', 'user', 'agents', '--version', workflowAt]),
-      'nemia workflows rm: agents/ holds',
-      "Name the workflow's folder",
+      () => [
+        'Invalid',
+        typedAt(['workflows', 'remove', 'user', 'agents', '--version', workflowAt]),
+        'nemia workflows rm: agents/ holds',
+        "Name the workflow's folder",
+      ],
     ],
     [
       'a workflow removed in the repository',
-      'Invalid',
-      typedAt(['workflows', 'remove', 'repo', 'triage', '--version', workflowAt]),
-      'nemia workflows rm',
-      ...repo('workflows'),
-      'only yours is written',
-      'copy the folder into',
+      () => [
+        'Invalid',
+        typedAt(['workflows', 'remove', 'repo', 'triage', '--version', workflowAt]),
+        'nemia workflows rm',
+        ...repo('workflows'),
+        'only yours is written',
+        'copy the folder into',
+      ],
     ],
   ];
-  for (const [name, tag, act, ...facts] of table) test(name, (sub) => refusedBy(act(sub), name, tag, ...facts));
+  for (const [name, later] of table)
+    test(name, (sub) => {
+      const [tag, act, ...facts] = later();
+      return refusedBy(act(sub), name, tag, ...facts);
+    });
 });
 
 /**

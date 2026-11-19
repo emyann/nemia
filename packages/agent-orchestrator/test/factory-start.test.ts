@@ -999,9 +999,12 @@ describe('an inbox card started in its factory, or refused with the card kept', 
 
 describe("a card and a brief work on the repository the factory's wiring names, never one a card or --repo names", () => {
   let dev!: string;
+  let a!: string;
+  let b!: string;
   beforeAll(() => {
     const t = teardowns();
     ({ dev } = aTeam());
+    [a, b] = [withTeam(aRepo()), withTeam(aRepo())];
     addFactoryAt(ROOT, { name: 'f', repos: [a, b] });
     attachWorkflowAt(ROOT, { factory: 'f', workflow: 'dev' });
     return t.end;
@@ -1011,7 +1014,6 @@ describe("a card and a brief work on the repository the factory's wiring names, 
     fs.cpSync(path.dirname(dev), path.join(repo, 'workflows'), { recursive: true });
     return repo;
   };
-  const [a, b] = [withTeam(aRepo()), withTeam(aRepo())];
   s.test('REFUSED: a card of a factory of two repositories that names none for its workflow, naming the attach', async () => {
     const card = aCard('pick', '---\nworkflow: dev\nfactory: f\n---\nPick a repository.\n');
     await startRefused(

@@ -718,6 +718,8 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
   let folder!: import('../src/start/start.verb.ts').StartedRun;
   let before!: string;
   let held!: string[];
+  let id!: string;
+  let u!: string[];
   beforeAll(async () => {
     const t = teardowns();
     heldBefore = holdFiles();
@@ -745,6 +747,8 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
     before = fs.readFileSync(holdFileOf(already.id), 'utf8');
     held = [...heldBefore, `${already.id}.hold`, `${worded.id}.hold`].sort();
     assert.deepEqual(holdFiles(), held, 'the two runs held on purpose are the hold files this story adds');
+    id = run.id;
+    u = ['hold', id, '--until', target.id];
     return t.end;
   });
   const holdFiles = (): string[] =>
@@ -754,117 +758,141 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
           .filter((f) => f.includes('.hold'))
           .sort()
       : [];
-  const id = run.id;
-  const u = ['hold', id, '--until', target.id];
-  const rows: Array<[string, string[], string, string[]]> = [
-    ['both', ['hold', 'r-x', '--until', 'a', '--off'], 'Invalid', ['nemia hold takes --until or --off, not both']],
-    ['a flag it does not take', ['hold', 'r-x', '--after', 'a'], 'Invalid', ['nemia hold does not take --after']],
-    ['--until with no run', ['hold', 'r-x', '--until'], 'Invalid', ['--until takes the run to wait on']],
-    ['--until followed by a flag', ['hold', 'r-x', '--until', '--off'], 'Invalid', ['--until takes the run to wait on']],
-    ['no run first', ['hold', '--until', 'a'], 'Invalid', ['nemia hold takes the run first']],
+  const rows: Array<[string, () => [string[], string, string[]]]> = [
+    ['both', () => [['hold', 'r-x', '--until', 'a', '--off'], 'Invalid', ['nemia hold takes --until or --off, not both']]],
+    ['a flag it does not take', () => [['hold', 'r-x', '--after', 'a'], 'Invalid', ['nemia hold does not take --after']]],
+    ['--until with no run', () => [['hold', 'r-x', '--until'], 'Invalid', ['--until takes the run to wait on']]],
+    ['--until followed by a flag', () => [['hold', 'r-x', '--until', '--off'], 'Invalid', ['--until takes the run to wait on']]],
+    ['no run first', () => [['hold', '--until', 'a'], 'Invalid', ['nemia hold takes the run first']]],
     [
       'a run id that climbs out of the store',
-      ['hold', '../x', '--until', 'a'],
-      'Invalid',
-      ['nemia hold writes its file under WF_ROOT by id'],
+      () => [['hold', '../x', '--until', 'a'], 'Invalid', ['nemia hold writes its file under WF_ROOT by id']],
     ],
     [
       '--until an id that climbs out',
-      ['hold', 'r-x', '--until', '../a'],
-      'Invalid',
-      ['--until "../a" is not a run\'s id', 'nemia hold r-x --until add-a-flag-x1y2'],
+      () => [
+        ['hold', 'r-x', '--until', '../a'],
+        'Invalid',
+        ['--until "../a" is not a run\'s id', 'nemia hold r-x --until add-a-flag-x1y2'],
+      ],
     ],
     [
       "--until a run's file",
-      ['hold', 'r-x', '--until', 'a-1.json'],
-      'Invalid',
-      ['--until "a-1.json" is not a run\'s id', 'nemia ls', 'nemia hold r-x --until a-1'],
+      () => [
+        ['hold', 'r-x', '--until', 'a-1.json'],
+        'Invalid',
+        ['--until "a-1.json" is not a run\'s id', 'nemia ls', 'nemia hold r-x --until a-1'],
+      ],
     ],
     [
       "a run's file held",
-      ['hold', 'r-x.hold', '--until', 'a-1'],
-      'Invalid',
-      ['"r-x.hold" is not a run\'s id', 'nemia ls', 'nemia hold r-x'],
+      () => [['hold', 'r-x.hold', '--until', 'a-1'], 'Invalid', ['"r-x.hold" is not a run\'s id', 'nemia ls', 'nemia hold r-x']],
     ],
-    ['no such run, held', ['hold', 'r-nope', '--until', 'a'], 'Missing', ['no such run: r-nope', 'nemia hold takes a run by its id']],
-    ['no such run, lifted', ['hold', 'r-nope', '--off'], 'Missing', ['no such run: r-nope', 'nemia hold takes a run by its id']],
-    ['no such run, --until=', ['hold', 'r-nope', '--until=a'], 'Missing', ['no such run: r-nope']],
-    ['--until a run the store has not', ['hold', id, '--until', 'r-nope'], 'Conflict', ['--until r-nope:', 'the store has no run r-nope']],
-    ['--until the run itself', ['hold', id, '--until', id], 'Conflict', [`--until ${id}:`, `that is ${id} itself`]],
-    ['--until one named twice', ['hold', id, '--until', other.id, '--until', other.id], 'Conflict', [`--until ${other.id} is given twice`]],
+    [
+      'no such run, held',
+      () => [['hold', 'r-nope', '--until', 'a'], 'Missing', ['no such run: r-nope', 'nemia hold takes a run by its id']],
+    ],
+    ['no such run, lifted', () => [['hold', 'r-nope', '--off'], 'Missing', ['no such run: r-nope', 'nemia hold takes a run by its id']]],
+    ['no such run, --until=', () => [['hold', 'r-nope', '--until=a'], 'Missing', ['no such run: r-nope']]],
+    [
+      '--until a run the store has not',
+      () => [['hold', id, '--until', 'r-nope'], 'Conflict', ['--until r-nope:', 'the store has no run r-nope']],
+    ],
+    ['--until the run itself', () => [['hold', id, '--until', id], 'Conflict', [`--until ${id}:`, `that is ${id} itself`]]],
+    [
+      '--until one named twice',
+      () => [['hold', id, '--until', other.id, '--until', other.id], 'Conflict', [`--until ${other.id} is given twice`]],
+    ],
     [
       '--until one already landed',
-      ['hold', id, '--until', landed.id],
-      'Conflict',
-      [`--until ${landed.id}:`, 'has already landed on main', 'nothing to wait for'],
+      () => [
+        ['hold', id, '--until', landed.id],
+        'Conflict',
+        [`--until ${landed.id}:`, 'has already landed on main', 'nothing to wait for'],
+      ],
     ],
-    ['--until one cancelled', ['hold', id, '--until', called.id], 'Conflict', [`--until ${called.id}:`, `${called.id} was cancelled`]],
+    [
+      '--until one cancelled',
+      () => [['hold', id, '--until', called.id], 'Conflict', [`--until ${called.id}:`, `${called.id} was cancelled`]],
+    ],
     [
       '--until one of another repository',
-      ['hold', id, '--until', elsewhere.id],
-      'Conflict',
-      [`--until ${elsewhere.id}:`, 'another repository'],
+      () => [['hold', id, '--until', elsewhere.id], 'Conflict', [`--until ${elsewhere.id}:`, 'another repository']],
     ],
-    ['--off of a run nobody holds', ['hold', id, '--off'], 'Conflict', [`${id} is not held`, 'no hold to lift']],
+    ['--off of a run nobody holds', () => [['hold', id, '--off'], 'Conflict', [`${id} is not held`, 'no hold to lift']]],
     [
       'a run already held, with no words: the fix puts it back as it was',
-      ['hold', already.id, '--until', target.id],
-      'Conflict',
-      ['A hold is put once, whole: lift it', `then nemia hold ${already.id} --until ${target.id}.`],
+      () => [
+        ['hold', already.id, '--until', target.id],
+        'Conflict',
+        ['A hold is put once, whole: lift it', `then nemia hold ${already.id} --until ${target.id}.`],
+      ],
     ],
-    ['a run cancelled', ['hold', called.id, '--until', target.id], 'Conflict', [`${called.id} was cancelled at`, 'nothing to hold']],
-    ['a run cancelled, held naming no run', ['hold', called.id], 'Conflict', [`${called.id} was cancelled at`, 'nothing to hold']],
-    ['a run landed, held naming no run', ['hold', landed.id], 'Conflict', [`${landed.id} has landed`, 'nothing of it is left to file']],
-    ['a run succeeded, held naming no run', ['hold', done.id], 'Conflict', [`${done.id} has succeeded`, `nemia decide ${done.id}`]],
+    [
+      'a run cancelled',
+      () => [['hold', called.id, '--until', target.id], 'Conflict', [`${called.id} was cancelled at`, 'nothing to hold']],
+    ],
+    ['a run cancelled, held naming no run', () => [['hold', called.id], 'Conflict', [`${called.id} was cancelled at`, 'nothing to hold']]],
+    [
+      'a run landed, held naming no run',
+      () => [['hold', landed.id], 'Conflict', [`${landed.id} has landed`, 'nothing of it is left to file']],
+    ],
+    ['a run succeeded, held naming no run', () => [['hold', done.id], 'Conflict', [`${done.id} has succeeded`, `nemia decide ${done.id}`]]],
     [
       'a run already held, held again naming no run',
-      ['hold', already.id],
-      'Conflict',
-      ['A hold is put once, whole: lift it', `nemia hold ${already.id} --off`],
+      () => [['hold', already.id], 'Conflict', ['A hold is put once, whole: lift it', `nemia hold ${already.id} --off`]],
     ],
     [
       'a folder run, held until a run lands',
-      ['hold', folder.id, '--until', target.id],
-      'Conflict',
-      ['place: folder', `nemia hold ${folder.id}`],
+      () => [['hold', folder.id, '--until', target.id], 'Conflict', ['place: folder', `nemia hold ${folder.id}`]],
     ],
-    ['a run landed', ['hold', landed.id, '--until', target.id], 'Conflict', [`${landed.id} has landed`, 'nothing of it is left to file']],
+    [
+      'a run landed',
+      () => [['hold', landed.id, '--until', target.id], 'Conflict', [`${landed.id} has landed`, 'nothing of it is left to file']],
+    ],
     [
       'a run succeeded',
-      ['hold', done.id, '--until', target.id],
-      'Conflict',
-      [`${done.id} has succeeded`, `merge its branch once ${target.id} has landed`],
+      () => [
+        ['hold', done.id, '--until', target.id],
+        'Conflict',
+        [`${done.id} has succeeded`, `merge its branch once ${target.id} has landed`],
+      ],
     ],
     [
       'a run held with words: the fix that puts them back, quoted for a shell',
-      ['hold', worded.id, '--until', target.id],
-      'Conflict',
-      [`then nemia hold ${worded.id} --until ${target.id} --why 'it'\\''s blocked'.`],
+      () => [
+        ['hold', worded.id, '--until', target.id],
+        'Conflict',
+        [`then nemia hold ${worded.id} --until ${target.id} --why 'it'\\''s blocked'.`],
+      ],
     ],
-    ['--why with no value', [...u, '--why'], 'Invalid', ['--why takes the words for why the run is held', 'nemia hold <runId>']],
-    ['--why followed by a flag', [...u, '--why', '--by', 'x'], 'Invalid', ['--why takes the words for why the run is held']],
-    ['--by with no value', [...u, '--by'], 'Invalid', ['--by takes who puts the hold, by a name', 'nemia hold <runId>']],
-    ['--why twice', [...u, '--why', 'a', '--why', 'b'], 'Invalid', ['nemia hold takes --why once']],
-    ['--by twice', [...u, '--by', 'a', '--by=b'], 'Invalid', ['nemia hold takes --by once']],
-    ['--why with --off', ['hold', id, '--off', '--why', 'w'], 'Invalid', ['nemia hold --off lifts the hold whole', 'no --why or --by']],
-    ['--by with --off', ['hold', id, '--by', 'x', '--off'], 'Invalid', ['nemia hold --off lifts the hold whole', 'no --why or --by']],
-    ['--why blank', [...u, '--why', ' \n '], 'Invalid', ['--why takes the words', 'only blanks']],
-    ['--by blank', [...u, '--by='], 'Invalid', ['--by takes who puts the hold', 'only blanks']],
+    ['--why with no value', () => [[...u, '--why'], 'Invalid', ['--why takes the words for why the run is held', 'nemia hold <runId>']]],
+    ['--why followed by a flag', () => [[...u, '--why', '--by', 'x'], 'Invalid', ['--why takes the words for why the run is held']]],
+    ['--by with no value', () => [[...u, '--by'], 'Invalid', ['--by takes who puts the hold, by a name', 'nemia hold <runId>']]],
+    ['--why twice', () => [[...u, '--why', 'a', '--why', 'b'], 'Invalid', ['nemia hold takes --why once']]],
+    ['--by twice', () => [[...u, '--by', 'a', '--by=b'], 'Invalid', ['nemia hold takes --by once']]],
+    [
+      '--why with --off',
+      () => [['hold', id, '--off', '--why', 'w'], 'Invalid', ['nemia hold --off lifts the hold whole', 'no --why or --by']],
+    ],
+    [
+      '--by with --off',
+      () => [['hold', id, '--by', 'x', '--off'], 'Invalid', ['nemia hold --off lifts the hold whole', 'no --why or --by']],
+    ],
+    ['--why blank', () => [[...u, '--why', ' \n '], 'Invalid', ['--why takes the words', 'only blanks']]],
+    ['--by blank', () => [[...u, '--by='], 'Invalid', ['--by takes who puts the hold', 'only blanks']]],
     [
       '--why over its cap',
-      [...u, '--why', 'w'.repeat(WHY_CAP + 1)],
-      'Invalid',
-      [`--why takes at most ${WHY_CAP} characters`, `given ${WHY_CAP + 1}`],
+      () => [[...u, '--why', 'w'.repeat(WHY_CAP + 1)], 'Invalid', [`--why takes at most ${WHY_CAP} characters`, `given ${WHY_CAP + 1}`]],
     ],
     [
       '--by over its cap',
-      [...u, '--by', 'b'.repeat(BY_CAP + 1)],
-      'Invalid',
-      [`--by takes at most ${BY_CAP} characters`, `given ${BY_CAP + 1}`],
+      () => [[...u, '--by', 'b'.repeat(BY_CAP + 1)], 'Invalid', [`--by takes at most ${BY_CAP} characters`, `given ${BY_CAP + 1}`]],
     ],
   ];
-  for (const [what, argv, tag, facts] of rows) {
+  for (const [what, later] of rows) {
     test(what, async (t) => {
+      const [argv, tag, facts] = later();
       const { error } = await typed(t, ...argv);
       assert.ok(error, `nemia ${argv.join(' ')} was not refused`);
       refusedNaming(tag, ...facts)(error);

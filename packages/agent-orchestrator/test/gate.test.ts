@@ -759,19 +759,19 @@ describe('`nemia approve`, REFUSED with nothing written', () => {
       'implement',
       undefined,
       'Conflict',
-      ['implement has no gate', `${gate.id} is gated at plan`],
+      () => ['implement has no gate', `${gate.id} is gated at plan`],
     ],
     [
       'a step the run does not have, naming its steps',
       'desing',
       undefined,
       'Conflict',
-      [`${gate.id} has no step "desing"`, 'plan, implement, review'],
+      () => [`${gate.id} has no step "desing"`, 'plan, implement, review'],
     ],
-    ['empty words', 'plan', '', 'Conflict', ['--message is empty']],
-  ] as Array<[string, string, string | undefined, 'Missing' | 'Conflict' | 'Invalid', string[]]>) {
+    ['empty words', 'plan', '', 'Conflict', () => ['--message is empty']],
+  ] as Array<[string, string, string | undefined, 'Missing' | 'Conflict' | 'Invalid', () => string[]]>) {
     test(`REFUSED ${row}`, async () => {
-      await assert.rejects(runWith(gate.e, approveRun(gate.id, step, words)), refusedAs(tag, ...facts));
+      await assert.rejects(runWith(gate.e, approveRun(gate.id, step, words)), refusedAs(tag, ...facts()));
       assert.deepEqual(asksOf(gate.id), []);
     });
   }

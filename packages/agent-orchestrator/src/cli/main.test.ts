@@ -279,22 +279,53 @@ describe("REFUSED at shipped defaults, by a store verb's own words: a word or a 
     b = board();
     run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
   });
-  const rows: Array<[string, string[], string[]]> = [
-    ["cancel, a word after the run's id", ['cancel', run.id, 'extra'], ['nemia cancel', "one run's id", 'not extra.']],
-    ["cancel, a flag after the run's id", ['cancel', run.id, '--now'], ['nemia cancel', "one run's id", 'not --now.']],
-    ['logs, a flag where the run stands', ['logs', '--x', 'implement'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
-    ['logs, a flag where the step stands', ['logs', 'r-1', '--x'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
-    ["cancel, a flag before the run's id", ['cancel', '--now', run.id], ['nemia cancel', "one run's id", 'not --now.']],
+  const rows: Array<[string, () => [string[], string[]]]> = [
+    [
+      "cancel, a word after the run's id",
+      () => [
+        ['cancel', run.id, 'extra'],
+        ['nemia cancel', "one run's id", 'not extra.'],
+      ],
+    ],
+    [
+      "cancel, a flag after the run's id",
+      () => [
+        ['cancel', run.id, '--now'],
+        ['nemia cancel', "one run's id", 'not --now.'],
+      ],
+    ],
+    [
+      'logs, a flag where the run stands',
+      () => [
+        ['logs', '--x', 'implement'],
+        ['nemia logs', "one run's id and one step's name", 'not --x.'],
+      ],
+    ],
+    [
+      'logs, a flag where the step stands',
+      () => [
+        ['logs', 'r-1', '--x'],
+        ['nemia logs', "one run's id and one step's name", 'not --x.'],
+      ],
+    ],
+    [
+      "cancel, a flag before the run's id",
+      () => [
+        ['cancel', '--now', run.id],
+        ['nemia cancel', "one run's id", 'not --now.'],
+      ],
+    ],
   ];
-  for (const [row, argv, said] of rows)
-    test(row, () =>
-      assert.rejects(answered(b.e, ...argv), (err: Error & { _tag?: string; exitCode?: number }) => {
+  for (const [row, later] of rows)
+    test(row, () => {
+      const [argv, said] = later();
+      return assert.rejects(answered(b.e, ...argv), (err: Error & { _tag?: string; exitCode?: number }) => {
         assert.equal(err._tag, 'Invalid');
         assert.equal(err.exitCode, 2);
         for (const fix of said) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
         return true;
-      }),
-    );
+      });
+    });
   test('nothing cancelled', () => assert.equal(runRecord(ROOT, run.id).cancelledAt, undefined));
 });
 

@@ -1094,7 +1094,6 @@ describe('REFUSED by name at shipped defaults: `nemia inbox queue` of a name wit
   let x!: Run;
   let before!: { [k: string]: string };
   let runs!: number;
-  let rows!: Array<[string, () => Promise<unknown>, 'Missing' | 'Conflict' | 'Invalid', string[], shipped?: boolean]>;
   beforeAll(async () => {
     const t = teardowns();
     emptyStore(undefined);
@@ -1113,72 +1112,80 @@ describe('REFUSED by name at shipped defaults: `nemia inbox queue` of a name wit
     );
     before = cards();
     runs = listRuns(ROOT).length;
-    rows = [
-      [
-        'a name with no card',
+    return t.end;
+  });
+  const cards = () => Object.fromEntries(fs.readdirSync(INBOX).map((f) => [f, fs.readFileSync(path.join(INBOX, f), 'utf8')]));
+  const queue = (...argv: string[]) => queuedBy(...argv);
+  const rows: Array<[string, () => [() => Promise<unknown>, 'Missing' | 'Conflict' | 'Invalid', string[], shipped?: boolean]]> = [
+    [
+      'a name with no card',
+      () => [
         () => queue('no-such-card'),
         'Missing',
         ['no card no-such-card in the inbox', bare.card.name, 'nemia inbox queue <name>', 'nemia inbox add "<idea>"'],
       ],
-      ['no name', () => queue(), 'Invalid', ['the name of the card', 'nemia inbox queue <name> [--workflow <name>] [--off]']],
-      ['a name that leaves the inbox', () => queue('../runs/x'), 'Invalid', ["`../runs/x` is not a card's name"]],
-      [
-        'a card with no workflow',
+    ],
+    ['no name', () => [() => queue(), 'Invalid', ['the name of the card', 'nemia inbox queue <name> [--workflow <name>] [--off]']]],
+    ['a name that leaves the inbox', () => [() => queue('../runs/x'), 'Invalid', ["`../runs/x` is not a card's name"]]],
+    [
+      'a card with no workflow',
+      () => [
         () => queue(bare.card.name),
         'Invalid',
         [`${bare.card.name}.md: no workflow`, `nemia inbox queue ${bare.card.name} --workflow <w>`],
       ],
-      [
-        '--off and --workflow at once',
-        () => queue(bare.card.name, '--off', '--workflow', 'dev'),
-        'Invalid',
-        ['--off', '--workflow', 'give one of them'],
-      ],
-      [
-        '--workflow with no value',
-        () => queue(bare.card.name, '--workflow'),
-        'Invalid',
-        ['--workflow takes the workflow the card starts on'],
-      ],
-      ['a second name', () => queue(bare.card.name, 'another'), 'Invalid', ['nemia inbox queue queues one card', 'another is a second']],
-      [
-        '--workflow given as a path',
-        () => queue(bare.card.name, '--workflow', './flows/dev'),
-        'Invalid',
-        ['./flows/dev', 'Nothing was queued.'],
-      ],
-      [
-        'a workflow its factory does not attach, naming the attach',
-        () => queue(bare.card.name, '--workflow', 'triage'),
-        'Invalid',
-        ['nemia factory attach solo triage', 'Nothing was queued.'],
-      ],
-      [
-        'a card already queued',
+    ],
+    [
+      '--off and --workflow at once',
+      () => [() => queue(bare.card.name, '--off', '--workflow', 'dev'), 'Invalid', ['--off', '--workflow', 'give one of them']],
+    ],
+    [
+      '--workflow with no value',
+      () => [() => queue(bare.card.name, '--workflow'), 'Invalid', ['--workflow takes the workflow the card starts on']],
+    ],
+    [
+      'a second name',
+      () => [() => queue(bare.card.name, 'another'), 'Invalid', ['nemia inbox queue queues one card', 'another is a second']],
+    ],
+    [
+      '--workflow given as a path',
+      () => [() => queue(bare.card.name, '--workflow', './flows/dev'), 'Invalid', ['./flows/dev', 'Nothing was queued.']],
+    ],
+    [
+      'a workflow its factory does not attach, naming the attach',
+      () => [() => queue(bare.card.name, '--workflow', 'triage'), 'Invalid', ['nemia factory attach solo triage', 'Nothing was queued.']],
+    ],
+    [
+      'a card already queued',
+      () => [
         () => queue('queued-a1b2'),
         'Conflict',
         ['queued-a1b2.md: already queued', '1 in the queue', 'nemia inbox queue queued-a1b2 --off'],
       ],
-      [
-        "a card a run's record names as started",
-        () => queue('kept-a1b2'),
-        'Conflict',
-        ['kept-a1b2.md: this card was started as started-already-zz99', 'nemia inbox add'],
-      ],
-      [
-        'and its start, of the same kind',
+    ],
+    [
+      "a card a run's record names as started",
+      () => [() => queue('kept-a1b2'), 'Conflict', ['kept-a1b2.md: this card was started as started-already-zz99', 'nemia inbox add']],
+    ],
+    [
+      'and its start, of the same kind',
+      () => [
         async () => await runPlaced(startFromInbox({ name: 'kept-a1b2', callerRepo: repo })),
         'Conflict',
         ['kept-a1b2.md: this card was started as started-already-zz99'],
       ],
-      [
-        'a start of a card not there',
+    ],
+    [
+      'a start of a card not there',
+      () => [
         async () => await runPlaced(startFromInbox({ name: 'no-such-card', callerRepo: repo })),
         'Missing',
         ['no card no-such-card in the inbox', 'nemia start '],
       ],
-      [
-        'as shipped, a card that names no factory',
+    ],
+    [
+      'as shipped, a card that names no factory',
+      () => [
         () => queue('loose'),
         'Invalid',
         [
@@ -1190,20 +1197,20 @@ describe('REFUSED by name at shipped defaults: `nemia inbox queue` of a name wit
         ],
         true,
       ],
-      [
-        'as shipped, a card that names default',
+    ],
+    [
+      'as shipped, a card that names default',
+      () => [
         () => queue('history'),
         'Invalid',
         ['`default` is the default factory', '`factory: <name>` in ', '/inbox/history.md, one of solo.', 'Nothing was queued.'],
         true,
       ],
-    ];
-    return t.end;
-  });
-  const cards = () => Object.fromEntries(fs.readdirSync(INBOX).map((f) => [f, fs.readFileSync(path.join(INBOX, f), 'utf8')]));
-  const queue = (...argv: string[]) => queuedBy(...argv);
-  for (const [name, refused, tag, facts, shipped] of rows)
+    ],
+  ];
+  for (const [name, later] of rows)
     test(name, async (c) => {
+      const [refused, tag, facts, shipped] = later();
       if (shipped) asShipped(c);
       await assert.rejects(refused, refusedAs(tag, ...facts));
       assert.deepEqual(cards(), before, 'nothing written');

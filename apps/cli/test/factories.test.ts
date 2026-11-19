@@ -101,6 +101,17 @@ describe('a person files a factory, wires its parts, sees each in the listing, a
     assert.match(await out(['factory', 'ls']), new RegExp(`^ +volume ${notes} :ro$`, 'm'));
     assert.match(await out(['factory', 'volume', 'rm', 'mill', 'notes']), new RegExp(`^mill  volume ${notes} removed$`, 'm'));
   });
+  s.test('`factory volume add --claude-md on --skills off` sets the switches, and an add again that names none keeps them', async () => {
+    const notes = path.join(here, 'notes');
+    const switched = new RegExp(`^mill  volume ${notes} :ro --claude-md on --skills off$`, 'm');
+    assert.match(await out(['factory', 'volume', 'add', 'mill', 'notes:ro', '--claude-md', 'on', '--skills', 'off']), switched);
+    assert.match(await out(['factory', 'volume', 'add', 'mill', 'notes:ro']), switched);
+    assert.match(
+      await out(['factory', 'volume', 'add', 'mill', 'notes:ro', '--skills', 'on']),
+      new RegExp(`^mill  volume ${notes} :ro --claude-md on$`, 'm'),
+    );
+    await out(['factory', 'volume', 'rm', 'mill', 'notes']);
+  });
   s.test('`factory setting` and `cost-line` set and take off what the runs are given, each seen in the listing', async () => {
     assert.match(
       await out(['factory', 'setting', 'set', 'mill', 'claude.language', '"french"']),

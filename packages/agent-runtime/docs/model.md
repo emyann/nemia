@@ -102,6 +102,7 @@ erDiagram
     string effort "optional"
     object mcp "optional"
     list projectMcp "optional"
+    string projectMcpFrom "optional"
     number contextTokens "optional"
     boolean background "optional"
     number budgetUsd "optional"
@@ -120,6 +121,7 @@ erDiagram
   Mount {
     string path
     boolean readOnly
+    enum ruled "optional"
   }
   ExecutionPlace {
     host place

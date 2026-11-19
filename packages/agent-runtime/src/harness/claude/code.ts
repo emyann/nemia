@@ -47,7 +47,7 @@ import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords, claudeTranscriptSpent } from './transcript.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_DECLARATION, bridgeAsked, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
-import { projectMcpConfig } from '../mcp.ts';
+import { mcpFolderOf, projectMcpConfig } from '../mcp.ts';
 import { programIn } from '../harness-bin.ts';
 import { RunnerError } from '../error.ts';
 import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './session-bridge.ts';
@@ -120,7 +120,7 @@ const claudePrepare = (
 ): Partial<HarnessIO> => {
   const signedOut = claudeSignedOutRefusal(r, executable, signInMs, harnessBin);
   if (signedOut) throw new Error(signedOut);
-  const found = r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd);
+  const found = r.config?.projectMcp ? undefined : projectMcpConfig(mcpFolderOf(r.cwd, r.config));
   const program = executable || process.env.AE_CLAUDE_EXECUTABLE ? undefined : programIn(harnessBin, 'claude');
   const io: Partial<HarnessIO> = {
     ...(found ? { projectMcpConfig: found } : {}),

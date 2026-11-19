@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { volumeBase, volumeOf, volumeRefusal, volumesNamed, withVolume } from './volume.ts';
+import { factoryVolumes } from '../factory.ts';
 
 describe('a volume is read as compose spells it, and its mark is required', () => {
   const rows: { name: string; spelled: string; want: { path: string; readOnly: boolean; origin?: string } | 'refused' }[] = [
@@ -90,6 +91,32 @@ test('a volume added again replaces the one of its path, keeping its name, and s
     volumes: [{ path: '/a', readOnly: true, name: 'a' }],
     was: null,
   });
+});
+
+test('a volume added again keeps the switches it is not given, and takes those it is', () => {
+  const before = { volumes: [{ path: '/b', readOnly: false, name: 'b', claudeMd: true, skills: false }] };
+  assert.deepEqual(withVolume(before, { path: '/b', readOnly: false }).volumes, before.volumes);
+  assert.deepEqual(withVolume(before, { path: '/b', readOnly: false, skills: true }).volumes, [
+    { path: '/b', readOnly: false, name: 'b', claudeMd: true, skills: true },
+  ]);
+  assert.deepEqual(withVolume({ volumes: [] }, { path: '/a', readOnly: true }).volumes, [{ path: '/a', readOnly: true, name: 'a' }]);
+});
+
+test("a run freezes a volume's switches only where they are not the defaults", () => {
+  assert.deepEqual(
+    factoryVolumes({
+      volumes: [
+        { path: '/a', readOnly: true, claudeMd: true, skills: true },
+        { path: '/b', readOnly: true, claudeMd: false, skills: false },
+        { path: '/c', readOnly: true },
+      ],
+    }),
+    [
+      { path: '/a', readOnly: true, claudeMd: true },
+      { path: '/b', readOnly: true, skills: false },
+      { path: '/c', readOnly: true },
+    ],
+  );
 });
 
 describe("a volume is named by its folder's name, a suffix telling two apart, and a name once stored is kept", () => {

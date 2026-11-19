@@ -40,6 +40,12 @@
  * one Claude Code, so it is made again at each bump by this case rather than carried; each `init` line is handed over as
  * `sdk-<version>-auto-<model>.json`.
  *
+ * The last two measure what a session in a factory's home meets (`docs/harness.md`, *A session in one folder, working on another*):
+ * whether, its added folders' memory files loaded (`CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`), the settings'
+ * `claudeMdExcludes` skips one by `<path>/**`, as the orchestrator writes it, beside a control that loads both; and whether a session
+ * started in a folder Claude Code was never asked to trust takes its `.claude/settings.json` (an output style, read off the `init`
+ * line) and lists its skills. Each answer is handed over as `sdk-<version>-excludes.json` and `sdk-<version>-untrusted-home.json`.
+ *
  * `OPUS_TODAY` in `sdk-pin.ts` is what this asserts, and the one constant of the three a bump cannot infer: an alias can move under a
  * version that did not.
  */
@@ -124,7 +130,16 @@ test.skipIf(skip)(
  * Each JSON line of a job's stdout. The `init` line is looked for rather than taken first: on 0.3.308 and 0.3.316 the SDK prints its
  * command lifecycle lines for the queued prompt ahead of it, and a `result` line does not open with its `type`.
  */
-type Line = { type?: string; subtype?: string; model?: string; claude_code_version?: string; permissionMode?: string };
+type Line = {
+  type?: string;
+  subtype?: string;
+  model?: string;
+  claude_code_version?: string;
+  permissionMode?: string;
+  output_style?: string;
+  skills?: string[];
+  result?: string;
+};
 const linesOf = (out: string) =>
   out.split('\n').flatMap((text) => {
     try {
@@ -138,13 +153,14 @@ const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin',
 
 /**
  * Runs the process the worker spawns for a step, `bin/ae-claude-job.ts`, on `config` and the SDK's own Claude Code (no
- * `AE_CLAUDE_EXECUTABLE`), and keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`).
+ * `AE_CLAUDE_EXECUTABLE`), and keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`). The
+ * session starts in a scratch folder of its own, or in `given.cwd`, and is told to answer ok, or `given.brief`.
  */
-const jobRun = async (name: string, config: object) => {
+const jobRun = async (name: string, config: object, given: { cwd?: string; brief?: string } = {}) => {
   const dir = scratch('ae-live-sdk-bin-');
   const at = path.join(dir, 'spawn.request.json');
-  const brief = 'Answer with the single word ok. Do nothing else.';
-  fs.writeFileSync(at, JSON.stringify({ request: { name, brief, cwd: dir, config }, io: {} }));
+  const brief = given.brief ?? 'Answer with the single word ok. Do nothing else.';
+  fs.writeFileSync(at, JSON.stringify({ request: { name, brief, cwd: given.cwd ?? dir, config }, io: {} }));
   const env = { ...process.env };
   delete env.AE_CLAUDE_EXECUTABLE;
   return new Promise<{ stdout: string; code: number | null; err: string }>((done) => {
@@ -212,5 +228,73 @@ test.skipIf(skip)(
       );
       assert.equal(code, 0, `and ${model} ran to a result: ${err}`);
     }
+  },
+);
+
+/** The session's last answer, off its `result` line. */
+const answerOf = (stdout: string) =>
+  linesOf(stdout)
+    .filter((line) => line.type === 'result')
+    .at(-1)?.result ?? '';
+
+/** A folder holding `files`, each by its path from it. */
+const folderOf = (prefix: string, files: Record<string, string>) => {
+  const dir = scratch(prefix);
+  for (const [at, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, at)), { recursive: true });
+    fs.writeFileSync(path.join(dir, at), text);
+  }
+  return dir;
+};
+
+const WORDS_BRIEF =
+  'Use no tool. Your memory files (CLAUDE.md) may each give a folder its word. Answer with every such word you were given, in capitals, ' +
+  'separated by spaces, and nothing else; answer NONE where you were given none.';
+
+test.skipIf(skip)(
+  "a session in one folder, with two folders added and their memory files loaded, skips the one its settings' `claudeMdExcludes` names " +
+    '(`<path>/**`, as the orchestrator writes it), and reads the other',
+  async () => {
+    const home = folderOf('ae-live-home-', {});
+    const read = folderOf('ae-live-read-', { 'CLAUDE.md': 'The word of this folder is PLUM.\n' });
+    const skipped = folderOf('ae-live-skipped-', { 'CLAUDE.md': 'The word of this folder is PEAR.\n' });
+    const config = (settings: object) => ({
+      model: 'haiku',
+      effort: 'low',
+      tools: [],
+      mounts: [read, skipped].map((p) => ({ path: p, readOnly: true })),
+      env: { CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1' },
+      claude: { settings: JSON.stringify(settings) },
+    });
+    const [excluded, control] = await Promise.all([
+      jobRun('ae/live/excludes', config({ claudeMdExcludes: [`${skipped}/**`] }), { cwd: home, brief: WORDS_BRIEF }),
+      jobRun('ae/live/excludes-control', config({}), { cwd: home, brief: WORDS_BRIEF }),
+    ]);
+    const words = { excluded: answerOf(excluded.stdout), control: answerOf(control.stdout) };
+    handOver(`sdk-${SDK_VERSION}-excludes.json`, `${JSON.stringify(words)}\n`);
+    assert.match(
+      words.control,
+      /PEAR/,
+      `without the exclude, the added folder's CLAUDE.md loads (the control): ${words.control} ${control.err}`,
+    );
+    assert.match(words.excluded, /PLUM/, `the folder not excluded is read: ${words.excluded} ${excluded.err}`);
+    assert.doesNotMatch(words.excluded, /PEAR/, `the folder its settings exclude by \`<path>/**\` is skipped: ${words.excluded}`);
+  },
+);
+
+test.skipIf(skip)(
+  "a session started in a folder Claude Code was never asked to trust takes that folder's `.claude/settings.json` and lists its skills",
+  async () => {
+    const home = folderOf('ae-live-untrusted-home-', {
+      '.claude/settings.json': `${JSON.stringify({ outputStyle: 'Explanatory' })}\n`,
+      '.claude/skills/steer/SKILL.md': '---\nname: steer\ndescription: Where a session stands, for a test.\n---\nSay where you stand.\n',
+    });
+    const { stdout, code, err } = await jobRun('ae/live/untrusted-home', { model: 'haiku', effort: 'low' }, { cwd: home });
+    const init = initOf(stdout);
+    assert.ok(init, `the session printed its init line: ${stdout.slice(0, 300)} ${err}`);
+    handOver(`sdk-${SDK_VERSION}-untrusted-home.json`, `${JSON.stringify(init)}\n`);
+    assert.equal(init.output_style, 'Explanatory', "the folder's settings are applied: its output style");
+    assert.ok(init.skills?.includes('steer'), `and its skills listed: ${JSON.stringify(init.skills)}`);
+    assert.equal(code, 0, `and the session ran to a result: ${err}`);
   },
 );

@@ -12,7 +12,7 @@
     },
     {
       "id": "checks-bare",
-      "says": "Run each check bare, one command per call: never wrapped in timeout, never cd or a for loop",
+      "says": "Run each check bare, one command per call: never wrapped in timeout, never a for loop or a cd but into the workspace",
       "breaks": [
         "Bash(timeout:*)",
         "Bash(cd:*)",

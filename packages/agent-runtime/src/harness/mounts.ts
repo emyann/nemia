@@ -9,10 +9,18 @@ import path from 'node:path';
  * One folder a session may reach beyond its `cwd`: an absolute path, as `path.resolve` gives it, and whether the session may
  * only read it. `readOnly` is required: a mount left unmarked would be writable without anyone having said so.
  */
-export type Mount = { path: string; readOnly: boolean };
+export type Mount = {
+  path: string;
+  readOnly: boolean;
+  /**
+   * Whether the task's own rules alone decide what the session may write there: the harness adds neither the allow it gives a
+   * writable mount nor the deny it gives a read-only one. Absent: the harness's rule for its mode. Refused beside `readOnly: true`.
+   */
+  ruled?: true;
+};
 
 /** The keys a mount has: a key beside them is a misspelling or a field no harness reads. */
-const MOUNT_KEYS: readonly string[] = ['path', 'readOnly'];
+const MOUNT_KEYS: readonly string[] = ['path', 'readOnly', 'ruled'];
 
 /** Why one entry of `config.mounts` is not a mount, or `undefined`. */
 const mountRefusalOf = (mount: unknown): string | undefined => {
@@ -20,13 +28,20 @@ const mountRefusalOf = (mount: unknown): string | undefined => {
     return `\`mounts\` holds ${JSON.stringify(mount)}, which is not a mount. Give an object, like { "path": "/srv/repo", "readOnly": true }.`;
   }
   const stray = Object.keys(mount).find((key) => !MOUNT_KEYS.includes(key));
-  if (stray) return `\`mounts\` holds a mount with \`${stray}\`, which a mount does not have. A mount has \`path\` and \`readOnly\` alone.`;
-  const { path: at, readOnly } = mount as Partial<Mount>;
+  if (stray)
+    return `\`mounts\` holds a mount with \`${stray}\`, which a mount does not have. A mount has \`path\`, \`readOnly\` and \`ruled\` alone.`;
+  const { path: at, readOnly, ruled } = mount as Partial<Mount>;
   if (typeof at !== 'string' || at.includes(String.fromCharCode(0)) || !path.isAbsolute(at) || path.resolve(at) !== at) {
     return `\`mounts\` holds the path ${JSON.stringify(at)}, which is not an absolute folder. Name the folder by its absolute path, as \`path.resolve\` gives it, like "/srv/repo".`;
   }
   if (typeof readOnly !== 'boolean') {
     return `\`mounts\` holds ${at} with \`readOnly: ${JSON.stringify(readOnly)}\`. Say whether the session may only read it: true, or false to let it write there.`;
+  }
+  if (ruled !== undefined && ruled !== true) {
+    return `\`mounts\` holds ${at} with \`ruled: ${JSON.stringify(ruled)}\`. Give \`ruled: true\` to let the task's own rules alone decide its writes there, or leave it out.`;
+  }
+  if (ruled === true && readOnly) {
+    return `\`mounts\` holds ${at} read-only and ruled by the task's own rules: a read-only mount is held by the harness's deny. Give \`readOnly: false\` with \`ruled: true\`, or leave \`ruled\` out.`;
   }
   return undefined;
 };

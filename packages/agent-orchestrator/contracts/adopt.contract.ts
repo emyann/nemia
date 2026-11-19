@@ -143,11 +143,6 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
       description: 'The factory taken over keeps its name',
       condition: ({ input: [factory], output }) => output.name === factory.name,
     },
-    keepsItsRepos: {
-      description: 'It keeps its repositories',
-      condition: ({ input: [factory], output }) =>
-        output.repos.length === factory.repos.length && output.repos.every((repo, i) => repo === factory.repos[i]),
-    },
     keepsItsSchedules: {
       description: 'It keeps its schedules',
       condition: ({ input: [factory], output }) =>
@@ -159,12 +154,15 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
       condition: ({ input: [factory], output }) => sameInstruction(output.instruction, factory.instruction),
     },
     keepsItsVolumes: {
-      description: "It keeps its volumes, none where it had none: they are the person's folders, never the template's",
+      description:
+        "It keeps its volumes, the repositories it works on among them, none where it had none: they are the person's folders, never the template's",
       condition: ({ input: [factory], output }) =>
-        (output.volumes === undefined) === (factory.volumes === undefined) &&
-        (output.volumes ?? []).length === (factory.volumes ?? []).length &&
-        (output.volumes ?? []).every(
-          (v, i) => v.path === (factory.volumes ?? []).at(i)?.path && v.readOnly === (factory.volumes ?? []).at(i)?.readOnly,
+        output.volumes.length === factory.volumes.length &&
+        output.volumes.every(
+          (v, i) =>
+            v.path === factory.volumes.at(i)?.path &&
+            v.readOnly === factory.volumes.at(i)?.readOnly &&
+            v.origin === factory.volumes.at(i)?.origin,
         ),
     },
     keepsItsHarnessSettings: {

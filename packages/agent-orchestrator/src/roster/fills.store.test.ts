@@ -33,7 +33,7 @@ const theirs = (name: string): string => path.resolve(repo, 'workflows', 'agents
 const yours = (name: string): string => path.resolve(home, 'workflows', 'agents', `${name}.md`);
 const factory = (name: string, workflows: string[], hires: Factory['hires'] = {}): Factory => ({
   name,
-  repos: [repo],
+  volumes: [{ path: repo, readOnly: false }],
   workflows,
   hires,
   schedules: {},
@@ -86,5 +86,5 @@ test("a factory made from a template fills the steps of its tree's workflows wit
     { from: 'user', workflow: 'omega', step: 'step', hired: false, file: yours('zed') },
   ]);
   assert.deepEqual(factoriesFilling([{ ...treed, file: 'treed.json' }], home).get(own), ['treed']);
-  assert.deepEqual(factoriesFilling([{ ...treed, repos: [], file: 'treed.json' }], home).get(own), ['treed'], 'on its tree alone');
+  assert.deepEqual(factoriesFilling([{ ...treed, volumes: [], file: 'treed.json' }], home).get(own), ['treed'], 'on its tree alone');
 });

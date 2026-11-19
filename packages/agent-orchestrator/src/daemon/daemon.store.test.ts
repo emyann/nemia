@@ -1182,6 +1182,28 @@ test('`up` raises a lower floor of the store to its own as it takes the store, a
   clear();
 });
 
+test("`up` moves a factory's file an earlier release wrote into one list of volumes as it takes the store, and the floor it raises is v1.26.0's", async () => {
+  const repo = path.join(ROOT, '..', 'moved-repo');
+  const file = path.join(ROOT, 'factories', 'moved.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ repos: [repo], origins: { [repo]: 'https://example.com/me/moved.git' }, workflows: [] }));
+  clear();
+  await runPlaced(Effect.scoped(up(engineOf(), { every: 10, repo: ROOT, holder: 'api' }))).then(
+    () => assert.fail('the daemon returned'),
+    (err: unknown) => assert.equal(err, STOP),
+  );
+  const moved = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  assert.equal('repos' in moved || 'origins' in moved, false, 'the keys an earlier release wrote are gone');
+  assert.deepEqual(
+    moved.volumes,
+    [{ path: repo, readOnly: false, origin: 'https://example.com/me/moved.git' }],
+    'its repository a writable volume, its origin kept',
+  );
+  assert.deepEqual(STORE_READABLE_FROM, { major: 1, minor: 26, patch: 0 }, 'an earlier release cannot read the moved file');
+  fs.rmSync(file, { force: true });
+  clear();
+});
+
 test("`up` births the daemon's series and the caller's at zero and exports them before it serves; a pass then puts its values in", async (t) => {
   clear();
   const c = await collector(t);

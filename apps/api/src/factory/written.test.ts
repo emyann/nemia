@@ -27,7 +27,7 @@ const folder = scratch('nemia-api-written-folder-');
 const step = path.join(folder, 'workflows', 'make', 'code.md');
 fs.mkdirSync(path.dirname(step), { recursive: true });
 fs.writeFileSync(step, '---\nplace: git\n---\nDo code.\n');
-addFactory({ name: 'wrote', repos: [folder] });
+addFactory({ name: 'wrote', volumes: [folder].map((r) => `${r}:rw`) });
 const FILE = path.join(root, 'factories', 'wrote.json');
 
 const json = { 'content-type': 'application/json' };

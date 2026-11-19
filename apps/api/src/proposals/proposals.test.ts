@@ -53,7 +53,7 @@ const TREE = (() => {
   fs.mkdirSync(factories, { recursive: true });
   fs.writeFileSync(
     path.join(factories, `${FACTORY}.json`),
-    JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+    JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   const tree = path.join(factories, FACTORY, 'tree');
   fs.mkdirSync(path.join(tree, 'workflows', 'dev'), { recursive: true });

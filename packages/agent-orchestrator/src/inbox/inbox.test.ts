@@ -706,9 +706,26 @@ test("a queued card of a factory is tried on the repository its wiring names for
   const refused = { at: '2026-09-16T10:06:00.000Z', text, repo: '/repos/solo', why: 'build: not offered.', refused: true };
   const listing = inboxListing([{ file: 'solo-a1b2.md', text }], [], new Map([['solo-a1b2', refused]]));
   const factories = new Map([
-    ['solo', { repos: ['/repos/solo'] }],
-    ['duo', { repos: ['/repos/a', '/repos/b'] }],
-    ['wired', { repos: ['/repos/a', '/repos/b'], workflowRepos: { build: 'b' } }],
+    ['solo', { volumes: [{ path: '/repos/solo', readOnly: false }] }],
+    [
+      'duo',
+      {
+        volumes: [
+          { path: '/repos/a', readOnly: false },
+          { path: '/repos/b', readOnly: false },
+        ],
+      },
+    ],
+    [
+      'wired',
+      {
+        volumes: [
+          { path: '/repos/a', readOnly: false },
+          { path: '/repos/b', readOnly: false },
+        ],
+        workflowRepos: { build: 'b' },
+      },
+    ],
   ]);
   assert.equal(nextQueued(listing, '/elsewhere', factories), undefined, "refused on its factory's repository: passed over");
   assert.equal(
@@ -744,7 +761,19 @@ test("a queued card of a factory is tried on the repository its wiring names for
   ]);
   const unwired = listed('duo', '');
   assert.equal(nextQueued(unwired, '/daemon', factories), undefined, 'refused on none, and none is what it would be tried on now');
-  const rewired = new Map([...factories, ['duo', { repos: ['/repos/a', '/repos/b'], workflowRepos: { build: 'a' } }]]);
+  const rewired = new Map([
+    ...factories,
+    [
+      'duo',
+      {
+        volumes: [
+          { path: '/repos/a', readOnly: false },
+          { path: '/repos/b', readOnly: false },
+        ],
+        workflowRepos: { build: 'a' },
+      },
+    ],
+  ]);
   assert.equal(nextQueued(unwired, '/daemon', rewired)?.name, 'duo-a1b2', 'wired since: a new try');
   assert.doesNotMatch(inboxLines(unwired)[0], / on |nemia up/, 'tried on none: no repository said, and no daemon to run elsewhere');
 });
@@ -808,7 +837,7 @@ test("REFUSED: a card that names no factory, naming its file, the line to write 
     '/s/inbox/a.md: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder, which can be two factories\'. Write `factory: <name>` in its frontmatter — one of abc, shop, or name it at start: --factory <name>; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.',
   );
   const queued = unfactoredCardRefusal('/s/inbox/a.md', []);
-  assert.match(queued, /— once one is filed: nemia factory add <name> --repo <root>; a new card/);
+  assert.match(queued, /— once one is filed: nemia factory add <name> --volume <root>:rw; a new card/);
   assert.equal(queued.includes('at start'), false, 'the queue has no start words of its own');
 });
 
@@ -1075,7 +1104,7 @@ describe('REFUSED: `queueFactoryRefusal` refuses a card that names no factory, n
     ],
     'no factory, and none on file': [
       () => queueFactoryRefusal(loose, file, [], false),
-      ['nemia factory add <name> --repo <root>', 'nemia inbox queue a.', 'Nothing was queued.'],
+      ['nemia factory add <name> --volume <root>:rw', 'nemia inbox queue a.', 'Nothing was queued.'],
     ],
     'no factory, where unfactored starts are allowed': [() => queueFactoryRefusal(loose, file, ['shop'], true), null],
   };

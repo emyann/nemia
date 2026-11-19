@@ -66,7 +66,7 @@ function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual'
   fs.mkdirSync(factories, { recursive: true });
   fs.writeFileSync(
     path.join(factories, `${name}.json`),
-    JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+    JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   const tree = path.join(factories, name, 'tree');
   fs.mkdirSync(path.join(tree, 'workflows', 'dev'), { recursive: true });
@@ -913,7 +913,7 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
   const settings: ProposedObject = {
     kind: 'Factory',
     metadata: { name: 'refuse', resourceVersion: 'x' },
-    spec: { repos: ['/x'] },
+    spec: { volumes: [{ path: '/x', readOnly: false }] },
     verb: 'update',
   };
   assert.equal((await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [settings] }, PLACE)))._tag, 'Invalid');
@@ -940,7 +940,7 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
     'a resource no proposal changes',
   );
   const plain = path.join(ROOT, 'factories', 'plain.json');
-  fs.writeFileSync(plain, JSON.stringify({ repos: [scratch('wf-proposals-plain-')] }));
+  fs.writeFileSync(plain, JSON.stringify({ volumes: [{ path: scratch('wf-proposals-plain-'), readOnly: false }] }));
   const untemplated = await refusalOf(
     proposeProgram(PERSON, 'plain', { objects: [{ ...object, metadata: { name: 'dev' }, verb: 'create' }] }, PLACE),
   );

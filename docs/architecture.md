@@ -340,6 +340,29 @@ still deny any assignment before `nemia`, `Bash(*=* nemia *)` (`ASSIGNED`, `src/
 `packages/templates/test/fences.test.ts` and the planted lines of `packages/agent-orchestrator/test/agent-fences.test.ts`), as git's
 and gh's are denied.
 
+**A local install signs in with no token typed, and nothing is weakened for it** (a security change, reviewed as one, 2026-11-18). On a
+person's own machine the token machinery stays whole and is never shown: the installer keeps the store's credential for the person's
+`nemia`, and `nemia open` (`OPEN_WORDS`, `apps/cli/src/commands/rest/pairing.ts`) mints a first-visit link through `POST /api/links`
+with that credential, or a remote context's token, and opens this machine's browser on it (`openerOf`, `apps/cli/src/browser.ts`,
+`apps/cli/contracts/opener.contract.ts`: `open` on macOS, `xdg-open` on Linux with a display), printing the link only where none
+opens. The link is single-use, lasts ten minutes and is claimed into the board's HttpOnly, `SameSite=Strict` cookie; on a laptop it is
+under `localhost`, never `127.0.0.1` (`boardBase`). The api's 401 to a browser with no token, or an unknown one, says whether the store
+is marked exposed (`exposed`, from `StoreConfig`), and the board's token page reads it: served on this machine alone, it names `nemia
+open` and folds the paste field away; exposed, it keeps its words. The cookie renews itself: each `GET` the person's cookie alone
+signed in sets it again for thirty days (`cookieRenewed`, `apps/api/src/server/renewal.ts`, `apps/api/contracts/cookie-renewal.contract.ts`),
+level-triggered, so a board in use never meets the page; it ends with Settings' Forget (`DELETE /api/session`, which clears the
+cookie and leaves its `board-<day>` token to `nemia token rm`) or with the token retired, refused `unknown-token`, which clears it.
+What is not weakened: every route the api answers still needs a credential on every store, loopback included (`needOf` and
+`token-need.contract.ts` unchanged), since a web page open in the person's browser can send requests to a local port, and its
+`SameSite=Strict` cookie and the unchanged write guard are what keep such a page from starting a run or approving a gate. Only the
+person mints a link (`personOnly` and the floor keep `links.mint` from an agent's token, `nemia open` is class `none`), a link's claim
+mints a person's token alone, and renewal sets again only a person's token the browser already sent, by the cookie, on a read: no
+agent's token is minted or renewed by any of it, and a session's or an agent's token kept in a browser lapses with its cookie. One risk
+is left as the installer leaves it: the link is on the opener's command line for a moment, where another user of a shared Linux
+machine could read it with `ps` and claim it first. Who acted stays readable (`actorWords`, objects): a write from the person's browser
+is `the person, on board-<day>`; from their terminal, `the person, on local`; from an agent's standing token, `<agent>, by its token
+<name>`; from an agent's session, `<agent>, of <run>/<step>`.
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in

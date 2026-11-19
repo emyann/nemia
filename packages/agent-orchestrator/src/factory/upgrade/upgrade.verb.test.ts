@@ -82,7 +82,7 @@ async function applied(name: string, rules?: string): Promise<{ dir: string; rep
   edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
     spec.steps[1].budget = { param: 'budget' };
   });
-  await main(['factory', 'apply', name, '--template', dir, '--repo', repo, '--set', 'budget=7'], noEngine());
+  await main(['factory', 'apply', name, '--template', dir, '--volume', `${repo}:rw`, '--set', 'budget=7'], noEngine());
   reconciled(templated(name));
   return { dir, repo };
 }
@@ -142,8 +142,8 @@ const previewOf = async (...args: string[]): Promise<Previewed> => (await main([
 test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir, repo } = await applied('kept');
-  await main(['factory', 'add', 'plain', '--repo', repo], noEngine());
-  await main(['factory', 'apply', 'unrendered', '--template', dir, '--repo', repo, '--set', 'budget=7'], noEngine());
+  await main(['factory', 'add', 'plain', '--volume', `${repo}:rw`], noEngine());
+  await main(['factory', 'apply', 'unrendered', '--template', dir, '--volume', `${repo}:rw`, '--set', 'budget=7'], noEngine());
   const before = bytesUnder(FACTORIES);
   const upgrade = (name: string, ...rest: string[]) => main(['factory', 'upgrade', name, ...rest], noEngine());
   await assert.rejects(upgrade('plain', '--to', '0.2.0'), refusedWith('Invalid', /plain is not made from a template/));

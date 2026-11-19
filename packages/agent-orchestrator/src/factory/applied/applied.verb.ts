@@ -16,10 +16,11 @@ import type { Args } from '../../command/command.ts';
 import type { Served } from '../../command/entry.verb.ts';
 import { Invalid, type Refusal } from '../../refusal/refusal.ts';
 import type { FeedConflicts } from '../../feed/index.ts';
-import { FactoryDoor, factoryOrNone, factoryRepos, originsOf, refuseName } from '../door/factories.store.ts';
+import { clonesOf, FactoryDoor, factoryOrNone, refuseName, volumesGiven } from '../door/factories.store.ts';
+import { volumesTrusted, writableRooted } from '../volume/volume.verb.ts';
 import { cloned } from '../clones/clones.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
-import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory.ts';
+import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate, Volume } from '../factory.ts';
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../../template/template.store.ts';
 import { TemplateSource } from '../../template/door/templates.model.ts';
 import { BuiltinTemplates, TemplateDoor, templatePlace } from '../../template/door/templates.store.ts';
@@ -46,7 +47,6 @@ import { overlaid, renderFactory, resolveParams, type Params } from './index.ts'
 import { transitionedAt } from './condition-time.ts';
 import { generationOf } from '../door/generation.ts';
 import type { PlaceTrust } from '../../trust/trust.ts';
-import { trustPlaces } from '../../trust/trust.verb.ts';
 import {
   approveLine,
   baseTemplateOf,
@@ -695,11 +695,11 @@ const manyOf = (args: Args, key: string): string[] => {
  * What `nemia factory apply` filed: the factory, its repositories, its file, the template it was made from and the folder or archive it
  * was read at, and the tree it runs from.
  */
-type Applied = { name: string; repos: readonly string[]; file: string; template: FactoryTemplate; place: string; tree: string };
+type Applied = { name: string; volumes: readonly Volume[]; file: string; template: FactoryTemplate; place: string; tree: string };
 
 /**
  * The factory `args` name, made from the template in `--template` with `--set`'s parameters. Refused, before anything is written: no
- * `--template` (`Invalid`); the repositories (`factoryRepos`); a template that does not pass its check, a parameter not declared, of the
+ * `--template` (`Invalid`); the volumes (`volumesGiven`); a template that does not pass its check, a parameter not declared, of the
  * wrong type or required and not given, and what the render refuses (`Invalid`, every one at once); then as `addFactory` refuses.
  */
 const applied = Effect.fn('applied')(function* (args: Args) {
@@ -712,9 +712,9 @@ const applied = Effect.fn('applied')(function* (args: Args) {
       }),
     );
   const home = yield* StoreRoot;
-  const { repos, origins } = yield* tried(() => {
+  const volumes = yield* tried(() => {
     refuseName(name, 'add');
-    return factoryRepos(home, name, manyOf(args, 'repos'));
+    return volumesGiven(home, name, manyOf(args, 'volumes'), process.cwd());
   });
   const source = sourceGiven(given);
   const read = yield* renderedAt(source, manyOf(args, 'sets'));
@@ -726,22 +726,23 @@ const applied = Effect.fn('applied')(function* (args: Args) {
     );
   const template = { source, version: read.version, params: read.params };
   const tree = treeDir(home, name);
-  yield* cloned(origins);
-  const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, template, tree, ...originsOf(origins) };
+  yield* cloned(clonesOf(volumes));
+  yield* writableRooted(volumes, 'Nothing was filed.');
+  const factory: Factory = { name, volumes, workflows: [], hires: {}, schedules: {}, template, tree };
   const file = yield* (yield* FactoryDoor).factories.create(factory);
   const place = builtinPlace(source, yield* BuiltinTemplates);
-  return { name, repos, file, template, place, tree } satisfies Applied;
+  return { name, volumes, file, template, place, tree } satisfies Applied;
 });
 
 /**
- * `nemia factory apply`: a factory filed from a template, its places then trusted as `nemia factory add` trusts them unless
- * `--no-trust` (`trustPlaces`); the daemon renders its tree.
+ * `nemia factory apply`: a factory filed from a template, its writable volumes then trusted as `nemia factory add` trusts them unless
+ * `--no-trust` (`volumesTrusted`); the daemon renders its tree.
  */
 export const FACTORY_APPLY: Served<Applied & { trusts: readonly PlaceTrust[] }> = {
   ...FACTORY_APPLY_WORDS,
   handler: (args) =>
     Effect.gen(function* () {
       const filed = yield* applied(args);
-      return { ...filed, trusts: args.noTrust === true ? [] : yield* trustPlaces(filed.repos) };
+      return { ...filed, trusts: yield* volumesTrusted(filed.volumes, args.noTrust === true) };
     }),
 };

@@ -38,6 +38,7 @@ import { leaseRelease } from '../release/index.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import { retain } from '../retention/retention.verb.ts';
 import { raiseStoreFloor } from '../release/archive.store.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
 import { credentialKept } from '../token/token.store.ts';
 import { releaseCheck } from '../release/check.verb.ts';
 import { upgradeCarries, type Running } from '../release/index.ts';
@@ -317,7 +318,8 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * it removes the installed releases no one needs (`retain`), pinning the one this process runs: by then each session it adopted has
  * recorded what it runs on. On a ninth, once the first pass has answered, an archive install asks for the newest release every six hours
  * (`releaseCheck`), unless `NEMIA_RELEASE_CHECK=off`. As it takes the store it raises the store's floor to the oldest release that reads
- * what this one writes, never lowering it (`raiseStoreFloor`), so `nemia upgrade` refuses to go back past it, and puts the person's
+ * what this one writes, never lowering it (`raiseStoreFloor`), each factory's file an earlier release wrote moved first into one list
+ * of volumes (`volumesMoved`), so `nemia upgrade` refuses to go back past it, and puts the person's
  * credential in place (`credentialKept`), so the person's `nemia` on this machine presents a token with nothing typed. Before the
  * engine holds anything it puts the store's tools folder first on its own PATH, its place's tools after it and their variables set
  * (`toolsOnPath`), and adopts each harness a release carries that the tools folder lacks (`adoptedAtStart`); once the engine
@@ -333,6 +335,17 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  */
 export const up = (e: Engine, options: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig> =>
   eventLoopWatched(daemon(e, options));
+
+/**
+ * Each factory file an earlier release wrote, moved into one list of volumes through the Factory door (`moveVolumes`), at every start,
+ * so a start stopped half way is finished by the next: each moved logged, and each left as it was warned of with why, the daemon going on
+ * (a file left reads as one that does not, naming `nemia up`, until it is fixed by hand).
+ */
+const volumesMoved = Effect.gen(function* () {
+  const { moved, left } = yield* (yield* FactoryDoor).factories.moveVolumes();
+  for (const file of moved) yield* Effect.logInfo(`${file} moved into one list of volumes: its repositories are its writable volumes.`);
+  for (const { file, why } of left) yield* Effect.logWarning(`${file} was left in the shape an earlier release wrote: ${why}.`);
+});
 
 /** The daemon `up` runs with its event loop watched: its doc says what it does. */
 const daemon = (
@@ -351,6 +364,7 @@ const daemon = (
       }),
       ({ held }) => Effect.sync(() => releaseStore(home, held)),
     );
+    yield* volumesMoved;
     yield* Effect.try({ try: () => raiseStoreFloor(home), catch: (err) => err });
     yield* Effect.try({ try: () => credentialKept(home), catch: (err) => err });
     const declared = (yield* PlaceService).declared;
@@ -395,7 +409,7 @@ const daemon = (
     yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(retain([leaseRelease(runningRelease())])), over(e)));
     yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(releaseCheck(runningRelease()))));
     let ready: Readiness | undefined;
-    yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(readied(memo, (read) => void (ready = read)))));
+    yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(readied(memo, (read) => void (ready = read))), over(e)));
     yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;

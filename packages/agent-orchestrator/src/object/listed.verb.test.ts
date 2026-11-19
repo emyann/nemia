@@ -19,11 +19,13 @@ const repo = scratch('nemia-object-listed-repo-');
 const acme: FactoryListing = {
   name: 'acme',
   file: path.join(home, 'factories', 'acme.json'),
-  repos: [repo],
+  volumes: [
+    { path: repo, readOnly: false },
+    { path: '/data/a', readOnly: true },
+  ],
   workflows: ['make'],
   hires: { 'make/implement': 'implementer' },
   schedules: {},
-  volumes: [{ path: '/data/a', readOnly: true }],
   generation: 3,
 };
 const { name: _name, file: _file, ...filed } = acme;

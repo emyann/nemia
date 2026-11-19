@@ -360,7 +360,7 @@ const flagWords = (flag: Flag, value: Args[string]): string[] => {
 /**
  * The command line that names `command` on these arguments, as a refusal says what to type: `nemia retry r-1 implement`, `nemia rm a b`. A
  * positional not given is said as the usage says it (`unsaid`); a rest is left out. `flags`, by their keys, are said after the positionals
- * in the order the spec lists them: `nemia factory add <name> --repo <path>`; a key no flag of the spec has is left out.
+ * in the order the spec lists them: `nemia factory add <name> --volume <path|url>:rw`; a key no flag of the spec has is left out.
  * @param command The command's name and its spec, whose positionals and flags are said.
  * @param args The positionals given, by their keys.
  * @param flags The flags to say, by their keys; none by default.

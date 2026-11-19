@@ -67,7 +67,11 @@ const classOf = (err: unknown): ApiErrorClass | undefined => API_ERRORS.find((ki
 export const refusedAs = (err: unknown): ApiError | undefined => {
   if (classOf(err) !== undefined) return err as ApiError;
   if (err instanceof TokenRefused)
-    return new Unauthorized({ error: err.message, ...(err.reason === undefined ? {} : { reason: err.reason }) });
+    return new Unauthorized({
+      error: err.message,
+      ...(err.reason === undefined ? {} : { reason: err.reason }),
+      ...(err.exposed === undefined ? {} : { exposed: err.exposed }),
+    });
   if (!isRefusal(err)) return undefined;
   switch (err._tag) {
     case 'Missing':

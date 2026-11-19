@@ -17,7 +17,7 @@ import { listed, summary, waitingRun } from './run-fixtures.ts';
 
 const SRC = path.resolve(import.meta.dirname, '../src');
 
-const nemia = { name: 'nemia', default: false, repos: [], workflows: [], hires: {}, error: null } as unknown as Factory;
+const nemia = { name: 'nemia', default: false, worksOn: [], workflows: [], hires: {}, error: null } as unknown as Factory;
 
 /** A run that still moves while a step of it waits at its gate, a running run at its gate, and one run that only moves. */
 const both = summary(

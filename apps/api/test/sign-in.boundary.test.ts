@@ -19,7 +19,7 @@ import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 import { scratch } from 'test-kit/scratch';
 
-addFactory({ name: 'signmill', repos: [scratch('nemia-api-sign-in-')] });
+addFactory({ name: 'signmill', volumes: [scratch('nemia-api-sign-in-')].map((r) => `${r}:rw`) });
 fs.mkdirSync(path.join(root, 'factories', 'signmill'), { recursive: true });
 
 const GITHUB = JSON.parse(fs.readFileSync(path.join(BUILTIN_SERVERS, 'github.json'), 'utf8')) as Record<string, unknown>;

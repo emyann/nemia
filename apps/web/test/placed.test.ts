@@ -11,7 +11,7 @@ import { factoryCommands, factoryList, factoryObject, scheduleList } from './fac
 
 /** A factory as the objects list it, on `repos`. */
 const factory = (name: string, repos: string[]) =>
-  factoryObject({ metadata: { name }, spec: { repos, workflows: [], hires: {}, volumes: [] } });
+  factoryObject({ metadata: { name }, spec: { workflows: [], hires: {}, volumes: repos.map((path) => ({ path, readOnly: false })) } });
 
 /**
  * Answers every fetch of the test `t`: the factories with `factories`, each factory's lines and schedules, a namespace's workflows with

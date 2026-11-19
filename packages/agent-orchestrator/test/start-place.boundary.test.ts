@@ -174,7 +174,7 @@ test('a SIGINT to nemia start is not passed on to the group of the git open runs
     PATH: `${bin}${path.delimiter}${process.env.PATH}`,
   };
   for (const args of [
-    ['factory', 'add', 'signal', '--repo', repo],
+    ['factory', 'add', 'signal', '--volume', `${repo}:rw`],
     ['factory', 'attach', 'signal', 'dev'],
   ])
     await typed(args, engine(env), undefined, builtinGitPlace, { ...env, PATH: process.env.PATH });

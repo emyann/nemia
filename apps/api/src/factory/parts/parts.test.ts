@@ -17,7 +17,7 @@ import { ReadMemo } from '../../layer.ts';
 const repo = scratch('nemia-api-parts-');
 fs.mkdirSync(path.join(repo, 'workflows', 'make'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'workflows', 'make', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
-addFactory({ name: 'works', repos: [repo] });
+addFactory({ name: 'works', volumes: [repo].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'works', workflow: 'make' });
 
 test('each path answers its kind, and each list its <Kind>List', async () => {

@@ -6,6 +6,7 @@
  * still moving and of none other. A controller: it reads the store, the engine's journals and feed through the client, and where
  * branches stand off `standing.json` (`standingSnapshot`).
  */
+import path from 'node:path';
 import { Effect } from 'effect';
 import type { StepSpec } from '../step/step.ts';
 import type { Engine } from '../runtime-client.ts';
@@ -33,6 +34,7 @@ import {
   type WaitOn,
 } from '../feed/index.ts';
 import type { CheckVerdict } from '../check/index.ts';
+import { RUN_PHASE_IN_PLAY } from '../phase/phase.ts';
 import { judgedSteps, stepNames, tryOf, type Unreadable, type Views, workflowsOf } from './reads.verb.ts';
 import {
   needsOf,
@@ -480,6 +482,28 @@ export const cardRuns = Effect.fn('cardRuns')(function* (e: Engine, { home, memo
     const phase = 'judgement' in one ? one.judgement.judged.phase : unjudgedFields().phase;
     return [{ id: run.id, ...(run.from === undefined ? {} : { from: run.from }), phase }];
   });
+});
+
+/**
+ * The id of each run of the factory `factory` still in play whose repository is `repo`, judged through the informer `how.memo` as the
+ * cards' runs are (`cardRuns`): the runs a volume's removal, or its turning read-only, would leave on a repository their factory no
+ * longer works on. A run that could not be judged reads `running`, in play (`unjudgedFields`); one the informer keeps none of is not read.
+ * @param e The engine.
+ * @param how The store's root, the informer and whether its answers are verified.
+ * @param factory The factory's name.
+ * @param repo The repository, by its whole path.
+ */
+export const runsWorkingOn = Effect.fn('runsWorkingOn')(function* (e: Engine, how: SummaryHow, factory: string, repo: string) {
+  const { git, read, all } = yield* listedThrough(e, how.memo, how.verify);
+  const on = all.filter((run) => run.factory === factory && run.repo !== undefined && path.resolve(run.repo) === repo);
+  const judged = yield* informedJudgements(e, how.home, on, read, git, () => all);
+  return on
+    .filter((run) => {
+      const one = judged.runs.get(run.id);
+      return one !== undefined && RUN_PHASE_IN_PLAY['judgement' in one ? one.judgement.judged.phase : unjudgedFields().phase];
+    })
+    .map((run) => run.id)
+    .sort();
 });
 
 /** A run whose record mounts volumes, as a Volume's status reads it: its id, its factory, its phase and the folders it mounts. */

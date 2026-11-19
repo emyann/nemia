@@ -13,13 +13,13 @@ export type { YourStore };
 /**
  * Your store under the root `home` (objects' `YourStore`), each folder absolute: `workflows`, where your workflows' folders are;
  * `agents`, your agents' files; `skills`, your library of skills. `fileFactory`: the line that files a factory, `nemia factory add <name>
- * --repo <path>`. `turnOnNemia`: the line that turns Nemia on, `nemia level semi-auto`, the act the board's switch takes.
+ * --volume <path|url>:rw`. `turnOnNemia`: the line that turns Nemia on, `nemia level semi-auto`, the act the board's switch takes.
  * @param home The store's root folder.
  */
 export const yourStore = (home: string): YourStore => ({
   workflows: path.join(home, 'workflows'),
   agents: yourAgentsDir(home),
   skills: librarySkills(home),
-  fileFactory: commandLine(FACTORY_ADD, {}, { repos: '<path>' }),
+  fileFactory: commandLine(FACTORY_ADD, {}, { volumes: '<path|url>:rw' }),
   turnOnNemia: commandLine(LEVEL, { level: 'semi-auto' }),
 });

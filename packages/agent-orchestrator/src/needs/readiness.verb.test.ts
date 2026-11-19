@@ -34,7 +34,8 @@ import type { Run } from '../record/record.ts';
 import { aRun } from '../../test/run-walks.ts';
 import { names } from '../../test/assessed.ts';
 import { nemiaDir, writeUntrusted } from '../nemia/level.store.ts';
-import { trustFolder } from '../runtime-client.ts';
+import { engineOf, EngineService, trustFolder } from '../runtime-client.ts';
+import { testEngine } from 'agent-runtime/testing';
 import { trustPlaces } from '../trust/trust.verb.ts';
 
 const ROOT = scratch('wf-readiness-');
@@ -156,6 +157,39 @@ test('a harness in place says whether its version is the pin and offers its remo
   for (const fix of signIn?.fixes ?? []) assert.deepEqual([fix.kind, fix.startable], ['typed', false]);
 });
 
+test('a harness in place carries its two checks: its version against the pin, with the install again where it differs, and its last turn, unrun', async () => {
+  const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
+  fs.writeFileSync(SIGNED_IN, '');
+  const checksOf = async (given: ReadinessFacts, engine = false) => {
+    const program = readinessOf(given).pipe(
+      Effect.provide(PlaceService.layer({ ...testPlace().place, declared: { ...declared, needs: [identity('exit 0')] } })),
+      Effect.provideService(StoreRoot, ROOT),
+    );
+    const got = await Effect.runPromise(engine ? program.pipe(Effect.provide(EngineService.layer(engineOf(testEngine().layer)))) : program);
+    return got.pieces.find((p) => p.name === DEFAULT_HARNESS)?.checks ?? [];
+  };
+  const [atPin] = await checksOf(facts({ PATH }));
+  assert.deepEqual([atPin?.name, atPin?.state, atPin?.found, atPin?.pin], ['version', 'passed', CLAUDE_PIN, CLAUDE_PIN]);
+  const [drifted] = await checksOf(facts({ PATH }, {}, '0.0.1'));
+  assert.deepEqual([drifted?.state, drifted?.found, drifted?.pin], ['failed', '0.0.1', CLAUDE_PIN]);
+  assert.deepEqual(
+    drifted?.fixes.map((f) => [f.startable, f.index]),
+    [[true, 0]],
+    'the install is offered again',
+  );
+  const broken = facts({ PATH });
+  const [unread] = await checksOf({
+    ...broken,
+    run: (command, args) =>
+      command === 'env' && args.at(-1)?.endsWith('--version') ? { code: 1, out: 'error: cannot find module\n' } : broken.run(command, args),
+  });
+  assert.equal(unread?.state, 'failed');
+  assert.ok(unread?.message.includes('cannot find module'), 'it fails in what the program printed');
+  assert.equal((await checksOf(facts({ PATH }))).length, 1, 'with no engine given, no turn is read');
+  const [, turn] = await checksOf(facts({ PATH }), true);
+  assert.deepEqual([turn?.name, turn?.state], ['turn', 'unrun']);
+});
+
 test('the kept token reaches the sign-in check, said as set and loading, never as good; a file others may read is missing, its chmod typed', async () => {
   fs.rmSync(SIGNED_IN, { force: true });
   writeClaudeToken(ROOT, 'a-token');
@@ -200,7 +234,7 @@ test("a need of a factory whose places are not trusted is unknown, its check nev
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'README.md'), '---\nneeds:\n  - name: stray-tool\n    message: the tool\n    check: touch ran\n---\n');
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  createFactoryAt(ROOT, { name: 'stray', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'stray', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
   const toolchain: Need = { name: 'toolchain', message: 'the toolchain', check: 'touch ran-here', scope: 'repository' };
   const got = await read(facts({ PATH: '/usr/bin' }), identity('exit 0'), toolchain);
   const need = got.pieces.find((p) => p.name === 'stray-tool');
@@ -268,7 +302,7 @@ test.skipIf(INSTALLED_BESIDE_NODE)(
     const dir = path.join(repo, 'workflows', 'dev');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: folder\nharness: ${other}\n---\nimplement it\n`);
-    createFactoryAt(ROOT, { name: 'named', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+    createFactoryAt(ROOT, { name: 'named', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
     const named = await read(facts({ PATH }), identity('exit 0'));
     assert.deepEqual(states(named), ['missing', 'missing'], "a factory's workflow runs on it, so it counts");
     assert.equal(named.ready, false);
@@ -316,10 +350,16 @@ test.skipIf(INSTALLED_BESIDE_NODE)(
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: folder\n---\nimplement it\n');
 
-    createFactoryAt(home, { name: 'unhired', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+    createFactoryAt(home, { name: 'unhired', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
     assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'the store agent alone, hired nowhere, runs no step');
 
-    createFactoryAt(home, { name: 'hired', repos: [repo], workflows: ['dev'], hires: { 'dev/implement': 'coder' }, schedules: {} });
+    createFactoryAt(home, {
+      name: 'hired',
+      volumes: [{ path: repo, readOnly: false }],
+      workflows: ['dev'],
+      hires: { 'dev/implement': 'coder' },
+      schedules: {},
+    });
     const hired = await readAt(home);
     assert.deepEqual(hired.states, ['missing', 'missing'], "hired into the factory's step, the store agent's harness counts");
     assert.equal(hired.ready, false);
@@ -560,7 +600,7 @@ test("a workflow's need of scope repository is read in its factory's repository,
   );
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
   fs.writeFileSync(path.join(repo, 'only-here'), '');
-  createFactoryAt(ROOT, { name: 'scoped', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'scoped', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
   await Effect.runPromise(trustPlaces([repo]).pipe(Effect.provide(PlaceService.layer(testPlace().place))));
   const got = await read(facts({ PATH: '/usr/bin' }), identity('exit 0'));
   const of = (name: string) => got.pieces.find((p) => p.name === name);

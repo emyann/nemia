@@ -87,7 +87,7 @@ test('the command line a table command shows names what was given', () => {
   assert.equal(commandLine(RETRY, { runId: 'r-1', step: 'impl' }), 'nemia retry r-1 impl');
   assert.equal(commandLine(SAY, { runId: 'r-1', step: 'impl', text: 'hi' }), 'nemia say r-1 impl');
   const add = words('factory add');
-  assert.equal(commandLine(add, {}, { repos: '<path>' }), 'nemia factory add <name> --repo <path>');
+  assert.equal(commandLine(add, {}, { volumes: '<path>:rw' }), 'nemia factory add <name> --volume <path>:rw');
 });
 
 /** What each flag `nemia stats` takes, as its refusal of one it does not take lists them. */

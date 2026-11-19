@@ -19,6 +19,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as TokensRouteImport } from './routes/tokens'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as AgentsNewRouteImport } from './routes/agents_.new'
 import { Route as FactoriesFactoryRouteImport } from './routes/factories.$factory'
@@ -96,6 +97,11 @@ const StatsRoute = StatsRouteImport.update({
 const TokensRoute = TokensRouteImport.update({
   id: '/tokens',
   path: '/tokens',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkflowsRoute = WorkflowsRouteImport.update({
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/stats': typeof StatsRoute
   '/tokens': typeof TokensRoute
+  '/welcome': typeof WelcomeRoute
   '/workflows': typeof WorkflowsRoute
   '/agents/new': typeof AgentsNewRoute
   '/factories/$factory': typeof FactoriesFactoryRoute
@@ -303,6 +310,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/stats': typeof StatsRoute
   '/tokens': typeof TokensRoute
+  '/welcome': typeof WelcomeRoute
   '/workflows': typeof WorkflowsRoute
   '/agents/new': typeof AgentsNewRoute
   '/factories/$factory': typeof FactoriesFactoryRoute
@@ -344,6 +352,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/stats': typeof StatsRoute
   '/tokens': typeof TokensRoute
+  '/welcome': typeof WelcomeRoute
   '/workflows': typeof WorkflowsRoute
   '/agents_/new': typeof AgentsNewRoute
   '/factories/$factory': typeof FactoriesFactoryRoute
@@ -386,6 +395,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/stats'
     | '/tokens'
+    | '/welcome'
     | '/workflows'
     | '/agents/new'
     | '/factories/$factory'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/stats'
     | '/tokens'
+    | '/welcome'
     | '/workflows'
     | '/agents/new'
     | '/factories/$factory'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/stats'
     | '/tokens'
+    | '/welcome'
     | '/workflows'
     | '/agents_/new'
     | '/factories/$factory'
@@ -507,6 +519,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   StatsRoute: typeof StatsRoute
   TokensRoute: typeof TokensRoute
+  WelcomeRoute: typeof WelcomeRoute
   WorkflowsRoute: typeof WorkflowsRoute
   AgentsNewRoute: typeof AgentsNewRoute
   FactoriesFactoryRoute: typeof FactoriesFactoryRoute
@@ -607,6 +620,13 @@ declare module '@tanstack/react-router' {
       path: '/tokens'
       fullPath: '/tokens'
       preLoaderRoute: typeof TokensRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workflows': {
@@ -819,6 +839,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   StatsRoute: StatsRoute,
   TokensRoute: TokensRoute,
+  WelcomeRoute: WelcomeRoute,
   WorkflowsRoute: WorkflowsRoute,
   AgentsNewRoute: AgentsNewRoute,
   FactoriesFactoryRoute: FactoriesFactoryRoute,

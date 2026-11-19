@@ -588,18 +588,10 @@ export {
   type UpgradeStreamEventName,
 } from './words.ts';
 export { PreviousRelease, Upgrade, UpgradeStart, UpgradeStreamEvent, UpgradesGroup, UpgradesRead } from './upgrade.ts';
-export {
-  Fix,
-  FixStart,
-  FixStreamEvent,
-  Readiness,
-  ReadinessFix,
-  ReadinessGroup,
-  ReadinessPiece,
-  missingSaid,
-  readinessSaid,
-  runsWait,
-} from './readiness.ts';
+export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
+export { HarnessCheck, HarnessTurn, MilestoneRead, Milestones, TurnStart, missingSaid, readinessSaid, runsWait } from './readiness.ts';
+export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES } from './words.ts';
+export type { HarnessCheckName, HarnessCheckState, Milestone, MilestoneState, TurnFailure } from './words.ts';
 export {
   LinkClaimed,
   LinkMinted,
@@ -754,7 +746,6 @@ export {
   FACTORY_SETTINGS_HARNESS,
   FACTORY_VOLUME_ADD_WORDS,
   FACTORY_VOLUME_RM_WORDS,
-  NOT_THE_WORKSPACE,
   SETTING_FORMS,
   VOLUME_FORMS,
 } from './commands-factories-settings.ts';
@@ -793,7 +784,7 @@ export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WAT
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
 export { LEVEL_FORM, LEVEL_WORDS, SUBSCRIBE_FORM, SUBSCRIBE_WORDS, UNSUBSCRIBE_WORDS, levelWritten } from './commands-rest-nemia.ts';
-export { BOARD_LINK_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from './commands-rest-pairing.ts';
+export { BOARD_LINK_WORDS, OPEN_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from './commands-rest-pairing.ts';
 export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest-tokens.ts';
 export { Actor, actorWords, Token, TokenList, TokenMint, TokenMinted, TokensGroup } from './token.ts';
 export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-rest-stats.ts';

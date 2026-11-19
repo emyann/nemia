@@ -294,7 +294,7 @@ describe('a person writes their library: an agent, a skill and a workflow, each 
       fs.writeFileSync(path.join(tree, 'workflows', 'agents', 'scribe.md'), SCRIBE.replace('output: scribe.schema.json\n', ''));
       fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['hired'], hires: { 'hired/only': 'scribe' } }));
       const template = { source: path.join(DRAFTS, 'shop.tgz'), version: '1.0.0', params: {} };
-      fs.writeFileSync(path.join(factories, 'shop.json'), JSON.stringify({ repos: [repo], template }));
+      fs.writeFileSync(path.join(factories, 'shop.json'), JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template }));
       const folder = path.join(DRAFTS, 'workflows', 'hired');
       fs.mkdirSync(folder, { recursive: true });
       fs.writeFileSync(path.join(folder, 'only.md'), '---\nplace: git\nskills: [tidy]\n---\n');

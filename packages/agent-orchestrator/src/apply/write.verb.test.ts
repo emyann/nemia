@@ -85,7 +85,10 @@ function plantedNeeds(prefix: string): { home: string; readme: string } {
   fs.mkdirSync(factories, { recursive: true });
   fs.writeFileSync(
     path.join(factories, `${FACTORY}.json`),
-    JSON.stringify({ repos: [scratch(`${prefix}repo-`)], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+    JSON.stringify({
+      volumes: [{ path: scratch(`${prefix}repo-`), readOnly: false }],
+      template: { source: '/t/team', version: '0.1.0', params: {} },
+    }),
   );
   const tree = path.join(factories, FACTORY, 'tree');
   fs.cpSync(TEAM, path.join(tree, 'workflows'), { recursive: true });

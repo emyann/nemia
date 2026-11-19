@@ -3388,13 +3388,13 @@ run 'wf tick' (or 'wf up') to start it
 
 ## Factories: a named grouping in the store — `wf factory`
 
-A factory names the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps, as a
-file of its own in the store. A run started in a factory names it on its record, and every run is started in one
+A factory names its volumes, the writable ones the repositories a body of work is on, the workflows it offers, and the agents it
+hires into their steps, as a file of its own in the store. A run started in a factory names it on its record, and every run is started in one
 ([*Every run in a factory*](#every-run-in-a-factory)); a record or a card written before, that names none, is in the one default
 factory, which holds that history.
 
 ```
-$ wf factory add pipao --repo ~/code/pipao
+$ wf factory add pipao --volume ~/code/pipao:rw
 pipao  /home/me/code/pipao
 filed: /home/me/.agent-workflows/factories/pipao.json
 $ wf factory attach pipao build
@@ -3414,9 +3414,11 @@ $ wf factory detach pipao build
 $ wf factory rm pipao
 ```
 
-- **A factory is `$WF_ROOT/factories/<name>.json`**, `{ "repos": ["/abs/path", ...] }`; its name is the file's. `wf factory
+- **A factory is `$WF_ROOT/factories/<name>.json`**, `{ "volumes": [{ "path": "/abs/path", "readOnly": false }, ...] }`, none at
+  all included; its name is the file's. `wf factory
   add` writes it whole to a hidden file and links it onto its name, so a reader never sees half of one and two adds of one
-  name file one. A key beside `repos` is kept when the file is read.
+  name file one. A key beside `volumes` is kept when the file is read; a file
+  an earlier release wrote, with `repos` and `origins`, is moved into volumes once, when the daemon starts.
 - **The default factory is no file.** It holds everything that names no factory: `wf factory` lists it first, and `add` and
   `rm` refuse its name, `default`. A `default.json` written by hand is listed as a file to remove by hand, never as a factory.
 - **A repository is a directory**, resolved from where `wf` is typed, as `wf start --repo` records one, and named once.

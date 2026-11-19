@@ -24,7 +24,7 @@ import { addFactory } from 'agent-orchestrator/testing';
  */
 const repo = scratch('nemia-api-remove-repo-');
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-addFactory({ name: 'remover', repos: [repo] });
+addFactory({ name: 'remover', volumes: [repo].map((r) => `${r}:rw`) });
 const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 type WorkflowRemoved = { metadata: { name: string }; status: { dir: string; origin: string } };

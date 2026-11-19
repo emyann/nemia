@@ -138,8 +138,14 @@ test("a sweep reads the places', the harnesses' and every trusted factory's work
   const home = scratch('wf-needs-sweep-');
   const trusted = devRepo(home, 'exit 1');
   const untrusted = devRepo(home, 'touch ran');
-  createFactoryAt(home, { name: 'acme', repos: [trusted.repo], workflows: ['dev'], hires: {}, schedules: {} });
-  createFactoryAt(home, { name: 'stray', repos: [untrusted.repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(home, { name: 'acme', volumes: [{ path: trusted.repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(home, {
+    name: 'stray',
+    volumes: [{ path: untrusted.repo, readOnly: false }],
+    workflows: ['dev'],
+    hires: {},
+    schedules: {},
+  });
   const placed = PlaceService.layer(testPlace().place);
   await Effect.runPromise(trustPlaces([trusted.repo]).pipe(Effect.provide(placed)));
   const memo = needsMemo(home, 2_000);
@@ -187,7 +193,7 @@ test("a workflow's need of scope repository is swept in its factory's repository
   );
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
   fs.writeFileSync(path.join(repo, 'only-here'), '');
-  createFactoryAt(home, { name: 'acme', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(home, { name: 'acme', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
   const placed = PlaceService.layer(testPlace().place);
   await Effect.runPromise(trustPlaces([repo]).pipe(Effect.provide(placed)));
   const memo = needsMemo(home, 2_000);

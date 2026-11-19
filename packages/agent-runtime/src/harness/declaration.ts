@@ -103,7 +103,9 @@ export type HarnessSignInFix = {
  * - `check`: whether its program is found;
  * - `install`: puts its program at `pin` into `$NEMIA_TOOLS/harnesses/<name>/<pin>/`, linked as `$NEMIA_TOOLS/bin/<program>`;
  * - `remove`: takes what `install` put away;
- * - `signIn`: the check whose exit 0 says it is signed in as the user that runs it, and the fixes that sign it in.
+ * - `signIn`: the check whose exit 0 says it is signed in as the user that runs it, and the fixes that sign it in;
+ * - `turnModel`: the smallest model a check's one tiny turn runs on, in the harness's own words, where it runs one under a spend cap;
+ *   absent, it runs none.
  */
 export type HarnessNeeds = {
   readonly program: string;
@@ -114,6 +116,7 @@ export type HarnessNeeds = {
   readonly install: string;
   readonly remove: string;
   readonly signIn: { readonly check: string; readonly fixes: readonly HarnessSignInFix[] };
+  readonly turnModel?: string;
 };
 
 /**

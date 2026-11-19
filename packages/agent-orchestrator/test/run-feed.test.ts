@@ -624,7 +624,7 @@ describe('a pinned run whose files moved past its pins says `revisions behind` o
   s.test('a run in a factory that follows revisions never raises it', async () => {
     const repo = aRepo();
     const factory = 'follows';
-    addFactoryAt(ROOT, { name: factory, repos: [repo] });
+    addFactoryAt(ROOT, { name: factory, volumes: [repo].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory, workflow: name });
     followed(ROOT, factory, 'follow');
     const follows = await stage.runPlaced(startRun({ brief: 'follows', repo, workflowDir: dir, isolate: false, factory }));

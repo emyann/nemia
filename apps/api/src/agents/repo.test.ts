@@ -18,7 +18,7 @@ import { app } from '../app.ts';
 const own = scratch('nemia-api-repo-own-');
 const theirs = scratch('nemia-api-repo-theirs-');
 process.env.HKB_REPO = own;
-addFactory({ name: 'elsewhere', repos: [theirs] });
+addFactory({ name: 'elsewhere', volumes: [theirs].map((r) => `${r}:rw`) });
 fs.mkdirSync(path.join(theirs, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(theirs, 'workflows', 'agents', 'outrider.md'), '---\ndescription: Rides out.\n---\nRide out.\n');
 fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });

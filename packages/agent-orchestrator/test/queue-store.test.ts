@@ -245,7 +245,7 @@ const aSoloFactory = (attached: readonly string[]): string => {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const repo = aRepo();
   fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
-  addFactoryAt(ROOT, { name: 'solo', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
   for (const workflow of attached) attachWorkflowAt(ROOT, { factory: 'solo', workflow });
   return repo;
 };
@@ -973,7 +973,7 @@ describe("the queue's failures: a card whose start is refused — its workflow g
       emptyStore(undefined);
       const [first, second] = [aRepo(), aRepo()];
       for (const r of [first, second]) fs.cpSync(TEAM, path.join(r, 'workflows'), { recursive: true });
-      addFactoryAt(ROOT, { name: 'duo', repos: [first, second] });
+      addFactoryAt(ROOT, { name: 'duo', volumes: [first, second].map((r) => `${r}:rw`) });
       attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev' });
       aCard('duo-card', { workflow: 'dev', repo: '/elsewhere', factory: 'duo', queued: at(1) }, 'Build it in duo.');
       const daemons = aRepoWith('dev');

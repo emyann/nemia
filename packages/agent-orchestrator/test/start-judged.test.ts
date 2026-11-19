@@ -284,7 +284,7 @@ describe("REFUSED at nemia start, before a run is written: a step's first filing
     const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
     const dir = lone('settings-asked', 'agent: plain', { plain: '---\nrole: Builder\n---\nBuild it.\n' });
     fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
-    const file = { repos: [repo], workflows: ['settings-asked'], harnessSettings };
+    const file = { volumes: [{ path: repo, readOnly: false }], workflows: ['settings-asked'], harnessSettings };
     fs.writeFileSync(path.join(ROOT, 'factories', 'settled.json'), JSON.stringify(file));
     started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[6]) });
     assert.deepEqual(asked, [harnessSettings]);

@@ -208,7 +208,10 @@ write(path.join(root, 'inbox', 'hold-the-reads.md'), 'Hold the reads to the old 
 write(path.join(root, 'inbox', 'called-off.md'), '---\nlabels:\n  team: gone\n---\nCalled off.\n');
 write(
   path.join(root, 'factories', 'nightly.json'),
-  JSON.stringify({ repos: [root], schedules: { tidy: { cron: '0 3 * * *', brief: 'Tidy the docs.', since: at(0) } } }),
+  JSON.stringify({
+    volumes: [{ path: root, readOnly: false }],
+    schedules: { tidy: { cron: '0 3 * * *', brief: 'Tidy the docs.', since: at(0) } },
+  }),
 );
 
 /** How a child ended, and what it said on each stream. */

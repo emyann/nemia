@@ -54,7 +54,7 @@ test("a warm read of the factories reads no finished run's record, however many 
   fs.mkdirSync(RUNS, { recursive: true });
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
-  addFactoryAt(ROOT, { name: 'nemia', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'nemia', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'nemia', workflow: 'janitor' });
   setScheduleAt(ROOT, { factory: 'nemia', workflow: 'janitor', cron: '0 3 * * *', brief: 'tidy' });
   writeRun('r-fired', { factory: 'nemia', workflow: 'janitor', due: '2026-10-15T03:00:00.000Z' });

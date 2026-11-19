@@ -164,7 +164,7 @@ function anOrigin(): { dir: string; url: string } {
   return { dir, url: pathToFileURL(dir).href };
 }
 
-test('under a remote context `nemia factory add --repo <url>` files the factory on the server, cloned there; a URL with a password is refused, exit 2, nothing filed', async (t) => {
+test('under a remote context `nemia factory add --volume <url>:rw` files the factory on the server, cloned there; a URL with a password is refused, exit 2, nothing filed', async (t) => {
   const vps = await servedStore('nemia-context-clone-', () => {}, { WF_EXPOSED: '1' });
   t.onTestFinished(vps.stop);
   const minted = await nemia(['token', 'add', 'laptop'], vps.env);
@@ -175,38 +175,38 @@ test('under a remote context `nemia factory add --repo <url>` files the factory 
   assert.equal((await nemia(['config', 'set-context', 'vps', '--server', vps.url, '--token-file', tokenFile(folder, token)], env)).code, 0);
   assert.equal((await nemia(['config', 'use-context', 'vps'], env)).code, 0);
   const { dir, url } = anOrigin();
-  const added = await nemia(['factory', 'add', 'mill', '--repo', url, '--no-trust'], env);
+  const added = await nemia(['factory', 'add', 'mill', '--volume', `${url}:rw`, '--no-trust'], env);
   assert.equal(added.code, 0, added.err);
   const into = path.join(vps.root, 'clones', 'localhost', ...dir.split(path.sep).filter(Boolean));
   const mill = JSON.parse(fs.readFileSync(path.join(vps.root, 'factories', 'mill.json'), 'utf8'));
-  assert.deepEqual([mill.repos, mill.origins], [[into], { [into]: url }]);
+  assert.deepEqual(mill.volumes, [{ path: into, readOnly: false, origin: url, name: 'r' }]);
   assert.ok(fs.existsSync(path.join(into, '.git')), 'the clone is made on the server');
-  const secret = await nemia(['factory', 'add', 'secret', '--repo', 'https://u:p@host/o/r', '--no-trust'], env);
+  const secret = await nemia(['factory', 'add', 'secret', '--volume', 'https://u:p@host/o/r:rw', '--no-trust'], env);
   assert.equal(secret.code, 2, secret.err);
   assert.equal(fs.existsSync(path.join(vps.root, 'factories', 'secret.json')), false, 'nothing filed');
   assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
 });
 
 describe('`nemia factory add --template` is refused naming `nemia factory apply`, exit 2, under a remote context and on this machine alike', () => {
-  let env!: NodeJS.ProcessEnv;
-  let root!: string;
-  let folder!: string;
-  let server!: string;
-  let set!: Said;
-  beforeAll(async () => {
-    ({ env, root, folder } = aLaptop('nemia-context-add-template-'));
-    server = `http://127.0.0.1:${await freePort()}`;
-    set = await nemia(['config', 'set-context', 'vps', '--server', server, '--token-file', tokenFile(folder, 'tok')], env);
-    assert.equal(set.code, 0, set.err);
-  });
-  const typed = ['factory', 'add', 'mill', '--template', 'mill', '--repo', 'https://github.com/o/r'];
-  test('under the remote context, before its server is asked', async () => {
+let env!: NodeJS.ProcessEnv;
+let root!: string;
+let folder!: string;
+let server!: string;
+let set!: Said;
+beforeAll(async () => {
+({ env, root, folder } = aLaptop('nemia-context-add-template-'));
+server = `http://127.0.0.1:${await freePort()}`;
+set = await nemia(['config', 'set-context', 'vps', '--server', server, '--token-file', tokenFile(folder, 'tok')], env);
+assert.equal(set.code, 0, set.err);
+});
+const typed = ['factory', 'add', 'mill', '--template', 'mill', '--volume', 'https://github.com/o/r:rw'];
+test('under the remote context, before its server is asked', async () => {
     const said = await nemia(typed, { ...env, NEMIA_CONTEXT: 'vps' });
     assert.equal(said.code, 2, said.err);
     assert.match(said.err, /nemia factory apply <name> --template/);
     assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
   });
-  test('on this machine', async () => {
+test('on this machine', async () => {
     const said = await nemia(typed, env);
     assert.equal(said.code, 2, said.err);
     assert.match(said.err, /nemia factory apply <name> --template/);

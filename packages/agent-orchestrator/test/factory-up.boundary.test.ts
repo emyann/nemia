@@ -36,9 +36,16 @@ test(
       execFileSync(process.execPath, [BIN, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
     const repo = scratch('wf-factory-up-repo-');
     fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+    execFileSync('git', ['init', '-q'], { cwd: repo, stdio: 'ignore' });
     const template = path.join(scratch('wf-factory-up-template-'), 'team');
     nemia('template', 'export', template, '--from', repo);
-    await typed(['factory', 'apply', 'shaped', '--template', template, '--repo', repo], engine(env), undefined, builtinGitPlace, env);
+    await typed(
+      ['factory', 'apply', 'shaped', '--template', template, '--volume', `${repo}:rw`],
+      engine(env),
+      undefined,
+      builtinGitPlace,
+      env,
+    );
     const folder = path.join(root, 'factories', 'shaped');
     assert.deepEqual(fs.existsSync(folder) ? fs.readdirSync(folder) : [], [], 'apply files the factory file alone');
     const up = nodeChild(`process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'up']; await import(${JSON.stringify(BIN)});`, env);

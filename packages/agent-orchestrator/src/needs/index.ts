@@ -3,4 +3,4 @@
  * it is run (`harness.ts`), which a file outside the folder imports from here.
  */
 export { needsWaited, waitingOnNeedsWord, type NeedHeld, type NeedWaited } from './needs.ts';
-export { DEACTIVATED, harnessInstallCommand } from './harness.ts';
+export { DEACTIVATED, harnessInstallCommand, harnessOfNeed, signInNeedOf } from './harness.ts';

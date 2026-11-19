@@ -31,7 +31,10 @@ function planted(name: string, repos: readonly string[]): string {
   fs.mkdirSync(factories, { recursive: true });
   fs.writeFileSync(
     path.join(factories, `${name}.json`),
-    JSON.stringify({ repos, template: { source: '/t/team', version: '0.1.0', params: {} } }),
+    JSON.stringify({
+      volumes: repos.map((at) => ({ path: at, readOnly: false })),
+      template: { source: '/t/team', version: '0.1.0', params: {} },
+    }),
   );
   const tree = path.join(factories, name, 'tree');
   fs.mkdirSync(path.join(tree, 'workflows', 'hired'), { recursive: true });

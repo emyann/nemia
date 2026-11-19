@@ -3148,8 +3148,8 @@ test("REFUSED: the step's bar reads in the address's factory — its folder ther
   const step = (name: string) => ({ name, spec: stepSpec(), body: '', own: null, hired: null, layers: null, mcp: [] });
   const listing = (steps: string[]) => workflow({ name: 'dev', from: 'repo', steps: steps.map(step), error: null });
   const bar = createElement(SpecBar, { from: 'repo', workflow: 'dev', step: 'draft' });
-  const quay = filed('quay', { repos: ['/a', '/b'] });
-  const pipao = filed('pipao', { repos: ['/code/pipao'] });
+  const quay = filed('quay', { worksOn: ['/a', '/b'] });
+  const pipao = filed('pipao', { worksOn: ['/code/pipao'] });
   const data: Array<[readonly unknown[], unknown]> = [
     [['factories'], [quay, pipao]],
     [['workflows'], [listing(['implement'])]],

@@ -160,7 +160,7 @@ const heldOf = (s: Store, name: string) => ({
 const NOTHING = { file: false, folder: false, cards: [] };
 
 /** The factory file of `name` in `s`'s store, as the door wrote it. */
-const fileOf = (s: Store, name: string): { volumes?: Array<{ path: string; readOnly: boolean; name?: string }>; repos: string[] } =>
+const fileOf = (s: Store, name: string): { volumes?: Array<{ path: string; readOnly: boolean; name?: string }> } =>
   JSON.parse(fs.readFileSync(path.join(s.home, 'factories', `${name}.json`), 'utf8'));
 
 /** The run `id` on `s`'s record, started from the inbox's card `card`. */
@@ -209,89 +209,49 @@ function originOfMill(): { origin: string; originDir: string } {
 }
 
 describe("a templated factory moved to a store of a later install: its lineage, tree, rules, level, volume and card read there as here, and the source's store is unchanged", () => {
-  let origin!: string;
-  let originDir!: string;
-  let other!: string;
-  let otherThere!: string;
-  let applied!: {
-    readonly name: string;
-    readonly repos: readonly string[];
-    readonly file: string;
-    readonly template: {
-      readonly source: string;
-      readonly version: string;
-      readonly params: { readonly [x: string]: string | number | boolean };
-    };
-    readonly place: string;
-    readonly tree: string;
-    readonly trusts: readonly (
-      | {
-          readonly place: string;
-          readonly harness: string;
-          readonly folder: string;
-          readonly grants: string;
-          readonly back: string;
-          readonly wrote: boolean;
-          readonly refused: string | null;
-        }
-      | { readonly place: string; readonly unasked: string }
-    )[];
-  };
-  let sourceTree!: string;
-  let clone!: string;
-  let before!: Record<string, string>;
-  let exp!: {
-    readonly name: string;
-    readonly cards: readonly { readonly name: string; readonly source: string }[];
-    readonly folder: { readonly archive: string };
-    readonly file: string;
-    readonly left: readonly { readonly name: string; readonly why: string }[];
-    readonly stays: readonly string[];
-    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
-  };
-  let key!: string;
-  let filed!: {
-    readonly name: string;
-    readonly file: string;
-    readonly repos: readonly string[];
-    readonly cloned: readonly string[];
-    readonly volumes: readonly { readonly name: string; readonly path: string }[];
-    readonly cards: readonly { readonly name: string; readonly was: string }[];
-    readonly untrusted: readonly string[];
-  };
-  beforeAll(async () => {
-    const t = teardowns();
-    ({ origin, originDir } = originOfMill());
-    other = scratch('nemia-api-move-other-');
-    otherThere = scratch('nemia-api-move-other-there-');
-    await answered(send(source, 'POST', '/api/factories', { name: 'quarry', repos: [other], noTrust: true }));
-    applied = await answered<FactoryApplied>(
-      send(source, 'POST', '/api/factories/mill/apply', { template: { name: 'mill' }, repos: [origin], noTrust: true }),
-    );
-    await answered(send(source, 'POST', '/api/factories/mill/volumes', { volume: `${other}:ro` }));
-    await reconciled(source, OLDER);
-    await answered(send(source, 'PUT', '/api/namespaces/mill/schedules/press', SCHEDULE));
-    await answered(send(source, 'PUT', '/api/factories/mill/costlines/press', { usd: 4 }));
-    await answered(send(source, 'PUT', '/api/namespaces/mill/mcpservers/tracker', SERVER));
-    await answered(send(source, 'PUT', '/api/factories/mill/rules', { words: 'Keep drafts short.\n' }));
-    sourceTree = path.join(source.home, 'factories', 'mill', 'tree');
-    fs.writeFileSync(path.join(sourceTree, DRAFT), 'Draft it our way.\n');
-    write(path.join(source.home, 'factories', 'mill', 'level.json'), `${JSON.stringify({ level: 'auto', since: SINCE })}\n`);
-    [clone = ''] = applied.repos;
-    write(
-      path.join(source.home, 'inbox', 'polish-it.md'),
-      `---\nworkflow: press\nfactory: mill\nrepo: ${clone}\nqueued: ${SINCE}\n---\n\nPolish it.\n`,
-    );
-    write(path.join(source.home, 'inbox', 'pressed.md'), '---\nworkflow: press\nfactory: mill\n---\n\nPress it.\n');
-    runFrom(source, 'run-pressed', 'pressed', clone);
-    before = digestsOf(source.home);
-    exp = await answered<FactoryExport>(send(source, 'GET', '/api/factories/mill/export'));
-    key = fileOf(source, 'mill').volumes?.[0]?.name ?? other;
-    return t.end;
-  });
-  const s = story(test);
-  s.test('the export carries the builtin by its name, the card that follows, and names the one a run keeps', () => {
+let origin!: string;
+let originDir!: string;
+let other!: any;
+let otherThere!: any;
+let applied!: any;
+let sourceTree!: any;
+let clone!: any;
+let before!: Record<string, string>;
+let exp!: any;
+let key!: any;
+let filed!: any;
+beforeAll(async () => {
+const t = teardowns();
+({ origin, originDir } = originOfMill());
+other = scratch('nemia-api-move-other-');
+otherThere = scratch('nemia-api-move-other-there-');
+await answered(send(source, 'POST', '/api/factories', { name: 'quarry', volumes: [`${other}:ro`], noTrust: true }));
+applied = await answered<FactoryApplied>(
+    send(source, 'POST', '/api/factories/mill/apply', { template: { name: 'mill' }, volumes: [`${origin}:rw`], noTrust: true }),
+  );
+await answered(send(source, 'POST', '/api/factories/mill/volumes', { volume: `${other}:ro` }));
+await reconciled(source, OLDER);
+await answered(send(source, 'PUT', '/api/namespaces/mill/schedules/press', SCHEDULE));
+await answered(send(source, 'PUT', '/api/factories/mill/costlines/press', { usd: 4 }));
+await answered(send(source, 'PUT', '/api/namespaces/mill/mcpservers/tracker', SERVER));
+await answered(send(source, 'PUT', '/api/factories/mill/rules', { words: 'Keep drafts short.\n' }));
+sourceTree = path.join(source.home, 'factories', 'mill', 'tree');
+fs.writeFileSync(path.join(sourceTree, DRAFT), 'Draft it our way.\n');
+write(path.join(source.home, 'factories', 'mill', 'level.json'), `${JSON.stringify({ level: 'auto', since: SINCE })}\n`);
+([clone = ''] = applied.volumes.map((v) => v.path));
+write(
+    path.join(source.home, 'inbox', 'polish-it.md'),
+    `---\nworkflow: press\nfactory: mill\nrepo: ${clone}\nqueued: ${SINCE}\n---\n\nPolish it.\n`,
+  );
+write(path.join(source.home, 'inbox', 'pressed.md'), '---\nworkflow: press\nfactory: mill\n---\n\nPress it.\n');
+runFrom(source, 'run-pressed', 'pressed', clone);
+before = digestsOf(source.home);
+exp = await answered<FactoryExport>(send(source, 'GET', '/api/factories/mill/export'));
+key = fileOf(source, 'mill').volumes?.find((v) => v.readOnly)?.name ?? other;
+return t.end;
+});
+const s = story(test);
+s.test('the export carries the builtin by its name, the card that follows, and names the one a run keeps', () => {
     assert.deepEqual(exp.template, { name: 'mill' });
     assert.deepEqual(
       exp.cards.map((c) => c.name),
@@ -303,16 +263,14 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     );
     assert.ok(exp.left[0]?.why.includes('run-pressed'), 'why names the run');
   });
-  s.test(
-    "REFUSED: the volume given the target's clone of another factory, inside its store, is a 422 naming --volume, nothing filed",
-    async () => {
+s.test("REFUSED: the volume given the target's clone of another factory, inside its store, is a 422 naming --volume, nothing filed", async () => {
       const quarryOrigin = path.join(scratch('nemia-api-move-quarry-'), 'acme', 'quarry');
       fs.mkdirSync(quarryOrigin, { recursive: true });
       stand().world.repository(quarryOrigin, { 'README.md': 'quarry\n' });
-      const quarry = await answered<{ repos: string[] }>(
-        send(target, 'POST', '/api/factories', { name: 'quarry', repos: [pathToFileURL(quarryOrigin).href], noTrust: true }),
+      const quarry = await answered<{ volumes: Array<{ path: string }> }>(
+        send(target, 'POST', '/api/factories', { name: 'quarry', volumes: [`${pathToFileURL(quarryOrigin).href}:rw`], noTrust: true }),
       );
-      const [quarryClone = ''] = quarry.repos;
+      const [quarryClone = ''] = quarry.volumes.map((v) => v.path);
       assert.ok(quarryClone.startsWith(path.join(target.home, 'clones')), quarryClone);
       const clones = filesOf(path.join(target.home, 'clones'));
       const res = await send(target, 'POST', '/api/factories/mill/import', {
@@ -325,47 +283,46 @@ describe("a templated factory moved to a store of a later install: its lineage, 
       assert.ok(body.includes(`--volume ${key}=`), body);
       assert.deepEqual(heldOf(target, 'mill'), NOTHING);
       assert.deepEqual(filesOf(path.join(target.home, 'clones')), clones, "nothing of mill's is cloned");
-    },
-  );
-  s.test("REFUSED: a session's token whose session has ended is a 401 on the import as on a create, nothing filed", async () => {
+    });
+s.test("REFUSED: a session's token whose session has ended is a 401 on the import as on a create, nothing filed", async () => {
     const bearer = { authorization: `Bearer ${endedToken(target)}` };
-    const create = await send(target, 'POST', '/api/factories', { name: 'mill', repos: [otherThere], noTrust: true }, bearer);
+    const create = await send(target, 'POST', '/api/factories', { name: 'mill', volumes: [`${otherThere}:ro`], noTrust: true }, bearer);
     const imp = await send(target, 'POST', '/api/factories/mill/import', { export: exp, from: 'laptop' }, bearer);
     assert.deepEqual([imp.status, imp.status], [create.status, 401]);
     const reasons = [((await create.json()) as { reason?: string }).reason, ((await imp.json()) as { reason?: string }).reason];
     assert.deepEqual(reasons, ['session-ended', 'session-ended']);
     assert.deepEqual(heldOf(target, 'mill'), NOTHING);
   });
-  s.test('the import clones the repository under the target and trusts none of its places', async () => {
-    filed = await answered<FactoryImported>(
-      send(target, 'POST', '/api/factories/mill/import', { export: exp, from: 'laptop', volumes: { [key]: otherThere } }),
-    );
+s.test('the import clones the repository under the target and trusts none of its places', async () => {
+filed = await answered<FactoryImported>(
+    send(target, 'POST', '/api/factories/mill/import', { export: exp, from: 'laptop', volumes: { [key]: otherThere } }),
+  );
     assert.deepEqual(filed.cloned, [origin]);
     const [there = ''] = filed.repos;
     assert.ok(there.startsWith(path.join(target.home, 'clones')), there);
     assert.equal(stand().world.head(there), stand().world.head(originDir));
     assert.deepEqual(filed.untrusted, filed.repos);
   });
-  s.test("the factory reads there as here: its template's source, version and parameters, its rules and its instruction", async () => {
-    const here = await answered<FactoryObject>(send(source, 'GET', '/api/factories/mill'));
-    const there = await answered<FactoryObject>(send(target, 'GET', '/api/factories/mill'));
-    assert.deepEqual(there.spec.template, here.spec.template);
-    assert.equal(there.spec.template?.version, '0.1.0', 'at the version it was applied at, not the one the target ships');
-    const rules = (s: Store) => answered<FactoryRules>(send(s, 'GET', '/api/factories/mill/rules'));
-    assert.equal((await rules(target)).words, (await rules(source)).words);
-    const instruction = async (s: Store) => {
-      const {
-        words,
-        path: at,
-        store: kept,
-        stored,
-        error,
-      } = await answered<FactoryInstruction>(send(s, 'GET', '/api/factories/mill/instruction'));
-      return { words, at, kept, stored, error };
-    };
-    assert.deepEqual(await instruction(target), await instruction(source));
-  });
-  s.test('its tree with its edit, its rendered base and its level are the files the source holds', () => {
+s.test("the factory reads there as here: its template's source, version and parameters, its rules and its instruction", async () => {
+      const here = await answered<FactoryObject>(send(source, 'GET', '/api/factories/mill'));
+      const there = await answered<FactoryObject>(send(target, 'GET', '/api/factories/mill'));
+      assert.deepEqual(there.spec.template, here.spec.template);
+      assert.equal(there.spec.template?.version, '0.1.0', 'at the version it was applied at, not the one the target ships');
+      const rules = (s: Store) => answered<FactoryRules>(send(s, 'GET', '/api/factories/mill/rules'));
+      assert.equal((await rules(target)).words, (await rules(source)).words);
+      const instruction = async (s: Store) => {
+        const {
+          words,
+          path: at,
+          store: kept,
+          stored,
+          error,
+        } = await answered<FactoryInstruction>(send(s, 'GET', '/api/factories/mill/instruction'));
+        return { words, at, kept, stored, error };
+      };
+      assert.deepEqual(await instruction(target), await instruction(source));
+    });
+s.test('its tree with its edit, its rendered base and its level are the files the source holds', () => {
     const folder = (s: Store) => path.join(s.home, 'factories', 'mill');
     assert.deepEqual(filesOf(path.join(folder(target), 'tree')), filesOf(path.join(folder(source), 'tree')));
     assert.equal(fs.readFileSync(path.join(folder(target), 'tree', DRAFT), 'utf8'), 'Draft it our way.\n');
@@ -375,7 +332,7 @@ describe("a templated factory moved to a store of a later install: its lineage, 
       fs.readFileSync(path.join(folder(source), 'level.json'), 'utf8'),
     );
   });
-  s.test('its schedule, its cost line and its recorded server read there as here', async () => {
+s.test('its schedule, its cost line and its recorded server read there as here', async () => {
     const spec = async (st: Store, url: string) => (await answered<{ spec: unknown }>(send(st, 'GET', url))).spec;
     for (const url of ['/api/namespaces/mill/schedules/press', '/api/namespaces/mill/mcpservers/tracker'])
       assert.deepEqual(await spec(target, url), await spec(source, url), url);
@@ -384,24 +341,26 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     assert.deepEqual(there.spec.costLines, { press: 4 });
     assert.deepEqual(there.spec.costLines, here.spec.costLines);
   });
-  s.test('its volume is mounted at the path given, read-only as it was', () => {
+s.test('its volume is mounted at the path given, read-only as it was', () => {
     assert.deepEqual(filed.volumes, [{ name: key, path: otherThere }]);
     assert.deepEqual(
-      fileOf(target, 'mill').volumes?.map((v) => [v.path, v.readOnly]),
+      fileOf(target, 'mill')
+        .volumes?.filter((v) => v.readOnly)
+        .map((v) => [v.path, v.readOnly]),
       [[otherThere, true]],
     );
   });
-  s.test('its card is filed there unqueued, with no repository, naming its old name; the card a run keeps stays', () => {
+s.test('its card is filed there unqueued, with no repository, naming its old name; the card a run keeps stays', () => {
     assert.deepEqual(filed.cards, [{ name: 'polish-it', was: 'polish-it' }]);
     const text = fs.readFileSync(path.join(target.home, 'inbox', 'polish-it.md'), 'utf8');
     assert.equal(/^(repo|queued):/m.test(text), false, text);
     assert.ok(text.includes('polish-it') && text.includes('laptop'), text);
     assert.equal(fs.existsSync(path.join(target.home, 'inbox', 'pressed.md')), false);
   });
-  s.test("the source's store is unchanged to the byte", () => {
+s.test("the source's store is unchanged to the byte", () => {
     assert.deepEqual(digestsOf(source.home), before);
   });
-  s.test('REFUSED: a second import of it is a 409, and the target holds what it held', async () => {
+s.test('REFUSED: a second import of it is a 409, and the target holds what it held', async () => {
     const held = filesOf(path.join(target.home, 'factories'));
     const cards = filesOf(path.join(target.home, 'inbox'));
     const res = await send(target, 'POST', '/api/factories/mill/import', { export: exp, from: 'laptop', volumes: { [key]: otherThere } });
@@ -409,9 +368,7 @@ describe("a templated factory moved to a store of a later install: its lineage, 
     assert.deepEqual(filesOf(path.join(target.home, 'factories')), held);
     assert.deepEqual(filesOf(path.join(target.home, 'inbox')), cards);
   });
-  s.test(
-    "an upgrade to the target's version merges against the base that moved: the tree's edit kept, the new version's change taken",
-    async () => {
+s.test("an upgrade to the target's version merges against the base that moved: the tree's edit kept, the new version's change taken", async () => {
       const plan = await answered<FactoryPlan>(send(target, 'POST', '/api/factories/mill/diff', { to: '0.2.0' }));
       assert.equal(plan.kind, 'upgrade');
       if (plan.kind !== 'upgrade') return;
@@ -424,8 +381,7 @@ describe("a templated factory moved to a store of a later install: its lineage, 
       const tree = path.join(target.home, 'factories', 'mill', 'tree');
       assert.equal(fs.readFileSync(path.join(tree, DRAFT), 'utf8'), 'Draft it our way.\n', 'the edit made on the source is kept');
       assert.ok(fs.readFileSync(path.join(tree, DRAFTER), 'utf8').endsWith('You draft, and you cite.\n'), "0.2.0's change is taken");
-    },
-  );
+    });
 });
 
 test('REFUSED: the export of a factory the store does not hold is a 404, and of the default factory a 409', async () => {

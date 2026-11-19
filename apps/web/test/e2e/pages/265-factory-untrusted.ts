@@ -4,7 +4,7 @@ import type { Page } from 'playwright';
 import { barValue } from '../../../src/lib/bar.ts';
 import { factoriesAnswered, openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { FACTORIES, FAKE } from '../seed.ts';
+import { FACTORIES, FAKE, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -42,7 +42,7 @@ export default {
     const inBar = page.locator(`[data-factory-bar="${FACTORY}"] [data-untrusted="${FACTORY}"]`);
     const denied = page.locator(`#step-${FAKE.refused} [data-fact="denied"]`);
     try {
-      fs.writeFileSync(file, JSON.stringify({ repos: [place] }, null, 2));
+      fs.writeFileSync(file, JSON.stringify({ volumes: worked([place]) }, null, 2));
       await visit(page, ALONE);
       const answered = await factoriesAnswered(page);
       const factory = answered.find((one) => one.name === FACTORY);

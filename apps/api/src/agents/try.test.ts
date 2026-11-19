@@ -42,7 +42,7 @@ const app = eachTest(() => appOver(standIn(), stand()));
  * (`ON_REPO`), which the factory `bench`, filed on it, lets the api read.
  */
 const repo = scratch('nemia-api-try-repo-');
-addFactory({ name: 'bench', repos: [repo] });
+addFactory({ name: 'bench', volumes: [repo].map((r) => `${r}:rw`) });
 const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 const YOURS = path.join(root, 'workflows', 'agents');

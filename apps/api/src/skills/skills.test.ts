@@ -31,7 +31,7 @@ import { runWith } from '../../test/builtin-place.ts';
 /** The scratch repository, read in `default` by its `?repo=` (`ON_REPO`), which the factory `bench`, filed on it, lets the api read. */
 const repo = scratch('nemia-api-skills-repo-');
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-addFactory({ name: 'bench', repos: [repo] });
+addFactory({ name: 'bench', volumes: [repo].map((r) => `${r}:rw`) });
 const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** `url` with the scratch repository's `?repo=`, where it asks the default factory and names no repository. */

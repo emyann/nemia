@@ -12,7 +12,7 @@
  * names, with a workflow and an MCP server of its own, which the api must never read nor start.
  */
 import { config, root } from '../../test/harness.ts';
-import { describe, test, vi } from 'vitest';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -78,7 +78,7 @@ for (const [name, repos] of [
   ['hired', [repoR]],
   ['pair', [repoR, repoS]],
 ] as const) {
-  addFactory({ name, repos });
+  addFactory({ name, volumes: repos.map((r) => `${r}:rw`) });
   attachWorkflow({ factory: name, workflow: 'alpha' });
 }
 hireAgent({ factory: 'hired', agent: 'ada', step: 'alpha/implement' });
@@ -100,35 +100,35 @@ const saysAll = (text: string, facts: string[]): void => {
 };
 
 describe('placeFor: the repository and the factory a request is answered on, and every other refused', () => {
-  test("a ?repo= that is no factory's is a 422 naming those it may be and the add — nothing of it listed, and never the api's own", async () => {
-    const { status, body } = await workflowsListed<never>(app, `repo=${encodeURIComponent(stranger)}`);
-    assert.equal(status, 422);
-    saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), '?repo=', `nemia factory add <name> --repo ${stranger}.`]);
-    assert.ok(!said(body).includes(own), "the api's own, which no factory works on, is not offered");
-    assert.ok(!JSON.stringify(body).includes('"x"'), 'the workflow x in it is never listed');
-  });
-  test("a ?repo= of the api's own that no factory works on is a 422 as any other, its workflow beta never listed", async () => {
+test("a ?repo= that is no factory's is a 422 naming those it may be and the add — nothing of it listed, and never the api's own", async () => {
+      const { status, body } = await workflowsListed<never>(app, `repo=${encodeURIComponent(stranger)}`);
+      assert.equal(status, 422);
+      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), '?repo=', `nemia factory add <name> --volume ${stranger}:rw.`]);
+      assert.ok(!said(body).includes(own), "the api's own, which no factory works on, is not offered");
+      assert.ok(!JSON.stringify(body).includes('"x"'), 'the workflow x in it is never listed');
+    });
+test("a ?repo= of the api's own that no factory works on is a 422 as any other, its workflow beta never listed", async () => {
     const { status, body } = await workflowsListed<never>(app, `repo=${encodeURIComponent(own)}`);
     assert.equal(status, 422);
-    saysAll(said(body), [`${own}: `, [repoR, repoS].join(', '), `nemia factory add <name> --repo ${own}.`]);
+    saysAll(said(body), [`${own}: `, [repoR, repoS].join(', '), `nemia factory add <name> --volume ${own}:rw.`]);
     assert.ok(!said(body).includes(`, ${own}`) && !said(body).includes(`${own},`), "the api's own is not among those it may be");
     assert.ok(!JSON.stringify(body).includes('"beta"'), 'the workflow beta in it is never listed');
   });
-  test('capabilities for a ?repo= no factory names is a 422, its MCP server never started — as it is once a factory names it', async () => {
-    const refused = await app.request(`/api/capabilities?repo=${encodeURIComponent(stranger)}`);
-    assert.equal(refused.status, 422);
-    assert.equal(fs.existsSync(starts), false, 'no server of the stranger started');
+test('capabilities for a ?repo= no factory names is a 422, its MCP server never started — as it is once a factory names it', async () => {
+      const refused = await app.request(`/api/capabilities?repo=${encodeURIComponent(stranger)}`);
+      assert.equal(refused.status, 422);
+      assert.equal(fs.existsSync(starts), false, 'no server of the stranger started');
 
-    addFactory({ name: 'strange', repos: [stranger] });
-    try {
-      const served = await app.request(`/api/capabilities?repo=${encodeURIComponent(stranger)}`);
-      assert.equal(served.status, 200, 'the same request, once a factory names the directory, is served');
-      assert.ok(fs.existsSync(starts), 'and its server is started: the fixture starts when the repository is served');
-    } finally {
-      removeFactory('strange');
-    }
-  });
-  test("in the default factory, a factory's repository is served: ?repo= lists its workflows, and not the api's own", async () => {
+      addFactory({ name: 'strange', volumes: [stranger].map((r) => `${r}:rw`) });
+      try {
+        const served = await app.request(`/api/capabilities?repo=${encodeURIComponent(stranger)}`);
+        assert.equal(served.status, 200, 'the same request, once a factory names the directory, is served');
+        assert.ok(fs.existsSync(starts), 'and its server is started: the fixture starts when the repository is served');
+      } finally {
+        removeFactory('strange');
+      }
+    });
+test("in the default factory, a factory's repository is served: ?repo= lists its workflows, and not the api's own", async () => {
     const { status, body } = await workflowsListed<WorkflowListing>(app, `repo=${encodeURIComponent(repoR)}`);
     assert.equal(status, 200);
     assert.deepEqual(
@@ -149,75 +149,73 @@ describe('placeFor: the repository and the factory a request is answered on, and
     );
     assert.equal((await workflowsListed<never>(app, '')).status, 422, 'and its repository layer, asked for, is refused');
   });
-  test('?factory=default is the same answer as naming none, and a ?repo= no factory names is refused in it all the same', async () => {
-    assert.deepEqual(await workflowsListed<WorkflowListing>(app, 'factory=default'), await workflowsListed<WorkflowListing>(app, ''));
-    const { status, body } = await workflowsListed<never>(app, `factory=default&repo=${encodeURIComponent(stranger)}`);
-    assert.equal(status, 422);
-    saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), `nemia factory add <name> --repo ${stranger}.`]);
-  });
-  test("a factory the store does not have is a 404, and a name that is no factory's a 422", async () => {
+test('?factory=default is the same answer as naming none, and a ?repo= no factory names is refused in it all the same', async () => {
+      assert.deepEqual(await workflowsListed<WorkflowListing>(app, 'factory=default'), await workflowsListed<WorkflowListing>(app, ''));
+      const { status, body } = await workflowsListed<never>(app, `factory=default&repo=${encodeURIComponent(stranger)}`);
+      assert.equal(status, 422);
+      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), `nemia factory add <name> --volume ${stranger}:rw.`]);
+    });
+test("a factory the store does not have is a 404, and a name that is no factory's a 422", async () => {
     assert.equal((await workflowsListed<never>(app, 'factory=nope')).status, 404);
     assert.equal((await workflowsListed<never>(app, 'factory=Bad')).status, 422);
   });
-  test("a repository outside the factory is a 422 naming the factory's, the ?repo= and the add; of two, none named, a 422 naming them", async () => {
-    const sorted = [repoR, repoS].sort();
-    const named = await workflowsListed<never>(app, `factory=pair&repo=${encodeURIComponent(own)}`);
-    assert.equal(named.status, 422);
-    saysAll(said(named.body), [
-      `${own}: the factory pair works on ${sorted.join(', ')}`,
-      `?factory=pair&repo=${sorted[0]}`,
-      `nemia factory add <name> --repo ${own}.`,
-    ]);
-    assert.doesNotMatch(said(named.body), /default factory/, "only the factory's own fix");
-    const fallen = await workflowsListed<never>(app, 'factory=pair');
-    assert.equal(fallen.status, 422, 'two repositories: none is filled in, and the api own is not one of them');
-    saysAll(said(fallen.body), [...sorted, `?factory=pair&repo=${sorted[0]}`]);
-    assert.ok(!said(fallen.body).includes(own), 'the api own, which is not one of them, is not offered');
-    for (const kind of ['workflows', 'agents', 'skills']) {
-      const plain = await app.request(`/api/namespaces/pair/${kind}`);
-      const body = (await plain.json()) as { error?: string };
-      assert.equal(
-        plain.status,
-        422,
-        `a plain list of ${kind}, no ?origin=, is refused as the repository's read is: ${JSON.stringify(body)}`,
-      );
-      assert.ok(body.error?.includes(`?factory=pair&repo=${sorted[0]}`), `${kind}: names the ?repo= that picks one`);
-    }
-    const inside = await workflowsListed<WorkflowListing>(app, `factory=pair&repo=${encodeURIComponent(repoS)}`);
-    assert.equal(inside.status, 200, 'one of its repositories is served');
-  });
-  test('a factory with one repository fills it in, and offers only the workflows attached to it', async () => {
+test("a repository outside the factory is a 422 naming the factory's, the ?repo= and the add; of two, none named, a 422 naming them", async () => {
+      const sorted = [repoR, repoS].sort();
+      const named = await workflowsListed<never>(app, `factory=pair&repo=${encodeURIComponent(own)}`);
+      assert.equal(named.status, 422);
+      saysAll(said(named.body), [
+        `${own}: the factory pair works on ${sorted.join(', ')}`,
+        `?factory=pair&repo=${sorted[0]}`,
+        `nemia factory volume add pair ${own}:rw.`,
+      ]);
+      assert.doesNotMatch(said(named.body), /default factory/, "only the factory's own fix");
+      const fallen = await workflowsListed<never>(app, 'factory=pair');
+      assert.equal(fallen.status, 422, 'two repositories: none is filled in, and the api own is not one of them');
+      saysAll(said(fallen.body), [...sorted, `?factory=pair&repo=${sorted[0]}`]);
+      assert.ok(!said(fallen.body).includes(own), 'the api own, which is not one of them, is not offered');
+      for (const kind of ['workflows', 'agents', 'skills']) {
+        const plain = await app.request(`/api/namespaces/pair/${kind}`);
+        const body = (await plain.json()) as { error?: string };
+        assert.equal(
+          plain.status,
+          422,
+          `a plain list of ${kind}, no ?origin=, is refused as the repository's read is: ${JSON.stringify(body)}`,
+        );
+        assert.ok(body.error?.includes(`?factory=pair&repo=${sorted[0]}`), `${kind}: names the ?repo= that picks one`);
+      }
+      const inside = await workflowsListed<WorkflowListing>(app, `factory=pair&repo=${encodeURIComponent(repoS)}`);
+      assert.equal(inside.status, 200, 'one of its repositories is served');
+    });
+test('a factory with one repository fills it in, and offers only the workflows attached to it', async () => {
     const { status, body } = await workflowsListed<WorkflowListing>(app, 'factory=solo');
     assert.equal(status, 200);
     assert.deepEqual(names(body), ['alpha'], "alpha from repoR: not gamma, which solo has not attached, nor the api's own beta");
     assert.equal(body[0].dir, path.join(repoR, 'workflows', 'alpha'));
   });
-  test("a factory that works on the api's own and another, asked with no ?repo=, is a 422 naming the ?repo= — the api's own is not filled in; named, it is read", async (t) => {
-    addFactory({ name: 'owned', repos: [own, repoR] });
-    t.onTestFinished(() => {
-      removeFactory('owned');
+test("a factory that works on the api's own and another, asked with no ?repo=, is a 422 naming the ?repo= — the api's own is not filled in; named, it is read", async (t) => {
+      addFactory({ name: 'owned', volumes: [own, repoR].map((r) => `${r}:rw`) });
+      t.onTestFinished(() => removeFactory('owned'));
+      const sorted = [own, repoR].sort();
+      const fallen = await workflowsListed<never>(app, 'factory=owned');
+      assert.equal(fallen.status, 422, JSON.stringify(fallen.body));
+      saysAll(said(fallen.body), [...sorted, `?factory=owned&repo=${sorted[0]}`]);
+      const repository = await get<unknown>('/api/repository?factory=owned');
+      assert.equal(repository.status, 422, 'nor does GET /api/repository fill it in');
+      const named = await get<{ repo: string }>(`/api/repository?factory=owned&repo=${encodeURIComponent(own)}`);
+      assert.deepEqual(named.body, { repo: own }, 'named with ?repo=, the factory reads it');
     });
-    const sorted = [own, repoR].sort();
-    const fallen = await workflowsListed<never>(app, 'factory=owned');
-    assert.equal(fallen.status, 422, JSON.stringify(fallen.body));
-    saysAll(said(fallen.body), [...sorted, `?factory=owned&repo=${sorted[0]}`]);
-    const repository = await get<unknown>('/api/repository?factory=owned');
-    assert.equal(repository.status, 422, 'nor does GET /api/repository fill it in');
-    const named = await get<{ repo: string }>(`/api/repository?factory=owned&repo=${encodeURIComponent(own)}`);
-    assert.deepEqual(named.body, { repo: own }, 'named with ?repo=, the factory reads it');
-  });
-  test("GET /api/repository answers the factory's repository, and with no factory named is a 422 naming ?factory=, never the api's own", async () => {
-    assert.deepEqual((await get<{ repo: string }>('/api/repository?factory=solo')).body, { repo: repoR });
-    const plain = await get<unknown>('/api/repository');
-    assert.equal(plain.status, 422, JSON.stringify(plain.body));
-    saysAll(said(plain.body), ['?factory=<name>', 'nemia factory add']);
-    assert.ok(!said(plain.body).includes(own), "the api's own is never answered");
-  });
+test("GET /api/repository answers the factory's repository, and with no factory named is a 422 naming ?factory=, never the api's own", async () => {
+      assert.deepEqual((await get<{ repo: string }>('/api/repository?factory=solo')).body, { repo: repoR });
+      const plain = await get<unknown>('/api/repository');
+      assert.equal(plain.status, 422, JSON.stringify(plain.body));
+      saysAll(said(plain.body), ['?factory=<name>', 'nemia factory add']);
+      assert.ok(!said(plain.body).includes(own), "the api's own is never answered");
+    });
 });
 
 describe('a person works in a factory with hires: the listing names what is unfilled, the step page its hires, and a run and a card start in it', () => {
-  const s = story(test);
-  s.test("`unfilled` names a step a factory's hires leave with no agent, in the package's words, and a hire fills it", async () => {
+const s = story(test);
+s.test("`unfilled` names a step a factory's hires leave with no agent, in the package's words, and a hire fills it", async () => {
     const { body: solo } = await workflowsListed<WorkflowListing>(app, 'factory=solo');
     const steps = loadWorkflows(path.join(repoR, 'workflows', 'alpha'));
     assert.equal(solo[0].unfilled, unfilledRefusal(steps, 'solo', 'alpha'));
@@ -231,9 +229,7 @@ describe('a person works in a factory with hires: the listing names what is unfi
     assert.equal(hired[0].steps[0].hired, 'ada', 'the listing says the agent is hired, not written in the step');
     assert.equal(hired[0].error, null);
   });
-  s.test(
-    "a step's page in a factory is read with its hires, and a workflow it has not attached is a 404 naming its own fix alone",
-    async () => {
+s.test("a step's page in a factory is read with its hires, and a workflow it has not attached is a 404 naming its own fix alone", async () => {
       const page = await get<WorkflowStepPage>('/api/namespaces/hired/workflows/alpha/steps/implement');
       assert.equal(page.status, 200);
       assert.equal(page.body.keys.find((k) => k.key === 'agent')?.value, 'ada');
@@ -275,11 +271,8 @@ describe('a person works in a factory with hires: the listing names what is unfi
       assert.doesNotMatch(said(gamma.body), /default factory/, "only the factory's own fix");
       const offered = await get<WorkflowStepPage>(`/api/namespaces/default/workflows/gamma/steps/plan?repo=${encodeURIComponent(repoR)}`);
       assert.equal(offered.status, 200, 'the default factory offers it');
-    },
-  );
-  s.test(
-    'POST /api/namespaces/<factory>/runs starts the run in the factory, its record naming the factory and its repository; a step unfilled is refused',
-    async () => {
+    });
+s.test('POST /api/namespaces/<factory>/runs starts the run in the factory, its record naming the factory and its repository; a step unfilled is refused', async () => {
       const before = runFiles();
       const refused = await post('/api/namespaces/solo/runs', { workflow: 'alpha', brief: 'Add a cache' });
       assert.equal(refused.status, 422);
@@ -309,12 +302,9 @@ describe('a person works in a factory with hires: the listing names what is unfi
       );
       const elsewhere = await get<WorkflowStepPage>('/api/namespaces/solo/workflows/alpha/steps/implement');
       assert.ok(!elsewhere.body.recentRuns.some((r) => r.id === id), "and only in its factory: another factory's page does not");
-    },
-  );
-  s.test(
-    'POST /api/namespaces/<factory>/runs on a factory of two repositories: unwired, a 422 naming the attach; wired, the run works on the wired one, whatever `?repo=` says',
-    async (t) => {
-      addFactory({ name: 'twin', repos: [repoR, repoS] });
+    });
+s.test('POST /api/namespaces/<factory>/runs on a factory of two repositories: unwired, a 422 naming the attach; wired, the run works on the wired one, whatever `?repo=` says', async (t) => {
+      addFactory({ name: 'twin', volumes: [repoR, repoS].map((r) => `${r}:rw`) });
       const implementer = path.join(repoR, 'workflows', 'agents', 'implementer.md');
       write(implementer, '---\nharness: claude\n---\nYou implement what you are asked.\n');
       t.onTestFinished(() => {
@@ -338,11 +328,8 @@ describe('a person works in a factory with hires: the listing names what is unfi
       const { id } = (await res.json()) as { id: string };
       const run = runsAtOnce(root).runs.read(id);
       assert.deepEqual([run.factory, run.repo], ['twin', repoR], '`?repo=` found the factory; its wiring placed the run');
-    },
-  );
-  s.test(
-    'a card started in the factory: the record names the factory, its repository and the card, and the card stays, listed as started',
-    async () => {
+    });
+s.test('a card started in the factory: the record names the factory, its repository and the card, and the card stays, listed as started', async () => {
       const { card } = onStore(addToInbox({ text: 'Cache the views' }));
       const res = await post(`/api/namespaces/default/cards/${card.name}/start?factory=hired`, { workflow: 'alpha' });
       assert.equal(res.status, 201, await res.clone().text());
@@ -354,11 +341,8 @@ describe('a person works in a factory with hires: the listing names what is unfi
         [id],
         'the card is kept, listed as started as its run',
       );
-    },
-  );
-  s.test(
-    'REFUSED: a card started in a factory whose hires leave the workflow unfilled is a 422; the card stays, nothing written',
-    async () => {
+    });
+s.test('REFUSED: a card started in a factory whose hires leave the workflow unfilled is a 422; the card stays, nothing written', async () => {
       const { card } = onStore(addToInbox({ text: 'Cache the lists' }));
       const before = runFiles();
       const res = await post(`/api/namespaces/default/cards/${card.name}/start?factory=solo`, { workflow: 'alpha' });
@@ -368,11 +352,8 @@ describe('a person works in a factory with hires: the listing names what is unfi
         'the card is still there',
       );
       assert.deepEqual(runFiles(), before, 'nothing written');
-    },
-  );
-  s.test(
-    "a card's namespace is its `factory:`: a card of hired started under solo is none of solo's, a 404, though hired would have run it",
-    async () => {
+    });
+s.test("a card's namespace is its `factory:`: a card of hired started under solo is none of solo's, a 404, though hired would have run it", async () => {
       const { card } = onStore(addToInbox({ text: 'Cache the pages', factory: 'hired' }));
       const before = runFiles();
       const res = await post(`/api/namespaces/solo/cards/${card.name}/start`, { workflow: 'alpha' });
@@ -382,8 +363,7 @@ describe('a person works in a factory with hires: the listing names what is unfi
         'the card is still there',
       );
       assert.deepEqual(runFiles(), before, 'nothing written');
-    },
-  );
+    });
 });
 
 /**
@@ -396,7 +376,7 @@ function asShipped(t: { onTestFinished: (fn: () => void) => void }): string {
   const repoT = gitRepo('nemia-api-factory-t-');
   write(path.join(repoT, 'workflows', 'delta', 'implement.md'), '---\nplace: git\nharness: claude\nagent: ada\n---\nImplement it.\n');
   write(path.join(repoT, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
-  addFactory({ name: 'trio', repos: [repoT] });
+  addFactory({ name: 'trio', volumes: [repoT].map((r) => `${r}:rw`) });
   attachWorkflow({ factory: 'trio', workflow: 'delta' });
   t.onTestFinished(() => {
     removeFactory('trio');
@@ -407,70 +387,68 @@ function asShipped(t: { onTestFinished: (fn: () => void) => void }): string {
 }
 
 describe('POST /api/namespaces/default/runs as shipped: the factory a start that names none is filed in, or why it names none', () => {
-  test('in `default` the run starts in the one factory whose repository holds ?repo=, on it', async (t) => {
+test('in `default` the run starts in the one factory whose repository holds ?repo=, on it', async (t) => {
     const repoT = asShipped(t);
     const res = await post(`/api/namespaces/default/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', brief: 'Add a cache' });
     assert.equal(res.status, 201, await res.clone().text());
     const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
     assert.deepEqual([run.factory, run.repo], ['trio', repoT]);
   });
-  test('REFUSED: on a repository three factories hold, or one none holds, a 422 naming the namespace to start in, and nothing is written', async (t) => {
-    asShipped(t);
-    const before = runFiles();
-    const shared = await post(`/api/namespaces/default/runs?repo=${encodeURIComponent(repoR)}`, {
-      workflow: 'alpha',
-      brief: 'Add a cache',
+test('REFUSED: on a repository three factories hold, or one none holds, a 422 naming the namespace to start in, and nothing is written', async (t) => {
+      asShipped(t);
+      const before = runFiles();
+      const shared = await post(`/api/namespaces/default/runs?repo=${encodeURIComponent(repoR)}`, {
+        workflow: 'alpha',
+        brief: 'Add a cache',
+      });
+      assert.equal(shared.status, 422);
+      const many = said(await shared.json());
+      assert.match(many, /^\S+: 3 factories work on this folder — hired on \S+, pair on \S+, solo on \S+ — /);
+      saysAll(many, ['POST /api/namespaces/hired/runs', 'POST /api/namespaces/pair/runs', 'POST /api/namespaces/solo/runs']);
+      assert.ok(many.endsWith('Nothing was started.'), many);
+      const loose = await post('/api/namespaces/default/runs', { workflow: 'beta', brief: 'Add a cache' });
+      assert.equal(loose.status, 422, "with no ?repo=, the default factory has no repository to start on: never the api's own");
+      const none = said(await loose.json());
+      saysAll(none, ['?factory=<name>', 'nemia factory add']);
+      assert.ok(!none.includes(own), none);
+      assert.deepEqual(runFiles(), before, 'nothing written');
     });
-    assert.equal(shared.status, 422);
-    const many = said(await shared.json());
-    assert.match(many, /^\S+: 3 factories work on this folder — hired on \S+, pair on \S+, solo on \S+ — /);
-    saysAll(many, ['POST /api/namespaces/hired/runs', 'POST /api/namespaces/pair/runs', 'POST /api/namespaces/solo/runs']);
-    assert.ok(many.endsWith('Nothing was started.'), many);
-    const loose = await post('/api/namespaces/default/runs', { workflow: 'beta', brief: 'Add a cache' });
-    assert.equal(loose.status, 422, "with no ?repo=, the default factory has no repository to start on: never the api's own");
-    const none = said(await loose.json());
-    saysAll(none, ['?factory=<name>', 'nemia factory add']);
-    assert.ok(!none.includes(own), none);
-    assert.deepEqual(runFiles(), before, 'nothing written');
-  });
-  test('`?factory=` is not read on a start: the namespace names the factory, and `default` names none — so `?factory=default` is no refusal', async (t) => {
-    const repoT = asShipped(t);
-    const res = await post(`/api/namespaces/default/runs?factory=default&repo=${encodeURIComponent(repoT)}`, {
-      workflow: 'delta',
-      brief: 'Add a cache',
+test('`?factory=` is not read on a start: the namespace names the factory, and `default` names none — so `?factory=default` is no refusal', async (t) => {
+      const repoT = asShipped(t);
+      const res = await post(`/api/namespaces/default/runs?factory=default&repo=${encodeURIComponent(repoT)}`, {
+        workflow: 'delta',
+        brief: 'Add a cache',
+      });
+      assert.equal(res.status, 201, await res.clone().text());
+      const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
+      assert.deepEqual([run.factory, run.repo], ['trio', repoT], 'started in the one factory that holds its repository');
     });
-    assert.equal(res.status, 201, await res.clone().text());
-    const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
-    assert.deepEqual([run.factory, run.repo], ['trio', repoT], 'started in the one factory that holds its repository');
-  });
-  test('REFUSED: a card that names no factory is a 422 naming ?factory=, never placed in the factory a repository is in; with ?repo= a 422 naming the attach; it stays', async (t) => {
-    const repoT = asShipped(t);
-    const { card } = onStore(addToInbox({ text: 'Cache the trios' }));
-    const before = runFiles();
-    const res = await post(`/api/namespaces/default/cards/${card.name}/start`, { workflow: 'delta' });
-    assert.equal(res.status, 422);
-    const none = said(await res.json());
-    assert.ok(none.startsWith(`${card.name}: `), none);
-    saysAll(none, ['?factory=<name>', 'factory:']);
-    const placed = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, {
-      workflow: 'delta',
+test('REFUSED: a card that names no factory is a 422 naming ?factory=, never placed in the factory a repository is in; with ?repo= a 422 naming the attach; it stays', async (t) => {
+      const repoT = asShipped(t);
+      const { card } = onStore(addToInbox({ text: 'Cache the trios' }));
+      const before = runFiles();
+      const res = await post(`/api/namespaces/default/cards/${card.name}/start`, { workflow: 'delta' });
+      assert.equal(res.status, 422);
+      const none = said(await res.json());
+      assert.ok(none.startsWith(`${card.name}: `), none);
+      saysAll(none, ['?factory=<name>', 'factory:']);
+      const placed = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, {
+        workflow: 'delta',
+      });
+      assert.equal(placed.status, 422, "a card's run is placed by its factory's wiring, never by ?repo=");
+      saysAll(said(await placed.json()), [card.name, '--repo', 'nemia factory attach']);
+      assert.ok(
+        onStore(readInbox()).some((c) => c.name === card.name),
+        'the card is still there',
+      );
+      assert.deepEqual(runFiles(), before, 'nothing written');
     });
-    assert.equal(placed.status, 422, "a card's run is placed by its factory's wiring, never by ?repo=");
-    saysAll(said(await placed.json()), [card.name, '--repo', 'nemia factory attach']);
-    assert.ok(
-      onStore(readInbox()).some((c) => c.name === card.name),
-      'the card is still there',
-    );
-    assert.deepEqual(runFiles(), before, 'nothing written');
-  });
 });
 
 describe('a person reads the factories: the default first, each by name, a broken file with why, the trust each wants, and a template', () => {
-  const s = story(test);
-  const listed = async () => (await get<FactoryList>('/api/factories')).body.items;
-  s.test(
-    'GET /api/factories serves a FactoryList: the default factory first, then each factory by name, and one whose file does not read with why, hiding no other',
-    async () => {
+const s = story(test);
+const listed = async () => (await get<FactoryList>('/api/factories')).body.items;
+s.test('GET /api/factories serves a FactoryList: the default factory first, then each factory by name, and one whose file does not read with why, hiding no other', async () => {
       write(path.join(root, 'factories', 'broken.json'), '{ not json');
       try {
         const { status, body } = await get<FactoryList>('/api/factories');
@@ -485,18 +463,14 @@ describe('a person reads the factories: the default first, each by name, a broke
         const commandsOf = (name: string) => ({
           attach: `nemia factory attach ${name} <workflow>`,
           rm: `nemia factory rm ${name}`,
-          add: `nemia factory add ${name} --repo <path>`,
+          add: `nemia factory add ${name} --volume <path|url>:rw`,
           schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
           trust: `nemia factory trust ${name}`,
-          volume: `nemia factory volume add ${name} <path>:ro|:rw`,
+          volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
           unschedule: {},
-          volumeRm: {},
+          volumeRm: name === 'hired' ? { [path.basename(repoR).toLowerCase()]: `nemia factory volume rm hired ${repoR}` } : {},
         });
-        assert.deepEqual(
-          byName('default')?.spec,
-          { repos: [], hires: {}, volumes: [] },
-          'no workflows: it offers every one, on no repository',
-        );
+        assert.deepEqual(byName('default')?.spec, { hires: {}, volumes: [] }, 'no workflows: it offers every one, on no repository');
         assert.deepEqual(byName('default')?.status, { conditions: [], untrusted: [] });
         assert.deepEqual(byName('hired')?.status.untrusted, [
           {
@@ -518,7 +492,11 @@ describe('a person reads the factories: the default first, each by name, a broke
           [repoS],
         );
         fs.rmSync(path.join(config, '.claude.json'));
-        assert.deepEqual(byName('hired')?.spec, { repos: [repoR], workflows: ['alpha'], hires: { 'alpha/implement': 'ada' }, volumes: [] });
+        assert.deepEqual(byName('hired')?.spec, {
+          workflows: ['alpha'],
+          hires: { 'alpha/implement': 'ada' },
+          volumes: [{ name: path.basename(repoR).toLowerCase(), path: repoR, readOnly: false }],
+        });
         assert.equal(byName('hired')?.metadata.generation, 3, 'filed at 1, its attach and its hire each counted');
         for (const name of ['default', 'hired', 'broken'])
           assert.deepEqual(
@@ -526,26 +504,25 @@ describe('a person reads the factories: the default first, each by name, a broke
             commandsOf(name),
             `${name}'s lines; a file that does not read is filed again by the same lines`,
           );
-        assert.deepEqual(byName('pair')?.spec.repos, [repoR, repoS]);
+        assert.deepEqual(
+          byName('pair')?.spec.volumes.map((v) => v.path),
+          [repoR, repoS],
+        );
         assert.match(byName('broken')?.status.error ?? '', /is not JSON/);
-        assert.deepEqual(byName('broken')?.spec, { repos: [], workflows: [], hires: {}, volumes: [] });
+        assert.deepEqual(byName('broken')?.spec, { workflows: [], hires: {}, volumes: [] });
         assert.deepEqual((await get<Factory>('/api/factories/hired')).body, byName('hired'), 'got as it is listed');
         assert.equal((await get<Factory>('/api/factories/default')).body.metadata.name, 'default');
         assert.equal((await get('/api/factories/nowhere')).status, 404);
       } finally {
         fs.rmSync(path.join(root, 'factories', 'broken.json'));
       }
-    },
-  );
-  s.test(
-    "a factory's volumes as the package lists them: resolved, sorted, once each, each named, with the line that takes it back",
-    async () => {
+    });
+s.test("a factory's volumes as the package lists them: resolved, sorted, once each, each named, with the line that takes it back", async () => {
       const file = path.join(root, 'factories', 'vols.json');
       write(
         file,
         JSON.stringify({
           name: 'vols',
-          repos: [repoR],
           workflows: [],
           hires: {},
           schedules: {},
@@ -584,77 +561,78 @@ describe('a person reads the factories: the default first, each by name, a broke
           notes: 'nemia factory volume rm vols /tmp/x/notes',
           zeta: 'nemia factory volume rm vols /tmp/x/zeta',
         });
-        assert.equal(commands.volume, 'nemia factory volume add vols <path>:ro|:rw');
+        assert.equal(commands.volume, 'nemia factory volume add vols <path|url>:ro|:rw');
       } finally {
         fs.rmSync(file);
       }
-    },
-  );
-  s.test("a templated factory's template: not applied before the daemon renders it, then the version and conditions it wrote", async () => {
-    addFactory({ name: 'shaped', repos: [repoR], template: { source: '/t/team', version: '0.1.0', params: { budget: 7 } } });
-    const shaped = async () => (await get<Factory>('/api/factories/shaped')).body;
-    try {
-      assert.deepEqual((await shaped()).spec.template, { source: '/t/team', version: '0.1.0', params: { budget: 7 } });
-      assert.deepEqual((await shaped()).status, { conditions: [], untrusted: (await shaped()).status.untrusted });
-      const drift = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at version 0.2.0.' };
-      const pending = { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'No upgrade is under way.' };
-      write(
-        path.join(root, 'factories', 'shaped', 'status.json'),
-        JSON.stringify({
-          version: '0.1.0',
-          digest: 'sha256:0',
-          params: { budget: 7 },
-          conditions: [drift, pending],
-          observedGeneration: 1,
-        }),
-      );
-      const status = (await shaped()).status;
-      assert.equal(status.applied, '0.1.0');
-      assert.deepEqual(status.conditions, [drift, pending]);
-      assert.equal(status.observedGeneration, 1);
-    } finally {
-      removeFactory('shaped');
-    }
-  });
-  s.test("a templated factory's workflows are its tree's, before its repository's: listed, paged and started from the tree", async () => {
-    addFactory({ name: 'treed', repos: [repoR], template: { source: '/t/team', version: '0.1.0', params: {} } });
-    const tree = path.join(root, 'factories', 'treed', 'tree');
-    write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['alpha', 'gamma'], hires: {} }));
-    write(path.join(tree, 'workflows', 'alpha', 'implement.md'), '---\nplace: git\nagent: ada\n---\nImplement it, as the tree says.\n');
-    write(path.join(tree, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what the tree asks.\n');
-    try {
-      const { body } = await workflowsListed<WorkflowListing>(app, 'factory=treed');
-      assert.deepEqual(
-        body.map((w) => [w.from, w.name, w.dir]),
-        [
-          ['factory', 'alpha', path.join(tree, 'workflows', 'alpha')],
-          ['repo', 'gamma', path.join(repoR, 'workflows', 'gamma')],
-        ],
-        "alpha is the tree's, served as `factory`, which shadows the repository's; gamma, which the tree has not, is the repository's",
-      );
-      const page = await get<WorkflowStepPage>('/api/namespaces/treed/workflows/alpha/steps/implement');
-      assert.equal(page.status, 200);
-      assert.equal(page.body.dir, path.join(tree, 'workflows', 'alpha'));
-      assert.match(page.body.source, /Implement it, as the tree says\./, "the tree's step file, as written");
+    });
+s.test("a templated factory's template: not applied before the daemon renders it, then the version and conditions it wrote", async () => {
+      addFactory({
+        name: 'shaped',
+        volumes: [repoR].map((r) => `${r}:rw`),
+        template: { source: '/t/team', version: '0.1.0', params: { budget: 7 } },
+      });
+      const shaped = async () => (await get<Factory>('/api/factories/shaped')).body;
+      try {
+        assert.deepEqual((await shaped()).spec.template, { source: '/t/team', version: '0.1.0', params: { budget: 7 } });
+        assert.deepEqual((await shaped()).status, { conditions: [], untrusted: (await shaped()).status.untrusted });
+        const drift = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at version 0.2.0.' };
+        const pending = { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'No upgrade is under way.' };
+        write(
+          path.join(root, 'factories', 'shaped', 'status.json'),
+          JSON.stringify({
+            version: '0.1.0',
+            digest: 'sha256:0',
+            params: { budget: 7 },
+            conditions: [drift, pending],
+            observedGeneration: 1,
+          }),
+        );
+        const status = (await shaped()).status;
+        assert.equal(status.applied, '0.1.0');
+        assert.deepEqual(status.conditions, [drift, pending]);
+        assert.equal(status.observedGeneration, 1);
+      } finally {
+        removeFactory('shaped');
+      }
+    });
+s.test("a templated factory's workflows are its tree's, before its repository's: listed, paged and started from the tree", async () => {
+      addFactory({ name: 'treed', volumes: [repoR].map((r) => `${r}:rw`), template: { source: '/t/team', version: '0.1.0', params: {} } });
+      const tree = path.join(root, 'factories', 'treed', 'tree');
+      write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['alpha', 'gamma'], hires: {} }));
+      write(path.join(tree, 'workflows', 'alpha', 'implement.md'), '---\nplace: git\nagent: ada\n---\nImplement it, as the tree says.\n');
+      write(path.join(tree, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what the tree asks.\n');
+      try {
+        const { body } = await workflowsListed<WorkflowListing>(app, 'factory=treed');
+        assert.deepEqual(
+          body.map((w) => [w.from, w.name, w.dir]),
+          [
+            ['factory', 'alpha', path.join(tree, 'workflows', 'alpha')],
+            ['repo', 'gamma', path.join(repoR, 'workflows', 'gamma')],
+          ],
+          "alpha is the tree's, served as `factory`, which shadows the repository's; gamma, which the tree has not, is the repository's",
+        );
+        const page = await get<WorkflowStepPage>('/api/namespaces/treed/workflows/alpha/steps/implement');
+        assert.equal(page.status, 200);
+        assert.equal(page.body.dir, path.join(tree, 'workflows', 'alpha'));
+        assert.match(page.body.source, /Implement it, as the tree says\./, "the tree's step file, as written");
 
-      const res = await post('/api/namespaces/treed/runs', { workflow: 'alpha', brief: 'Add a cache' });
-      assert.equal(res.status, 201, await res.clone().text());
-      const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
-      assert.deepEqual([run.factory, run.repo, run.workflowDir], ['treed', repoR, path.join(tree, 'workflows', 'alpha')]);
-    } finally {
-      removeFactory('treed');
-    }
-  });
+        const res = await post('/api/namespaces/treed/runs', { workflow: 'alpha', brief: 'Add a cache' });
+        assert.equal(res.status, 201, await res.clone().text());
+        const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
+        assert.deepEqual([run.factory, run.repo, run.workflowDir], ['treed', repoR, path.join(tree, 'workflows', 'alpha')]);
+      } finally {
+        removeFactory('treed');
+      }
+    });
 });
 
 describe('a person schedules a workflow in a factory: listed with its next fire and last run, a cron refused, and taken back', () => {
-  const s = story(test);
-  const route = '/api/namespaces/solo/schedules/alpha';
-  const json = { 'content-type': 'application/json' };
-  const schedulesOf = async (name: string) => (await get<ScheduleList>(`/api/namespaces/${name}/schedules`)).body.items;
-  s.test(
-    'GET /api/namespaces/<factory>/schedules answers a ScheduleList with each next fire and last scheduled run, as the package lists them, and the line that takes each back',
-    async () => {
+const s = story(test);
+const route = '/api/namespaces/solo/schedules/alpha';
+const json = { 'content-type': 'application/json' };
+const schedulesOf = async (name: string) => (await get<ScheduleList>(`/api/namespaces/${name}/schedules`)).body.items;
+s.test('GET /api/namespaces/<factory>/schedules answers a ScheduleList with each next fire and last scheduled run, as the package lists them, and the line that takes each back', async (sub: TestContext) => {
       vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-08T12:00:00Z') });
       setSchedule({ factory: 'solo', workflow: 'alpha', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
       const record = path.join(root, 'runs', 'r-scheduled.json');
@@ -699,9 +677,8 @@ describe('a person schedules a workflow in a factory: listed with its next fire 
         fs.rmSync(record);
         vi.useRealTimers();
       }
-    },
-  );
-  s.test("REFUSED: a PUT with a cron Effect's Cron does not read is a 422 naming the cron, and nothing is scheduled", async () => {
+    });
+s.test("REFUSED: a PUT with a cron Effect's Cron does not read is a 422 naming the cron, and nothing is scheduled", async () => {
     const res = await app.request(route, {
       method: 'PUT',
       headers: json,
@@ -711,13 +688,13 @@ describe('a person schedules a workflow in a factory: listed with its next fire 
     assert.match(said(await res.json()), /not a cron/);
     assert.deepEqual(await schedulesOf('solo'), []);
   });
-  s.test('REFUSED: a cron that is no string is a 400 naming the route, and nothing is scheduled', async () => {
+s.test('REFUSED: a cron that is no string is a 400 naming the route, and nothing is scheduled', async () => {
     const wrong = await app.request(route, { method: 'PUT', headers: json, body: JSON.stringify({ cron: 9, brief: 'Read the stats' }) });
     assert.equal(wrong.status, 400);
     assert.match(said(await wrong.json()), /PUT \/api\/namespaces\/solo\/schedules\/alpha/);
     assert.deepEqual(await schedulesOf('solo'), []);
   });
-  s.test('a Schedule PUT is listed in its factory and taken back by its DELETE, which answers what it took back', async () => {
+s.test('a Schedule PUT is listed in its factory and taken back by its DELETE, which answers what it took back', async () => {
     const put = await app.request(route, {
       method: 'PUT',
       headers: json,
@@ -738,12 +715,12 @@ describe('a person schedules a workflow in a factory: listed with its next fire 
 });
 
 describe("a person sets a workflow's cost line on a factory: the Factory answers it, a DELETE takes it back, and a bad write is refused", () => {
-  const s = story(test);
-  const route = '/api/factories/solo/costlines/alpha';
-  const json = { 'content-type': 'application/json' };
-  const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers: json, body: JSON.stringify(body) });
-  const linesOfSolo = async () => (await get<Factory>('/api/factories/solo')).body.spec.costLines;
-  s.test('a PUT of { usd } answers the Factory with the line, and its DELETE answers it without', async () => {
+const s = story(test);
+const route = '/api/factories/solo/costlines/alpha';
+const json = { 'content-type': 'application/json' };
+const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers: json, body: JSON.stringify(body) });
+const linesOfSolo = async () => (await get<Factory>('/api/factories/solo')).body.spec.costLines;
+s.test('a PUT of { usd } answers the Factory with the line, and its DELETE answers it without', async () => {
     const set = await put(route, { usd: 80 });
     assert.equal(set.status, 200, said(await set.clone().json()));
     assert.deepEqual(((await set.json()) as Factory).spec.costLines, { alpha: 80 });
@@ -753,15 +730,15 @@ describe("a person sets a workflow's cost line on a factory: the Factory answers
     assert.equal(((await del.json()) as Factory).spec.costLines, undefined);
     assert.equal((await app.request(route, { method: 'DELETE', headers: json, body: '{}' })).status, 404, 'no line left to take back');
   });
-  s.test('REFUSED: an amount as words is a 400, and nothing is set', async () => {
+s.test('REFUSED: an amount as words is a 400, and nothing is set', async () => {
     assert.equal((await put(route, { usd: '80' })).status, 400);
     assert.equal(await linesOfSolo(), undefined);
   });
-  s.test('REFUSED: a workflow the factory does not offer, and an amount not above zero, are Invalid, and nothing is set', async () => {
-    assert.equal((await put('/api/factories/solo/costlines/gamma', { usd: 80 })).status, 422);
-    assert.equal((await put(route, { usd: 0 })).status, 422);
-    assert.equal(await linesOfSolo(), undefined);
-  });
+s.test('REFUSED: a workflow the factory does not offer, and an amount not above zero, are Invalid, and nothing is set', async () => {
+      assert.equal((await put('/api/factories/solo/costlines/gamma', { usd: 80 })).status, 422);
+      assert.equal((await put(route, { usd: 0 })).status, 422);
+      assert.equal(await linesOfSolo(), undefined);
+    });
 });
 
 /** The cell of `row` under the column `name` of `table`. */
@@ -790,8 +767,16 @@ test('the factories asked as a Table answer the columns of a factory, the defaul
   );
   const lines = tableLines(table, { wide: false, showLabels: false, columns: [] });
   assert.equal(lines.length, list.items.length + 1, 'a header, then a line per factory');
-  const withRepos = list.items.find((f) => f.metadata.name !== 'default' && f.spec.repos.length > 0);
+  const withRepos = list.items.find((f) => f.metadata.name !== 'default' && f.spec.volumes.some((v) => !v.readOnly));
   assert.ok(withRepos, 'a factory filed on a repository');
   const line = lines.find((l) => l.startsWith(`${withRepos.metadata.name} `));
-  assert.ok(line?.includes(withRepos.spec.repos.join(', ')), 'its repositories');
+  assert.ok(
+    line?.includes(
+      withRepos.spec.volumes
+        .filter((v) => !v.readOnly)
+        .map((v) => v.path)
+        .join(', '),
+    ),
+    'its repositories',
+  );
 });

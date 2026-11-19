@@ -17,7 +17,7 @@ import { app } from '../app.ts';
 
 type FactoryRules = import('agent-orchestrator').FactoryRules;
 
-addFactory({ name: 'mill', repos: [scratch('nemia-api-rules-folder-')] });
+addFactory({ name: 'mill', volumes: [scratch('nemia-api-rules-folder-')].map((r) => `${r}:rw`) });
 
 const STORE = path.join(root, 'factories', 'mill');
 const FILE = path.join(STORE, 'RULES.md');

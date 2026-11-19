@@ -27,6 +27,7 @@ import {
   READINESS_AREAS,
   readinessSaid,
   runsWait,
+  type HarnessCheck,
   type Readiness,
   type ReadinessCost,
   type ReadinessFix,
@@ -192,15 +193,24 @@ const fixLine = (p: ReadinessPiece, fix: ReadinessFix): string =>
     ? `           ${fix.kind === 'removes' ? 'remove' : 'start'}: ${fixCommand(p, fix)}   (${fix.message}: the server runs \`${fix.command}\`)`
     : `           fix: ${fix.command}   (${fix.message})`;
 
+/** How each state of a harness's check is marked: a tick, a cross, or a dot while it runs or was never run. */
+const CHECK_MARKS: Readonly<Record<HarnessCheck['state'], string>> = { passed: '✓', failed: '✗', running: '·', unrun: '·' };
+
+/** A harness's check's lines: its mark, name and message, and under a failed one each of its fixes as the piece's are said. */
+const checkLines = (p: ReadinessPiece, check: HarnessCheck): string[] => [
+  `           ${CHECK_MARKS[check.state]} ${check.name}: ${check.message}`,
+  ...(check.state === 'failed' ? check.fixes.map((fix) => `  ${fixLine(p, fix)}`) : []),
+];
+
 /**
  * A piece's lines: its state, name, where it is and message, and under it each fix's command where it is not met; where it is, the
- * fix that removes it, how to take it off again.
+ * fix that removes it, how to take it off again; then each of a harness's checks it carries, a tick each (`checkLines`).
  */
 function pieceLines(p: ReadinessPiece): string[] {
   const where = p.factory === undefined ? '' : ` (${[p.factory, p.workflow].filter((w) => w !== undefined).join('/')})`;
   const head = `  ${p.state.padEnd(8)} ${p.name}${where}: ${p.message}`;
   const shown = p.state === 'met' ? p.fixes.filter((fix) => fix.kind === 'removes') : p.fixes.filter((fix) => fix.kind !== 'removes');
-  return [head, ...shown.map((fix) => fixLine(p, fix))];
+  return [head, ...shown.map((fix) => fixLine(p, fix)), ...(p.checks ?? []).flatMap((check) => checkLines(p, check))];
 }
 
 /**

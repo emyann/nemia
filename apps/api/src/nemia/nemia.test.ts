@@ -92,7 +92,7 @@ test("GET /api/policy/:name/reach reads the steps at their gate in a factory's w
     '---\nrole: Writer\ndescription: Drafts.\nharness: claude\n---\nDraft.\n',
   );
   fs.writeFileSync(path.join(repo, 'workflows', 'plain', 'draft.md'), '---\nplace: git\nagent: writer\ngate: true\n---\nDraft it.\n');
-  addFactory({ name: 'reachmill', repos: [repo] });
+  addFactory({ name: 'reachmill', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflow({ factory: 'reachmill', workflow: 'plain' });
   const res = await asked('GET', '/api/policy/drafter/reach?factory=reachmill');
   assert.equal(res.status, 200, JSON.stringify(res.body));

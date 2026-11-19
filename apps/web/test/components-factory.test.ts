@@ -164,7 +164,7 @@ test('REFUSED: the start in no factory yet offers each factory a run starts in, 
 
 test("REFUSED: the floor's start in a factory of several repositories offers no repository to pick: the workflow is picked, and the wiring places it", async () => {
   const { StartBar } = await import('../src/components/factory/FactoryStart.tsx');
-  const factory = filed('quay', { repos: ['/code/a', '/code/b'], workflows: ['dev'], workflowRepos: { dev: 'b' } });
+  const factory = filed('quay', { worksOn: ['/code/a', '/code/b'], workflows: ['dev'], workflowRepos: { dev: 'b' } });
   const html = await pagedWith(createElement(StartBar, { factory: 'quay' }), [[['factories'], [factory]], STORE_ANSWER]);
   assert.doesNotMatch(html, /<option value="\/code\/a"/, 'refused: a repository a person picks, which the api would not run on');
   assert.match(
@@ -355,11 +355,18 @@ test("FactoryTrust says each place that is not trusted, what is withheld and the
   assert.match(two, /Trust them:/);
 });
 
-test("REFUSED: FactoryVolumes says the caveat on a writable volume alone — each path with its mark and the api's line; with none, the line that adds one", async () => {
+test("FactoryVolumes says a writable volume is worked on, each path with its mark, its Remove and the api's line; with none, the line that adds one; the form under them", async () => {
   const { FactoryVolumes } = await import('../src/components/factory/FactoryVolumes.tsx');
-  const volume = (path: string, readOnly: boolean) => ({ path, readOnly, commands: { rm: `nemia factory volume rm nemia ${path}` } });
+  const volume = (path: string, readOnly: boolean) => ({
+    path,
+    readOnly,
+    origin: null,
+    commands: { rm: `nemia factory volume rm nemia ${path}` },
+  });
   const factory = filed('nemia', { volumes: [volume('/home/me/notes', true), volume('/home/me/scratch', false)] });
-  const html = renderToStaticMarkup(createElement(FactoryVolumes, { factory }));
+  const drawn = (f: typeof factory) =>
+    renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(FactoryVolumes, { factory: f })));
+  const html = drawn(factory);
   assert.match(html, /data-factory-volumes="nemia"/);
   assert.deepEqual(
     [...html.matchAll(/data-factory-volume="([^"]*)"/g)].map((m) => m[1]),
@@ -369,14 +376,16 @@ test("REFUSED: FactoryVolumes says the caveat on a writable volume alone — eac
   const [, notes = '', scratch = ''] = html.split(/data-factory-volume="/);
   assert.match(notes, /data-volume-mark="ro"[^>]*><span[^>]*>:ro</);
   assert.match(scratch, /data-volume-mark="rw"[^>]*><span[^>]*>:rw</);
-  assert.doesNotMatch(notes, /data-volume-caveat/, 'a read-only volume carries no caveat');
-  assert.match(scratch, /data-volume-caveat/, "the writable one says it is not the run's workspace");
+  assert.match(notes, /data-volume-role="read"/, 'a read-only volume is read');
+  assert.match(scratch, /data-volume-role="worked-on"/, 'the writable one is worked on');
+  assert.match(notes, /data-volume-remove="\/home\/me\/notes"/, 'each row has its Remove');
+  assert.match(html, /data-volume-form/, 'the form that gives one');
   assert.ok(notes.includes('nemia factory volume rm nemia /home/me/notes'), "the api's line that takes it back");
   assert.ok(scratch.includes('nemia factory volume rm nemia /home/me/scratch'));
   assert.doesNotMatch(html, /data-no-volumes/);
-  const none = renderToStaticMarkup(createElement(FactoryVolumes, { factory: filed('nemia') }));
+  const none = drawn(filed('nemia'));
   assert.match(none, /data-no-volumes/);
-  assert.ok(none.includes('nemia factory volume add nemia &lt;path&gt;:ro|:rw'), `the api's line that adds one: ${none}`);
+  assert.ok(none.includes('nemia factory volume add nemia &lt;path|url&gt;:ro|:rw'), `the api's line that adds one: ${none}`);
   assert.doesNotMatch(none, /data-factory-volume=/);
 });
 
@@ -448,8 +457,8 @@ test("a factory's delegations list each agent's grants in words with a Remove, b
 test("switcherLine: the switcher says its factory's repository, its template and version, and whether the store ticks, each where known", async () => {
   const { switcherLine } = await import('../src/components/factory/FactoryPicker.tsx');
   const template = { source: 'github:acme/templates/sdlc', version: '3.11.0', params: {}, applied: null, conditions: [] };
-  assert.equal(switcherLine(filed('kit', { repos: ['/code/app'], template }), 'ticking'), 'app · sdlc@3.11.0 · ticking');
-  assert.equal(switcherLine(filed('kit', { repos: ['/code/a', '/code/b'] }), 'paused'), 'a +1 · paused');
-  assert.equal(switcherLine(filed('kit', { repos: [] }), undefined), 'no repository', 'nothing said of what is not read');
-  assert.equal(switcherLine(undefined, 'not ticking'), 'no repository · not ticking');
+  assert.equal(switcherLine(filed('kit', { worksOn: ['/code/app'], template }), 'ticking'), 'app · sdlc@3.11.0 · ticking');
+  assert.equal(switcherLine(filed('kit', { worksOn: ['/code/a', '/code/b'] }), 'paused'), 'a +1 · paused');
+  assert.equal(switcherLine(filed('kit', { worksOn: [] }), undefined), 'no volume to work on', 'nothing said of what is not read');
+  assert.equal(switcherLine(undefined, 'not ticking'), 'no volume to work on · not ticking');
 });

@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { PlaceService, runningRelease, startRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
-import { Conflict, Invalid, type Fix, type Need, type Readiness } from 'objects';
+import { Conflict, Invalid, MILESTONES, type Fix, type Milestones, type Need, type Readiness } from 'objects';
 import { Schema } from 'effect';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { root } from '../../test/harness.ts';
@@ -142,4 +142,33 @@ test("REFUSED: a fix a person types is objects' Invalid, and a removal a run sti
   assert.equal(held.status, statusOf(Conflict), await held.clone().text());
   assert.deepEqual(((await held.json()) as { users?: string[] }).users, [run.id]);
   assert.deepEqual(engine().filings, [], 'no fix filed');
+});
+
+test("a check turn: a session's token starts none (403), a harness that runs none is a 404, and an unknown turn a 404", async () => {
+  const task = 't-readiness-turn-session';
+  const token = Effect.runSync(
+    Effect.gen(function* () {
+      return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
+    }).pipe(Effect.provide(tokenDoorFiles(root))),
+  );
+  Effect.runSync(engineFor(engine()).file({ id: task, brief: 'Be on.', cwd: root, harness: 'claude' }));
+  engine().settle(task, 'working');
+  const before = engine().specs.length;
+  const refused = await send('POST', '/api/readiness/turns', { harness: 'claude' }, token);
+  assert.equal(refused.status, 403);
+  assert.equal(((await refused.json()) as { reason?: string }).reason, 'person-only');
+  assert.equal(engine().specs.length, before, 'no turn filed');
+  assert.equal((await send('POST', '/api/readiness/turns', { harness: 'command' })).status, 404);
+  assert.equal((await send('GET', '/api/readiness/turns/no-such-turn')).status, 404);
+});
+
+test('GET /api/readiness/milestones answers the four milestones in their order, one next', async () => {
+  const res = await send('GET', '/api/readiness/milestones');
+  assert.equal(res.status, 200, await res.clone().text());
+  const read = (await res.json()) as Milestones;
+  assert.deepEqual(
+    read.milestones.map((m) => m.name),
+    [...MILESTONES],
+  );
+  assert.equal(read.milestones.filter((m) => m.state === 'next').length, 1);
 });

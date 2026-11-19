@@ -1,6 +1,6 @@
 ---
 name: create-a-factory
-description: Make a whole factory, short of a run — create it, write its workflows, agents and skills into yours, attach its workflows, hire agents into steps, write its rules and its instruction, try an agent on a short brief — and stop before any work starts.
+description: Make a whole factory, short of a run — propose a template Nemia ships where the person's goal fits one, or create it, write its workflows, agents and skills into yours, attach its workflows, hire agents into steps, write its rules and its instruction, try an agent on a short brief — and stop before any work starts.
 ---
 # Create a factory
 
@@ -18,14 +18,35 @@ What the factory builds, on which repositories, and how its work should go: the 
 person decides. Read what exists first — `nemia factory`, `nemia agents --repo <path>`, the repository's own `workflows/` folder — and
 build on it rather than beside it.
 
-## 2. Create it
+## 2. Propose a template, where one fits
 
-`nemia factory add <name> --repo <path>`, a `--repo` for each repository, as an absolute path.
+Nemia ships templates: a factory made whole, its workflows, its agents hired into their steps, its rules. Read them before you draft
+anything: `nemia get templates -o yaml`, at a shell, lists each with its `description` (what it is for, who works in it, where a person
+decides), its `parameters`, its `hires`, and in its `status` its workflows, agents and skills, and each problem that stops it being
+applied. Read only that: what a template is, it says itself, and the list is the one you go by, whatever it holds today.
+
+When one's description fits what the person told you — their repositories, their work, how they want it judged and where they want to
+decide — propose it, and say why it fits. Say in three lines what they get, in its description's words and its status's names: its
+workflows, its team, and where a person decides. Then say what it costs them to change later: the factory follows the template, and each
+of its new versions is an upgrade they decide, merged into what they changed, a conflict wherever both changed the same part (the
+`bring-what-waits` skill brings one).
+
+Never apply a template unasked. On their yes, read its `parameters` with them, each one's description and default, and ask for the
+value of each the default does not fit; then say what the line does and run it, which prompts them:
+`nemia factory apply <name> --template <template>`, a `--volume <path|url>:rw` for each repository it works on that they named, as an
+absolute path or a git URL, and `--set <key>=<value>` for each parameter they chose. The factory then holds its workflows, attached,
+and its hires: go to the last section, and say what stands.
+
+On their no, where none fits, or where the one that fits lists a problem, say so in a line and go on below: you draft it with them.
+
+## 3. Create it
+
+`nemia factory add <name> --volume <path|url>:rw`, a `--volume` for each repository it works on, as an absolute path or a git URL, and `:ro` for a folder every step only reads. A factory may be filed with none and given its volumes after, with `nemia factory volume add <name> <path|url>:rw`.
 
 A factory has its own level, `nemia level <level> --factory <name>`, and follows the store's until it has one. Its level is the person's
 to set: you never raise it.
 
-## 3. Its workflows, agents and skills, written into yours
+## 4. Its workflows, agents and skills, written into yours
 
 You write a factory's workflows, agents and skills yourself, into yours, never into its repositories. Each write prompts the person: say
 what it writes and why, then run it. Write the file or folder in your own folder first, under `drafts/<factory>/`, as the factory will
@@ -50,16 +71,16 @@ naming each until they say it is there, and check that it is.
 What you write is the factory's words, and its taste is the person's: name each file you wrote when you say what stands, so they read it
 before work depends on it.
 
-## 4. Attach its workflows
+## 5. Attach its workflows
 
 `nemia factory attach <factory> <workflow>`, by the workflow's folder name, once it is written. `nemia factory detach` takes one back.
 
-## 5. Hire agents into steps
+## 6. Hire agents into steps
 
 Who to hire into a step, find with the `recruit-or-create` skill. `nemia factory hire <factory> <agent> --step <workflow>/<step>`, one agent
 a step; `nemia factory fire <factory> --step <workflow>/<step>` takes a hire back. A step whose own file names its `agent:` takes no hire.
 
-## 6. Its rules, and its instruction
+## 7. Its rules, and its instruction
 
 Two files, each told to someone else.
 
@@ -76,19 +97,20 @@ in `drafts/<factory>/NEMIA.md` and show it. The person may keep it in the reposi
 
 Words a person adds to one agent without rewriting it are its custom instructions: `nemia agents custom <name> --file <path>`.
 
-## 7. Try an agent on a short brief
+## 8. Try an agent on a short brief
 
 Before work depends on an agent, try it: `nemia agents run yours <name> --brief "<words>"`, on a brief small enough to read in a minute.
 A try is yours to run unasked: one step of that agent, in a folder of its own, capped at a dollar, one at a time an agent. Say that you
 started it, follow it with `nemia ls`, and bring what it did.
 
-## 8. Stop, and say what stands
+## 9. Stop, and say what stands
 
 Say what is in place and what is not, apart:
 
 - **Placed**: the factory, its repositories, the workflows attached, each hire, its instruction — as `nemia factory` reads them now.
 - **Written**: each workflow, agent and skill you wrote into yours, by its file, for the person to read; and each try, with what it did.
 - **Drafted, not placed**: each schema or skill file still only in your folder.
-- **Next**: the first card to start, or the draft to place first.
+- **Next**, in one line: the draft to place first, where one waits; else to give it its first volume, the repository it works on —
+  `nemia factory volume add <factory> <path|url>:rw`, which prompts them; where it has one already, the first card to start.
 
 Never call a factory complete while a draft of it waits to be placed.

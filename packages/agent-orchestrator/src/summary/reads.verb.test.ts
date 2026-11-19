@@ -37,7 +37,7 @@ function repository(): { repo: string; folder: string } {
 
 /** The factory `name` over `repo`, attaching `build` and hiring `seldon` into `build/design`. */
 function hiring(name: string, repo: string): void {
-  addFactoryAt(ROOT, { name, repos: [repo] });
+  addFactoryAt(ROOT, { name, volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: name, workflow: 'build' });
   hireAgentAt(ROOT, { factory: name, agent: 'seldon', step: 'build/design' });
 }

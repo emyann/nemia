@@ -70,7 +70,7 @@ async function unread(page: Page): Promise<void> {
         'No factory is filed in this store, and the default factory reads no repository: file a factory, and the page reads its repository.',
       factory: null,
       repos: [],
-      commands: ['nemia factory add <name> --repo <path>', 'nemia factory apply <name> --template <name> --repo <path>'],
+      commands: ['nemia factory add <name> --volume <path|url>:rw', 'nemia factory apply <name> --template <name> --volume <path|url>:rw'],
     }),
   };
   for (const [reason, body] of Object.entries(held)) {

@@ -1,6 +1,7 @@
 /**
  * The Factory: a factory served as an object, which no namespace holds (it is the namespace its parts are in). Its `spec` is what its
- * file says — the repositories it works on, the workflows it offers, its hires by `<workflow>/<step>`, its volumes, its harness settings,
+ * file says — its volumes, the writable ones those it works on, the workflows it offers, its hires by `<workflow>/<step>`, its harness
+ * settings,
  * whether its runs follow merged revisions, the template it was applied from and its own level — and its `status` what the controller
  * last observed of it: the generation it read, its conditions, the template's version its base holds, an upgrade waiting, its places a
  * harness does not trust now, and why its file does not read. Its `metadata.generation` counts the changes to its spec.
@@ -16,8 +17,8 @@
  * `FactoryApplied`), a hand-made one taken over by one (`FactoryAdoptWrite`, `FactoryAdopted`), the preview of either change
  * (`FactoryDiffWrite`, `FactoryPlan`), an upgrade filed (`FactoryUpgradeWrite`, `FactoryUpgraded`) and a conflict's choice
  * (`FactoryResolveWrite`, `FactoryResolved`). A template travels as `TemplateGiven`: a builtin template by its name, any other packed as
- * `nemia template pack` packs it; a repository's or a volume's path names a folder of the machine the api runs on, and a repository may
- * be a git URL instead, which that machine clones under its store. Plain Schemas of JSON, as every object of this package is.
+ * `nemia template pack` packs it; a volume's path names a folder of the machine the api runs on, and a volume may be a git URL instead,
+ * which that machine clones under its store. Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, describedNumber, describedOne, listOf } from './meta.ts';
@@ -32,11 +33,19 @@ import {
   REVISIONS_POLICIES,
 } from './words.ts';
 
-/** A folder of the person's machine the factory mounts for every local step: its stored name, its path, and whether steps only read it. */
+/**
+ * A folder or repository of the person's machine the factory reaches: its stored name, its path, whether steps only read it, and the git
+ * URL it was cloned from where it was given by one. A writable volume is one the factory works on, a git repository its runs work in.
+ */
 export const FactoryVolume = Schema.Struct({
   name: Schema.optionalKey(Schema.String.annotate({ description: "The volume's stored name; absent where it was mounted without one." })),
   path: Schema.String.annotate({ description: 'The folder of the machine it mounts, by its whole path.' }),
-  readOnly: Schema.Boolean.annotate({ description: 'Whether steps only read the folder (:ro), not write it (:rw).' }),
+  readOnly: Schema.Boolean.annotate({
+    description: 'Whether steps only read the folder (:ro); a writable one (:rw) is a repository the factory works on.',
+  }),
+  origin: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The git URL the folder was cloned from; absent where it was given by its path.' }),
+  ),
 });
 export type FactoryVolume = typeof FactoryVolume.Type;
 
@@ -55,17 +64,16 @@ export const HarnessSettings = Schema.Record(Schema.String, Schema.Record(Schema
 export type HarnessSettings = typeof HarnessSettings.Type;
 
 /**
- * What a factory's file says: its repositories; the workflows it offers, absent on the default factory, which offers every workflow
- * found; its hires, `<workflow>/<step>` to an agent's name; its volumes; and, where its file names them, its harness settings, its
+ * What a factory's file says: its volumes, the folders and repositories it reaches, its writable ones those it works on; the workflows it
+ * offers, absent on the default factory, which offers every workflow
+ * found; its hires, `<workflow>/<step>` to an agent's name; and, where its file names them, its harness settings, its
  * revisions policy, the template it was applied from, its own level (absent where it follows the store's), and its cost line per
  * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none); and the
- * git URL each of its repositories named by one is cloned from, by the repository's folder (absent where it was given none); and the
  * repository each workflow it attaches works on, by the workflow's name to the repository's folder name (`nemia factory attach <factory>
  * <workflow>
  * --repo <name>`), absent where it names none: a workflow it names none for works on its only repository.
  */
 export const FactorySpec = Schema.Struct({
-  repos: Schema.Array(Schema.String).annotate({ description: "The factory's repositories, each a folder of the machine by its path." }),
   workflows: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description: 'The workflows it offers, by name; absent on the default factory, which offers every workflow found.',
@@ -74,7 +82,9 @@ export const FactorySpec = Schema.Struct({
   hires: Schema.Record(Schema.String, Schema.String).annotate({
     description: 'Its hires, each a `<workflow>/<step>` to the name of the agent hired for it.',
   }),
-  volumes: Schema.Array(FactoryVolume).annotate({ description: 'The folders of the machine it mounts for every local step.' }),
+  volumes: Schema.Array(FactoryVolume).annotate({
+    description: 'The folders and repositories it reaches, each read-only or writable: a writable one is a repository it works on.',
+  }),
   harnessSettings: Schema.optionalKey(
     HarnessSettings.annotate({
       description: 'Its harness settings, by harness, each a record of the settings its file names; absent where its file names none.',
@@ -95,11 +105,6 @@ export const FactorySpec = Schema.Struct({
         "The dollars a run of each workflow should stay under, all tries and rounds included, by the workflow's name; absent where it sets none.",
     }),
   ),
-  origins: Schema.optionalKey(
-    Schema.Record(Schema.String, Schema.String).annotate({
-      description: "The git URL each repository named by one is cloned from, by the repository's folder; absent where it was given none.",
-    }),
-  ),
   workflowRepos: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.String).annotate({
       description:
@@ -107,7 +112,7 @@ export const FactorySpec = Schema.Struct({
     }),
   ),
 }).annotate({
-  description: "What the factory's file says: its repositories, workflows, hires, volumes, settings, template, level and cost lines.",
+  description: "What the factory's file says: its volumes, workflows, hires, settings, template, level and cost lines.",
 });
 export type FactorySpec = typeof FactorySpec.Type;
 
@@ -390,49 +395,57 @@ export const TemplateGiven = Schema.Union([
 export type TemplateGiven = typeof TemplateGiven.Type;
 
 /**
- * A factory filed (`POST /api/factories`): its name, its repositories, each a folder of the machine the api runs on by its whole path
- * or a git URL that machine clones under its store, and, with `noTrust`, its places left untrusted. A key left out is refused by the
- * verb, in the command line's words.
+ * A factory filed (`POST /api/factories`): its name, its volumes, none or several, each a folder of the machine the api runs on by its
+ * whole path or a git URL that machine clones under its store, marked `:ro` or `:rw` as `nemia factory volume add` spells it, and, with
+ * `noTrust`, its writable volumes left untrusted. A volume refused is refused by the verb, in the command line's words.
  */
 export const FactoryCreate = Schema.Struct({
   name: Schema.String.annotate({ description: 'The name of the factory to file.' }),
-  repos: Schema.optionalKey(
+  volumes: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description:
-        'Its repositories, each a folder of the machine the api runs on by its whole path, or a git URL that machine clones under its store.',
+        'Its volumes, each a folder of the machine the api runs on by its whole path, or a git URL that machine clones, marked :ro or :rw.',
     }),
   ),
   noTrust: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether to leave its places untrusted.' })),
 });
 export type FactoryCreate = typeof FactoryCreate.Type;
 
-/** What a filing answers: the factory, its repositories, its file, and what was asked for each of its places' trust. */
+/** What a filing answers: the factory, its volumes, its file, and what was asked for each of its places' trust. */
 export const FactoryCreated = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory filed.' }),
-  repos: Schema.Array(Schema.String).annotate({ description: 'Its repositories.' }),
+  volumes: Schema.Array(FactoryVolume).annotate({ description: 'Its volumes, none where it was filed with none.' }),
   file: Schema.String.annotate({ description: 'Its file.' }),
   trusts: Schema.Array(FactoryPlaceTrust).annotate({ description: "What was asked for each of its places' trust." }),
 });
 export type FactoryCreated = typeof FactoryCreated.Type;
 
 /**
- * A volume mounted for a factory's runs (`POST /api/factories/<factory>/volumes`): a folder of the machine the api runs on by its whole
- * path, marked `:ro` or `:rw`, as `nemia factory volume add` spells it.
+ * A volume given to a factory (`POST /api/factories/<factory>/volumes`): a folder of the machine the api runs on by its whole path, or a
+ * git URL that machine clones, marked `:ro` or `:rw`, as `nemia factory volume add` spells it; with `noTrust`, a writable one left
+ * untrusted.
  */
 export const VolumeWrite = Schema.Struct({
   volume: Schema.String.annotate({
     description:
-      'The folder of the machine the api runs on, by its whole path, marked :ro or :rw, as `nemia factory volume add` spells it.',
+      'The folder of the machine the api runs on, by its whole path, or a git URL it clones, marked :ro or :rw, as `nemia factory volume add` spells it.',
   }),
+  noTrust: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether to leave a writable volume untrusted.' })),
 });
 export type VolumeWrite = typeof VolumeWrite.Type;
 
-/** A volume mounted: the factory's file written, the volume, and what a volume of its path was marked before (null for none). */
+/**
+ * A volume given: the factory's file written, the volume, what a volume of its path was marked before (null for none), and what was asked
+ * of its trust, none for a read-only one or under `noTrust`.
+ */
 export const VolumeAdded = Schema.Struct({
   file: Schema.String.annotate({ description: "The factory's file written." }),
   volume: FactoryVolume.annotate({ description: 'The volume mounted.' }),
   was: Schema.NullOr(Schema.Boolean).annotate({
     description: 'What a volume of its path was marked before: true if read-only, false if writable; null for none.',
+  }),
+  trusts: Schema.Array(FactoryPlaceTrust).annotate({
+    description: "What was asked of the volume's trust: none for a read-only one, or with noTrust.",
   }),
 });
 export type VolumeAdded = typeof VolumeAdded.Type;
@@ -445,15 +458,17 @@ export const VolumeRemoved = Schema.Struct({
 export type VolumeRemoved = typeof VolumeRemoved.Type;
 
 /**
- * A factory made from a template (`POST /api/factories/<name>/apply`): the template, its repositories, each a folder of the machine the api
- * runs on or a git URL that machine clones under its store, its parameters as `--set` words (`<key>=<value>`), and, with `noTrust`, its
- * places left untrusted. A template or the repositories left out are refused by the verb, in the command line's words.
+ * A factory made from a template (`POST /api/factories/<name>/apply`): the template, its volumes, none or several, each a folder of the
+ * machine the api runs on or a git URL that machine clones under its store, marked `:ro` or `:rw`, its parameters as `--set` words
+ * (`<key>=<value>`), and, with `noTrust`, its places left untrusted. A template left out is refused by the verb, in the command line's
+ * words.
  */
 export const FactoryApplyWrite = Schema.Struct({
   template: Schema.optionalKey(TemplateGiven.annotate({ description: 'The template to make the factory from.' })),
-  repos: Schema.optionalKey(
+  volumes: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
-      description: 'Its repositories, each a folder of the machine the api runs on or a git URL that machine clones under its store.',
+      description:
+        'Its volumes, each a folder of the machine the api runs on by its whole path, or a git URL that machine clones, marked :ro or :rw.',
     }),
   ),
   sets: Schema.optionalKey(
@@ -464,12 +479,12 @@ export const FactoryApplyWrite = Schema.Struct({
 export type FactoryApplyWrite = typeof FactoryApplyWrite.Type;
 
 /**
- * What an apply filed: the factory, its repositories, its file, the template it was made from and where that is read, the tree it runs
+ * What an apply filed: the factory, its volumes, its file, the template it was made from and where that is read, the tree it runs
  * from, and what was asked for each of its places' trust.
  */
 export const FactoryApplied = Schema.Struct({
   name: Schema.String.annotate({ description: 'The factory filed.' }),
-  repos: Schema.Array(Schema.String).annotate({ description: 'Its repositories.' }),
+  volumes: Schema.Array(FactoryVolume).annotate({ description: 'Its volumes, none where it was made with none.' }),
   file: Schema.String.annotate({ description: 'Its file.' }),
   template: FactoryTemplate.annotate({ description: 'The template it was made from.' }),
   place: Schema.String.annotate({ description: 'Where the template is read.' }),
@@ -579,7 +594,6 @@ export const FactoryAdoptPlan = Schema.Struct({
   plan: Schema.Struct({
     factory: Schema.String.annotate({ description: 'The factory.' }),
     kept: Schema.Struct({
-      repos: Schema.Array(Schema.String).annotate({ description: 'The repositories it keeps.' }),
       schedules: Schema.Array(Schema.String).annotate({ description: 'The schedules it keeps.' }),
       instruction: Schema.Boolean.annotate({ description: 'Whether it keeps its instruction.' }),
       volumes: Schema.Array(Schema.String).annotate({ description: 'The volumes it keeps.' }),

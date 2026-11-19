@@ -5,7 +5,7 @@
  */
 import type { TestContext } from 'vitest';
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -78,7 +78,8 @@ export async function world(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; r
   for (const [factory, workflows] of Object.entries(FACTORIES)) {
     const repo = path.join(at, 'repos', factory);
     fs.mkdirSync(repo, { recursive: true });
-    nemia(env, ['factory', 'add', factory, '--repo', repo, '--no-trust']);
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    nemia(env, ['factory', 'add', factory, '--volume', `${repo}:rw`, '--no-trust']);
     for (const workflow of workflows) nemia(env, ['factory', 'attach', factory, workflow]);
   }
   return { env, root: env.WF_ROOT! };

@@ -40,7 +40,7 @@ const tree = path.join(root, 'factories', 'acme', 'tree');
 fs.cpSync(TEAM, path.join(tree, 'workflows'), { recursive: true });
 write(
   path.join(root, 'factories', 'acme.json'),
-  JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+  JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
 );
 write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
 

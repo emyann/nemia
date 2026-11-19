@@ -26,11 +26,13 @@ import {
   readFactoriesAt,
   readFactoryAt,
   setScheduleAt,
+  volumesMovedAt,
 } from './factory.store.ts';
 import { detached } from '../../test/factory-planted.ts';
 import { typed } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';
 import { revisionsOf } from './factory.ts';
+import { volumeBase } from './volume/volume.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-factory-');
@@ -57,23 +59,29 @@ const refused =
     return true;
   };
 
-/** The factories `nemia factory ls` reads, by name: each with its repositories, or the file that does not read and why. */
+/** The paths of `volumes` that are writable: the repositories a factory works on. */
+const writable = (volumes: readonly { path: string; readOnly: boolean }[] | undefined): string[] | undefined =>
+  volumes?.filter((v) => !v.readOnly).map((v) => v.path);
+
+/** The factories `nemia factory ls` reads, by name: each with the repositories it works on, or the file that does not read and why. */
 const listedBy = async (): Promise<Array<[string, unknown]>> => {
   const { factories } = (await main(['factory', 'ls'], noEngine())) as {
-    factories: Array<{ name: string; repos?: readonly string[]; file: string; error?: string }>;
+    factories: Array<{ name: string; volumes?: readonly { path: string; readOnly: boolean }[]; file: string; error?: string }>;
   };
-  return factories.map((f) => [f.name, f.error === undefined ? f.repos : `${f.file} ${f.error}`]);
+  return factories.map((f) => [f.name, f.error === undefined ? writable(f.volumes) : `${f.file} ${f.error}`]);
 };
 
 /** The files in the factories folder, hidden ones too, by name. */
 const filed = () => (fs.existsSync(FACTORIES) ? fs.readdirSync(FACTORIES).sort() : []);
-const reposIn = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')).repos;
+/** The repositories the factory `name`'s file works on: its writable volumes' paths. */
+const reposIn = (name: string): unknown => writable(JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')).volumes);
 /** The factory `name`'s file, as JSON. */
 const fileOf = (name: string): Record<string, unknown> => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8'));
 /** The bytes of the factory `name`'s file. */
 const bytesOf = (name: string): Buffer => fs.readFileSync(path.join(FACTORIES, `${name}.json`));
 
-/** An empty folder of factories, and a plain directory to name as a repository: no `.git`, which no factory asks for. */
+/** An empty folder of factories, and a plain directory to name as a repository: no `.git`, which the store asks for of none (the verb asks
+ * the place). */
 const fresh = (): string => {
   fs.rmSync(FACTORIES, { recursive: true, force: true });
   return fs.mkdtempSync(path.join(ROOT, 'repo-'));
@@ -82,60 +90,116 @@ const fresh = (): string => {
 /** `fresh`, and the factory `pipao` filed on its repository, with `workflows` attached: the repository. */
 const pipao = (...workflows: string[]): string => {
   const repo = fresh();
-  addFactoryAt(ROOT, { name: 'pipao', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
   for (const workflow of workflows) attachWorkflowAt(ROOT, { factory: 'pipao', workflow });
   return repo;
 };
 
-test('REFUSED: two adds of one name, the second while the first is between its write and its link, file one and refuse the other', () => {
+test('REFUSED: two adds of one name, the second while the first is between its write and its link, file one and refuse the other', (t) => {
   const first = fresh();
   const second = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const link = fs.linkSync;
   let raced: unknown;
   const mocked = vi.spyOn(fs, 'linkSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     mocked.mockRestore();
-    raced = addFactoryAt(ROOT, { name: 'pipao', repos: [second] });
+    raced = addFactoryAt(ROOT, { name: 'pipao', volumes: [second].map((r) => `${r}:rw`) });
     return link(from, to);
   });
-  assert.throws(() => addFactoryAt(ROOT, { name: 'pipao', repos: [first] }), refused('Conflict', 'pipao'));
+  assert.throws(() => addFactoryAt(ROOT, { name: 'pipao', volumes: [first].map((r) => `${r}:rw`) }), refused('Conflict', 'pipao'));
   assert.ok(raced, 'the second add, run between the first write and its link, filed the factory');
   assert.deepEqual(reposIn('pipao'), [second], 'the file is the one that won, never overwritten');
   assert.deepEqual(filed(), ['pipao.json']);
 });
 
-describe('REFUSED: `nemia factory add`, nothing filed', () => {
-  test('no --repo is Invalid, naming the flag', async () => {
+test('a factory with no volume is filed, working on no repository yet, its instruction kept in the store', async () => {
+  fresh();
+  await main(['factory', 'add', 'acme'], noEngine());
+  assert.deepEqual(fileOf('acme'), { volumes: [], instruction: { store: true }, generation: 1 });
+  assert.deepEqual(await listedBy(), [['acme', []]]);
+});
+
+describe("an earlier release's file is moved once to one list of volumes, its repositories writable, and no key of the old shape kept", () => {
+const write = (name: string, content: object) => {
+    fs.mkdirSync(FACTORIES, { recursive: true });
+    fs.writeFileSync(path.join(FACTORIES, `${name}.json`), `${JSON.stringify(content)}\n`);
+  };
+test('repositories first, writable, with their origins; the extra folders after, read-only, names and origins kept', () => {
     fresh();
-    await assert.rejects(main(['factory', 'add', 'pipao'], noEngine()), refused('Invalid', 'nemia factory add pipao --repo <path|url>'));
+    write('mill', {
+      repos: ['/r/one', '/r/two'],
+      origins: { '/r/two': 'https://h/o/two.git' },
+      volumes: [{ path: '/data', readOnly: true, name: 'data' }],
+      workflows: ['build'],
+      workflowRepos: { build: 'one' },
+    });
+    write('new', { volumes: [{ path: '/r/three', readOnly: false }] });
+    const before = bytesOf('new');
+    assert.deepEqual(volumesMovedAt(ROOT), { moved: [path.join(FACTORIES, 'mill.json')], left: [] });
+    assert.deepEqual(fileOf('mill'), {
+      volumes: [
+        { path: '/r/one', readOnly: false },
+        { path: '/r/two', readOnly: false, origin: 'https://h/o/two.git' },
+        { path: '/data', readOnly: true, name: 'data' },
+      ],
+      workflows: ['build'],
+      workflowRepos: { build: 'one' },
+    });
+    assert.deepEqual(bytesOf('new'), before, 'a file of the new shape is not written');
+  });
+test('a second start moves nothing', () => {
+    const before = bytesOf('mill');
+    assert.deepEqual(volumesMovedAt(ROOT), { moved: [], left: [] });
+    assert.deepEqual(bytesOf('mill'), before);
+  });
+test('a file whose repositories repeat is left as it was, with why, and reads as one of the old shape naming nemia up', () => {
+    fresh();
+    write('twice', { repos: ['/r/one', '/r/one'] });
+    const before = bytesOf('twice');
+    const { moved, left } = volumesMovedAt(ROOT);
+    assert.deepEqual([moved, left.map((l) => l.file)], [[], [path.join(FACTORIES, 'twice.json')]]);
+    assert.deepEqual(bytesOf('twice'), before);
+    assert.throws(() => readFactoryAt(ROOT, 'twice'), refused('Invalid', 'twice', 'nemia up'));
+  });
+});
+
+describe('REFUSED: `nemia factory add`, nothing filed', () => {
+test('--repo is Invalid, naming --volume: a repository is a writable volume', async () => {
+    const repo = fresh();
+    await assert.rejects(main(['factory', 'add', 'pipao', '--repo', repo], noEngine()), refused('Invalid', '--volume'));
     assert.deepEqual(filed(), []);
   });
-  test('a --repo missing, or a file, is Invalid, naming each', async () => {
+test('a volume with no mark is Invalid', async () => {
+    const repo = fresh();
+    await assert.rejects(main(['factory', 'add', 'pipao', '--volume', repo], noEngine()), refused('Invalid', repo));
+    assert.deepEqual(filed(), []);
+  });
+test('a --volume missing, or a file, is Invalid, naming each', async () => {
     const repo = fresh();
     const gone = path.join(ROOT, 'no-such-dir');
     const aFile = path.join(repo, 'README.md');
     fs.writeFileSync(aFile, 'not a directory\n');
     await assert.rejects(
-      main(['factory', 'add', 'pipao', '--repo', repo, '--repo', gone, '--repo', aFile], noEngine()),
-      refused('Invalid', '--repo', `${gone}, ${aFile}`),
+      main(['factory', 'add', 'pipao', '--volume', `${repo}:rw`, '--volume', `${gone}:ro`, '--volume', `${aFile}:rw`], noEngine()),
+      refused('Invalid', gone, aFile),
     );
-    await assert.rejects(main(['factory', 'add', 'pipao', '--repo', gone], noEngine()), refused('Invalid', gone));
+    await assert.rejects(main(['factory', 'add', 'pipao', '--volume', `${gone}:rw`], noEngine()), refused('Invalid', gone));
     assert.deepEqual(filed(), []);
   });
-  for (const name of ['../x', 'Nemia', '.hidden', 'a/b'])
+for (const name of ['../x', 'Nemia', '.hidden', 'a/b'])
     test(`a name that is no slug, ${name}, is Invalid before any path is made of it`, async () => {
       const repo = fresh();
-      await assert.rejects(main(['factory', 'add', name, '--repo', repo], noEngine()), refused('Invalid', `\`${name}\``));
+      await assert.rejects(main(['factory', 'add', name, '--volume', `${repo}:rw`], noEngine()), refused('Invalid', `\`${name}\``));
       assert.ok(!fs.existsSync(FACTORIES), 'not even the folder');
       assert.ok(!fs.existsSync(path.join(ROOT, 'x.json')));
     });
 });
 
 describe('REFUSED: `nemia factory rm`, nothing removed', () => {
-  const rows: Array<[string, string, 'Missing' | 'Conflict' | 'Invalid', string[]]> = [
+const rows: Array<[string, string, 'Missing' | 'Conflict' | 'Invalid', string[]]> = [
     ['the default factory is a Conflict', 'default', 'Conflict', ['nemia factory rm']],
     ['a name that is no slug is Invalid', '../runs', 'Invalid', ['`../runs`']],
   ];
-  for (const [row, name, tag, facts] of rows)
+for (const [row, name, tag, facts] of rows)
     test(row, async () => {
       pipao();
       await assert.rejects(main(['factory', 'rm', name], noEngine()), refused(tag, ...facts));
@@ -144,14 +208,14 @@ describe('REFUSED: `nemia factory rm`, nothing removed', () => {
 });
 
 describe('REFUSED: `nemia factory` typed with a subcommand, a flag or an argument it does not take, each by name, nothing written', () => {
-  const rows: Array<[string[], string[]]> = [
+const rows: Array<[string[], string[]]> = [
     [
       ['frob'],
       [
         'nemia factory',
         'frob',
         'nemia factory ls',
-        'nemia factory add <name> --repo <path>',
+        'nemia factory add <name> [--volume <path|url>:rw]',
         'nemia factory attach <factory> <workflow>',
         'nemia factory detach <factory> <workflow>',
         'nemia factory hire <factory> <agent> --step',
@@ -163,10 +227,10 @@ describe('REFUSED: `nemia factory` typed with a subcommand, a flag or an argumen
     ],
     [['add', 'pipao', '--rep', '/x'], ['--rep']],
     [
-      ['add', 'acme', '--template', 'mill', '--repo', '/x'],
-      ['--template', 'nemia factory apply <name> --template <name|folder|archive> --repo <path|url>', '--set <key>=<value>'],
+      ['add', 'acme', '--template', 'mill', '--volume', '/x:rw'],
+      ['--template', 'nemia factory apply <name> --template <name|folder|archive> [--volume <path|url>:ro|:rw ...]', '--set <key>=<value>'],
     ],
-    [['add', 'acme', '--template=mill', '--repo', '/x'], ['nemia factory apply <name> --template']],
+    [['add', 'acme', '--template=mill', '--volume', '/x:rw'], ['nemia factory apply <name> --template']],
     [
       ['hire', 'pipao', 'ada'],
       ['nemia factory hire', '--step'],
@@ -225,13 +289,17 @@ describe('REFUSED: `nemia factory` typed with a subcommand, a flag or an argumen
       ['nemia factory schedule', '--brief'],
     ],
   ];
-  for (const [argv, facts] of rows)
+for (const [argv, facts] of rows)
     test(argv.join(' '), async () => {
       const repo = pipao('janitor');
       const before = bytesOf('pipao');
       await assert.rejects(main(['factory', ...argv], noEngine()), refused('Invalid', ...facts));
       assert.deepEqual(bytesOf('pipao'), before);
-      assert.deepEqual(fileOf('pipao'), { repos: [repo], workflows: ['janitor'], generation: 2 });
+      assert.deepEqual(fileOf('pipao'), {
+        volumes: [{ path: repo, readOnly: false, name: volumeBase(repo) }],
+        workflows: ['janitor'],
+        generation: 2,
+      });
     });
 });
 
@@ -243,7 +311,7 @@ const hiring = (): Buffer => {
 };
 
 describe('REFUSED: `nemia factory hire` and `fire`, nothing written', () => {
-  const rows: Array<[string, () => unknown, 'Missing' | 'Conflict' | 'Invalid', string[]]> = [
+const rows: Array<[string, () => unknown, 'Missing' | 'Conflict' | 'Invalid', string[]]> = [
     [
       'a hire in the default factory is a Conflict, a plain session filling its steps',
       () => main(['factory', 'hire', 'default', 'ada', '--step', 'build/implement'], noEngine()),
@@ -287,43 +355,43 @@ describe('REFUSED: `nemia factory hire` and `fire`, nothing written', () => {
       ['`a/b`'],
     ],
   ];
-  for (const [row, act, tag, facts] of rows)
+for (const [row, act, tag, facts] of rows)
     test(row, async () => {
       const before = hiring();
       await assert.rejects(async () => await act(), refused(tag, ...facts));
       assert.deepEqual(bytesOf('pipao'), before);
       assert.deepEqual(filed(), ['pipao.json']);
     });
-  test('a hire into a step whose own file names its agent is a Conflict, naming the file; a file naming none, and no file, take one', async () => {
-    const repo = pipao('build');
-    const before = bytesOf('pipao');
-    const theirs = path.join(repo, 'workflows', 'build');
-    const yours = path.join(ROOT, 'workflows', 'build');
-    for (const dir of [theirs, yours]) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(theirs, 'named.md'), '---\nagent: reviewer\n---\nSay it.\n');
-    fs.writeFileSync(path.join(theirs, 'implement.md'), '---\nmodel: opus\n---\nBuild it.\n');
-    fs.writeFileSync(path.join(yours, 'yours.md'), '---\nagent: agora\n---\nSay it.\n');
-    try {
-      await assert.rejects(
-        main(['factory', 'hire', 'pipao', 'ada', '--step', 'build/named'], noEngine()),
-        refused('Conflict', '`agent: reviewer`', path.join(theirs, 'named.md')),
-      );
-      assert.throws(
-        () => hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step: 'build/yours' }),
-        refused('Conflict', '`agent: agora`', path.join(yours, 'yours.md')),
-      );
-      assert.deepEqual(bytesOf('pipao'), before);
-      hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step: 'build/implement' });
-      hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step: 'build/absent' });
-      assert.deepEqual(fileOf('pipao').hires, { 'build/implement': 'ada', 'build/absent': 'ada' });
-    } finally {
-      fs.rmSync(path.join(ROOT, 'workflows'), { recursive: true, force: true });
-    }
-  });
+test('a hire into a step whose own file names its agent is a Conflict, naming the file; a file naming none, and no file, take one', async () => {
+      const repo = pipao('build');
+      const before = bytesOf('pipao');
+      const theirs = path.join(repo, 'workflows', 'build');
+      const yours = path.join(ROOT, 'workflows', 'build');
+      for (const dir of [theirs, yours]) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(theirs, 'named.md'), '---\nagent: reviewer\n---\nSay it.\n');
+      fs.writeFileSync(path.join(theirs, 'implement.md'), '---\nmodel: opus\n---\nBuild it.\n');
+      fs.writeFileSync(path.join(yours, 'yours.md'), '---\nagent: agora\n---\nSay it.\n');
+      try {
+        await assert.rejects(
+          main(['factory', 'hire', 'pipao', 'ada', '--step', 'build/named'], noEngine()),
+          refused('Conflict', '`agent: reviewer`', path.join(theirs, 'named.md')),
+        );
+        assert.throws(
+          () => hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step: 'build/yours' }),
+          refused('Conflict', '`agent: agora`', path.join(yours, 'yours.md')),
+        );
+        assert.deepEqual(bytesOf('pipao'), before);
+        hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step: 'build/implement' });
+        hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step: 'build/absent' });
+        assert.deepEqual(fileOf('pipao').hires, { 'build/implement': 'ada', 'build/absent': 'ada' });
+      } finally {
+        fs.rmSync(path.join(ROOT, 'workflows'), { recursive: true, force: true });
+      }
+    });
 });
 
 describe('REFUSED: `nemia factory attach` and `detach`, nothing written', () => {
-  for (const verb of ['attach', 'detach'] as const) {
+for (const verb of ['attach', 'detach'] as const) {
     const change = (workflow: string, factory = 'pipao') =>
       verb === 'attach' ? attachWorkflowAt(ROOT, { factory, workflow }) : detached(ROOT, factory, workflow);
     test(`${verb} in the default factory is a Conflict`, async () => {
@@ -346,7 +414,7 @@ describe('REFUSED: `nemia factory attach` and `detach`, nothing written', () => 
         assert.deepEqual(filed(), ['pipao.json']);
       });
   }
-  test('a detach of a workflow it still hires into is Invalid, naming each fire; once fired, it detaches', () => {
+test('a detach of a workflow it still hires into is Invalid, naming each fire; once fired, it detaches', () => {
     const repo = pipao('build', 'builder');
     hireAgentAt(ROOT, { factory: 'pipao', agent: 'agora', step: 'build/review' });
     hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step: 'build/implement' });
@@ -368,20 +436,25 @@ describe('REFUSED: `nemia factory attach` and `detach`, nothing written', () => 
     detached(ROOT, 'pipao', 'build');
     assert.deepEqual(
       fileOf('pipao'),
-      { repos: [repo], workflows: ['builder'], hires: { 'builder/x': 'otto' }, generation: 9 },
+      {
+        volumes: [{ path: repo, readOnly: false, name: volumeBase(repo) }],
+        workflows: ['builder'],
+        hires: { 'builder/x': 'otto' },
+        generation: 9,
+      },
       "builder's hire does not hold build",
     );
   });
 });
 
 describe('REFUSED: an attach naming a repository the factory has no folder of that name for, nothing written; one named is written to its file, and a detach takes it off', () => {
-  const shop = (): string => {
+const shop = (): string => {
     const repo = fresh();
-    addFactoryAt(ROOT, { name: 'shop', repos: [repo] });
+    addFactoryAt(ROOT, { name: 'shop', volumes: [repo].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: 'shop', workflow: 'dev' });
     return repo;
   };
-  test('an unknown name is Invalid, naming the attach and the folder names to choose from', async () => {
+test('an unknown name is Invalid, naming the attach and the folder names to choose from', async () => {
     const repo = shop();
     const before = bytesOf('shop');
     await assert.rejects(
@@ -390,7 +463,7 @@ describe('REFUSED: an attach naming a repository the factory has no folder of th
     );
     assert.deepEqual(bytesOf('shop'), before);
   });
-  test("its folder's name is kept in the factory's own file, and a detach takes it off with the workflow", async () => {
+test("its folder's name is kept in the factory's own file, and a detach takes it off with the workflow", async () => {
     const repo = shop();
     await main(['factory', 'attach', 'shop', 'dev', '--repo', path.basename(repo)], noEngine());
     assert.deepEqual(fileOf('shop').workflowRepos, { dev: path.basename(repo) });
@@ -401,9 +474,9 @@ describe('REFUSED: an attach naming a repository the factory has no folder of th
 });
 
 describe('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', () => {
-  const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
-  const attach = `nemia factory attach ${at.factory} ${at.workflow} --repo`;
-  const rows: Array<[string, (repo: string) => unknown, 'Missing' | 'Invalid', (repo: string) => string[]]> = [
+const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
+const attach = `nemia factory attach ${at.factory} ${at.workflow} --repo`;
+const rows: Array<[string, (repo: string) => unknown, 'Missing' | 'Invalid', (repo: string) => string[]]> = [
     [
       'a cron Cron does not read, quoting it',
       () => setScheduleAt(ROOT, { ...at, cron: '61 * * * *' }),
@@ -439,17 +512,17 @@ describe('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', 
       () => ['--tz Not/AZone'],
     ],
   ];
-  for (const [row, act, tag, facts] of rows)
+for (const [row, act, tag, facts] of rows)
     test(row, async () => {
       const repo = pipao('janitor');
       const before = bytesOf('pipao');
       await assert.rejects(async () => await act(repo), refused(tag, ...facts(repo)));
       assert.deepEqual(bytesOf('pipao'), before);
     });
-  test('a workflow the wiring places on none of a factory of two is refused naming the attach; one wired is written', () => {
+test('a workflow the wiring places on none of a factory of two is refused naming the attach; one wired is written', () => {
     const repo = fresh();
     const other = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-    addFactoryAt(ROOT, { name: at.factory, repos: [repo, other] });
+    addFactoryAt(ROOT, { name: at.factory, volumes: [repo, other].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, at);
     const before = bytesOf(at.factory);
     assert.throws(() => setScheduleAt(ROOT, at), refused('Invalid', attach));
@@ -459,7 +532,7 @@ describe('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', 
     assert.equal(written.repo, undefined);
     assert.deepEqual(readFactoryAt(ROOT, at.factory).schedules[at.workflow], written);
   });
-  test("an old schedule's repository sent back as it is, as a Schedule's object reads it, is written; another is refused", () => {
+test("an old schedule's repository sent back as it is, as a Schedule's object reads it, is written; another is refused", () => {
     const repo = pipao(at.workflow);
     const file = path.join(FACTORIES, `${at.factory}.json`);
     const old = { cron: '0 9 * * 1', brief: 'Read the stats', repo, since: '2026-01-01T00:00:00.000Z' };
@@ -474,44 +547,44 @@ describe('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', 
 });
 
 describe('a factory file that does not read: listed with why, the others still listed, and refused to hire, fire, attach, detach and start', () => {
-  test('`nemia factory ls` lists each with why, by name, a hidden file not at all', async () => {
+test('`nemia factory ls` lists each with why, by name, a hidden file not at all', async () => {
     const repo = fresh();
-    await main(['factory', 'add', 'pipao', '--repo', repo], noEngine());
+    addFactoryAt(ROOT, { name: 'pipao', volumes: [`${repo}:rw`] });
     fs.writeFileSync(path.join(FACTORIES, 'empty.json'), '{}\n');
-    fs.writeFileSync(path.join(FACTORIES, 'torn.json'), '{"repos": [');
-    fs.writeFileSync(path.join(FACTORIES, 'none.json'), '{"repos": []}\n');
-    fs.writeFileSync(path.join(FACTORIES, '.pipao.json.123.abcd'), '{"repos": ["/x"]}\n');
-    fs.writeFileSync(path.join(FACTORIES, '.hidden.json'), '{"repos": ["/x"]}\n');
+    fs.writeFileSync(path.join(FACTORIES, 'torn.json'), '{"volumes": [');
+    fs.writeFileSync(path.join(FACTORIES, 'old.json'), '{"repos": ["/x"]}\n');
+    fs.writeFileSync(path.join(FACTORIES, '.pipao.json.123.abcd'), '{"volumes": []}\n');
+    fs.writeFileSync(path.join(FACTORIES, '.hidden.json'), '{"volumes": []}\n');
     const listed = await listedBy();
-    const [empty, none, made, torn] = listed;
-    assert.deepEqual([empty?.[0], none?.[0], torn?.[0], listed.length], ['empty', 'none', 'torn', 4]);
-    assert.match(String(empty?.[1]), /empty\.json .*`repos`.* nemia factory rm empty/);
-    assert.match(String(none?.[1]), /none\.json .*`repos.0`.* nemia factory rm none/);
+    const [empty, old, made, torn] = listed;
+    assert.deepEqual([empty?.[0], old?.[0], torn?.[0], listed.length], ['empty', 'old', 'torn', 4]);
+    names(String(empty?.[1]), 'empty.json', '`volumes`', 'nemia factory rm empty');
+    names(String(old?.[1]), 'old.json', 'nemia up');
     assert.deepEqual(made, ['pipao', [repo]]);
     assert.match(String(torn?.[1]), /torn\.json .*JSON/);
   });
-  test('a default.json written by hand is listed as a file to remove, never as the default factory or a factory', async () => {
+test('a default.json written by hand is listed as a file to remove, never as the default factory or a factory', async () => {
     const repo = fresh();
-    await main(['factory', 'add', 'pipao', '--repo', repo], noEngine());
-    fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"repos": ["/x"]}\n');
+    addFactoryAt(ROOT, { name: 'pipao', volumes: [`${repo}:rw`] });
+    fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"volumes": []}\n');
     const listed = await listedBy();
     assert.deepEqual([listed[0]?.[0], listed.length], ['default', 2]);
     assert.ok(String(listed[0]?.[1]).startsWith(`${path.join(FACTORIES, 'default.json')} `), String(listed[0]?.[1]));
     names(String(listed[0]?.[1]), 'nemia factory rm');
     assert.deepEqual(listed[1], ['pipao', [repo]]);
     assert.deepEqual(
-      readFactoriesAt(ROOT).flatMap((f) => ('repos' in f ? [f.name] : [])),
+      readFactoriesAt(ROOT).flatMap((f) => ('volumes' in f ? [f.name] : [])),
       ['pipao'],
     );
   });
-  for (const [key, verbs] of [
+for (const [key, verbs] of [
     ['hires', 'hire and fire'],
     ['workflows', 'attach and detach'],
   ] as const)
     test(`\`${key}\` that does not read: ${verbs} are Invalid, the bytes left; a read names it; no such factory is Missing`, () => {
       fresh();
       fs.mkdirSync(FACTORIES, { recursive: true });
-      fs.writeFileSync(path.join(FACTORIES, 'bent.json'), `{"repos": ["/x"], "${key}": 3}\n`);
+      fs.writeFileSync(path.join(FACTORIES, 'bent.json'), `{"volumes": [], "${key}": 3}\n`);
       const before = bytesOf('bent');
       const bent = readFactoriesAt(ROOT).find((f) => f.name === 'bent');
       assert.ok(bent && 'error' in bent, 'listed with why');
@@ -531,7 +604,7 @@ describe('a factory file that does not read: listed with why, the others still l
 });
 
 describe("a factory's revisions: pinned when its file says nothing, written by `nemia factory revisions`, and a third value refused", () => {
-  test('absent reads pinned; the verb writes follow, every other key kept, and ls reads it', async () => {
+test('absent reads pinned; the verb writes follow, every other key kept, and ls reads it', async () => {
     pipao('build');
     assert.equal(revisionsOf(readFactoryAt(ROOT, 'pipao')), 'pinned', 'a factory that says nothing keeps its runs pinned');
     await main(['factory', 'revisions', 'pipao', 'follow'], noEngine());
@@ -545,13 +618,13 @@ describe("a factory's revisions: pinned when its file says nothing, written by `
       'the listing reads the policy written',
     );
   });
-  test('a file whose `revisions` is neither follow nor pinned does not read, naming the key', () => {
+test('a file whose `revisions` is neither follow nor pinned does not read, naming the key', () => {
     fresh();
     fs.mkdirSync(FACTORIES, { recursive: true });
-    fs.writeFileSync(path.join(FACTORIES, 'bent.json'), '{"repos": ["/x"], "revisions": "always"}\n');
+    fs.writeFileSync(path.join(FACTORIES, 'bent.json'), '{"volumes": [], "revisions": "always"}\n');
     assert.throws(() => readFactoryAt(ROOT, 'bent'), refused('Invalid', 'bent', '`revisions`'));
   });
-  for (const [row, argv, tag] of [
+for (const [row, argv, tag] of [
     ['the default factory is a Conflict', ['factory', 'revisions', 'default', 'follow'], 'Conflict'],
     ['a policy that is neither is refused before the file is read', ['factory', 'revisions', 'pipao', 'always'], 'Invalid'],
     ['no such factory is Missing', ['factory', 'revisions', 'nope', 'follow'], 'Missing'],

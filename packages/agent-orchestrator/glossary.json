@@ -1047,12 +1047,22 @@
     },
     {
       "term": "First-visit link",
-      "meaning": "a single-use ticket the person makes at the server (`nemia board link`), needing no approval: the browser that opens it within ten minutes is signed in to the board by a person token minted then, set as its cookie and never shown (`linkMinted`, `linkClaimed`)."
+      "meaning": "a single-use ticket the person makes at the server (`nemia board link`, or `nemia open`, which opens this machine's browser on it), needing no approval: the browser that opens it within ten minutes is signed in to the board by a person token minted then, set as its cookie and never shown (`linkMinted`, `linkClaimed`)."
     },
     {
       "term": "Address kind",
       "meaning": "what a bind's address is: loopback, wildcard, private (RFC 1918), shared (100.64.0.0/10, a carrier-grade or Tailscale network), link-local, unique-local or public (`addressKind`, `kindOfBind`, `packages/agent-orchestrator/src/service/address.ts`); a public or wildcard bind is listened on only where the person acknowledged it (`bindExposure`, `NEMIA_BIND_PUBLIC=1`, `nemia service install --public`).",
       "type": "AddressKind"
+    },
+    {
+      "term": "Check turn",
+      "meaning": "one tiny real turn the server files through an installed, signed-in harness to prove it answers: an ordinary job of the harness on its declared smallest model (`turnModel`), in its held fence, capped at `TURN_BUDGET_USD` and `TURN_DEADLINE_SECONDS`, its record under `<home>/turns/` (`startTurn`, `turnOf`, `packages/agent-orchestrator/src/harness-turn/harness-turn.verb.ts`); it passes only on an answer (`turnCheckOf`, `packages/agent-orchestrator/src/harness-turn/harness-turn.ts`).",
+      "type": "TurnVerdict"
+    },
+    {
+      "term": "Milestone",
+      "meaning": "one step of a store on its way to its first landed change — a harness signed in, a factory filed, a volume a run would mount, a run landed — done by what the store holds now and never by a saved flag, the first not done `next` (`milestonesOf`, `packages/agent-orchestrator/src/milestones/milestones.ts`; `milestonesNow`, `packages/agent-orchestrator/src/milestones/milestones.verb.ts`).",
+      "type": "MilestoneStates"
     }
   ]
 }

@@ -209,13 +209,13 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
    */
   requires: ({ input: [factory, change] }) => accepted(factory, change),
   /**
-   * A wiring change copies the factory's instruction, revisions, template, tree, volumes, harness settings, cost lines and origins as they
-   * were, by a spread, and the verifier reads no optional field through one (tsverify's `docs/reads.md`: "a field read through a spread,
-   * where the spread value may lack it"), so no law can say they are kept: left to the code, which names none of them, until the verifier
-   * reads one.
-   * That a factory's volumes and harness settings survive a wiring change is held by the tests of its verbs (`test/factory-start.test.ts`,
-   * its volume and setting checkpoints). Its generation is carried the same way: the door counts it on the write that follows
-   * (`generationAfter`, `contracts/generation.contract.ts`), never the wiring.
+   * A wiring change copies the factory's instruction, revisions, template, tree, harness settings and cost lines as they were, by a
+   * spread, and the verifier reads no optional field through one (tsverify's `docs/reads.md`: "a field read through a spread, where the
+   * spread value may lack it"), so no law can say they are kept: left to the code, which names none of them, until the verifier reads
+   * one. Its volumes, which a factory always has, none or several, are a law (`keepsVolumes`).
+   * That a factory's harness settings survive a wiring change is held by the tests of its verbs (`test/factory-start.test.ts`, its
+   * setting checkpoints). Its generation is carried the same way: the door counts it on the write that follows (`generationAfter`,
+   * `contracts/generation.contract.ts`), never the wiring.
    */
   open: [
     'output.generation',
@@ -223,10 +223,8 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     'output.revisions',
     'output.template',
     'output.tree',
-    'output.volumes',
     'output.harnessSettings',
     'output.costLines',
-    'output.origins',
     'output.workflowRepos',
   ],
   ensures: {
@@ -246,10 +244,16 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
       description: 'After an unschedule the factory schedules the workflow no more',
       condition: ({ input: [, change], output }) => change.verb !== 'unschedule' || !Object.hasOwn(output.schedules, change.workflow),
     },
-    keepsRepos: {
-      description: 'A wiring change never changes the repositories',
+    keepsVolumes: {
+      description: 'A wiring change never changes the volumes: each at its path, read-only or writable, with its origin, in its order',
       condition: ({ input: [factory], output }) =>
-        output.repos.length === factory.repos.length && output.repos.every((repo, i) => repo === factory.repos[i]),
+        output.volumes.length === factory.volumes.length &&
+        output.volumes.every(
+          (v, i) =>
+            v.path === factory.volumes.at(i)?.path &&
+            v.readOnly === factory.volumes.at(i)?.readOnly &&
+            v.origin === factory.volumes.at(i)?.origin,
+        ),
     },
     hireNames: {
       description: 'After a hire the step names the hired agent',

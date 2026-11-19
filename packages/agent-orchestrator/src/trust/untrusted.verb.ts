@@ -2,6 +2,7 @@
  * Which places of a factory a harness does not trust now (`untrustedPlaces`), read fresh off the place and the harness's own file, apart
  * from the trust's verbs (`trust.verb.ts`) so a controller that only reads it — the needs' sweep, a fix — imports no command.
  */
+import { workedOn } from '../factory/factory.ts';
 import { Effect } from 'effect';
 import { folderTrust } from '../runtime-client.ts';
 import type { FactoryListing } from '../factory/factory.ts';
@@ -41,7 +42,7 @@ function lacking(factory: string, dir: string, root: string | undefined): Untrus
  */
 export const untrustedPlaces = Effect.fn('untrustedPlaces')(function* (factories: readonly FactoryListing[]) {
   const place = yield* PlaceService;
-  const places = factories.flatMap((f) => ('error' in f ? [] : f.repos.map((dir) => ({ factory: f.name, dir }))));
+  const places = factories.flatMap((f) => ('error' in f ? [] : workedOn(f).map((dir) => ({ factory: f.name, dir }))));
   const read = yield* Effect.forEach(
     places,
     ({ factory, dir }) => Effect.map(rootOf(place, dir), (rooted) => ('unasked' in rooted ? [] : lacking(factory, dir, rooted.root))),

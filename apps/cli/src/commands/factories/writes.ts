@@ -1,5 +1,5 @@
 /**
- * The runners of a factory's own writes: `nemia factory add` (its repositories sent as `repoSent` says), `attach` and `detach` a
+ * The runners of a factory's own writes: `nemia factory add` (its volumes sent as `volumeSent` says), `attach` and `detach` a
  * workflow, `hire` and `fire` an agent of a step (the Hire named `<workflow>.<step>`), `revisions`, `trust` and `rm`. Each asks its
  * endpoint and prints, word for word as the old path did, what the answer says it wrote (`writtenOf`).
  */
@@ -7,19 +7,20 @@ import { type Args, REVISIONS_POLICIES } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { listArg, said, switchArg, textArg } from '../requests.ts';
-import { repoSent, textOf, trustedLines, writtenOf } from './lines.ts';
+import { textOf, trustedLines, volumeSent, worksOnLine, writtenOf } from './lines.ts';
 
 /**
- * `nemia factory add`: the factory filed on its repositories, then the trust asked for each place unless `--no-trust`.
+ * `nemia factory add`: the factory filed with its volumes, none or several, then the trust asked for each writable one unless
+ * `--no-trust`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function factoryAdd(args: Args): Promise<number> {
   const name = textOf(args, 'name');
-  const repos = listArg(args, 'repos').map((r) => repoSent(r));
+  const volumes = listArg(args, 'volumes').map((v) => volumeSent(v));
   const filed = await asked('factory add', (c) =>
-    c.factories.create({ payload: { name, repos, ...(switchArg(args, 'noTrust') ? { noTrust: true } : {}) } }),
+    c.factories.create({ payload: { name, volumes, ...(switchArg(args, 'noTrust') ? { noTrust: true } : {}) } }),
   );
-  said([`${filed.name}  ${filed.repos.join(', ')}`, `filed: ${filed.file}`, ...trustedLines(filed.name, filed.trusts)]);
+  said([`${filed.name}  ${worksOnLine(filed.volumes)}`, `filed: ${filed.file}`, ...trustedLines(filed.name, filed.trusts)]);
   return 0;
 }
 

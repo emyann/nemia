@@ -67,7 +67,7 @@ write(path.join(mine, 'plan.md'), '---\nplace: git\n---\nWrite PLAN.md.\n');
 write(path.join(repo, 'workflows', 'both', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 write(path.join(root, 'workflows', 'both', 'implement.md'), '---\nplace: git\n---\nImplement it my way.\n');
 write(path.join(repo, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
-addFactory({ name: 'desk', repos: [repo] });
+addFactory({ name: 'desk', volumes: [repo].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'desk', workflow: 'dev' });
 hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
@@ -177,7 +177,7 @@ const onFolder = (about: string): string => {
     .replace(/[^a-z0-9]+/g, '-')}`;
   write(path.join(about, 'workflows', 'dev', 'implement.md'), '---\nplace: git\nharness: claude\nagent: implementer\n---\nImplement it.\n');
   write(path.join(about, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
-  addFactory({ name, repos: [about] });
+  addFactory({ name, volumes: [about].map((r) => `${r}:rw`) });
   attachWorkflow({ factory: name, workflow: 'dev' });
   return name;
 };
@@ -465,9 +465,9 @@ for (const at of [first, second]) {
   write(path.join(at, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: at });
 }
-addFactory({ name: 'mill', repos: [first] });
+addFactory({ name: 'mill', volumes: [first].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'mill', workflow: 'dev' });
-addFactory({ name: 'pair', repos: [first, second] });
+addFactory({ name: 'pair', volumes: [first, second].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'pair', workflow: 'dev', repo: path.basename(second) });
 attachWorkflow({ factory: 'pair', workflow: 'solo' });
 
@@ -968,7 +968,7 @@ const acmeFactory = (): { dev: string; repo: string; gone: () => void } => {
   fs.cpSync(TEAM, folders, { recursive: true });
   write(
     path.join(root, 'factories', 'acme.json'),
-    JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+    JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
   const gone = (): void => {

@@ -58,7 +58,8 @@ const CARDS = names('c-paged');
 for (const name of CARDS) write(path.join(root, 'inbox', `${name}.md`), `Do ${name}.\n`);
 
 const FACTORIES = names('f-paged');
-for (const name of FACTORIES) write(path.join(root, 'factories', `${name}.json`), JSON.stringify({ repos: [repo] }));
+for (const name of FACTORIES)
+  write(path.join(root, 'factories', `${name}.json`), JSON.stringify({ volumes: [{ path: repo, readOnly: false }] }));
 
 const WORKFLOWS = names('wf-paged', SOME);
 const STEPS = WORKFLOWS.map((wf) => `${wf}/implement`);
@@ -87,7 +88,7 @@ write(
   path.join(root, 'factories', FACTORY, 'servers.json'),
   JSON.stringify({ servers: Object.fromEntries(SERVERS.map((n) => [n, { type: 'http', url: `https://${n}.example/mcp` }])) }),
 );
-write(path.join(root, 'factories', `${FACTORY}.json`), JSON.stringify({ repos: [repo] }));
+write(path.join(root, 'factories', `${FACTORY}.json`), JSON.stringify({ volumes: [{ path: repo, readOnly: false }] }));
 
 /**
  * The factory the workflows are attached in, each hired and scheduled: a Hire is a step of a workflow it offers, read with it, and a
@@ -99,7 +100,7 @@ const SCHEDULES = WORKFLOWS;
 write(
   path.join(root, 'factories', `${WORKFLOW_FACTORY}.json`),
   JSON.stringify({
-    repos: [repo],
+    volumes: [{ path: repo, readOnly: false }],
     workflows: WORKFLOWS,
     hires: Object.fromEntries(STEPS.map((step, i) => [step, AGENTS[i]])),
     schedules: Object.fromEntries(

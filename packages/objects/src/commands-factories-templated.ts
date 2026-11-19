@@ -11,7 +11,28 @@ export const NO_TRUST: Flag = { flag: '--no-trust', kind: 'switch', key: 'noTrus
 
 /** What `nemia factory apply` takes after its verb, said by its usage and by `nemia factory add`'s refusal of a `--template`. */
 export const APPLY_USAGE =
-  '<name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]';
+  '<name> --template <name|folder|archive> [--volume <path|url>:ro|:rw ...] [--set <key>=<value> ...] [--no-trust]';
+
+/** `--volume <path|url>:ro|:rw`, on `nemia factory add` and `apply`, once per volume the factory is filed with: none or several. */
+export const VOLUMES = {
+  flag: '--volume',
+  kind: 'text',
+  key: 'volumes',
+  many: true,
+  takes:
+    "--volume takes a folder's whole path or a git URL, marked :ro (read only) or :rw (worked on): --volume <path|url>:ro|:rw, once per volume",
+} as const satisfies Flag;
+
+/**
+ * Whether `arg` is the retired `--repo` of `nemia factory add` and `apply`, and, where it is, its refusal: a factory's repositories are its
+ * writable volumes.
+ * @param verb The verb that was given it, `add` or `apply`.
+ * @param arg The argument as typed.
+ */
+export const retiredRepo = (verb: 'add' | 'apply', arg: string): string | undefined =>
+  arg === '--repo' || arg.startsWith('--repo=')
+    ? `nemia factory ${verb} does not take --repo: a repository a factory works on is a writable volume. Give it with --volume <path|url>:rw, or after with nemia factory volume add <factory> <path|url>:rw. Nothing was filed.`
+    : undefined;
 
 /** Why the command line takes a verb of a template by its arguments: the api serves it, a template traveling by its name or packed. */
 const servedAs = (endpoints: string): { readonly side: 'cli'; readonly why: string } => ({
@@ -28,7 +49,7 @@ const SET: Flag = {
   takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
 };
 
-/** `nemia factory apply`'s spec: the factory's name, its template, a `--repo` or more, a `--set` a parameter, and `--no-trust`. */
+/** `nemia factory apply`'s spec: the factory's name, its template, a `--volume` a volume, a `--set` a parameter, and `--no-trust`. */
 const APPLY_SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
   flags: [
@@ -40,23 +61,17 @@ const APPLY_SPEC: Spec = {
         "--template takes the name of a builtin template, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote: nemia factory apply <name> --template <name|folder|archive>",
       twice: 'nemia factory apply takes --template once: a factory is made from one template.',
     },
-    {
-      flag: '--repo',
-      kind: 'text',
-      key: 'repos',
-      many: true,
-      takes:
-        "--repo takes a repository's directory or its git URL: nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...]",
-    },
+    VOLUMES,
     SET,
     NO_TRUST,
   ],
   unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory apply does not take ${arg}. It takes the name, --template <name|folder|archive>, --repo <path|url> once per repository, --set <key>=<value> once per parameter, and --no-trust.`
-      : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <name|folder|archive> --repo <path>.`,
+    retiredRepo('apply', arg) ??
+    (arg.startsWith('-')
+      ? `nemia factory apply does not take ${arg}. It takes the name, --template <name|folder|archive>, --volume <path|url>:ro|:rw once per volume, --set <key>=<value> once per parameter, and --no-trust.`
+      : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <name|folder|archive> [--volume <path|url>:rw].`),
   missing:
-    "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <name|folder|archive> --repo <path> [--set <key>=<value> ...].",
+    "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <name|folder|archive> [--volume <path|url>:ro|:rw ...] [--set <key>=<value> ...].",
 };
 
 /** `nemia factory apply`: a factory filed from a template, its places then trusted unless `--no-trust`; the daemon renders its tree. */

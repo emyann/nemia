@@ -104,7 +104,8 @@ const trust = (trusted: boolean) =>
 /** The factory `pipao` in the store and her folder trusted: a story of a factory's level starts from it. */
 const withPipao = () => {
   trust(true);
-  if (!factoryNamesAt(ROOT).includes('pipao')) addFactoryAt(ROOT, { name: 'pipao', repos: [fs.mkdtempSync(path.join(ROOT, 'repo-'))] });
+  if (!factoryNamesAt(ROOT).includes('pipao'))
+    addFactoryAt(ROOT, { name: 'pipao', volumes: [fs.mkdtempSync(path.join(ROOT, 'repo-'))].map((r) => `${r}:rw`) });
 };
 
 /** The person's custom words for her written, their folder made where none was. */
@@ -255,7 +256,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       const b = stage.board();
       writeCustom('Answer in French. Times in Montreal.\n');
       const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-      addFactoryAt(ROOT, { name: 'pipao', repos: [repo] });
+      addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
       const daemon = {
         pid: process.pid,
         by: 'api',

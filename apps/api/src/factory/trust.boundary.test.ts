@@ -25,7 +25,7 @@ const gitRepo = (prefix: string): string => {
   return repo;
 };
 
-addFactory({ name: 'mill', repos: [gitRepo('nemia-api-factory-trust-')] });
+addFactory({ name: 'mill', volumes: [gitRepo('nemia-api-factory-trust-')].map((r) => `${r}:rw`) });
 
 const send = (method: string, url: string) => app.request(url, { method, headers: { 'content-type': 'application/json' }, body: '{}' });
 

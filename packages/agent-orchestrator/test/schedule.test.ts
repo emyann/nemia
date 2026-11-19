@@ -15,8 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
-import { beforeAll, describe, test, vi } from 'vitest';
-import type { Finishes } from 'test-kit/checkpoints';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -95,14 +94,14 @@ const aTeamRepo = (): string => {
  * A store with no runs, cards, tries, pause or factories, then the factory `solo` on a repository of its own, attaching the team's `dev`,
  * and the clock at `now`. The cap as given: `undefined` unsets it.
  */
-const aStore = (t: Finishes, now: string, cap?: string): string => {
+const aStore = (t: TestContext, now: string, cap?: string): string => {
   for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }
   ENV.WF_MAX_RUNS = cap;
   vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
   const repo = aTeamRepo();
-  addFactoryAt(ROOT, { name: 'solo', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
   return repo;
 };
@@ -126,18 +125,18 @@ const startedBy = (pass: { scheduled?: unknown }): string | undefined => {
 };
 
 describe('a weekly schedule over the weeks: one run a due fire, once after downtime, and never again once its run is removed', () => {
-  let repo!: string;
-  let e!: import('agent-runtime').EngineShape;
-  beforeAll(() => {
-    const t = teardowns();
-    repo = aStore(t, '2026-10-04T12:00:00Z');
-    weekly();
-    e = runtime();
-    return t.end;
-  });
-  const s = story(test);
-  let latest = '';
-  s.test('a pass on the fire itself, to the second, starts one run for it, on the factory, the fire on its record', async () => {
+let repo!: string;
+let e!: EngineShape;
+beforeAll(() => {
+const t = teardowns();
+repo = aStore(t, '2026-10-04T12:00:00Z');
+weekly();
+e = runtime();
+return t.end;
+});
+const s = story(test);
+let latest = '';
+s.test('a pass on the fire itself, to the second, starts one run for it, on the factory, the fire on its record', async (t) => {
     vi.setSystemTime(Date.parse(MONDAY) + 400);
     const first = await runWith(e, tickRun());
     const [run] = listRuns(ROOT);
@@ -148,49 +147,49 @@ describe('a weekly schedule over the weeks: one run a due fire, once after downt
     );
     assert.deepEqual(runRecord(ROOT, run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
   });
-  s.test('the next pass starts none', async () => {
+s.test('the next pass starts none', async (t) => {
     vi.setSystemTime(Date.parse(MONDAY) + 30_000);
     assert.deepEqual([(await runWith(e, tickRun())).scheduled, scheduledDues()], [undefined, [MONDAY]]);
   });
-  s.test('a daemon down across three fires starts one run, for the latest, then none', async () => {
+s.test('a daemon down across three fires starts one run, for the latest, then none', async (t) => {
     vi.setSystemTime(Date.parse('2026-10-27T12:00:00Z'));
     latest = startedBy(await runWith(e, tickRun())) ?? '';
     assert.equal((await runWith(e, tickRun())).scheduled, undefined);
     assert.deepEqual(scheduledDues(), [MONDAY, '2026-10-26T13:00:00.000Z']);
   });
-  s.test('its run removed, as nemia rm removes it, the fire does not come back: the try the tick kept says it was started', async () => {
-    filesStore.runs.forget(latest);
-    assert.deepEqual(scheduledDues(), [MONDAY]);
-    assert.equal((await runWith(e, tickRun())).scheduled, undefined);
-    assert.deepEqual(scheduledDues(), [MONDAY]);
-  });
+s.test('its run removed, as nemia rm removes it, the fire does not come back: the try the tick kept says it was started', async () => {
+      filesStore.runs.forget(latest);
+      assert.deepEqual(scheduledDues(), [MONDAY]);
+      assert.equal((await runWith(e, tickRun())).scheduled, undefined);
+      assert.deepEqual(scheduledDues(), [MONDAY]);
+    });
 });
 
 describe('a due fire waits behind the run cap and behind the queue, then starts', () => {
-  let repo!: string;
-  let e!: import('agent-runtime').EngineShape;
-  beforeAll(() => {
-    const t = teardowns();
-    repo = aStore(t, '2026-10-04T12:00:00Z', '1');
-    weekly();
-    e = runtime();
-    return t.end;
-  });
-  const s = story(test);
-  s.test('REFUSED at a cap of 1 at shipped defaults: with one run in flight a due fire starts nothing', async () => {
+let repo!: string;
+let e!: EngineShape;
+beforeAll(() => {
+const t = teardowns();
+repo = aStore(t, '2026-10-04T12:00:00Z', '1');
+weekly();
+e = runtime();
+return t.end;
+});
+const s = story(test);
+s.test('REFUSED at a cap of 1 at shipped defaults: with one run in flight a due fire starts nothing', async (t) => {
     await main(['start', 'By hand', '--workflows', 'dev', '--factory', 'solo', '--repo', repo], e);
     await runWith(e, tickRun());
     vi.setSystemTime(Date.parse(MONDAY) + 30_000);
     const held = await runWith(e, tickRun());
     assert.deepEqual([held.scheduled, scheduledDues(), listRuns(ROOT).length], [undefined, [], 1]);
   });
-  s.test('the cap lifted, it starts on the next pass', async () => {
+s.test('the cap lifted, it starts on the next pass', async () => {
     ENV.WF_MAX_RUNS = '2';
     await runWith(e, tickRun());
     assert.deepEqual(scheduledDues(), [MONDAY]);
     ENV.WF_MAX_RUNS = undefined;
   });
-  s.test('the queue goes first: a queued card and the next due fire on one pass start the card alone', async () => {
+s.test('the queue goes first: a queued card and the next due fire on one pass start the card alone', async (t) => {
     fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'inbox', 'a-card.md'), '---\nworkflow: dev\nfactory: solo\n---\nBuild it.\n');
     await verb(['inbox', 'queue', 'a-card'], e);
@@ -198,35 +197,35 @@ describe('a due fire waits behind the run cap and behind the queue, then starts'
     const first = await runWith(e, tickRun());
     assert.deepEqual([first.queue && 'run' in first.queue, first.scheduled, scheduledDues()], [true, undefined, [MONDAY]]);
   });
-  s.test('and the pass after starts the fire', async () => {
+s.test('and the pass after starts the fire', async () => {
     const second = await runWith(e, tickRun());
     assert.deepEqual([startedBy(second) !== undefined, scheduledDues()], [true, [MONDAY, '2026-10-12T13:00:00.000Z']]);
   });
 });
 
 describe('a schedule written after its latest fire waits for its next; refused by its factory, it is kept refused for that fire alone', () => {
-  let repo!: string;
-  let e!: import('agent-runtime').EngineShape;
-  let file!: string;
-  beforeAll(() => {
-    const t = teardowns();
-    repo = aStore(t, '2026-10-05T14:00:00Z');
-    weekly();
-    e = runtime();
-    file = path.join(ROOT, 'factories', 'solo.json');
-    return t.end;
-  });
-  const s = story(test);
-  let why = '';
-  s.test('written after its latest fire, it starts nothing before its next', async () => {
+let repo!: string;
+let e!: EngineShape;
+let file!: any;
+beforeAll(() => {
+const t = teardowns();
+repo = aStore(t, '2026-10-05T14:00:00Z');
+weekly();
+e = runtime();
+file = path.join(ROOT, 'factories', 'solo.json');
+return t.end;
+});
+const s = story(test);
+let why = '';
+s.test('written after its latest fire, it starts nothing before its next', async (t) => {
     vi.setSystemTime(Date.parse('2026-10-05T15:00:00Z'));
     assert.equal((await runWith(e, tickRun({ repo }))).scheduled, undefined);
   });
-  s.test('at its next fire it starts', async () => {
+s.test('at its next fire it starts', async (t) => {
     vi.setSystemTime(Date.parse('2026-10-12T13:00:05Z'));
     assert.equal((await runWith(e, tickRun({ repo }))).scheduled?.due, '2026-10-12T13:00:00.000Z');
   });
-  s.test('REFUSED at shipped defaults: its workflow detached by hand, its next fire is refused and kept refused for it', async () => {
+s.test('REFUSED at shipped defaults: its workflow detached by hand, its next fire is refused and kept refused for it', async (t) => {
     fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), workflows: [] }, null, 2));
     vi.setSystemTime(Date.parse('2026-10-19T13:00:30Z'));
     const refused = await runWith(e, tickRun({ repo }));
@@ -236,10 +235,10 @@ describe('a schedule written after its latest fire waits for its next; refused b
     const kept = JSON.parse(fs.readFileSync(path.join(ROOT, 'schedules', 'solo', 'dev.json'), 'utf8'));
     assert.deepEqual([kept.due, kept.refused, kept.why], ['2026-10-19T13:00:00.000Z', true, why]);
   });
-  s.test('that fire is tried no more and said no more', async () => {
+s.test('that fire is tried no more and said no more', async () => {
     assert.deepEqual([(await runWith(e, tickRun({ repo }))).scheduled, scheduledDues()], [undefined, ['2026-10-12T13:00:00.000Z']]);
   });
-  s.test('and its next fire is tried again', async () => {
+s.test('and its next fire is tried again', async (t) => {
     vi.setSystemTime(Date.parse('2026-10-26T13:00:05Z'));
     const next = await runWith(e, tickRun({ repo }));
     assert.equal(next.scheduled && 'refused' in next.scheduled ? next.scheduled.due : undefined, '2026-10-26T13:00:00.000Z');
@@ -283,21 +282,21 @@ const planted = (name: string, workflow: string, schedule: Record<string, string
 };
 
 describe("an old schedule's repository is read and ignored: its run starts on the repository the factory's wiring names", () => {
-  let named!: string;
-  let wired!: string;
-  let e!: import('agent-runtime').EngineShape;
-  beforeAll(() => {
-    const t = teardowns();
-    aStore(t, '2026-10-04T12:00:00Z');
-    named = aTeamRepo();
-    wired = aTeamRepo();
-    addFactoryAt(ROOT, { name: 'duo', repos: [named, wired] });
-    attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev' });
-    e = runtime();
-    return t.end;
-  });
-  const s = story(test);
-  s.test('REFUSED: a workflow the wiring places on neither repository is refused on its fire, naming the attach', async () => {
+let named!: string;
+let wired!: string;
+let e!: EngineShape;
+beforeAll(() => {
+const t = teardowns();
+aStore(t, '2026-10-04T12:00:00Z');
+named = aTeamRepo();
+wired = aTeamRepo();
+addFactoryAt(ROOT, { name: 'duo', volumes: [named, wired].map((r) => `${r}:rw`) });
+attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev' });
+e = runtime();
+return t.end;
+});
+const s = story(test);
+s.test('REFUSED: a workflow the wiring places on neither repository is refused on its fire, naming the attach', async (t) => {
     planted('duo', 'dev', {
       cron: '0 9 * * 1',
       tz: 'America/Montreal',
@@ -311,7 +310,7 @@ describe("an old schedule's repository is read and ignored: its run starts on th
     assert.match(at?.refused ?? '', /nemia factory attach duo dev --repo/);
     assert.deepEqual(scheduledDues(), []);
   });
-  s.test('wired to the other repository, its next fire starts on that one, not on the one the schedule names', async () => {
+s.test('wired to the other repository, its next fire starts on that one, not on the one the schedule names', async (t) => {
     attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev', repo: path.basename(wired) });
     planted('duo', 'dev', {
       cron: '0 9 * * 1',

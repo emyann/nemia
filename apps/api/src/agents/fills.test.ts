@@ -58,13 +58,13 @@ for (const [name, repo, workflow] of [
   ['shadow', repoR, 'delta'],
   ['other', repoS, 'omega'],
 ] as const) {
-  addFactory({ name, repos: [repo] });
+  addFactory({ name, volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflow({ factory: name, workflow });
 }
 hireAgent({ factory: 'hired', agent: 'ada', step: 'alpha/implement' });
 hireAgent({ factory: 'shadow', agent: 'max', step: 'delta/ship' });
 hireAgent({ factory: 'other', agent: 'zed', step: 'omega/step' });
-addFactory({ name: 'treed', repos: [repoS], template: { source: '/t/team', version: '0.1.0', params: {} } });
+addFactory({ name: 'treed', volumes: [repoS].map((r) => `${r}:rw`), template: { source: '/t/team', version: '0.1.0', params: {} } });
 const TREE = path.join(root, 'factories', 'treed', 'tree');
 write(path.join(TREE, 'factory.json'), JSON.stringify({ workflows: ['press'], hires: { 'press/review': 'proof' } }));
 write(path.join(TREE, 'workflows', 'press', 'review.md'), '---\nplace: git\n---\nReview it.\n');

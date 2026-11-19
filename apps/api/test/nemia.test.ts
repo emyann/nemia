@@ -101,7 +101,7 @@ describe('A person sets where Nemia is: manual by default, a word that is no lev
   s.test(
     'a factory raised for a stretch reads above its default until its end; a raise ended reads as its default; for with no factory a 422',
     async () => {
-      addFactory({ name: 'mill', repos: [fs.mkdtempSync(path.join(root, 'mill-'))] });
+      addFactory({ name: 'mill', volumes: [fs.mkdtempSync(path.join(root, 'mill-'))].map((r) => `${r}:rw`) });
       const read = await asked('GET', '/api/level');
       assert.deepEqual(
         (read.body.factories as Array<{ factory: string }>).map((f) => f.factory),

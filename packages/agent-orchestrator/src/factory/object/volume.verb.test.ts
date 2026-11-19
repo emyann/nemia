@@ -12,11 +12,11 @@ import { volumesOf } from './volume.verb.ts';
 const mill: Exclude<FactoryListing, { error: string }> = {
   name: 'mill',
   file: '/store/factories/mill.json',
-  repos: ['/repo'],
   workflows: [],
   hires: {},
   schedules: {},
   volumes: [
+    { path: '/repo', readOnly: false },
     { path: '/data/notes', readOnly: true, name: 'kept' },
     { path: '/data/gone', readOnly: false },
   ],
@@ -41,6 +41,7 @@ test('each volume is named as its file keeps it, or as it reads, in path order, 
     [
       ['gone', 'mill'],
       ['kept', 'mill'],
+      ['repo', 'mill'],
     ],
   );
   for (const v of volumes) assert.ok(Schema.is(Volume)(v));

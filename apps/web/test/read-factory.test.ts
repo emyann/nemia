@@ -170,7 +170,7 @@ const readServers = factoryServersQuery('mill').queryFn as unknown as () => Prom
 const millView: Factory = {
   name: 'mill',
   default: false,
-  repos: ['/work/mill'],
+  worksOn: ['/work/mill'],
   workflows: ['build'],
   hires: { 'build/implement': 'implementer' },
   error: null,
@@ -196,7 +196,10 @@ const millView: Factory = {
   },
   template: null,
   untrusted: [],
-  volumes: [{ path: '/home/me/notes', readOnly: true, commands: { rm: 'nemia factory volume rm mill notes' } }],
+  volumes: [
+    { path: '/home/me/notes', readOnly: true, origin: null, commands: { rm: 'nemia factory volume rm mill notes' } },
+    { path: '/work/mill', readOnly: false, origin: null, commands: { rm: 'nemia factory volume rm mill mill' } },
+  ],
   costLines: {},
   workflowRepos: {},
 };

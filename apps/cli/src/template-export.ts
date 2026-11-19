@@ -54,7 +54,7 @@ const keptAt = (name: string, env: NodeJS.ProcessEnv): string => {
 export const partsOf = (factory: Factory, rules: FactoryRules, instruction: FactoryInstruction, file: string) => ({
   factory: {
     name: factory.metadata.name,
-    repos: factory.spec.repos,
+    volumes: factory.spec.volumes.map(({ path, readOnly }) => ({ path, readOnly })),
     workflows: factory.spec.workflows ?? [],
     hires: factory.spec.hires,
     ...(factory.spec.revisions === undefined ? {} : { revisions: factory.spec.revisions }),

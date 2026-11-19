@@ -215,7 +215,7 @@ function agentPlaceRefusal(home: string, dir: string, anywhere: boolean, repo?: 
     return `${dir} is not a folder of agents: the agents the workflows name are in the ${AGENTS_FOLDER}/ beside them. Name <workflows>/${AGENTS_FOLDER}.`;
   }
   if (anywhere || isWorkflowsHolderAt(home, path.dirname(dir), repo)) return undefined;
-  return `${dir} is not the store's ${AGENTS_FOLDER}/ (${path.join(path.resolve(home, 'workflows'), AGENTS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${AGENTS_FOLDER}, for a factory's repo), the two places the board lists agents from. Write it to one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${dir} all the same.`;
+  return `${dir} is not the store's ${AGENTS_FOLDER}/ (${path.join(path.resolve(home, 'workflows'), AGENTS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${AGENTS_FOLDER}, for a factory's repo), the two places the board lists agents from. Write it to one of the two, give its repository to a factory (nemia factory volume add <factory> <repo>:rw), or pass { anywhere: true } to write ${dir} all the same.`;
 }
 
 /** Whether two paths are one file on disk: a rename by case, where the filesystem does not tell case apart. */

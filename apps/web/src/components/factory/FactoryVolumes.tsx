@@ -72,7 +72,9 @@ function VolumeRow({
   return (
     <div data-factory-volume={v.path} className="flex flex-col gap-2">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span id={`${id}-path`} className="min-w-0 font-mono text-body-medium [overflow-wrap:anywhere]">{v.path}</span>
+        <span id={`${id}-path`} className="min-w-0 font-mono text-body-medium [overflow-wrap:anywhere]">
+          {v.path}
+        </span>
         <Tag variant={v.readOnly ? 'tonal' : 'outlined'} className="font-mono" data-volume-mark={v.readOnly ? 'ro' : 'rw'}>
           {v.readOnly ? ':ro' : ':rw'}
         </Tag>

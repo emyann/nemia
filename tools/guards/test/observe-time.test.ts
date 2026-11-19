@@ -449,7 +449,7 @@ test('REFUSED: the scope after the batch, on every span, copied from the command
   const copied = 'set(attributes["test_scope"], attributes["full_command"])';
   assert.deepEqual(
     changed((statements) => statements.push(copied)),
-    [`statement 9 sets no literal, not one of ${SCOPES.join(', ')}`],
+    [`statement 8 sets no literal, not one of ${SCOPES.join(', ')}`],
   );
   assert.deepEqual(
     changed((statements) => {
@@ -461,6 +461,9 @@ test('REFUSED: the scope after the batch, on every span, copied from the command
       'no statement sets the scope files',
       '"node --test test/a.test.ts" has the scope files: test/a.test.ts, not files',
       '"timeout --foreground 60 node --test test/a.test.ts" has the scope files: test/a.test.ts, not files',
+      '"npx vitest run test/a.test.ts" has the scope files: test/a.test.ts, not files',
+      '"cd packages/agent-orchestrator && npx vitest run test/observe-time.test.ts" has the scope files: test/a.test.ts, not files',
+      '"cd apps/web && npx vitest run --project=node test/a.test.ts" has the scope files: test/a.test.ts, not files',
       '"cd packages/agent-orchestrator && node --import ./test/ambient.ts --test test/observe-time.test.ts" has the scope files: test/a.test.ts, not files',
     ],
   );

@@ -2,12 +2,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Route } from 'playwright';
-import { photograph, READINESS_ROUTE, themeOf } from '../board.ts';
+import { photograph, READINESS_ROUTE, runPath, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { HARNESS_SKIP_KEY } from '../../../src/lib/harnessSkip.ts';
+import { GATED, LANDED } from '../seed.ts';
 import { bearer } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { apiEnv, OUT } from '../world.ts';
+import { apiEnv, OUT, store } from '../world.ts';
 
 /** A check of a harness, as the api answers it: the keys the page reads. */
 type Check = { name: 'version' | 'turn'; state: 'passed' | 'failed' | 'running' | 'unrun'; message: string; fixes: [] };
@@ -201,6 +202,107 @@ async function givesAFolder(page: Page): Promise<void> {
   await idle(page);
 }
 
+/** The label that marks a first card and its run, as the board files it (`FIRST_CARD_LABEL`). */
+const FIRST_LABEL = 'onboarding=first-card';
+
+/** The milestones answered once a change has landed: every one done. */
+const ALL_DONE = { milestones: FACTORY_NEXT.milestones.map((m) => ({ ...m, state: 'done' })) };
+
+/** `edits` made to the labels of the seeded run `id` through the api (`600-labels`' way). */
+async function labelRun(page: Page, id: string, edits: string[]): Promise<void> {
+  const answered = await page.request.post(new URL(`${await runPath(page, id)}/labels`, page.url()).href, {
+    data: { labels: edits },
+  });
+  if (answered.status() !== 200) throw new Refused(`the api labels ${id} — it answered ${answered.status()}: ${await answered.text()}`);
+}
+
+/** The labels a first card's hints read taken back from the seeded run `id`, and the file the edit left. */
+async function unlabelRun(page: Page, id: string): Promise<void> {
+  await labelRun(page, id, ['onboarding-']).catch(() => undefined);
+  if (store !== undefined) fs.rmSync(path.join(store, 'runs', `${id}.labels`), { force: true });
+}
+
+/**
+ * The first card, at `/welcome/card` for the factory made: a suggestion taken, the cost line drawn above Start, and Start filing the
+ * card through the real api, labelled as the first card, then starting it in quick gated at its landing, the start answered here with a
+ * seeded run at a gate, whose page the board opens. The card filed is answered back in `filed`.
+ */
+async function startsTheFirstCard(page: Page, filed: string[]): Promise<void> {
+  await page.goto(new URL('/welcome/card', page.url()).href);
+  await idle(page);
+  const card = page.locator('article[data-first-card="write"]');
+  await expectVisible(card, 'the first card page offers to write a card, at /welcome/card');
+  const choice = card.locator(`[data-first-factory="${MADE}"]`);
+  if ((await choice.count()) > 0) await choice.click();
+  await card.locator('[data-first-suggestion]').first().click();
+  await expectVisible(card.locator('[data-cost-line]'), 'the cost line stands above Start');
+  await settled(page);
+  await photograph(page, path.join(OUT, `welcome-card-${await themeOf(page)}.png`));
+  const made = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/namespaces/${MADE}/cards`,
+  );
+  const started: unknown[] = [];
+  const start = (route: Route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    started.push(route.request().postDataJSON());
+    const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-2) ?? '');
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: GATED.id, card: name }) });
+  };
+  await page.route(`**/api/namespaces/${MADE}/cards/*/start`, start);
+  try {
+    await card.locator('[data-first-start]').click();
+    const answer = await made;
+    const body = (await answer.json().catch(() => undefined)) as { metadata?: { name?: string; labels?: Record<string, string> } };
+    if (body?.metadata?.name !== undefined) filed.push(body.metadata.name);
+    if (answer.status() !== 201 || body?.metadata?.labels?.onboarding !== 'first-card')
+      throw new Refused(`Start files the card labelled ${FIRST_LABEL} — the api answered ${answer.status()} ${JSON.stringify(body)}`);
+    await page.waitForURL((url) => url.pathname.endsWith(`/runs/${GATED.id}`));
+    const asked = started[0] as { workflow?: string; gates?: string[] } | undefined;
+    if (asked?.workflow !== 'quick' || JSON.stringify(asked.gates) !== JSON.stringify(['land']))
+      throw new Refused(`Start starts the card in quick, gated at land — it sent ${JSON.stringify(asked)}`);
+  } finally {
+    await page.unroute(`**/api/namespaces/${MADE}/cards/*/start`, start);
+  }
+}
+
+/** The run `id`'s page, labelled as a first card's, drawing the hint of `beat`. */
+async function hints(page: Page, id: string, beat: 'gate' | 'landed'): Promise<void> {
+  await labelRun(page, id, [FIRST_LABEL]);
+  await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+  await expectVisible(page.locator(`aside[data-first-hint="${beat}"]`), `a first card's run, ${id}, says the ${beat} beat on its page`);
+  await settled(page);
+  await photograph(page, path.join(OUT, `welcome-hint-${beat}-${await themeOf(page)}.png`));
+}
+
+/**
+ * The first card's whole way: started (`startsTheFirstCard`), its gate's hint on the seeded gated run labelled as the first card, its
+ * landed hint on the seeded landed run, whose button leads to "You are set", drawing its three next steps once the milestones say a
+ * change landed. The labels and the card are taken back.
+ */
+async function runsTheFirstCard(page: Page, milestones: { answer: object }): Promise<void> {
+  const filed: string[] = [];
+  try {
+    await startsTheFirstCard(page, filed);
+    await hints(page, GATED.id, 'gate');
+    await hints(page, LANDED.id, 'landed');
+    milestones.answer = ALL_DONE;
+    await page.locator('aside[data-first-hint="landed"] [data-first-next]').click();
+    await page.waitForURL((url) => url.pathname === '/welcome/next');
+    await idle(page);
+    await expectVisible(page.locator('article[data-you-are-set="set"]'), 'a change landed: the last page says You are set');
+    await expectVisible(page.locator('[data-next-step="level"]'), 'its first next step is the level of the factory');
+    await expectVisible(page.locator('[data-next-step="terminal"]'), 'and one is the terminal');
+    await settled(page);
+    await photograph(page, path.join(OUT, `welcome-next-${await themeOf(page)}.png`));
+  } finally {
+    milestones.answer = FACTORY_NEXT;
+    await unlabelRun(page, GATED.id);
+    await unlabelRun(page, LANDED.id);
+    for (const name of filed) await asked(page, 'DELETE', `/api/namespaces/${MADE}/cards/${encodeURIComponent(name)}`);
+  }
+}
+
 /** The planted folders taken away. */
 function takeBackFolders(): void {
   for (const name of ['plain', 'work']) fs.rmSync(path.join(folderRoot(), name), { recursive: true, force: true });
@@ -250,8 +352,9 @@ export default {
    * The welcome, over readiness reads it answers in place of the api's: `/` on a fresh store lands on `/welcome`; Activate starts the
    * install piece's first fix; a turn failed and both passed are drawn as their ticks, Next shown once both passed, leading to the
    * factory step, where sdlc is applied through the real api (`makesFromTemplate`, the milestones answered too: factory next), and on to
-   * the volume step, where a folder planted under the listing's root is given it (`givesAFolder`); and the skip leaves for `/`, under
-   * the Setup banner, which no longer sends that browser to the welcome. The factory, its folders and the skip are taken back.
+   * the volume step, where a folder planted under the listing's root is given it (`givesAFolder`), and on to the first card, its hints on
+   * a run's page and "You are set" (`runsTheFirstCard`); and the skip leaves for `/`, under the Setup banner, which no longer sends that
+   * browser to the welcome. The factory, its folders, the card, the labels and the skip are taken back.
    */
   name: 'welcome',
   route: '/setup',
@@ -265,9 +368,10 @@ export default {
             body: JSON.stringify({ ready: false, ran: false, pieces: READS[planted] }),
           })
         : route.fallback();
+    const held: { answer: object } = { answer: FACTORY_NEXT };
     const milestones = (route: Route) =>
       route.request().method() === 'GET'
-        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FACTORY_NEXT) })
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(held.answer) })
         : route.fallback();
     await page.route(READINESS_ROUTE, answer);
     await page.route(MILESTONES_ROUTE, milestones);
@@ -300,6 +404,7 @@ export default {
       await photograph(page, path.join(OUT, `welcome-ready-${await themeOf(page)}.png`));
       await makesFromTemplate(page);
       await givesAFolder(page);
+      await runsTheFirstCard(page, held);
 
       planted = 'fresh';
       await page.goto(new URL('/welcome/', page.url()).href);

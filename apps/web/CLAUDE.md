@@ -41,8 +41,6 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.
 - `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due,
   which pictures them in dark alone, and `--light` beside it when a light picture is asked for on purpose (`themesOf`, `e2e/pages.ts`);
-  never the whole suite in a session but to measure it. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
-- `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due;
   `ci` shards every page on the round's commit. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
   --pages <…>`, or `--look` alone) when the change touches a part of the look, a story, `test/e2e/stories/` or a runner file beside the
   pages (`visit.ts`, `checks.ts`, `contrast.ts`). A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming

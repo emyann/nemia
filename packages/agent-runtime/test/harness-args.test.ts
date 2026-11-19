@@ -27,8 +27,8 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-describe('argsRefusalOf: where a key is and whether it is one — the twenty-one arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', () => {
-  test("HARNESS_ARGS is the twenty-one arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
+describe('argsRefusalOf: where a key is and whether it is one — the twenty-two arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', () => {
+  test("HARNESS_ARGS is the twenty-two arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
     assert.deepEqual([...HARNESS_ARGS].sort(), [
       'allowedTools',
       'budgetUsd',
@@ -48,6 +48,7 @@ describe('argsRefusalOf: where a key is and whether it is one — the twenty-one
       'niceness',
       'permissionMode',
       'projectMcp',
+      'projectMcpFrom',
       'terminationMessagePath',
       'tools',
       'worktree',
@@ -79,6 +80,10 @@ describe('argsRefusalOf: where a key is and whether it is one — the twenty-one
       }
     }
     assert.equal(argsRefusalOf({ ...task, config: { projectMcp: ['repo'] } }), undefined);
+    for (const from of ['repo', 7]) {
+      assert.match(argsRefusalOf({ ...task, config: { projectMcpFrom: from } } as never) ?? '', /^`projectMcpFrom: /, String(from));
+    }
+    assert.equal(argsRefusalOf({ ...task, config: { projectMcpFrom: '/repo' } }), undefined);
   });
   test('a harness argument filed beside config is refused, naming where it goes — each of the twenty — and the same value under config is taken', () => {
     const value: Record<keyof HarnessArgs, unknown> = {
@@ -90,6 +95,7 @@ describe('argsRefusalOf: where a key is and whether it is one — the twenty-one
       disallowedTools: ['SendMessage'],
       mcp: {},
       projectMcp: ['playwright'],
+      projectMcpFrom: '/repo',
       contextTokens: 200000,
       worktree: true,
       budgetUsd: 5,

@@ -200,6 +200,29 @@ const ROWS: { name: string; check: () => void }[] = [
     },
   },
   {
+    name: 'a mount the task’s own rules rule is an added folder given neither the allow of a writable mount nor the deny of a read-only one',
+    check: () => {
+      const given = attachedOptions({
+        ...RICH,
+        config: { ...RICH.config, mounts: [...(RICH.config?.mounts ?? []), { path: '/ws', readOnly: false, ruled: true }] },
+      });
+      assert.deepEqual(given.additionalDirectories, ['/ro', '/rw', '/ws']);
+      assert.equal(given.allowedTools?.some((rule) => rule.includes('//ws')), false);
+      assert.equal(given.disallowedTools?.some((rule) => rule.includes('//ws')), false);
+    },
+  },
+  {
+    name: 'a task that names `projectMcpFrom` reads that folder’s `.mcp.json`, whole or by the names `projectMcp` picks, and not its cwd’s',
+    check: () => {
+      const from = scratch('ae-session-options-mcp-from-');
+      fs.writeFileSync(path.join(from, '.mcp.json'), JSON.stringify({ mcpServers: { ws: { command: 'ws-server' } } }));
+      const whole = attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: CWD, config: { projectMcpFrom: from } });
+      assert.deepEqual(whole.mcpServers, { ws: { command: 'ws-server' } });
+      const picked = attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: CWD, config: { projectMcpFrom: from, projectMcp: ['ws'] } });
+      assert.deepEqual(picked.mcpServers, { ws: { command: 'ws-server' } });
+    },
+  },
+  {
     name: 'a task with no server of its own and no .mcp.json is given no servers at all, and no file is written for it',
     check: () => {
       const bare = scratch('ae-session-options-bare-');

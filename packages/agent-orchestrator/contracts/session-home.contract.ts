@@ -162,6 +162,9 @@ const everyFileUnder = (folder: string): string => `${folder}/**`;
 const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(`${outer}/`);
 
 const memoryFilesSpec = spec<(folders: readonly MemoryFolder[]) => MemoryFiles>({
+  /** No added folder is another, or inside another: a folder both left off and switched on could be neither skipped nor read. */
+  requires: ({ input: [folders] }) =>
+    folders.every((f, i) => folders.every((g, j) => i === j || (!within(f.path, g.path) && !within(g.path, f.path)))),
   ensures: {
     offByDefault: {
       description: "Where no added folder is switched on, no added folder's memory file loads, and nothing is excluded",

@@ -245,19 +245,19 @@ export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g
  */
 export const claudeDenies = (config: SpawnRequest['config']): string[] => [
   ...(config?.disallowedTools ?? []),
-  ...(config?.mounts ?? []).filter((m) => m.readOnly).map((m) => `Edit(/${m.path}/**)`),
+  ...(config?.mounts ?? []).filter((m) => m.readOnly && m.ruled !== true).map((m) => `Edit(/${m.path}/**)`),
 ];
 
 /**
  * What a Claude Code session may do without asking: the task's `allowedTools`, and an edit anywhere under each writable mount,
- * `Edit(//<path>/**)`. `dontAsk` refuses a write under an added folder that no allow names, `Edit(**)` included, since it resolves
+ * `Edit(//<path>/**)`, but a mount the task's own rules rule (`ruled`), which is given no rule of the runtime's. `dontAsk` refuses a write under an added folder that no allow names, `Edit(**)` included, since it resolves
  * against the session's cwd; the allow lets the Edit tool and a Bash redirection write there. `auto` writes there without it
  * (measured on Claude Code 2.1.288).
  * @param config The task's spawn config, read for its allowed tools and its mounts; absent, none.
  */
 export const claudeAllows = (config: SpawnRequest['config']): string[] => [
   ...(config?.allowedTools ?? []),
-  ...(config?.mounts ?? []).filter((m) => !m.readOnly).map((m) => `Edit(/${m.path}/**)`),
+  ...(config?.mounts ?? []).filter((m) => !m.readOnly && m.ruled !== true).map((m) => `Edit(/${m.path}/**)`),
 ];
 
 /**

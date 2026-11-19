@@ -68,7 +68,7 @@ the why: prose is not a constraint.
 | Level | What belongs there | The question that places it | Where it lives here |
 |---|---|---|---|
 | **Agent** | How this kind of worker does its craft anywhere it is hired: its role, its method, its generic skills, its standing fence | Is it true for this agent in any factory and any workflow, another person's Java repository or a marketing factory included? | `packages/templates/sdlc/agents/<name>/` (the template the nemia factory runs on): its body, `skills:`, `tools`, fence |
-| **Factory** | How work is done in this factory's codebase or domain, by every workflow and step: its rules, its tools, its traps, its own skills | Is it true of any step of any workflow that works here, whoever the agent? | the root and package `CLAUDE.md` files, `docs/architecture.md`, `.claude/skills/` (the factory instruction, a path on the factory's record, `NEMIA.md` by default, once Nemia reads one) |
+| **Factory** | How work is done in this factory's codebase or domain, by every workflow and step: its rules, its tools, its traps, its own skills | Is it true of any step of any workflow that works here, whoever the agent? | the nemia factory's home, in its tree out of git: its standards (`.claude/rules/`), its skills (`.claude/skills/`) and its settings, changed only by the operator's hand edits, recorded where the operator records them; and the facts beside the code: the root and package `CLAUDE.md` files, `docs/architecture.md`, the repository's `.claude/skills/` |
 | **Workflow** | How the steps of one process fit together: their order, what flows between them (`input:`, artifacts, `## From run`), gates, loops and rounds, budgets, the checks a step's work must pass, the ending | Is it about how the steps relate, or what every step of this process must pass? | `packages/templates/sdlc/workflows/<name>/README.md` and each step's frontmatter (`after:`, `input:`, `loop:`, `rounds:`, `gate:`, `budget:`, `check:`) |
 | **Step** | What one step of one workflow does that its agent's craft does not say: the words for this position, the skills it adds, the fence it tightens, the store folders it reads | Does it make sense only at this step's place in this workflow? | the step's body and policy in `<name>/<step>.md` of the workflow's folder: `packages/templates/sdlc/workflows/<name>/<step>.md` in the template, the factory's tree in the store (`skills:`, `reads:`, `disallowedTools:`) |
 
@@ -96,9 +96,9 @@ Around these four sit two more, which are not the factory's:
   `pictures.ts`), its review reads them. Not Grace's or Agora's body
   (they are the template's seed), and not CLAUDE.md (too specific for every step of the factory).
 - *The e2e asserts in the dark theme and takes no pictures.* This is the **workflow's** check: its command and the e2e's code.
-- *Load the `effect` skill before touching code that imports `effect`.* The knowledge is the **factory's** skill
-  (`.claude/skills/effect/`). Its attachment is on the **steps** that design, build and review (`skills:` on build's steps, in the nemia factory's overlays).
-  It is not on the agents.
+- *Read `node_modules/effect/AGENTS.md` before touching code that imports `effect`.* The knowledge is Effect's own, installed with it;
+  the pointer is the **factory's** standard, a rule of the nemia factory's home (`.claude/rules/effect.md`), which every step's session
+  loads at its start. It is not on the agents, nor on a step.
 - *Read with Read, Grep and Glob, never `grep` or `cd` in Bash; `cat`, `head`, `tail`, `wc`, `cut` and `ls` only inside the workspace.* This is the **agent's** craft, true anywhere. Iris's
   vendored skill does not say it, so it goes in her body.
 - *Argus reads the inbox's cards.* This is the janitor **step's** `reads: [inbox]`, a mount held by machinery, not a sentence.
@@ -502,7 +502,7 @@ own deadline (2700 s), measured from a week of landings, now bounding a receipt 
 green pull request and nothing is pushed by hand.
 
 **For the steps of `build`:** implement pictures the pages a web change touches (light, dark, the phone where it matters); review reads them
-and may ask git read-only questions; design, implement and review list `effect`, `shadcn` and `change-the-board`.
+and may ask git read-only questions; design, implement and review list `shadcn`, and every step is offered the home's `change-the-board` and `change-a-contract`.
 
 **For the person's custom instruction:** a cost line of about $80 with fewer, larger cards; auto-mode bounds; Montreal time; replies in
 English; never push or open a pull request unless asked.

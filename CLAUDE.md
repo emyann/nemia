@@ -94,55 +94,14 @@ holds what every change needs.
 
 ## Rules the code keeps
 
-- **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure
-  and stays a screen long. A knob on a workload is a field carried on the task and read by a runner, never a callback into `decide`,
-  and no `if` in `engine.ts` belongs in `decide`. What sits in which layer today, and what is a candidate to move, is in
-  `docs/architecture.md`, *Who owns what*.
-- **Each context says its words in its glossary table**: a `glossary.json` at its door (a term, its meaning, the closed type that
-  holds it, the spellings it retired, each with its card), which the docs' Glossary page draws one section per context
-  (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
-  old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
-  paths except those its row lists as `kept`, each with why; a rename still in flight holds its counts in
-  `tools/guards/test/glossary.baseline.ts`, which only shrinks. A row cites each path from the repository's root
-  (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the
-  docs' tests, `npx vitest run` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does
-  not find them.
-- **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
-  `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
-  Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, with no exception.
-- **A thing with a lifecycle has one machine, and one writer** (`docs/architecture.md`, rule 5), and a contract imports nothing from the
-  code that implements it (`change-a-contract`). Each package's `CLAUDE.md` names its *Files to copy from* where it has one written so:
-  the orchestrator's (a written state, marks that combine, a state worked out), objects' (fields served together), the guards' (a guard
-  with a baseline). The runtime, the api, the board and the cli have none yet: the runtime's lifecycle (`core/lifecycle.ts`) is a table
-  its contract trusts and does not prove, so it is no example of the proof.
-- **What a thing is for is said where its reader finds it.** An exported function's doc names each of its parameters, `@param <name>`
-  and what it is for, in the signature's order, and no tag for a name it has not (`tools/guards/test/params.test.ts`); `@returns` is
-  asked of nobody, the signature's type says it. A field of a served object says what it is on its Schema, `.annotate({ description
-  })`, since the document a client, the reference page and the MCP port's tools read holds no comment
-  (`packages/objects/test/described.test.ts`), and an endpoint says what it does on itself, `OpenApi.Description`
-  (`packages/objects/test/described-endpoints.test.ts`). Each has a baseline of what was written before, which only shrinks: a file you change
-  is left owing less. A comment inside a body is still refused (`comments/no-code-comments`).
-- **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
-  transition is wrong after a restart.
-- **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
-- **Errors say what to do next.** A message names the fix — the command to type, the field to set — and not only what went wrong: what
-  a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's to check, and a test
-  that asserts a whole sentence of them is refused (`tools/guards/test/test-rules.test.ts`), what still does being a
-  debt that only shrinks (`tools/guards/test/test-rules.baseline.ts`).
-- **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
-  package's docs whose begin line names the command; never a drawing. A diagram that has drifted from what its command prints is
-  another matter, and refused.
-- **The Kubernetes test for a new field on the runtime's task: does the Pod spec (`core/v1`) have one?** A container's command, args,
-  env, volumes, restart policy, resources and priority are the runtime's; what a workflow means — a step, a gate, a check's verdict, a
-  budget across tries — is not.
+The rules the code keeps, and those of a commit, are the nemia factory's home standards, not this file's: its home's
+`.claude/rules/` (`code.md`, `git.md` and `effect.md`), which a step's session loads at its start, and which a person reads in a
+session of their own opened by `nemia factory home nemia <this repository>`. This file and each folder's `CLAUDE.md` hold the facts.
 
 ## Git
 
-- Commit on your branch, in small coherent commits with plain messages: a short imperative subject, an optional body saying why. **No
-  attribution trailers**, no session URLs.
-- **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
-  refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/templates/test/fences.test.ts`).
-  `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
+- Pushing and opening a pull request are the person's, or done by their session when they ask, and `.claude/settings.json` denies
+  none of it; a workflow step does neither (the home's *Git* standard).
   What a step may not type, the run does in its place, as two frozen scripts read from the run's frozen workflow files
   (`$WF_CARRIED_FILES`, the copy of the template's `carried/` folder the run took when it began, beside its workflow's; out of git while that is unset) and run with
   `node`, never as a tool a fence could not tell apart: `packages/templates/sdlc/carried/pull-request.ts` pushes a run's own
@@ -161,7 +120,6 @@ holds what every change needs.
   cut`, which cuts each template's version and record again from the base: the nemia factory takes them at its upgrade onto sdlc
   3.11.0, `nemia factory upgrade <factory> --to 3.11.0 --set "landingRefresh=node packages/templates/released.ts cut" --set
   "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`.
-- If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
 ## Agents in this repository
 
@@ -192,10 +150,11 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   linter, which the settings allow (`npx tsrs --noEmit`, the compiler `ci` judges with, `npx tsc --noEmit` where tsc 6 is still
   wanted, `npx oxlint`), and deny on that line what would write or watch, each compiler's options by their first letters in each case,
   and tsrs's fast mode by `--fast` and by `TSRS_FAST` (`Bash(*=* npx tsrs *)`); intake and the janitor deny all three whole.
-- **In the nemia factory, build's design writes the contracts its spec adds** (`change-a-contract`): the factory's own copy of Seldon,
+- **In the nemia factory, build's design writes the contracts its spec adds** (`change-a-contract`, a skill of the factory's home): the
+  factory's own copy of Seldon,
   in its tree out of git, adds `Write, Edit` to its tools and allows `Edit(packages/*/contracts/*.contract.ts)` and
-  `Edit(apps/*/contracts/*.contract.ts)`, a contract directly under a package's or an app's `contracts/` and no other file, each path
-  read from the session's working folder; a step's fence only narrows its agent's, so the lines are the agent's, never the step's.
+  `Edit(apps/*/contracts/*.contract.ts)`, a contract directly under a package's or an app's `contracts/` and no other file, each relative
+  path read against the workspace, whatever folder the session starts in; a step's fence only narrows its agent's, so the lines are the agent's, never the step's.
   `packages/agent-orchestrator/test/agent-fences.test.ts` holds them on planted lines: the checkout's contracts written, every other file
   refused, and the same lines on a step refused at load.
 
@@ -204,27 +163,23 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
 - `docs/architecture.md` — the layers, what each owns and its public contract, and the rules that hold them.
 - `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
-- `.claude/skills/` — the repository's skills. Ours: `look`, `see-a-dashboard` (a dashboard of the side Grafana, rendered and read),
-  `effect` (how we write Effect 4), `change-a-contract` (what a contract asks of a design, an implement and a review) and
-  `change-the-board` (the trigger of shadcn and of the kit's skills, and the board's own traps, for a change under apps/web). Vendored
+- `.claude/skills/` — the repository's skills. Ours: `look` and `see-a-dashboard` (a dashboard of the side Grafana, rendered and
+  read); `change-a-contract`, `change-the-board`, `code-review` and the Effect pointer are the nemia factory's home's. Vendored
   unchanged, pinned in `skills-lock.json`
   and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (it is loaded, and its CLI runs, from `apps/web`, where `components.json` is:
   loaded from the root it refuses with `monorepo_root`), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
   claude-code --copy -y`, refreshed by `npx skills update`, and it describes the library's latest release, which may be ahead of the
   board's pin), and `tsverify` (the verifier's, for a contract under a package's `contracts/` and the function it proves: taken by `npx
-  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by the nemia factory's overlays), and
-  `code-review` (Matt Pocock's two-axis review of a diff, Standards and Spec: taken by `npx skills add
-  https://github.com/mattpocock/skills --skill code-review -a claude-code --copy -y`, on trial on build's review, given to its step by
-  the nemia factory's overlay).
+  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by the nemia factory's overlays).
 - `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
   and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`: a nested
   folder, given to the build's design, implement and review steps as `apps/web:<name>` by the nemia factory's overlays, and said to a
-  session outside a run by `change-the-board`; a kit update that adds or renames one names it there and in the skill; the board's look
+  session outside a run by `apps/web/CLAUDE.md`, *shadcn and the kit's skills*; a kit update that adds or renames one names it there; the board's look
   is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
 - `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the
   breakdown and its preview, the rail, the scan lines, the pager, the text link, the copy id, the radio tile (the kit's block, copied in), the run at its five sizes, a conversation's trace and its marker) behind one door, each with its stories beside it; Nemia's Storybook
-  (`npm run storybook`, from `apps/web`) shows them to a person, and `change-the-board` says which to take (`apps/web/CLAUDE.md`).
+  (`npm run storybook`, from `apps/web`) shows them to a person, and `apps/web/CLAUDE.md`, *The look's parts*, says which to take.
 - What Nemia has built in: the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as
   `gitPlaceLayer`), the skills the api lists as builtin
   (`BUILTIN_SKILLS`, the package's own `skills/`: `create-an-agent`, and `grilling` and `grill-me`, Iris's interview, vendored

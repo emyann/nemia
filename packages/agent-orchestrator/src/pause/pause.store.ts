@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { Actor } from 'objects';
 import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -71,13 +71,7 @@ const timeoutRead = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
-const jsonOr = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
+const jsonOr = (text: string): unknown => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** The pause's file as one read gave it: the pause, the process that holds it where the file names one, and the text read. */
 export type PauseFileRead = { pause: Pause; heldBy?: PauseHolder; text: string };

@@ -112,7 +112,7 @@ const readFrom = (version: VersionAnswer, upgrades: UpgradesRead): ServerUpgrade
   previous: upgrades.previous === null ? null : { tag: upgrades.previous.tag, refused: upgrades.previous.refused !== undefined },
 });
 
-const decodeUpgrade = Schema.decodeUnknownSync(Upgrade);
+const decodeUpgrade = Schema.decodeUnknownSync(Schema.fromJsonString(Upgrade));
 
 /** How one open of the output stream ended: the `Upgrade` it ended with, closed without one (`dropped`), or not opened (`unopened`). */
 type Opened = Upgrade | 'dropped' | 'unopened';
@@ -160,7 +160,7 @@ async function readTo(
       const { sent, rest } = blocksOf(text + decoder.decode(value, { stream: true }));
       text = rest;
       for (const s of sent) {
-        if (s.event === 'ended') return { opened: decodeUpgrade(JSON.parse(s.data)), printed: said };
+        if (s.event === 'ended') return { opened: decodeUpgrade(s.data), printed: said };
         if (s.event !== 'output') continue;
         if (said - at < s.data.length) speak.out(s.data.slice(Math.max(0, said - at)));
         at += s.data.length;

@@ -14,7 +14,7 @@ import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import {
   ambiguousFactoryRefusal,
   takenFactoryRefusal,
@@ -852,12 +852,15 @@ export function volumesMovedAt(home: string): VolumesMoved {
   const left: { file: string; why: string }[] = [];
   for (const name of names.filter((n) => n.endsWith('.json') && !n.startsWith('.')).sort()) {
     const file = path.join(factoriesDirAt(home), name);
-    let raw: unknown;
+    let text: string;
     try {
-      raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+      text = fs.readFileSync(file, 'utf8');
     } catch {
       continue;
     }
+    const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+    if (Option.isNone(json)) continue;
+    const raw = json.value;
     if (!isFormer(raw)) continue;
     const keys = Schema.decodeUnknownResult(FormerKeysSchema)(raw);
     if (Result.isFailure(keys)) {

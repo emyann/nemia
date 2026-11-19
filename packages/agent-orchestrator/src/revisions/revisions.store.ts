@@ -18,7 +18,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Effect, Layer, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Schema } from 'effect';
 import { revisionNow, REVISION_KINDS, type Revision, type RevisionKind } from './revisions.ts';
 import { RevisionAppended, RevisionOnRead, type RevisionOf } from './revisions.model.ts';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
@@ -116,12 +116,8 @@ function entriesIn(file: string): Revision[] {
   } catch {
     return [];
   }
-  try {
-    const raw: unknown = JSON.parse(text);
-    return Array.isArray(raw) ? raw.filter(isRevision) : [];
-  } catch {
-    return [];
-  }
+  const read = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Unknown)))(text);
+  return Option.isSome(read) ? read.value.filter(isRevision) : [];
 }
 
 /** The ledger's files in the folder `dir` (`<root>/revisions`), as a layer of the door. */

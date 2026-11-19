@@ -67,6 +67,15 @@ describe("`ownBin`: the folder whose nemia is its own tree's client, and none wh
     linked(path.join(root, 'checkout', 'node_modules', '.bin'), path.join(client, 'bin', 'nemia.ts'));
     assert.equal(ownBin(own), path.join(fs.realpathSync(root), 'checkout', 'node_modules', '.bin'));
   });
+  test('REFUSED: a nemia whose package.json is no JSON is declared by none, and passed over', () => {
+    const root = scratch('wf-nemia-unread-');
+    const own = path.join(root, 'packages', 'agent-orchestrator');
+    fs.mkdirSync(own, { recursive: true });
+    const client = pkg(path.join(root, 'apps', 'cli'));
+    fs.writeFileSync(path.join(client, 'package.json'), '{ "bin": ');
+    linked(path.join(root, 'node_modules', '.bin'), path.join(client, 'bin', 'nemia.ts'));
+    assert.equal(ownBin(own), undefined);
+  });
   test("the checkout gives this package its own tree's client", () => {
     const bin = ownBin();
     assert.ok(bin !== undefined, 'the checkout links its nemia');

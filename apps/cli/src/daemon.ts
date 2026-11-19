@@ -45,14 +45,10 @@ export type Probe = 'answers' | 'silent' | 'refused';
 
 /** The release a health answer says: `Health.release` where the body reads as `Health` and says one, else null. */
 const releaseIn = (body: string): string | null => {
-  try {
-    return Option.match(Schema.decodeUnknownOption(Health)(JSON.parse(body)), {
-      onNone: () => null,
-      onSome: (health) => health.release ?? null,
-    });
-  } catch {
-    return null;
-  }
+  return Option.match(Schema.decodeUnknownOption(Schema.fromJsonString(Health))(body), {
+    onNone: () => null,
+    onSome: (health) => health.release ?? null,
+  });
 };
 
 /**
@@ -102,15 +98,13 @@ export function releaseHeld(verb: string, base: string, daemon: string | null, c
   );
 }
 
+/** A line naming a url, as `nemia daemon --json` answers and a lease is written. */
+const urlOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ url: Schema.String })));
+
 /** The url a `nemia daemon --json` answered on its last line, where it names one. */
 const urlIn = (stdout: string): string | undefined => {
-  try {
-    const answer: unknown = JSON.parse(stdout.trim().split('\n').at(-1) ?? '');
-    if (typeof answer !== 'object' || answer === null || !('url' in answer)) return undefined;
-    return typeof answer.url === 'string' && answer.url !== '' ? answer.url : undefined;
-  } catch {
-    return undefined;
-  }
+  const url = Option.getOrUndefined(urlOf(stdout.trim().split('\n').at(-1) ?? ''))?.url;
+  return url === '' ? undefined : url;
 };
 
 /** Why none serves the store, and what to type: a daemon started here, the service installed, and the setting where it is why. */

@@ -266,7 +266,7 @@ const bridgeFileOf = (root: string, name: string): AttachedBridge | undefined =>
     return undefined;
   }
   try {
-    return Schema.decodeUnknownSync(BridgeFactsSchema)(JSON.parse(text));
+    return Schema.decodeUnknownSync(Schema.fromJsonString(BridgeFactsSchema))(text);
   } catch (e) {
     return {
       why: `the bridge file ${file} is not one this runtime reads (${e instanceof Error ? e.message : String(e)}): run the job under a runtime that wrote it, or file it again.`,

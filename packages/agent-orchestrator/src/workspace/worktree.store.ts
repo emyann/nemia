@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
+import { Effect, Option, Schema } from 'effect';
 import { INSTALL_ARGS, lastLines } from '../check/index.ts';
 import { isCloneFolder } from '../factory/clones/index.ts';
 import {
@@ -160,13 +160,12 @@ export function keptNotes(repo: string, kept: CheckoutKept): string[] {
   return [];
 }
 
+/** A package's `package.json`, as `installedAt` reads it: its version, where it names one. */
+const versionIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ version: Schema.optional(Schema.String) })));
+
 /** A lockfile's text, parsed; null where it does not parse, which `lockfileParting` reads as parting at `package-lock.json`. */
 function parsedLock(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+  return Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 }
 
 /**
@@ -196,7 +195,7 @@ function installedAt(root: string, lock: unknown, through = false): Record<strin
     } else {
       let version: string | undefined;
       try {
-        version = JSON.parse(fs.readFileSync(path.join(at, 'package.json'), 'utf8')).version;
+        version = Option.getOrUndefined(versionIn(fs.readFileSync(path.join(at, 'package.json'), 'utf8')))?.version;
       } catch {}
       installed[key] = { link: false, version };
     }

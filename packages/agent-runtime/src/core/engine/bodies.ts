@@ -259,7 +259,16 @@ export const resolver = (bodies: BodyOps | undefined) => {
   const field = (key: keyof typeof STANDS_FOR, value: unknown): Effect.Effect<unknown, BodyError> => {
     if (key !== 'briefParts')
       return key === 'closeoutSchemaBody'
-        ? Effect.map(text(value as BodyRef), (json) => JSON.parse(json) as unknown)
+        ? Effect.flatMap(text(value as BodyRef), (json) =>
+            Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(json).pipe(
+              Effect.mapError(
+                () =>
+                  new BodyError({
+                    message: `names ${where(value as BodyRef)}, whose text is no JSON, where the schema of a session's final answer is: restore it from a backup of the store.`,
+                  }),
+              ),
+            ),
+          )
         : text(value as BodyRef);
     return Effect.map(
       Effect.forEach(value as (string | { body: BodyRef })[], (part) =>

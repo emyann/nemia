@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { CURRENT, RELEASE_FILE, RELEASE_PLATFORMS, type Current, type ReleaseFile, type Running } from './release.ts';
 import type { BuildLog, Installed, PidEntry } from '../retention/index.ts';
 
@@ -62,7 +62,7 @@ export function releaseFileOf(dir: string): ReleaseFile | undefined {
     return undefined;
   }
   try {
-    const decoded = Schema.decodeUnknownResult(ReleaseFileSchema)(JSON.parse(text));
+    const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(ReleaseFileSchema))(text);
     return Result.isFailure(decoded) ? undefined : decoded.success;
   } catch {
     return undefined;
@@ -93,14 +93,19 @@ export function currentRelease(root: string): Current | null {
   return file === undefined ? null : { ...file, dir };
 }
 
+/** A `package.json`'s scripts, as `scriptsOf` reads them: a map, or none. */
+const scriptsIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ scripts: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) })),
+);
+
 /**
  * The scripts of the `package.json` at the root of `dir`, or none where it has none.
  * @param dir The folder whose `package.json` is read.
  */
 export function scriptsOf(dir: string): Readonly<Record<string, unknown>> {
   try {
-    const scripts = (JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { scripts?: unknown }).scripts;
-    return typeof scripts === 'object' && scripts !== null ? (scripts as Record<string, unknown>) : {};
+    const read = scriptsIn(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    return Option.isSome(read) ? (read.value.scripts ?? {}) : {};
   } catch {
     return {};
   }

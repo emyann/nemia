@@ -7,15 +7,18 @@
  * nothing (`tools/guards/test/release.test.ts` holds this read to the bump's file).
  */
 import fs from 'node:fs';
+import { Result, Schema } from 'effect';
 
 /** The root package.json, four folders up from this file's: `packages/agent-orchestrator/src/version/`. */
 const RELEASE_MANIFEST = new URL('../../../../package.json', import.meta.url);
 
-const manifest = JSON.parse(fs.readFileSync(RELEASE_MANIFEST, 'utf8')) as { version?: unknown };
+const manifest = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Struct({ version: Schema.String })))(
+  fs.readFileSync(RELEASE_MANIFEST, 'utf8'),
+);
 
-if (typeof manifest.version !== 'string')
+if (Result.isFailure(manifest))
   throw new Error(
     `${RELEASE_MANIFEST.pathname} has no version: set its version field, as tools/release/release.ts writes it when it cuts a release`,
   );
 
-export const VERSION: string = manifest.version;
+export const VERSION: string = manifest.success.version;

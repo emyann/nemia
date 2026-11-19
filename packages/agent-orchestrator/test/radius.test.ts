@@ -25,8 +25,8 @@ import {
   sensitiveHeading,
   sensitivePaths,
   touchedLines,
-  workspacesIn,
 } from '../src/branches/branches.ts';
+import { workspacesIn } from '../src/branches/changes.store.ts';
 import { count, sumUsage, usedLines, peakMark, readWords, rebuiltCache } from '../src/usage/usage.ts';
 import { budgetWord, dollars } from '../src/money/money.ts';
 

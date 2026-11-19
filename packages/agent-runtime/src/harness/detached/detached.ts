@@ -17,7 +17,7 @@
  * `codex` (`harness/codex/codex.ts`), a Claude Code job (`claudeJobSpec`, `harness/claude/code.ts`) and `commandHarness`
  * (`harness/command/command.ts`).
  */
-import { Effect } from 'effect';
+import { Effect, Option, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Denial, Sighting, SpentSoFar, Usage } from '../../core/index.ts';
@@ -920,11 +920,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
     } catch {
       return undefined;
     }
-    let payload: unknown = text;
-    try {
-      payload = JSON.parse(text);
-    } catch {}
-    return { payload };
+    return { payload: Option.getOrElse(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text), () => text) };
   };
 
   const outputs: SaidMemo = new Map();

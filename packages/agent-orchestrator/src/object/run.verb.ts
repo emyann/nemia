@@ -14,24 +14,13 @@ import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { artifactsDir } from '../record/record.store.ts';
-import {
-  addSpend,
-  budgetOf,
-  gatesOf,
-  isRepositoryRun,
-  overBudget,
-  placeOf,
-  type Run,
-  type Spend,
-  type SpendOf,
-  stepSpend,
-} from '../run.ts';
+import { addSpend, budgetOf, isRepositoryRun, overBudget, placeOf, type Run, type Spend, type SpendOf, stepSpend } from '../run.ts';
 import { LOOP_REPLIES, loopSpan, outputFields, type StepSpec } from '../workflow.ts';
 import type { FieldShape } from 'objects';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Retry } from '../retry/index.ts';
 import { stepRaise } from '../retry/index.ts';
-import { stepStatus } from '../status/status.ts';
+import { gatesAt, stepStatus } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
 import { runInputGraph } from '../summary/graph.ts';
 import { bare, tryOf } from '../summary/reads.verb.ts';
@@ -337,7 +326,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
     read: runRead(at),
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,
-    gates: gatesOf(steps, run),
+    gates: gatesAt(steps, run),
     warning: null,
     kinds: [...kinds],
     ...resultOf(run, steps),

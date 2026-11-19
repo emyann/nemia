@@ -16,7 +16,7 @@ import { filedOwed } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
 import { declarationOf } from '../harness/harness.ts';
-import type { Actor } from 'objects';
+import type { Actor, GateAt } from 'objects';
 export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
@@ -232,6 +232,15 @@ export { endsOnBase };
  */
 export const approvedFirst = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace'>, run: Pick<Run, 'gates'>): boolean =>
   endsOnBase(step) && hasGate(step, run);
+
+/**
+ * The steps a run is gated at, in the order they run (`gatesOf`), each with where its approval is: `before` for one approved first
+ * (`approvedFirst`), `after` for one whose closeout waits. Pure.
+ * @param steps The run's steps, in the order they run.
+ * @param run The run, the gates it was started with among it.
+ */
+export const gatesAt = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): Array<{ step: string; at: GateAt }> =>
+  steps.filter((s) => hasGate(s, run)).map((s) => ({ step: s.name, at: approvedFirst(s, run) ? 'before' : 'after' }));
 
 /**
  * Whether the run waits at that step's gate now, with nothing of the step filed: it is approved first (`approvedFirst`), it has not been

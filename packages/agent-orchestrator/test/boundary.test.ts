@@ -371,7 +371,7 @@ const isEffect = (m: string): boolean => m === 'effect' || m.startsWith('effect/
 /**
  * The modules of Effect a pure file may import, each by that exact name: `effect/Data`, for the tagged refusals' `TaggedError`
  * (`src/refusal/refusal.ts`), and `effect/Predicate`, for Effect's own guards (`isObject`) in place of hand-written ones. Neither
- * loads Effect's runtime: `Predicate` imports `Function` alone, and `HKT` and `Types` for their types.
+ * loads Effect's runtime: Predicate imports only Effect's Function module, and its HKT and Types modules as types.
  */
 const PURE_EFFECT: readonly string[] = ['effect/Data', 'effect/Predicate'];
 

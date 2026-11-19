@@ -13,7 +13,7 @@ import { factoryVolumesNamed, volumeRefusal } from '../factory/volume/volume.ts'
 import { isDirectory } from '../record/record.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { tried } from '../runtime-client.ts';
-import { harnessOfNeed, signInNeedOf } from '../needs/harness.ts';
+import { harnessOfNeed, signInNeedOf } from '../needs/index.ts';
 import { checkKey, harnessCheckOf, needsMemo, NeedsMemory, needsOnce } from '../needs/needs.verb.ts';
 import { MILESTONE_WORDS, milestonesOf } from './milestones.ts';
 

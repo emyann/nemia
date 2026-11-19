@@ -13,7 +13,7 @@ import { asked, EngineService, type TaskView } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { MOMENTUM } from '../status/status.ts';
-import { signInNeedOf } from '../needs/harness.ts';
+import { signInNeedOf } from '../needs/index.ts';
 import { checkKey, harnessCheckOf, needsMemo, NeedsMemory, needsOnce } from '../needs/needs.verb.ts';
 import { TURN_BUDGET_USD, TURN_DEADLINE_SECONDS, TURN_PROMPT, TURN_SCHEMA, turnCheckOf, type TurnSeen } from './harness-turn.ts';
 import { latestTurnRecord, readTurnRecord, turnsDir, writeTurnRecord, type TurnRecord } from './harness-turn.store.ts';

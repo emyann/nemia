@@ -41,6 +41,9 @@ here and read its page.
 | Hold a resource and let it go whatever happens, the last taken first | `Effect.acquireRelease`, `Scope.addFinalizer` | `node_modules/effect/ai-docs/src/01_effect/05_resources/10_acquire-release.ts` |
 | Build a service from others and give it to a program | `Layer.effect`, `Layer.provide`, `Layer.mergeAll` | `node_modules/effect/ai-docs/src/01_effect/03_services/20_layer-composition.ts` |
 
+A schema of a value a library already types is checked against that type, its keys and its field types, at compile time, never tied
+to it by a citation alone (`boundTo`, `packages/agent-runtime/src/harness/claude/stream.ts`).
+
 In a review, a hand-rolled version of one of these is a finding.
 
 v4 is not v3: read the page, not your memory.

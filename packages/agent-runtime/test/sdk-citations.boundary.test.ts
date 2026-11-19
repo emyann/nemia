@@ -52,8 +52,6 @@ const CLAIMS: Record<string, string> = {
   '6134': 'SDKRateLimitInfo',
   '6135': 'status',
   '6343-6346': 'total_cost_usd',
-  '6492': 'SDKStatusMessage',
-  '6520': 'claude_code_version',
   '6535': 'permissionMode',
   '9750': 'autoCompactWindow',
   '9957': 'claudeMdExcludes',

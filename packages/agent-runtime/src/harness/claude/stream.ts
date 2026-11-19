@@ -11,6 +11,17 @@
  * fix (`printedLinesOf`): one Claude Code binary prints every session's output, so a line printed otherwise says its format moved,
  * and a refused output is never read as saying nothing.
  */
+import type {
+  ModelUsage,
+  NonNullableUsage,
+  SDKAssistantMessage,
+  SDKPartialAssistantMessage,
+  SDKPermissionDenial,
+  SDKPermissionDeniedMessage,
+  SDKResultMessage,
+  SDKStatusMessage,
+  SDKSystemMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 import { Result, Schema } from 'effect';
 import { firstRefusal } from '../../core/index.ts';
 import type { PartialMark } from '../detached/follow.ts';
@@ -50,43 +61,98 @@ const DeltaEvent = Schema.Struct({
 /** A block written whole, by its place in its message. */
 const StopEvent = Schema.Struct({ type: Schema.Literal('content_block_stop'), index: Count });
 
-/** A call Claude Code refused without asking: its tool, the id of its call, and the input it was called with. */
-const DenialSchema = Schema.Struct({
-  tool_name: Schema.NonEmptyString,
-  tool_use_id: Schema.optional(Schema.String),
-  tool_input: Schema.optional(Schema.Unknown),
+/** Every key of `T`, of each of its members when it is a union. */
+type KeyOfAny<T> = T extends unknown ? keyof T : never;
+
+/** The type of `K` in `T`, across each of its members that has it when `T` is a union. */
+type FieldOfAny<T, K extends PropertyKey> = T extends unknown ? (K extends keyof T ? T[K] : never) : never;
+
+/**
+ * How the schema whose encoded type is `E` has drifted from the SDK type `Sdk` it reads: each key it reads that `Sdk` lacks, and each
+ * key whose type in `Sdk` is wider than the schema takes; `never` when it has not.
+ */
+type Drift<Sdk, E> = {
+  [K in keyof E]-?: K extends KeyOfAny<Sdk>
+    ? [FieldOfAny<Sdk, K>] extends [E[K]]
+      ? never
+      : `${K & string}: the SDK types it wider than the schema reads it`
+    : `${K & string}: no key of the SDK's type`;
+}[keyof E];
+
+/** How each schema of `P` has drifted from its SDK type in `Sdks`, and each key of `P` that names none: `never` when none has. */
+export type Drifts<Sdks, P> = {
+  [K in keyof P]-?: K extends keyof Sdks
+    ? P[K] extends Schema.Top
+      ? Drift<Sdks[K], P[K]['Encoded']>
+      : never
+    : `${K & string}: names no SDK type`;
+}[keyof P];
+
+/**
+ * The schemas of `schemas`, each bound at compile time to the type the Agent SDK gives the value it reads, its key's in `Sdks`: every
+ * key the schema reads is a key of that type, and the SDK's type of it is assignable to the schema's encoded type of it, so an SDK
+ * upgrade that renames, drops or retypes a field the runtime reads fails the typecheck rather than decoding as absent. A schema stays
+ * as lenient as it is written: what it takes beyond the SDK's type, an absent field or a wider word, is a capture of an older version.
+ * The keys of `Sdks` and of `schemas` are the same.
+ * @param schemas The schemas, by the key of their SDK type in `Sdks`.
+ */
+export const boundTo =
+  <Sdks>() =>
+  <P extends { readonly [K in keyof Sdks]: Schema.Top }>(
+    schemas: P & NoInfer<[Drifts<Sdks, P>] extends [never] ? unknown : { readonly drift: Drifts<Sdks, P> }>,
+  ): P =>
+    schemas;
+
+/**
+ * The parts of a line the runtime reads: a call Claude Code refused without asking — its tool, the id of its call, and the input it
+ * was called with; a response's token counts, in their classes; and one model's token counts in a result's `modelUsage`, which counts
+ * every model of the session, subagents included.
+ */
+const PARTS = boundTo<{ denial: SDKPermissionDenial; tokens: NonNullableUsage; modelTokens: ModelUsage }>()({
+  denial: Schema.Struct({
+    tool_name: Schema.NonEmptyString,
+    tool_use_id: Schema.optional(Schema.String),
+    tool_input: Schema.optional(Schema.Unknown),
+  }),
+  tokens: Schema.Struct({
+    input_tokens: Schema.optional(Count),
+    cache_creation_input_tokens: Schema.optional(Count),
+    cache_read_input_tokens: Schema.optional(Count),
+    output_tokens: Schema.optional(Count),
+  }),
+  modelTokens: Schema.Struct({
+    inputTokens: Schema.optional(Count),
+    cacheCreationInputTokens: Schema.optional(Count),
+    cacheReadInputTokens: Schema.optional(Count),
+    outputTokens: Schema.optional(Count),
+  }),
 });
 
-/** A response's token counts, in their classes. */
-const TokensSchema = Schema.Struct({
-  input_tokens: Schema.optional(Count),
-  cache_creation_input_tokens: Schema.optional(Count),
-  cache_read_input_tokens: Schema.optional(Count),
-  output_tokens: Schema.optional(Count),
-});
-
-/** One model's token counts in a result's `modelUsage`, which counts every model of the session, subagents included. */
-const ModelTokensSchema = Schema.Struct({
-  inputTokens: Schema.optional(Count),
-  cacheCreationInputTokens: Schema.optional(Count),
-  cacheReadInputTokens: Schema.optional(Count),
-  outputTokens: Schema.optional(Count),
-});
+/** The SDK's type of each kind of line in `PRINTED`, the message `bin/ae-claude-job.ts` prints it from. */
+type PrintedSdk = {
+  result: SDKResultMessage;
+  'system permission_denied': SDKPermissionDeniedMessage;
+  'system init': SDKSystemMessage;
+  'system status': SDKStatusMessage;
+  stream_event: SDKPartialAssistantMessage;
+  assistant: SDKAssistantMessage;
+};
 
 /**
  * The lines of a session's stream the runtime reads, by kind — a `type`, and its `subtype` for a `system` line — in what it reads
- * of each; every other key is not checked. A field the runtime starts reading is added here.
+ * of each; every other key is not checked. A field the runtime starts reading is added here, and each kind is bound to its SDK type
+ * in `PrintedSdk`.
  */
-const PRINTED = {
+const PRINTED = boundTo<PrintedSdk>()({
   result: Schema.Struct({
     type: Schema.Literal('result'),
     subtype: Schema.optional(Schema.String),
     structured_output: Schema.optional(Schema.Unknown),
     total_cost_usd: Schema.optional(Measure),
     duration_api_ms: Schema.optional(Measure),
-    usage: Schema.optional(TokensSchema),
-    modelUsage: Schema.optional(Schema.Record(Schema.String, ModelTokensSchema)),
-    permission_denials: Schema.optional(Schema.Array(DenialSchema)),
+    usage: Schema.optional(PARTS.tokens),
+    modelUsage: Schema.optional(Schema.Record(Schema.String, PARTS.modelTokens)),
+    permission_denials: Schema.optional(Schema.Array(PARTS.denial)),
   }),
   'system permission_denied': Schema.Struct({
     type: Schema.Literal('system'),
@@ -100,18 +166,17 @@ const PRINTED = {
     cwd: Schema.optional(Schema.NonEmptyString),
     model: Schema.optional(Schema.NonEmptyString),
     /**
-     * The version of Claude Code the process runs, as the SDK's init message names it (`sdk.d.ts:6520`): absent from a capture of an
-     * older one.
+     * The version of Claude Code the process runs: absent from a capture of an older one.
      */
     claude_code_version: Schema.optional(Schema.NonEmptyString),
     /**
-     * The mode the turn runs in, as the SDK's init message names it (`sdk.d.ts:6535`), one per turn: a model that cannot run `auto`
+     * The mode the turn runs in, one per turn: a model that cannot run `auto`
      * runs in `default`, and its init line says so. Read as written, never matched against the modes Claude Code has.
      */
     permissionMode: Schema.optional(Schema.NonEmptyString),
   }),
   /**
-   * A change of the session's state, as the SDK's status message names it (`SDKStatusMessage`, `sdk.d.ts:6492`), read for its mode
+   * A change of the session's state, read for its mode
    * alone: the `init` line can name a mode Claude Code has not yet settled, and the `status` line that follows it names the one the
    * session runs in — measured on 2.1.322: on `claude-haiku-4-5` filed in `auto`, 1 run in 10 printed `init` with `auto`
    * and then a `status` with `default`, where the other 9 printed `default` on both. Read as written, as the `init` line's is.
@@ -131,7 +196,7 @@ const PRINTED = {
       content: Schema.Union([Schema.String, Schema.Array(Schema.Union([ToolUseBlock, otherThan(['tool_use'])]))]),
     }),
   }),
-};
+});
 
 /** A kind of line the runtime reads: a key of `PRINTED`. */
 export type PrintedKind = keyof typeof PRINTED;

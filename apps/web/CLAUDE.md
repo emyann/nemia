@@ -42,6 +42,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due,
   which pictures them in dark alone, and `--light` beside it when a light picture is asked for on purpose (`themesOf`, `e2e/pages.ts`);
   never the whole suite in a session but to measure it. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
+- `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due;
+  `ci` shards every page on the round's commit. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
   --pages <…>`, or `--look` alone) when the change touches a part of the look, a story, `test/e2e/stories/` or a runner file beside the
   pages (`visit.ts`, `checks.ts`, `contrast.ts`). A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming
   its slowest pages; its own time past `E2E_BOUND_MS` is said, never refused: it is the machine's, by the workers it gave (`overBound`,
@@ -61,8 +63,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `e2e/built.ts`: the board's files but its tests, `objects`' and the lockfile, by size and time of change; never in CI); `rm -rf dist`
   makes it build. A worker stops at its first failing page, and its seat starts another on a fresh store for the pages left
   (`startsAgain`, `e2e/workers.ts`), so one run names every failing page of its batch, five at most, and their names together at its end:
-  read them all before running again. After a change to a part most pages draw, run the pages that draw it most and sign off: the
-  round's `ci` shards visit every page in five minutes and name the ones it broke, where walking them all here takes an hour.
+  read them all before running again. The round's `ci` shards visit every page in five minutes and name the ones a change broke,
+  where walking them all on one machine takes an hour.
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.

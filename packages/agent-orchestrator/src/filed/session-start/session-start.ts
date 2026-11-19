@@ -28,6 +28,12 @@ export const sessionStart: SessionStartOf = (i) => {
 
 const bare = (inner: string): string => (inner.startsWith('./') ? bare(inner.slice(2)) : inner);
 
+const expanded = (text: string, workspace: string): string => {
+  const at = text.indexOf(WORKSPACE_EXPRESSION);
+  if (at < 0) return text;
+  return `${text.slice(0, at)}${workspace}${expanded(text.slice(at + WORKSPACE_EXPRESSION.length), workspace)}`;
+};
+
 /**
  * A step's rule read against its workspace: `${{ workspace }}` expanded to the workspace, and a relative path of a file rule
  * (`Read`, `Edit`, `Write`, `NotebookEdit`) named in the workspace; any other rule as written.
@@ -35,7 +41,7 @@ const bare = (inner: string): string => (inner.startsWith('./') ? bare(inner.sli
  * @param workspace The step's workspace, absolute.
  */
 export const inWorkspace: InWorkspace = (rule, workspace) => {
-  if (rule.includes(WORKSPACE_EXPRESSION)) return rule.split(WORKSPACE_EXPRESSION).join(workspace);
+  if (rule.includes(WORKSPACE_EXPRESSION)) return expanded(rule, workspace);
   const open = rule.indexOf('(');
   if (open < 0 || !rule.endsWith(')')) return rule;
   const tool = rule.slice(0, open);

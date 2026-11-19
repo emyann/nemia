@@ -52,6 +52,8 @@ const editDenied = (folder: string): string => `Edit(/${folder}/**)`;
 const startsInHome = (i: SessionPlaceOf): boolean => i.home !== undefined && i.local && i.addsFolders;
 
 const sessionStartSpec = spec<(i: SessionPlaceOf) => SessionStart>({
+  /** The workspace and the home are absolute paths, and the home is not the workspace. */
+  requires: ({ input: [i] }) => i.workspace.startsWith('/') && (i.home === undefined || (i.home.startsWith('/') && i.home !== i.workspace)),
   ensures: {
     inTheHome: {
       description: "A step on this machine whose harness adds a writable folder starts in its run's home, where the run froze one",
@@ -73,6 +75,10 @@ const sessionStartSpec = spec<(i: SessionPlaceOf) => SessionStart>({
       condition: ({ input: [i], output }) =>
         output.worked === null ||
         (i.writes ? output.worked.readOnly === false && output.worked.ruled === true : output.worked.readOnly === true),
+    },
+    readOnlyUnruled: {
+      description: "A workspace read-only to the session keeps the runtime's deny for a read-only folder: it is never ruled",
+      condition: ({ output }) => output.worked === null || output.worked.readOnly === false || output.worked.ruled === undefined,
     },
     homeReadOnly: {
       description: 'A session in the home may write nothing there: the home changes only by a proposal',
@@ -108,7 +114,11 @@ const relative = (inner: string): boolean => inner.length > 0 && !inner.startsWi
 const bare = (inner: string): string => (inner.startsWith('./') ? bare(inner.slice(2)) : inner);
 
 /** Every occurrence of the workspace expression in `text`, replaced by `workspace`. */
-const expanded = (text: string, workspace: string): string => text.split(WORKSPACE_EXPRESSION).join(workspace);
+const expanded = (text: string, workspace: string): string => {
+  const at = text.indexOf(WORKSPACE_EXPRESSION);
+  if (at < 0) return text;
+  return `${text.slice(0, at)}${workspace}${expanded(text.slice(at + WORKSPACE_EXPRESSION.length), workspace)}`;
+};
 
 const inWorkspaceSpec = spec<(rule: string, workspace: string) => string>({
   /** The workspace is an absolute path with no expression in it. */
@@ -160,9 +170,13 @@ const everyFileUnder = (folder: string): string => `${folder}/**`;
 const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(`${outer}/`);
 
 const memoryFilesSpec = spec<(folders: readonly MemoryFolder[]) => MemoryFiles>({
-  /** No added folder is another, or inside another: a folder both left off and switched on could be neither skipped nor read. */
+  /**
+   * Each folder is an absolute path, and no folder left off is a folder switched on, inside one or around one: a folder both left
+   * off and switched on could be neither skipped nor read.
+   */
   requires: ({ input: [folders] }) =>
-    folders.every((f, i) => folders.every((g, j) => i === j || (!within(f.path, g.path) && !within(g.path, f.path)))),
+    folders.every((f) => f.path.startsWith('/')) &&
+    folders.every((f) => f.claudeMd || folders.every((g) => !g.claudeMd || (!within(f.path, g.path) && !within(g.path, f.path)))),
   ensures: {
     offByDefault: {
       description: "Where no added folder is switched on, no added folder's memory file loads, and nothing is excluded",

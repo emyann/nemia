@@ -125,6 +125,7 @@ const STEP_HOLDS: Record<string, string> = {
 /** The name each file of sdlc must hold, by its path from the template: the first rule whose pattern takes the path. */
 const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/^nemia\.yaml$/, () => 'kind: FactoryTemplate'],
+  [/^home\/CLAUDE\.md$/, () => '# Where you stand\n'],
   [/^RULES\.md$/, () => '${{ parameters.areas }}'],
   [/^fences\/[\w-]+\.(?:allow|deny)\.yaml$/, () => '\n- '],
   [/^agents\/[\w-]+\/agent\.yaml$/, () => 'kind: Agent'],

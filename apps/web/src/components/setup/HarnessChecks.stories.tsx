@@ -18,7 +18,7 @@ const VERSION: HarnessCheck = {
 const UNRUN: HarnessCheck = {
   name: 'turn',
   state: 'unrun',
-  message: "no check turn has run through Agent One: run one from the board's Setup, capped at $0.05",
+  message: 'no check turn has run through Agent One yet: Run the check, on the board, runs one real turn capped at $0.05',
   fixes: [],
   capUsd: 0.05,
 };

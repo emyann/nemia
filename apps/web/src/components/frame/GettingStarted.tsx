@@ -62,7 +62,7 @@ export function GettingStarted({ milestones, onDismiss }: { milestones: readonly
 }
 
 /**
- * Getting started on the floor: the store's milestones as the api reads them, shown until a run has landed or the person dismisses it
+ * Getting started on the floor: the store's milestones as the api reads them, shown until a change is merged or the person dismisses it
  * in this browser (`starterShown`); nothing while the read is out or refused.
  */
 export function GettingStartedOnFloor() {

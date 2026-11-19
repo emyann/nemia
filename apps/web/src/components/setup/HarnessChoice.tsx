@@ -82,7 +82,9 @@ export function HarnessChoice({
               ? (lead ??
                 'A session runs on a harness this server installs for you. Activate one now, or skip and activate one from the list below when you need it.')
               : activation.installed
-                ? 'It is installed. Sign it in, and a session can start on it.'
+                ? signIn?.state === 'met'
+                  ? 'It is installed and signed in: a session can start on it.'
+                  : 'It is installed. Sign it in, and a session can start on it.'
                 : 'The server installs it: its output shows here as it runs.'}
           </p>
         </header>

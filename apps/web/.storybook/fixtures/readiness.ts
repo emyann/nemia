@@ -4,7 +4,7 @@
  * typecheck here; and the MSW handlers a story names in `parameters.msw` — a fresh store, a harness installing, a check failed, ready.
  */
 import { http, HttpResponse } from 'msw';
-import type { Fix, HarnessCheck, HarnessTurn, Milestones, Readiness, ReadinessPiece } from 'objects';
+import type { Fix, HarnessCheck, HarnessTurn, Milestones, Quota, Readiness, ReadinessPiece } from 'objects';
 
 /** The harness's install piece, in `state`, carrying `checks` where it is met. */
 const install = (state: ReadinessPiece['state'], checks?: HarnessCheck[]): ReadinessPiece => ({
@@ -79,8 +79,25 @@ const FRESH_MILESTONES: Milestones = {
     { name: 'harness', state: 'next', message: 'activate a harness: it runs every session in your factories' },
     { name: 'factory', state: 'later', message: 'file a factory' },
     { name: 'volume', state: 'later', message: 'give a factory a volume' },
-    { name: 'landed', state: 'later', message: 'land a first run' },
+    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
   ],
+};
+
+/** The subscription's quota, fresh: what the welcome shows beside a passed turn, as information. */
+const QUOTA: Quota = {
+  state: 'fresh',
+  askedAt: '2026-11-18T10:00:00.000Z',
+  ageMs: 60_000,
+  againAt: '2026-11-18T10:05:00.000Z',
+  subscription: 'max',
+  windows: [
+    { key: 'five_hour', label: '5-hour', usedPercentage: 12, resetsAt: '2026-11-18T14:00:00.000Z', reset: false, marked: false },
+    { key: 'seven_day', label: 'week', usedPercentage: 40, resetsAt: '2026-11-22T10:00:00.000Z', reset: false, marked: false },
+  ],
+  last: null,
+  keepMs: 300_000,
+  markAt: 80,
+  said: null,
 };
 
 /** The install's fix, started. */
@@ -90,6 +107,7 @@ const STARTED: Fix = { id: 'fix-1', need: 'claude', phase: 'pending', output: ''
 const answering = (pieces: ReadinessPiece[], milestones: Milestones = FRESH_MILESTONES) => [
   http.get('/api/readiness', () => HttpResponse.json(read(pieces))),
   http.get('/api/readiness/milestones', () => HttpResponse.json(milestones)),
+  http.get('/api/quota', () => HttpResponse.json(QUOTA)),
   http.post('/api/readiness/fixes', () => HttpResponse.json(STARTED)),
   http.get('/api/readiness/fixes/:id/output', () =>
     new HttpResponse('event: output\ndata: added 1 package in 2s\n\n', { headers: { 'content-type': 'text/event-stream' } }),
@@ -116,7 +134,7 @@ export const checkFailed = answering([
       message: 'Claude Code answers 2.0.1, and this release was tested with 2.1.325: install 2.1.325 again',
       fixes: [{ message: 'install Claude Code 2.1.325 into the tools folder', command: 'nemia doctor fix claude', startable: true, index: 0 }],
     },
-    { name: 'turn', state: 'unrun', message: "no check turn has run through Claude Code: run one from the board's Setup, capped at $0.05", fixes: [], capUsd: 0.05 },
+    { name: 'turn', state: 'unrun', message: 'no check turn has run through Claude Code yet: Run the check, on the board, runs one real turn capped at $0.05', fixes: [], capUsd: 0.05 },
   ]),
   signIn('met'),
   NO_FACTORY,
@@ -128,6 +146,6 @@ export const harnessReady = answering([install('met', [VERSION, TURN_PASSED]), s
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
     { name: 'factory', state: 'next', message: 'file a factory from a template, on a repository' },
     { name: 'volume', state: 'later', message: 'give a factory a volume' },
-    { name: 'landed', state: 'later', message: 'land a first run' },
+    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
   ],
 });

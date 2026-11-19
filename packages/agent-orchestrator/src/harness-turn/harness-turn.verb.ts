@@ -240,7 +240,7 @@ export const latestTurnCheck = Effect.fnUntraced(function* (home: string, harnes
   return {
     name: 'turn',
     state: 'unrun',
-    message: `no check turn has run through ${title}: run one from the board's Setup, capped at ${costWords(TURN_BUDGET_USD)}`,
+    message: `no check turn has run through ${title} yet: Run the check, on the board, runs one real turn capped at ${costWords(TURN_BUDGET_USD)}`,
     fixes: [],
     capUsd: TURN_BUDGET_USD,
   } satisfies HarnessCheck;

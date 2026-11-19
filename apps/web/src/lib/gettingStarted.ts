@@ -20,7 +20,7 @@ export const MILESTONE_NAMES: Readonly<Record<Milestone, string>> = {
   harness: 'A harness',
   factory: 'A factory',
   volume: 'A volume',
-  landed: 'A first run landed',
+  landed: 'A first change merged',
 };
 
 /** The key the dismissal is kept under. */

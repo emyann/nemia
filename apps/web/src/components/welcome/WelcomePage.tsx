@@ -6,16 +6,19 @@ import { Button } from '@/components/ui/ds';
 import { FollowedFix } from '@/components/setup/FollowedFix';
 import { HarnessChecks } from '@/components/setup/HarnessChecks';
 import { HarnessChoice } from '@/components/setup/HarnessChoice';
+import { quotaQuery } from '@/lib/api/quota';
 import { milestonesQuery, readinessQuery } from '@/lib/api/readiness';
 import { MILESTONE_NAMES } from '@/lib/gettingStarted';
+import { quotaTitle } from '@/lib/quota';
 import { useHarnessActivation } from '@/lib/useHarnessActivation';
+import { useNow } from '@/lib/useNow';
 
 /** The one line the welcome says of a harness, and no more. */
 export const WELCOME_LINE = "The harness you pick runs Nemia's own agent and every session in your factories.";
 
 /**
  * The welcome, at `/welcome`, where a fresh store opens: one card per harness the read declares, with the one line; Activate installs the
- * pinned copy (the same fix as Setup's), followed on the page, then its version tick, its sign-in, and one real turn through it. Its
+ * pinned copy (the same fix as Setup's), followed on the page, then its version tick, its sign-in, and one real turn through it, the quota shown once it passed, as information. Its
  * skip keeps the skip in this browser and leaves for the board; once both ticks passed, Next names the next milestone. A harness
  * already installed when the page is drawn is shown as activated, with its sign-in and its checks.
  */
@@ -23,6 +26,9 @@ export function WelcomePage() {
   const navigate = useNavigate();
   const { data } = useSuspenseQuery(readinessQuery);
   const milestones = useQuery(milestonesQuery);
+  const quota = useQuery(quotaQuery);
+  const now = useNow(60_000);
+  const quotaWords = quota.data === undefined ? undefined : quotaTitle(quota.data, new Date(now));
   const a = useHarnessActivation(data.pieces);
   const chosen = a.chosen ?? a.choices.find((choice) => choice.install.state === 'met');
   const install = chosen === undefined ? undefined : a.checkedInstall(chosen.install);
@@ -49,7 +55,12 @@ export function WelcomePage() {
             ...(a.installRun === undefined ? {} : { run: <FollowedFix key={a.installRun.id} fix={a.installRun} onEnded={a.ended} /> }),
             installed: a.installed || chosen.install.state === 'met',
             checks: (
-              <HarnessChecks install={install} {...(chosen.signIn?.state === 'met' ? { turn: a.turnOf(chosen.name) } : {})} {...a.starts} />
+              <HarnessChecks
+                install={install}
+                {...(chosen.signIn?.state === 'met' ? { turn: a.turnOf(chosen.name) } : {})}
+                {...(quotaWords === undefined ? {} : { quota: quotaWords })}
+                {...a.starts}
+              />
             ),
           }}
           {...a.starts}

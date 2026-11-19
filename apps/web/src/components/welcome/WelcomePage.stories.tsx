@@ -62,11 +62,13 @@ export const CheckFailed: Story = {
   },
 };
 
-/** Both ticks passed: Next names the next milestone. */
+/** Both ticks passed: signed in, the quota shown beside the turn as information, and Next names the next milestone. */
 export const Ready: Story = {
   parameters: { msw: harnessReady },
   play: async ({ canvasElement }) => {
     const page = await loaded(canvasElement);
     await waitFor(() => expect(within(page).getByRole('link', { name: 'Next: a factory' })).toBeVisible(), { timeout: 5000 });
+    await expect(within(page).getByText(/installed and signed in/)).toBeVisible();
+    await waitFor(() => expect(page.querySelector('[data-harness-quota]')).not.toBeNull(), { timeout: 5000 });
   },
 };

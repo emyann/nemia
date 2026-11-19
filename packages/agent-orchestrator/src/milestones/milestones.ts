@@ -43,8 +43,8 @@ export const MILESTONE_WORDS: Readonly<Record<Milestone, Readonly<Record<Milesto
     later: 'give a factory a volume',
   },
   landed: {
-    done: 'a run landed its change',
-    next: 'start a first card and land its change',
-    later: 'land a first run',
+    done: "a run's change is merged into its base branch",
+    next: 'start a first card, and merge its change into the base branch',
+    later: 'merge a first change into its base branch',
   },
 };

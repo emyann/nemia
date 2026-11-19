@@ -88,6 +88,18 @@ const servedKeys = (keys: Readonly<Record<string, unknown>>): Record<string, unk
   );
 
 /**
+ * `keys` with a `workspace:` in a former word said in today's, as the loader reads it (`placeSpelled`, `baseSpelled`): `folder` as `place:
+ * folder`, where `place:` is not written beside it, and `main` as `base`. A spec carries no word nothing writes, so a step read and
+ * proposed back is written as the same step, its file kept.
+ */
+const spelledNow = (keys: Record<string, unknown>): Record<string, unknown> => {
+  if (keys.workspace === 'main') return { ...keys, workspace: 'base' };
+  if (keys.workspace !== 'folder' || keys.place !== undefined) return keys;
+  const { workspace: _workspace, ...rest } = keys;
+  return { ...rest, place: 'folder' };
+};
+
+/**
  * The spec `files`, the text files of a workflow's folder, say: its steps, its README where it has one, and its other files.
  * @param files The text files directly in the workflow's folder, in any order.
  */
@@ -99,7 +111,7 @@ export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
     .map((f) => {
       const name = f.name.slice(0, -'.md'.length);
       const { keys, body } = fileParts(name, f.text);
-      return { name, keys: { ...servedKeys(fenceRead(keys)), ...mapTexts(name, splitFrontmatter(name, f.text).block) }, body };
+      return { name, keys: { ...spelledNow(servedKeys(fenceRead(keys))), ...mapTexts(name, splitFrontmatter(name, f.text).block) }, body };
     });
   const others = byName.filter((f) => !isMarkdown(f.name)).map((f) => ({ path: f.name, text: f.text }));
   return { ...(readme !== undefined && { readme: readme.text }), steps, files: others };

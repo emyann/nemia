@@ -22,7 +22,7 @@
  * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from the library's agents.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Result, Schema } from 'effect';
 import {
   definitionRevision,
   factoryDraftIn,
@@ -51,7 +51,7 @@ import {
   type Workflow,
   type WorkflowCreate,
   type WorkflowFile,
-  type WorkflowSpec,
+  WorkflowSpec,
   type WorkflowStep,
   type WorkflowWrite,
 } from 'objects';
@@ -143,15 +143,19 @@ const keysOf = (spec: ListedStep['spec']): WorkflowStep['keys'] => {
 
 /**
  * The spec of a folder as its files hold it (`workflowSpecAt`, the orchestrator's one reader of it, which a proposal's stale check reads
- * too), so a spec read and proposed back changes nothing; no steps where one does not read (`WorkflowError`), `status.error` saying why.
+ * too), so a spec read and proposed back changes nothing. No steps where a step's frontmatter does not read (`WorkflowError`, or its YAML
+ * refused), nor where a key holds a value no step's key takes (`WorkflowSpec`), which the loader refuses too: `status.error` says why.
  */
 const specAt = (dir: string): WorkflowSpec => {
+  let read: unknown;
   try {
-    return workflowSpecAt(dir) as WorkflowSpec;
+    read = workflowSpecAt(dir);
   } catch (err) {
-    if (err instanceof WorkflowError) return { steps: [] };
+    if (err instanceof WorkflowError || (err instanceof Error && err.name.startsWith('YAML'))) return { steps: [] };
     throw err;
   }
+  const spec = Schema.decodeUnknownResult(WorkflowSpec)(read);
+  return Result.isSuccess(spec) ? spec.success : { ...(read as WorkflowSpec), steps: [] };
 };
 
 /**

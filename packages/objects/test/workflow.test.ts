@@ -22,11 +22,14 @@ const workflow = {
   apiVersion: API_VERSION,
   kind: 'Workflow',
   metadata: { name: 'dev', namespace: 'acme', creationTimestamp: '2026-11-05T00:00:00.000Z', resourceVersion: 'sha256:1' },
-  spec: { description: 'An intent to main.', readme: null, steps: [{ name: 'design', keys: { agent: 'architect' }, body: '' }] },
+  spec: { readme: null, steps: [{ name: 'design', keys: { agent: 'architect' }, body: '' }] },
   status: {
     origin: 'factory',
     revision: 3,
     dir: '/store/factories/acme/tree/workflows/dev',
+    description: 'An intent to main.',
+    needs: [],
+    readmeBody: null,
     graph: {
       roots: ['triage'],
       edges: [{ from: 'triage', to: 'design', kind: 'route', route: 'dev' }],

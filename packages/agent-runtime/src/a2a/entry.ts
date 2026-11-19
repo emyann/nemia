@@ -122,7 +122,7 @@ const entryIn = (file: string, text: string): EntryOnDisk => {
   const json = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text);
   const read = Result.isSuccess(json) ? Schema.decodeUnknownResult(EntrySchema)(json.success) : json;
   if (Result.isSuccess(read)) return read.success;
-  const where = Result.isSuccess(json) ? firstRefusal(json.success, read.failure) : { path: [], words: 'is not JSON' };
+  const where = Result.isSuccess(json) ? firstRefusal(EntrySchema, json.success) : { path: [], words: 'is not JSON' };
   throw new Error(
     `${file}${where.path.length ? `: its ${where.path.map(String).join('.')}` : ''} ${where.words}: it is no entry of the remote agents' registry. Remove the file; its Task stays the remote agent's.`,
   );

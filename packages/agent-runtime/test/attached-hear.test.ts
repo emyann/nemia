@@ -36,7 +36,7 @@ test('REFUSED: a say-file line that is no words said is passed over, said with i
       },
     },
   } as unknown as Live;
-  const written = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  const written = vi.spyOn(process.stderr, 'write');
   try {
     hear(root, live);
     assert.deepEqual(pushed, ['y']);

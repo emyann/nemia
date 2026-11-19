@@ -11,6 +11,7 @@
       "Bash(npm test)",
       "Bash(npm run typecheck)",
       "Bash(npm run lint)",
+      "Bash(npm run lint:fast)",
       "Bash(npx turbo run typecheck --force)",
       "Bash(npx tsc --noEmit:*)",
       "Bash(npx tsrs --noEmit:*)",

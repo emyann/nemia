@@ -1,12 +1,16 @@
 /**
  * What the factory's own parts read, typed by the board's views of `objects`: a factory's block on the Factories canvas (`block`), a
- * workflow it offers on its repository (`listing`), the template it is made from (`template`), its volumes (`volumes`) and its
- * instruction (`instruction`). Each story seeds its query client with them (`seeded`, beside the proposals' fixtures).
+ * workflow it offers on its repository (`listing`), the template it is made from (`template`), its volumes (`volumes`), the line that
+ * opens its home (`homeLine`) and its instruction (`instruction`). Each story seeds its query client with them (`seeded`, beside the
+ * proposals' fixtures).
  */
 import type { Factory, FactoryInstruction, FactoryTemplate, FactoryVolume } from '../../src/lib/api/factories';
 import type { WorkflowListing } from '../../src/lib/api/workflows';
 import type { FactoryBlock } from '../../src/lib/factories';
 import { FACTORY, factoryView } from './proposals';
+
+/** The line that opens the factory's home in a person's own session, as the api answers it on `FactoryCommands.home`. */
+export const homeLine = `nemia factory home ${FACTORY}`;
 
 /**
  * The block of the factory `name` on the Factories canvas: on one repository, two runs in flight, one waiting on the person; or, given

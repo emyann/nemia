@@ -1,10 +1,10 @@
 /**
  * A factory's volumes, on its settings page: each folder or git URL its runs reach, its path as the api resolved it, its mark (`:ro` or
  * `:rw`, as docker compose marks it), the origin it was cloned from, and Remove, which takes it back. A writable volume is a repository
- * the factory works on, and says so. Each has its two switches, set as `nemia factory volume set` sets them (a PATCH on the Volume):
- * whether its memory files load into the factory's sessions, and whether its skills are offered to them. Under them, the form that
- * gives one: a path or a git URL and its mode, sent as the CLI's `nemia factory volume add` sends it, the api's refusal shown in its words
- * under the form. Each write reads the factories again.
+ * the factory works on, and says so. Each has its two switches, set as the CLI's volume set sets them (a PATCH on the Volume): whether
+ * its memory files load into the factory's sessions, and whether its skills are offered to them. Under them, the form that gives one: a
+ * path or a git URL and its mode, sent as the CLI's volume add sends it, the api's refusal shown in its words under the form. Each write
+ * reads the factories again.
  */
 import { Fragment, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';

@@ -57,19 +57,29 @@ type Said = { read: HarnessOutput } | { wrong: string };
 /** What this process has read of each run's capture, by the run's name, with the key it read it at. */
 export type SaidMemo = Map<string, SaidKey & { said: Said }>;
 
+/**
+ * What a session said as it ended, as a reading keeps it and a remote agent's registry entry holds it: its payload, and when it
+ * was said where that is known.
+ */
+export const StatementRead = {
+  closeout: Schema.optional(Schema.Struct({ payload: Schema.Unknown, at: Schema.optional(Schema.Finite) })),
+};
+
 /** A kept output: the key it was read at, and what the reader read (`HarnessOutput`, field for field). */
 const KeptSchema = Schema.Struct({
   version: Schema.Finite,
   size: Schema.Finite,
   mtimeMs: Schema.Finite,
   read: Schema.Struct({
-    closeout: Schema.optional(Schema.Struct({ payload: Schema.Unknown })),
+    ...StatementRead,
     usage: Schema.optional(UsageSchema),
     ownTokens: Schema.optional(UsageSchema),
     limit: Schema.optional(Schema.String),
     denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),
     skills: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
     files: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+    ranOn: Schema.optional(Schema.String),
+    harnessVersion: Schema.optional(Schema.String),
     ranIn: Schema.optional(Schema.String),
   }),
 });

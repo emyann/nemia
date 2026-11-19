@@ -184,8 +184,8 @@ describe('Her floor: a call on a run or a factory left at manual is denied, one 
     },
   );
   s.test('REFUSED: a call with no cwd, or whose input is no map, is no call, and is asked', async () => {
-    assert.equal(await decidedOn({ tool: 'Bash', input: { command: 'nemia show r-pipao' }, cwd: '/w' }), undefined);
-    assert.equal(await decidedOn({ tool: 'Bash', input: { command: 'nemia show r-pipao' } }), 'ask');
+    assert.equal(await decidedOn({ tool: 'Bash', input: { command: 'nemia show r-default' }, cwd: '/w' }), undefined);
+    assert.equal(await decidedOn({ tool: 'Bash', input: { command: 'nemia show r-default' } }), 'ask');
     assert.equal(await decidedOn({ tool: 'Bash', input: [], cwd: '/w' }), 'ask');
   });
   s.test("the store's level raised raises the default factory, and every factory without its own", async () => {

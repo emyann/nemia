@@ -264,7 +264,7 @@ export const resolver = (bodies: BodyOps | undefined) => {
               Effect.mapError(
                 () =>
                   new BodyError({
-                    message: `names ${where(value as BodyRef)}, whose text is no JSON, where a closeout's schema is: restore it from a backup of the store.`,
+                    message: `names ${where(value as BodyRef)}, whose text is no JSON, where the schema of a session's final answer is: restore it from a backup of the store.`,
                   }),
               ),
             ),

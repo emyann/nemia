@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { Result, Schema } from 'effect';
 import { replaceFile } from '../core/replace.ts';
 import { MemoryUseSchema, UsageSchema, firstRefusal } from '../core/event-schema.ts';
+import { StatementRead } from '../harness/detached/said.ts';
 import { formerStateOf, isSessionState, type Sighting } from '../core/index.ts';
 import { forgetFiles, keptOf, type RunnerOps } from '../harness/index.ts';
 import type { Monotonic } from '../core/clock.ts';
@@ -56,7 +57,7 @@ const SightingOnDisk: Schema.Decoder<Omit<Sighting, 'state'> & { state: string }
     exitCode: Schema.optional(Schema.Finite),
     terminationMessage: Schema.optional(Schema.String),
     memory: Schema.optional(MemoryUseSchema),
-    closeout: Schema.optional(Schema.Struct({ payload: Schema.Unknown, at: Schema.optional(Schema.Finite) })),
+    ...StatementRead,
     quietMs: Schema.optional(Schema.Finite),
     waitingFor: Schema.optional(Schema.String),
     limit: Schema.optional(Schema.String),

@@ -23,10 +23,10 @@ type Story = StoryObj<typeof meta>;
 /** The step in `canvas` once its reads are in, on `screen` where named. */
 const loaded = async (canvas: HTMLElement, screen?: string): Promise<HTMLElement> => {
   await waitFor(
-    () => {
+    async () => {
       const page = canvas.querySelector<HTMLElement>('[data-volume-step]');
-      expect(page).not.toBeNull();
-      if (screen !== undefined) expect(page).toHaveAttribute('data-volume-step', screen);
+      await expect(page).not.toBeNull();
+      if (screen !== undefined) await expect(page).toHaveAttribute('data-volume-step', screen);
     },
     { timeout: 5000 },
   );

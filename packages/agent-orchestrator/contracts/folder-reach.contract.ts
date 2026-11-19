@@ -10,7 +10,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 /** Where a folder stands for the listing: under a root and in no store (`within`), in a store (`store`), or under no root (`outside`). */
 export type FolderReach = 'within' | 'store' | 'outside';
 
-/** Whether the absolute path `inner` is `outer` or a folder under it, by whole segments: `/home/a` is not under `/home/ab`. */
+/** Whether the absolute path `inner` is `outer` or a folder under it, by whole segments: `/srv/a` is not under `/srv/ab`. */
 const under = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer.endsWith('/') ? outer : outer + '/');
 
 const folderReachSpec = spec<(real: string, roots: readonly string[], stores: readonly string[]) => FolderReach>({

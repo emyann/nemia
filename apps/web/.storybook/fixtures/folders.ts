@@ -94,7 +94,7 @@ const READINESS: Readiness = {
 type Held = { volumes: FactoryVolume[]; untrusted: FactoryUntrusted[] };
 
 /** `acme` as the api serves it from `held`. */
-const factoryOf = (held: Held): Factory => ({
+const factoryHeld = (held: Held): Factory => ({
   apiVersion: 'nemia/v1',
   kind: 'Factory',
   metadata: { name: ACME, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
@@ -122,10 +122,10 @@ export const volumeStore = ({ held = false, keepsTrust = true }: { held?: boolea
         apiVersion: 'nemia/v1',
         kind: 'FactoryList',
         metadata: {},
-        items: [{ ...factoryOf({ volumes: [], untrusted: [] }), metadata: { name: 'default', creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' } }, factoryOf(store)],
+        items: [{ ...factoryHeld({ volumes: [], untrusted: [] }), metadata: { name: 'default', creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' } }, factoryHeld(store)],
       } satisfies FactoryList),
     ),
-    http.get('/api/factories/:name', () => HttpResponse.json(factoryOf(store))),
+    http.get('/api/factories/:name', () => HttpResponse.json(factoryHeld(store))),
     http.get('/api/factories/:name/commands', () => HttpResponse.json(ACME_COMMANDS)),
     http.get('/api/readiness/milestones', () =>
       HttpResponse.json(milestones(done() ? 'done' : 'next', store.volumes.some((v) => !v.readOnly))),

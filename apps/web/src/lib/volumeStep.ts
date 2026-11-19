@@ -1,8 +1,8 @@
 /**
  * What the welcome's volume step, "Where is the work?", shows (`volumeStepOf`, proved by `contracts/volume-step.contract.ts`), the order
- * its three ways are offered in (`VOLUME_WAYS`), and whether a factory as the api reads it now holds a trusted writable volume
- * (`heldOf`). Pure, over the factory's read, the tile the person chose, the folder's answer and the write this page made: no flag of this
- * browser moves the step on.
+ * its three ways are offered in (`VOLUME_WAYS`), whether a factory as the api reads it now holds a trusted writable volume (`heldOf`),
+ * and the mode a volume is offered and added in (`modeOffered`, `addedAs`). Pure, over the factory's read, the tile the person chose, the
+ * folder's answer and the write this page made: no flag of this browser moves the step on.
  */
 import type { VolumeScreen, VolumeStepOf, VolumeWay } from '../../contracts/volume-step.contract.ts';
 
@@ -31,3 +31,21 @@ export const heldOf = (factory: {
   readonly volumes: readonly { readonly path: string; readonly readOnly: boolean }[];
   readonly untrusted: readonly { readonly place: string }[];
 }): boolean => factory.volumes.some((v) => !v.readOnly && !factory.untrusted.some((u) => u.place === v.path));
+
+/** The mode a volume is added in: writable, or read-only beside the writable one a factory holds. */
+export type Mode = 'rw' | 'ro';
+
+/**
+ * Whether the step offers the person a mode on `screen`: opened again where the factory holds its work, on a way's panel, but a new
+ * repository's, which is made in the store, and the store takes no read-only volume.
+ * @param again Whether the step is opened again from Settings for a factory that holds its work.
+ * @param screen The screen the step shows.
+ */
+export const modeOffered = (again: boolean, screen: VolumeScreen): boolean => again && screen !== 'choose' && screen !== 'new';
+
+/**
+ * The mode a volume reached by `way` is added in: a new repository writable, whatever was chosen, else `chosen`.
+ * @param way The way the volume was reached.
+ * @param chosen The mode the person chose, or the step's default.
+ */
+export const addedAs = (way: VolumeWay | undefined, chosen: Mode): Mode => (way === 'new' ? 'rw' : chosen);

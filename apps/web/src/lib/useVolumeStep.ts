@@ -11,10 +11,10 @@ import { addVolumeUntrusted, factoryNamesQuery, factoryViewQuery, trustFactory }
 import { makeRepository, newRepository } from './api/folders.ts';
 import { milestonesQuery } from './api/readiness.ts';
 import { MILESTONE_LINKS } from './gettingStarted.ts';
-import { heldOf, volumeStepOf, type NotRepository, type VolumeWay } from './volumeStep.ts';
+import { addedAs, heldOf, volumeStepOf, type Mode, type NotRepository, type VolumeWay } from './volumeStep.ts';
 
 /** How a volume is given: writable, a repository the factory works on, or read-only, a folder its steps read. */
-export type Mode = 'rw' | 'ro';
+export type { Mode } from './volumeStep.ts';
 
 /** The volume this page added, as the api answered it: its folder (a clone's, for an address) and whether it is read-only. */
 export type Added = { readonly path: string; readonly readOnly: boolean };
@@ -45,7 +45,7 @@ function useVolumeWrites(name: string | undefined, mode: Mode, onAdded: (added: 
   const init = useMutation({ mutationFn: (path: string) => makeRepository(path), onSuccess: (made) => add.mutate({ target: made.path }) });
   const made = useMutation({
     mutationFn: (repository: string) => newRepository(repository),
-    onSuccess: (r) => add.mutate({ target: r.path, as: 'rw' }),
+    onSuccess: (r) => add.mutate({ target: r.path, as: addedAs('new', mode) }),
   });
   const trust = useMutation({
     mutationFn: async () => {

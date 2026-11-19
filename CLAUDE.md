@@ -52,7 +52,10 @@ holds what every change needs.
   the 27 files that import its compiler API, the editor, and a step's `npx tsc --noEmit` where tsc 6 is still wanted: the steps
   measure with `npx tsrs --noEmit`, the compiler `ci` judges with.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
-  `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
+  `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. It extends
+  `@interfere/landmines`' recommended config, pinned exactly, which holds how a test is written (no double but a watching spy, MSW for
+  the network, no fixed sleep, no retry or raised timeout); its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
+  with a count for each file, are in `.oxlintrc.json`'s top-level rules, and a count only shrinks.
 - `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their
   boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of what a
   session changed never run them, so a step's session runs it before it signs off, and anyone before a push.

@@ -363,6 +363,22 @@ machine could read it with `ps` and claim it first. Who acted stays readable (`a
 is `the person, on board-<day>`; from their terminal, `the person, on local`; from an agent's standing token, `<agent>, by its token
 <name>`; from an agent's session, `<agent>, of <run>/<step>`.
 
+**The person's folder listing names folders, under the store's roots alone** (a security change, reviewed as one, 2026-11-19). The
+board's "Where is the work?" helps a path field by `GET /api/folders?path=<typed>` (`foldersNamed`,
+`packages/agent-orchestrator/src/factory/folders/folders.verb.ts`), which lets the person read folder names on the machine the daemon
+runs on. It is bounded four ways. Who: the person alone (`personOnly`): an agent's token, standing or a session's, is refused 403
+`person-only`. Where: only under the roots the store names, `WF_FOLDER_ROOTS` (absolute paths, split by the path delimiter), else the
+home of the user the daemon runs as, judged after `fs.realpath`, so a link out of a root is judged where it leads, and never inside a
+store, `WF_ROOT` or the runtime's `AE_ROOT` (`folderReach`, proved by `packages/agent-orchestrator/contracts/folder-reach.contract.ts`).
+What: names of folders, and whether the typed folder is a git repository; never a file, a size, a time or a byte of contents, a hidden
+folder only when the typed name opens with a dot, at most 50 names with a word that more were left out (`folderNamesShown`,
+`packages/agent-orchestrator/contracts/folder-names.contract.ts`). How much: one folder a request. The two writes it serves are the
+person's alone too: `POST /api/folders/repository` makes a folder under the roots a git repository with one empty first commit, adding
+none of its files, and `POST /api/repositories` makes an empty repository under `<WF_ROOT>/repositories/`, both through the place's
+`init` verb. A path outside the roots can still be given as a volume by its whole path: it only gets no help. The residual risk: a page
+open in the person's browser cannot read the listing (the board's cookie is `SameSite=Strict`, and the api answers no CORS), but
+anyone holding the person's token can list folder names under the roots.
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in

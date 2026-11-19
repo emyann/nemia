@@ -9,6 +9,7 @@ import { clone } from './verbs/clone.ts';
 import { exported } from './verbs/export.ts';
 import { follow } from './verbs/follow.ts';
 import { handoff } from './verbs/handoff.ts';
+import { init } from './verbs/init.ts';
 import { inventory } from './verbs/inventory.ts';
 import { land } from './verbs/land.ts';
 import { make } from './verbs/make.ts';
@@ -40,6 +41,7 @@ const VERBS: { readonly [V in PlaceVerb]: (request: PlaceRequests[V]) => Asking<
   export: exported,
   seal,
   clone,
+  init,
 };
 
 /** `verb`'s body for `request`, which it reads first: one it cannot read is `Malformed` before any command is run. */

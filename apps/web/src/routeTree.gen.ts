@@ -27,12 +27,14 @@ import { Route as InboxNameRouteImport } from './routes/inbox_.$name'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as WelcomeFactoryRouteImport } from './routes/welcome_.factory'
+import { Route as WelcomeVolumeRouteImport } from './routes/welcome_.volume'
 import { Route as AgentsFromAgentRouteImport } from './routes/agents_.$from.$agent'
 import { Route as AgentsSkillsNewRouteImport } from './routes/agents_.skills.new'
 import { Route as FactoriesFactoryAgentsRouteImport } from './routes/factories.$factory_.agents'
 import { Route as FactoriesFactoryInboxRouteImport } from './routes/factories.$factory_.inbox'
 import { Route as FactoriesFactorySettingsRouteImport } from './routes/factories.$factory_.settings'
 import { Route as FactoriesFactorySkillsRouteImport } from './routes/factories.$factory_.skills'
+import { Route as FactoriesFactoryVolumeRouteImport } from './routes/factories.$factory_.volume'
 import { Route as FactoriesFactoryWorkflowsRouteImport } from './routes/factories.$factory_.workflows'
 import { Route as LabelsKeyValueRouteImport } from './routes/labels.$key.$value'
 import { Route as WorkflowsFromWorkflowRouteImport } from './routes/workflows_.$from.$workflow'
@@ -140,6 +142,11 @@ const WelcomeFactoryRoute = WelcomeFactoryRouteImport.update({
   path: '/welcome/factory',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WelcomeVolumeRoute = WelcomeVolumeRouteImport.update({
+  id: '/welcome_/volume',
+  path: '/welcome/volume',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsFromAgentRoute = AgentsFromAgentRouteImport.update({
   id: '/agents_/$from/$agent',
   path: '/agents/$from/$agent',
@@ -169,6 +176,11 @@ const FactoriesFactorySettingsRoute =
 const FactoriesFactorySkillsRoute = FactoriesFactorySkillsRouteImport.update({
   id: '/factories/$factory_/skills',
   path: '/factories/$factory/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FactoriesFactoryVolumeRoute = FactoriesFactoryVolumeRouteImport.update({
+  id: '/factories/$factory_/volume',
+  path: '/factories/$factory/volume',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FactoriesFactoryWorkflowsRoute =
@@ -282,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/welcome/factory': typeof WelcomeFactoryRoute
+  '/welcome/volume': typeof WelcomeVolumeRoute
   '/runs/': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
@@ -289,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/factories/$factory/inbox': typeof FactoriesFactoryInboxRoute
   '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
   '/factories/$factory/skills': typeof FactoriesFactorySkillsRoute
+  '/factories/$factory/volume': typeof FactoriesFactoryVolumeRoute
   '/factories/$factory/workflows': typeof FactoriesFactoryWorkflowsRoute
   '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
@@ -324,6 +338,7 @@ export interface FileRoutesByTo {
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/welcome/factory': typeof WelcomeFactoryRoute
+  '/welcome/volume': typeof WelcomeVolumeRoute
   '/runs': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
@@ -331,6 +346,7 @@ export interface FileRoutesByTo {
   '/factories/$factory/inbox': typeof FactoriesFactoryInboxRoute
   '/factories/$factory/settings': typeof FactoriesFactorySettingsRoute
   '/factories/$factory/skills': typeof FactoriesFactorySkillsRoute
+  '/factories/$factory/volume': typeof FactoriesFactoryVolumeRoute
   '/factories/$factory/workflows': typeof FactoriesFactoryWorkflowsRoute
   '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows/$from/$workflow': typeof WorkflowsFromWorkflowRoute
@@ -367,6 +383,7 @@ export interface FileRoutesById {
   '/inbox_/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/welcome_/factory': typeof WelcomeFactoryRoute
+  '/welcome_/volume': typeof WelcomeVolumeRoute
   '/runs/': typeof RunsIndexRoute
   '/agents_/$from/$agent': typeof AgentsFromAgentRoute
   '/agents_/skills/new': typeof AgentsSkillsNewRoute
@@ -374,6 +391,7 @@ export interface FileRoutesById {
   '/factories/$factory_/inbox': typeof FactoriesFactoryInboxRoute
   '/factories/$factory_/settings': typeof FactoriesFactorySettingsRoute
   '/factories/$factory_/skills': typeof FactoriesFactorySkillsRoute
+  '/factories/$factory_/volume': typeof FactoriesFactoryVolumeRoute
   '/factories/$factory_/workflows': typeof FactoriesFactoryWorkflowsRoute
   '/labels/$key/$value': typeof LabelsKeyValueRoute
   '/workflows_/$from/$workflow': typeof WorkflowsFromWorkflowRoute
@@ -411,6 +429,7 @@ export interface FileRouteTypes {
     | '/inbox/$name'
     | '/runs/$runId'
     | '/welcome/factory'
+    | '/welcome/volume'
     | '/runs/'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
@@ -418,6 +437,7 @@ export interface FileRouteTypes {
     | '/factories/$factory/inbox'
     | '/factories/$factory/settings'
     | '/factories/$factory/skills'
+    | '/factories/$factory/volume'
     | '/factories/$factory/workflows'
     | '/labels/$key/$value'
     | '/workflows/$from/$workflow'
@@ -453,6 +473,7 @@ export interface FileRouteTypes {
     | '/inbox/$name'
     | '/runs/$runId'
     | '/welcome/factory'
+    | '/welcome/volume'
     | '/runs'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
@@ -460,6 +481,7 @@ export interface FileRouteTypes {
     | '/factories/$factory/inbox'
     | '/factories/$factory/settings'
     | '/factories/$factory/skills'
+    | '/factories/$factory/volume'
     | '/factories/$factory/workflows'
     | '/labels/$key/$value'
     | '/workflows/$from/$workflow'
@@ -495,6 +517,7 @@ export interface FileRouteTypes {
     | '/inbox_/$name'
     | '/runs/$runId'
     | '/welcome_/factory'
+    | '/welcome_/volume'
     | '/runs/'
     | '/agents_/$from/$agent'
     | '/agents_/skills/new'
@@ -502,6 +525,7 @@ export interface FileRouteTypes {
     | '/factories/$factory_/inbox'
     | '/factories/$factory_/settings'
     | '/factories/$factory_/skills'
+    | '/factories/$factory_/volume'
     | '/factories/$factory_/workflows'
     | '/labels/$key/$value'
     | '/workflows_/$from/$workflow'
@@ -538,6 +562,7 @@ export interface RootRouteChildren {
   InboxNameRoute: typeof InboxNameRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
   WelcomeFactoryRoute: typeof WelcomeFactoryRoute
+  WelcomeVolumeRoute: typeof WelcomeVolumeRoute
   RunsIndexRoute: typeof RunsIndexRoute
   AgentsFromAgentRoute: typeof AgentsFromAgentRoute
   AgentsSkillsNewRoute: typeof AgentsSkillsNewRoute
@@ -545,6 +570,7 @@ export interface RootRouteChildren {
   FactoriesFactoryInboxRoute: typeof FactoriesFactoryInboxRoute
   FactoriesFactorySettingsRoute: typeof FactoriesFactorySettingsRoute
   FactoriesFactorySkillsRoute: typeof FactoriesFactorySkillsRoute
+  FactoriesFactoryVolumeRoute: typeof FactoriesFactoryVolumeRoute
   FactoriesFactoryWorkflowsRoute: typeof FactoriesFactoryWorkflowsRoute
   LabelsKeyValueRoute: typeof LabelsKeyValueRoute
   WorkflowsFromWorkflowRoute: typeof WorkflowsFromWorkflowRoute
@@ -691,6 +717,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WelcomeFactoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/welcome_/volume': {
+      id: '/welcome_/volume'
+      path: '/welcome/volume'
+      fullPath: '/welcome/volume'
+      preLoaderRoute: typeof WelcomeVolumeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents_/$from/$agent': {
       id: '/agents_/$from/$agent'
       path: '/agents/$from/$agent'
@@ -731,6 +764,13 @@ declare module '@tanstack/react-router' {
       path: '/factories/$factory/skills'
       fullPath: '/factories/$factory/skills'
       preLoaderRoute: typeof FactoriesFactorySkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory_/volume': {
+      id: '/factories/$factory_/volume'
+      path: '/factories/$factory/volume'
+      fullPath: '/factories/$factory/volume'
+      preLoaderRoute: typeof FactoriesFactoryVolumeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/factories/$factory_/workflows': {
@@ -866,6 +906,7 @@ const rootRouteChildren: RootRouteChildren = {
   InboxNameRoute: InboxNameRoute,
   RunsRunIdRoute: RunsRunIdRoute,
   WelcomeFactoryRoute: WelcomeFactoryRoute,
+  WelcomeVolumeRoute: WelcomeVolumeRoute,
   RunsIndexRoute: RunsIndexRoute,
   AgentsFromAgentRoute: AgentsFromAgentRoute,
   AgentsSkillsNewRoute: AgentsSkillsNewRoute,
@@ -873,6 +914,7 @@ const rootRouteChildren: RootRouteChildren = {
   FactoriesFactoryInboxRoute: FactoriesFactoryInboxRoute,
   FactoriesFactorySettingsRoute: FactoriesFactorySettingsRoute,
   FactoriesFactorySkillsRoute: FactoriesFactorySkillsRoute,
+  FactoriesFactoryVolumeRoute: FactoriesFactoryVolumeRoute,
   FactoriesFactoryWorkflowsRoute: FactoriesFactoryWorkflowsRoute,
   LabelsKeyValueRoute: LabelsKeyValueRoute,
   WorkflowsFromWorkflowRoute: WorkflowsFromWorkflowRoute,

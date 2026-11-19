@@ -4,6 +4,7 @@
  */
 import { RUN_STATES, type RunState, type WatchedObject } from 'objects';
 import type { MeasuredToNow } from '../../contracts/measured-to-now.contract.ts';
+import { isObject } from 'effect/Predicate';
 
 /**
  * Whether the frame of a run in `state` (its status's `state`, undefined where the status carries no frame) has its `wallMs` and `clock`
@@ -11,9 +12,6 @@ import type { MeasuredToNow } from '../../contracts/measured-to-now.contract.ts'
  * @param state The run's state, as its status says it, or undefined where the status carries no frame.
  */
 export const measuredToNow: MeasuredToNow = (state) => state === 'waiting' || state === 'inFlight';
-
-/** Whether `v` is an object of JSON, not an array. */
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** `word` as a run's state, or undefined where it is none. */
 const runStateOf = (word: unknown): RunState | undefined => RUN_STATES.find((s) => s === word);

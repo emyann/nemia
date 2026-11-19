@@ -27,7 +27,7 @@ import { firstRefusal } from '../../core/index.ts';
 import type { PartialMark } from '../detached/follow.ts';
 import type { InitRead } from '../../../contracts/capture.contract.ts';
 
-const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Count = Schema.Natural;
 
 const Measure = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 

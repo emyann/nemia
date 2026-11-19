@@ -10,7 +10,7 @@
 import { Result, Schema } from 'effect';
 import { firstRefusal } from '../../core/index.ts';
 
-const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Count = Schema.Natural;
 
 const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
 

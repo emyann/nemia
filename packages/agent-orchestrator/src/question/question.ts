@@ -8,9 +8,10 @@
  */
 import type { FieldShape } from 'objects';
 import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
-import { isObject, type StepSpec } from '../step/step.ts';
+import { type StepSpec } from '../step/step.ts';
 import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
 import { fieldsOf, itemsOf, knownSchemas, sameSchema } from '../shape/shape.ts';
+import { isObject } from 'effect/Predicate';
 
 /** One option of a question: its label, which an answer names, and what choosing it means. */
 export type QuestionOption = { label: string; meaning: string };

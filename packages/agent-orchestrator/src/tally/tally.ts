@@ -7,7 +7,8 @@
  * items of an array `field` whose boolean `flag` is `true`, and `field.key=value` the items of an array `field` whose string `key` is
  * exactly `value`. A value with nothing measured under it is null, never 0. Pure.
  */
-import { isObject, refuse, type StepOutput } from '../step/step.ts';
+import { refuse, type StepOutput } from '../step/step.ts';
+import { isObject } from 'effect/Predicate';
 
 /** One tally of one try: its name as the step writes it, and the try's closeout's value of it, null where none was measured. */
 export type TallyFact = { tally: string; value: number | null };

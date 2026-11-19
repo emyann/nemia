@@ -1,12 +1,13 @@
 /**
- * `nemia factory volume add` and `volume rm`: a folder of the person's machine, or a git URL cloned under the store, given to a factory as
+ * `nemia factory volume add`, `volume set` and `volume rm`: a folder of the person's machine, or a git URL cloned under the store, given to a factory as
  * a volume, marked `:ro` or `:rw`, and taken back. A writable one is a git repository the factory works on, trusted as it is added unless
  * `noTrust`; a read-only one is mounted for every local step of its runs. Written into the factory's own file through the Factory door,
- * whether or not it is made from a template: a volume is the person's, never the template's.
+ * whether or not it is made from a template: a volume is the person's, never the template's. `volume set` sets one volume's switches, by
+ * its stored name, without giving it again.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { FACTORY_VOLUME_ADD_WORDS, FACTORY_VOLUME_RM_WORDS } from 'objects';
+import { FACTORY_VOLUME_ADD_WORDS, FACTORY_VOLUME_RM_WORDS, FACTORY_VOLUME_SET_WORDS } from 'objects';
 import type { Args } from '../../command/command.ts';
 import { tableEntry, type Served } from '../../command/entry.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
@@ -16,7 +17,7 @@ import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { isDirectory } from '../../record/record.store.ts';
 import { factoryVolumes, folderName, volumeEntry, workedOn, type Factory, type FactoryTemplate, type Volume } from '../factory.ts';
 import { originSetsAt } from '../applied/declared.verb.ts';
-import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
+import { factoryVolumesNamed, volumeOf, volumeRefusal, volumeSwitched, withVolume } from './volume.ts';
 import { cloned } from '../clones/clones.verb.ts';
 import { PlaceService } from '../../place/place.store.ts';
 import { rootOf } from '../../trust/untrusted.verb.ts';
@@ -31,11 +32,11 @@ import type { PlaceTrust } from '../../trust/trust.ts';
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
- * How the command line spells a volume's switch, as `objects`' words of `nemia factory volume add` name it.
+ * How the command line spells a volume's switch, as `objects`' words of `nemia factory volume add` and `set` name it.
  * @param key The switch's key.
  */
 const flagOf = (key: 'claudeMd' | 'skills'): string =>
-  FACTORY_VOLUME_ADD_WORDS.spec.flags.find((f) => 'key' in f && f.key === key)?.flag ?? key;
+  [...FACTORY_VOLUME_ADD_WORDS.spec.flags, ...FACTORY_VOLUME_SET_WORDS.spec.flags].find((f) => 'key' in f && f.key === key)?.flag ?? key;
 
 /**
  * A volume's switch under `key` as given: true for `on` (or true, over the api), false for `off` (or false), undefined where it is not
@@ -225,5 +226,54 @@ export const FACTORY_VOLUME_RM: Served<{ file: string; removed: string }> = {
   },
 };
 
+/**
+ * `nemia factory volume set`: one volume of a factory, by its stored name (`factoryVolumesNamed`), given the switches the person sets
+ * (`volumeSwitched`), each one not given kept, its folder, mark, origin and name unmoved; a volume whose file stores no name has the one
+ * it reads by stored, so no link to it moves (`withVolume`). Runs started after take it; a run in flight keeps what it began with.
+ * Refused, and nothing written: a switch neither `on` nor `off` and neither switch given (`Invalid`), the default factory and a name with
+ * no factory, and a name no volume of the factory holds (`Missing`, naming each it holds).
+ */
+export const FACTORY_VOLUME_SET: Served<{ file: string; name: string }> = {
+  ...FACTORY_VOLUME_SET_WORDS,
+  handler: (args) => {
+    const name = textOf(args, 'factory');
+    const volume = textOf(args, 'volume');
+    return Effect.gen(function* () {
+      const claudeMd = switchOf(args, 'claudeMd', flagOf('claudeMd'));
+      if (typeof claudeMd === 'string') return yield* Effect.fail(new Invalid({ message: claudeMd }));
+      const skills = switchOf(args, 'skills', flagOf('skills'));
+      if (typeof skills === 'string') return yield* Effect.fail(new Invalid({ message: skills }));
+      yield* tried(() => refuseName(name, 'volume'));
+      const door = yield* FactoryDoor;
+      const factory = yield* filedFactory(name, 'volume');
+      const named = factoryVolumesNamed(factory);
+      const switched = volumeSwitched(named, volume, {
+        ...(claudeMd === undefined ? {} : { claudeMd }),
+        ...(skills === undefined ? {} : { skills }),
+      });
+      if (switched.kind === 'unasked')
+        return yield* Effect.fail(
+          new Invalid({
+            message: `nemia factory volume set sets a switch, and was given neither: nemia factory volume set ${name} ${volume} --claude-md on|off, or --skills on|off. Nothing was changed.`,
+          }),
+        );
+      if (switched.kind === 'missing')
+        return yield* Effect.fail(
+          new Missing({
+            message: `${name} holds no volume named ${volume}: ${named.length ? `its volumes are ${named.map((v) => `${v.name} (${v.path})`).join(', ')}` : 'it has none, and nemia factory volume add gives it one'}; nemia get volumes -n ${name} lists them. Nothing was changed.`,
+          }),
+        );
+      const { name: _named, ...given } = switched.volume;
+      const { volumes } = withVolume(factory, given);
+      const file = yield* door.factories.rewrite({ ...factory, volumes });
+      return { file, name: volume };
+    });
+  },
+};
+
 /** `nemia factory volume`'s entries, in the order `nemia`'s help lists them. */
-export const FACTORY_VOLUMES: readonly Served[] = [tableEntry(FACTORY_VOLUME_ADD), tableEntry(FACTORY_VOLUME_RM)];
+export const FACTORY_VOLUMES: readonly Served[] = [
+  tableEntry(FACTORY_VOLUME_ADD),
+  tableEntry(FACTORY_VOLUME_SET),
+  tableEntry(FACTORY_VOLUME_RM),
+];

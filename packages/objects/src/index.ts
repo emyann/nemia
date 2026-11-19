@@ -264,7 +264,7 @@ export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { LibraryAdd, LibraryAddList, LibraryAddSpec, LibraryAddStatus } from './library.ts';
-export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
+export { Volume, VolumeList, VolumeSpec, VolumeStatus, VolumeSwitchesWrite } from './volume.ts';
 export {
   Api,
   type ApiEndpointName,
@@ -755,6 +755,7 @@ export {
   FACTORY_SETTINGS_HARNESS,
   FACTORY_VOLUME_ADD_WORDS,
   FACTORY_VOLUME_RM_WORDS,
+  FACTORY_VOLUME_SET_WORDS,
   SETTING_FORMS,
   VOLUME_FORMS,
 } from './commands-factories-settings.ts';

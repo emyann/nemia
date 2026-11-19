@@ -1,6 +1,6 @@
 /**
  * The runners of what a factory gives the runs started in it: a volume mounted and taken off (`nemia factory volume add|rm`, its folder
- * or git URL sent through `repoSent`, the daemon keeping it by its whole path), a harness setting set and taken off (`setting set|rm`) and
+ * or git URL sent through `repoSent`, the daemon keeping it by its whole path) and its switches set (`volume set`), a harness setting set and taken off (`setting set|rm`) and
  * a
  * workflow's cost line (`cost-line set|rm`). Each prints, word for word as the old path did, what the answer says it wrote.
  */
@@ -18,14 +18,15 @@ const markOf = (readOnly: boolean): ':ro' | ':rw' => (readOnly ? ':ro' : ':rw');
  * and refused where it is neither.
  * @param args The words typed after the command's name, parsed against its words.
  * @param key The switch's key, `claudeMd` or `skills`.
+ * @param command The command it was typed to, named in the refusal.
  */
-const onOff = (args: Args, key: 'claudeMd' | 'skills'): { claudeMd?: boolean; skills?: boolean } => {
+const onOff = (args: Args, key: 'claudeMd' | 'skills', command = 'factory volume add'): { claudeMd?: boolean; skills?: boolean } => {
   const given = args[key];
   if (given === 'on') return { [key]: true };
   if (given === 'off') return { [key]: false };
   if (given === undefined) return {};
   const flag = key === 'claudeMd' ? '--claude-md' : '--skills';
-  throw new Refused(`nemia factory volume add takes ${flag} on or ${flag} off, not ${JSON.stringify(given)}. Nothing was changed.`);
+  throw new Refused(`nemia ${command} takes ${flag} on or ${flag} off, not ${JSON.stringify(given)}. Nothing was changed.`);
 };
 
 /** A volume's switches where they are not the defaults, as a person types them: ` --claude-md on`, ` --skills off`. */
@@ -56,6 +57,25 @@ export async function factoryVolumeAdd(args: Args): Promise<number> {
     ...(volume.readOnly ? [] : ['a repository the factory works on: a run on it works in a worktree of its own']),
     `changed: ${file} — runs started from now on mount it; a run in flight keeps what it was started with`,
     ...trustedLines(factory, trusts),
+  ]);
+  return 0;
+}
+
+/**
+ * `nemia factory volume set`: one volume's switches set, by its stored name, the other kept; printed as the Volume reads after.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
+export async function factoryVolumeSet(args: Args): Promise<number> {
+  const [factory, volume] = [textOf(args, 'factory'), textOf(args, 'volume')];
+  const answer = await asked('factory volume set', (c) =>
+    c.volumes.patch({
+      params: { namespace: factory, name: volume },
+      payload: { ...onOff(args, 'claudeMd', 'factory volume set'), ...onOff(args, 'skills', 'factory volume set') },
+    }),
+  );
+  said([
+    `${factory}  volume ${answer.spec.path} ${markOf(answer.spec.readOnly)}${switchesSaid(answer.spec)}`,
+    `changed: ${writtenOf(answer, 'factory volume set').file} — runs started from now on take it; a run in flight keeps what it was started with`,
   ]);
   return 0;
 }

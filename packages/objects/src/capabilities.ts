@@ -1,6 +1,6 @@
 /**
  * The lists of the Capabilities page's answer (`CapabilitiesWithSteps`, `server-api.ts`), each served with its shape: a skill or an agent
- * (`CapabilityDescribed`), a permission rule (`CapabilityRule`), a server of the checkout's `.mcp.json` (`CapabilityServer`), the
+ * (`CapabilityDescribed`), a permission rule (`CapabilityRule`), a server of the repository's `.mcp.json` (`CapabilityServer`), the
  * measured set and the read-only commands of Claude Code (`MeasuredTools`, `ReadOnlyCommands`), and what a step gets (`StepReach`, what
  * the settings allow it in `StepReachAllowed`). The api builds them and the board draws them; none has an identifier, so each is inlined
  * into the answer's operation, its every field described there.
@@ -42,7 +42,7 @@ const ServerTool = Schema.Struct({
 /** The transports a harness loads a server over, and `unknown` for any other word. */
 const SERVER_TYPES = ['stdio', ...MCP_TRANSPORTS, 'unknown'] as const;
 
-/** A server as the checkout's `.mcp.json` declares it, and what it answered when the api asked it for its tools. */
+/** A server as the repository's `.mcp.json` declares it, and what it answered when the api asked it for its tools. */
 export const CapabilityServer = Schema.Struct({
   name: Text('Its name in `.mcp.json`.'),
   source: Text('The file it was declared in.'),
@@ -65,7 +65,7 @@ export const CapabilityServer = Schema.Struct({
     "The state the harness reports of the server of this name the default factory records, the harness's own word; null where it records none or its state could not be read.",
   ),
   checkedAt: OrNull(Schema.String, 'When it was asked, as an ISO 8601 time: the api asks each server once while it runs.'),
-}).annotate({ description: 'A server of the checkout, and what it answered when asked for its tools.' });
+}).annotate({ description: "A server of the repository's working folder, and what it answered when asked for its tools." });
 export type CapabilityServer = typeof CapabilityServer.Type;
 
 /** When a measurement was taken, on what, and where it is recorded: data of one day and one version, never claimed current. */

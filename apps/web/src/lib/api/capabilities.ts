@@ -17,7 +17,7 @@ export type ReadOnlyCommands = CapabilitiesWithSteps['readOnly'];
 /** A skill or an agent, and the file it was read from. */
 export type Described = CapabilityDescribed;
 
-/** A server of the checkout's `.mcp.json`, and what it answered: named apart from the kind of objects. */
+/** A server of the repository's `.mcp.json`, and what it answered: named apart from the kind of objects. */
 export type McpServer = CapabilityServer;
 
 /**

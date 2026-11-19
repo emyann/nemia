@@ -278,7 +278,7 @@ function allowedOf(
     narrowerAsks: (rule: string) => string[];
   },
   hasBash: boolean,
-  mode: { dontAsk: boolean; askDenier: StepReachAllowed['askDenier']; bashTaken: RemovedTool | undefined },
+  mode: { dontAsk: boolean; askDenier: StepReachAllowed['askDenier']; bashTaken?: RemovedTool },
 ): StepReachAllowed {
   const { denied, asked, has, narrowerAsks } = over;
   const standing: string[] = [];

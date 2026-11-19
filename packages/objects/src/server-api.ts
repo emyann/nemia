@@ -146,7 +146,7 @@ export const CapabilitiesWithSteps = Schema.Struct({
     description: 'The agents the repository offers: `.claude/agents/*.md`, by file.',
   }),
   mcp: Schema.Array(CapabilityServer).annotate({
-    description: "The MCP servers the checkout's `.mcp.json` declares, each with the tools it listed or why not.",
+    description: "The MCP servers the repository's `.mcp.json` declares, each with the tools it listed or why not.",
   }),
   denied: Schema.Array(CapabilityRule).annotate({ description: '`permissions.deny` in the settings, in its order.' }),
   asked: Schema.Array(CapabilityRule).annotate({

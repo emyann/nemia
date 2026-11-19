@@ -16,8 +16,8 @@ import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
 import type { CapabilitiesWithSteps, CapabilityDescribed, CapabilityServer } from 'objects';
 
 /**
- * What the repository offers, read from its checkout: the parts of objects' `CapabilitiesWithSteps` that are the checkout's own, and the
- * checkout it was read from. Each part says what it is on objects' Schema.
+ * What the repository offers, read from its working folder: the parts of objects' `CapabilitiesWithSteps` that are the repository's own,
+ * and the folder it was read from. Each part says what it is on objects' Schema.
  */
 export type Capabilities = Pick<CapabilitiesWithSteps, 'skills' | 'agents' | 'mcp' | 'denied' | 'asked' | 'allowed' | 'warnings'> & {
   readonly repo: string;

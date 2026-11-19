@@ -7,6 +7,11 @@
   ],
   "terms": [
     {
+      "term": "MCP server type",
+      "meaning": "the transport an MCP server of a factory's `.mcp.json` declares, as a harness loads one (`stdio`, `http`, `sse`), or `unknown` for any other word, the word as written quoted in the server's not-asked sentence; a server with a command and no type is `stdio` (`CapabilityServer`, `packages/objects/src/capabilities.ts`).",
+      "type": "CapabilityServer"
+    },
+    {
       "term": "Object",
       "meaning": "one thing Nemia serves, of one kind: its `apiVersion`, nemia/v1 (`API_VERSION`), its `kind`, and its `metadata`, which names it and says which change of it a reader holds (`ObjectMeta`, `packages/objects/src/meta.ts`). A kind's spec and status sit beside them.",
       "type": "ObjectMeta"

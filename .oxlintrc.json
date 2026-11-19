@@ -474,6 +474,14 @@
         "landmines-structure/colocated-tests": "off"
       }
     },
+    // Three api tests drive their own folder's routes through the app over HTTP, and import from src/objects one constant or helper
+    // of the serving, which the rule takes for their owner: they stay beside the routes they test.
+    {
+      "files": ["apps/api/src/files/files.test.ts", "apps/api/src/runs/actions.test.ts", "apps/api/src/factory/templated.test.ts"],
+      "rules": {
+        "landmines-structure/colocated-tests": "off"
+      }
+    },
     // apps/api/src/mcp/tools.ts is no test: the rule takes the file's own function named `describe` for a suite's, and its last
     // argument for a suite's options.
     {

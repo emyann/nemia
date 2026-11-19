@@ -2,8 +2,9 @@ apiVersion: nemia.dev/v1alpha1
 kind: FactoryTemplate
 metadata:
   name: sdlc
+  description: "For building software on a repository, each change reviewed before it lands. Four workflows: intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing; quick lands once its review passes."
 spec:
-  version: 4.6.0
+  version: 4.7.0
   rules:
     path: RULES.md
   parameters:

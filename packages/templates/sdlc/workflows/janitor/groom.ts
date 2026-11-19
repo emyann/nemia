@@ -7,7 +7,7 @@
  * card's work, what replaced a replaced one (`by`), and a stale one's `facts`, each what the card says (`was`), what is true now (`now`)
  * and why. It grooms the cards of the run's own factory alone: the namespace `nemia get runs/<WF_RUN> -o json` serves the run in, a
  * card of another factory being neither judged nor asked for. It reads them with `nemia get cards -n <that factory> -o json`, run in
- * `WF_WORKSPACE`, and checks the whole closeout before it writes
+ * `WF_WORKSPACE`, each read bounded at 64 MiB of output (`OUTPUT_BYTES`), and checks the whole closeout before it writes
  * anything. Then, under `WF_ARTIFACTS`, it writes `groom/<card>.json` for each stale card, the card as `nemia get cards/<card> -o json`
  * served it with each fact's `was` replaced by its `now` in its body and its `status` dropped, and `groom.md`, every verdict with the
  * command that acts on it: `nemia inbox rm <card>` for a done or replaced card, `nemia apply -f <file>` for a stale one, which the api
@@ -19,7 +19,7 @@
  * not one of the four, a card has two verdicts, a done card's commit is not on the base (`WF_BASE_REF`, which must be set, `git
  * merge-base --is-ancestor`), a replaced card says nothing replaced it, a stale card has no facts or one `amendment` cannot place, or a
  * card of the run's factory in play filed before the period's last day has no verdict; and when `WF_ARTIFACTS` or `WF_RUN` is unset,
- * the run serves no namespace, or `nemia` fails. Whether the
+ * the run serves no namespace, or `nemia` fails or prints more than it reads. Whether the
  * factory lands on GitHub or in the checkout, it reads and writes the same: the base is the branch the run's work lands on.
  */
 import { spawnSync } from 'node:child_process';
@@ -137,9 +137,21 @@ function verdictsOf(closeout: Record<string, unknown>): Verdict[] {
 /** Where `nemia` and `git` run: the run's workspace. */
 const workspace = (): string => process.env.WF_WORKSPACE || process.cwd();
 
-/** `nemia <args>`, its stdout parsed as JSON; refuses, naming the command, when it fails. */
+/**
+ * The most `nemia` may print to one read here, 64 MiB, as the repository's own scripts bound git: Node's default, 1 MiB, is less than
+ * a factory's card listing grows to, since the listing serves each card's body.
+ */
+const OUTPUT_BYTES = 64 << 20;
+
+/** `nemia <args>`, its stdout parsed as JSON; refuses, naming the command, when it fails or prints more than `OUTPUT_BYTES`. */
 function nemia(args: readonly string[]): unknown {
-  const ran = spawnSync('nemia', args, { cwd: workspace(), encoding: 'utf8', timeout: 60_000 });
+  const ran = spawnSync('nemia', args, { cwd: workspace(), encoding: 'utf8', timeout: 60_000, maxBuffer: OUTPUT_BYTES });
+  if ((ran.error as NodeJS.ErrnoException | undefined)?.code === 'ENOBUFS')
+    throw new Refusal(
+      `nemia ${args.join(' ')} printed more than the ${OUTPUT_BYTES >> 20} MiB the groom reads, and running it again prints as much: ` +
+        'take the cards that are done or replaced out of the inbox with `nemia inbox rm <card>`, ' +
+        'or raise OUTPUT_BYTES in the janitor\'s groom.ts by a change to the template',
+    );
   if (ran.status !== 0)
     throw new Refusal(
       `nemia ${args.join(' ')} failed (${ran.error?.message ?? `exit ${ran.status}`}): ${(ran.stderr ?? '').trim()}; run the check again once it answers`,

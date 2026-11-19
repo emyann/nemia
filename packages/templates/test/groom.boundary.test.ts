@@ -168,6 +168,18 @@ test('the groom writes the amended card and the report, changes no card, and the
   assert.ok(card.includes('factory: acme') && card.includes('workflow: build'), 'its frontmatter is kept');
 });
 
+test('the groom reads a factory’s listing past 1 MiB, the most Node reads from a child by default', async (t) => {
+  const { env, root, wf } = await groomWorld(t);
+  const { dir: repo } = repository();
+  const artifacts = scratch('nemia-groom-artifacts-');
+  const names = ['a-long-card-l0n1', 'a-long-card-l0n2', 'a-long-card-l0n3'];
+  for (const name of names) plant(root, name, `${name}\n\n${'a long body line\n'.repeat(25_000)}`);
+  const ran = run(env, wf, repo, artifacts, [closeoutFile({ verdicts: names.map((name) => verdict(name, 'standing')) })]);
+  assert.equal(ran.code, 0, ran.err);
+  const report = fs.readFileSync(path.join(artifacts, 'groom.md'), 'utf8');
+  for (const name of names) assert.ok(report.includes(name), `the report names ${name}`);
+});
+
 test('REFUSED: an amendment applied after the card was edited by hand exits 1 and leaves the edit', async (t) => {
   const { env, root, wf } = await groomWorld(t);
   const { dir: repo } = repository();

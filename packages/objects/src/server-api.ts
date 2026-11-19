@@ -15,7 +15,7 @@ import { describedNumber, describedOne } from './meta.ts';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Invalid, Missing } from './api-errors.ts';
 import { Ceilings, Daemon, Metrics, PassesRead, Quota, SeriesRead } from './server-machine.ts';
-import { FEED_STREAM_EVENTS, FINISHING_KINDS, INTERRUPT_KINDS, STATS_BY } from './words.ts';
+import { FEED_LINE_EVENTS, type FeedStreamEventName, FINISHING_KINDS, INTERRUPT_KINDS, STATS_BY } from './words.ts';
 import { SubscriptionScope } from './subscription.ts';
 import { SessionReleaseSchema } from './run.ts';
 import { Event } from './event.ts';
@@ -373,17 +373,77 @@ export const Unsubscribed = Schema.Struct({ name: Schema.String.annotate({ descr
 export type Unsubscribed = typeof Unsubscribed.Type;
 
 /**
- * One event of the feed's stream: its name (`FEED_STREAM_EVENTS`), its data the JSON of what it says — a line as the feed wrote it, a
- * hint's `{ message }`, a failed read's `{ error, retrying }`, `{}` for `readable`, nothing for `opened` and `bookmark` — and, for a line
- * and a bookmark, its id, the cursor an EventSource sends back as Last-Event-ID.
+ * A line of the feed as its stream sends it, the data of a `store`, `daemon`, `factory`, `step`, `removed` and `run` event: the fields a
+ * reader says it by — its time and word; the run and step, the store, the factory or the daemon it is about; its note, and who paused the
+ * store and why — and every other key the line carries kept as written, so a reader that prints the line whole loses none. The fields are
+ * named in the order the feed writes them, before every other key, so the line encodes to the bytes it was written as.
  */
-export const FeedStreamEvent = Schema.Struct({
-  id: Schema.optionalKey(
-    Schema.String.annotate({ description: 'The cursor an EventSource sends back as Last-Event-ID; on a line and a bookmark alone.' }),
-  ),
-  event: Schema.Literals(FEED_STREAM_EVENTS).annotate({ description: "The event's name." }),
-  data: Schema.String.annotate({ description: 'The JSON of what it says: a line as the feed wrote it, a hint, a failed read, or empty.' }),
-});
+export const FeedStreamLine = Schema.StructWithRest(
+  Schema.Struct({
+    at: Schema.String.annotate({ description: 'When the line was written, an ISO time.' }),
+    run: Schema.optionalKey(Schema.String.annotate({ description: "The run's id, on a run's and a step's line." })),
+    step: Schema.optionalKey(Schema.String.annotate({ description: "The step's name, on a step's line." })),
+    store: Schema.optionalKey(Schema.String.annotate({ description: "store, on the store's line." })),
+    factory: Schema.optionalKey(Schema.String.annotate({ description: "The factory's name, on a factory's line." })),
+    daemon: Schema.optionalKey(describedNumber("The daemon's pid, on a daemon's line.")),
+    word: Schema.String.annotate({ description: 'What happened, as the tick said it.' }),
+    note: Schema.optionalKey(Schema.String.annotate({ description: 'What the word is qualified with, where it is.' })),
+    by: Schema.optionalKey(Schema.String.annotate({ description: "Who paused the store, on the store's line that says so." })),
+    why: Schema.optionalKey(Schema.String.annotate({ description: "Why the store was paused, on the store's line that says so." })),
+  }),
+  [Schema.Record(Schema.String, describedOne(Schema.Unknown, 'Another key of the line, kept as the feed wrote it.'))],
+).annotate({ description: 'A line of the feed, every key it carries kept as written.' });
+export type FeedStreamLine = typeof FeedStreamLine.Type;
+
+/** A `hint` event's data: the sentence a person reads of a selector that names a former word. */
+export const FeedStreamHint = Schema.Struct({
+  message: Schema.String.annotate({ description: 'The hint, naming what the selector says now.' }),
+}).annotate({ description: 'A hint of a selector that names a former word.' });
+export type FeedStreamHint = typeof FeedStreamHint.Type;
+
+/** An `unreadable` event's data: why a read of the feed failed, and whether the stream reads again or ends. */
+export const FeedStreamUnreadable = Schema.Struct({
+  error: Schema.String.annotate({ description: 'Why the read failed.' }),
+  retrying: Schema.Boolean.annotate({
+    description: 'Whether the stream reads again on its next beat (true) or ends, the feed cut under its cursor (false).',
+  }),
+}).annotate({ description: 'A read of the feed that failed.' });
+export type FeedStreamUnreadable = typeof FeedStreamUnreadable.Type;
+
+/** The cursor an EventSource sends back as Last-Event-ID, on a line and a bookmark. */
+const feedCursorId = Schema.String.annotate({ description: 'The cursor an EventSource sends back as Last-Event-ID.' });
+
+/** An event whose data is the JSON of `data`, with no id. */
+const feedSaid = <E extends FeedStreamEventName, D extends Schema.Top>(event: E, data: D, said: string) =>
+  Schema.Struct({
+    event: Schema.Literal(event).annotate({ description: "The event's name." }),
+    data: Schema.fromJsonString(data).pipe(Schema.annotateEncoded({ description: said })),
+  });
+
+/**
+ * One event of the feed's stream, by its name (`FEED_STREAM_EVENTS`), its data the JSON of what it says: a line as the feed wrote it
+ * (`FeedStreamLine`) with its id the cursor after it; a hint (`FeedStreamHint`); a failed read (`FeedStreamUnreadable`); `{}` for
+ * `readable`; and nothing for `opened` and for `bookmark`, whose id is where the stream has read to.
+ */
+export const FeedStreamEvent = Schema.Union([
+  Schema.Struct({
+    event: Schema.Literals(FEED_LINE_EVENTS).annotate({ description: 'What the line is about, as the event is named.' }),
+    id: feedCursorId,
+    data: Schema.fromJsonString(FeedStreamLine).pipe(Schema.annotateEncoded({ description: 'The JSON of the line.' })),
+  }),
+  Schema.Struct({
+    event: Schema.Literal('bookmark').annotate({ description: "The event's name." }),
+    id: feedCursorId,
+    data: Schema.Literal('').annotate({ description: 'Empty: where the stream has read to is its id.' }),
+  }),
+  Schema.Struct({
+    event: Schema.Literal('opened').annotate({ description: "The event's name: the stream's first, which a reader skips." }),
+    data: Schema.Literal('').annotate({ description: 'Empty.' }),
+  }),
+  feedSaid('hint', FeedStreamHint, 'The JSON of the hint.'),
+  feedSaid('unreadable', FeedStreamUnreadable, 'The JSON of why the read failed.'),
+  feedSaid('readable', Schema.Struct({}), 'The JSON `{}`.'),
+]);
 export type FeedStreamEvent = typeof FeedStreamEvent.Type;
 
 /**

@@ -811,6 +811,10 @@ export const FEED_STREAM_EVENTS = [
 ] as const;
 export type FeedStreamEventName = (typeof FEED_STREAM_EVENTS)[number];
 
+/** The events of the feed's stream that carry a line, each named by what the line is about. */
+export const FEED_LINE_EVENTS = ['store', 'daemon', 'factory', 'step', 'removed', 'run'] as const satisfies readonly FeedStreamEventName[];
+export type FeedLineEventName = (typeof FEED_LINE_EVENTS)[number];
+
 /**
  * The name of the board's cookie that holds one of the person's tokens: set HttpOnly by `POST /api/session` from a token the person
  * pasted, sent by the browser on every request of the board's, and read by the api as the request's token where it presents no bearer.

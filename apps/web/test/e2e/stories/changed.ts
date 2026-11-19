@@ -341,6 +341,31 @@ function argsOf(argv: readonly string[]) {
   }
 }
 
+/**
+ * Writes into `out`, for each changed approved picture, `before-<name>.png` (its bytes at `base`, from git), `after-<name>.png` (the
+ * working tree's) and `diff-<name>.png` (what `diff` draws of the two): what a step hands of a picture its change moved.
+ * @param root The repository's root.
+ * @param base The commit the pictures are read before the change at.
+ * @param out The folder the three pictures of each go to.
+ * @param changed The changed pictures, each by its name and its path from the root (`picturesOf`'s `changed`).
+ * @param diff Draws the difference of the pictures at the two paths, as a PNG: Chromium's `differ` in a run.
+ */
+export async function handChanged(
+  root: string,
+  base: string,
+  out: string,
+  changed: readonly { name: string; file: string }[],
+  diff: (before: string, after: string) => Promise<Buffer>,
+): Promise<void> {
+  for (const { name, file } of changed) {
+    const before = path.join(out, `before-${name}.png`);
+    const after = path.join(out, `after-${name}.png`);
+    fs.writeFileSync(before, execFileSync('git', ['show', `${base}:${file}`], { cwd: root, maxBuffer: 1 << 28 }));
+    fs.copyFileSync(path.join(root, file), after);
+    fs.writeFileSync(path.join(out, `diff-${name}.png`), await diff(before, after));
+  }
+}
+
 async function main(): Promise<number> {
   const { values, positionals } = argsOf(process.argv.slice(2));
   const root = rootOf(process.cwd());
@@ -374,13 +399,13 @@ async function main(): Promise<number> {
   let browser: Browser | undefined;
   const opened = async (): Promise<Browser> => (browser ??= await (await import('playwright')).chromium.launch());
   try {
-    for (const { name, file } of pictures.changed) {
-      const before = path.join(out, `before-${name}.png`);
-      const after = path.join(out, `after-${name}.png`);
-      fs.writeFileSync(before, execFileSync('git', ['show', `${mergeBase ?? 'HEAD'}:${file}`], { cwd: root, maxBuffer: 1 << 28 }));
-      fs.copyFileSync(path.join(root, file), after);
-      fs.writeFileSync(path.join(out, `diff-${name}.png`), (await differ(await opened(), before, after)).png);
-    }
+    await handChanged(
+      root,
+      mergeBase ?? 'HEAD',
+      out,
+      pictures.changed,
+      async (before, after) => (await differ(await opened(), before, after)).png,
+    );
     if (targetsDir !== undefined && matches.length > 0) {
       const short = git(root, ['rev-parse', '--short', 'HEAD']).trim();
       const css = fs.readFileSync(path.join(root, BOARD, 'theme', 'theme.css'), 'utf8');

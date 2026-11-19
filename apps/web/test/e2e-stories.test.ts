@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { LIGHT_CANARIES } from '../.storybook/approved.ts';
-import { approvedName } from './e2e/stories/changed.ts';
+import { approvedName, handChanged, picturesOf } from './e2e/stories/changed.ts';
 import { matchesOf, targetsOf, type Match } from './e2e/stories/targets.ts';
 
 const CHANGED = path.join(import.meta.dirname, 'e2e', 'stories', 'changed.ts');
@@ -352,4 +352,31 @@ test('a pass whose change adds and removes pictures, and changes none, lists the
   assert.deepEqual(fs.readdirSync(out), ['approved.json'], 'no before, after or diff of a picture that did not change');
   const report = JSON.parse(fs.readFileSync(path.join(out, 'approved.json'), 'utf8')) as Listed & { base: string };
   assert.deepEqual([report.base, report.added, report.changed, report.removed], [base, ['run-card--narrow-one'], [], ['look-tag--plain']]);
+});
+
+test("a changed picture is handed as its base's bytes, the head's and their diff, a light canary's named <id>-light", async () => {
+  const { root, base } = planted();
+  write(root, { [WIDE]: 'wider', [PLAIN_LIGHT]: 'plain, lighter', [NARROW]: 'narrow' });
+  commit(root, 'two pictures moved, one added');
+  const touched = git(root, 'diff', '--name-only', base, 'HEAD').split('\n').filter(Boolean);
+  const { changed } = picturesOf(root, touched, base);
+  const out = path.join(root, 'files');
+  fs.mkdirSync(out);
+  await handChanged(root, base, out, changed, async (before, after) =>
+    Buffer.from(`${fs.readFileSync(before, 'utf8')} | ${fs.readFileSync(after, 'utf8')}`),
+  );
+  const read = (file: string) => fs.readFileSync(path.join(out, file), 'utf8');
+  assert.deepEqual(fs.readdirSync(out).sort(), [
+    'after-look-tag--plain-light.png',
+    'after-run-card--wide.png',
+    'before-look-tag--plain-light.png',
+    'before-run-card--wide.png',
+    'diff-look-tag--plain-light.png',
+    'diff-run-card--wide.png',
+  ]);
+  assert.deepEqual(
+    [read('before-run-card--wide.png'), read('after-run-card--wide.png'), read('diff-run-card--wide.png')],
+    ['wide', 'wider', 'wide | wider'],
+  );
+  assert.deepEqual([read('before-look-tag--plain-light.png'), read('after-look-tag--plain-light.png')], ['plain light', 'plain, lighter']);
 });

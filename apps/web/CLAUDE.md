@@ -84,8 +84,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   (`LIGHT_CANARIES`, `.storybook/approved.ts`); `.storybook/compare.ts` compares the story's ground against it, strictly (pixelmatch's
   0.1, anti-aliasing ignored, no other pixel), on a clock that stands still, in reduced motion, the pointer moved off and a read
   still out drawn at once. It compares only in the pinned place, Ubuntu 24.04 on x64 with the lockfile's Chromium
-  (`test/e2e/stories/pinned.ts`, which `npm run stories` runs), as CI's `e2e-look` job and the steps' server both are; anywhere else
-  it says so and compares nothing. A story that differs fails, its reference, actual and diff left under `.vitest/attachments/approved/`
+  (`test/e2e/stories/pinned.ts`, which `npm run stories` runs), as CI's `e2e-look` job (`runs-on: ubuntu-24.04`) and the steps' server both
+  are; anywhere else it says so and compares nothing, but under CI, where it refuses (`placeVerdict`). A story that differs fails, its reference, actual and diff left under `.vitest/attachments/approved/`
   (uploaded by `e2e-look` on a failure); `npm run stories -- --update <file>.stories.tsx` writes the pictures of a change meant, to
   commit with it. `test/approved.test.ts` refuses a story with no picture and a picture of no story. `npm run e2e -- --look` runs it after the look's
   tests (`LOOK_RUNS`, `e2e/look.ts`), so CI's `e2e-look` job does; `npm test` never does. One file:

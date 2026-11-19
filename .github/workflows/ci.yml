@@ -285,7 +285,9 @@ jobs:
     # prove once. Two files at a time, the bound of every package's suite (LOOK_TESTS, apps/web/test/e2e/look.ts). The job took
     # 2m43s on its first green run (Actions run 43510805757, 2026-11-13); bounded at 20, above that and above its Chromium install's 15 on a cache miss.
     name: e2e look
-    runs-on: ubuntu-latest
+    # The pinned place of the stories' approved pictures (apps/web/test/e2e/stories/pinned.ts, SYSTEM): never ubuntu-latest, which
+    # moves, and on another system pinned.ts refuses under CI rather than compare nothing (test/e2e-look.test.ts).
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7

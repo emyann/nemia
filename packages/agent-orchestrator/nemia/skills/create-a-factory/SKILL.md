@@ -33,9 +33,9 @@ of its new versions is an upgrade they decide, merged into what they changed, a 
 
 Never apply a template unasked. On their yes, read its `parameters` with them, each one's description and default, and ask for the
 value of each the default does not fit; then say what the line does and run it, which prompts them:
-`nemia factory apply <name> --template <template> --repo <path>`, a `--repo` for each repository, as an absolute path, and `--set
-<key>=<value>` for each parameter they chose. The factory then holds its workflows, attached, and its hires: go to the last section, and
-say what stands.
+`nemia factory apply <name> --template <template>`, a `--volume <path|url>:rw` for each repository it works on that they named, as an
+absolute path or a git URL, and `--set <key>=<value>` for each parameter they chose. The factory then holds its workflows, attached,
+and its hires: go to the last section, and say what stands.
 
 On their no, where none fits, or where the one that fits lists a problem, say so in a line and go on below: you draft it with them.
 
@@ -110,7 +110,7 @@ Say what is in place and what is not, apart:
 - **Placed**: the factory, its repositories, the workflows attached, each hire, its instruction — as `nemia factory` reads them now.
 - **Written**: each workflow, agent and skill you wrote into yours, by its file, for the person to read; and each try, with what it did.
 - **Drafted, not placed**: each schema or skill file still only in your folder.
-- **Next**, in one line: the draft to place first, where one waits; else to give it its first volume, a folder of their machine that
-  every local step of its runs mounts, read-only or writable: `nemia factory volume add <factory> <path>:ro|:rw`, which prompts them.
+- **Next**, in one line: the draft to place first, where one waits; else to give it its first volume, the repository it works on —
+  `nemia factory volume add <factory> <path|url>:rw`, which prompts them; where it has one already, the first card to start.
 
 Never call a factory complete while a draft of it waits to be placed.

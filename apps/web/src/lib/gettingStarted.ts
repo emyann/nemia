@@ -1,5 +1,5 @@
 /**
- * The floor's "Getting started" list: where each milestone's page is (`MILESTONE_LINKS`; the harness's and the factory's today, the
+ * The floor's "Getting started" list: where each milestone's page is (`MILESTONE_LINKS`; the harness's, the factory's and the volume's today, the
  * next cards adding theirs), each milestone's name as the list says it, whether the list is shown (`starterShown`), and the person's
  * dismissal of it, kept in this browser through `lib/stored.ts`, since the server keeps nothing of it. Where each milestone stands is the
  * api's read, never kept here.
@@ -8,10 +8,10 @@ import type { Milestone, MilestoneRead } from 'objects';
 import { readStored, store } from './stored.ts';
 
 /** The page that does each milestone, where one is built: none for those whose page a later card adds. */
-export const MILESTONE_LINKS: Readonly<Record<Milestone, '/setup' | '/welcome/factory' | undefined>> = {
+export const MILESTONE_LINKS: Readonly<Record<Milestone, '/setup' | '/welcome/factory' | '/welcome/volume' | undefined>> = {
   harness: '/setup',
   factory: '/welcome/factory',
-  volume: undefined,
+  volume: '/welcome/volume',
   landed: undefined,
 };
 

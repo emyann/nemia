@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
+import type { StartFound } from '../filed/filed.ts';
 import { runsDir } from '../record/record.store.ts';
 import { carriedFilesRoot, homeFilesRoot, workflowFilesRoot } from '../record/places.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -185,3 +186,45 @@ function freezeInto(home: string, files: readonly WorkflowFile[], run: Pick<Run,
   }
   return hex;
 }
+
+/**
+ * What a filing finds on disk of where a step's session starts, for a run that froze a home (`StartFound`): the copy's path, whether it
+ * holds a `.mcp.json`, and the skills of the home, of the workspace and of each folder the run mounts, read now; nothing for a run that
+ * froze none.
+ * @param home The store's root.
+ * @param run The run: its frozen home, its mounts and its volumes.
+ * @param workspace The step's workspace.
+ */
+export const startFoundAt = (
+  home: string,
+  run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>,
+  workspace: string,
+): { start?: StartFound } => {
+  if (run.homeFiles === undefined) return {};
+  const at = homeFilesDir(home, run, run.homeFiles);
+  const folders = [at, workspace, ...(run.mounts ?? []).map((m) => m.path), ...(run.volumes ?? []).map((m) => m.path)];
+  return {
+    start: {
+      home: at,
+      mcp: fs.statSync(path.join(at, '.mcp.json'), { throwIfNoEntry: false })?.isFile() === true,
+      skills: Object.fromEntries(folders.map((folder) => [folder, projectSkillsIn(folder)])),
+    },
+  };
+};
+
+/**
+ * The names of the skills of a folder's Claude Code project, each folder of its `.claude/skills` that holds a `SKILL.md`, sorted; none
+ * where it has none or cannot be read.
+ * @param folder The folder.
+ */
+const projectSkillsIn = (folder: string): string[] => {
+  const dir = path.join(folder, '.claude', 'skills');
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((name) => fs.statSync(path.join(dir, name, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true)
+      .sort();
+  } catch {
+    return [];
+  }
+};

@@ -6,7 +6,6 @@
  * it, through the Run door — the asks waiting, and every answer a person gave, waiting or consumed, which the steps after each are told.
  * A controller: it reads the run's rendered agent folder, the skills where a start of the run's folder finds them, and the run's place.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Result } from 'effect';
 import { ownArgsOf } from 'agent-runtime/vocabulary';
@@ -60,7 +59,7 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir, isDirectory } from '../record/record.store.ts';
-import { carriedFilesDir, homeFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, startFoundAt, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
@@ -307,47 +306,6 @@ export const sessionCwd = (
   workspace: string,
 ): string => startOf(step, workspace, startFoundAt(home, run, workspace).start).cwd;
 
-/**
- * What a filing finds on disk of where a step's session starts, for a run that froze a home (`StartFound`): the copy's path, whether it
- * holds a `.mcp.json`, and the skills of the home, of the workspace and of each folder the run mounts, read now; nothing for a run that
- * froze none.
- * @param home The store's root.
- * @param run The run: its frozen home, its mounts and its volumes.
- * @param workspace The step's workspace.
- */
-const startFoundAt = (
-  home: string,
-  run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>,
-  workspace: string,
-): { start?: StartFound } => {
-  if (run.homeFiles === undefined) return {};
-  const at = homeFilesDir(home, run, run.homeFiles);
-  const folders = [at, workspace, ...(run.mounts ?? []).map((m) => m.path), ...(run.volumes ?? []).map((m) => m.path)];
-  return {
-    start: {
-      home: at,
-      mcp: fs.statSync(path.join(at, '.mcp.json'), { throwIfNoEntry: false })?.isFile() === true,
-      skills: Object.fromEntries(folders.map((folder) => [folder, projectSkillsIn(folder)])),
-    },
-  };
-};
-
-/**
- * The names of the skills of a folder's Claude Code project, each folder of its `.claude/skills` that holds a `SKILL.md`, sorted; none
- * where it has none or cannot be read.
- * @param folder The folder.
- */
-const projectSkillsIn = (folder: string): string[] => {
-  const dir = path.join(folder, '.claude', 'skills');
-  try {
-    return fs
-      .readdirSync(dir)
-      .filter((name) => fs.statSync(path.join(dir, name, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true)
-      .sort();
-  } catch {
-    return [];
-  }
-};
 
 /**
  * The MCP servers the factory `factory` records, beside the library's it has added (its own winning a name), each through `mcpServerOf` —

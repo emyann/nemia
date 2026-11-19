@@ -623,9 +623,8 @@ describe('the conformance walk: each verb through the client reaches the driver 
       'ae/t-3/1': 'not expected',
     };
     const unread = expected.map((e) => e.name);
-    vi.spyOn(HarnessHandler.prototype, 'observeSessions').mockImplementation(async () =>
-      answer === undefined ? { tasks: [], unread, why: [] } : { tasks: [], unread, why: [], unreadWhy: answer },
-    );
+    vi.spyOn(HarnessHandler.prototype, 'observeSessions').mockImplementation((async () =>
+      answer === undefined ? { tasks: [], unread, why: [] } : { tasks: [], unread, why: [], unreadWhy: answer }) as never);
     const runner = a2aOps('fake', ops, async () => []);
     const kept = await Effect.runPromise(runner.observeFor!(expected));
     assert.deepEqual(kept.unreadWhy, new Map([['ae/t-1/1', 'its output cannot be read']]), 'a number, and a name not unread, dropped');

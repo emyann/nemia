@@ -79,7 +79,7 @@ const besideRunOf = (root: string, id: string, n: number, end: string) =>
  * An engine over a store of its own, its Claude Code jobs on the stand-in, polling the drain every 20 ms and held at most `holdMs`;
  * each task it files has a folder of its own, the stand-in's, and every process it starts is ended at the test's end.
  */
-const stand = (t: TestContext, holdMs?: number) => {
+const stand = (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, holdMs?: number) => {
   const root = scratch('ae-park-');
   const ops = claudeCodeOps({ root, claudeExecutable: STAND_IN, holdPollMs: 20, ...(holdMs ? { holdMs } : {}) });
   const engine: Built = builtEngine(Engine.layer({ root, harnesses: { claude: ops } }));
@@ -237,7 +237,7 @@ describe('a Claude Code job stopped by the sessions’ drain parks, is held whil
     assert.equal((await viewNow(a.engine, spent.id)).state.attempts.length, 1, 'no attempt 2');
   });
   s.test('a worker killed under a drain: read parked, held while the drain stands', async (c) => {
-    b = stand(t);
+    b = stand(c);
     const lost = await b.file({ id: '5e551011-0000-4000-8000-0000000000e3', call: 'Bash', cost: 0.25 }, 1);
     await viewWhen(c, b.engine, lost.id, (v) => v.calling?.tool === 'Bash', 'the call in flight');
     await Effect.runPromise(b.engine.drainSessions({ graceMs: LONG_GRACE_MS }));

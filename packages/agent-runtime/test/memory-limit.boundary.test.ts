@@ -33,9 +33,9 @@ const RUNAWAY = [
 
 const refused = scopeRefusal();
 
-describe(
+describe.skipIf(refused)(
   'a runaway child past a task’s memory limit is killed in its scope alone: the attempt carries the limit, the kill and the peak, and a neighbour runs on',
-  { ...WAITED, ...(refused ? { skip: refused } : {}) },
+  WAITED,
   () => {
     let root!: string;
     let cwd!: string;

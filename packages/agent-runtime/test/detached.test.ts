@@ -35,7 +35,7 @@
  * - A process a test kills in its `finally` may be gone already, and a file it polls may be mid-write or not there yet: the
  *   kill or the read that fails is passed over.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -1919,9 +1919,27 @@ describe(
   },
 );
 
-test('codex filed through the engine at shipped defaults, against a fake binary: what it prints is on the record', WAITED, async (t) => {
-  const s = story(t);
-  const bin = scratch('ae-fake-bin-');
+describe('codex filed through the engine at shipped defaults, against a fake binary: what it prints is on the record', WAITED, () => {
+  let bin!: string;
+  let engine!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    const t = teardowns();
+    bin = scratch('ae-fake-bin-');
+    fs.writeFileSync(
+      path.join(bin, 'codex'),
+      [
+        '#!/bin/sh',
+        'echo "Reading additional input from stdin..." >&2',
+        ...codexStream.map((e) => `printf '%s\\n' '${JSON.stringify(e)}'`),
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    process.env.PATH = `${bin}:${prev.PATH}`;
+    process.env.CODEX_HOME = root();
+    engine = builtEngine(Engine.layer({ root: root() }));
+    return t.end;
+  });
+  const s = story(test);
   const codexStream = [
     { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' },
     { type: 'turn.started' },
@@ -1938,42 +1956,25 @@ test('codex filed through the engine at shipped defaults, against a fake binary:
       },
     },
   ];
-  fs.writeFileSync(
-    path.join(bin, 'codex'),
-    [
-      '#!/bin/sh',
-      'echo "Reading additional input from stdin..." >&2',
-      ...codexStream.map((e) => `printf '%s\\n' '${JSON.stringify(e)}'`),
-    ].join('\n'),
-    { mode: 0o755 },
-  );
   const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
-  process.env.PATH = `${bin}:${prev.PATH}`;
-  process.env.CODEX_HOME = root();
-  try {
-    const engine = builtEngine(Engine.layer({ root: root() }));
-
-    await s.test(
-      'codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it',
-      async (sub) => {
-        const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
-        await ticked(sub, engine, id);
-        const { state } = await Effect.runPromise(engine.view(id));
-        assert.equal(state.settled, 'succeeded');
-        assert.deepEqual(
-          state.attempts[0]?.usage,
-          { toolCalls: 1, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
-          'measured, and nothing it did not measure',
-        );
-        assert.equal(state.attempts[0]?.exitCode, 0);
-        assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
-      },
+  s.test('codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it', async (sub) => {
+    const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
+    await ticked(sub, engine, id);
+    const { state } = await Effect.runPromise(engine.view(id));
+    assert.equal(state.settled, 'succeeded');
+    assert.deepEqual(
+      state.attempts[0]?.usage,
+      { toolCalls: 1, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
+      'measured, and nothing it did not measure',
     );
-  } finally {
+    assert.equal(state.attempts[0]?.exitCode, 0);
+    assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
+  });
+  afterAll(() => {
     process.env.PATH = prev.PATH;
     if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
     else process.env.CODEX_HOME = prev.CODEX_HOME;
-  }
+  });
 });
 
 describe(

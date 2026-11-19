@@ -11,7 +11,6 @@ const unread: Waiter = {
   get signal(): AbortSignal {
     throw new Error('no signal to read');
   },
-  diagnostic: () => undefined,
 };
 
 test('a wait whose waiter has no signal to read fails at once', async () => {

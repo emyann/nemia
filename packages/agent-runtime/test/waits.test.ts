@@ -11,7 +11,7 @@
  * mocked clock, a timestamp, a reaper's bound, a synchronous hold or an assertion, never a wait, and a count only shrinks
  * (`deadlineBreaks`). A change that takes one out lowers its count in the same commit.
  */
-import { test, type TestContext } from 'vitest';
+import { test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,15 +23,25 @@ const PACKAGE = path.join(TEST, '..');
 const ROOT = path.join(PACKAGE, '..', '..');
 
 /**
- * A test's signal and diagnostics, as `until` reads them, with what it said kept and its abort in the test's hands: aborted once the test
+ * A test's signal, as `until` reads it, and what it said on the test's log (`console.error`, spied), with what it said kept and its abort in the test's hands: aborted once the test
  * `of` ends, so a wait it left pending holds no process open.
  */
 const waiter = (of: TestContext) => {
-  const said: string[] = [];
   const control = new AbortController();
-  const t: Waiter = { signal: control.signal, diagnostic: (message: string) => void said.push(message) };
+  const t: Waiter = { signal: control.signal };
+  const logged = vi.isMockFunction(console.error) ? console.error : vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const from = vi.mocked(logged).mock.calls.length;
   of.onTestFinished(() => control.abort());
-  return { t, said, abort: () => control.abort() };
+  return {
+    t,
+    get said(): string[] {
+      return vi
+        .mocked(logged)
+        .mock.calls.slice(from)
+        .map((call: unknown[]) => String(call[0]));
+    },
+    abort: () => control.abort(),
+  };
 };
 
 /** A turn of the event loop, so a timer due at once has fired. */
@@ -224,7 +234,7 @@ test("REFUSED: a Vitest config with no default timeout, or another than `WAITED`
     `the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
   ];
   assert.deepEqual(timeoutBreaks('export default { test: { maxWorkers: 2 } };'), refused, 'none');
-  assert.deepEqual(timeoutBreaks("test: {\n    testTimeout: 600_000,\n  }"), refused, 'a longer one');
+  assert.deepEqual(timeoutBreaks('test: {\n    testTimeout: 600_000,\n  }'), refused, 'a longer one');
   assert.deepEqual(timeoutBreaks(`test: {\n    testTimeout: ${WAITED.timeout},\n  }`), [], 'its own');
 });
 

@@ -400,12 +400,9 @@ const sayReaches = async () => {
   );
 };
 
-test(
+test.skipIf(skip)(
   'say reaches a working job on its stdin: told a file name, it writes that file; the same job never told writes none — and the journal has what was said',
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
+  { timeout: 15 * 60_000 },
   sayReaches,
 );
 

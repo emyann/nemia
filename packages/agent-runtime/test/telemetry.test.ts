@@ -42,7 +42,7 @@ const told: SpawnRequest = {
 };
 
 /** Sets `vars` in this process's environment for the rest of test `t`. */
-const withEnv = (t: TestContext, vars: Record<string, string>) => {
+const withEnv = (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, vars: Record<string, string>) => {
   const before = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
   Object.assign(process.env, vars);
   t.onTestFinished(() => {

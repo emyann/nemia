@@ -7,7 +7,7 @@
  * answers `auth status` as `STANDIN_AUTH` says and records each ask in `auth.jsonl`. The bound is shortened through the runner
  * (`signInMs`); the shipped one is `CLAUDE_SIGN_IN_MS`.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -55,12 +55,12 @@ describe(
       const ops = claudeCodeOps({ root, claudeExecutable: STAND_IN, ...(signInMs !== undefined ? { signInMs } : {}) });
       return builtEngine(Engine.layer({ root, harnesses: { claude: ops } }));
     };
-    const run = async (c: Waiter, auth: string | undefined, on = shipped) => {
+    const run = async (c: Waiter & Pick<TestContext, 'onTestFinished'>, auth: string | undefined, on = shipped) => {
       const dir = scratch('ae-sign-in-work-');
       const plan = JSON.stringify({ id: '5e551011-0000-4000-8000-00000000a0e1' });
       const env = { STANDIN_DIR: dir, STANDIN_PLAN: plan, STANDIN_NO_BRIDGE: '1', ...(auth !== undefined ? { STANDIN_AUTH: auth } : {}) };
       const id = await Effect.runPromise(on.file({ brief: 'work', cwd: dir, harness: 'claude', config: { env } }));
-      t.onTestFinished(() => Effect.runPromise(Effect.ignore(on.stop(id))));
+      c.onTestFinished(() => Effect.runPromise(Effect.ignore(on.stop(id))));
       await until(
         c,
         async () => {

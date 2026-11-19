@@ -35,7 +35,7 @@ describe('a held session under a memory limit, on a host that makes no scope', W
   s.test('its neighbour with no limit starts on the same holder', async (st) => {
     const { root, dir, request } = kept({});
     const h = await holder(root, undefined, undefined, NO_SCOPE);
-    t.onTestFinished(async () => {
+    st.onTestFinished(async () => {
       fs.writeFileSync(path.join(dir, 'end'), '');
       await h.close();
     });
@@ -54,7 +54,7 @@ describe('a held session under a memory limit, on a host that makes no scope', W
       request: { ...request, resources: LIMITED, brief: undefined },
     });
     const h = await holder(root, undefined, undefined, NO_SCOPE);
-    t.onTestFinished(h.close);
+    st.onTestFinished(h.close);
     await Effect.runPromise(h.attached.ops.observe);
     await until(st, () => run(root)?.state === 'failed', 'the parked session ended failed', { everyMs: 50 });
     await Effect.runPromise(h.attached.ops.observe);
@@ -65,9 +65,9 @@ describe('a held session under a memory limit, on a host that makes no scope', W
 
 const refused = scopeRefusal();
 
-test(
+test.skipIf(refused)(
   'a held session under a memory limit runs in a scope of its own, and its run file and sighting say what the scope held',
-  { ...WAITED, ...(refused ? { skip: refused } : {}) },
+  WAITED,
   async (t) => {
     const { root, dir, request } = kept({});
     const h = await holder(root);

@@ -29,7 +29,7 @@ const exited = (child: ChildProcess): Promise<void> =>
 describe('processesNow reads this user processes with the variables asked for, and endProcesses ends one only while its start matches', () => {
   let folder!: string;
   let child!: ChildProcess;
-  let pid!: number | undefined;
+  let pid!: number;
   beforeAll(() => {
     const t = teardowns();
     folder = path.join(scratch('ae-processes-'), 'work');

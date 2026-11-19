@@ -30,7 +30,7 @@ import { instantNow } from '../src/core/engine/now.ts';
 const BINDINGS: Binding[] = ['JSONRPC', 'HTTP+JSON'];
 
 /** A test agent that streams unless `o` says otherwise, closed once the test `t` ends. */
-const serve = async (t: TestContext, o: ServerOptions = {}) => {
+const serve = async (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, o: ServerOptions = {}) => {
   const s = await remoteServer({ streaming: true, script: () => [{ state: 'working' }], ...o });
   t.onTestFinished(() => s.close());
   return s;

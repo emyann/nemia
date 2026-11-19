@@ -15,7 +15,7 @@ import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
 
 /** A test agent for the row `t`, closed once the row ends. */
-const serve = async (t: TestContext, o: ServerOptions = {}) => {
+const serve = async (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, o: ServerOptions = {}) => {
   const s = await remoteServer(o);
   t.onTestFinished(() => s.close());
   return s;

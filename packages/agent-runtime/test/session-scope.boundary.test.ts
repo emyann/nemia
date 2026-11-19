@@ -29,7 +29,6 @@ import { filesOf, writeRun } from '../src/harness/claude/attached-file.ts';
 import { spawnSync } from 'node:child_process';
 
 const refused = scopeRefusal();
-const SKIP = refused ? { skip: refused } : {};
 /** The runner's stop grace, shortened from the shipped `WORKER_STOP_GRACE_MS`; the heartbeat with it. */
 const QUICK = { stopGraceMs: 300, beatMs: 200 } as const;
 
@@ -79,9 +78,9 @@ const runFileOf = (root: string, id: string, end = 'json'): { cgroup?: string; u
 };
 
 for (const limited of [false, true])
-  test(
+  test.skipIf(refused)(
     `${limited ? 'a limited' : 'an unlimited'} job's child that left its group and ignores SIGTERM is ended with its scope, and the release waits for it`,
-    { ...WAITED, ...SKIP },
+    WAITED,
     async (t) => {
       const root = scratch('ae-scope-');
       const cwd = scratch('ae-scope-cwd-');
@@ -135,9 +134,9 @@ for (const limited of [false, true])
     },
   );
 
-test(
+test.skipIf(refused)(
   'a held session’s child that left its group is ended with its scope when the session is stopped',
-  { ...WAITED, ...SKIP },
+  WAITED,
   async (t) => {
     const { root, dir, request } = kept({ leave: true });
     const h = await holder(root);
@@ -157,9 +156,9 @@ test(
   },
 );
 
-test(
+test.skipIf(refused)(
   'a held session that ended with its scope still holding a process is released only once the holder has killed what was left',
-  { ...WAITED, ...SKIP },
+  WAITED,
   async (t) => {
     const { root, dir, request } = kept({});
     const left = path.join(dir, 'left');

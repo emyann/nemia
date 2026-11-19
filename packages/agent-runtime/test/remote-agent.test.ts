@@ -42,7 +42,7 @@ import { story } from 'test-kit/checkpoints';
 import { until as untilEvent, WAITED } from '../src/waits/index.ts';
 
 /** A test agent, closed once the test or row `t` ends. */
-const serve = async (t: TestContext, o: ServerOptions = {}) => {
+const serve = async (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, o: ServerOptions = {}) => {
   const s = await remoteServer(o);
   t.onTestFinished(() => s.close());
   return s;

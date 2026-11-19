@@ -8,7 +8,7 @@
  *
  * `decide`'s half is in `decide.test.ts` (HELD OPEN); the words it journals are pinned in `journal-words.test.ts`.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -65,15 +65,18 @@ const signedJournal = (): Event[] => [
 
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 
-test('a task held open signs and waits with its session released; answered after a restart, it resumes under the answer; closed, it settles — through the Effect door, and through `ae answer` and `ae close`', async (t) => {
-  const s = story(t);
-  const root = scratch('ae-hold-open-');
-  try {
-    const sessions = new Map<string, Sighting>();
-    const spawned: SpawnRequest[] = [];
-    const released: string[] = [];
-    const ops = testOps({ sessions, spawned });
-    const harness = Runner.layer({
+describe('a task held open signs and waits with its session released; answered after a restart, it resumes under the answer; closed, it settles — through the Effect door, and through `ae answer` and `ae close`', () => {
+  let root!: string;
+  let sessions!: Map<string, Sighting>;
+  let ops!: import('../src/index.ts').RunnerOps;
+  let harness!: Layer.Layer<Runner, never, never>;
+  let engine!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    const t = teardowns();
+    root = scratch('ae-hold-open-');
+    sessions = new Map<string, Sighting>();
+    ops = testOps({ sessions, spawned });
+    harness = Runner.layer({
       ...ops,
       release: (x) =>
         Effect.sync(() => {
@@ -81,114 +84,111 @@ test('a task held open signs and waits with its session released; answered after
           for (const [name, task] of sessions) if (task.sessionId === x.sessionId) sessions.delete(name);
         }),
     });
-    const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
-      Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(Journal.files(root), harness))));
-    const phase = async (id: string) =>
-      (await run(Effect.flatMap(Runner, (r) => r.observe).pipe(Effect.flatMap((o) => view(id, o))))).phase;
-    let id = '';
-
-    await s.test('signed, it waits with its session let go, and nothing is started while it waits, pass after pass', async () => {
-      id = await run(file({ brief: 'draft the plan', cwd: '/repo', holdOpen: true, config: { model: 'opus', budgetUsd: 1 } }));
+    return t.end;
+  });
+  const s = story(test);
+  const spawned: SpawnRequest[] = [];
+  const released: string[] = [];
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
+    Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(Journal.files(root), harness))));
+  const phase = async (id: string) => (await run(Effect.flatMap(Runner, (r) => r.observe).pipe(Effect.flatMap((o) => view(id, o))))).phase;
+  let id = '';
+  s.test('signed, it waits with its session let go, and nothing is started while it waits, pass after pass', async () => {
+    id = await run(file({ brief: 'draft the plan', cwd: '/repo', holdOpen: true, config: { model: 'opus', budgetUsd: 1 } }));
+    await run(tick());
+    signed(sessions, `ae/${id}/1`, 'a first draft', (await run(view(id, new Map()))).state.attempts[0].startedAt);
+    await run(tick());
+    assert.equal(await phase(id), 'input-required');
+    assert.deepEqual(released, ['fake-1'], 'the signed session is let go: nothing runs while it waits');
+    for (let i = 0; i < 3; i++) await run(tick());
+    assert.equal(spawned.length, 1, 'and nothing is started while it waits, pass after pass');
+    assert.equal(await phase(id), 'input-required');
+  });
+  s.test(
+    "answered, it resumes the session that signed, told the answer, under the answer's budget laid over the filing's configuration",
+    async () => {
+      const input = await run(answer(id, 'shorter, please', { budgetUsd: 0.5 }));
+      assert.equal(input.text, 'shorter, please');
+      assert.deepEqual(input.config, { budgetUsd: 0.5 });
       await run(tick());
-      signed(sessions, `ae/${id}/1`, 'a first draft', (await run(view(id, new Map()))).state.attempts[0].startedAt);
-      await run(tick());
-      assert.equal(await phase(id), 'input-required');
-      assert.deepEqual(released, ['fake-1'], 'the signed session is let go: nothing runs while it waits');
-      for (let i = 0; i < 3; i++) await run(tick());
-      assert.equal(spawned.length, 1, 'and nothing is started while it waits, pass after pass');
-      assert.equal(await phase(id), 'input-required');
-    });
-
-    await s.test(
-      "answered, it resumes the session that signed, told the answer, under the answer's budget laid over the filing's configuration",
-      async () => {
-        const input = await run(answer(id, 'shorter, please', { budgetUsd: 0.5 }));
-        assert.equal(input.text, 'shorter, please');
-        assert.deepEqual(input.config, { budgetUsd: 0.5 });
-        await run(tick());
-        assert.equal(spawned.length, 2);
-        assert.equal(spawned[1].name, `ae/${id}/2`);
-        assert.equal(spawned[1].resumeFrom, 'fake-1', 'it continues the session that signed');
-        assert.equal(spawned[1].brief, 'shorter, please', 'told the answer, not the brief again');
-        assert.deepEqual(
-          spawned[1].config,
-          { model: 'opus', budgetUsd: 0.5 },
-          "under the answer's budget, laid over the rest of the filing's configuration",
-        );
-        assert.deepEqual(spawned[0].config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
-        assert.equal(await phase(id), 'working');
-      },
-    );
-
-    await s.test('signed again, it waits again; closed, it settles succeeded, each closeout kept', async () => {
-      signed(sessions, `ae/${id}/2`, 'a shorter draft', (await run(view(id, new Map()))).state.attempts[1].startedAt);
-      await run(tick());
-      assert.equal(await phase(id), 'input-required', 'signed again: it waits again');
-      await run(close(id));
-      await run(tick());
-      const settled = await run(view(id, new Map()));
-      assert.equal(settled.phase, 'succeeded');
-      const events = await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id))));
+      assert.equal(spawned.length, 2);
+      assert.equal(spawned[1].name, `ae/${id}/2`);
+      assert.equal(spawned[1].resumeFrom, 'fake-1', 'it continues the session that signed');
+      assert.equal(spawned[1].brief, 'shorter, please', 'told the answer, not the brief again');
       assert.deepEqual(
-        events.slice(-2).map((e) => (e.kind === 'settled' ? [e.kind, e.outcome, e.note] : [e.kind])),
-        [['closed'], ['settled', 'succeeded', 'closed']],
+        spawned[1].config,
+        { model: 'opus', budgetUsd: 0.5 },
+        "under the answer's budget, laid over the rest of the filing's configuration",
       );
-      assert.deepEqual(
-        settled.state.attempts.map((a) => a.closeout),
-        [
-          { outcome: 'done', summary: 'a first draft' },
-          { outcome: 'done', summary: 'a shorter draft' },
-        ],
-      );
-    });
-
-    const engine = builtEngine(Engine.layer({ root }));
-    const waiting = async () => {
-      const waits = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, holdOpen: true }));
-      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(waits), e))));
-      return waits;
-    };
-    const journal = (task: string) => run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))));
-    const cli = (...args: string[]) =>
-      spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: root }, encoding: 'utf8' });
-    let answered = '';
-
-    await s.test(
-      'ae answer refuses a budget that is not dollars, exit 2 and nothing journalled; then prints the line it journalled, the words being everything after the id but --budget',
-      async () => {
-        answered = await waiting();
-        const bad = cli('answer', answered, 'shorter', '--budget', '$5');
-        assert.equal(bad.status, 2, bad.stderr);
-        assert.match(bad.stderr, /^answer: `--budget \$5` is not an amount of dollars\. Write dollars above 0, digits only/);
-        assert.match(cli('answer', answered, 'shorter', '--budget').stderr, /^answer: `--budget ` is not an amount of dollars/);
-        assert.equal((await journal(answered)).length, 4, 'nothing journalled');
-        const ok = cli('answer', answered, 'shorter,', 'please', '--budget', '0.5');
-        assert.equal(ok.status, 0, ok.stderr);
-        assert.match(ok.stdout, /answered\s+shorter, please  \(budget \$0\.5\)\n/);
-        const last = (await journal(answered)).at(-1)!;
-        assert.deepEqual(last.kind === 'input' ? [last.text, last.config] : last, ['shorter, please', { budgetUsd: 0.5 }]);
-      },
+      assert.deepEqual(spawned[0].config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
+      assert.equal(await phase(id), 'working');
+    },
+  );
+  s.test('signed again, it waits again; closed, it settles succeeded, each closeout kept', async () => {
+    signed(sessions, `ae/${id}/2`, 'a shorter draft', (await run(view(id, new Map()))).state.attempts[1].startedAt);
+    await run(tick());
+    assert.equal(await phase(id), 'input-required', 'signed again: it waits again');
+    await run(close(id));
+    await run(tick());
+    const settled = await run(view(id, new Map()));
+    assert.equal(settled.phase, 'succeeded');
+    const events = await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id))));
+    assert.deepEqual(
+      events.slice(-2).map((e) => (e.kind === 'settled' ? [e.kind, e.outcome, e.note] : [e.kind])),
+      [['closed'], ['settled', 'succeeded', 'closed']],
     );
-
-    await s.test('ae close of a task answered already, and ae answer with no words, each exit 2', () => {
-      const again = cli('close', answered);
-      assert.equal(again.status, 2);
-      assert.match(again.stderr, /^close: `t-.*` has been answered already/);
-      const empty = cli('answer', answered, '');
-      assert.equal(empty.status, 2);
-      assert.match(empty.stderr, /^answer: `text` is empty/);
-    });
-
-    await s.test('ae close of a task that waits prints that the next tick settles it, and journals the close', async () => {
-      const c = await waiting();
-      const closed = cli('close', c);
-      assert.equal(closed.status, 0, closed.stderr);
-      assert.match(closed.stdout, /closed: the next tick settles it/);
-      assert.equal((await journal(c)).at(-1)!.kind, 'closed');
-    });
-  } finally {
+    assert.deepEqual(
+      settled.state.attempts.map((a) => a.closeout),
+      [
+        { outcome: 'done', summary: 'a first draft' },
+        { outcome: 'done', summary: 'a shorter draft' },
+      ],
+    );
+  });
+  const waiting = async () => {
+    const waits = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, holdOpen: true }));
+    await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(waits), e))));
+    return waits;
+  };
+  const journal = (task: string) => run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))));
+  const cli = (...args: string[]) =>
+    spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: root }, encoding: 'utf8' });
+  let answered = '';
+  s.test(
+    'ae answer refuses a budget that is not dollars, exit 2 and nothing journalled; then prints the line it journalled, the words being everything after the id but --budget',
+    async () => {
+      engine = builtEngine(Engine.layer({ root }));
+      answered = await waiting();
+      const bad = cli('answer', answered, 'shorter', '--budget', '$5');
+      assert.equal(bad.status, 2, bad.stderr);
+      assert.match(bad.stderr, /^answer: `--budget \$5` is not an amount of dollars\. Write dollars above 0, digits only/);
+      assert.match(cli('answer', answered, 'shorter', '--budget').stderr, /^answer: `--budget ` is not an amount of dollars/);
+      assert.equal((await journal(answered)).length, 4, 'nothing journalled');
+      const ok = cli('answer', answered, 'shorter,', 'please', '--budget', '0.5');
+      assert.equal(ok.status, 0, ok.stderr);
+      assert.match(ok.stdout, /answered\s+shorter, please  \(budget \$0\.5\)\n/);
+      const last = (await journal(answered)).at(-1)!;
+      assert.deepEqual(last.kind === 'input' ? [last.text, last.config] : last, ['shorter, please', { budgetUsd: 0.5 }]);
+    },
+  );
+  s.test('ae close of a task answered already, and ae answer with no words, each exit 2', () => {
+    const again = cli('close', answered);
+    assert.equal(again.status, 2);
+    assert.match(again.stderr, /^close: `t-.*` has been answered already/);
+    const empty = cli('answer', answered, '');
+    assert.equal(empty.status, 2);
+    assert.match(empty.stderr, /^answer: `text` is empty/);
+  });
+  s.test('ae close of a task that waits prints that the next tick settles it, and journals the close', async () => {
+    const c = await waiting();
+    const closed = cli('close', c);
+    assert.equal(closed.status, 0, closed.stderr);
+    assert.match(closed.stdout, /closed: the next tick settles it/);
+    assert.equal((await journal(c)).at(-1)!.kind, 'closed');
+  });
+  afterAll(() => {
     fs.rmSync(root, { recursive: true, force: true });
-  }
+  });
 });
 
 /**

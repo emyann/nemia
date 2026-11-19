@@ -209,7 +209,7 @@ describe(
       assert.equal(a.hold()?.parked, undefined, 'never parked');
     });
     s.test('grace 0 with a call in flight: the job parks with the call it cut, and leaves with its Claude Code gone', async (c) => {
-      const b = job(t, { call: 'Bash', cost: 0.25 });
+      const b = job(c, { call: 'Bash', cost: 0.25 });
       await until(
         c,
         () => b.hold()?.calling?.tool === 'Bash',
@@ -233,7 +233,7 @@ describe(
       assert.equal(wrote(b.dir, 'cost-state.jsonl').length, 1, 'and Claude Code ended on its own, saving its total, never killed');
     });
     s.test('held past a shortened bound between calls: the job parks with no call', async (c) => {
-      const d = job(t, { call: 'Bash', next: 'Edit' }, { holdMs: 1_000 });
+      const d = job(c, { call: 'Bash', next: 'Edit' }, { holdMs: 1_000 });
       await until(
         c,
         () => d.hold()?.calling?.tool === 'Bash',
@@ -252,7 +252,7 @@ describe(
       assert.equal(answered(d.dir, 'PreToolUse'), 1, 'and the held call never ran');
     });
     s.test('a sub-agent’s call is answered while the job’s calls are held', async (c) => {
-      const e = job(t, { nested: 'Read', fromSubAgent: true, hold: true });
+      const e = job(c, { nested: 'Read', fromSubAgent: true, hold: true });
       await until(c, () => wrote(e.dir, 'said.jsonl').length === 1, 'the session took its brief', { everyMs: 20 });
       putSessionDrain(e.root, { graceMs: LONG_GRACE_MS });
       await until(
@@ -274,7 +274,7 @@ describe(
       assert.equal(code, 0, e.err());
     });
     s.test('held after a call that ended: its hold file names that call as the one it stopped after', async (c) => {
-      const g = job(t, { call: 'Read', next: 'Edit' });
+      const g = job(c, { call: 'Read', next: 'Edit' });
       await until(
         c,
         () => g.hold()?.calling?.tool === 'Read',
@@ -297,7 +297,7 @@ describe(
       assert.equal(code, 0, g.err());
     });
     s.test('a drain put again with its grace keeps its `at`; put with another grace it is stamped anew and judged by it', async (c) => {
-      const h = job(t, { call: 'Bash' });
+      const h = job(c, { call: 'Bash' });
       await until(
         c,
         () => h.hold()?.calling?.tool === 'Bash',
@@ -326,7 +326,7 @@ describe(
       assert.equal(h.hold()?.parked?.calling?.tool, 'Bash', `parked at once with the call it cut: ${JSON.stringify(h.hold())}`);
     });
     s.test('a SIGTERM still ends a held job, and its Claude Code with it', async (c) => {
-      const f = job(t, { call: 'Bash' });
+      const f = job(c, { call: 'Bash' });
       putSessionDrain(f.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,

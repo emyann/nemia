@@ -75,13 +75,13 @@ export type Held = {
  * context, which a `beforeAll` has not; it files them here, and returns `end`, which Vitest runs after the describe's last test.
  */
 export function teardowns(): Held {
-  const fns: (() => unknown)[] = [];
+  const fns: ((...args: never[]) => unknown)[] = [];
   return {
     onTestFinished: (fn) => {
       fns.push(fn);
     },
     end: async () => {
-      for (const fn of fns.splice(0)) await fn();
+      for (const fn of fns.splice(0)) await (fn as () => unknown)();
     },
   };
 }

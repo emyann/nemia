@@ -203,8 +203,12 @@ describe('one broken run does not stop the others: each left out and said once, 
       runs.good = (await started('the good one')).id;
 
       const stderr = vi.spyOn(process.stderr, 'write');
-      const wrote = () => stderr.mock.calls.flatMap(([line]) => [String(line)]);
-      const now = await pass().finally(() => stderr.mockRestore());
+      let written: string[] = [];
+      const now = await pass().finally(() => {
+        written = stderr.mock.calls.flatMap(([line]) => [String(line)]);
+        stderr.mockRestore();
+      });
+      const wrote = () => written;
 
       assert.deepEqual(now.runs.find((a) => a.run.id === runs.good)?.filed, ['work'], 'the good run filed its step');
       for (const id of [runs.journal, runs.gone, runs.unplaced])

@@ -1274,7 +1274,8 @@ test('a record that does not read as a run stops no other run: the pass files th
   const broken = path.join(RUNS, 'r-broken.json');
   fs.writeFileSync(broken, JSON.stringify({ id: 'r-broken', brief: 'written by hand' }));
   const err = vi.spyOn(process.stderr, 'write');
-  const errs = () => err.mock.calls.flatMap(([chunk]) => [String(chunk)]);
+  let written: string[] = [];
+  const errs = () => written;
   try {
     const ticked = await printedBy(t, ['tick']);
     assert.deepEqual(b.filings, [`${run.id}-implement`]);
@@ -1286,6 +1287,7 @@ test('a record that does not read as a run stops no other run: the pass files th
     );
     await runWith(b.e, tickRun());
   } finally {
+    written = err.mock.calls.flatMap(([chunk]) => [String(chunk)]);
     err.mockRestore();
     fs.rmSync(broken);
   }

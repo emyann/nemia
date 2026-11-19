@@ -303,11 +303,13 @@ test("REFUSED at shipped defaults: a queued card on a daemon whose folder is no 
   aCard('no-git-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
 
   const stderr = vi.spyOn(process.stderr, 'write');
-  const said = () => stderr.mock.calls.flatMap(([chunk]) => [String(chunk)]);
+  let written: string[] = [];
+  const said = () => written;
   let pass: Effect.Success<ReturnType<typeof tickRun>>;
   try {
     pass = await runWith(b.e, tickRun());
   } finally {
+    written = stderr.mock.calls.flatMap(([chunk]) => [String(chunk)]);
     stderr.mockRestore();
   }
   assert.deepEqual(

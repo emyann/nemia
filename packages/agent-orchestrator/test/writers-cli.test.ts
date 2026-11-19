@@ -54,22 +54,21 @@ const DRAFTS = scratch('wf-writers-cli-drafts-');
 
 /** What this CLI's `main` printed on stdout for `nemia <argv>`, or the words it was refused with, its kind (`_tag`) and its exit code. */
 async function said(t: TestContext, ...argv: string[]) {
-  const out: string[] = [];
   const log = vi.spyOn(console, 'log');
   const err = vi.spyOn(console, 'error');
+  const out = () => log.mock.calls.map((args) => args.join(' '));
   try {
     await main(argv, engineOf(engine().layer), undefined, undefined, ENV);
-    return { out: out.join('\n') } satisfies { out: string; refused?: string; tag?: string; exitCode?: number };
+    return { out: out().join('\n') } satisfies { out: string; refused?: string; tag?: string; exitCode?: number };
   } catch (e) {
     const { message, _tag, exitCode } = e as Error & { _tag?: string; exitCode?: number };
-    return { out: out.join('\n'), refused: message, tag: _tag, exitCode } satisfies {
+    return { out: out().join('\n'), refused: message, tag: _tag, exitCode } satisfies {
       out: string;
       refused?: string;
       tag?: string;
       exitCode?: number;
     };
   } finally {
-    out.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
     err.mockRestore();
   }

@@ -50,14 +50,15 @@ function hostOf() {
 /** What `nemia <argv>` prints on stdout, over `host`. */
 async function printed(t: TestContext, argv: string[], host: () => DemandHost) {
   const linesSpy = vi.spyOn(console, 'log');
-  const lines = () => linesSpy.mock.calls.flatMap(([line]) => [String(line)]);
   vi.spyOn(console, 'error');
+  let lines: string[] = [];
   try {
     await main(argv, engineOf(engine().layer), host);
   } finally {
+    lines = linesSpy.mock.calls.flatMap(([line]) => [String(line)]);
     vi.restoreAllMocks();
   }
-  return lines().join('\n');
+  return lines.join('\n');
 }
 
 test('nemia daemon is served on the command line alone and starts the daemon as a command that ticks', () => {

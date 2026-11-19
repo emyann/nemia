@@ -955,7 +955,7 @@ test('`nemia up` says a task the runtime left out once while it lasts, and again
     said.every((l) => /^\d\d:\d\d:\d\d  left out: /.test(l)),
     'stamped as the daemon stamps every line',
   );
-  errors().length = 0;
+  errorsSpy.mockClear();
   e.setTick(async () => pass({ tasks: 2, unreadable: [bad, feed] }));
   assert.equal((await typed(t, ['tick'], e)).threw, undefined);
   assert.deepEqual(errors(), [`left out: ${bad}`, `left out: ${feed}`]);

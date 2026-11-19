@@ -177,15 +177,14 @@ const aStarted = (repo: string, brief: string, workflowDir = oneStep(), more: Pa
 
 /** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const typed = async (t: Finishes, ...argv: string[]) => {
-  const printed: string[] = [];
   const log = vi.spyOn(console, 'log');
+  const printed = () => log.mock.calls.map((a) => a.join(' ')).join('\n');
   try {
     await stage.main(argv);
-    return { printed: printed.join('\n'), error: undefined };
+    return { printed: printed(), error: undefined };
   } catch (err) {
-    return { printed: printed.join('\n'), error: err as Error & { exitCode?: number; _tag?: string } };
+    return { printed: printed(), error: err as Error & { exitCode?: number; _tag?: string } };
   } finally {
-    printed.push(...log.mock.calls.flatMap((a) => [a.join(' ')]));
     log.mockRestore();
   }
 };

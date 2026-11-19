@@ -84,7 +84,7 @@ export function teardowns(): Held {
       fns.push(fn);
     },
     end: async () => {
-      for (const fn of fns.splice(0)) await (fn as () => unknown)();
+      for (const fn of fns.splice(0)) await fn();
     },
   };
 }

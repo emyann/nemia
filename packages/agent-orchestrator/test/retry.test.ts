@@ -1781,8 +1781,7 @@ describe('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and
       text: string,
     ) => Effect.Effect<
       import('agent-runtime').Said,
-      import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
-      never
+      import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent
     >;
     file: (
       spec: import('agent-runtime').TaskSpec,

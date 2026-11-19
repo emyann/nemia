@@ -83,7 +83,7 @@ const makeAll = (): void => {
 /** The test or `describe` at the head of the file that `task` belongs to. */
 const headOf = (task: { suite?: unknown; file: unknown }): unknown => {
   let top: { suite?: unknown } = task;
-  while (top.suite && top.suite !== task.file) top = top.suite as { suite?: unknown };
+  while (top.suite && top.suite !== task.file) top = top.suite;
   return top;
 };
 

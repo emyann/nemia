@@ -20,7 +20,7 @@ const PACKAGE = path.join(import.meta.dirname, '..');
 /** The default timeout a package's `vitest.config.ts` gives every test (`testTimeout: <ms>`), or null for none. */
 const defaultTimeout = (config: string): number | null => {
   const m = /^\s*testTimeout:\s*([1-9][\d_]*),/m.exec(config);
-  return m ? Number(m[1]!.replaceAll('_', '')) : null;
+  return m ? Number(m[1].replaceAll('_', '')) : null;
 };
 
 /**

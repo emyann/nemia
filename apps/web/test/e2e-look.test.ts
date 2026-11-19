@@ -22,7 +22,7 @@ const projected = (config: string, project: string, key: string): number | null 
   if (at < 0) return null;
   const next = config.indexOf("name: '", at + 1);
   const m = new RegExp(`\\b${key}:\\s*([\\d_]+)`).exec(config.slice(at, next < 0 ? undefined : next));
-  return m ? Number(m[1]!.replaceAll('_', '')) : null;
+  return m ? Number(m[1].replaceAll('_', '')) : null;
 };
 
 /**

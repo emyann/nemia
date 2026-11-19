@@ -996,10 +996,8 @@ describe('a composite of harnesses routes every verb to the harness that owns th
   let b!: Map<string, Sighting>;
   let c!: Map<string, Sighting>;
   let alpha!: {
-    release: (seen: Sighting) => Effect.Effect<void, never, never>;
-    observeFor: (
-      expected: readonly { name: string }[],
-    ) => Effect.Effect<{ seen: Map<string, Sighting>; unread: Set<string> }, never, never>;
+    release: (seen: Sighting) => Effect.Effect<void, never>;
+    observeFor: (expected: readonly { name: string }[]) => Effect.Effect<{ seen: Map<string, Sighting>; unread: Set<string> }, never>;
     spawn: (r: import('../src/index.ts').SpawnRequest) => Effect.Effect<void, RunnerError>;
     observe: Effect.Effect<Map<string, Sighting>, RunnerError>;
     find?: (name: string) => Effect.Effect<{ sessionId: string } | undefined, RunnerError>;

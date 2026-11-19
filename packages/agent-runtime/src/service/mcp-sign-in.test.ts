@@ -80,11 +80,11 @@ describe('a person signs in with a secret, the server connects, and they sign ou
     mcpSignIn: (
       name: string,
       server: RemoteMcpServer,
-      clientSecret?: string | undefined,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+      clientSecret?: string,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
     mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
   };
   beforeAll(() => {
     const t = teardowns();
@@ -134,11 +134,11 @@ describe('a server signed in with no secret runs no CLI, connects, and is signed
     mcpSignIn: (
       name: string,
       server: RemoteMcpServer,
-      clientSecret?: string | undefined,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+      clientSecret?: string,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
     mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
   };
   beforeAll(() => {
     const t = teardowns();
@@ -180,11 +180,11 @@ describe('a second sign-in on a port a first one holds is refused until the firs
     mcpSignIn: (
       name: string,
       server: RemoteMcpServer,
-      clientSecret?: string | undefined,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+      clientSecret?: string,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
     mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
   };
   beforeAll(async () => {
     const t = teardowns();
@@ -284,11 +284,11 @@ describe('a person whose browser runs elsewhere pastes back the address it lande
     mcpSignIn: (
       name: string,
       server: RemoteMcpServer,
-      clientSecret?: string | undefined,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused, never>;
+      clientSecret?: string,
+    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
     mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused, never>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused, never>;
+    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
+    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
   };
   beforeAll(() => {
     const t = teardowns();

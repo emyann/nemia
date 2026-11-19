@@ -453,7 +453,7 @@ describe(
     ];
     cursors(0).forEach(([name], i) =>
       test(`a cursor the feed never gave is a 400 naming it and what to pass: ${name}`, () => {
-        const [, query, headers, facts] = cursors(size)[i]!;
+        const [, query, headers, facts] = cursors(size)[i];
         return refusedBefore(query, headers, 400, [...facts, ...whatToPass]);
       }),
     );

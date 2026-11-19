@@ -21,7 +21,7 @@ const PACKAGE = path.join(TEST, '..');
 const defaultTimeout = (config: string): number | null => {
   const at = config.indexOf("name: 'node'");
   const m = at < 0 ? null : /\btestTimeout:\s*([1-9][\d_]*)/.exec(config.slice(at));
-  return m ? Number(m[1]!.replaceAll('_', '')) : null;
+  return m ? Number(m[1].replaceAll('_', '')) : null;
 };
 
 /**

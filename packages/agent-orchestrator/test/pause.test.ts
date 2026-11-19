@@ -118,7 +118,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
   let CHECKED!: string;
   let SHIP!: string;
   let stopping!: {
-    stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').JournalError | import('agent-runtime').StopRefused, never>;
+    stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').JournalError | import('agent-runtime').StopRefused>;
     file: (
       spec: import('agent-runtime').TaskSpec,
     ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;

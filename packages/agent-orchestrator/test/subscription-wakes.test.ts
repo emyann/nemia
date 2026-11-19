@@ -274,8 +274,7 @@ describe(
         text: string,
       ) => Effect.Effect<
         import('agent-runtime').Said,
-        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
-        never
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent
       >;
       file: (
         spec: import('agent-runtime').TaskSpec,
@@ -580,8 +579,7 @@ describe(
         text: string,
       ) => Effect.Effect<
         import('agent-runtime').Said,
-        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
-        never
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent
       >;
       file: (
         spec: import('agent-runtime').TaskSpec,
@@ -767,8 +765,7 @@ describe(
         text: string,
       ) => Effect.Effect<
         import('agent-runtime').Said,
-        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
-        never
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent
       >;
       file: (
         spec: import('agent-runtime').TaskSpec,
@@ -978,8 +975,7 @@ describe(
         text: string,
       ) => Effect.Effect<
         import('agent-runtime').Said,
-        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
-        never
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent
       >;
       file: (
         spec: import('agent-runtime').TaskSpec,
@@ -1190,8 +1186,7 @@ describe(
         text: string,
       ) => Effect.Effect<
         import('agent-runtime').Said,
-        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
-        never
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent
       >;
       file: (
         spec: import('agent-runtime').TaskSpec,
@@ -1401,8 +1396,7 @@ describe(
         text: string,
       ) => Effect.Effect<
         import('agent-runtime').Said,
-        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent,
-        never
+        import('agent-runtime').JournalError | import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent
       >;
       file: (
         spec: import('agent-runtime').TaskSpec,
@@ -1532,7 +1526,7 @@ describe(
         onError?: (e: unknown) => void;
       }) => Effect.Effect<{ stop: () => void }>;
     };
-    let door!: Layer.Layer<never, never, never>;
+    let door!: Layer.Layer<never, never>;
     let d!: ReturnType<typeof delivering>;
     beforeAll(() => {
       const t = teardowns();

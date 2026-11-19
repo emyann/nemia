@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { ThemesOf } from '../../contracts/page-themes.contract.ts';
 import type { PageSpec, Theme } from './visit.ts';
 
 export const PAGES_DIR = path.join(import.meta.dirname, 'pages');
@@ -125,12 +126,19 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
 }
 
 /**
+ * The themes a run visits its pages in, dark last: light first where `--light` or `--contrast` asks for it, never by `--photos` alone.
+ * @param asked What the command line asked: pictures, light pictures besides, the contrast's measure.
+ */
+export const themesOf: ThemesOf = (asked) => (asked.light || asked.contrast ? ['light', 'dark'] : ['dark']);
+
+/**
  * What a run of the e2e does, read from its command line: the pages it `visit`s, in their order; the `themes` it visits them in; whether a
- * page is `pictured`; how many `workers` it asks for, if it does; and whether it is `whole` — every page, in the dark theme alone, the run
+ * page is `pictured`; whether it asked for `photos` and for `light`, which run.ts hands its workers; how many `workers` it asks for, if it does; and whether it is `whole` — every page, in the dark theme alone, the run
  * a check makes, which is held to the e2e's bound (`overBound`, timing.ts). With no flag, every page in the dark theme, pictured by none:
- * the assertions alone. `--photos` visits light, then dark, and pictures each page visited; `--pages <name,…>` visits only the pages
+ * the assertions alone. `--photos` pictures each page visited, in the dark theme alone; `--light`, with `--photos`, visits light first
+ * and pictures it too, and is refused without it (`themesOf`); `--pages <name,…>` visits only the pages
  * named, in the order of the pages, and with `--photos` pictures them; `--contrast`, with `--photos`, has each picture's text pairs
- * `measured` beside it (contrast.ts), and is refused without it; `--workers <n>` sets how many workers visit them; and
+ * `measured` beside it (contrast.ts), in both themes, light then dark, and is refused without it; `--workers <n>` sets how many workers visit them; and
  * `--shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist (`shardOf`). A shard is no whole run either, so its
  * pages are never summed against their bound: a reporter sums every shard's instead (pages-bound.ts). Refuses a flag it does not know, a
  * name that is no page (listing the pages there are), `--pages` with no name after it, `--workers` with no whole number of one or more,
@@ -149,6 +157,8 @@ export function planOf<P extends { name: string }>(
   visit: P[];
   themes: Theme[];
   pictured: (name: string) => boolean;
+  photos: boolean;
+  light: boolean;
   measured: boolean;
   workers?: number;
   shard?: { i: number; of: number };
@@ -157,6 +167,7 @@ export function planOf<P extends { name: string }>(
 } {
   let look = false;
   let photos = false;
+  let light = false;
   let measured = false;
   let named: string[] | undefined;
   let workers: number | undefined;
@@ -165,6 +176,7 @@ export function planOf<P extends { name: string }>(
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--look') look = true;
     else if (argv[i] === '--photos') photos = true;
+    else if (argv[i] === '--light') light = true;
     else if (argv[i] === '--contrast') measured = true;
     else if (argv[i] === '--pages') named = namesAfter(argv[++i]);
     else if (argv[i] === '--workers') workers = workersAfter(argv[++i]);
@@ -172,7 +184,7 @@ export function planOf<P extends { name: string }>(
     else if (argv[i] === '--of') of = wholeAfter('--of', 'the whole number of shards', argv[++i]);
     else
       throw new Error(
-        `the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not ${argv[i]}: ` +
+        `the e2e takes --look, --photos, --light, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not ${argv[i]}: ` +
           'npm run e2e -- --photos --pages <name,…>',
       );
   }
@@ -195,20 +207,24 @@ export function planOf<P extends { name: string }>(
       "--look runs the look's tests once, and a shard is one of several runs of the pages: run them apart " +
         '(npm run e2e -- --look, and npm run e2e -- --shard 1 --of 4)',
     );
-  if (look && !named && (photos || measured || workers !== undefined))
+  if (look && !named && (photos || light || measured || workers !== undefined))
     throw new Error(
-      '--photos, --contrast and --workers are about the pages a run visits, and --look alone visits none: name them ' +
+      '--photos, --light, --contrast and --workers are about the pages a run visits, and --look alone visits none: name them ' +
         '(npm run e2e -- --look --pages <name,…> --photos)',
     );
   if (measured && !photos)
     throw new Error('--contrast measures what is pictured, and nothing is without --photos: npm run e2e -- --photos --contrast');
-  const themes: Theme[] = photos ? ['light', 'dark'] : ['dark'];
+  if (light && !photos)
+    throw new Error('--light pictures the pages in the light theme too, and nothing is pictured without --photos: npm run e2e -- --photos --light');
+  const themes: Theme[] = [...themesOf({ photos, light, contrast: measured })];
   if (shard !== undefined && of !== undefined) {
     if (named) throw new Error('--shard deals the pages itself and --pages names them: give one of the two, not both (--shard 1 --of 4)');
     return {
       visit: shardOf(pages, shard, of),
       themes,
       pictured: (name) => photos && name !== '',
+      photos,
+      light,
       measured,
       workers,
       shard: { i: shard, of },
@@ -216,8 +232,8 @@ export function planOf<P extends { name: string }>(
       look: false,
     };
   }
-  if (look && !named) return { visit: [], themes, pictured: () => false, measured, workers, whole: false, look };
-  if (!named) return { visit: [...pages], themes, pictured: () => photos, measured, workers, whole: !photos, look: true };
+  if (look && !named) return { visit: [], themes, pictured: () => false, photos, light, measured, workers, whole: false, look };
+  if (!named) return { visit: [...pages], themes, pictured: () => photos, photos, light, measured, workers, whole: !photos, look: true };
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
   if (unknown.length)
@@ -227,6 +243,8 @@ export function planOf<P extends { name: string }>(
     visit: pages.filter((p) => chosen.has(p.name)),
     themes,
     pictured: (name) => photos && chosen.has(name),
+    photos,
+    light,
     measured,
     workers,
     whole: false,

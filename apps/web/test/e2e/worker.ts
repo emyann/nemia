@@ -2,7 +2,7 @@
  * One worker of `npm run e2e` (run.ts starts them): a store of its own, seeded, served by an api and `vite preview` of its own, and its
  * share of the pages visited in a browser of its own, so no page's write crosses into another worker's pages.
  *
- *     node test/e2e/worker.ts --worker <i> --store <empty dir> --result <file> [--pages <name,…>] [--photos]
+ *     node test/e2e/worker.ts --worker <i> --store <empty dir> --result <file> [--pages <name,…>] [--photos [--light] [--contrast]]
  *
  * Started by run.ts, it asks run.ts for each page it visits next, over the channel run.ts opens with it; started by hand, it visits
  * every page its plan names, in their order.
@@ -54,7 +54,7 @@ function argsOf(argv: readonly string[]): { worker: number; store: string; resul
   }
   const worker = Number(own['--worker']);
   if (!Number.isInteger(worker) || !own['--store'] || !own['--result'])
-    throw new Error('usage: node test/e2e/worker.ts --worker <i> --store <empty dir> --result <file> [--pages <name,…>] [--photos]');
+    throw new Error('usage: node test/e2e/worker.ts --worker <i> --store <empty dir> --result <file> [--pages <name,…>] [--photos [--light] [--contrast]]');
   return { worker, store: own['--store'], result: own['--result'], rest };
 }
 

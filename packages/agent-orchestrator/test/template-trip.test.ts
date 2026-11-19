@@ -34,6 +34,7 @@ import { factoryTyped } from './factory-typed.ts';
 import type { StartedAnswer } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { volumeBase } from '../src/factory/volume/volume.ts';
 
 const ROOT = scratch('wf-template-trip-');
 const CONFIG = scratch('wf-template-trip-harness-');
@@ -198,7 +199,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
   });
 
   await s.test("apply of the archive with --set files only the factory's file, and trusts the repository it names", async () => {
-    const made = (await stage.main(['factory', 'apply', 'trip', '--template', archive, '--repo', repo, '--set', 'budget=7'])) as {
+    const made = (await stage.main(['factory', 'apply', 'trip', '--template', archive, '--volume', `${repo}:rw`, '--set', 'budget=7'])) as {
       trusts: ReadonlyArray<{ place: string; wrote?: boolean }>;
     };
     assert.deepEqual(
@@ -206,7 +207,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
       ['trip.json'],
     );
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(FACTORIES, 'trip.json'), 'utf8')), {
-      repos: [repo],
+      volumes: [{ path: repo, readOnly: false, name: volumeBase(repo) }],
       template: { source: archive, version: '0.1.0', params: { budget: 7, model: 'opus' } },
       generation: 1,
     });
@@ -217,7 +218,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
       'none is applied before the controller renders it',
     );
     await assert.rejects(
-      stage.main(['factory', 'apply', 'trip', '--template', archive, '--repo', repo, '--set', 'budget=7']),
+      stage.main(['factory', 'apply', 'trip', '--template', archive, '--volume', `${repo}:rw`, '--set', 'budget=7']),
       (err: Error & { exitCode?: number; _tag?: string }) => err._tag === 'Conflict' && err.exitCode === 2,
     );
     assert.deepEqual(trusted(), [repo]);

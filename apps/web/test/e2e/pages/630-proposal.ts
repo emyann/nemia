@@ -4,7 +4,7 @@ import type { Locator, Page, Request } from 'playwright';
 import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf, trailLevel } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { WAITING_SELECTOR } from '../../../src/lib/api/proposals.ts';
-import { AGENTS, WORKFLOWS } from '../seed.ts';
+import { AGENTS, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -368,7 +368,10 @@ export default {
   route: '/runs',
   expect: async (page) => {
     const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
-    fs.writeFileSync(factoryFile, JSON.stringify({ repos: [path.join(store!, 'checkout')], workflows: [WORKFLOWS.yours.name] }, null, 2));
+    fs.writeFileSync(
+      factoryFile,
+      JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [WORKFLOWS.yours.name] }, null, 2),
+    );
     let back = (): void => undefined;
     try {
       const name = await proposed(page);

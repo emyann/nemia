@@ -84,7 +84,7 @@ export const volumeObject = Effect.fn('volumeObject')(function* (
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({
-        message: `the factory ${namespace} mounts no volume ${name}: list them with nemia factory, or mount one with nemia factory volume add ${namespace} <path>:ro|:rw`,
+        message: `the factory ${namespace} mounts no volume ${name}: list them with nemia factory, or mount one with nemia factory volume add ${namespace} <path|url>:ro|:rw`,
       }),
     );
   return found;

@@ -47,7 +47,7 @@ function pmillIn(home: string): void {
   const repo = scratch('nemia-api-install-pmill-repo-');
   write(
     path.join(home, 'factories', 'pmill.json'),
-    JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+    JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   const tree = path.join(home, 'factories', 'pmill', 'tree');
   write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
@@ -208,7 +208,7 @@ test('an install with no repository and no factory named: yours is created, read
     pmillIn(home);
     const factories = await got<FactoryList>('/api/factories');
     assert.deepEqual(
-      factories.items.map((f) => [f.metadata.name, f.spec.repos.length]),
+      factories.items.map((f) => [f.metadata.name, f.spec.volumes.filter((v) => !v.readOnly).length]),
       [
         ['default', 0],
         ['pmill', 1],

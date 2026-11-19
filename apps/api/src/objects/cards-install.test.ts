@@ -37,7 +37,7 @@ const { app } = appOf(Layer.merge(liveOf(env), ApiConfig.layer(env, running)));
 const millRepo = scratch('nemia-api-cards-install-repo-');
 fs.mkdirSync(path.join(millRepo, 'workflows', 'dev'), { recursive: true });
 fs.writeFileSync(path.join(millRepo, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
-addFactory({ name: 'mill', repos: [millRepo] });
+addFactory({ name: 'mill', volumes: [millRepo].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'mill', workflow: 'dev' });
 
 const JSON_TYPE = { 'content-type': 'application/json' };

@@ -49,7 +49,7 @@ beforeEachTest(() => {
     closeout: { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] },
   });
 });
-addFactory({ name: 'bf', repos: [root] });
+addFactory({ name: 'bf', volumes: [root].map((r) => `${r}:rw`) });
 fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
 fs.writeFileSync(path.join(root, 'inbox', 'c-bound.md'), 'Do it.\n');
 

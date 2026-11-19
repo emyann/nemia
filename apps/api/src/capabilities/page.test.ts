@@ -23,10 +23,12 @@ type FactoryListing = import('agent-orchestrator').FactoryListing;
 type Running = import('agent-orchestrator').Running;
 
 /** A factory as `placeFor` gives it, on `repos`. */
-const factoryOn = (name: string, repos: string[]): Factory => ({ name, repos, workflows: [], hires: {} }) as unknown as Factory;
+const factoryOn = (name: string, repos: string[]): Factory =>
+  ({ name, volumes: repos.map((at) => ({ path: at, readOnly: false })), workflows: [], hires: {} }) as unknown as Factory;
 
 /** A listing of the store's factory `name` on `repos`, as `listedAtOnce` gives it. */
-const listedOn = (name: string, repos: string[]): FactoryListing => ({ name, repos }) as unknown as FactoryListing;
+const listedOn = (name: string, repos: string[]): FactoryListing =>
+  ({ name, volumes: repos.map((at) => ({ path: at, readOnly: false })) }) as unknown as FactoryListing;
 
 test('pageRead: the repository the page reads, or why none', async (t) => {
   const rows: Array<{
@@ -186,10 +188,10 @@ test('an install unpacked from an archive, its source an address: the page reads
 
   await s.test('the default factory is on no repository, and a read that needs one is refused, naming the fix', async () => {
     const factories = (await (await app.request('/api/factories')).json()) as {
-      items: Array<{ metadata: { name: string }; spec: { repos: string[] } }>;
+      items: Array<{ metadata: { name: string }; spec: { volumes: Array<{ path: string }> } }>;
     };
     const fallback = factories.items.find((f) => f.metadata.name === 'default');
-    assert.deepEqual(fallback?.spec.repos, [], 'the default factory lists no repository, never the address');
+    assert.deepEqual(fallback?.spec.volumes, [], 'the default factory lists no volume, never the address');
     const refused = await app.request('/api/repository');
     assert.equal(refused.status, 422);
     namesNoAddress(await refused.json());
@@ -197,7 +199,7 @@ test('an install unpacked from an archive, its source an address: the page reads
 
   const repoA = repoWithSkill('a');
   await s.test('one factory filed on one repository: the page reads it, with no factory named', async () => {
-    addFactory({ name: 'alpha', repos: [repoA] });
+    addFactory({ name: 'alpha', volumes: [repoA].map((r) => `${r}:rw`) });
     const answer = await page();
     assert.equal(answer.repo, repoA);
     assert.equal(answer.unread, undefined);
@@ -212,7 +214,7 @@ test('an install unpacked from an archive, its source an address: the page reads
   await s.test(
     'a second factory, on two repositories: pick a factory; named, pick one of its repositories; each read by ?repo=',
     async () => {
-      addFactory({ name: 'beta', repos: [repoB, repoC] });
+      addFactory({ name: 'beta', volumes: [repoB, repoC].map((r) => `${r}:rw`) });
       assert.equal((await page()).unread?.reason, 'several-factories');
       assert.equal((await page('?factory=alpha')).repo, repoA, 'the factory the picker names');
       const pick = (await page('?factory=beta')).unread;

@@ -7,7 +7,7 @@
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -24,6 +24,7 @@ after(store.stop);
 const here = scratch('nemia-factories-here-');
 const repo = path.join(here, 'mill');
 write(path.join(repo, 'workflows', 'make', 'code.md'), '---\nplace: git\n---\nDo code.\n');
+execFileSync('git', ['init', '-q'], { cwd: repo });
 fs.mkdirSync(path.join(here, 'notes'));
 write(path.join(here, 'RULES.md'), 'Say what you changed.\n');
 write(path.join(here, 'NEMIA.md'), 'The mill presses drafts.\n');
@@ -60,7 +61,7 @@ test('a person files a factory, wires its parts, sees each in the listing, and r
   const s = story(t);
 
   await s.test('`factory add` with a repository typed relative files it on the folder by its whole path', async () => {
-    const said = await out(['factory', 'add', 'mill', '--repo', 'mill', '--no-trust']);
+    const said = await out(['factory', 'add', 'mill', '--volume', 'mill:rw', '--no-trust']);
     assert.match(said, new RegExp(`^mill  ${repo}$`, 'm'));
     assert.match(said, /^filed: .*mill\.json$/m);
     assert.match(await out(['factory', 'ls']), new RegExp(`^mill +${repo}$`, 'm'));

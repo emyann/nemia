@@ -40,11 +40,11 @@ To work on the board itself, `npm run dev` at the root runs an api on port 8788 
 
 ## Make a factory
 
-A run is started in a [factory](/factories/): a name for the repositories the work is on, the workflows it offers and the agents it
+A run is started in a [factory](/factories/): a name for its volumes, the repositories the work is on (`:rw`), the workflows it offers and the agents it
 hires into their steps.
 
 ```bash
-nemia factory add pipao --repo ~/code/pipao
+nemia factory add pipao --volume ~/code/pipao:rw
 nemia factory attach pipao build
 nemia factory hire pipao ada --step build/implement
 ```

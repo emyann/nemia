@@ -59,7 +59,8 @@ test("a factory's level said on the feed: each change of the level in force is o
   const b = stage.board();
   Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
   const pass = () => stage.runWith(b.e, tickRun());
-  for (const name of ['acme', 'quiet']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+  for (const name of ['acme', 'quiet'])
+    addFactoryAt(ROOT, { name, volumes: [fs.mkdtempSync(path.join(ROOT, `${name}-`))].map((r) => `${r}:rw`) });
 
   await s.test('every factory at manual: a pass says no level', async () => {
     await pass();

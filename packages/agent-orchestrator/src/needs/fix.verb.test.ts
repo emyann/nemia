@@ -138,7 +138,7 @@ test("a workflow's fix of a factory whose places are not trusted is refused, nam
     path.join(dir, 'README.md'),
     '---\nneeds:\n  - name: tool\n    message: the tool\n    check: exit 1\n    fixes:\n      - command: echo installed\n        message: install it\n---\n',
   );
-  createFactoryAt(ROOT, { name: 'acme', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'acme', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
   const refused = await refusedBy(startFix({ need: 'tool', factory: 'acme', workflow: 'dev' }));
   assert.ok(refused instanceof Invalid);
   assert.match(refused.message, /nemia factory trust acme/);
@@ -168,7 +168,7 @@ test("the store's tools need is found by its name and filed in the store's folde
 test("a repository need named by its factory alone runs in the factory's repository once trusted, and is refused, naming the trust, before", async () => {
   const repo = scratch('wf-fix-toolchain-');
   stand().world.repository(repo, { 'a.txt': 'one\n' });
-  createFactoryAt(ROOT, { name: 'tooled', repos: [repo], workflows: [], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'tooled', volumes: [{ path: repo, readOnly: false }], workflows: [], hires: {}, schedules: {} });
   const refused = await refusedBy(startFix({ need: 'toolchain', factory: 'tooled' }));
   assert.ok(refused instanceof Invalid);
   assert.match(refused.message, /nemia factory trust tooled/);
@@ -200,7 +200,7 @@ test("a workflow's need of scope repository is fixed in its factory's repository
     path.join(dir, 'README.md'),
     ['---', 'needs:', ...need('inside', '    scope: repository'), ...need('outside'), '---', ''].join('\n'),
   );
-  createFactoryAt(ROOT, { name: 'scoped', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'scoped', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
   await run(trustPlaces([repo]));
   const inside = engine().tasks.get((await run(startFix({ need: 'inside', factory: 'scoped', workflow: 'dev' }))).id)?.spec;
   assert.ok(inside);

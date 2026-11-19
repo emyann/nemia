@@ -58,7 +58,7 @@ function aRepo(): string {
 function fresh(): { repo: string; dev: string; file: string } {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const repo = aRepo();
-  addFactoryAt(ROOT, { name: 'pipao', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'dev' });
   return { repo, dev: path.join(teamCopy('wf-factory-rules-team-'), 'dev'), file: path.join(ROOT, 'factories', 'pipao', 'RULES.md') };
 }

@@ -215,14 +215,14 @@ clones the repository with the credentials of step 5. Here it is the builtin tem
 on GitHub:
 
 ```bash
-nemia factory apply mill --template sdlc --set github=true --repo https://github.com/<owner>/<repo>.git
+nemia factory apply mill --template sdlc --set github=true --volume https://github.com/<owner>/<repo>.git:rw
 ```
 
-A clone that fails is refused with git's own words and the setup to do, and nothing is filed. A `--repo` that is a folder rather than a
+A clone that fails is refused with git's own words and the setup to do, and nothing is filed. A `--volume` that is a folder rather than a
 URL names a folder of the server, so the server refuses it from the laptop: type that one on the server.
 
 On v1.4.0 and earlier, which file a factory by URL on the server alone, type the same command there, as
-`ssh <server> '~/.local/bin/nemia factory apply mill --template sdlc --set github=true --repo <url>'`.
+`ssh <server> '~/.local/bin/nemia factory apply mill --template sdlc --set github=true --repo <url>'`, the flag those releases took.
 
 With `github=true`, the factory waits on the repository's CI context, named ci unless you set another
 ([its parameters](/sdlc/#its-parameters)). [Before you apply it on GitHub](/sdlc/#before-you-apply-it-on-github) says what the

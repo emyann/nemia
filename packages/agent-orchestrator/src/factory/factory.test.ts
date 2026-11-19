@@ -32,8 +32,14 @@ import {
   workflowNameRefusal,
 } from './factory.ts';
 
-/** A factory on `repos`, attaching and hiring nothing. */
-const on = (name: string, ...repos: string[]) => ({ name, repos, workflows: [], hires: {}, schedules: {} });
+/** A factory working on `repos`, its writable volumes, attaching and hiring nothing. */
+const on = (name: string, ...repos: string[]) => ({
+  name,
+  volumes: repos.map((path) => ({ path, readOnly: false })),
+  workflows: [],
+  hires: {},
+  schedules: {},
+});
 
 const DEFAULT_LINE = 'default  every run and card that names no factory — read, never written';
 
@@ -144,11 +150,17 @@ test('what a refused start names: the factory, the workflow, the steps, the fold
     },
   );
   await t.test('outsideRefusal: taken as path.resolve spells both; REFUSED naming the list, sorted, the --repo and the add', () => {
-    const pipao = { name: 'pipao', repos: ['/r/b', '/r/a/'] };
+    const pipao = {
+      name: 'pipao',
+      volumes: [
+        { path: '/r/b', readOnly: false },
+        { path: '/r/a/', readOnly: false },
+      ],
+    };
     assert.equal(outsideRefusal(pipao, '/r/a'), undefined);
     assert.equal(outsideRefusal(pipao, '/r/b/'), undefined);
     const why = outsideRefusal(pipao, '/r/c');
-    names(why, '/r/c', 'pipao', '/r/a, /r/b', '--repo /r/a', 'nemia factory add <name> --repo /r/c');
+    names(why, '/r/c', '/r/a, /r/b', '--repo /r/a', 'nemia factory volume add pipao /r/c:rw');
     assert.doesNotMatch(why!, /default factory/);
   });
   await t.test(
@@ -158,14 +170,14 @@ test('what a refused start names: the factory, the workflow, the steps, the fold
         noFactoryRefusal('/s/loose', ['pipao', 'abc'], '--factory <name>', ['broken']),
         '/s/loose',
         '--factory <name>, one of abc, pipao',
-        'nemia factory add <name> --repo <root>',
+        'nemia factory add <name> --volume <root>:rw',
         'nemia factory attach <name> <workflow>',
         'broken',
         'nemia factory ls',
       ),
   );
   await t.test("noFactoryRefusal: with none filed, the api's fix once one is", () =>
-    names(noFactoryRefusal('/s/loose', [], '?factory=<name>'), '?factory=<name>', 'nemia factory add <name> --repo <root>'),
+    names(noFactoryRefusal('/s/loose', [], '?factory=<name>'), '?factory=<name>', 'nemia factory add <name> --volume <root>:rw'),
   );
   await t.test('ambiguousFactoryRefusal: REFUSED naming each holder with its repository, by name, and the fix for each', () =>
     names(
@@ -203,7 +215,7 @@ test('what a refused start names: the factory, the workflow, the steps, the fold
 
 test('noFactoryLine: no factory of that name, naming those there are, or the add when there is none but the default', async (t) => {
   await t.test('some filed', () => names(noFactoryLine('nope', ['pipao', 'abc']), 'nope', 'abc, pipao'));
-  await t.test('none filed', () => names(noFactoryLine('nope', []), 'nope', 'nemia factory add <name> --repo <path>'));
+  await t.test('none filed', () => names(noFactoryLine('nope', []), 'nope', 'nemia factory add <name> --volume <path|url>:rw'));
 });
 
 test("fillsOf: a factory's hires into one workflow's steps, by step, and none of another workflow's", async (t) => {
@@ -217,8 +229,13 @@ test("fillsOf: a factory's hires into one workflow's steps, by step, and none of
 });
 
 test("factoryRepo: the repository of a run in a factory: the one named, else the factory's only one, else where it is started from", async (t) => {
-  const one = { repos: ['/r/pipao'] };
-  const two = { repos: ['/r/b', '/r/a'] };
+  const one = { volumes: [{ path: '/r/pipao', readOnly: false }] };
+  const two = {
+    volumes: [
+      { path: '/r/b', readOnly: false },
+      { path: '/r/a', readOnly: false },
+    ],
+  };
   await t.test('a named repository over everything', () => assert.equal(factoryRepo(one, '/r/other', '/here'), '/r/other'));
   await t.test('the only repository, wherever it is started from', () => assert.equal(factoryRepo(one, undefined, '/here'), '/r/pipao'));
   await t.test('with two, where it is started from', () => assert.equal(factoryRepo(two, undefined, '/here'), '/here'));
@@ -262,18 +279,56 @@ test('every factory that holds a folder is returned, none chosen: one repository
 test("instructionAt: a factory's instruction in its first folder as filed, at NEMIA.md or the path its file names, or the store's file", async (t) => {
   const store = '/s/factories/pipao/NEMIA.md';
   await t.test('NEMIA.md, in the first folder', () =>
-    assert.deepEqual(instructionAt({ repos: ['/b', '/a'] }, store), { in: 'folder', folder: '/b', path: 'NEMIA.md', file: '/b/NEMIA.md' }),
+    assert.deepEqual(
+      instructionAt(
+        {
+          name: 'acme',
+          volumes: [
+            { path: '/b', readOnly: false },
+            { path: '/a', readOnly: false },
+          ],
+        },
+        store,
+      ),
+      { in: 'folder', folder: '/b', path: 'NEMIA.md', file: '/b/NEMIA.md' },
+    ),
   );
   await t.test('the path its file names', () =>
-    assert.deepEqual(instructionAt({ repos: ['/b', '/a'], instruction: { path: 'docs/X.md' } }, store), {
-      in: 'folder',
-      folder: '/b',
-      path: 'docs/X.md',
-      file: '/b/docs/X.md',
-    }),
+    assert.deepEqual(
+      instructionAt(
+        {
+          name: 'acme',
+          volumes: [
+            { path: '/b', readOnly: false },
+            { path: '/a', readOnly: false },
+          ],
+          instruction: { path: 'docs/X.md' },
+        },
+        store,
+      ),
+      {
+        in: 'folder',
+        folder: '/b',
+        path: 'docs/X.md',
+        file: '/b/docs/X.md',
+      },
+    ),
   );
   await t.test("the store's file", () =>
-    assert.deepEqual(instructionAt({ repos: ['/b', '/a'], instruction: { store: true } }, store), { in: 'store', file: store }),
+    assert.deepEqual(
+      instructionAt(
+        {
+          name: 'acme',
+          volumes: [
+            { path: '/b', readOnly: false },
+            { path: '/a', readOnly: false },
+          ],
+          instruction: { store: true },
+        },
+        store,
+      ),
+      { in: 'store', file: store },
+    ),
   );
 });
 
@@ -294,9 +349,26 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
   await t.test('the default alone', () => assert.deepEqual(factoryLines([]), [DEFAULT_LINE]));
   await t.test('each by name with its repositories, and one that does not read with why', () => {
     const factories = [
-      { name: 'pipao', file: '/s/factories/pipao.json', repos: ['/code/pipao'], workflows: [], hires: {}, schedules: {} },
+      {
+        name: 'pipao',
+        file: '/s/factories/pipao.json',
+        volumes: [{ path: '/code/pipao', readOnly: false }],
+        workflows: [],
+        hires: {},
+        schedules: {},
+      },
       { name: 'broken', file: '/s/factories/broken.json', error: 'does not read as a factory: `repos` is missing' },
-      { name: 'abc', file: '/s/factories/abc.json', repos: ['/code/a', '/code/b'], workflows: [], hires: {}, schedules: {} },
+      {
+        name: 'abc',
+        file: '/s/factories/abc.json',
+        volumes: [
+          { path: '/code/a', readOnly: false },
+          { path: '/code/b', readOnly: false },
+        ],
+        workflows: [],
+        hires: {},
+        schedules: {},
+      },
     ];
     assert.deepEqual(factoryLines(factories), [
       DEFAULT_LINE,
@@ -306,7 +378,14 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
     ]);
   });
   await t.test('its harness settings, each by its key with its value, and none for a factory that sets none', () => {
-    const acme = { name: 'acme', file: '/s/factories/acme.json', repos: ['/code/acme'], workflows: [], hires: {}, schedules: {} };
+    const acme = {
+      name: 'acme',
+      file: '/s/factories/acme.json',
+      volumes: [{ path: '/code/acme', readOnly: false }],
+      workflows: [],
+      hires: {},
+      schedules: {},
+    };
     const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
     assert.deepEqual(factoryLines([{ ...acme, harnessSettings }]), [
       DEFAULT_LINE,
@@ -316,7 +395,14 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
     assert.deepEqual(factoryLines([acme]), [DEFAULT_LINE, 'acme     /code/acme']);
   });
   await t.test('its cost lines, one per workflow, sorted, and none for a factory that sets none', () => {
-    const mill = { name: 'mill', file: '/s/factories/mill.json', repos: ['/code/mill'], workflows: [], hires: {}, schedules: {} };
+    const mill = {
+      name: 'mill',
+      file: '/s/factories/mill.json',
+      volumes: [{ path: '/code/mill', readOnly: false }],
+      workflows: [],
+      hires: {},
+      schedules: {},
+    };
     assert.deepEqual(factoryLines([{ ...mill, costLines: { intake: 5, build: 80 } }]), [
       DEFAULT_LINE,
       'mill     /code/mill',
@@ -331,7 +417,7 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
         {
           name: 'pipao',
           file: '/s/factories/pipao.json',
-          repos: ['/code/pipao'],
+          volumes: [{ path: '/code/pipao', readOnly: false }],
           workflows: [],
           hires: { 'build/review': 'agora', 'build/implement': 'ada' },
           schedules: {},
@@ -346,18 +432,25 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
         {
           name: 'pipao',
           file: '/s/pipao.json',
-          repos: ['/code/pipao'],
+          volumes: [{ path: '/code/pipao', readOnly: false }],
           workflows: ['intake', 'build'],
           hires: { 'build/implement': 'ada' },
           schedules: {},
         },
-        { name: 'nemia', file: '/s/nemia.json', repos: ['/code/nemia'], workflows: [], hires: {}, schedules: {} },
+        {
+          name: 'nemia',
+          file: '/s/nemia.json',
+          volumes: [{ path: '/code/nemia', readOnly: false }],
+          workflows: [],
+          hires: {},
+          schedules: {},
+        },
       ]),
       [DEFAULT_LINE, 'nemia    /code/nemia', 'pipao    /code/pipao', '         workflows: build, intake', '         build/implement ← ada'],
     ),
   );
   await t.test('where its instruction is kept, when its file says', () => {
-    const base = { file: '/s/f.json', repos: ['/code/a'], workflows: [], hires: {}, schedules: {} };
+    const base = { file: '/s/f.json', volumes: [{ path: '/code/a', readOnly: false }], workflows: [], hires: {}, schedules: {} };
     assert.deepEqual(
       factoryLines([
         { ...base, name: 'aa', instruction: { path: 'docs/X.md' } },
@@ -377,7 +470,7 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
     const made = {
       name: 'made',
       file: '/s/factories/made.json',
-      repos: ['/code/made'],
+      volumes: [{ path: '/code/made', readOnly: false }],
       workflows: ['dev'],
       hires: {},
       schedules: {},
@@ -424,7 +517,7 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
         {
           name: 'nemia',
           file: '/s/nemia.json',
-          repos: ['/code/nemia'],
+          volumes: [{ path: '/code/nemia', readOnly: false }],
           workflows: ['janitor', 'build'],
           hires: {},
           schedules: {

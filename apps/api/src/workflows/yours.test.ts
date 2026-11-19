@@ -22,9 +22,9 @@ test("GET /api/store answers your folders under the app's store root, each absol
   const fileFactory = commandLine(
     COMMANDS.find((c) => c.name === 'factory add')!,
     {},
-    { repos: '<path>' },
+    { volumes: '<path|url>:rw' },
   );
-  assert.equal(fileFactory, 'nemia factory add <name> --repo <path>');
+  assert.equal(fileFactory, 'nemia factory add <name> --volume <path|url>:rw');
   const turnOnNemia = 'nemia level semi-auto';
   assert.deepEqual(await storeOn(app), {
     workflows: path.join(root, 'workflows'),

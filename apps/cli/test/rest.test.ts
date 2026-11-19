@@ -123,8 +123,7 @@ test('`nemia level` reads where she is; a level, a factory raised for a stretch 
     [['level', '--factory', 'default', '--end'], /nemia level/],
   ] as const)
     assert.match((await typed(argv, 2)).err, named, argv.join(' '));
-  const mill = fs.mkdtempSync(path.join(store.root, 'mill-'));
-  await typed(['factory', 'add', 'mill', '--repo', mill]);
+  await typed(['factory', 'add', 'mill']);
   const raised = await typed(['level', 'semi-auto', '--factory', 'mill', '--for', '2h']);
   assert.match(raised.out, /^ {2}mill: semi-auto until \S+, then manual \(the store's\)$/m);
   assert.match(fs.readFileSync(path.join(store.root, 'factories', 'mill', 'level.json'), 'utf8'), /semi-auto/);

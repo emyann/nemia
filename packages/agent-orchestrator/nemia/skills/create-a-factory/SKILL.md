@@ -41,7 +41,7 @@ On their no, where none fits, or where the one that fits lists a problem, say so
 
 ## 3. Create it
 
-`nemia factory add <name> --repo <path>`, a `--repo` for each repository, as an absolute path.
+`nemia factory add <name> --volume <path|url>:rw`, a `--volume` for each repository it works on, as an absolute path or a git URL, and `:ro` for a folder every step only reads. A factory may be filed with none and given its volumes after, with `nemia factory volume add <name> <path|url>:rw`.
 
 A factory has its own level, `nemia level <level> --factory <name>`, and follows the store's until it has one. Its level is the person's
 to set: you never raise it.

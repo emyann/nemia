@@ -39,7 +39,7 @@ const onRepo = (home = root): void => {
   const was = process.env.WF_ROOT;
   process.env.WF_ROOT = home;
   try {
-    addFactory({ name: 'bench', repos: [repo] });
+    addFactory({ name: 'bench', volumes: [repo].map((r) => `${r}:rw`) });
   } finally {
     process.env.WF_ROOT = was;
   }

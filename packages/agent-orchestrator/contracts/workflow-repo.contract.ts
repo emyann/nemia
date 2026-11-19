@@ -5,18 +5,24 @@
  * attach <factory> <workflow> --repo <name>`), as a step's `writable:` names one; a workflow it names none for works on the factory's
  * only repository.
  *
- * Refused, closed: a factory of several repositories whose wiring names none for the workflow (`unwired`), a name no repository of the
- * factory has (`unknown`), and a name two of them share (`shared`): each said by its caller with the `nemia factory attach … --repo` that
- * fixes it. Pure: the caller hands each repository with its folder name (`path.basename` of the path as `path.resolve` spells it), so no
- * law reads a path.
+ * A factory's repositories are its writable volumes: a factory may have none yet, made before its first volume is added.
+ *
+ * Refused, closed: a factory with no writable volume at all (`none`), said by its caller with the `nemia factory volume add … :rw` that
+ * gives it one, whatever its wiring names; a factory of several repositories whose wiring names none for the workflow (`unwired`), a
+ * name no repository of the factory has (`unknown`), and a name two of them share (`shared`): each said by its caller with the `nemia
+ * factory attach … --repo` that fixes it. Pure: the caller hands each repository with its folder name (`path.basename` of the path as
+ * `path.resolve` spells it), so no law reads a path.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** A repository of the factory: its path, as `path.resolve` spells it, and its folder's name. */
+/** A repository of the factory, one of its writable volumes: its path, as `path.resolve` spells it, and its folder's name. */
 export type NamedRepo = { readonly path: string; readonly name: string };
 
-/** Why a factory gives a workflow no repository, closed: several and none named, a name none has, a name two share. */
-export type WorkflowRepoRefusal = 'unwired' | 'unknown' | 'shared';
+/**
+ * Why a factory gives a workflow no repository, closed: no writable volume at all, several and none named, a name none has, a name two
+ * share.
+ */
+export type WorkflowRepoRefusal = 'none' | 'unwired' | 'unknown' | 'shared';
 
 /** The repository a workflow works on, by its path, or why the factory gives it none. */
 export type WorkflowRepoOf = { readonly repo: string } | { readonly refused: WorkflowRepoRefusal };
@@ -47,11 +53,21 @@ const workflowRepoSpec = spec<
         );
       },
     },
+    noneRefused: {
+      description: 'A factory with no writable volume gives no workflow a repository, and says so as none, whatever its wiring names',
+      condition: ({ input: [repos], output }) => repos.length !== 0 || ('refused' in output && output.refused === 'none'),
+    },
+    noneOnlyWhenNone: {
+      description: 'A factory with a writable volume is never refused as having none',
+      condition: ({ input: [repos], output }) => repos.length === 0 || !('refused' in output && output.refused === 'none'),
+    },
     unknownNameRefused: {
-      description: 'A workflow the wiring names a repository for by a name no repository of the factory has is refused as unknown',
+      description: 'A workflow the wiring names a repository for by a name no repository of a factory with some has is refused as unknown',
       condition: ({ input: [repos, wired, workflow], output }) => {
         const name = wiredName(wired, workflow);
-        return name === undefined || named(repos, name) !== 0 || ('refused' in output && output.refused === 'unknown');
+        return (
+          name === undefined || repos.length === 0 || named(repos, name) !== 0 || ('refused' in output && output.refused === 'unknown')
+        );
       },
     },
     sharedNameRefused: {

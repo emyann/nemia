@@ -102,7 +102,7 @@ export function adoptLines({ plan, digest, line }: FactoryAdoptPlan): string[] {
   const blocked = stranded.cards.length > 0 || stranded.schedules.length > 0;
   return [
     `${factory}: taken over by the template, in place — nothing is written until nemia factory adopt`,
-    `stays: its name, its repositories (${listed(kept.repos)}), its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its volumes (${listed(kept.volumes)}), its harness settings (${listed(kept.settings)}), its cards, its runs and its stats`,
+    `stays: its name, its schedules (${listed(kept.schedules)}), ${kept.instruction ? 'its instruction' : 'no instruction'}, its volumes, the repositories it works on among them (${listed(kept.volumes)}), its harness settings (${listed(kept.settings)}), its cards, its runs and its stats`,
     `workflows: + ${listed(workflows.added)}; - ${listed(workflows.dropped)}; kept ${listed(workflows.kept)}`,
     hires.length ? 'hires:' : 'hires: unchanged',
     ...hires.map(hireLine),

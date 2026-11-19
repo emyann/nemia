@@ -18,7 +18,7 @@ import { app, appOf, liveOf } from '../../app.ts';
 import { StoreRoot } from '../../store.ts';
 
 const folder = scratch('nemia-api-hires-folder-');
-addFactory({ name: 'mill', repos: [folder] });
+addFactory({ name: 'mill', volumes: [folder].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'mill', workflow: 'make' });
 /** A step file `step` of the workflow `workflow` in `dir`'s `workflows/`, which works on a git repository. */
 const stepIn = (dir: string, workflow: string, step: string): void => {
@@ -160,8 +160,9 @@ test('the Hire writes: what a hire or a fire refuses, the factory file as it was
     seatPerson(home);
     const file = naming(home, 'mine', 'otto');
     fs.mkdirSync(path.join(home, 'factories'), { recursive: true });
-    const record = JSON.parse(fs.readFileSync(RECORD, 'utf8')) as { repos: string[] };
-    fs.writeFileSync(path.join(home, 'factories', 'mill.json'), JSON.stringify({ ...record, repos: [scratch('nemia-api-hires-bare-')] }));
+    const record = JSON.parse(fs.readFileSync(RECORD, 'utf8')) as object;
+    const bare = { path: scratch('nemia-api-hires-bare-'), readOnly: false };
+    fs.writeFileSync(path.join(home, 'factories', 'mill.json'), JSON.stringify({ ...record, volumes: [bare] }));
     const { app: moved } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
     const put = () =>
       moved.request('/api/namespaces/mill/hires/make.mine', {

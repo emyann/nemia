@@ -39,7 +39,7 @@ import { placeQuery } from '../src/lib/api/workflows.ts';
 const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
   name,
   default: false,
-  repos: ['/code/nemia'],
+  worksOn: ['/code/nemia'],
   workflows: ['build'],
   hires: { 'build/implement': 'implementer' },
   error: null,
@@ -47,10 +47,10 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
   commands: {
     attach: `nemia factory attach ${name} <workflow>`,
     rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --repo <path>`,
+    add: `nemia factory add ${name} --volume <path|url>:rw`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
-    volume: `nemia factory volume add ${name} <path>:ro|:rw`,
+    volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
   },
   untrusted: [],
   volumes: [],
@@ -61,7 +61,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
 });
 
 /** The default factory as the api lists it: on the api's repository, offering every workflow and hiring no one. */
-const fallback = factory('default', { default: true, repos: ['/code/app'], workflows: null, hires: {} });
+const fallback = factory('default', { default: true, worksOn: ['/code/app'], workflows: null, hires: {} });
 
 /** A run finished in `factory`, which nothing moves and nobody is asked about; `extra` puts keys over it. */
 const run = (id: string, factoryName: string | null, extra: Partial<RunView> = {}): FactoryRun & { id: string } => ({
@@ -99,7 +99,7 @@ test('openBlocks, blockOf, factoriesShown: the machine split into a block a fact
     'the default factory is a block only while no factory is filed and its answer counts a run (`held`), whatever the order it is listed in',
     () => {
       const nemia = factory('nemia');
-      const broken = factory('broken', { repos: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
+      const broken = factory('broken', { worksOn: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
       const blocks = (factories: Factory[], held: boolean) => names(openBlocks(factories, answers(factories), held));
       assert.deepEqual(blocks([fallback], true), ['default']);
       assert.deepEqual(blocks([fallback], false), []);
@@ -156,7 +156,7 @@ test('openBlocks, blockOf, factoriesShown: the machine split into a block a fact
     },
   );
   await t.test('a factory whose file does not read is still a block, with why, and hides no other', () => {
-    const broken = factory('broken', { repos: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
+    const broken = factory('broken', { worksOn: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
     const factories = [fallback, factory('nemia'), broken, factory('pipao')];
     const blocks = openBlocks(factories, answers(factories), false);
     assert.deepEqual(names(blocks), ['nemia', 'broken', 'pipao']);
@@ -205,25 +205,26 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a 
   await t.test(
     "a workflow starts on the repository the factory's wiring names for it, else its only one; never on a card's: the orchestrator's workflowRepo",
     () => {
-      const pair = { repos: ['/r/app', '/r/docs'] };
-      const rows: Array<[string, Partial<Factory>, string, string | null, 'unwired' | 'unknown' | 'shared' | null]> = [
+      const pair = { worksOn: ['/r/app', '/r/docs'] };
+      const rows: Array<[string, Partial<Factory>, string, string | null, 'none' | 'unwired' | 'unknown' | 'shared' | null]> = [
         ['wired', { ...pair, workflowRepos: { build: 'docs' } }, 'build', '/r/docs', null],
         [
           'wired with a trailing separator',
-          { repos: ['/r/app/', '/r/docs/'], workflowRepos: { build: 'docs' } },
+          { worksOn: ['/r/app/', '/r/docs/'], workflowRepos: { build: 'docs' } },
           'build',
           '/r/docs/',
           null,
         ],
-        ['only one, none named', { repos: ['/r/app'] }, 'build', '/r/app', null],
-        ['only one, another workflow wired', { repos: ['/r/app'], workflowRepos: { quick: 'app' } }, 'build', '/r/app', null],
+        ['only one, none named', { worksOn: ['/r/app'] }, 'build', '/r/app', null],
+        ['only one, another workflow wired', { worksOn: ['/r/app'], workflowRepos: { quick: 'app' } }, 'build', '/r/app', null],
         ['several, none named', pair, 'build', null, 'unwired'],
         ['several, another workflow wired', { ...pair, workflowRepos: { quick: 'app' } }, 'build', null, 'unwired'],
         ["a prototype's name is no wiring", { ...pair, workflowRepos: {} }, 'constructor', null, 'unwired'],
-        ['none at all', { repos: [] }, 'build', null, 'unwired'],
+        ['none at all', { worksOn: [] }, 'build', null, 'none'],
+        ['none at all, the workflow wired', { worksOn: [], workflowRepos: { build: 'app' } }, 'build', null, 'none'],
         ['a name none has', { ...pair, workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
-        ['a name none has, on its only one', { repos: ['/r/app'], workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
-        ['a name two share', { repos: ['/a/app', '/b/app'], workflowRepos: { build: 'app' } }, 'build', null, 'shared'],
+        ['a name none has, on its only one', { worksOn: ['/r/app'], workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
+        ['a name two share', { worksOn: ['/a/app', '/b/app'], workflowRepos: { build: 'app' } }, 'build', null, 'shared'],
       ];
       for (const [row, extra, workflow, repo, refused] of rows) {
         const on = startRepo(factory('pair', extra), workflow);
@@ -231,8 +232,10 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a 
         else {
           assert.ok('refused' in on, row);
           assert.equal(on.refused, refused, row);
-          assert.match(on.why, new RegExp(`nemia factory attach pair ${workflow} --repo`), `${row}: names the attach that fixes it`);
-          for (const name of new Set((extra.repos ?? []).map((r) => r.split('/').filter(Boolean).at(-1)))) {
+          if (refused === 'none')
+            assert.ok(on.why.includes('nemia factory volume add pair'), `${row}: names the volume add that fixes it: ${on.why}`);
+          else assert.match(on.why, new RegExp(`nemia factory attach pair ${workflow} --repo`), `${row}: names the attach that fixes it`);
+          for (const name of new Set((extra.worksOn ?? []).map((r) => r.split('/').filter(Boolean).at(-1)))) {
             assert.ok(on.why.includes(name!), `${row}: offers ${name}`);
           }
         }
@@ -255,11 +258,15 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a 
     'a named floor starts on its one repository, on none until a person picks among several, and says why when it cannot start',
     () => {
       assert.deepEqual(floorPlace(factory('nemia')), { factory: 'nemia', repos: ['/code/nemia'], repo: '/code/nemia' });
-      assert.deepEqual(floorPlace(factory('pair', { repos: ['/r/a', '/r/b'] })), { factory: 'pair', repos: ['/r/a', '/r/b'], repo: null });
-      const broken = floorPlace(factory('broken', { repos: ['/r/a'], error: '/wf/factories/broken.json is not JSON' }));
+      assert.deepEqual(floorPlace(factory('pair', { worksOn: ['/r/a', '/r/b'] })), {
+        factory: 'pair',
+        repos: ['/r/a', '/r/b'],
+        repo: null,
+      });
+      const broken = floorPlace(factory('broken', { worksOn: ['/r/a'], error: '/wf/factories/broken.json is not JSON' }));
       assert.ok(broken && 'why' in broken, 'a factory whose file does not read cannot start');
       assert.match(broken.why, /broken[\s\S]*\/wf\/factories\/broken\.json is not JSON/);
-      const none = floorPlace(factory('bare', { repos: [] }));
+      const none = floorPlace(factory('bare', { worksOn: [] }));
       assert.ok(none && 'why' in none, 'a factory on no repository cannot start');
       assert.match(none.why, /bare/);
     },
@@ -275,7 +282,7 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a 
     () => {
       const place = { place: '/code/nemia', harness: 'A harness', withheld: 'its allow rules', never: null };
       const lacking = factory('nemia', { untrusted: [place] });
-      const trusting = factory('pipao', { repos: ['/code/pipao'] });
+      const trusting = factory('pipao', { worksOn: ['/code/pipao'] });
       const found = { factory: 'nemia', trust: 'nemia factory trust nemia', place };
       assert.deepEqual(untrustedFor([trusting, lacking], { repo: '/code/nemia' }), found);
       assert.equal(untrustedFor([trusting, lacking], { repo: '/code/pipao' }), undefined, 'another repository');
@@ -312,11 +319,11 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
     "REFUSED: a workflow is tagged only with the factories that attach it where it is found — the repository's on its repository, yours on any — never the default or a factory whose file does not read",
     () => {
       const factories = [
-        factory('default', { default: true, repos: ['/r'], workflows: null, hires: {} }),
-        factory('b-other', { repos: ['/elsewhere'], workflows: ['dev'] }),
-        factory('a-here', { repos: ['/r'], workflows: ['dev'] }),
-        factory('c-broken', { repos: ['/r'], workflows: ['dev'], hires: {}, error: '/wf/factories/c-broken.json is not JSON' }),
-        factory('d-here', { repos: ['/r'], workflows: ['build'] }),
+        factory('default', { default: true, worksOn: ['/r'], workflows: null, hires: {} }),
+        factory('b-other', { worksOn: ['/elsewhere'], workflows: ['dev'] }),
+        factory('a-here', { worksOn: ['/r'], workflows: ['dev'] }),
+        factory('c-broken', { worksOn: ['/r'], workflows: ['dev'], hires: {}, error: '/wf/factories/c-broken.json is not JSON' }),
+        factory('d-here', { worksOn: ['/r'], workflows: ['build'] }),
       ];
       assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, factories), ['a-here']);
       assert.deepEqual(workflowFactories({ name: 'dev', from: 'user' }, factories), ['a-here', 'b-other']);
@@ -328,7 +335,7 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
   await t.test(
     "REFUSED: a named factory's workflows are read in it, on its own repository — never judged against the default factory's",
     () => {
-      const factories = [fallback, factory('pipao', { repos: ['/code/pipao'], workflows: ['dev'] })];
+      const factories = [fallback, factory('pipao', { worksOn: ['/code/pipao'], workflows: ['dev'] })];
       assert.deepEqual(listPlace({ factory: 'pipao' }, factories), {
         kind: 'in',
         place: { factory: 'pipao', repo: '/code/pipao' },
@@ -344,7 +351,7 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
   await t.test(
     'REFUSED: the address reads every workflow with no factory or the default; a factory on several repositories is read on the one named, and asks which when none is',
     () => {
-      const two = factory('quay', { repos: ['/a', '/b'] });
+      const two = factory('quay', { worksOn: ['/a', '/b'] });
       const factories = [fallback, factory('nemia'), two];
       assert.deepEqual(listPlace({}, factories), { kind: 'every' });
       assert.deepEqual(listPlace({ repo: '/a' }, factories), { kind: 'every' });
@@ -361,7 +368,7 @@ test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf
     'REFUSED: a factory of no such name, one whose file does not read and one on no repository list nothing, and say why',
     () => {
       const broken = factory('broken', { error: '/wf/factories/broken.json is not JSON' });
-      const homeless = factory('homeless', { repos: [] });
+      const homeless = factory('homeless', { worksOn: [] });
       const factories = [fallback, broken, homeless];
       assert.deepEqual(listPlace({ factory: 'gone' }, factories), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });
       assert.deepEqual(listPlace({ factory: 'gone' }, []), { kind: 'refused', factory: 'gone', why: 'No factory is named gone.' });

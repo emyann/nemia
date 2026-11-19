@@ -72,7 +72,7 @@ To change a parameter later without a new version of sdlc, preview it at the ver
 ## Apply it
 
 ```bash
-nemia factory apply myapp --template sdlc --repo ~/code/myapp \
+nemia factory apply myapp --template sdlc --volume ~/code/myapp:rw \
   --set localCheck='npm run lint && npm test' \
   --set areas='src, docs and scripts'
 ```
@@ -80,16 +80,16 @@ nemia factory apply myapp --template sdlc --repo ~/code/myapp \
 That factory works in your checkout, with no remote. To judge and land on GitHub instead:
 
 ```bash
-nemia factory apply myapp --template sdlc --repo ~/code/myapp \
+nemia factory apply myapp --template sdlc --volume ~/code/myapp:rw \
   --set github=true \
   --set ciCheck=build \
   --set roundCheck='npm run lint'
 ```
 
 That files the factory `myapp` on the repository, made from sdlc with your parameters, and trusts the repository for the harness, as
-[a factory's repositories](/factories/#its-repositories) says (`--no-trust` trusts nothing). The daemon renders the template into the
-factory, its workflows and agents yours to change after. A `--set` may be repeated, one per parameter, and `--repo` too, for a factory
-on more than one repository. `nemia factory diff` and `nemia factory upgrade` take the same name at their template flag.
+[a factory's volumes](/factories/#its-volumes) says (`--no-trust` trusts nothing). The daemon renders the template into the
+factory, its workflows and agents yours to change after. A `--set` may be repeated, one per parameter, and `--volume` too, for a factory
+that works on more than one repository or reads a folder (`:ro`). `nemia factory diff` and `nemia factory upgrade` take the same name at their template flag.
 
 ## In your checkout, the default
 

@@ -53,7 +53,7 @@ const writeRun = (id: string, createdAt: string, scheduled?: { factory: string; 
 
 /** The store's factories: `mill`, which schedules `janitor` and `nightly` and fired `janitor` once, and a file that does not read. */
 const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-addFactory({ name: 'mill', repos: [repo] });
+addFactory({ name: 'mill', volumes: [`${repo}:rw`] });
 attachWorkflow({ factory: 'mill', workflow: 'nightly' });
 attachWorkflow({ factory: 'mill', workflow: 'janitor' });
 setSchedule({ factory: 'mill', workflow: 'nightly', cron: '0 3 * * *', brief: 'tidy at night' });

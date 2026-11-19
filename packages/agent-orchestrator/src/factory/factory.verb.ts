@@ -24,9 +24,18 @@ import { tried } from '../runtime-client.ts';
 import { Missing } from '../refusal/refusal.ts';
 import type { Args } from '../command/command.ts';
 import { tableEntry, type Served } from '../command/entry.verb.ts';
-import { REVISIONS_POLICIES, unhiredFireRefusal, type Factory, type FactoryListing, type RevisionsPolicy } from './factory.ts';
-import { factoriesDirAt, FactoryDoor, factoryRepos, filedFactory, originsOf, refuseName } from './door/factories.store.ts';
+import {
+  REVISIONS_POLICIES,
+  unhiredFireRefusal,
+  workedOn,
+  type Factory,
+  type FactoryListing,
+  type RevisionsPolicy,
+  type Volume,
+} from './factory.ts';
+import { clonesOf, factoriesDirAt, FactoryDoor, filedFactory, refuseName, volumesGiven } from './door/factories.store.ts';
 import { cloned } from './clones/clones.verb.ts';
+import { volumesTrusted, writableRooted } from './volume/volume.verb.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -40,7 +49,7 @@ import { scheduleRun, schedulesListed, type ScheduleRuns } from './schedule/list
 import type { ScheduleListed } from './schedule/schedule.ts';
 import { keptRuns } from '../record/files.store.ts';
 import type { PlaceTrust, Untrusted } from '../trust/trust.ts';
-import { FACTORY_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
+import { FACTORY_TRUST, untrustedPlaces } from '../trust/trust.verb.ts';
 import { FACTORY_SERVER_VERBS } from './servers/servers.verb.ts';
 import { FACTORY_VOLUMES } from './volume/volume.verb.ts';
 import { FACTORY_SETTINGS } from '../harness-settings/harness-settings.verb.ts';
@@ -90,28 +99,32 @@ const FACTORY_LS: Served<Listed> = {
 };
 
 /**
- * `nemia factory add`: one factory filed, and where; then, unless `--no-trust`, each of its places trusted for the harnesses that keep
- * a trust (`trustPlaces`), and what was done of it.
+ * `nemia factory add`: one factory filed, with its volumes, none or several (`volumesGiven`), each URL cloned and each writable one a git
+ * repository (`writableRooted`), and where; then, unless `--no-trust`, each writable one trusted for the harnesses that keep a trust
+ * (`volumesTrusted`), and what was done of it. A factory that works on no repository keeps its instruction in the store, so a volume
+ * given it later does not move where it is read.
  */
-export const FACTORY_ADD: Served<{ name: string; repos: readonly string[]; file: string; trusts: readonly PlaceTrust[] }> = {
+export const FACTORY_ADD: Served<{ name: string; volumes: readonly Volume[]; file: string; trusts: readonly PlaceTrust[] }> = {
   ...FACTORY_ADD_WORDS,
   handler: (args) =>
     Effect.gen(function* () {
       const name = textOf(args, 'name');
-      const given = Array.isArray(args.repos) ? args.repos : [];
+      const given = Array.isArray(args.volumes) ? args.volumes : [];
       const home = yield* StoreRoot;
-      const { repos, origins } = yield* tried(() => {
+      const volumes = yield* tried(() => {
         refuseName(name, 'add');
-        return factoryRepos(home, name, given);
+        return volumesGiven(home, name, given, process.cwd());
       });
-      yield* cloned(origins);
-      const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, ...originsOf(origins) };
+      yield* cloned(clonesOf(volumes));
+      yield* writableRooted(volumes, 'Nothing was filed.');
+      const stored = workedOn({ volumes }).length ? {} : { instruction: { store: true as const } };
+      const factory: Factory = { name, volumes, workflows: [], hires: {}, schedules: {}, ...stored };
       const file = yield* Effect.gen(function* () {
         const door = yield* FactoryDoor;
         return yield* door.factories.create(factory);
       });
-      const trusts = args.noTrust === true ? [] : yield* trustPlaces(factory.repos);
-      return { name: factory.name, repos: factory.repos, file, trusts };
+      const trusts = yield* volumesTrusted(volumes, args.noTrust === true);
+      return { name: factory.name, volumes: factory.volumes, file, trusts };
     }),
 };
 

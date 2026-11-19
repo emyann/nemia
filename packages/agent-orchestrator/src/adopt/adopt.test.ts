@@ -12,7 +12,7 @@ import { adopted, adoptLines, adoptPlan, type Adoption } from './adopt.ts';
 /** A hand-made factory offering `a` and `b`, hiring `p` into `a/x`, scheduling `a`. */
 const made: Factory = {
   name: 'f',
-  repos: ['/r'],
+  volumes: [{ path: '/r', readOnly: false }],
   workflows: ['a', 'b'],
   hires: { 'a/x': 'p' },
   schedules: { a: { cron: '0 9 * * *', brief: 'daily', since: '2026-11-03T00:00:00.000Z' } },
@@ -42,10 +42,10 @@ test("a takeover's plan, row by row", async (t) => {
 
   await t.test('what stays: the repositories, the schedules, whether it keeps an instruction, and its volumes', () => {
     const plan = adoptPlan({ ...made, instruction: { store: true } }, adoption(), [], null);
-    assert.deepEqual(plan.kept, { repos: ['/r'], schedules: ['a'], instruction: true, volumes: [], settings: [] });
-    const mounting = adoptPlan({ ...made, volumes: [{ path: '/notes', readOnly: true }] }, adoption(), [], null);
-    assert.deepEqual(mounting.kept.volumes, ['/notes:ro']);
-    assert.ok(adoptLines(mounting, 'sha256:d', 'adopt').some((l) => l.includes('its volumes (/notes:ro)')));
+    assert.deepEqual(plan.kept, { schedules: ['a'], instruction: true, volumes: ['/r:rw'], settings: [] });
+    const mounting = adoptPlan({ ...made, volumes: [...made.volumes, { path: '/notes', readOnly: true }] }, adoption(), [], null);
+    assert.deepEqual(mounting.kept.volumes, ['/notes:ro', '/r:rw']);
+    assert.ok(adoptLines(mounting, 'sha256:d', 'adopt').some((l) => l.includes('(/notes:ro, /r:rw)')));
     const set = adoptPlan({ ...made, harnessSettings: { claude: { attribution: false } } }, adoption(), [], null);
     assert.deepEqual(set.kept.settings, ['claude.attribution']);
     assert.ok(adoptLines(set, 'sha256:d', 'adopt').some((l) => l.includes('its harness settings (claude.attribution)')));

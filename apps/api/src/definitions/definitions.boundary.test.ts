@@ -40,9 +40,9 @@ write(path.join(STORE, 'shared', 'go.md'), '---\nplace: git\n---\nYours says go.
 write(path.join(STORE, 'mine', 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
 write(path.join(STORE, 'mine', 'make.md'), '---\nafter: plan\nplace: git\nagent: implementer\n---\nBuild it.\n');
 write(path.join(STORE, 'agents', 'implementer.md'), '---\nharness: claude\nmodel: opus\n---\nYou make what the plan says.\n');
-addFactory({ name: 'works', repos: [repo] });
+addFactory({ name: 'works', volumes: [repo].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'works', workflow: 'make' });
-addFactory({ name: 'treed', repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } });
+addFactory({ name: 'treed', volumes: [repo].map((r) => `${r}:rw`), template: { source: '/t/team', version: '0.1.0', params: {} } });
 const tree = path.join(root, 'factories', 'treed', 'tree');
 write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['make', 'shared'], hires: {} }));
 write(path.join(tree, 'workflows', 'make', 'implement.md'), '---\nplace: git\n---\nImplement it, as the tree says.\n');

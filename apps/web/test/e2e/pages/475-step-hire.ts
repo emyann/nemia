@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { AGENTS, FACTORIES, WORKFLOWS } from '../seed.ts';
+import { AGENTS, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -26,7 +26,7 @@ function written(): () => void {
   const madeFile = path.join(store!, 'workflows', 'agents', `${MADE.name}.md`);
   fs.writeFileSync(
     factoryFile,
-    JSON.stringify({ repos: [path.join(store!, 'checkout')], workflows: [WORKFLOWS.yours.name, WORKFLOWS.good.name] }, null, 2),
+    JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [WORKFLOWS.yours.name, WORKFLOWS.good.name] }, null, 2),
   );
   return () => {
     fs.rmSync(madeFile, { force: true });

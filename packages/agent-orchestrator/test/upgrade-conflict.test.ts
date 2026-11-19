@@ -143,7 +143,7 @@ async function scripted(t: { mock: { method: Function } }, name: string): Promis
   const at = path.join(scratch(`wf-upgrade-conflict-${name}-`), 'team');
   exportTemplate({ dir: at, from: repo });
   fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
-  await printedBy(t, 'factory', 'apply', name, '--template', at, '--repo', repo);
+  await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
   reconciled(factory(name));
   fs.writeFileSync(path.join(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.ours);
   edit(at, 'nemia.yaml', (spec) => {
@@ -190,7 +190,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].budget = { param: 'budget' };
     });
-    await printedBy(t, 'factory', 'apply', 'crew', '--template', dir, '--repo', repo, '--set', 'budget=7');
+    await printedBy(t, 'factory', 'apply', 'crew', '--template', dir, '--volume', `${repo}:rw`, '--set', 'budget=7');
     assert.equal(reconciled(factory('crew')).conditions[0].reason, 'Rendered');
     run = ((await stage.main(['start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'])) as StartedAnswer).id;
     assert.equal(runRecord(ROOT, run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
@@ -558,7 +558,7 @@ test('a workflow whose step writes checkFailurePolicy as a block map: a conflict
       const at = path.join(scratch(`wf-upgrade-conflict-${name}-`), 'team');
       exportTemplate({ dir: at, from: repo });
       fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
-      await printedBy(t, 'factory', 'apply', name, '--template', at, '--repo', repo);
+      await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
       reconciled(factory(name));
       applied = textIn(treeDir(ROOT, name), IMPLEMENT);
       assert.match(applied, /^checkFailurePolicy:\n {2}rules:\n/m, 'the applied step writes its policy as a block map');
@@ -620,7 +620,7 @@ async function editedAfterApply(t: { mock: { method: Function } }, name: string,
   const at = path.join(scratch(`wf-upgrade-conflict-${name}-`), 'team');
   exportTemplate({ dir: at, from: repo });
   fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
-  await printedBy(t, 'factory', 'apply', name, '--template', at, '--repo', repo);
+  await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
   reconciled(factory(name));
   const tree = treeDir(ROOT, name);
   fs.writeFileSync(path.join(tree, PICTURES), OWN);

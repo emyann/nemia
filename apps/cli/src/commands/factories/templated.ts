@@ -17,7 +17,7 @@ import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { textOf as fileText } from '../files.ts';
 import { listArg, said, switchArg, textArg } from '../requests.ts';
-import { repoSent, textOf, trustedLines } from './lines.ts';
+import { textOf, trustedLines, volumeSent, worksOnLine } from './lines.ts';
 import { adoptLines, approveLine, planLines, resolveLine, UNKNOWN } from './plan.ts';
 
 /** A builtin template's name: lowercase words joined by dashes. */
@@ -71,22 +71,22 @@ const setsOf = (args: Args): { sets?: readonly string[] } => {
 };
 
 /**
- * `nemia factory apply`: a factory made from a template, its repositories trusted unless `--no-trust`.
+ * `nemia factory apply`: a factory made from a template, with its volumes, its writable ones trusted unless `--no-trust`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function factoryApply(args: Args): Promise<number> {
   const name = textOf(args, 'name');
-  const repos = listArg(args, 'repos').map((r) => repoSent(r));
+  const volumes = listArg(args, 'volumes').map((v) => volumeSent(v));
   const payload = {
     ...(await templateOf(args, 'factory apply')),
-    ...(repos.length ? { repos } : {}),
+    ...(volumes.length ? { volumes } : {}),
     ...setsOf(args),
     ...(switchArg(args, 'noTrust') ? { noTrust: true } : {}),
   };
   const made = await asked('factory apply', (c) => c.factories.apply({ params: { name }, payload }));
   const { template, place, tree } = made;
   said([
-    `${made.name}  ${made.repos.join(', ')}`,
+    `${made.name}  ${worksOnLine(made.volumes)}`,
     `filed: ${made.file}`,
     `made from ${place === template.source ? template.source : `the builtin template ${template.source} (${place})`} at ${template.version}; the daemon renders its tree into ${tree} on its next pass (nemia up)`,
     ...trustedLines(made.name, made.trusts),

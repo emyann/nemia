@@ -79,7 +79,7 @@ write(path.join(repo, 'workflows', '.vscode', 'settings.json'), '{}\n');
 write(path.join(repo, 'workflows', '.draft', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 write(path.join(repo, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nImplement what you are asked.\n');
 
-addFactory({ name: 'bench', repos: [repo] });
+addFactory({ name: 'bench', volumes: [repo].map((r) => `${r}:rw`) });
 for (const workflow of ['good', 'broken']) attachWorkflow({ factory: 'bench', workflow });
 
 /**

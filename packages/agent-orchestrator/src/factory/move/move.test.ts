@@ -15,16 +15,15 @@ const SINCE = '2026-11-01T00:00:00.000Z';
 /** A factory of the source's store on two repositories, one a clone of its origin, scheduled, wired and mounting two volumes. */
 const SOURCE: Factory = {
   name: 'shop',
-  repos: ['/src/clones/github.com/acme/shop', '/work/notes'],
+  volumes: [
+    { path: '/src/clones/github.com/acme/shop', readOnly: false, origin: 'https://git.example/acme/shop.git' },
+    { path: '/work/notes', readOnly: false },
+    { path: '/work/data', readOnly: true, name: 'data' },
+  ],
   workflows: ['build'],
   hires: { 'build/review': 'reviewer' },
   schedules: { build: { cron: '0 9 * * 1', brief: 'weekly', since: SINCE, repo: 'notes' } },
-  origins: { '/src/clones/github.com/acme/shop': 'https://git.example/acme/shop.git' },
   workflowRepos: { build: 'notes' },
-  volumes: [
-    { path: '/work/data', readOnly: true, name: 'data' },
-    { path: '/work/out', readOnly: false },
-  ],
   harnessSettings: { model: 'big' },
   costLines: { build: 5 },
   revisions: 'follow',
@@ -52,13 +51,24 @@ test('factoryOnTarget: the factory as the target files it', async (t) => {
   });
   await t.test('a repository followed by its origin keeps its URL under the target’s clone folder', () => {
     const moved = factoryOnTarget(SOURCE, TARGET);
-    assert.deepEqual(moved.repos, ['/dst/clones/github.com/acme/shop', '/srv/journal']);
-    assert.deepEqual(moved.origins, { '/dst/clones/github.com/acme/shop': 'https://git.example/acme/shop.git' });
+    assert.deepEqual(
+      moved.volumes.filter((v) => !v.readOnly),
+      [
+        { path: '/dst/clones/github.com/acme/shop', readOnly: false, origin: 'https://git.example/acme/shop.git' },
+        { path: '/srv/journal', readOnly: false },
+      ],
+    );
   });
   await t.test('a whole path typed enters its repositories with no origin', () => {
     const moved = factoryOnTarget(SOURCE, { ...TARGET, origins: {} });
-    assert.equal(moved.repos.includes('/srv/journal'), true);
-    assert.equal('origins' in moved, false);
+    assert.equal(
+      moved.volumes.some((v) => v.path === '/srv/journal'),
+      true,
+    );
+    assert.equal(
+      moved.volumes.some((v) => v.origin !== undefined),
+      false,
+    );
   });
   await t.test('the workflows’ repositories and a schedule’s follow a repository whose folder name changed', () => {
     const moved = factoryOnTarget(SOURCE, TARGET);
@@ -83,11 +93,11 @@ test('factoryOnTarget: the factory as the target files it', async (t) => {
       },
     );
   });
-  await t.test('volumes at their decided paths, their names and marks kept', () => {
-    assert.deepEqual(factoryOnTarget(SOURCE, { ...TARGET, volumes: { data: '/srv/data', '/work/out': '/srv/out' } }).volumes, [
-      { path: '/srv/data', readOnly: true, name: 'data' },
-      { path: '/srv/out', readOnly: false },
-    ]);
+  await t.test('read-only volumes at their decided paths, their names and marks kept', () => {
+    assert.deepEqual(
+      factoryOnTarget(SOURCE, TARGET).volumes.filter((v) => v.readOnly),
+      [{ path: '/srv/data', readOnly: true, name: 'data' }],
+    );
   });
   await t.test('hires, workflows, schedules, cost lines, harness settings and revisions are carried as read', () => {
     const { hires, workflows, schedules, costLines, harnessSettings, revisions } = factoryOnTarget(SOURCE, TARGET);

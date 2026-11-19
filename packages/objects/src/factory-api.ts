@@ -225,7 +225,7 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   ),
   HttpApiEndpoint.post('create', '/api/factories', { payload: FactoryCreate, success: FactoryCreated, error: objectErrors }).annotate(
     OpenApi.Description,
-    'Files a new factory on the repositories the body names, each a folder of this machine by its whole path or a git URL it clones, its places trusted unless the body says not to. Answers FactoryCreated.',
+    'Files a new factory with the volumes the body names, none at all included, each a folder of this machine by its whole path or a git URL it clones, its writable ones trusted unless the body says not to. Answers FactoryCreated.',
   ),
   HttpApiEndpoint.post('addVolume', '/api/factories/:factory/volumes', {
     params: factoryOwnParams,
@@ -234,7 +234,7 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Mounts a folder of this machine, by its whole path and its mark, into a factory's runs. Answers VolumeAdded.",
+    'Gives a factory a volume: a folder of this machine by its whole path, or a git URL it clones, marked :ro or :rw; a writable one is a repository the factory works on. Answers VolumeAdded.',
   ),
   HttpApiEndpoint.delete('removeVolume', '/api/factories/:factory/volumes', {
     params: factoryOwnParams,

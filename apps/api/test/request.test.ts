@@ -157,7 +157,7 @@ async function spansOf(url: string): Promise<Traced[]> {
 const repo = scratch('nemia-api-trace-');
 fs.mkdirSync(path.join(repo, 'workflows', 'make'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'workflows', 'make', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
-addFactory({ name: 'traced', repos: [repo] });
+addFactory({ name: 'traced', volumes: [repo].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'traced', workflow: 'make' });
 
 const at = '2026-09-25T09:00:00.000Z';

@@ -19,11 +19,11 @@ const cloneRefusal = Effect.fn('cloneRefusal')(function* (url: string, into: str
 });
 
 /**
- * Each of `origins`, a folder to the URL it is cloned from, cloned there where it is not yet. Refused, `Invalid`, at the first the place
+ * Each of `urls`, a folder to the URL it is cloned from, cloned there where it is not yet. Refused, `Invalid`, at the first the place
  * did not clone, in its words, nothing filed: a factory is filed on clones that are there.
  */
-export const cloned = Effect.fn('cloned')(function* (origins: Readonly<Record<string, string>>) {
-  for (const [into, url] of Object.entries(origins)) {
+export const cloned = Effect.fn('cloned')(function* (urls: Readonly<Record<string, string>>) {
+  for (const [into, url] of Object.entries(urls)) {
     const refused = yield* cloneRefusal(url, into);
     if (refused !== undefined) return yield* Effect.fail(new Invalid({ message: `${refused} Nothing was filed.` }));
   }
@@ -35,8 +35,23 @@ export type CloneMemory = { said: Map<string, string> };
 /** A daemon's memory before its first sweep. */
 export const freshCloneMemory = (): CloneMemory => ({ said: new Map() });
 
+/** The clone `into` of `factory`'s volume, gone, cloned again from `url`: whether it was, a refusal warned of once while it stands. */
+const clonedAgain = Effect.fn('clonedAgain')(function* (memory: CloneMemory, factory: string, into: string, url: string) {
+  const refused = yield* cloneRefusal(url, into);
+  if (refused === undefined) {
+    memory.said.delete(into);
+    return true;
+  }
+  if (memory.said.get(into) !== refused) {
+    memory.said.set(into, refused);
+    yield* Effect.logWarning(`The repository ${into} of the factory ${factory} is gone, and was not cloned again: ${refused}`);
+  }
+  return false;
+});
+
 /**
- * One sweep: each folder a factory names an origin of that is not there now cloned again, the folders it found there asked nothing.
+ * One sweep: each volume of a factory cloned from an origin whose folder is not there now cloned again, the folders it found there asked
+ * nothing.
  * A refusal is a warning, said once while its words stand. The folders cloned again.
  */
 export const clonesOnce = Effect.fn('clonesOnce')(function* (memory: CloneMemory) {
@@ -44,17 +59,10 @@ export const clonesOnce = Effect.fn('clonesOnce')(function* (memory: CloneMemory
   const missing = new Set<string>();
   for (const factory of yield* (yield* FactoryDoor).factories.listed()) {
     if ('error' in factory) continue;
-    for (const [into, url] of Object.entries(factory.origins ?? {})) {
-      if (fs.existsSync(into) || missing.has(into)) continue;
+    for (const { path: into, origin: url } of factory.volumes) {
+      if (url === undefined || fs.existsSync(into) || missing.has(into)) continue;
       missing.add(into);
-      const refused = yield* cloneRefusal(url, into);
-      if (refused === undefined) {
-        memory.said.delete(into);
-        made.push(into);
-      } else if (memory.said.get(into) !== refused) {
-        memory.said.set(into, refused);
-        yield* Effect.logWarning(`The repository ${into} of the factory ${factory.name} is gone, and was not cloned again: ${refused}`);
-      }
+      if (yield* clonedAgain(memory, factory.name, into, url)) made.push(into);
     }
   }
   for (const into of memory.said.keys()) if (!missing.has(into)) memory.said.delete(into);

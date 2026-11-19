@@ -208,7 +208,6 @@ erDiagram
   }
   Factory {
     FactoryName name PK
-    list repos
     list workflows FK
     object hires FK
     object schedules
@@ -217,7 +216,6 @@ erDiagram
     string tree "optional"
     object harnessSettings "optional"
     object costLines "optional"
-    object origins "optional"
     object workflowRepos "optional"
     number generation "optional"
   }
@@ -236,6 +234,7 @@ erDiagram
     string path
     boolean readOnly
     string name "optional"
+    string origin "optional"
   }
   Template {
     TemplateSource source PK
@@ -388,10 +387,10 @@ erDiagram
   WorkflowStep ||--o{ Card : gate
   Factory ||--o{ Card : factory
   Run ||--o{ Card : from
+  Factory ||--o{ Volume : volumes
   Workflow ||--o{ Factory : workflows
   Agent ||--o{ Factory : hires
   Factory ||--o| AppliedTemplate : template
-  Factory ||--o{ Volume : volumes
   Template ||--o{ AppliedTemplate : source
   Factory ||--o{ Hire : factory
   Workflow ||--o{ Hire : workflow

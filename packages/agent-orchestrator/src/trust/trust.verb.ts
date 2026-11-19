@@ -10,7 +10,7 @@ import { Effect, Schema } from 'effect';
 import { tried, trustFolder } from '../runtime-client.ts';
 import { FACTORY_TRUST_WORDS } from 'objects';
 import type { Served } from '../command/entry.verb.ts';
-import { noFactoryLine } from '../factory/factory.ts';
+import { noFactoryLine, workedOn } from '../factory/factory.ts';
 import { HARNESSES } from '../harness/harness.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { Missing } from '../refusal/refusal.ts';
@@ -76,7 +76,7 @@ function placesOf(home: string, name: string): readonly string[] {
     throw new Missing({
       message: `${found.file} ${found.error}, so the factory ${name} names no place to trust: fix or remove the file (nemia factory rm ${name}). Nothing was trusted.`,
     });
-  return found.repos;
+  return workedOn(found);
 }
 
 /**

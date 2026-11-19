@@ -128,7 +128,8 @@ const plantRun = (
   );
 
 /** A factory of the store, named `name`, holding a scratch repository. */
-const factory = (name: string) => addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+const factory = (name: string) =>
+  addFactoryAt(ROOT, { name, volumes: [fs.mkdtempSync(path.join(ROOT, `${name}-`))].map((r) => `${r}:rw`) });
 
 /** Puts on the board a task settled as it succeeded, with `closeout` and its exit code. */
 const settled = (id: string, closeout?: unknown, exitCode = 0) => {

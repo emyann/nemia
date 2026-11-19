@@ -2,7 +2,9 @@
  * The store's floor: the oldest release that can read the store, which `$WF_ROOT/store.json` records (`readableFrom`). A release says in
  * its code the oldest release that reads what it writes (`STORE_READABLE_FROM`); the daemon raises the record to it as it takes the
  * store (`floorAfter`) and never lowers it; and `nemia upgrade <older>` is refused where the release asked for is below it
- * (`goingBackRefused`). Moving forward the store is read in place and never rewritten, so only going back is ever refused. Pure: the
+ * (`goingBackRefused`). Moving forward the store is read in place, so only going back is ever refused: the one rewrite, v1.26.0's move
+ * of each factory's file into one list of volumes (`volumesMovedAt`), is made by the daemon as it takes the store, before it raises this.
+ * Pure: the
  * record is read and written by `archive.store.ts`, the refusal said by `upgrade.verb.ts`.
  */
 import type { FloorAfter, GoingBackRefused, Version } from '../../contracts/store-floor.contract.ts';
@@ -11,9 +13,10 @@ export type { Version };
 
 /**
  * The oldest release that reads what this release writes to the store. A release that changes what the store holds so that an older one
- * would misread it raises this to its own version; none since v1.2.0 has.
+ * would misread it raises this to its own version: v1.26.0 has, as each factory's file holds one list of volumes, which a release before
+ * it reads as a factory on no repository.
  */
-export const STORE_READABLE_FROM: Version = { major: 1, minor: 2, patch: 0 };
+export const STORE_READABLE_FROM: Version = { major: 1, minor: 26, patch: 0 };
 
 /**
  * A release's version as its tag or `release.json` says it, `v1.2.3` or `1.2.3`, read as three whole numbers; null for anything else,

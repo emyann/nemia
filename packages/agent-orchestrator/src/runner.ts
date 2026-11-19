@@ -208,6 +208,8 @@ export {
   outsideRefusal,
   unattachedRefusal,
   unfilledRefusal,
+  volumeAddLine,
+  workedOn,
 } from './factory/factory.ts';
 export type {
   Factory,

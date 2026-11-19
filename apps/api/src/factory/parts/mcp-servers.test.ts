@@ -22,7 +22,7 @@ import { app } from '../../app.ts';
 type McpServer = import('objects').McpServer;
 type McpServerList = import('objects').McpServerList;
 
-addFactory({ name: 'mcpmill', repos: [scratch('nemia-api-servers-folder-')] });
+addFactory({ name: 'mcpmill', volumes: [scratch('nemia-api-servers-folder-')].map((r) => `${r}:rw`) });
 
 const FILE = path.join(root, 'factories', 'mcpmill', 'servers.json');
 const URL = '/api/namespaces/mcpmill/mcpservers';

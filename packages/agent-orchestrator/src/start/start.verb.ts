@@ -52,6 +52,7 @@ import {
   factoryMountRefusal,
   factoryMounts,
   factoryVolumes,
+  readOnlyVolumes,
   volumeMountRefusal,
   writableMountRefusal,
   writableRefusal,
@@ -418,9 +419,11 @@ const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount
   factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
 
 /**
- * The volumes of `factory` a run in it mounts (`factoryVolumes`), each marked as named and a directory now; none in the default factory.
+ * The read-only volumes of `factory` a run in it mounts (`factoryVolumes` of `readOnlyVolumes`), each a directory now; none in the default
+ * factory. Its writable ones are the repositories it works on, mounted as `mounts` (`mountsAt`).
  */
-const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryVolumes(factory).filter((v) => isDirectory(v.path)) : []);
+const volumesAt = (factory: Factory | undefined): Mount[] =>
+  factory ? factoryVolumes({ volumes: readOnlyVolumes(factory) }).filter((v) => isDirectory(v.path)) : [];
 
 /**
  * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
@@ -487,7 +490,7 @@ function leftOut(home: string, run: Run): { mounts: string[]; volumes: string[] 
     mounts: factoryMounts(factory, isRepositoryRun(run) ? run.repo : undefined)
       .map((m) => m.path)
       .filter(missing),
-    volumes: factoryVolumes(factory)
+    volumes: factoryVolumes({ volumes: readOnlyVolumes(factory) })
       .map((v) => v.path)
       .filter(missing),
   };

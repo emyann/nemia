@@ -159,12 +159,12 @@ const WordsGiven = Schema.Struct({ words: Schema.NullOr(Schema.String), error: S
 
 /**
  * A factory's parts as the client hands them on stdin (`--factory-parts -`), read through the api of the context in use: the factory's
- * name, repositories, attached workflows, hires and revisions policy, where it is kept, its instruction and its rules.
+ * name, volumes, attached workflows, hires and revisions policy, where it is kept, its instruction and its rules.
  */
 const PartsGiven = Schema.Struct({
   factory: Schema.Struct({
     name: Schema.String,
-    repos: Schema.Array(Schema.String),
+    volumes: Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })),
     workflows: Schema.Array(Schema.String),
     hires: Schema.Record(Schema.String, Schema.String),
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),

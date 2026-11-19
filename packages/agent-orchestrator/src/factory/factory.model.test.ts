@@ -12,7 +12,7 @@ import { erDiagram } from '../model/er.model.ts';
 /** A factory as `readFactory` answers one: attached, hiring and scheduling, its instruction in the store. */
 const PIPAO = {
   name: 'pipao',
-  repos: ['/home/me/code/app'],
+  volumes: [{ path: '/home/me/code/app', readOnly: false }],
   workflows: ['build', 'intake'],
   hires: { 'build/implement': 'ada', 'intake/frame-the-idea': 'iris-2' },
   schedules: { build: { cron: '0 9 * * 1', brief: 'The week’s cleanup.', since: '2026-09-16T10:00:00.000Z' } },
@@ -37,7 +37,7 @@ test('a factory decodes as its store reads one, and one whose wiring outlives a 
     assert.equal(
       Schema.is(Factory)({
         name: 'acme',
-        repos: ['/r/app'],
+        volumes: [{ path: '/r/app', readOnly: false }],
         workflows: ['mill'],
         hires: {},
         schedules: {},
@@ -50,7 +50,7 @@ test('a factory decodes as its store reads one, and one whose wiring outlives a 
     assert.equal(
       Schema.is(Factory)({
         name: 'acme',
-        repos: ['/r'],
+        volumes: [{ path: '/r', readOnly: false }],
         workflows: [],
         hires: {},
         schedules: {},
@@ -59,11 +59,16 @@ test('a factory decodes as its store reads one, and one whose wiring outlives a 
       true,
     ),
   );
+  await t.test('with no volume, as nemia factory add files one given none', () =>
+    assert.equal(Schema.is(Factory)({ ...PIPAO, volumes: [] }), true),
+  );
   await t.test('as nemia factory add files it', () =>
-    assert.equal(Schema.is(Factory)({ name: 'nemia', repos: ['/r'], workflows: [], hires: {}, schedules: {} }), true),
+    assert.equal(
+      Schema.is(Factory)({ name: 'nemia', volumes: [{ path: '/r', readOnly: false }], workflows: [], hires: {}, schedules: {} }),
+      true,
+    ),
   );
   const rows: Record<string, object> = {
-    'no repository': { ...PIPAO, repos: [] },
     'a hire into a workflow it does not offer': { ...PIPAO, hires: { ...PIPAO.hires, 'quick/implement': 'ada' } },
     'a schedule of a workflow it does not offer': { ...PIPAO, schedules: { quick: PIPAO.schedules.build } },
   };
@@ -83,13 +88,12 @@ test("the factory's part of the diagram draws its four entities, and a FactoryNa
   assert.ok(lines.includes('  Factory ||--o{ Hire : factory'), lines.join('\n'));
 });
 
-test('a factory mounts volumes beside its repositories, and one that is a repository or named twice is refused', async (t) => {
-  const acme = { name: 'acme', repos: ['/r'], workflows: [], hires: {}, schedules: {} };
+test('a factory mounts read-only volumes beside its writable ones, and one named twice is refused', async (t) => {
+  const acme = { name: 'acme', volumes: [{ path: '/r', readOnly: false }], workflows: [], hires: {}, schedules: {} };
   await t.test('a folder beside its repositories', () =>
-    assert.equal(Schema.is(Factory)({ ...acme, volumes: [{ path: '/notes', readOnly: true }] }), true),
+    assert.equal(Schema.is(Factory)({ ...acme, volumes: [...acme.volumes, { path: '/notes', readOnly: true }] }), true),
   );
   const rows: Record<string, object> = {
-    'a volume that is one of its repositories': { ...acme, volumes: [{ path: '/r', readOnly: true }] },
     'a volume named twice': {
       ...acme,
       volumes: [
@@ -103,7 +107,7 @@ test('a factory mounts volumes beside its repositories, and one that is a reposi
 });
 
 test('a factory names the harness settings a factory may set, and one naming another key or harness is refused, never stripped', async (t) => {
-  const acme = { name: 'acme', repos: ['/r'], workflows: [], hires: {}, schedules: {} };
+  const acme = { name: 'acme', volumes: [{ path: '/r', readOnly: false }], workflows: [], hires: {}, schedules: {} };
   await t.test('attribution off', () =>
     assert.equal(Schema.is(Factory)({ ...acme, harnessSettings: { claude: { attribution: { commit: '', pr: '' } } } }), true),
   );
@@ -116,7 +120,7 @@ test('a factory names the harness settings a factory may set, and one naming ano
 });
 
 test('a factory sets a cost line for a workflow it offers, and one for a workflow it does not offer, or of no dollars, is refused', async (t) => {
-  const mill = { name: 'mill', repos: ['/r'], workflows: ['build'], hires: {}, schedules: {} };
+  const mill = { name: 'mill', volumes: [{ path: '/r', readOnly: false }], workflows: ['build'], hires: {}, schedules: {} };
   await t.test('a line of $80 for build, which it offers', () =>
     assert.equal(Schema.is(Factory)({ ...mill, costLines: { build: 80 } }), true),
   );
@@ -129,12 +133,13 @@ test('a factory sets a cost line for a workflow it offers, and one for a workflo
     await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Factory)(factory), false));
 });
 
-test('a factory names the URL only of a repository it has, and one naming another folder is refused', async (t) => {
-  const mill = { name: 'mill', repos: ['/store/clones/h/o/r'], workflows: [], hires: {}, schedules: {} };
+test("a writable volume cloned from a URL keeps its origin, and an old file's repos key is no factory", async (t) => {
+  const mill = { name: 'mill', workflows: [], hires: {}, schedules: {} };
   await t.test('the URL of its one clone', () =>
-    assert.equal(Schema.is(Factory)({ ...mill, origins: { '/store/clones/h/o/r': 'https://h/o/r' } }), true),
+    assert.equal(
+      Schema.is(Factory)({ ...mill, volumes: [{ path: '/store/clones/h/o/r', readOnly: false, origin: 'https://h/o/r' }] }),
+      true,
+    ),
   );
-  await t.test('REFUSED: the URL of a folder that is none of its repositories', () =>
-    assert.equal(Schema.is(Factory)({ ...mill, origins: { '/elsewhere': 'https://h/o/r' } }), false),
-  );
+  await t.test('REFUSED: repos, with no volumes', () => assert.equal(Schema.is(Factory)({ ...mill, repos: ['/r'] }), false));
 });

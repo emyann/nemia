@@ -32,6 +32,8 @@ import {
   FACTORY_RESOLVE_WORDS,
   FACTORY_UPGRADE_WORDS,
   NO_TRUST,
+  retiredRepo,
+  VOLUMES,
 } from './commands-factories-templated.ts';
 import { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FACTORY_RULES_WORDS } from './commands-factories-words.ts';
 import { REVISIONS_POLICIES } from './words.ts';
@@ -50,7 +52,7 @@ export const FACTORY_LIST_WORDS = {
     positionals: [],
     flags: [],
     unknown: (arg) =>
-      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, takes a hand-made one over by a template with nemia factory diff <name> --template <folder|archive>, then nemia factory adopt, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, mounts a folder for its runs with nemia factory volume add <factory> <path>:ro|:rw, gives its runs' sessions a harness setting with nemia factory setting set <factory> <harness>.<key> <json>, sets a workflow's cost line with nemia factory cost-line set <factory> <workflow> <usd>, and removes one with nemia factory rm <name> (nemia factory --help).`,
+      `nemia factory does not take ${arg}. It lists the factories — nemia factory ls — files one with nemia factory add <name> [--volume <path|url>:rw], takes a hand-made one over by a template with nemia factory diff <name> --template <folder|archive>, then nemia factory adopt, trusts its places again with nemia factory trust <name>, attaches a workflow with nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, schedules a workflow's runs with nemia factory schedule <factory> <workflow> --cron <expr> --brief <text>, takes the schedule back with nemia factory unschedule <factory> <workflow>, writes the rules its agents are told with nemia factory rules <name> --file <path>, says where Nemia's instruction for it is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, gives it a volume with nemia factory volume add <factory> <path|url>:ro|:rw, gives its runs' sessions a harness setting with nemia factory setting set <factory> <harness>.<key> <json>, sets a workflow's cost line with nemia factory cost-line set <factory> <workflow> <usd>, and removes one with nemia factory rm <name> (nemia factory --help).`,
   },
   writes: false,
   class: 'read',
@@ -77,38 +79,30 @@ export const FACTORY_LS_WORDS = {
   },
 } as const satisfies CommandWords;
 
-/** `--repo <path>`, once per repository a factory is filed with. */
-const REPOS = {
-  flag: '--repo',
-  kind: 'text',
-  key: 'repos',
-  many: true,
-  takes: "--repo takes a repository's directory or its git URL: nemia factory add <name> --repo <path|url> [--repo <path|url> ...]",
-} satisfies Flag;
-
-/** `nemia factory add`'s spec: the factory's name, then `--repo` once per repository, and `--no-trust`. */
+/** `nemia factory add`'s spec: the factory's name, then `--volume` once per volume, none or several, and `--no-trust`. */
 const ADD_SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-  flags: [REPOS, NO_TRUST],
+  flags: [VOLUMES, NO_TRUST],
   unknown: (arg) =>
-    arg === '--template' || arg.startsWith('--template=')
+    retiredRepo('add', arg) ??
+    (arg === '--template' || arg.startsWith('--template=')
       ? `nemia factory add files a factory by hand and does not take --template: a factory made from a template is filed by nemia factory apply ${APPLY_USAGE}.`
       : arg.startsWith('-')
-        ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path|url>, once per repository, and --no-trust.`
-        : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path|url>, once per factory.`,
-  apart: () => REPOS.takes,
+        ? `nemia factory add does not take ${arg}. It takes the factory's name, then --volume <path|url>:ro|:rw, once per volume, and --no-trust.`
+        : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> [--volume <path|url>:ro|:rw ...], once per factory.`),
+  apart: () => VOLUMES.takes,
   missing:
-    "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path|url> [--repo <path|url> ...]. Nothing was filed.",
+    "nemia factory add takes the factory's name, first: nemia factory add <name> [--volume <path|url>:ro|:rw ...]. Nothing was filed.",
 };
 
 /** `nemia factory add`: one factory filed; then, unless `--no-trust`, each of its places trusted for the harnesses that keep a trust. */
 export const FACTORY_ADD_WORDS = {
   name: 'factory add',
   served: [{ endpoint: 'factories.create' }],
-  usage: '<name> --repo <path|url> [--repo <path|url> ...] [--no-trust]',
+  usage: '<name> [--volume <path|url>:ro|:rw ...] [--no-trust]',
   help: [
-    'file a factory: a lowercase slug naming one or more directories or git URLs,',
-    'each URL cloned, each trusted for its steps unless --no-trust',
+    'file a factory: a lowercase slug, with none or several volumes, each a folder or',
+    'a git URL, cloned; each writable one trusted for its steps unless --no-trust',
   ],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),

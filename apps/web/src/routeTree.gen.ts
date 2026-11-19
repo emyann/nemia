@@ -26,6 +26,7 @@ import { Route as FactoriesFactoryRouteImport } from './routes/factories.$factor
 import { Route as InboxNameRouteImport } from './routes/inbox_.$name'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as WelcomeFactoryRouteImport } from './routes/welcome_.factory'
 import { Route as AgentsFromAgentRouteImport } from './routes/agents_.$from.$agent'
 import { Route as AgentsSkillsNewRouteImport } from './routes/agents_.skills.new'
 import { Route as FactoriesFactoryAgentsRouteImport } from './routes/factories.$factory_.agents'
@@ -132,6 +133,11 @@ const RunsIndexRoute = RunsIndexRouteImport.update({
 const RunsRunIdRoute = RunsRunIdRouteImport.update({
   id: '/runs/$runId',
   path: '/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeFactoryRoute = WelcomeFactoryRouteImport.update({
+  id: '/welcome_/factory',
+  path: '/welcome/factory',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsFromAgentRoute = AgentsFromAgentRouteImport.update({
@@ -275,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/welcome/factory': typeof WelcomeFactoryRoute
   '/runs/': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
@@ -316,6 +323,7 @@ export interface FileRoutesByTo {
   '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/welcome/factory': typeof WelcomeFactoryRoute
   '/runs': typeof RunsIndexRoute
   '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/agents/skills/new': typeof AgentsSkillsNewRoute
@@ -358,6 +366,7 @@ export interface FileRoutesById {
   '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox_/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/welcome_/factory': typeof WelcomeFactoryRoute
   '/runs/': typeof RunsIndexRoute
   '/agents_/$from/$agent': typeof AgentsFromAgentRoute
   '/agents_/skills/new': typeof AgentsSkillsNewRoute
@@ -401,6 +410,7 @@ export interface FileRouteTypes {
     | '/factories/$factory'
     | '/inbox/$name'
     | '/runs/$runId'
+    | '/welcome/factory'
     | '/runs/'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
@@ -442,6 +452,7 @@ export interface FileRouteTypes {
     | '/factories/$factory'
     | '/inbox/$name'
     | '/runs/$runId'
+    | '/welcome/factory'
     | '/runs'
     | '/agents/$from/$agent'
     | '/agents/skills/new'
@@ -483,6 +494,7 @@ export interface FileRouteTypes {
     | '/factories/$factory'
     | '/inbox_/$name'
     | '/runs/$runId'
+    | '/welcome_/factory'
     | '/runs/'
     | '/agents_/$from/$agent'
     | '/agents_/skills/new'
@@ -525,6 +537,7 @@ export interface RootRouteChildren {
   FactoriesFactoryRoute: typeof FactoriesFactoryRoute
   InboxNameRoute: typeof InboxNameRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
+  WelcomeFactoryRoute: typeof WelcomeFactoryRoute
   RunsIndexRoute: typeof RunsIndexRoute
   AgentsFromAgentRoute: typeof AgentsFromAgentRoute
   AgentsSkillsNewRoute: typeof AgentsSkillsNewRoute
@@ -669,6 +682,13 @@ declare module '@tanstack/react-router' {
       path: '/runs/$runId'
       fullPath: '/runs/$runId'
       preLoaderRoute: typeof RunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome_/factory': {
+      id: '/welcome_/factory'
+      path: '/welcome/factory'
+      fullPath: '/welcome/factory'
+      preLoaderRoute: typeof WelcomeFactoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents_/$from/$agent': {
@@ -845,6 +865,7 @@ const rootRouteChildren: RootRouteChildren = {
   FactoriesFactoryRoute: FactoriesFactoryRoute,
   InboxNameRoute: InboxNameRoute,
   RunsRunIdRoute: RunsRunIdRoute,
+  WelcomeFactoryRoute: WelcomeFactoryRoute,
   RunsIndexRoute: RunsIndexRoute,
   AgentsFromAgentRoute: AgentsFromAgentRoute,
   AgentsSkillsNewRoute: AgentsSkillsNewRoute,

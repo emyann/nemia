@@ -395,10 +395,10 @@ export const FeedStreamLine = Schema.StructWithRest(
 ).annotate({ description: 'A line of the feed, every key it carries kept as written.' });
 export type FeedStreamLine = typeof FeedStreamLine.Type;
 
-/** A `hint` event's data: the sentence a person reads of a selector that names a former word. */
+/** A `hint` event's data: the sentence a person reads of a labelSelector that names a former word. */
 export const FeedStreamHint = Schema.Struct({
-  message: Schema.String.annotate({ description: 'The hint, naming what the selector says now.' }),
-}).annotate({ description: 'A hint of a selector that names a former word.' });
+  message: Schema.String.annotate({ description: 'The hint, naming what the labelSelector says now.' }),
+}).annotate({ description: 'A hint of a labelSelector that names a former word.' });
 export type FeedStreamHint = typeof FeedStreamHint.Type;
 
 /** An `unreadable` event's data: why a read of the feed failed, and whether the stream reads again or ends. */

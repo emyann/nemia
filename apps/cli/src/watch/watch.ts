@@ -173,6 +173,10 @@ function decodedOf(s: Sent): Option.Option<FeedStreamEvent> | 'undecoded' {
  * stream opens with, skipped; a line, its id the cursor; a bookmark, which a `--once` read leaves to its end; a hint, said once on stderr;
  * a failed read said on stderr. An event of a name the feed does not send is skipped; one whose data does not decode is said on stderr,
  * by its name, and the watch goes on. Answers `cut` for a feed cut under the cursor.
+ *
+ * @param s the event as the stream sent it: its name, its data and its id
+ * @param asked what `nemia watch` was asked: `--once`, how it prints, and the cursor file it keeps
+ * @param at where the watch is: the cursor it has read to, which a line and a bookmark move, and whether the hints were said
  */
 export function onSent(s: Sent, asked: Asked, at: At): 'cut' | undefined {
   const decoded = decodedOf(s);

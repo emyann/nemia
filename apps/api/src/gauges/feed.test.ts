@@ -705,10 +705,13 @@ const labelOf = (line: FeedLine, key: string) => (line as { labels?: Record<stri
  * encoded by `objects`' `FeedStreamEvent` as the endpoint's `StreamSse` writes it. The wait is the stream's: it ends on the event it
  * counts, never on a length of time.
  */
-const untilBookmark = async (from: number, selectors: Selectors, every: Duration.Input): Promise<Block[]> =>
-  (await runtime.runPromise(Stream.runCollect(Stream.takeUntil(feedEvents(from, selectors, every), (m) => m.event === 'bookmark')))).map(
-    (m) => Schema.encodeSync(FeedStreamEvent)(m),
+const untilBookmark = async (from: number, selectors: Selectors, every: Duration.Input) => {
+  const sent = await runtime.runPromise(
+    Stream.runCollect(Stream.takeUntil(feedEvents(from, selectors, every), (m) => m.event === 'bookmark')),
   );
+  const encoded: Block[] = sent.map((m) => Schema.encodeSync(FeedStreamEvent)(m));
+  return encoded;
+};
 
 describe(
   'A board follows the feed through selectors: only the lines they take, a comma and a second selector, a bare key, and a bookmark that says where it has read to',

@@ -10,8 +10,16 @@ import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 export const VolumeSpec = Schema.Struct({
   path: Schema.String.annotate({ description: "The folder's absolute path on the machine." }),
   readOnly: Schema.Boolean.annotate({ description: 'Whether steps only read the folder (:ro) rather than write it too (:rw).' }),
+  claudeMd: Schema.optionalKey(
+    Schema.Boolean.annotate({ description: "Whether the volume's CLAUDE.md files reach the factory's sessions; absent is off." }),
+  ),
+  skills: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "Whether the skills of the volume's .claude/skills are offered to the factory's sessions; absent is on.",
+    }),
+  ),
 }).annotate({
-  description: 'The folder, by its absolute path, and whether steps only read it.',
+  description: "The folder, by its absolute path, whether steps only read it, and what it gives the factory's sessions.",
 });
 export type VolumeSpec = typeof VolumeSpec.Type;
 

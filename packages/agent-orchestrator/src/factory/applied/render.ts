@@ -15,7 +15,7 @@ import { DEFAULT_HARNESS } from '../../harness/harness.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory.ts';
 import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
 import { frontmatterOfValues, frontmatterValues } from '../../frontmatter/frontmatter.ts';
-import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, HOME_FOLDER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
 import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../template/index.ts';
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
@@ -339,7 +339,7 @@ function renderRules(rules: string | undefined, out: Rendered): void {
 /**
  * The template `read`, which passes its check, rendered with `params` into the files of a factory's tree: each workflow's steps, each
  * agent, each skill carried whole (a `skill.yaml` left behind: what it fetches is refused by the check), `factory.json` holding every
- * workflow, the manifest's hires and its revisions policy, `NEMIA.md` from the manifest's instruction or the template's own, and
+ * workflow, the manifest's hires and its revisions policy, the template's `home/` carried whole into the tree's `home/` (`HOME_FOLDER`), `NEMIA.md` from the manifest's instruction or the template's own, and
  * `RULES.md` from its rules, as `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`, `renderAgent` or
  * `renderRules` refuses, a harness block's `options`, and a block of a harness the step or agent does not run on.
  * @param read The template as read, which passes its check.
@@ -372,6 +372,7 @@ export function renderFactory(read: TemplateRead, params: Params): Rendered {
     if (holder === SKILLS_FOLDER && !(leaf === 'skill.yaml' && file.split('/').length === 3))
       out.copies.push({ path: `${WORKFLOWS}/${file}`, from: file });
     if (holder === CARRIED_FOLDER) out.copies.push({ path: `${WORKFLOWS}/${file}`, from: file });
+    if (holder === HOME_FOLDER) out.copies.push({ path: file, from: file });
   }
   const instruction = textOr(manifest.instruction, 'NEMIA.md', read, params);
   if (instruction !== undefined) out.files.push({ path: 'NEMIA.md', text: `${instruction.trim()}\n` });

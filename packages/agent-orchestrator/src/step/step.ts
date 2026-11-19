@@ -663,3 +663,10 @@ export const SKILLS_FOLDER = 'skills';
  * has its name either (`agentsFolderRefusal`).
  */
 export const CARRIED_FOLDER = 'carried';
+
+/**
+ * The folder of a factory's tree, and of the template it is applied from, that is the factory's home: where a run's Claude Code sessions
+ * start, its `CLAUDE.md`, `.claude/` and `.mcp.json` theirs. Copied byte for byte from the template's into the tree's, and frozen per run
+ * at `nemia start` under `runs/<id>/home/<hex>/` (`freezeHomeFiles`), read-only to every session.
+ */
+export const HOME_FOLDER = 'home';

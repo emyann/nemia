@@ -118,7 +118,26 @@ export type Factory = {
  * `origin`: the git URL it was given by, its folder `clones/<host>/<path>` in the store (`cloneTarget`), which the daemon clones again
  * when the folder is gone (`clonesOnce`).
  */
-export type Volume = { path: string; readOnly: boolean; name?: string; origin?: string };
+export type Volume = { path: string; readOnly: boolean; name?: string; origin?: string } & VolumeSwitches;
+
+/**
+ * What a volume gives the factory's sessions, which start in its home where it has one: `claudeMd`, whether its CLAUDE.md files load
+ * (absent is off), and `skills`, whether the skills of its `.claude/skills` are offered (absent is on). A person's settings, kept on the
+ * volume in the factory's own file, which no proposal changes; stored only where given.
+ */
+export type VolumeSwitches = { claudeMd?: boolean; skills?: boolean };
+
+/** A volume as a run freezes it (`factoryVolumes`): its path, its mark, and its switches where they are not the defaults (`switchesOf`). */
+export type FrozenVolume = { path: string; readOnly: boolean; claudeMd?: true; skills?: false };
+
+/**
+ * A volume's switches as a run freezes them: `claudeMd: true` where switched on, `skills: false` where switched off, nothing for a default.
+ * @param v The volume, by its switches.
+ */
+export const switchesOf = (v: VolumeSwitches): { claudeMd?: true; skills?: false } => ({
+  ...(v.claudeMd === true ? { claudeMd: true as const } : {}),
+  ...(v.skills === false ? { skills: false as const } : {}),
+});
 
 /**
  * A volume's own keys, its path, its mark, and its name and origin where it has them, and no other a file kept beside them.
@@ -129,6 +148,8 @@ export const volumeEntry = (v: Volume): Volume => ({
   readOnly: v.readOnly,
   ...(v.name === undefined ? {} : { name: v.name }),
   ...(v.origin === undefined ? {} : { origin: v.origin }),
+  ...(v.claudeMd === undefined ? {} : { claudeMd: v.claudeMd }),
+  ...(v.skills === undefined ? {} : { skills: v.skills }),
 });
 
 /**
@@ -154,14 +175,15 @@ export const volumeAddLine = (factory: string): string => `nemia factory volume 
 
 /**
  * The volumes of `factory` as a run mounts them, each as `path.resolve` spells it, sorted, once each: the first named of a path given
- * twice; its path and mark alone, a name being no mount's (`factoryVolumesNamed`, `volume/volume.ts`, names them).
+ * twice; its path, its mark and its switches as a run freezes them (`switchesOf`), a name being no mount's (`factoryVolumesNamed`,
+ * `volume/volume.ts`, names them).
  * @param factory The factory, by its volumes.
  */
-export function factoryVolumes(factory: { readonly volumes?: readonly Volume[] }): Volume[] {
-  const seen = new Map<string, Volume>();
+export function factoryVolumes(factory: { readonly volumes?: readonly Volume[] }): FrozenVolume[] {
+  const seen = new Map<string, FrozenVolume>();
   for (const v of factory.volumes ?? []) {
     const at = path.resolve(v.path);
-    if (!seen.has(at)) seen.set(at, { path: at, readOnly: v.readOnly });
+    if (!seen.has(at)) seen.set(at, { path: at, readOnly: v.readOnly, ...switchesOf(v) });
   }
   return [...seen.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
@@ -732,7 +754,7 @@ export function factoryMounts(factory: Pick<Factory, 'volumes'>, repo: string | 
   return workedOn(factory)
     .filter((r) => r !== own)
     .sort()
-    .map((r) => ({ path: r, readOnly: true }));
+    .map((r) => ({ path: r, readOnly: true, ...switchesOf(factory.volumes.find((v) => path.resolve(v.path) === r) ?? {}) }));
 }
 
 /**

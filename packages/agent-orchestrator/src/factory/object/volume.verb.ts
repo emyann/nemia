@@ -33,7 +33,12 @@ export type VolumeWorld = {
  */
 export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, filedAt: string, world: VolumeWorld): Volume[] =>
   factoryVolumesNamed(listing).map((v) => {
-    const spec = { path: v.path, readOnly: v.readOnly };
+    const spec = {
+      path: v.path,
+      readOnly: v.readOnly,
+      ...(v.claudeMd === undefined ? {} : { claudeMd: v.claudeMd }),
+      ...(v.skills === undefined ? {} : { skills: v.skills }),
+    };
     const refused = volumeRefusal(listing, v, world.home, world.isDirectory);
     const status: Volume['status'] = {
       present: world.isDirectory(path.resolve(v.path)),

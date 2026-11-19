@@ -13,9 +13,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
 import { runsDir } from '../record/record.store.ts';
-import { carriedFilesRoot, workflowFilesRoot } from '../record/places.store.ts';
+import { carriedFilesRoot, homeFilesRoot, workflowFilesRoot } from '../record/places.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { CARRIED_FOLDER } from '../step/step.ts';
+import { CARRIED_FOLDER, HOME_FOLDER } from '../step/step.ts';
 
 /**
  * The run's own copies of its workflow folder, `runs/<id>/workflow`, and with `hex` the one copy under that digest (`Run.workflowFiles`):
@@ -34,6 +34,44 @@ export const workflowFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: strin
  * @param hex The digest of one copy, or undefined for the folder of every copy.
  */
 export const carriedFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => carriedFilesRoot(runsDir(home), run.id, hex);
+
+/**
+ * The run's own copies of its factory's home, `runs/<id>/home`, and with `hex` the one copy under that digest (`Run.homeFiles`): the
+ * folder each local Claude Code session of the run starts in (`sessionStart`). Beside the run's record, and removed with it (`nemia rm`).
+ * @param home The store's home folder.
+ * @param run The run, by its id.
+ * @param hex The digest of one copy, or undefined for the folder of every copy.
+ */
+export const homeFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => homeFilesRoot(runsDir(home), run.id, hex);
+
+/**
+ * The home folder of a factory's tree (`tree`), `home/` in it, where its template gave one.
+ * @param tree The factory's tree, or undefined for a factory made by hand, which has none.
+ */
+export const homeDirOf = (tree: string | undefined): string | undefined =>
+  tree === undefined ? undefined : path.join(tree, HOME_FOLDER);
+
+/**
+ * Every file of the factory's home in its tree (`homeDirOf`), read and refused as `workflowFilesOf` reads and refuses them; undefined
+ * where the factory has no tree or its tree no `home/`.
+ * @param tree The factory's tree, or undefined for a factory made by hand.
+ */
+export const homeFilesOf = (tree: string | undefined): WorkflowFile[] | undefined => {
+  const dir = homeDirOf(tree);
+  return dir !== undefined && fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? workflowFilesOf(dir) : undefined;
+};
+
+/**
+ * Copies the factory's home (`homeFilesOf`) into the run's own `home/<hex>/` (`homeFilesDir`), as `freezeWorkflowFiles` copies the
+ * workflow's, and answers the hex; undefined where the factory has none.
+ * @param home The store's home folder.
+ * @param run The run, by its id.
+ * @param tree The factory's tree, or undefined for a factory made by hand.
+ */
+export function freezeHomeFiles(home: string, run: Pick<Run, 'id'>, tree: string | undefined): string | undefined {
+  const files = homeFilesOf(tree);
+  return files === undefined ? undefined : freezeInto(home, files, run, 'home');
+}
 
 /**
  * The carried folder of the workflow at `workflowDir`: `carried/` beside it, the files the workflows of its folder share.
@@ -120,12 +158,13 @@ export const carriedFilesOf = (workflowDir: string): WorkflowFile[] | undefined 
 };
 
 /**
- * Copies `files`, a folder as read, into the run's copies of its workflow folder or of its carried files (`which`), under its digest, as
+ * Copies `files`, a folder as read, into the run's copies of its workflow folder, of its carried files or of its home (`which`), under its digest, as
  * `freezeWorkflowFiles` says; answers the hex.
  */
-function freezeInto(home: string, files: readonly WorkflowFile[], run: Pick<Run, 'id'>, which: 'workflow' | 'carried'): string {
+function freezeInto(home: string, files: readonly WorkflowFile[], run: Pick<Run, 'id'>, which: 'workflow' | 'carried' | 'home'): string {
   const hex = workflowFilesDigest(files);
-  const parent = which === 'workflow' ? workflowFilesDir(home, run) : carriedFilesDir(home, run);
+  const parent =
+    which === 'workflow' ? workflowFilesDir(home, run) : which === 'carried' ? carriedFilesDir(home, run) : homeFilesDir(home, run);
   const target = path.join(parent, hex);
   if (fs.existsSync(target)) return hex;
   fs.mkdirSync(parent, { recursive: true });

@@ -7,10 +7,26 @@
 import type { Args } from 'objects';
 import { asked } from '../../objects.ts';
 import { said, switchArg } from '../requests.ts';
+import { Refused } from '../../refused.ts';
 import { dollars, repoSent, textOf, trustedLines, volumeSent, writtenOf } from './lines.ts';
 
 /** How a volume is said: `:ro` or `:rw`, as docker compose marks it. */
 const markOf = (readOnly: boolean): ':ro' | ':rw' => (readOnly ? ':ro' : ':rw');
+
+/**
+ * A volume's switch as typed, `on` or `off`, as the api takes it: `{ [key]: true }` or `{ [key]: false }`, nothing where it was not given,
+ * and refused where it is neither.
+ * @param args The words typed after the command's name, parsed against its words.
+ * @param key The switch's key, `claudeMd` or `skills`.
+ */
+const onOff = (args: Args, key: 'claudeMd' | 'skills'): { claudeMd?: boolean; skills?: boolean } => {
+  const given = args[key];
+  if (given === 'on') return { [key]: true };
+  if (given === 'off') return { [key]: false };
+  if (given === undefined) return {};
+  const flag = key === 'claudeMd' ? '--claude-md' : '--skills';
+  throw new Refused(`nemia factory volume add takes ${flag} on or ${flag} off, not ${JSON.stringify(given)}. Nothing was changed.`);
+};
 
 /**
  * `nemia factory volume add`: a writable volume, a repository the factory works on, its place trusted unless `--no-trust`; or a
@@ -22,7 +38,12 @@ export async function factoryVolumeAdd(args: Args): Promise<number> {
   const added = await asked('factory volume add', (c) =>
     c.factories.addVolume({
       params: { factory },
-      payload: { volume: volumeSent(textOf(args, 'volume')), ...(switchArg(args, 'noTrust') ? { noTrust: true } : {}) },
+      payload: {
+        volume: volumeSent(textOf(args, 'volume')),
+        ...(switchArg(args, 'noTrust') ? { noTrust: true } : {}),
+        ...onOff(args, 'claudeMd'),
+        ...onOff(args, 'skills'),
+      },
     }),
   );
   const { file, volume, was, trusts } = added;

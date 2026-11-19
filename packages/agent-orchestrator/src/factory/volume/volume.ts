@@ -83,14 +83,24 @@ export function volumeRefusal(
  * ones were given in stays (`workedOn`), and what that one was marked (`was`), null for a new one: each with its name, the one it is named
  * on read for one its file stores none of (`volumesNamed`), and the new one's taken among them (`volumeNameAt`), so the file stores every
  * name and none moves.
+ * A switch the added volume does not give (`claudeMd`, `skills`) is the one of its path kept.
  * @param factory The factory: its volumes as its file holds them.
- * @param volume The volume added: its path, whether it is read-only, and its origin where it is a clone.
+ * @param volume The volume added: its path, whether it is read-only, its origin where it is a clone, and the switches given.
  */
 export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume): { volumes: Volume[]; was: boolean | null } {
   const at = path.resolve(volume.path);
   const volumes = volumesNamed(factory.volumes);
-  const was = volumes.find((v) => path.resolve(v.path) === at)?.readOnly ?? null;
-  const named = { ...volume, path: at, name: volumeNameAt(factory.volumes, at) };
+  const before = volumes.find((v) => path.resolve(v.path) === at);
+  const was = before?.readOnly ?? null;
+  const claudeMd = volume.claudeMd ?? before?.claudeMd;
+  const skills = volume.skills ?? before?.skills;
+  const named = {
+    ...volume,
+    path: at,
+    name: volumeNameAt(factory.volumes, at),
+    ...(claudeMd === undefined ? {} : { claudeMd }),
+    ...(skills === undefined ? {} : { skills }),
+  };
   const kept = was === null ? [...volumes, named] : volumes.map((v) => (path.resolve(v.path) === at ? named : v));
   return { volumes: kept.filter((v, i) => kept.findIndex((w) => path.resolve(w.path) === path.resolve(v.path)) === i), was };
 }
@@ -158,6 +168,8 @@ export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>): NamedVol
         ...v,
         ...(first?.name === undefined ? {} : { name: first.name }),
         ...(first?.origin === undefined ? {} : { origin: first.origin }),
+        ...(first?.claudeMd === undefined ? {} : { claudeMd: first.claudeMd }),
+        ...(first?.skills === undefined ? {} : { skills: first.skills }),
       };
     }),
   );

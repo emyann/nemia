@@ -185,6 +185,7 @@ const PINNED: Record<string, string[]> = {
     'FACTORY_UPGRADE',
     'FACTORY_VOLUME_ADD',
     'FACTORY_VOLUME_RM',
+    'FACTORY_VOLUME_SET',
     'PASSES',
     'PAUSE',
     'PAUSED',

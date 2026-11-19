@@ -70,6 +70,33 @@ async function expectListed(page: Page, ...given: string[]) {
   if ((await themeOf(page)) === 'dark') await photograph(page, path.join(OUT, 'factory-volumes-listed-dark.png'), { fullPage: true });
 }
 
+/**
+ * The switches of FACTORY's read-only volume `ro`: CLAUDE.md off and skills on, as a volume that sets neither; its CLAUDE.md switch
+ * pressed, the api answers the volume with it on, the factory's file holds it on the same path, its mark unmoved, and the page drawn
+ * again reads it on.
+ * @param factoryFile The factory's file.
+ */
+async function expectSwitched(page: Page, ro: string, factoryFile: string) {
+  await settingsOf(page, FACTORY);
+  const row = page.locator(`[data-factory-volumes="${FACTORY}"] [data-factory-volume="${ro}"]`);
+  const input = (key: string) => row.locator(`[data-volume-switch="${key}"] input`);
+  if ((await input('claudeMd').isChecked()) || !(await input('skills').isChecked()))
+    throw new Refused(`${ro} sets neither switch, so it draws CLAUDE.md off and skills on — it draws otherwise`);
+  await row.locator('[data-volume-switch="claudeMd"]').click();
+  await expectCount(page.locator('[data-volume-refused]'), 0, 'the switch is not refused');
+  await idle(page);
+  const answered = (await listed(page, FACTORY)).volumes.find((v) => v.path === ro);
+  if (answered?.claudeMd !== true)
+    throw new Refused(`the api answers ${ro} with CLAUDE.md on once its switch is pressed — it answers ${JSON.stringify(answered)}`);
+  const filed = (
+    JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as { volumes: Array<{ path: string; readOnly: boolean; claudeMd?: boolean }> }
+  ).volumes.find((v) => v.path === ro);
+  if (filed?.claudeMd !== true || filed.readOnly !== true)
+    throw new Refused(`the factory's file holds ${ro} read-only with claudeMd true — it holds ${JSON.stringify(filed)}`);
+  await settingsOf(page, FACTORY);
+  if (!(await input('claudeMd').isChecked())) throw new Refused(`${ro}'s CLAUDE.md switch reads on once the page is drawn again`);
+}
+
 /** The card of a factory with no volume: an empty state that shows the api's line to add one. */
 async function expectNone(page: Page) {
   const line = (await listed(page, NONE)).commands.volume;
@@ -102,12 +129,12 @@ async function expectAddedThenRemoved(page: Page, folder: string) {
 
 export default {
   /**
-   * A factory's volumes on its settings page. The page makes folders where the pictures go (`OUT`), outside the store and every
-   * factory's repositories, as `nemia factory volume add` requires, and writes one into the file of FACTORIES' `hiring` beside its
-   * repository as the verb writes it, `:ro`: the card lists each, in the api's order, with its mark, what it is,
-   * and the line that takes it back. A third is given through the card's form, read only, and taken back by its Remove. A factory it
-   * files with none shows the api's line to add one. It is pictured once, in the dark theme. The factory's file is put back, the one it
-   * filed removed, then the folders, whatever happens.
+   * A factory's volumes on its settings page. The page makes folders where the pictures go (`OUT`), outside the store and every factory's
+   * repositories, as `nemia factory volume add` requires, and writes one into the file of FACTORIES' `hiring` beside its repository as the
+   * verb writes it, `:ro`: the card lists each, in the api's order, with its mark, what it is, and the line that takes it back; its
+   * CLAUDE.md switch, pressed, is written to the file and read again on. A third is given through the card's form, read only, and taken
+   * back by its Remove. A factory it files with none shows the api's line to add one. It is pictured once, in the dark theme. The factory's
+   * file is put back, the one it filed removed, then the folders, whatever happens.
    */
   name: 'factory-volumes',
   route: '/',
@@ -124,6 +151,7 @@ export default {
       fs.writeFileSync(factoryFile, `${JSON.stringify({ ...factory, volumes }, null, 2)}\n`);
       fs.writeFileSync(noneFile, `${JSON.stringify({ volumes: [], instruction: { store: true } }, null, 2)}\n`);
       await expectListed(page, ro);
+      await expectSwitched(page, ro, factoryFile);
       await expectAddedThenRemoved(page, formed);
       await expectNone(page);
     } finally {

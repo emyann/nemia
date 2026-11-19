@@ -53,6 +53,12 @@ nemia factory volume rm pipao /home/me/notes
 - Volumes are yours: they live in the factory's own file, never in a template, and `nemia factory adopt` and `nemia factory upgrade`
   keep them. `nemia factory` says what the factory works on and lists the read-only ones under it; the board's Settings page of the
   factory lists each with its mark, adds one from a path or a URL and its mode, and takes one back with Remove.
+- **Each volume has two switches**, yours, for the sessions that start in the factory's home: `--claude-md on` loads the volume's
+  `CLAUDE.md` files (off by default), and `--skills off` hides the skills of its `.claude/skills` (on by default). Give them as you add
+  the volume, or set one later without giving the volume again, by its name (`nemia get volumes -n <factory>` lists the names):
+  `nemia factory volume set pipao notes --claude-md on`. A switch you do not name keeps its value. The Settings page shows both switches
+  on each volume, with what each does, and flips one when you press it. Like every volume, they reach the runs started after the
+  change, and no proposal changes them.
 - A store an earlier release wrote, whose files said `"repos"` and `"origins"`, is moved once, when its daemon starts: each repository
   becomes a writable volume with its origin, and those keys are read no more.
 
@@ -284,6 +290,8 @@ nemia factory home shop ~/code/shop --claude-md on
 - **Your repository is added beside it**, the folder you typed the command in unless you name one, writable as usual. Its own
   `CLAUDE.md` is loaded only with `--claude-md on`, as a volume's switch says for a step. A repository inside the copy, or one holding
   it, is refused.
+- **The factory's Settings page gives the line**, `nemia factory home <factory>`, in its Home card with a button that copies it, where
+  the factory has a home.
 - **Only the home's settings are read** (`--setting-sources project`), as a step's session reads them: your own settings, hooks and
   user `CLAUDE.md` do not apply. For your own, open a plain session instead.
 - **Claude Code asks what a step is never asked**: to trust the copy's folder, and to approve the home's `.mcp.json` servers, once for

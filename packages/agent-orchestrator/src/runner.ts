@@ -588,7 +588,7 @@ export {
 export { PERSON, actorOf, type Caller, type ProposalCaller } from './caller/index.ts';
 export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
 export { workflowSpecAt, type ProposalPlace } from './propose/current.verb.ts';
-export { workflowSpecOf, type WorkflowSpecRead } from './propose/workflow-spec.ts';
+export { workflowSpecOf, type WorkflowSpecRead } from './propose/index.ts';
 export { approveProgram, declineProgram, proposalGet, proposalsList } from './approval/approve.verb.ts';
 export { ProposalDoor, proposalDoorFiles, type ProposalDoorShape } from './proposal/proposal.store.ts';
 export { delegationGet, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';

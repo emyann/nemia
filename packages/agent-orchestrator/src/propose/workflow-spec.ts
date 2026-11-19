@@ -21,7 +21,7 @@ export type FolderText = { readonly name: string; readonly text: string };
 export type WorkflowSpecRead = {
   readme?: string;
   steps: { name: string; keys: Record<string, unknown>; body: string }[];
-  files: { path: string; text: string }[];
+  files?: { path: string; text: string }[];
 };
 
 /**
@@ -100,7 +100,8 @@ const spelledNow = (keys: Record<string, unknown>): Record<string, unknown> => {
 };
 
 /**
- * The spec `files`, the text files of a workflow's folder, say: its steps, its README where it has one, and its other files.
+ * The spec `files`, the text files of a workflow's folder, say: its steps, its README where it has one, and its other files where it
+ * has any, so a Workflow written with neither reads back as it was written.
  * @param files The text files directly in the workflow's folder, in any order.
  */
 export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
@@ -114,7 +115,7 @@ export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
       return { name, keys: { ...spelledNow(servedKeys(fenceRead(keys))), ...mapTexts(name, splitFrontmatter(name, f.text).block) }, body };
     });
   const others = byName.filter((f) => !isMarkdown(f.name)).map((f) => ({ path: f.name, text: f.text }));
-  return { ...(readme !== undefined && { readme: readme.text }), steps, files: others };
+  return { ...(readme !== undefined && { readme: readme.text }), steps, ...(others.length > 0 && { files: others }) };
 }
 
 /**

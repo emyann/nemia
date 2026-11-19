@@ -177,7 +177,7 @@ async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<
       ? { places: s.repo === undefined ? { home: s.home } : placesOf(s.repo, s.home), fills: undefined }
       : factoryDraftIn(s.home, s.factory, name, s.repo);
   await s.inRequest(workflowDraftOfFiles(name, files, places, fills));
-  return { metadata: { name }, spec: workflowSpecOf(files.map((f) => ({ name: f.path, text: f.text }))) as WorkflowSpec };
+  return { metadata: { name }, spec: workflowSpecOf(files.map((f) => ({ name: f.path, text: f.text }))) };
 }
 
 /** A step the object sends, as the builder takes it: `agent` among its keys makes every key its own, and its body its own note. */

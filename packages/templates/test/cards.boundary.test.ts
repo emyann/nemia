@@ -13,12 +13,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { SDLC } from './template.ts';
-import { inbox, world } from './janitor-world.ts';
+import { inbox, janitorRun, world } from './janitor-world.ts';
 
 const SCRIPT = path.join(SDLC, 'workflows', 'janitor', 'cards.ts');
 
 /** A card as Argus's closeout declares it, ready to start, with `over` written over its fields. */
-const card = (title: string, over: Record<string, string> = {}) => ({
+const card = (title: string, over: Record<string, unknown> = {}) => ({
   title,
   kind: 'fence',
   correction: 'Allow Bash(git log:*) in agora',
@@ -26,6 +26,7 @@ const card = (title: string, over: Record<string, string> = {}) => ({
   agent: 'agora',
   factory: 'acme',
   workflow: 'build',
+  labels: [] as string[],
   ...over,
 });
 
@@ -38,13 +39,16 @@ function closeoutFile(fields: Record<string, unknown>) {
   return file;
 }
 
-/** Run the script over the closeout `args` names in the world `env`, bounded; its exit and streams. */
-function run(env: NodeJS.ProcessEnv, args: string[]) {
+/**
+ * Run the script over the closeout `args` names in the world `env`, bounded, with the label rules `rules` as the check line hands them
+ * (no `--labels` at all where null), in the run `wf`; its exit and streams.
+ */
+function run(env: NodeJS.ProcessEnv, args: string[], rules: string | null = '', wf = 'read-the-stats-ab12') {
   const tmp = scratch('nemia-janitor-tmp-');
   const cwd = path.dirname(env.HOME!);
-  const ran = spawnSync(process.execPath, [SCRIPT, ...args], {
+  const ran = spawnSync(process.execPath, [SCRIPT, ...args, ...(rules === null ? [] : ['--labels', rules])], {
     cwd,
-    env: { ...env, WF_WORKSPACE: cwd, WF_RUN: 'read-the-stats-ab12', TMPDIR: tmp },
+    env: { ...env, WF_WORKSPACE: cwd, WF_RUN: wf, TMPDIR: tmp },
     encoding: 'utf8',
     timeout: 120_000,
   });
@@ -180,5 +184,58 @@ test('REFUSED: no closeout, or one that is not there, files nothing and names it
   const gone = run(env, [path.join(root, 'gone.json')]);
   assert.equal(gone.code, 1);
   assert.ok(gone.err.includes(path.join(root, 'gone.json')), gone.err);
+  assert.deepEqual(inbox(root), {});
+});
+
+const RULES = 'work=fix:fix work=docs:docs';
+
+/** A filed card's frontmatter, between its two `---` lines. */
+const frontmatter = (text: string) => /^---\n([\s\S]*?)\n---\n/.exec(text)?.[1] ?? '';
+
+test('under the factory’s label rules, a card of its factory is filed with its labels, and one of another factory with none', async (t) => {
+  const { env, root, wf } = await janitorRun(t);
+  const ours = card('Allow agora the log it reads', { labels: ['work=fix', 'area=agents'] });
+  const theirs = card('Send seldon’s reads to Grep', { factory: 'pipao', workflow: 'intake', labels: ['work=fix'] });
+  const ran = run(env, [closeoutFile({ cards: [ours, theirs] })], RULES, wf);
+  assert.equal(ran.code, 0, ran.err);
+  const cards = Object.values(inbox(root));
+  const filed = cards.find((text) => text.includes(ours.title));
+  assert.ok(filed, 'the card of the run’s factory is filed');
+  const front = frontmatter(filed);
+  assert.match(front, /^labels:/m, filed);
+  assert.match(front, /work: fix/, filed);
+  assert.match(front, /area: agents/, filed);
+  const other = cards.find((text) => text.includes(theirs.title));
+  assert.ok(other, 'the card of another factory is filed');
+  assert.doesNotMatch(frontmatter(other), /^labels:/m, 'with no labels');
+  assert.ok(ran.out.includes('pipao'), 'its line says why it carries none');
+});
+
+test('where the factory names no label rules, a card is filed with no labels', async (t) => {
+  const { env, root } = await world(t);
+  const ran = run(env, [closeoutFile({ cards: [card('Allow agora the log it reads', { labels: ['work=fix'] })] })]);
+  assert.equal(ran.code, 0, ran.err);
+  const [filed] = Object.values(inbox(root));
+  assert.ok(filed);
+  assert.doesNotMatch(frontmatter(filed), /^labels:/m, filed);
+});
+
+test('REFUSED: under rules, a card whose labels no rule reads files nothing, not even the card beside it', async (t) => {
+  const { env, root, wf } = await janitorRun(t);
+  const ready = card('A ready card', { labels: ['work=fix'] });
+  const unread = card('A card no rule reads', { labels: ['area=agents'] });
+  const ran = run(env, [closeoutFile({ cards: [ready, unread] })], RULES, wf);
+  assert.equal(ran.code, 1);
+  assert.ok(ran.err.includes('#2'), 'it names the card');
+  assert.deepEqual(inbox(root), {});
+});
+
+test('REFUSED: a check line that hands no label rules, or a rule that is not one, files nothing', async (t) => {
+  const { env, root } = await world(t);
+  const closeout = closeoutFile({ cards: [card('A ready card')] });
+  assert.equal(run(env, [closeout], null).code, 1);
+  const bad = run(env, [closeout], 'work=fix');
+  assert.equal(bad.code, 1);
+  assert.ok(bad.err.includes('work=fix'), 'it names the rule');
   assert.deepEqual(inbox(root), {});
 });

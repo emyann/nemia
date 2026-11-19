@@ -150,7 +150,7 @@ function nemia(args: readonly string[]): unknown {
     throw new Refusal(
       `nemia ${args.join(' ')} printed more than the ${OUTPUT_BYTES >> 20} MiB the groom reads, and running it again prints as much: ` +
         'take the cards that are done or replaced out of the inbox with `nemia inbox rm <card>`, ' +
-        'or raise OUTPUT_BYTES in the janitor\'s groom.ts by a change to the template',
+        "or raise OUTPUT_BYTES in the janitor's groom.ts by a change to the template",
     );
   if (ran.status !== 0)
     throw new Refusal(

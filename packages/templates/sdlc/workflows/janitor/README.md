@@ -12,13 +12,18 @@ argus
 
 The step's check files the cards (`cards.ts`, read from the run's frozen workflow files, `$WF_WORKFLOW_FILES`, never from the tree;
 where that is not set, the check says so on stderr and fails): each through `nemia inbox add`, with its factory and workflow (its
-repository is the one the factory wires to the workflow), so it is ready to start. It refuses the whole closeout, filing nothing, when
-a card names no factory or workflow, when two cards share a title, or when the period compared with is not as long as the period read
+repository is the one the factory wires to the workflow), so it is ready to start, and with its labels, so the run it starts can open
+its pull request: the check line hands it the factory's `pullRequestLabels` rules (`--labels`), and a card of the run's own factory is
+filed with the labels Argus gave it, one `--label` each, which at least one rule reads. Where the factory names no rules, or a card is
+for another factory, whose rules are not these, the card is filed with no labels, and its line says why. It refuses the whole
+closeout, filing nothing, when a card names no factory or workflow, when two cards share a title, when a label of a card it labels is
+not `<key>=<value>`, gives a key twice or no rule reads its labels, or when the period compared with is not as long as the period read
 and does not end the day before it. A card whose title the inbox already has is not filed again, so the check run again files only what is missing. Nothing is
 started: the inbox is where a person decides.
 
 The check then grooms the inbox (`groom.ts`, from the same frozen files): the cards of the run's own factory alone, the namespace
-`nemia get runs/<run> -o json` serves the run in, read through `nemia get cards -n <that factory> -o json`; another factory's cards
+`nemia get runs/<run> -o json` serves the run in, read through `nemia get cards -n <that factory> -o json`, up to 64 MiB of it, which a listing reaches only when the cards done or
+replaced are long left in the inbox, and the refusal past it says to remove them; another factory's cards
 are its own janitor's. It checks the verdicts whole before it writes anything, refusing, exit 1, a verdict word not of the four, two verdicts on one card, a done
 card whose commit is not on the base (the run's `WF_BASE_REF`, whether the factory lands on GitHub or in the checkout), a replaced card
 that names nothing replacing it, a stale card whose facts are none or whose `was` it does not find exactly once in the card, and a card of

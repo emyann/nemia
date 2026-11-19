@@ -1,10 +1,10 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { MACHINE_WORDS, outcomeOf, outcomeWord } from '../src/lib/outcome.ts';
-import type { StepAttempts, StepCloseout } from '../src/lib/api/tries.ts';
+import type { StepCloseout } from '../src/lib/api/tries.ts';
 import type { AttemptEnd, AttemptOutcome } from '../src/lib/api/tries.ts';
 
-const ended = (reason: AttemptEnd, how: AttemptOutcome = 'failed'): StepAttempts => ({
+const ended = (reason: AttemptEnd, how: AttemptOutcome = 'failed') => ({
   count: 1,
   latest: { startedAt: 'a', ended: how, endedAt: 'b', reason, release: null, harness: null },
 });

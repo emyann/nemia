@@ -29,7 +29,7 @@ async function asked(method: string, url: string, body?: unknown) {
 }
 
 /** The error's text of a refusal's body. */
-const errorOf = (body: unknown): string => String((body as { error?: unknown }).error);
+const errorOf = (body: unknown) => String((body as { error?: unknown }).error);
 
 /** What the agent `drafter` proposed, as the store keeps it. */
 const PROPOSED = path.join(root, 'auto', 'drafter.proposed.json');

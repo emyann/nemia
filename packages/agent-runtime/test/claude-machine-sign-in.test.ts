@@ -11,7 +11,7 @@ import { scratch } from 'test-kit/scratch';
 import { claudeSignIn } from '../src/index.ts';
 
 /** The environment naming a Claude Code whose body is `script`. */
-const stubbed = (script: string): NodeJS.ProcessEnv => {
+const stubbed = (script: string) => {
   const bin = scratch('ae-claude-machine-');
   const claude = path.join(bin, 'claude');
   fs.writeFileSync(claude, `#!/bin/sh\n${script}\n`, { mode: 0o755 });

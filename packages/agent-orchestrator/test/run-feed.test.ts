@@ -128,14 +128,14 @@ const emptyStore = () => {
 };
 
 /** A repository with one commit on the test place, so a start has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
 };
 
 /** A workflow folder of `steps`, each its file's frontmatter lines past `place: git`, and its body `<name> it`. */
-const folderOf = (steps: Record<string, string[]>): string => {
+const folderOf = (steps: Record<string, string[]>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, lines] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${['place: git', ...lines].join('\n')}\n---\n${name} it\n`);
@@ -150,17 +150,17 @@ const UNGATED = folderOf({ plan: [], implement: ['after: plan'] });
 const ENDING = folderOf({ implement: [], ship: ['after: implement', 'workspace: base', 'gate: true'] });
 
 /** A run started on `workflowDir` in a repository of its own, its steps sharing its checkout unless `isolate`. */
-const started = (brief: string, workflowDir = GATED, isolate = false): Promise<Run> =>
+const started = (brief: string, workflowDir = GATED, isolate = false) =>
   stage.runPlaced(startRun({ brief, repo: aRepo(), workflowDir, isolate }));
 
 /** Every line of a run in the feed, read off the file as a reader with cursor 0 would. */
-const lines = (): RunLine[] => readFeed(ROOT, 0).lines.filter(isRunLine);
-const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
+const lines = () => readFeed(ROOT, 0).lines.filter(isRunLine);
+const size = () => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
 /**
  * The words of a run's own lines, or of one step's, in order — but each `closed out`: a closeout read is a one-shot of its own, read with
  * `said(run, 'ClosedOut')`, written on the pass that reads the word the step ended on.
  */
-const words = (run: string, step?: string): string[] =>
+const words = (run: string, step?: string) =>
   lines()
     .filter((l) => l.run === run && l.step === step && l.reason !== 'ClosedOut')
     .map((l) => l.word);
@@ -177,8 +177,7 @@ const judged = (pass: Effect.Success<ReturnType<typeof tickRun>>) => new Map(pas
 const handedTo = (...argv: string[]) => typed(argv, stage.board().e, undefined, stage.place().place, ENV);
 
 /** The lines of the feed from `from` that `selectors` take (`selects`), as the api's stream serves them to `nemia watch`. */
-const taken = (from: number, ...selectors: string[]): FeedLine[] =>
-  readFeed(ROOT, from).lines.filter((l) => selects(parseSelectors(selectors), l));
+const taken = (from: number, ...selectors: string[]) => readFeed(ROOT, from).lines.filter((l) => selects(parseSelectors(selectors), l));
 
 /** Refused at exit 2, its words naming each of `facts`. */
 const refusedNaming =
@@ -190,7 +189,7 @@ const refusedNaming =
   };
 
 /** The reads the engine's stand-in was asked so far. */
-const reads = async (): Promise<number> => (await Effect.runPromise(stage.board().e.io())).reads;
+const reads = async () => (await Effect.runPromise(stage.board().e.io())).reads;
 
 describe(
   'a gated run through its gate, its approval and its end: a line per transition, read by nemia watch and across a restart',

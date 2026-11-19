@@ -24,30 +24,39 @@ import {
 const QUERY = selectorFlag('nemia ls').key ?? '';
 
 /** What `words` make of `argv`: the arguments, or what refused them, by the spec or by the check, and `help` for a line it helps. */
-function readOf(words: CommandWords, argv: readonly string[]): { args: Args } | { refused: string } | 'help' {
+function readOf(words: CommandWords, argv: readonly string[]) {
   try {
     const args = parseArgv(words.spec, argv);
-    if (args === undefined) return 'help';
+    if (args === undefined) {
+      const made: { args: Args } | { refused: string } | 'help' = 'help' as const;
+      return made;
+    }
     const wrong = words.check?.(args);
-    return wrong ? { refused: wrong } : { args };
+    {
+      const made: { args: Args } | { refused: string } | 'help' = wrong ? { refused: wrong } : { args };
+      return made;
+    }
   } catch (err) {
     assert.ok(err instanceof CommandRefused, `${String(err)} is a CommandRefused`);
-    return { refused: err.message };
+    {
+      const made: { args: Args } | { refused: string } | 'help' = { refused: err.message };
+      return made;
+    }
   }
 }
 
 /** The words `words` refuse `argv` in, which must name each of `fixes`. */
-function refused(words: CommandWords, argv: readonly string[], ...fixes: string[]): void {
+function refused(words: CommandWords, argv: readonly string[], ...fixes: string[]) {
   const read = readOf(words, argv);
   assert.ok(typeof read === 'object' && 'refused' in read, `${words.name} ${argv.join(' ')} is refused: ${JSON.stringify(read)}`);
   for (const fix of fixes) assert.ok(read.refused.includes(fix), `${read.refused} names ${fix}`);
 }
 
 /** The arguments `words` read of `argv`, refused by neither the spec nor the check. */
-function argsOf(words: CommandWords, argv: readonly string[]): Args {
+function argsOf(words: CommandWords, argv: readonly string[]) {
   const read = readOf(words, argv);
   assert.ok(typeof read === 'object' && 'args' in read, `${words.name} ${argv.join(' ')} is read: ${JSON.stringify(read)}`);
-  return read.args;
+  return read.args satisfies Args;
 }
 
 test('the group lists each read once, in the order the help lists them', () => {

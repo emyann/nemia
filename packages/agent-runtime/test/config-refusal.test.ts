@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { configRefusal } from '../src/index.ts';
 
 /** The refusal of `config` on `harness`, which the case expects there is. */
-const refused = (harness: string, config: Parameters<typeof configRefusal>[1]): string => {
+const refused = (harness: string, config: Parameters<typeof configRefusal>[1]) => {
   const why = configRefusal(harness, config);
   assert.ok(why, `expected ${harness} to refuse ${JSON.stringify(config)}`);
   return why;

@@ -18,7 +18,7 @@ const read = (body: unknown) =>
   app.request('/api/skills/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 /** Every file under the store, by its path there: what a read must leave as it was. */
-const storeNow = (): string[] => (fs.existsSync(root) ? (fs.readdirSync(root, { recursive: true }) as string[]).sort() : []);
+const storeNow = () => (fs.existsSync(root) ? (fs.readdirSync(root, { recursive: true }) as string[]).sort() : []);
 
 test('a SKILL.md reads as the spec a GET of the same file in your library answers, named by its name:, and writes nothing', async () => {
   fs.mkdirSync(path.join(SKILLS, 'tidy'), { recursive: true });

@@ -73,7 +73,7 @@ type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 const isLanded = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).landed(run, branch);
 
 /** A run this file started on a repository, as `isLanded` reads one: a repository run. */
-const repositoryRun = (run: Run): RepositoryRun => {
+const repositoryRun = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
@@ -113,7 +113,7 @@ const git = (cwd: string, ...args: string[]) =>
   }).trim();
 
 /** A repository with one file committed on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'add.ts'), 'export const add = (a, b) => a + b;\n');
@@ -126,7 +126,7 @@ const aRepo = (): string => {
  * `implement → ship`, with the team's `dev/ship.md` as its ending — its keys and its agent — with only its `after:` changed, since this
  * folder has no review.
  */
-const folder = (): string => {
+const folder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   assert.match(SHIP_MD, /^after: review$/m);
@@ -196,7 +196,7 @@ const board = () => {
  * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
  * what this folder has: what a person types `nemia retry --round` at once the loop has handed on.
  */
-const loopingFolder = (rounds = 3): string => {
+const loopingFolder = (rounds = 3) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
@@ -224,7 +224,7 @@ const loopingFolder = (rounds = 3): string => {
  * `implement → ship` with the team's ship.md's `check:` line taken out: an ending with no check of its own, whose own session runs the
  * check and commits, in its prose. Nothing of the run lands such a merge (`landsOnCheck`).
  */
-const uncheckedFolder = (): string => {
+const uncheckedFolder = () => {
   const dir = folder();
   const file = path.join(dir, 'ship.md');
   const text = fs.readFileSync(file, 'utf8');
@@ -420,14 +420,14 @@ async function stagedAndSigned(given: Given & { message?: string; artifacts?: st
   return { ...at, signed, checkId: `${at.id}-ship-check` };
 }
 
-const mergeHead = (repo: string): boolean => fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD'));
+const mergeHead = (repo: string) => fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD'));
 
 /**
  * What the ship's check leaves in its files directory when its e2e runs on the merged tree (`WF_ARTIFACTS`): a picture per page and
  * theme, `-failed` for a page that failed. By default the shape of a web run's `artifacts/ship` in the owner's store: 252 of them,
  * about 194 KB each, 48.9 MB. The bytes in the directory before, to measure what a landing frees.
  */
-const photographed = (id: string, { count = 252, bytes = 194_000 } = {}): { dir: string; pictures: string[]; before: number } => {
+const photographed = (id: string, { count = 252, bytes = 194_000 } = {}) => {
   const dir = artifactsDir(ROOT, { id }, 'ship');
   fs.mkdirSync(dir, { recursive: true });
   const pictures = Array.from({ length: count }, (_, i) => `page-${String(i).padStart(3, '0')}-${i % 2 ? 'dark' : 'light'}.png`);
@@ -435,9 +435,9 @@ const photographed = (id: string, { count = 252, bytes = 194_000 } = {}): { dir:
   for (const name of pictures) fs.writeFileSync(path.join(dir, name), Buffer.alloc(bytes, 1));
   return { dir, pictures, before: bytesIn(dir) };
 };
-const bytesIn = (dir: string): number =>
+const bytesIn = (dir: string) =>
   artifactFiles(ROOT, { id: path.basename(path.dirname(path.dirname(dir))) }, 'ship').reduce((sum, f) => sum + f.bytes, 0);
-const pngsIn = (dir: string): string[] =>
+const pngsIn = (dir: string) =>
   fs.existsSync(dir)
     ? fs
         .readdirSync(dir)
@@ -718,7 +718,7 @@ const STOPPED = {
 };
 
 /** main moves under the run: a commit on the base branch that gives add.ts a `sub` of its own, which the branch's conflicts with. */
-const mainMoves = (repo: string): string => {
+const mainMoves = (repo: string) => {
   fs.appendFileSync(path.join(repo, 'add.ts'), 'export const sub = (a, b) => b - a;\n');
   git(repo, 'commit', '-q', '-am', "main's sub");
   return git(repo, 'rev-parse', 'HEAD');
@@ -736,7 +736,7 @@ const mergeRefused = (id: string, words: RegExp) => (err: Error & { exitCode?: n
 };
 
 /** A `git` on PATH that answers every command as git does but reading the commit `branch` names, which it says it has none of. */
-function blindTo(branch: string): string {
+function blindTo(branch: string) {
   const real = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
   const dir = scratch('wf-ship-blind-git-');
   fs.writeFileSync(

@@ -8,6 +8,7 @@ import { until, type Waiter } from '../../../src/waits/index.ts';
 
 /** A waiter whose signal throws when read, as a function handed in its place does. */
 const unread: Waiter = {
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- a getter that only throws infers void
   get signal(): AbortSignal {
     throw new Error('no signal to read');
   },

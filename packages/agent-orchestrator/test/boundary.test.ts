@@ -62,7 +62,7 @@ const BINS = ['bin/nemia.ts', 'bin/wf.ts'];
 const CLI_FOLDER = 'src/cli/';
 
 /** The CLI's files, which reach the package through the root (`CLI_REACHES`, `BIN_REACHES`), never the client or the store. */
-const isCli = (file: string): boolean => BINS.includes(file) || file.startsWith(CLI_FOLDER);
+const isCli = (file: string) => BINS.includes(file) || file.startsWith(CLI_FOLDER);
 
 /** The one file that imports agent-runtime. */
 const CLIENT = 'src/runtime-client.ts';
@@ -73,28 +73,28 @@ type Kind = 'PURE' | 'STORE' | 'CONTROLLER' | 'CLIENT' | 'MODEL';
 const MODEL_FOLDER = 'src/model/';
 
 /** The kinds a file is named in: a root file by the lists above, a file in a folder by its name, and a test beside the code by none. */
-function kindsOf(file: string): Kind[] {
+function kindsOf(file: string) {
   const listed = Object.entries({ PURE, STORE, CONTROLLER, CLIENT: [CLIENT] })
     .filter(([, files]) => files.includes(file))
     .map(([kind]) => kind as Kind);
-  if (listed.length || !/^src\/.+\/[^/]+\.ts$/.test(file) || file.endsWith('.test.ts')) return listed;
-  if (file.startsWith(CLI_FOLDER) || file.endsWith('.verb.ts')) return ['CONTROLLER'];
-  if (file.endsWith('.model.ts')) return ['MODEL'];
-  return file.endsWith('.store.ts') ? ['STORE'] : ['PURE'];
+  if (listed.length || !/^src\/.+\/[^/]+\.ts$/.test(file) || file.endsWith('.test.ts')) return listed satisfies Kind[];
+  if (file.startsWith(CLI_FOLDER) || file.endsWith('.verb.ts')) return ['CONTROLLER'] satisfies Kind[];
+  if (file.endsWith('.model.ts')) return ['MODEL'] satisfies Kind[];
+  return (file.endsWith('.store.ts') ? ['STORE'] : ['PURE']) satisfies Kind[];
 }
 
 /** The files of each kind among `sources`, each file of one kind. */
-function kinds(sources: Sources): Record<Kind, string[]> {
+function kinds(sources: Sources) {
   const out: Record<Kind, string[]> = { PURE: [], STORE: [], CONTROLLER: [], CLIENT: [], MODEL: [] };
   for (const file of Object.keys(sources).sort()) {
     const of = kindsOf(file);
     if (of.length === 1) out[of[0]].push(file);
   }
-  return out;
+  return out satisfies Record<Kind, string[]>;
 }
 
 /** The controllers beneath the CLI: each reaches the client, and they and the client alone import the store. */
-const beneathCli = (sources: Sources): string[] => kinds(sources).CONTROLLER.filter((f) => !isCli(f));
+const beneathCli = (sources: Sources) => kinds(sources).CONTROLLER.filter((f) => !isCli(f)) satisfies string[];
 
 /**
  * The bottom of the store's tree: they import no store file. Among them the two mechanics every store may use, a file written whole
@@ -287,7 +287,7 @@ const IMPURE_GLOBALS = ['global:process.env', 'global:fetch'];
 type Sources = Record<string, readonly string[]>;
 
 /** Every module a piece of source names: imports and re-exports, type-only included, and a whole `import()`. */
-const importsIn = (text: string): string[] => specifiersIn(text, { calls: ['import'], closed: true });
+const importsIn = (text: string) => specifiersIn(text, { calls: ['import'], closed: true }) satisfies string[];
 
 /** `process.env` however a file reaches it: read off `process`, by `['env']`, or destructured from it (`const { env } = process`). */
 const PROCESS_ENV = /\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])|\{[^}]*\benv\b[^}]*\}\s*=\s*(?:globalThis\s*\.\s*)?process\b/;
@@ -299,16 +299,16 @@ const PROCESS_ENV = /\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])|\{[^}]*\
 const FETCH = /(?:^|[^.\w$'"`-])fetch(?![\w$-])(?!\s*:)|\bglobalThis\s*\.\s*fetch\b/m;
 
 /** The impure globals a piece of source reads outside its comment lines, each as `IMPURE_GLOBALS` names it. */
-function globalsIn(text: string): string[] {
+function globalsIn(text: string) {
   const code = withoutComments(text);
   const found: string[] = [];
   if (PROCESS_ENV.test(code)) found.push('global:process.env');
   if (FETCH.test(code)) found.push('global:fetch');
-  return found;
+  return found satisfies string[];
 }
 
 /** A relative module as the package path it names (`../runner.ts` in `src/cli/main.ts` is `src/runner.ts`); any other as written. */
-const packagePath = (file: string, mod: string): string => resolved(file, mod) ?? mod;
+const packagePath = (file: string, mod: string) => resolved(file, mod) ?? mod;
 
 /** Each source file's imports, resolved, and the impure globals it reads: `src/` and `bin/`, every `.ts`. */
 /**
@@ -318,18 +318,20 @@ const packagePath = (file: string, mod: string): string => resolved(file, mod) ?
 const TYPES_OF = 'types:';
 
 /** The modules `file` names, a model file a pure file imports for its types alone named under `TYPES_OF`. */
-function modulesOf(file: string, text: string): string[] {
+function modulesOf(file: string, text: string) {
   const valued = new Set(
     erasedIn(text)
       .filter((i) => !i.typeOnly)
       .map((i) => i.spec),
   );
-  const erased = (m: string): boolean => kindsOf(file)[0] === 'PURE' && m.endsWith('.model.ts') && !valued.has(m);
-  return importsIn(text).map((m) => (erased(m) ? `${TYPES_OF}${packagePath(file, m)}` : packagePath(file, m)));
+  const erased = (m: string) => kindsOf(file)[0] === 'PURE' && m.endsWith('.model.ts') && !valued.has(m);
+  return importsIn(text).map((m) => (erased(m) ? `${TYPES_OF}${packagePath(file, m)}` : packagePath(file, m))) satisfies string[];
 }
 
-function sourcesOf(texts: Record<string, string>): Sources {
-  return Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, [...modulesOf(file, text), ...globalsIn(text)]]));
+function sourcesOf(texts: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(texts).map(([file, text]) => [file, [...modulesOf(file, text), ...globalsIn(text)]]),
+  ) satisfies Sources;
 }
 
 let scanned: Sources | undefined;
@@ -338,7 +340,7 @@ let scanned: Sources | undefined;
  * Every `.ts` under `src` and `bin`, in folders too, but the tests beside the code: read and scanned once for the whole file, and
  * each call given its own copy, its lists too, so a test that changes one changes no other's.
  */
-const packageSources = (): Sources =>
+const packageSources = () =>
   Object.fromEntries(
     Object.entries(
       (scanned ??= sourcesOf(
@@ -353,25 +355,30 @@ const packageSources = (): Sources =>
         ),
       )),
     ).map(([file, imports]) => [file, [...imports]]),
-  );
+  ) satisfies Sources;
 
 /** The runtime's pure door to its vocabulary, which any file may import: by that exact name, and no subpath of it. */
 const VOCABULARY = 'agent-runtime/vocabulary';
 
 /** The runtime by any entry but its vocabulary (`VOCABULARY`): what the client alone imports. */
-const isRuntime = (m: string): boolean => m !== VOCABULARY && (m === 'agent-runtime' || m.startsWith('agent-runtime/'));
+const isRuntime = (m: string) => m !== VOCABULARY && (m === 'agent-runtime' || m.startsWith('agent-runtime/'));
 
 /**
  * Effect, by any subpath. A pure file takes what a store file decoded, and the api loads `agent-orchestrator/run` and
- * `agent-orchestrator/workflow`, which are pure and load no Effect but `PURE_EFFECT`: a schema lives beside the read it decodes.
+ * `agent-orchestrator/workflow`, which are pure and load no Effect but the modules `PURE_EFFECT` names: a schema lives beside the
+ * read it decodes.
  */
-const isEffect = (m: string): boolean => m === 'effect' || m.startsWith('effect/') || m.startsWith('@effect/');
+const isEffect = (m: string) => m === 'effect' || m.startsWith('effect/') || m.startsWith('@effect/');
 
-/** The one module of Effect a pure file may import, by that exact name: the tagged refusals' `TaggedError` (`src/refusal/refusal.ts`). */
-const PURE_EFFECT = 'effect/Data';
+/**
+ * The modules of Effect a pure file may import, each by that exact name: `effect/Data`, for the tagged refusals' `TaggedError`
+ * (`src/refusal/refusal.ts`), and `effect/Predicate`, for Effect's own guards (`isObject`) in place of hand-written ones. Neither
+ * loads Effect's runtime: Predicate imports only Effect's Function module, and its HKT and Types modules as types.
+ */
+const PURE_EFFECT: readonly string[] = ['effect/Data', 'effect/Predicate'];
 
 /** Every file is of exactly one kind, and every file a kind names is there. */
-function unsorted(sources: Sources): string[] {
+function unsorted(sources: Sources) {
   const out: string[] = [];
   for (const file of Object.keys(sources).sort()) {
     const of = kindsOf(file);
@@ -383,21 +390,21 @@ function unsorted(sources: Sources): string[] {
   }
   for (const [kind, files] of Object.entries({ PURE, STORE, CONTROLLER, CLIENT: [CLIENT] }))
     for (const file of files) if (!(file in sources)) out.push(`${kind} names ${file}, which is not there`);
-  return out;
+  return out satisfies string[];
 }
 
 /**
- * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but `PURE_EFFECT`, and no store,
- * controller, client or model file, and reads neither the environment nor `fetch`.
+ * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but the modules `PURE_EFFECT`
+ * names, and no store, controller, client or model file, and reads neither the environment nor `fetch`.
  */
-function impurities(sources: Sources): string[] {
+function impurities(sources: Sources) {
   const of = kinds(sources);
   return of.PURE.flatMap((file) =>
     (sources[file] ?? [])
       .filter(
         (m) =>
           isRuntime(m) ||
-          (isEffect(m) && m !== PURE_EFFECT) ||
+          (isEffect(m) && !PURE_EFFECT.includes(m)) ||
           IMPURE.includes(m) ||
           IMPURE_GLOBALS.includes(m) ||
           of.STORE.includes(m) ||
@@ -406,7 +413,7 @@ function impurities(sources: Sources): string[] {
           m === CLIENT,
       )
       .map((m) => `${file} is pure and imports ${m}`),
-  );
+  ) satisfies string[];
 }
 
 /**
@@ -420,7 +427,7 @@ const OBJECTS = 'objects';
  * else — no store, controller or client file, no runtime, no node module, no global of the process — so a model is a declaration a
  * door adopts, never a door itself; and `src/model/` holds model files alone.
  */
-function modelBreaks(sources: Sources): string[] {
+function modelBreaks(sources: Sources) {
   const of = kinds(sources);
   const out = of.MODEL.flatMap((file) =>
     (sources[file] ?? [])
@@ -432,7 +439,7 @@ function modelBreaks(sources: Sources): string[] {
       out.push(
         `${file} is in ${MODEL_FOLDER}, which holds model files alone: name it <name>.model.ts, or put it beside the feature it serves`,
       );
-  return out;
+  return out satisfies string[];
 }
 
 /**
@@ -444,7 +451,7 @@ function modelBreaks(sources: Sources): string[] {
 /** The door every door of the store is made by (`doorOf`). */
 const DOOR = 'src/door/door.store.ts';
 
-function treeBreaks(sources: Sources): string[] {
+function treeBreaks(sources: Sources) {
   const { STORE: stores, CONTROLLER: controllers } = kinds(sources);
   const beneath = beneathCli(sources);
   const out: string[] = [];
@@ -476,14 +483,14 @@ function treeBreaks(sources: Sources): string[] {
       if (stores.includes(m))
         out.push(`${file} imports ${m}, a store file: only the client and the controllers beneath the CLI import the store`);
   }
-  return out;
+  return out satisfies string[];
 }
 
 /**
  * The CLI reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and each bin only through the CLI and what it
  * exits with.
  */
-function cliBreaks(sources: Sources): string[] {
+function cliBreaks(sources: Sources) {
   const reaching = (file: string, reaches: readonly string[], own: (m: string) => boolean) =>
     (sources[file] ?? [])
       .filter((m) => (m.startsWith('src/') || m.startsWith('bin/')) && !reaches.includes(m) && !own(m))
@@ -494,7 +501,7 @@ function cliBreaks(sources: Sources): string[] {
   return [
     ...cli.flatMap((file) => reaching(file, CLI_REACHES, (m) => m.startsWith(CLI_FOLDER))),
     ...BINS.flatMap((bin) => reaching(bin, BIN_REACHES, () => false)),
-  ];
+  ] satisfies string[];
 }
 
 /**
@@ -522,12 +529,13 @@ const DOORED_ONLY: readonly string[] = [
  * Only the client imports agent-runtime, a type included — and it does; every controller beneath the CLI imports the client or a
  * controller that reaches it, followed through controller imports, but those of `DOORED_ONLY`; and the client imports no controller.
  */
-function clientBreaks(sources: Sources): string[] {
+function clientBreaks(sources: Sources) {
   const controllers = kinds(sources).CONTROLLER;
   const out = Object.entries(sources)
     .filter(([file, imports]) => file !== CLIENT && imports.some(isRuntime))
     .map(([file]) => `${file} imports agent-runtime, and only ${CLIENT} may`);
   if (!(sources[CLIENT] ?? []).some(isRuntime)) out.push(`${CLIENT} imports no agent-runtime: CLIENT names the wrong file`);
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const reaches = (file: string, seen: Set<string>): boolean => {
     const imports = sources[file] ?? [];
     if (imports.includes(CLIENT)) return true;
@@ -541,20 +549,20 @@ function clientBreaks(sources: Sources): string[] {
       );
   for (const m of sources[CLIENT] ?? [])
     if (controllers.includes(m)) out.push(`${CLIENT} imports ${m}, a controller: the client is beneath every controller`);
-  return out;
+  return out satisfies string[];
 }
 
 /**
  * The cycles among the client and the controllers, each its files sorted: an ES module read in a cycle can be read before it has run,
  * and a name it exports is then not yet there.
  */
-function controllerCycles(sources: Sources): string[][] {
+function controllerCycles(sources: Sources) {
   const nodes = new Set([CLIENT, ...kinds(sources).CONTROLLER]);
-  return cycles(new Map([...nodes].map((file) => [file, (sources[file] ?? []).filter((m) => nodes.has(m))])));
+  return cycles(new Map([...nodes].map((file) => [file, (sources[file] ?? []).filter((m) => nodes.has(m))]))) satisfies string[][];
 }
 
 /** Each file of a place's code (`place/<name>/`, in folders too) with its imports, the relative ones resolved from the package. */
-const placeSources = (): Sources => {
+const placeSources = () => {
   const dir = path.join(PKG, 'place');
   return Object.fromEntries(
     fs
@@ -562,11 +570,11 @@ const placeSources = (): Sources => {
       .map((f) => `place/${f.split(path.sep).join('/')}`)
       .filter((f) => /^place\/[^/]+\/.+\.ts$/.test(f) && !f.endsWith('.test.ts'))
       .map((f) => [f, importsIn(fs.readFileSync(path.join(PKG, f), 'utf8')).map((m) => packagePath(f, m))]),
-  );
+  ) satisfies Sources;
 };
 
 /** A node built-in, bare or as `node:`. */
-const isBuiltin = (m: string): boolean => m.startsWith('node:') || builtinModules.includes(m);
+const isBuiltin = (m: string) => m.startsWith('node:') || builtinModules.includes(m);
 
 /** The files of `src` a place's code may import: what a place is, its contract and its service. */
 const PLACE_REACHES = ['src/place/place.ts', 'src/place/place.store.ts'];
@@ -575,7 +583,7 @@ const PLACE_REACHES = ['src/place/place.ts', 'src/place/place.store.ts'];
  * A contract of the package (`contracts/<name>.contract.ts`), which a place's pure code takes its type from with `import type`, as
  * `src` does: the spec that proves it, erased when the place runs.
  */
-const isContract = (m: string): boolean => /^contracts\/[^/]+\.contract\.ts$/.test(m);
+const isContract = (m: string) => /^contracts\/[^/]+\.contract\.ts$/.test(m);
 
 /** The one file of `src` that imports a place's code, and gives it to whoever composes a program. */
 const PLACE_DOOR = 'src/place/builtin.store.ts';
@@ -589,7 +597,7 @@ const DOOR_GIVES = 'place/git/';
  * `packageFiles`, the package's `src` and `bin`, `PLACE_DOOR` alone imports a file under `place/`, and of those only one under
  * `DOOR_GIVES`.
  */
-function placeBreaks(sources: Sources, packageFiles: Sources = {}): string[] {
+function placeBreaks(sources: Sources, packageFiles: Sources = {}) {
   const own = (file: string) => `${file.split('/').slice(0, 2).join('/')}/`;
   const inPlace = Object.entries(sources).flatMap(([file, imports]) =>
     imports
@@ -607,19 +615,19 @@ function placeBreaks(sources: Sources, packageFiles: Sources = {}): string[] {
           .filter((m) => m.startsWith('place/'))
           .map((m) => `${file} imports ${m}: ${PLACE_DOOR} alone imports a place's code, and every other file asks the place it is given`),
   );
-  return [...inPlace, ...throughDoor];
+  return [...inPlace, ...throughDoor] satisfies string[];
 }
 
 /** The package's sources with `file`'s imports changed by `change`: a copy, so each plant breaks one thing. */
-const planted = (file: string, change: (imports: readonly string[]) => readonly string[]): Sources => {
-  const sources = { ...packageSources() };
+const planted = (file: string, change: (imports: readonly string[]) => readonly string[]) => {
+  const sources: Sources = { ...packageSources() };
   sources[file] = change(sources[file] ?? []);
-  return sources;
+  return sources satisfies Sources;
 };
-const adding = (file: string, mod: string): Sources => planted(file, (imports) => [...imports, mod]);
+const adding = (file: string, mod: string) => planted(file, (imports) => [...imports, mod]) satisfies Sources;
 /** The package's sources with `mod` imported by no file. */
-const unimported = (mod: string): Sources =>
-  Object.fromEntries(Object.entries(packageSources()).map(([file, imports]) => [file, imports.filter((m) => m !== mod)]));
+const unimported = (mod: string) =>
+  Object.fromEntries(Object.entries(packageSources()).map(([file, imports]) => [file, imports.filter((m) => m !== mod)])) satisfies Sources;
 
 test('the scanner sees every way a file can name a module — or the rules below would pass by seeing nothing', () => {
   const text = [
@@ -740,7 +748,7 @@ test('model files import effect, objects, other model files and pure files alone
   );
   assert.deepEqual(modelBreaks(sources), []);
   const reached = new Set<string>();
-  const reach = (file: string): void => {
+  const reach = (file: string) => {
     if (reached.has(file)) return;
     reached.add(file);
     for (const m of sources[file] ?? []) if (m in sources) reach(m);
@@ -749,7 +757,7 @@ test('model files import effect, objects, other model files and pure files alone
   assert.deepEqual(
     [...reached].filter((f) => kindsOf(f)[0] === 'MODEL'),
     [],
-    'no model file is reachable from agent-orchestrator/run or /workflow, which load no Effect but effect/Data',
+    'no model file is reachable from agent-orchestrator/run or /workflow, which load no Effect but effect/Data and effect/Predicate',
   );
 });
 
@@ -786,17 +794,24 @@ test('REFUSED: a pure file that imports a model file, and a model file that impo
     assert.deepEqual(modelBreaks(adding('src/record/record.model.ts', m)), [], `${m} is let through`);
 });
 
-test('pure files import no runtime, read no disk, spawn nothing, load no Effect but effect/Data, and reach for no store or controller file', () => {
+test('pure files import no runtime, read no disk, spawn nothing, load no Effect but effect/Data and effect/Predicate, and reach for no store or controller file', () => {
   assert.deepEqual(impurities(packageSources()), []);
 });
 
-test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or Effect other than effect/Data, or reaches for a store or a controller file', () => {
+test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or Effect other than effect/Data and effect/Predicate, or reaches for a store or a controller file', () => {
   assert.deepEqual(impurities(adding('src/run.ts', 'effect')), ['src/run.ts is pure and imports effect']);
   assert.deepEqual(impurities(adding('src/daemon/daemon.ts', 'effect/Schema')), ['src/daemon/daemon.ts is pure and imports effect/Schema']);
   assert.deepEqual(impurities(adding('src/run.ts', 'effect/DataX')), ['src/run.ts is pure and imports effect/DataX']);
   assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data/internal')), ['src/run.ts is pure and imports effect/Data/internal']);
   assert.deepEqual(impurities(adding('src/run.ts', '@effect/Data')), ['src/run.ts is pure and imports @effect/Data']);
-  assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data')), [], 'effect/Data, and it alone, is let through');
+  assert.deepEqual(impurities(adding('src/run.ts', 'effect/PredicateX')), ['src/run.ts is pure and imports effect/PredicateX']);
+  assert.deepEqual(impurities(adding('src/run.ts', '@effect/Predicate')), ['src/run.ts is pure and imports @effect/Predicate']);
+  assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data')), [], 'effect/Data is let through');
+  assert.deepEqual(
+    impurities(adding('src/run.ts', 'effect/Predicate')),
+    [],
+    'effect/Predicate is let through, and no other module of Effect',
+  );
   assert.ok(
     ['src/status/status.ts', 'src/record/record.ts'].every((f) => f in packageSources()),
     'the plants go into files the scan reads',
@@ -888,7 +903,7 @@ test("a place's code imports node built-ins, effect, its own files and what a pl
 
 test("REFUSED: a place's file that imports a package, the rest of src or another place, and a file of src but the door that imports a place", () => {
   const at = 'place/git/git.ts';
-  const plant = (m: string): Sources => ({ ...placeSources(), [at]: [...placeSources()[at], m] });
+  const plant = (m: string) => ({ ...placeSources(), [at]: [...placeSources()[at], m] }) satisfies Sources;
   for (const m of [
     'agent-runtime',
     'agent-orchestrator/run',

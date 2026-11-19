@@ -19,7 +19,7 @@ const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const TEAM = path.join(import.meta.dirname, '..', '..', '..', 'packages', 'agent-orchestrator', 'test', 'fixtures', 'team');
 
 /** A scratch git repository with one commit on `main`. */
-function repoMade(prefix: string): string {
+function repoMade(prefix: string) {
   const repo = scratch(prefix);
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -55,7 +55,7 @@ afterAll(store.stop);
 const DRAFTS = scratch('nemia-runs-drafts-');
 
 /** The run a start printed first on its first line. */
-const idIn = (said: Said): string => /^(\S+)\s/.exec(said.out)?.[1] ?? assert.fail(`no run id in: ${said.out}${said.err}`);
+const idIn = (said: Said) => /^(\S+)\s/.exec(said.out)?.[1] ?? assert.fail(`no run id in: ${said.out}${said.err}`);
 
 /** The run's record as the store keeps it. */
 const recordOf = (root: string, id: string) =>
@@ -69,7 +69,7 @@ const recordOf = (root: string, id: string) =>
   };
 
 /** `dev` started in `acme` with `argv` after the brief, its id. */
-async function started(brief: string, ...argv: string[]): Promise<string> {
+async function started(brief: string, ...argv: string[]) {
   const said = await store.nemia(['start', brief, '--workflows', 'dev', '--factory', 'acme', ...argv]);
   assert.equal(said.code, 0, said.err);
   return idIn(said);
@@ -261,7 +261,7 @@ test('nemia wait --for 1s prints the cursor to wait again from', async () => {
 });
 
 /** A laptop with no store of its own, its scratch home and config, the start off. */
-function laptop(prefix: string): NodeJS.ProcessEnv {
+function laptop(prefix: string) {
   const folder = scratch(prefix);
   return {
     ...ambient('NEMIA_ON_INSTALLED'),
@@ -270,11 +270,11 @@ function laptop(prefix: string): NodeJS.ProcessEnv {
     HOME: path.join(folder, 'home'),
     XDG_CONFIG_HOME: path.join(folder, 'config'),
     NEMIA_DAEMON_START: 'off',
-  };
+  } satisfies NodeJS.ProcessEnv;
 }
 
 /** `nemia <argv>` on `env`, typed in the folder `cwd` (this test's own where none is named), waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, cwd?: string): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, cwd?: string) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -283,7 +283,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, cwd?: string): P
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 test('under a remote context, nemia start and nemia hold land on the remote store, nothing made on this machine', async () => {

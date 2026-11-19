@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
 import { atRest, tipOf } from '../../../.storybook/play';
 import { CopyId } from './CopyId';
-import { ON_CARD } from './stories.fixtures';
+import { ON_CARD } from './stories.fixture';
 
 /** A run's id with the control that copies it: short, its last four characters, whole, and whole under a title. */
 const meta: Meta = { title: 'Look/CopyId' };

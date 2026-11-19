@@ -11,7 +11,7 @@ import { drift, fingerprint, leftOver } from './e2e/print.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** A store with a run, a card and a repository, as the seed writes them. */
-function store(): string {
+function store() {
   const root = scratch('nemia-e2e-print-');
   for (const [rel, text] of Object.entries({
     'runs/r1.json': '{"id":"r1"}\n',

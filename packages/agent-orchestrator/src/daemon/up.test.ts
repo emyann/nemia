@@ -15,7 +15,7 @@ import { toolsBinDir, toolsDir } from '../config/root.store.ts';
 import type { Pass } from '../tick/tick.verb.ts';
 
 /** A pass that advanced one run, `r-1`: a note, `implement` filed and `review` checking; the rest of an `Advanced` is not read here. */
-const advanced = (): Pass =>
+const advanced = () =>
   ({
     runs: [{ run: { id: 'r-1' }, notes: ['review: waits on implement'], filed: ['implement'], tried: [], looped: [], checked: ['review'] }],
   }) as never;
@@ -24,7 +24,7 @@ const advanced = (): Pass =>
 type Logged = { level: string; text: string; annotations: Record<string, unknown> };
 
 /** Runs `logPass` under a logger that keeps what it is handed, in place of every other: answers with what it kept and what was said. */
-async function logged(pass: Pass, was: UpSaid = NOTHING_SAID): Promise<{ logs: Logged[]; said: UpSaid }> {
+async function logged(pass: Pass, was: UpSaid = NOTHING_SAID) {
   const logs: Logged[] = [];
   const keeper = Logger.make(({ message, logLevel, fiber }) => {
     logs.push({

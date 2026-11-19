@@ -15,10 +15,10 @@ export const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2
 
 /** `text` without the colour codes a terminal reads. */
 // oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
-export const plain = (text: string): string => text.replace(/\x1b\[[0-9;]*m/g, '');
+export const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, '');
 
 /** A package's file, from the nearest node_modules above the web app — where a worktree's link leads. */
-export function fromNodeModules(file: string): string {
+export function fromNodeModules(file: string) {
   for (let dir = WEB; ; dir = path.dirname(dir)) {
     const candidate = path.join(dir, 'node_modules', file);
     if (fs.existsSync(candidate)) return candidate;
@@ -28,7 +28,7 @@ export function fromNodeModules(file: string): string {
 
 /** The seeded store, a temporary WF_ROOT, while the e2e runs. */
 export let store: string | undefined;
-export function setStore(to: string | undefined): void {
+export function setStore(to: string | undefined) {
   store = to;
 }
 /**
@@ -36,12 +36,12 @@ export function setStore(to: string | undefined): void {
  * on the worker's seat is given it as the board's cookie (`seated`), and a request a page makes from Node presents it as its bearer.
  */
 export let seatToken: string | undefined;
-export function setSeatToken(to: string | undefined): void {
+export function setSeatToken(to: string | undefined) {
   seatToken = to;
 }
 /** The environment the api runs in — its store, its `claude`, where sessions register — for a `wf` a page runs on the same store. */
 export let apiEnv: NodeJS.ProcessEnv = {};
-export function setApiEnv(to: NodeJS.ProcessEnv): void {
+export function setApiEnv(to: NodeJS.ProcessEnv) {
   apiEnv = to;
 }
 /**
@@ -49,7 +49,7 @@ export function setApiEnv(to: NodeJS.ProcessEnv): void {
  * page, from the run's plan (`planOf`): false unless the e2e was run with `--photos`.
  */
 export let photographing = false;
-export function setPhotographing(to: boolean): void {
+export function setPhotographing(to: boolean) {
   photographing = to;
 }
 /**
@@ -57,7 +57,7 @@ export function setPhotographing(to: boolean): void {
  * contrast.ts). Set by `visitAll` from the run's plan: false unless the e2e was run with `--photos --contrast`.
  */
 export let measuring = false;
-export function setMeasuring(to: boolean): void {
+export function setMeasuring(to: boolean) {
   measuring = to;
 }
 /** Every line said to draft's session (SAYING), off its say file, in order: what the `say` page holds its words to. */
@@ -72,7 +72,7 @@ const PASS =
  * api's package on the api's environment: the api ticks nothing in the e2e (`--no-tick`), and the board's list reads where a run's result
  * stands off that file alone. Throws, with what the process printed, where the pass failed.
  */
-export function standingPass(): void {
+export function standingPass() {
   try {
     execFileSync(process.execPath, ['--input-type=module', '--eval', PASS], { cwd: API, env: apiEnv, stdio: 'pipe' });
   } catch (err) {
@@ -88,7 +88,7 @@ export function standingPass(): void {
  * the store's `standing.json` for its repository (`standingPass`) — a repository the seed names and no machine has, never said to be on
  * the base or not. Throws where the pass read that repository, or did not ask it.
  */
-export function unreadName(id: string): string {
+export function unreadName(id: string) {
   const { repo } = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as { repo: string };
   const { places } = JSON.parse(fs.readFileSync(path.join(store!, 'standing.json'), 'utf8')) as {
     places: { repo: string; unread?: string }[];
@@ -102,7 +102,7 @@ export function unreadName(id: string): string {
  * The runs a page started since it read `before` (the names under `runs/`) taken back by hand, each file of theirs under `runs/`, and the
  * claim under `started/` of each card one was started from (`claimCard`), where it names one of them: what `nemia rm` removes of a run.
  */
-export function takeBackRuns(runsDir: string, before: readonly string[]): void {
+export function takeBackRuns(runsDir: string, before: readonly string[]) {
   const made = fs.readdirSync(runsDir).filter((file) => !before.includes(file));
   const ids = new Set(made.filter((file) => file.endsWith('.json')).map((file) => file.slice(0, -'.json'.length)));
   for (const file of made) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });

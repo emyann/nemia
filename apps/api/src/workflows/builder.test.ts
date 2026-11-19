@@ -45,10 +45,9 @@ const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 /** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
-const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
-  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
-const versionOf = (dir: string): string =>
-  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
+const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>) =>
+  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root))) satisfies Promise<A>;
+const versionOf = (dir: string) => Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 type KeyForm = import('objects').KeyForm;
 type WorkflowSaved = import('./builder.ts').WorkflowSaved;
@@ -59,7 +58,7 @@ type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 const STORE = path.join(root, 'workflows');
 const TEAM_DEV = path.join(TEAM, 'dev');
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -78,18 +77,18 @@ const risks = JSON.stringify(
 );
 
 /** Every file directly in `dir`, by name, with what it holds — a folder as one — : what a refused write must leave as it was. */
-const snapshot = (dir: string): Record<string, string> =>
-  fs.existsSync(dir)
+const snapshot = (dir: string) =>
+  (fs.existsSync(dir)
     ? Object.fromEntries(
         fs
           .readdirSync(dir)
           .sort()
           .map((f) => [f, fs.statSync(path.join(dir, f)).isDirectory() ? '(a folder)' : fs.readFileSync(path.join(dir, f), 'utf8')]),
       )
-    : {};
+    : {}) satisfies Record<string, string>;
 
 /** That a refusal's words open with `head` and name each of `facts`: the facts it is about, never its sentence. */
-const tells = (said: string, head: string, facts: string[] = []): void => {
+const tells = (said: string, head: string, facts: string[] = []) => {
   assert.ok(said.startsWith(head), said);
   for (const fact of facts) assert.ok(said.includes(fact), `${fact}: ${said}`);
 };
@@ -98,7 +97,7 @@ const tells = (said: string, head: string, facts: string[] = []): void => {
  * A copy of the tests' team's `dev` — README, comments and `budget: 20` — as a workflow of yours named `name`, with the agents it names
  * beside it.
  */
-function devIn(name: string): string {
+function devIn(name: string) {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
   fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });
@@ -108,7 +107,7 @@ function devIn(name: string): string {
 }
 
 /** A workflow of yours, `plan` then `build`, with a schema `build` does not name yet. */
-function planned(name: string): string {
+function planned(name: string) {
   const dir = path.join(STORE, name);
   write(path.join(dir, 'plan.md'), '---\nplace: git\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n');
   write(path.join(dir, 'build.md'), '---\nafter: plan\nplace: git\ncheck: npm test\n---\nBuild what PLAN.md says.\n');
@@ -121,7 +120,7 @@ const theirs = path.join(repo, 'workflows', 'good');
 write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImplement it.\n');
 
 /** A workflow's steps as GET /api/workflows lists them. */
-async function listedSteps(name: string, from = 'user'): Promise<ListedStep[]> {
+async function listedSteps(name: string, from = 'user') {
   const all = await listedIn<{ name: string; from: string; steps: ListedStep[] }>(app, 'workflows', `origin=${from}&${ON_REPO}`);
   const found = all.find((w) => w.name === name && w.from === from);
   assert.ok(found, `${from} lists ${name}`);
@@ -163,7 +162,7 @@ const writtenOf = ({ name, spec: keys = {}, body, own }: SentStep) => {
  * sent to the object's path in `default` (definitions/workflows.ts): its steps as the spec writes them (`writtenOf`), its `version` as
  * `metadata.resourceVersion`, its `name` as `metadata.name`. A Workflow answered is read as `{ workflow }`, the listing; a refusal as is.
  */
-async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string>): Promise<Response> {
+async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string>) {
   const asked = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : null) as Record<string, unknown> | null;
   let sent = typeof body === 'string' ? body : JSON.stringify(body);
   if (asked) {
@@ -179,52 +178,56 @@ async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, header
   }
   const res = await app.request(url.replace(/^\/api\/namespaces\/default\//, '/api/'), { method, headers, body: sent });
   if (!res.ok) return res;
-  return new Response(JSON.stringify({ workflow: asWorkflowListing((await res.json()) as never) }), { status: res.status, headers: json });
+  return new Response(JSON.stringify({ workflow: asWorkflowListing((await res.json()) as never) }), {
+    status: res.status,
+    headers: json,
+  }) satisfies Response;
 }
 
 /** A spec with every key unset but `fields` and the `place: git` every step says, as the listing has one. */
-const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null,
-  model: null,
-  effort: null,
-  context: null,
-  after: [],
-  resume: null,
-  input: [],
-  place: 'git',
-  workspace: null,
-  writable: [],
-  reads: [],
-  slot: null,
-  agent: null,
-  skills: [],
-  mcp: [],
-  permissionMode: null,
-  sandbox: null,
-  tools: null,
-  disallowedTools: [],
-  allowedTools: [],
-  denials: null,
-  remote: null,
-  deadlineSeconds: null,
-  memory: null,
-  budget: null,
-  check: null,
-  checkMemory: null,
-  retries: null,
-  checkFailurePolicy: null,
-  gate: null,
-  output: null,
-  tally: [],
-  loop: null,
-  rounds: null,
-  routes: null,
-  route: null,
-  when: null,
-  ends: null,
-  workflow: null,
-  ...fields,
-});
+const spec = (fields: Partial<WorkflowStepSpec> = {}) =>
+  ({
+    harness: null,
+    model: null,
+    effort: null,
+    context: null,
+    after: [],
+    resume: null,
+    input: [],
+    place: 'git',
+    workspace: null,
+    writable: [],
+    reads: [],
+    slot: null,
+    agent: null,
+    skills: [],
+    mcp: [],
+    permissionMode: null,
+    sandbox: null,
+    tools: null,
+    disallowedTools: [],
+    allowedTools: [],
+    denials: null,
+    remote: null,
+    deadlineSeconds: null,
+    memory: null,
+    budget: null,
+    check: null,
+    checkMemory: null,
+    retries: null,
+    checkFailurePolicy: null,
+    gate: null,
+    output: null,
+    tally: [],
+    loop: null,
+    rounds: null,
+    routes: null,
+    route: null,
+    when: null,
+    ends: null,
+    workflow: null,
+    ...fields,
+  }) satisfies WorkflowStepSpec;
 
 describe('a person builds a workflow of theirs on the board: the form, a new folder, a save as listed, a change drawn, schemas pasted', () => {
   const s = story(test);
@@ -327,7 +330,7 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
           `${own} says what the agent is, what it is given or what becomes of Claude Code's own prompt, and is no role key: a step adds skills to its agent's with a key of its own`,
         );
 
-      const refusedAs = (key: string, value: string): string | null => {
+      const refusedAs = (key: string, value: string) => {
         const lines = { after: 'a', place: 'git', output: 'b.schema.json', loop: 'a' } as Record<string, string>;
         lines[key] = value;
         const b = `---\n${Object.entries(lines)
@@ -341,9 +344,9 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
             ],
             (f) => (f === 'b.schema.json' ? again : undefined),
           );
-          return null;
+          return null satisfies string | null;
         } catch (err) {
-          return (err as Error).message;
+          return (err as Error).message satisfies string | null;
         }
       };
       for (const key of STEP_KEYS) {
@@ -660,7 +663,7 @@ describe('a person builds a workflow of theirs on the board: the form, a new fol
 });
 
 /** A workflow of yours whose one step, `build`, has the agent `coder` (a name not its own), with a key and a note of its own. */
-function attached(name: string): string {
+function attached(name: string) {
   const dir = path.join(STORE, name);
   write(path.join(STORE, 'agents', 'coder.md'), '---\nharness: claude\nmodel: opus\neffort: high\n---\nYou write code.\n');
   write(path.join(dir, 'build.md'), '---\nplace: git\nagent: coder\ncheck: npm test\n---\nAnd mind the cache.\n');
@@ -1343,7 +1346,7 @@ describe('PUT /api/workflows/yours/:name: a save the package refuses, or of a fo
     write(path.join(dir, 'review.schema.json'), again);
     const before = snapshot(dir);
     const [implement, review] = (await listedSteps('pasted')) as [ListedStep, ListedStep];
-    const outputOf = (step: ListedStep, file: string): ListedStep => ({ ...step, spec: { ...step.spec, output: file } });
+    const outputOf = (step: ListedStep, file: string) => ({ ...step, spec: { ...step.spec, output: file } }) satisfies ListedStep;
     const loose = JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } } });
     const without = JSON.stringify({
       type: 'object',

@@ -19,7 +19,7 @@ const stand = eachTest(testPlace);
 const tried: MissedStart = { at: '2026-11-05T10:00:00.000Z', text: '# Gone\n', repo: '/repo', why: 'not offered', refused: true };
 
 /** A Card door with no card, one try of a card no longer queued, and a disk that refuses to remove it. */
-const stuckTries = (): Layer.Layer<never> => {
+const stuckTries = () => {
   const layer: CardLayer = {
     cards: {
       entries: () => [],

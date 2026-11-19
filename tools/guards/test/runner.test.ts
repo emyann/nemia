@@ -11,7 +11,7 @@ import path from 'node:path';
 import { REPO } from 'test-kit/repo';
 
 /** Whether `text` imports `node:test`, or a module of it, by a static import or an `import()`. */
-const importsNodeTest = (text: string): boolean =>
+const importsNodeTest = (text: string) =>
   /^\s*import\b[^;]*?\bfrom\s*['"]node:test(\/[\w-]+)?['"]/m.test(text) || /\bimport\s*\(\s*['"]node:test(\/[\w-]+)?['"]\s*\)/.test(text);
 
 test('REFUSED: a file that imports node:test, statically, by a module of it, or by import(); a string that names it is no import', () => {

@@ -15,7 +15,7 @@ import { firstRefusal, own, type Usage } from '../../core/index.ts';
 import type { HarnessOutput, StartEvent } from '../detached/detached.ts';
 import type { PartialMark } from '../detached/follow.ts';
 
-const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Count = Schema.Natural;
 
 /** A thread begun or resumed, which names it: the session's own id, which a resume and the rollout are found by. */
 const ThreadStartedSchema = Schema.Struct({ type: Schema.Literal('thread.started'), thread_id: Schema.NonEmptyString });

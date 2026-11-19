@@ -23,7 +23,7 @@ import { SHIPPED_NEMIA, nemiaDefinition } from '../src/nemia/level.store.ts';
 const SHIPPED = path.join(import.meta.dirname, '..', 'nemia');
 
 /** Every file that ships with her, by its path under `nemia/`, with its text. */
-const shipped = (dir = SHIPPED): Map<string, string> =>
+const shipped = (dir = SHIPPED) =>
   new Map(
     fs
       .readdirSync(dir, { recursive: true, encoding: 'utf8' })
@@ -48,7 +48,7 @@ const OWNER = ['Montreal', 'America/Montreal', 'EDT', '$80'];
 const OURS = [...TEAM, 'playbook-operator', 'architecture.md', 'CLAUDE.md', 'features.md', ...OWNER];
 
 /** Where `files` say one of `OURS`, whole and in any case: a line each, `<file>: <word>`. */
-const oursIn = (files: Map<string, string>): string[] =>
+const oursIn = (files: Map<string, string>) =>
   [...files].flatMap(([file, text]) =>
     OURS.filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`, 'i').test(text)).map(
       (word) => `${file}: ${word}`,
@@ -56,7 +56,7 @@ const oursIn = (files: Map<string, string>): string[] =>
   );
 
 /** The skills `files` name, as "the `<name>` skill" says one: a line each, `<file>: <name>`. */
-const skillsNamed = (files: Map<string, string>): string[] =>
+const skillsNamed = (files: Map<string, string>) =>
   [...files].flatMap(([file, text]) => [...text.matchAll(/`([a-z][a-z-]*)` skill/g)].map((m) => `${file}: ${m[1]}`));
 
 test("what ships with Nemia names no agent of this repository's team, no doc of its own and no playbook of its operator", () => {
@@ -97,7 +97,7 @@ const STEP_GATE = /`gate:`|--gate\b|\bits gate\b|\bstep's gate\b|\bgated at\b/gi
  * Where `files` say "gate" of anything but a step's gate (`STEP_GATE`), across line breaks: a line each, `<file>: <the words before it and
  * the word>`.
  */
-const gateWordsIn = (files: Map<string, string>): string[] =>
+const gateWordsIn = (files: Map<string, string>) =>
   [...files].flatMap(([file, text]) => {
     const flat = text.replace(/\s+/g, ' ').replace(STEP_GATE, (said) => said.replace(/gat/gi, '—'));
     return [...flat.matchAll(/(?:\S+ ){0,3}\S*\bgat(?:e|es|ed|ing)\b/gi)].map((m) => `${file}: ${m[0]}`);
@@ -167,7 +167,7 @@ const SECTIONS: Record<string, string[]> = {
 };
 
 /** The sections of `SECTIONS` that `files` miss, a file not there missing them all: a line each, `<file>: <heading>`. */
-const missingSections = (files: Map<string, string>): string[] =>
+const missingSections = (files: Map<string, string>) =>
   Object.entries(SECTIONS).flatMap(([file, headings]) =>
     headings.filter((heading) => !(files.get(file) ?? '').includes(`\n## ${heading}\n`)).map((heading) => `${file}: ${heading}`),
   );
@@ -196,7 +196,7 @@ const TEMPLATES = fs
   .map((e) => e.name);
 
 /** Where `files`' create-a-factory names a template Nemia ships, whole and in any case: a line each, `<file>: <template>`. */
-const templatesNamed = (files: Map<string, string>): string[] =>
+const templatesNamed = (files: Map<string, string>) =>
   [...files]
     .filter(([file]) => file === 'skills/create-a-factory/SKILL.md')
     .flatMap(([file, text]) =>
@@ -228,7 +228,7 @@ const FACT_SAID = /(?:\bfact(?:\s+named)?|\bkept\s+as|\bkeep\s+it\s+as)\s+`([a-z
  * Where `files` name the facts of her memory otherwise than `FACTS`: a fact a file of `FACTS` does not say in backticks, and a fact said
  * by a phrase of `FACT_SAID` that `FACTS` does not hold: a line each, `<file>: <fact>`.
  */
-const unnamedFacts = (files: Map<string, string>): string[] => {
+const unnamedFacts = (files: Map<string, string>) => {
   const known = new Set(Object.values(FACTS).flat());
   const unsaid = Object.entries(FACTS).flatMap(([file, facts]) =>
     facts.filter((fact) => !(files.get(file) ?? '').includes(`\`${fact}\``)).map((fact) => `${file}: ${fact}`),
@@ -279,7 +279,7 @@ const DENIAL = upgraded({
 });
 
 /** Each of `said` that `text` does not name in backticks: a line each. */
-const unnamedWords = (text: string, said: readonly string[]): string[] => said.filter((word) => !text.includes(`\`${word}\``));
+const unnamedWords = (text: string, said: readonly string[]) => said.filter((word) => !text.includes(`\`${word}\``));
 
 test('her instruction names both the word a denial shows her and the reason her selector asks for', () => {
   assert.equal(
@@ -317,7 +317,7 @@ test("her plugin's agent is the file the keeper reads, and the only agent it shi
  * pair` wrote), so a token paired again is taken without restarting Claude Code, and none is held in the person's environment. The url
  * stays substituted from `${NEMIA_URL}` as the plugin is loaded: a context changed later is not followed by it.
  */
-const serverBreaks = (text: string): string[] => {
+const serverBreaks = (text: string) => {
   const servers = (JSON.parse(text) as { mcpServers?: Record<string, Record<string, unknown>> }).mcpServers ?? {};
   const names = Object.keys(servers);
   if (names.length !== 1 || names[0] !== 'nemia') return [`servers: ${names.join(', ') || 'none'}`];

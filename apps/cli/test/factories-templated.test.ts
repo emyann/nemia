@@ -25,7 +25,7 @@ const store = await servedStore('nemia-factories-templated-', () => {});
 afterAll(store.stop);
 
 /** The template `name` in `folder`: one workflow, `press`, whose step `draft` the agent `drafter` fills. */
-function template(folder: string, name: string): string {
+function template(folder: string, name: string) {
   const at = path.join(folder, name);
   write(
     path.join(at, 'nemia.yaml'),
@@ -52,7 +52,7 @@ execFileSync('git', ['init', '-q'], { cwd: repo });
 const press = template(here, 'press');
 
 /** `nemia <argv>` typed in `here` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = store.env): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = store.env) {
   const child = spawn(process.execPath, [CLI, ...argv], { cwd: here, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -61,19 +61,19 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = store.env): Pro
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** What `argv` printed on `env`, its exit 0 asserted. */
-async function out(argv: readonly string[], env?: NodeJS.ProcessEnv): Promise<string> {
+async function out(argv: readonly string[], env?: NodeJS.ProcessEnv) {
   const said = await nemia(argv, env);
   assert.equal(said.code, 0, `nemia ${argv.join(' ')}: ${said.err}`);
   return said.out;
 }
 
 /** The factory `name`'s file in the store at `root`. */
-const fileOf = (root: string, name: string): { template?: { source: string } } =>
-  JSON.parse(fs.readFileSync(path.join(root, 'factories', `${name}.json`), 'utf8'));
+const fileOf = (root: string, name: string) =>
+  JSON.parse(fs.readFileSync(path.join(root, 'factories', `${name}.json`), 'utf8')) as { template?: { source: string } };
 
 describe("under this machine's context a person makes a factory from a template's folder, and takes a hand-made one over by it", () => {
   const s = story(test);

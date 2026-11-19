@@ -9,7 +9,7 @@ import { stepsOf } from '../src/steps/steps.verb.ts';
 import type { Run } from '../src/record/record.ts';
 import type { StepSpec } from '../src/workflow.ts';
 
-export const stepsNow = (run: Run, root: string | undefined = process.env.WF_ROOT): StepSpec[] => {
+export const stepsNow = (run: Run, root: string | undefined = process.env.WF_ROOT) => {
   assert.ok(root, 'the test names its store: hand stepsNow its root, or load test/ambient.ts, which sets WF_ROOT');
-  return Effect.runSync(Effect.provideService(stepsOf(run), StoreRoot, root));
+  return Effect.runSync(Effect.provideService(stepsOf(run), StoreRoot, root)) satisfies StepSpec[];
 };

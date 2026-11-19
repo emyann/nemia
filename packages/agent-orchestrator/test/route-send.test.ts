@@ -40,8 +40,10 @@ process.env.NEMIA_DAEMON_START = 'off';
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? typed(argv, e, undefined, place, env)
+    : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 const files = filesStoreAt(ROOT);
 
@@ -53,7 +55,7 @@ const SCHEMA = JSON.stringify({
 });
 
 /** plan → triage (a table over plan's surface: web routes on to `build`, docs ends) → ship, the workflow node on `deliver`. */
-const folder = (): string => {
+const folder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   const files: Record<string, string> = {
     'plan.md': '---\nplace: git\noutput: plan.schema.json\n---\nplan it\n',
@@ -75,7 +77,7 @@ const started = async (inputs: readonly string[] = []) => {
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** The inbox's cards, by file. */
-const cards = (): string[] => (fs.existsSync(inboxAt(ROOT)) ? fs.readdirSync(inboxAt(ROOT)).filter((f) => f.endsWith('.md')) : []);
+const cards = () => (fs.existsSync(inboxAt(ROOT)) ? fs.readdirSync(inboxAt(ROOT)).filter((f) => f.endsWith('.md')) : []) satisfies string[];
 
 /**
  * A run whose plan has signed off on `surface`, which triage's table routes by, and on the routed card's `title`, null when none is

@@ -20,7 +20,7 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store, takeBackRuns } from '../world.ts';
 
 /** A card on the Inbox page, by its name. */
-const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
+const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
 
 /** The idea the `inbox` page files from its box, and takes back with Remove. */
 const FILED = 'Give the inbox a keyboard shortcut\n\nN files a card from any page.';
@@ -36,7 +36,7 @@ const FACTORY = FACTORIES.hiring.name;
  * Open the start of the card `name`, which names no factory, on `p`, and pick FACTORY in its Factory list: no start form is drawn before
  * the pick. Returns the card.
  */
-async function startIn(p: Page, name: string): Promise<Locator> {
+async function startIn(p: Page, name: string) {
   const item = cardIn(p, name);
   await item.getByRole('button', { name: 'Start' }).click();
   const pick = item.locator('[data-pick-factory]');
@@ -50,13 +50,13 @@ async function startIn(p: Page, name: string): Promise<Locator> {
  * A seeded card's text with `factory: FACTORY` as its frontmatter's last line: the card a queue leg queues, which the seed leaves with no
  * factory for the legs that start it.
  */
-const inFactory = (text: string): string => text.replace('\n---\n', `\nfactory: ${FACTORY}\n---\n`);
+const inFactory = (text: string) => text.replace('\n---\n', `\nfactory: ${FACTORY}\n---\n`);
 
 /**
  * Refuses unless `answered`, a start's answer, was sent to FACTORY in its query, and no repository: no start of this page names no
  * factory, and none names a repository, which the factory's wiring decides.
  */
-function expectInFactory(answered: Response): void {
+function expectInFactory(answered: Response) {
   const sent = new URL(answered.url()).searchParams;
   if (sent.get('factory') !== FACTORY || sent.has('repo'))
     throw new Refused(`the start names the factory picked in its query, and no repository — it was sent to ${answered.url()}`);
@@ -85,7 +85,7 @@ export default {
 } satisfies PageSpec;
 
 /** What the `inbox` page asserts, the factory already able to start its workflow. */
-async function visit(page: Page): Promise<void> {
+async function visit(page: Page) {
   {
     await sidebar(page);
     await expectVisible(railPlace(page, 'Waiting').and(litOf(page)), 'the rail lights Waiting on the store’s Inbox');

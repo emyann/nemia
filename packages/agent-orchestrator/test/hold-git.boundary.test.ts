@@ -37,7 +37,7 @@ const git = (cwd: string, ...args: string[]) =>
 const holdFileOf = (id: string) => path.join(ROOT, 'runs', `${id}.hold`);
 
 /** A repository with one commit. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');

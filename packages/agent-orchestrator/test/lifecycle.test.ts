@@ -53,24 +53,24 @@ const world = () => stage.place().world;
 /** One pass of the tick over the run `id`, on the stage's engine. */
 const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 /** The brief the engine was filed with for the task `id`. */
-const briefOf = (id: string): string => stage.board().tasks.get(id)!.spec.brief;
+const briefOf = (id: string) => stage.board().tasks.get(id)!.spec.brief;
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, {});
   return repo;
 };
 /** A workflow folder of `steps`, each its file's frontmatter lines past `place: git`, and its body `<name> it`. */
-const folderOf = (steps: Record<string, string[]>): string => {
+const folderOf = (steps: Record<string, string[]>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, lines] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${['place: git', ...lines].join('\n')}\n---\n${name} it\n`);
   return dir;
 };
 /** The paths `checkout` holds uncommitted, a line each. */
-const uncommitted = (checkout: string): string => world().changes(checkout).join('\n');
+const uncommitted = (checkout: string) => world().changes(checkout).join('\n');
 /** The first line of the message of each commit the checkout's head follows, itself first, a merge's first parent first. */
-const subjects = (checkout: string): string[] => {
+const subjects = (checkout: string) => {
   const seen: string[] = [];
   const next = [world().head(checkout)];
   while (next.length) {
@@ -79,10 +79,10 @@ const subjects = (checkout: string): string[] => {
     seen.push(at);
     next.push(...world().read(checkout, at).parents);
   }
-  return seen.map((id) => world().read(checkout, id).message.split('\n')[0]);
+  return seen.map((id) => world().read(checkout, id).message.split('\n')[0]) satisfies string[];
 };
 /** The step names `nemia ls <id>` reads of the run, in its order. */
-const lsNames = async (id: string): Promise<string[]> => {
+const lsNames = async (id: string) => {
   const { runs } = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
   assert.deepEqual(
     runs.map(({ run }) => run.id),
@@ -92,7 +92,7 @@ const lsNames = async (id: string): Promise<string[]> => {
   return (runs[0]?.listed.steps ?? []).map((step) => step.name);
 };
 /** The steps the decision of `<id>` reads, in its order: the order the client's `nemia decide` prints them in. */
-const decideNames = async (id: string, steps: readonly string[]): Promise<string[]> =>
+const decideNames = async (id: string, steps: readonly string[]) =>
   (await decidedOn(stage, id)).steps.map((x) => x.name).filter((n) => steps.includes(n));
 /** The test place, its `verb` answering `outcome`, each call counted, as the layer a pass is given it by. */
 const placeAnswering = <V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOutcome<V>) => {

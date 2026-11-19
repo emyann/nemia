@@ -37,7 +37,7 @@ const STARTERS = ['What is waiting on me?', 'What is at work?', 'What did today 
  * until it is pressed. Read against the api rather than against a presence written here: the seed's own waiting runs are hers to show,
  * and their count moves with the seed. Her chat here holds no ask, so none is said.
  */
-async function expectClosed(page: Page): Promise<void> {
+async function expectClosed(page: Page) {
   const face = herFaceOf(page);
   await expectVisible(face, 'her face is in the rail');
   const read = (await page.request.get(new URL('/api/nemia/chat', page.url()).href).then((r) => r.json())) as {
@@ -83,20 +83,20 @@ async function expectClosed(page: Page): Promise<void> {
 }
 
 /** This browser's `sidebar_state` pair, as the person's fold of the rail is kept: none where it was never written. */
-const railCookie = (page: Page): Promise<string | undefined> =>
+const railCookie = (page: Page) =>
   page.evaluate(() =>
     document.cookie
       .split(';')
       .map((pair) => pair.trim())
       .find((pair) => pair.startsWith('sidebar_state=')),
-  );
+  ) satisfies Promise<string | undefined>;
 
 /** What the rail shows of the page whatever its width: the destination lit, and the Waiting badge's count. */
-const railSays = async (page: Page): Promise<string> =>
+const railSays = async (page: Page) =>
   `${await litOf(page).getAttribute('href')} · ${(await railPlace(page, 'Waiting').locator('[data-slot="badge"]').allTextContents()).join()}`;
 
 /** The store's rail stands at the window's left, 80 wide, whatever her sheet does: it folds for nothing. */
-const expectRail = (page: Page, assertion: string): Promise<void> =>
+const expectRail = (page: Page, assertion: string) =>
   expectNone(async () => {
     const box = await railColumnOf(page).boundingBox();
     return box && Math.abs(box.x) <= 1 && Math.abs(box.width - 80) <= 1 ? null : `it stands at ${box?.x}, ${box?.width} wide`;
@@ -106,7 +106,7 @@ const expectRail = (page: Page, assertion: string): Promise<void> =>
  * The machine bar holds whole under her sheet, across the window's foot: its gauges and its pause, and the account at the rail's foot,
  * stand in the window with nothing over them, her sheet included.
  */
-async function expectBarWhole(page: Page, assertion: string): Promise<void> {
+async function expectBarWhole(page: Page, assertion: string) {
   for (const [part, name] of [
     ['footer[data-machine-bar] button[data-pause]', 'the pause'],
     ['footer[data-machine-bar] [data-gauges-button]', 'the gauges'],
@@ -119,7 +119,7 @@ async function expectBarWhole(page: Page, assertion: string): Promise<void> {
  * Her sheet stands docked in the frame's row: 400 wide, holding her panel, its left at or past the page's right, nothing modal over the
  * page, and the page's own right edge its own.
  */
-async function expectDocked(page: Page): Promise<void> {
+async function expectDocked(page: Page) {
   const sheet = herSheetOf(page);
   await expectVisible(sheet.locator('[data-chat-panel="sheet"]'), 'her sheet holds her panel');
   await expectCount(page.locator('[data-slot="side-sheet-overlay"]'), 0, 'and is docked, with no scrim over the page');
@@ -139,7 +139,7 @@ async function expectDocked(page: Page): Promise<void> {
 }
 
 /** Her greeting, her level and what is at work, and the four chips. */
-async function expectEmpty(panel: ReturnType<typeof chatPanelOf>): Promise<void> {
+async function expectEmpty(panel: ReturnType<typeof chatPanelOf>) {
   const empty = panel.locator('[data-chat-empty]');
   await expectVisible(empty.getByText('I keep your factories running.'), 'her greeting');
   await expectVisible(empty.getByText('ask before what is yours to decide', { exact: false }), 'what she is for');
@@ -153,13 +153,13 @@ async function expectEmpty(panel: ReturnType<typeof chatPanelOf>): Promise<void>
 }
 
 /** The composer's edge, its colour and the shape it is clipped to: the layer the look's cut field draws round the whole box. */
-async function edgeOf(page: Page): Promise<{ colour: string; clip: string }> {
+async function edgeOf(page: Page) {
   const edge = page.locator('[data-chat-composer] [data-cut-edge]');
   await expectVisible(edge, "the composer's edge is a layer of its own");
-  return await edge.evaluate((layer) => {
+  return (await edge.evaluate((layer) => {
     const style = getComputedStyle(layer);
     return { colour: style.backgroundColor, clip: style.clipPath };
-  });
+  })) satisfies { colour: string; clip: string };
 }
 
 export default {

@@ -25,7 +25,6 @@ import {
   sensitiveHeading,
   sensitivePaths,
   touchedLines,
-  type Change,
 } from '../src/branches/branches.ts';
 import { workspacesIn } from '../src/branches/changes.store.ts';
 import { count, sumUsage, usedLines, peakMark, readWords, rebuiltCache } from '../src/usage/usage.ts';
@@ -36,7 +35,7 @@ const WORKSPACES = ['packages/*', 'apps/*'];
  * The files a branch changed, as the place's `report` lists them, each written `added<TAB>removed<TAB>path`: `-` for a binary file's
  * count, and a rename's path `from => to`.
  */
-const numstat = (...lines: string[]): Change[] =>
+const numstat = (...lines: string[]) =>
   lines.map((line) => {
     const [added, removed, named] = line.split('\t');
     const [from, to] = named.split(' => ');

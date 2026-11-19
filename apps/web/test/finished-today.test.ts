@@ -6,7 +6,8 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { finishedTodayQuery, readsOnToday, type FinishedRun } from '../src/lib/api/runs.ts';
-import { detail, runList, runObject } from './run-fixtures.ts';
+import { detail, runList, runObject } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** The day the strip counts, from its midnight. */
 const DAY_START = Date.parse('2026-09-13T00:00:00.000Z');
@@ -16,26 +17,22 @@ const finishedRun = (id: string, finishedAt: string) =>
   runObject(detail({ id, status: 'succeeded', moving: false }), { state: 'finished', finishedAt, outcome: 'succeeded' });
 
 /** Each page the api answers, by the `continue` it was asked with ('' for the first), and the URLs it was asked. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, pages: Record<string, unknown>): string[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, pages: Record<string, unknown>) {
   const asked: string[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input: string | URL | Request) => {
+  apiAnswers(async (input: string | URL | Request) => {
     const url = new URL(input instanceof Request ? input.url : String(input), 'http://board');
     asked.push(url.pathname + url.search);
     const body = pages[url.searchParams.get('continue') ?? ''];
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
-  return asked;
+  return asked satisfies string[];
 }
 
 /** The runs finished since `DAY_START`, read through a client of their own. */
-async function readToday(): Promise<FinishedRun[]> {
+async function readToday() {
   const client = new QueryClient();
   try {
-    return await client.fetchQuery(finishedTodayQuery(undefined, DAY_START));
+    return (await client.fetchQuery(finishedTodayQuery(undefined, DAY_START))) satisfies FinishedRun[];
   } finally {
     client.clear();
   }

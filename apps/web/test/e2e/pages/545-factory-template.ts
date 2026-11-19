@@ -43,16 +43,16 @@ const statusOf = (applied: typeof RENDERED) => ({
 });
 
 /** Go to the page `at` of the factory `name`, its floor for none, read again. */
-async function factoryAt(page: Page, name: string, at = ''): Promise<void> {
+async function factoryAt(page: Page, name: string, at = '') {
   await page.goto(new URL(`/factories/${name}${at}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Go to the settings of the factory `name`, read again. */
-const settingsOf = (page: Page, name: string): Promise<void> => factoryAt(page, name, '/settings');
+const settingsOf = (page: Page, name: string) => factoryAt(page, name, '/settings');
 
 /** Photograph the page `page` shows, as `what`, once it has settled. */
-async function pictured(page: Page, what: string): Promise<void> {
+async function pictured(page: Page, what: string) {
   await settled(page);
   await photograph(page, path.join(OUT, `factory-template-${what}-${await themeOf(page)}.png`));
 }

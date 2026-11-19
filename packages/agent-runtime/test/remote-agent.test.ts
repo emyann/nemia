@@ -86,16 +86,17 @@ const heldEngineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = sc
   ),
 });
 
-const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({
-  brief: 'paint the fence',
-  cwd: '/nowhere/in/particular',
-  harness: 'remote',
-  closeoutSchema: SCHEMA,
-  ...o,
-});
+const task = (o: Partial<TaskSpec> = {}) =>
+  ({
+    brief: 'paint the fence',
+    cwd: '/nowhere/in/particular',
+    harness: 'remote',
+    closeoutSchema: SCHEMA,
+    ...o,
+  }) satisfies TaskSpec;
 
 /** Tick until the task's view meets `ok`, under a bound of passes. */
-const until = async (e: EngineShape, id: string, ok: (v: TaskView) => boolean, what: string, passes = 60): Promise<TaskView> => {
+const until = async (e: EngineShape, id: string, ok: (v: TaskView) => boolean, what: string, passes = 60) => {
   let v: TaskView | undefined;
   for (let i = 0; i < passes; i++) {
     await Effect.runPromise(e.tick());
@@ -111,7 +112,7 @@ const running = (e: EngineShape, id: string) => until(e, id, (v) => v.phase === 
 const attemptOf = async (e: EngineShape, o: Partial<TaskSpec> = {}) =>
   (await settled(e, await Effect.runPromise(e.file(task(o))))).state.attempts[0];
 
-const refusal = async (f: () => unknown): Promise<Error & { _tag?: string }> => {
+const refusal = async (f: () => unknown) => {
   try {
     await f();
   } catch (e) {
@@ -154,12 +155,12 @@ const writeIntent = (root: string, name: string, messageId: string, pid?: number
   );
 };
 /** The start and the spawn of a journal as if written `ms` earlier, on the wall clock and on the monotonic clock of their boot. */
-const agedBy = (events: object[], ms: number): object[] =>
+const agedBy = (events: object[], ms: number) =>
   events.map((ev) => {
     const e = ev as { kind: string; at: string; mono?: { boot: string; ms: number } };
     if (e.kind !== 'starting' && e.kind !== 'spawned') return ev;
     return { ...e, at: new Date(Date.parse(e.at) - ms).toISOString(), ...(e.mono ? { mono: { ...e.mono, ms: e.mono.ms - ms } } : {}) };
-  });
+  }) satisfies object[];
 /** How many calls of `method` the agent `s` has answered so far. */
 const calls = (s: RemoteServer, method: string) => s.counts[method] ?? 0;
 
@@ -239,17 +240,20 @@ const UNSTARTABLE: Array<[string, (t: TestContext) => Promise<void>]> = [
       ['mutual TLS', mtls(), /mutual TLS, and this runtime holds no client certificate/],
       ['an HTTP scheme it does not speak', digest, /HTTP `Digest` authentication, and this runtime sends only `Bearer` and `Basic`/],
     ] as const
-  ).map(([what, security, said]): [string, (t: TestContext) => Promise<void>] => [
-    `what the runtime cannot send refuses too: ${what}`,
-    async (t) => {
-      const s = await serve(t, { security, script: HELD });
-      const { e } = engineOn(s, { credentials: () => 'a secret it has' });
-      const a = await attemptOf(e);
-      assert.equal(a.reason, 'unstartable');
-      assert.match(a.error ?? '', said);
-      assert.equal(s.paths.length, 0);
-    },
-  ]),
+  ).map(
+    ([what, security, said]) =>
+      [
+        `what the runtime cannot send refuses too: ${what}`,
+        async (t) => {
+          const s = await serve(t, { security, script: HELD });
+          const { e } = engineOn(s, { credentials: () => 'a secret it has' });
+          const a = await attemptOf(e);
+          assert.equal(a.reason, 'unstartable');
+          assert.match(a.error ?? '', said);
+          assert.equal(s.paths.length, 0);
+        },
+      ] satisfies [string, (t: TestContext) => Promise<void>],
+  ),
   [
     'a secret the agent refuses: unstartable, in words that say to check it, and the agent did nothing',
     async (t) => {
@@ -327,20 +331,23 @@ const UNSTARTABLE: Array<[string, (t: TestContext) => Promise<void>]> = [
       assert.equal(s.paths.length, 0, 'no A2A request was made');
     },
   ],
-  ...Object.entries(FUTURE).map(([form, scheme]): [string, (t: TestContext) => Promise<void>] => [
-    `a requirement that names a scheme of a kind A2A 1.0 does not define is unmet, the card in its ${form} form`,
-    async (t) => {
-      const only = await serve(t, {
-        script: HELD,
-        cardForm: form === 'sdk' ? 'sdk' : 'wire',
-        cardJson: (c) => ({ ...c, securitySchemes: { future: scheme }, securityRequirements: [{ schemes: { future: {} } }] }),
-      });
-      const a = await attemptOf(engineOn(only, { credentials: () => 'a secret it has' }).e);
-      assert.equal(a.reason, 'unstartable', form);
-      assert.match(a.error ?? '', /`future` is a kind of scheme this runtime does not know, and cannot send\. Nothing was sent/, form);
-      assert.equal(only.paths.length, 0, form);
-    },
-  ]),
+  ...Object.entries(FUTURE).map(
+    ([form, scheme]) =>
+      [
+        `a requirement that names a scheme of a kind A2A 1.0 does not define is unmet, the card in its ${form} form`,
+        async (t) => {
+          const only = await serve(t, {
+            script: HELD,
+            cardForm: form === 'sdk' ? 'sdk' : 'wire',
+            cardJson: (c) => ({ ...c, securitySchemes: { future: scheme }, securityRequirements: [{ schemes: { future: {} } }] }),
+          });
+          const a = await attemptOf(engineOn(only, { credentials: () => 'a secret it has' }).e);
+          assert.equal(a.reason, 'unstartable', form);
+          assert.match(a.error ?? '', /`future` is a kind of scheme this runtime does not know, and cannot send\. Nothing was sent/, form);
+          assert.equal(only.paths.length, 0, form);
+        },
+      ] satisfies [string, (t: TestContext) => Promise<void>],
+  ),
   [
     'a card served at one origin that names its interfaces on another: unstartable, and neither origin is sent the secret',
     async (t) => {
@@ -613,26 +620,26 @@ const HOLD = {
 } as const;
 /** What an agent that floods its logs says: 100,000 characters, in one artifact or one reply. */
 const FLOOD = 'x'.repeat(100_000);
-const scriptOf = (t: Turn): Step[] => {
-  if (t.turn === 2) return [{ data: { colour: t.text }, state: 'completed' }];
+const scriptOf = (t: Turn) => {
+  if (t.turn === 2) return [{ data: { colour: t.text }, state: 'completed' }] satisfies Step[];
   switch (t.text) {
     case BRIEF.asks:
-      return [{ state: 'input-required', words: 'which colour?' }];
+      return [{ state: 'input-required', words: 'which colour?' }] satisfies Step[];
     case BRIEF.fails:
-      return [{ state: 'failed', words: 'the paint ran out' }];
+      return [{ state: 'failed', words: 'the paint ran out' }] satisfies Step[];
     case BRIEF.words:
-      return [{ text: 'done, in words', state: 'completed' }];
+      return [{ text: 'done, in words', state: 'completed' }] satisfies Step[];
     case BRIEF.floods:
-      return [{ text: FLOOD, state: 'completed' }];
+      return [{ text: FLOOD, state: 'completed' }] satisfies Step[];
     case HOLD.floods:
-      return [{ reply: FLOOD, data: { answer: 42 } }];
+      return [{ reply: FLOOD, data: { answer: 42 } }] satisfies Step[];
     case HOLD.reply:
-      return [{ reply: 'here you are', data: { answer: 42 } }];
+      return [{ reply: 'here you are', data: { answer: 42 } }] satisfies Step[];
     case HOLD.open:
     case HOLD.answer:
-      return [{ data: { turn: t.turn, heard: t.text }, state: 'completed' }];
+      return [{ data: { turn: t.turn, heard: t.text }, state: 'completed' }] satisfies Step[];
     default:
-      return HELD();
+      return HELD() satisfies Step[];
   }
 };
 
@@ -985,12 +992,12 @@ test("a registry an older runtime wrote, `seen` in its former words, is read in 
 });
 
 /** Every file under `dir`, as text. */
-const everyFile = (dir: string): Array<[string, string]> =>
+const everyFile = (dir: string) =>
   fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .map((f) => path.join(dir, f))
     .filter((f) => fs.statSync(f).isFile())
-    .map((f) => [f, fs.readFileSync(f, 'utf8')]);
+    .map((f) => [f, fs.readFileSync(f, 'utf8')]) satisfies Array<[string, string]>;
 
 test('the secret is sent, and written nowhere: not the journal, the registry, the feed, nor the view', async (t) => {
   const token = 'tok-3f9a-SECRET-7c21';
@@ -1016,10 +1023,10 @@ test('the secret is sent, and written nowhere: not the journal, the registry, th
 });
 
 /** How long `f` took, in ms, and what it gave. */
-const timed = async <A>(f: () => Promise<A>): Promise<[number, A]> => {
+const timed = async <A>(f: () => Promise<A>) => {
   const from = performance.now();
   const a = await f();
-  return [performance.now() - from, a];
+  return [performance.now() - from, a] satisfies [number, A];
 };
 
 test(

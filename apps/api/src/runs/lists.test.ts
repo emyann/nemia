@@ -27,7 +27,7 @@ const DONE = { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: []
 const BLOCKED = { outcome: 'blocked', summary: 'Could not.', needs: 'a key', artifacts: [] };
 
 /** A task on the engine, at work from `from`, and signed `closeout` at `to` where one is given. */
-function journalled(taskId: string, from: string, end?: { to: string; closeout: typeof DONE | typeof BLOCKED }): void {
+function journalled(taskId: string, from: string, end?: { to: string; closeout: typeof DONE | typeof BLOCKED }) {
   Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd: root, harness: 'codex' }));
   const begun = { startedAt: from, spawnedAt: from };
   if (!end) standIn().settle(taskId, 'working', begun);
@@ -41,7 +41,7 @@ function journalled(taskId: string, from: string, end?: { to: string; closeout: 
 }
 
 /** A folder run of one step, created at `created`, of `factory` where one is named. */
-function aRun(id: string, created: string, factory?: string): void {
+function aRun(id: string, created: string, factory?: string) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'runs', `${id}.json`),
@@ -77,14 +77,14 @@ beforeEachTest(() => {
   aRun('l-moves', at(30));
 });
 
-const read = async <T>(address: string): Promise<T> => {
+const read = async <T>(address: string) => {
   const res = await app().request(address);
   assert.equal(res.status, 200, `${address}: ${await res.clone().text()}`);
   return (await res.json()) as T;
 };
 
 /** The names of a list's runs, in its order. */
-const namesOf = (list: RunList): string[] => list.items.map((item) => item.metadata.name);
+const namesOf = (list: RunList) => list.items.map((item) => item.metadata.name);
 
 test('the runs not finished by name, and the finished newest first, each with the frame and the counts of the whole namespace', async () => {
   const open = await read<RunList>('/api/runs?fieldSelector=status.state!%3Dfinished');

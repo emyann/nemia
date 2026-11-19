@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { diff2Lines, diff3Lines, linesOf } from './lines.ts';
 
 /** The lines `a b c` as a file holds them, one a line. */
-const file = (...words: string[]): string[] => words.map((w) => `${w}\n`);
+const file = (...words: string[]) => words.map((w) => `${w}\n`);
 
 describe('the merge by line, row by row: what both sides keep, what conflicts, and how a text is cut', () => {
   test('changes far apart on each side are both kept, and the same change on both sides is taken once', () => {

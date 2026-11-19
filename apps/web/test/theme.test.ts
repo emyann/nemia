@@ -9,7 +9,7 @@ const web = path.resolve(import.meta.dirname, '..');
 const GENERATED = ['theme.css', 'theme.v4.css', 'DESIGN.resolved.md'] as const;
 
 /** A file of an installed package, from the nearest `node_modules` above the board that has it. */
-const installed = (file: string): string => {
+const installed = (file: string) => {
   for (let dir = web; ; dir = path.dirname(dir)) {
     const found = path.join(dir, 'node_modules', file);
     if (fs.existsSync(found)) return found;
@@ -18,7 +18,7 @@ const installed = (file: string): string => {
 };
 
 /** The kit's generator run on `design` into a new folder: the folder, and what it said. */
-const generated = (design: string): { out: string; said: string } => {
+const generated = (design: string) => {
   const out = path.join(scratch('web-theme-'), 'theme');
   const generator = path.join(web, 'src', 'components', 'ui', 'ds', 'tokens', 'generate-theme.mjs');
   const ran = spawnSync(process.execPath, ['--import', 'tsx', generator, design, '--out', out], { cwd: web, encoding: 'utf8' });
@@ -27,11 +27,11 @@ const generated = (design: string): { out: string; said: string } => {
 };
 
 /** The generated files in `out` that are not, byte for byte, the board's own. */
-const stale = (out: string): string[] =>
+const stale = (out: string) =>
   GENERATED.filter((name) => fs.readFileSync(path.join(out, name), 'utf8') !== fs.readFileSync(path.join(web, 'theme', name), 'utf8'));
 
 /** How many errors and warnings the kit's lint finds in `design`. */
-const findings = (design: string): number => {
+const findings = (design: string) => {
   const ran = spawnSync(process.execPath, [installed('@google/design.md/dist/index.js'), 'lint', design], { cwd: web, encoding: 'utf8' });
   const { summary } = JSON.parse(ran.stdout) as { summary: { errors: number; warnings: number } };
   return summary.errors + summary.warnings;

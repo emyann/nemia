@@ -84,7 +84,7 @@ const e = engineOf(
 type Logged = { text: string; annotations: Record<string, unknown> };
 
 /** The names of `span`'s ancestors, its parent first, up to the first that is not this process's own. */
-const ancestorsOf = (span: Tracer.Span): string[] => {
+const ancestorsOf = (span: Tracer.Span) => {
   const names: string[] = [];
   let at: Tracer.AnySpan | undefined = Option.getOrUndefined(span.parent);
   while (at?._tag === 'Span') {
@@ -98,7 +98,7 @@ const ancestorsOf = (span: Tracer.Span): string[] => {
  * Ticks a pass of the store, the engine its service, tracing to a tracer that keeps its spans and logging at `Debug` to one that keeps
  * its logs.
  */
-async function tickTraced(): Promise<{ spans: Tracer.NativeSpan[]; logs: Logged[] }> {
+async function tickTraced() {
   const spans: Tracer.NativeSpan[] = [];
   const logs: Logged[] = [];
   const tracer = Tracer.make({

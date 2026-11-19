@@ -16,24 +16,25 @@ const endpointOf = (group: string, name: string) => {
 };
 
 /** `value` decoded from JSON by the first of `schemas` that takes it and encoded back to JSON, or undefined where none takes it. */
-const throughOne = (schemas: readonly Schema.Top[], value: unknown): unknown => {
+const throughOne = (schemas: readonly Schema.Top[], value: unknown) => {
   for (const schema of schemas) {
     const codec = schema as Schema.Codec<unknown, unknown>;
     const decoded = Schema.decodeUnknownExit(codec)(JSON.parse(JSON.stringify(value)));
-    if (Exit.isSuccess(decoded)) return JSON.parse(JSON.stringify(Schema.encodeSync(codec)(decoded.value)));
+    if (Exit.isSuccess(decoded)) return JSON.parse(JSON.stringify(Schema.encodeSync(codec)(decoded.value))) as unknown;
   }
-  return undefined;
+  return undefined satisfies unknown;
 };
 
 /**
  * `value` as the endpoint `group`.`name` answers it: decoded by one of its success Schemas and encoded back, which keeps only the keys
  * that Schema declares; undefined where it refuses it.
  */
-export const answered = (group: string, name: string, value: unknown): unknown => throughOne([...endpointOf(group, name).success], value);
+export const answered = (group: string, name: string, value: unknown) =>
+  throughOne([...endpointOf(group, name).success], value) satisfies unknown;
 
 /** `value` as the endpoint `group`.`name` takes it for its body, decoded and encoded back; undefined where it refuses it. */
-export const taken = (group: string, name: string, value: unknown): unknown =>
+export const taken = (group: string, name: string, value: unknown) =>
   throughOne(
     [...endpointOf(group, name).payload.values()].flatMap((p) => p.schemas),
     value,
-  );
+  ) satisfies unknown;

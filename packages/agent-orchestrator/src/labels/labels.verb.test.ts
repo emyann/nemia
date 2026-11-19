@@ -28,7 +28,7 @@ function over<A, E>(program: Effect.Effect<A, E>, card = '---\nworkflow: build\n
 }
 
 /** The refusal an exit failed with: its kind, exit code and words. */
-function refusal(exit: Exit.Exit<unknown, unknown>): { _tag: string; exitCode: number; message: string } {
+function refusal(exit: Exit.Exit<unknown, unknown>) {
   assert.equal(Exit.isFailure(exit), true, 'refused');
   if (!Exit.isFailure(exit)) throw new Error('unreachable');
   const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');
@@ -37,7 +37,7 @@ function refusal(exit: Exit.Exit<unknown, unknown>): { _tag: string; exitCode: n
   return error;
 }
 
-const value = <A>(exit: Exit.Exit<A, unknown>): A => {
+const value = <A>(exit: Exit.Exit<A, unknown>) => {
   if (!Exit.isSuccess(exit)) assert.fail(`refused: ${JSON.stringify(exit.cause)}`);
   return exit.value;
 };

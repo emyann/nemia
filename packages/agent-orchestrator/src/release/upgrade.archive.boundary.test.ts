@@ -47,7 +47,7 @@ const SOURCE = pathToFileURL(BASE).href;
  * Publishes `tag` at the base: an archive of a release whose `bin/nemia` exits `exit`, and its `SHA256SUMS`, whose checksum is another's
  * where `damaged`; and names it newest where `latest`.
  */
-function published(tag: string, { exit = 0, damaged = false, latest = false } = {}): void {
+function published(tag: string, { exit = 0, damaged = false, latest = false } = {}) {
   const tree = scratch('wf-upgrade-archive-tree-');
   const shipped: ReleaseFile = { tag, commit: `c0ffee${tag.replace(/\W/g, '')}`, source: 'ci', builtAt: '2026-11-01T00:00:00.000Z' };
   writeReleaseFile(tree, shipped);
@@ -119,7 +119,7 @@ const idle: ServiceHost = {
 const run = (args: Args) => runWith(engineOf(engine().layer), upgrade(args, idle, ENV, FIRST));
 
 /** The refusal an upgrade fails with: its tag and message, its exit 2. */
-async function refusalOf(args: Args): Promise<{ tag: string; message: string }> {
+async function refusalOf(args: Args) {
   const err = await run(args).then(
     () => assert.fail('the upgrade was expected to be refused'),
     (e: Error & { _tag?: string; exitCode?: number }) => e,
@@ -129,7 +129,7 @@ async function refusalOf(args: Args): Promise<{ tag: string; message: string }> 
 }
 
 /** What is left under `releases/` beside the releases and the logs: no build folder, no hidden link. */
-const leftovers = (): string[] => fs.readdirSync(releasesDir(ROOT)).filter((f) => f.startsWith('.') && f !== '.logs');
+const leftovers = () => fs.readdirSync(releasesDir(ROOT)).filter((f) => f.startsWith('.') && f !== '.logs');
 
 describe('an archive install upgraded from its download base: the newest by default, refused a damaged archive, and refused going back past its floor', () => {
   const s = story(test);
@@ -204,7 +204,7 @@ describe('an archive install upgraded from its download base: the newest by defa
  * A stub GitHub on loopback: every download answers 404, and the API answers the release of each tag in `published`, with the assets
  * named, and 404 for any other. Its download base is `<origin>/o/r/releases`, a repository's as github.com lays it out.
  */
-async function stubGitHub(published: Record<string, readonly string[]>): Promise<{ source: string; close: () => Promise<void> }> {
+async function stubGitHub(published: Record<string, readonly string[]>) {
   const server = http.createServer((req, res) => {
     const asked = /^\/api\/v3\/repos\/o\/r\/releases\/tags\/([^/]+)$/.exec(req.url ?? '');
     const assets = asked?.[1] === undefined ? undefined : published[decodeURIComponent(asked[1])];
@@ -226,7 +226,7 @@ test('an archive that answers 404: Conflict where its release is published witho
   const github = await stubGitHub({ 'v1.5.0': ['SHA256SUMS', 'install.sh'] });
   t.onTestFinished(github.close);
   const install = { ...FIRST, source: github.source };
-  const kindOf = async (tag: string): Promise<string> => {
+  const kindOf = async (tag: string) => {
     const err = await runWith(engineOf(engine().layer), upgrade({ tag }, idle, ENV, install)).then(
       () => assert.fail('the upgrade was expected to be refused'),
       (e: Error & { _tag?: string; exitCode?: number }) => e,

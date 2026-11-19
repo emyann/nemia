@@ -33,14 +33,14 @@ export type Words = {
 };
 
 /** Every operation of `document`. */
-const operationsOf = (document: Document): Operation[] => Object.values(document.paths ?? {}).flatMap((methods) => Object.values(methods));
+const operationsOf = (document: Document) => Object.values(document.paths ?? {}).flatMap((methods) => Object.values(methods));
 
 /**
  * The operations of `document` with no description of their own, by their `operationId`, per group (the operation's first tag): a group
  * with none owed is left out.
  * @param document The api's document, `OpenApi.fromApi(Api)`, or a planted one.
  */
-export const unsaid = (document: Document): Record<string, string[]> => {
+export const unsaid = (document: Document) => {
   const owed: Record<string, string[]> = {};
   for (const operation of operationsOf(document))
     if (!operation.description?.trim()) {
@@ -55,7 +55,7 @@ export const unsaid = (document: Document): Record<string, string[]> => {
  * @param document The api's document, or a planted one.
  * @param words The command table, `COMMAND_WORDS`, or a planted one.
  */
-export const copied = (document: Document, words: readonly Words[]): string[] =>
+export const copied = (document: Document, words: readonly Words[]) =>
   operationsOf(document).flatMap((operation) =>
     words
       .filter((command) => command.served?.some((link) => link.endpoint === operation.operationId))
@@ -76,7 +76,7 @@ export const copied = (document: Document, words: readonly Words[]): string[] =>
  * @param today The endpoints said nowhere, per group, from `unsaid`.
  * @param baseline The counts `described-endpoints.baseline.json` holds.
  */
-export const breaks = (today: Readonly<Record<string, readonly string[]>>, baseline: Readonly<Record<string, number>>): string[] => [
+export const breaks = (today: Readonly<Record<string, readonly string[]>>, baseline: Readonly<Record<string, number>>) => [
   ...Object.entries(today)
     .filter(([group, names]) => names.length > (baseline[group] ?? 0))
     .map(
@@ -93,7 +93,7 @@ export const breaks = (today: Readonly<Record<string, readonly string[]>>, basel
     ),
 ];
 
-const document = (): Document => OpenApi.fromApi(Api) as Document;
+const document = () => OpenApi.fromApi(Api) as Document;
 
 if (process.argv.includes('--print'))
   process.stdout.write(
@@ -137,7 +137,7 @@ else {
 
   test("REFUSED: a description holding a help line of a command that links it; a short line, or another endpoint's command's, is not", () => {
     const help = ['Lists every parcel the depot holds, newest first.', 'the same, by its name'];
-    const said = (description: string): Document => ({
+    const said = (description: string) => ({
       paths: { '/parcels': { get: { operationId: 'parcels.list', tags: ['parcels'], description } } },
     });
     const words: Words[] = [{ name: 'parcels', help, served: [{ endpoint: 'parcels.list' }] }];

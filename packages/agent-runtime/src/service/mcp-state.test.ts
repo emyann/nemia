@@ -30,7 +30,7 @@ const asking = () => {
 };
 
 /** The refusal `effect` fails with: a verb that succeeds fails the test. */
-const refusalOf = <A, E>(effect: Effect.Effect<A, E>): Promise<{ _tag?: string; message: string }> =>
+const refusalOf = <A, E>(effect: Effect.Effect<A, E>) =>
   Effect.runPromise(Effect.flip(effect)) as Promise<{ _tag?: string; message: string }>;
 
 describe('mcpStateVerbOf: where the verb opens its session, and what it refuses before it opens one', () => {

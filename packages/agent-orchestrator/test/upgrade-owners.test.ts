@@ -35,35 +35,36 @@ const LAND = 'workflows/carried/land.ts';
 const HIRE = 'factory.json#hires.dev/review';
 
 /** The document `file` of `dir`, its spec changed by `change`. */
-function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc.spec);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
 /** The text of `file` in `folder`. */
-const textIn = (folder: string, file: string): string => fs.readFileSync(path.join(folder, file), 'utf8');
+const textIn = (folder: string, file: string) => fs.readFileSync(path.join(folder, file), 'utf8');
 
 /** `file` in `folder` with `from` replaced by `to`. */
-const rewrite = (folder: string, file: string, from: string, to: string): void => {
+const rewrite = (folder: string, file: string, from: string, to: string) => {
   const text = textIn(folder, file);
   assert.ok(text.includes(from), `${file} holds ${from}`);
   fs.writeFileSync(path.join(folder, file), text.replace(from, to));
 };
 
 /** `file` in `folder` written, its folders made. */
-const written = (folder: string, file: string, text: string): void => {
+const written = (folder: string, file: string, text: string) => {
   fs.mkdirSync(path.dirname(path.join(folder, file)), { recursive: true });
   fs.writeFileSync(path.join(folder, file), text);
 };
 
 /** What `argv` printed, line by line. */
-async function printedBy(t: TestContext, ...argv: string[]): Promise<string[]> {
+async function printedBy(t: TestContext, ...argv: string[]) {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv);
   } finally {
+    printed.push(...log.mock.calls.flatMap((words) => [words.join(' ')]));
     log.mockRestore();
   }
   return printed.flatMap((p) => p.split('\n'));
@@ -78,20 +79,20 @@ const proposalIn = (factory: string, name: string) =>
   JSON.parse(fs.readFileSync(path.join(FACTORIES, factory, 'proposals', `${name}.json`), 'utf8'));
 
 /** The proposals the store holds for `factory`, by name. */
-const proposalsOf = (factory: string): string[] => {
+const proposalsOf = (factory: string) => {
   const dir = path.join(FACTORIES, factory, 'proposals');
-  return fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => f.replace(/\.json$/, '')) : [];
+  return (fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => f.replace(/\.json$/, '')) : []) satisfies string[];
 };
 
 /** The proposal recorded for the owner `owner` (`<Kind>/<name>`) of `factory`'s upgrade. */
-const recordedFor = (factory: string, owner: string): string => readResolutions(ROOT, factory)?.proposals?.[owner] ?? '';
+const recordedFor = (factory: string, owner: string) => readResolutions(ROOT, factory)?.proposals?.[owner] ?? '';
 
 /**
  * A factory `name` applied from the tests' team at 0.1.0, its template carrying a note in the reviewer's skill and a carried script, the
  * person's change and the template's 0.2.0 each made by `change` to the tree and to the template, the upgrade filed: its conflicts'
  * addresses.
  */
-async function upgraded(t: TestContext, name: string, change: (tree: string, template: string) => void): Promise<string[]> {
+async function upgraded(t: TestContext, name: string, change: (tree: string, template: string) => void) {
   const repo = scratch(`wf-upgrade-owners-${name}-repo-`);
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stage.place().world.repository(repo, {});

@@ -20,11 +20,11 @@ export const GIT_ENV: NodeJS.ProcessEnv = {
 };
 
 /** Git run in `dir` with `args`, its stdout trimmed; it throws with git's words when git fails. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', args, { cwd: dir, env: GIT_ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** Each of `files` written under `dir`, or taken away where null. */
-function written(dir: string, files: Readonly<Record<string, string | null>>): void {
+function written(dir: string, files: Readonly<Record<string, string | null>>) {
   for (const [file, text] of Object.entries(files)) {
     const at = path.join(dir, file);
     if (text === null) fs.rmSync(at, { force: true });
@@ -36,7 +36,7 @@ function written(dir: string, files: Readonly<Record<string, string | null>>): v
 }
 
 /** A commit on `name` that changes `files`, made in `root`'s own checkout, which is put back on the branch it was on. */
-function branch(root: string, name: string, files: Readonly<Record<string, string | null>>, from: string): string {
+function branch(root: string, name: string, files: Readonly<Record<string, string | null>>, from: string) {
   const was = git(root, 'rev-parse', '--abbrev-ref', 'HEAD');
   const there = spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`], { cwd: root, env: GIT_ENV }).status === 0;
   if (was !== name) git(root, 'checkout', '-q', ...(there ? [name] : ['-b', name, from]));
@@ -49,7 +49,7 @@ function branch(root: string, name: string, files: Readonly<Record<string, strin
 }
 
 /** The merge of `name` staged in `checkout` and not committed: git's exit 1 is a merge left in conflict, any other failure thrown. */
-function stage(checkout: string, name: string): void {
+function stage(checkout: string, name: string) {
   const ran = spawnSync('git', ['merge', '--no-ff', '--no-commit', name], { cwd: checkout, env: GIT_ENV, encoding: 'utf8' });
   if (ran.status !== 0 && ran.status !== 1) throw new Error(`git merge ${name} in ${checkout}: ${ran.stderr}`);
 }

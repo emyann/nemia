@@ -18,11 +18,11 @@ import { READS_ITS_CODE } from './contract-first.baseline.ts';
 const BASELINE = 'tools/guards/test/contract-first.baseline.ts';
 
 /** The files `text` imports by a relative path, each by its path from the root, read from `from`'s folder. */
-const importsOf = (from: string, text: string): string[] =>
+const importsOf = (from: string, text: string) =>
   [...text.matchAll(/from '(\.{1,2}\/[^']+)'/g)].map((m) => path.posix.join(path.posix.dirname(from), m[1] ?? ''));
 
 /** Each contract among `sources`, a path and its text, that imports a file importing it back: the contract and that file. */
-export const readsItsCode = (sources: ReadonlyMap<string, string>): Array<{ contract: string; code: string }> =>
+export const readsItsCode = (sources: ReadonlyMap<string, string>) =>
   [...sources]
     .filter(([file]) => file.endsWith('.contract.ts'))
     .flatMap(([contract, text]) =>
@@ -32,7 +32,7 @@ export const readsItsCode = (sources: ReadonlyMap<string, string>): Array<{ cont
     );
 
 /** What today's contracts and `baseline` disagree on, each a sentence naming the fix. */
-export const breaks = (found: ReadonlyArray<{ contract: string; code: string }>, baseline: readonly string[]): string[] => {
+export const breaks = (found: ReadonlyArray<{ contract: string; code: string }>, baseline: readonly string[]) => {
   const reading = new Set(found.map((f) => f.contract));
   return [
     ...found

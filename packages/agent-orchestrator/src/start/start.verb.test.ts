@@ -25,7 +25,7 @@ const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A workflow folder of one step, in git. */
-const folder = (): string => {
+const folder = () => {
   const dir = scratch('wf-start-labels-team-');
   fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
   return dir;

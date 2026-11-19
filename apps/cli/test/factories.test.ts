@@ -30,7 +30,7 @@ write(path.join(here, 'RULES.md'), 'Say what you changed.\n');
 write(path.join(here, 'NEMIA.md'), 'The mill presses drafts.\n');
 
 /** `nemia <argv>` typed in `here` on the store's environment, `stdin` its input, waited on for its end. */
-function nemia(argv: readonly string[], stdin = ''): Promise<Said> {
+function nemia(argv: readonly string[], stdin = '') {
   const child = spawn(process.execPath, [CLI, ...argv], { cwd: here, env: store.env, stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -40,18 +40,18 @@ function nemia(argv: readonly string[], stdin = ''): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** What `argv` printed, its exit 0 asserted. */
-async function out(argv: readonly string[], stdin?: string): Promise<string> {
+async function out(argv: readonly string[], stdin?: string) {
   const said = await nemia(argv, stdin);
   assert.equal(said.code, 0, `nemia ${argv.join(' ')}: ${said.err}`);
   return said.out;
 }
 
 /** That `argv` was refused with `code`, naming `named` on stderr. */
-async function refused(argv: readonly string[], code: number, named: string): Promise<void> {
+async function refused(argv: readonly string[], code: number, named: string) {
   const said = await nemia(argv);
   assert.equal(said.code, code, `nemia ${argv.join(' ')}: ${said.out}${said.err}`);
   assert.ok(said.err.includes(named), `nemia ${argv.join(' ')} names ${named}: ${said.err}`);

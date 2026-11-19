@@ -16,7 +16,7 @@ type Sub = { skip: (note?: string) => void; entry: Filed };
  * A runner that runs each body in turn, as Vitest runs a describe's tests, and records it; a throw is kept, as the runner keeps a
  * test's failure. `done` is when every body filed so far has run.
  */
-const recorder = (): { t: Teller<Sub>; filed: Filed[]; done: () => Promise<void> } => {
+const recorder = () => {
   const filed: Filed[] = [];
   let chain = Promise.resolve();
   const t: Teller<Sub> = (name, how) => {

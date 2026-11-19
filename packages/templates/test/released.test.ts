@@ -17,19 +17,13 @@ import { scratch } from 'test-kit/scratch';
 import { digestOf, modesOf, RELEASED, templatesIn } from '../released.ts';
 import { TEMPLATES } from './template.ts';
 
-/** How a template stands apart from its record: no record at its version, or another content under the version recorded. */
-type Kind = 'unrecorded' | 'changed';
-
-/** A template apart from its record: its name, how, and what to do, for a person. */
-type Apart = { template: string; kind: Kind; message: string };
-
 /** The modes of every template of this workspace as git records them, by its path from the workspace. */
 const MODES = modesOf(TEMPLATES);
 
 /** Each template of the workspace `root` apart from its record in `released.json` there. */
-function apart(root: string): Apart[] {
+function apart(root: string) {
   const record = JSON.parse(fs.readFileSync(path.join(root, RELEASED), 'utf8')) as Record<string, { version: string; digest: string }>;
-  return templatesIn(root).flatMap((template): Apart[] => {
+  return templatesIn(root).flatMap((template) => {
     const manifest = yaml.load(fs.readFileSync(path.join(root, template, 'nemia.yaml'), 'utf8')) as { spec: { version: string } };
     const version = manifest.spec.version;
     const recorded = record[template];
@@ -55,7 +49,7 @@ function apart(root: string): Apart[] {
 }
 
 /** A scratch copy of this workspace's templates and their record, each file of `edit` changed by its function, which must change it. */
-function workspaceWith(edit: Record<string, (text: string) => string>): string {
+function workspaceWith(edit: Record<string, (text: string) => string>) {
   const root = scratch('nemia-released-root-');
   for (const name of [RELEASED, ...templatesIn(TEMPLATES)])
     fs.cpSync(path.join(TEMPLATES, name), path.join(root, name), { recursive: true });
@@ -69,7 +63,7 @@ function workspaceWith(edit: Record<string, (text: string) => string>): string {
 }
 
 /** How each template of `root` stands apart, by template and kind. */
-const kinds = (root: string): string[] => apart(root).map(({ template, kind }) => `${template}: ${kind}`);
+const kinds = (root: string) => apart(root).map(({ template, kind }) => `${template}: ${kind}`);
 
 test('REFUSED: a byte of a step changed under the version recorded', () => {
   const root = workspaceWith({ 'sdlc/workflows/build/design.md': (text) => `${text} ` });

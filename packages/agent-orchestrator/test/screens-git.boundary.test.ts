@@ -60,7 +60,7 @@ const runPlaced = runGiven(gitPlaceLayer, ENV);
  * owner's machine, `main` on a runner. It inits under a default of `main` on purpose, so the branch can only come from the `-b`:
  * drop it and the file fails wherever it runs, rather than only where the machine disagrees.
  */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'init.defaultBranch=main', ...args], {
@@ -216,7 +216,7 @@ const folder = (implementKeys = '') => {
 };
 
 /** A run this file started on a repository: a repository run, whose repository and base branch are on its record. */
-const repositoryRunOf = (run: Run): RepositoryRun => {
+const repositoryRunOf = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
@@ -249,7 +249,7 @@ const write = (repo: string, file: string, text: string | Uint8Array) => {
 };
 
 /** A repository on `main` with a workspace package that has a source file and a test. */
-const aPackage = (): string => {
+const aPackage = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   write(repo, 'package.json', JSON.stringify({ workspaces: ['packages/*'] }));

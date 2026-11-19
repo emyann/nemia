@@ -45,7 +45,7 @@ const git = (dir: string, ...args: string[]) => {
 };
 
 /** Commits `lists` laid out by `layout` on `branch` of `dir`, from `from`, the baseline's folder written whole. */
-const commit = (dir: string, branch: string, from: string | undefined, layout: Layout, lists: Lists): void => {
+const commit = (dir: string, branch: string, from: string | undefined, layout: Layout, lists: Lists) => {
   if (from !== undefined) git(dir, 'checkout', '-q', '-b', branch, from);
   fs.rmSync(path.join(dir, FOLDER), { recursive: true, force: true });
   for (const [file, text] of Object.entries(layout(lists))) {

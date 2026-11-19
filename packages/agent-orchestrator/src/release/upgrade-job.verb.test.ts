@@ -144,7 +144,7 @@ test('a server that runs code from a repository has no release to go back to, an
       runWith,
       () => stand().layer,
       env,
-    )(engineOf(engine().layer), program.pipe(Effect.provideService(RunningCode, (): Running => ({ kind: 'checkout', root: '/r' }))));
+    )(engineOf(engine().layer), program.pipe(Effect.provideService(RunningCode, () => ({ kind: 'checkout', root: '/r' }))));
   fs.mkdirSync(releaseDir('v1.0.0', root), { recursive: true });
   writeReleaseFile(releaseDir('v1.0.0', root), { tag: 'v1.0.0', commit: 'c0ffee', source: 'file:///base', builtAt: '' });
   assert.deepEqual(await checkout(upgradesRead()), { previous: null, last: null });

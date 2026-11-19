@@ -27,7 +27,7 @@ const store = () => {
   const root = scratch('wf-card-door-');
   return { root, door: doorFrom(CardDoor, cardDoorFiles(root)), inbox: path.join(root, 'inbox') };
 };
-const nameOf = (name: string): CardName => CardName.read(name);
+const nameOf = (name: string) => CardName.read(name);
 
 test("the inbox's entries: a folder by its name and a trailing slash, any other file with no text, a hidden one not listed", () => {
   const { door, inbox } = store();
@@ -112,8 +112,7 @@ test('the default door reads the files at the store root the program is given, a
 const PKG = path.join(import.meta.dirname, '..', '..');
 
 /** Every file of `src` but the tests and the Card door's own folder, by its path from the package. */
-const outsideCards = (): Record<string, string> =>
-  Object.fromEntries(Object.entries(sourcesUnder(PKG, 'src')).filter(([file]) => !file.startsWith('src/cards/')));
+const outsideCards = () => Object.fromEntries(Object.entries(sourcesUnder(PKG, 'src')).filter(([file]) => !file.startsWith('src/cards/')));
 
 /** A call of the door's files layer by hand (`cardFiles(`), not a method of the same name, rather than yielding `CardDoor`. */
 const BY_HAND = /(?<![\w$.])cardFiles\s*\(/g;

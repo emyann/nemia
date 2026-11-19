@@ -31,7 +31,7 @@ const WROTE = 'Start the two kit cards as one batch.';
 const CHANGED = 'Start the two kit cards as one batch, and tell me when their checks are green.';
 
 /** The message the browser kept, with the three things the person may do with it. */
-async function expectKept(panel: ReturnType<typeof chatPanelOf>, words: string): Promise<void> {
+async function expectKept(panel: ReturnType<typeof chatPanelOf>, words: string) {
   const kept = panel.locator('[data-chat-kept]');
   await expectVisible(kept, 'the api would not take the message, so this browser keeps it');
   await expectTexts(kept.locator('[data-chat-bubble="kept"]'), [words], 'drawn as the person’s own words, failing');
@@ -46,7 +46,7 @@ async function expectKept(panel: ReturnType<typeof chatPanelOf>, words: string):
 }
 
 /** The composer, and a message Enter sends: answers the panel it was written in. */
-async function wrote(page: Page, words: string, open = false): Promise<ReturnType<typeof chatPanelOf>> {
+async function wrote(page: Page, words: string, open = false) {
   const panel = open ? chatPanelOf(page) : await openChat(page);
   const field = chatFieldOf(page);
   await field.fill(words);

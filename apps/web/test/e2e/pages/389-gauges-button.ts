@@ -9,18 +9,18 @@ import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
 /** The Factory's queue lane, beside the floor. */
-const lane = (page: Page): Locator => page.getByRole('complementary', { name: 'Queued cards' });
+const lane = (page: Page) => page.getByRole('complementary', { name: 'Queued cards' }) satisfies Locator;
 
 /** The gauges button's own box, which carries what its dot and mark say. */
-const markOf = (page: Page): Locator => machineBarOf(page).locator('[data-gauges-button]');
+const markOf = (page: Page) => machineBarOf(page).locator('[data-gauges-button]') satisfies Locator;
 
 /** What the api answers at `pathname`, read as the board reads it. */
-async function answer<T>(page: Page, pathname: string): Promise<T> {
+async function answer<T>(page: Page, pathname: string) {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
 /** The button's dot says the daemon's tone, its quota in money that it nears its limit, and its name both; the feed is followed. */
-async function says(page: Page): Promise<void> {
+async function says(page: Page) {
   await expectCount(page.locator('footer[data-frame-footer]'), 0, 'no bottom bar: the gauges button holds its facts');
   await expectVisible(markOf(page).and(page.locator('[data-daemon-dot="none"][data-tone="down"]')), "the dot: the e2e's api ticks nothing");
   await expectVisible(markOf(page).locator('[data-quota-line][data-quota-mark]'), 'the quota in money: the week is past the mark');
@@ -36,7 +36,7 @@ async function says(page: Page): Promise<void> {
  * Pressed, the button opens the machine's gauges in the frame's side sheet — the daemon, the feed, what is at work as the api's runs make
  * it, the quota and the version the api answers — the queue lane giving its room to the floor; pressed again it closes them.
  */
-async function opens(page: Page): Promise<void> {
+async function opens(page: Page) {
   await gaugesButtonOf(page).click();
   await page.waitForURL((url) => url.searchParams.get('bar') === 'gauges');
   const bar = page.locator('[data-gauges]');

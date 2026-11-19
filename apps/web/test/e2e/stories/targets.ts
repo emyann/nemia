@@ -25,14 +25,14 @@ export type Target = { file: string; id: string; themes: readonly Theme[] };
  * The targets among `names`, a folder's file names, in name order: each `target-<id>[-light|-dark].png`, of its own theme or of both.
  * @param names The file names of the targets' folder.
  */
-export const targetsOf = (names: readonly string[]): Target[] =>
+export const targetsOf = (names: readonly string[]) =>
   [...names].sort().flatMap((file) => {
     const named = TARGET.exec(file);
     const id = named?.[1];
     if (id === undefined) return [];
     const theme = named?.[2]?.toLowerCase();
     return [{ file, id, themes: theme === 'light' || theme === 'dark' ? [theme] : THEMES }];
-  });
+  }) satisfies Target[];
 
 /**
  * One match: the story and theme, the target's file name, the story's approved picture at the head (from the board's folder), and the
@@ -44,7 +44,7 @@ export type Match = { id: string; theme: Theme; target: string; story: string; m
 export type Unknown = { file: string; nearest: string[] };
 
 /** The edits that turn `a` into `b`, one character at a time. */
-const distance = (a: string, b: string): number => {
+const distance = (a: string, b: string) => {
   let row = Array.from({ length: b.length + 1 }, (_, at) => at);
   for (let i = 1; i <= a.length; i++) {
     const next = [i];
@@ -56,8 +56,8 @@ const distance = (a: string, b: string): number => {
 };
 
 /** The ids of `known` nearest `id`, three at most, the nearest first. */
-const nearestOf = (id: string, known: readonly string[]): string[] =>
-  [...known].sort((a, b) => distance(id, a) - distance(id, b) || a.localeCompare(b)).slice(0, 3);
+const nearestOf = (id: string, known: readonly string[]) =>
+  [...known].sort((a, b) => distance(id, a) - distance(id, b) || a.localeCompare(b)).slice(0, 3) satisfies string[];
 
 /**
  * Each target of `targets` paired with its story's approved picture in each theme it is of that the story has one in, one match per
@@ -68,11 +68,7 @@ const nearestOf = (id: string, known: readonly string[]): string[] =>
  * @param known Every story id of the board.
  * @param canaries The stories approved in the light theme too (`LIGHT_CANARIES`).
  */
-export function matchesOf(
-  targets: readonly Target[],
-  known: readonly string[],
-  canaries: readonly string[],
-): { matches: Match[]; unknown: Unknown[]; lightless: string[] } {
+export function matchesOf(targets: readonly Target[], known: readonly string[], canaries: readonly string[]) {
   const held = new Set(known);
   const unknown = targets
     .filter((target) => !held.has(target.id))
@@ -92,11 +88,11 @@ export function matchesOf(
     }
   }
   const matches = [...chosen.values()].sort((a, b) => a.id.localeCompare(b.id) || THEMES.indexOf(a.theme) - THEMES.indexOf(b.theme));
-  return { matches, unknown, lightless };
+  return { matches, unknown, lightless } satisfies { matches: Match[]; unknown: Unknown[]; lightless: string[] };
 }
 
 /** A PNG's width and height, read off its header. */
-const sizeOf = (png: Buffer): { width: number; height: number } => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) });
+const sizeOf = (png: Buffer) => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) }) satisfies { width: number; height: number };
 
 /** The space around and between the two pictures, in pixels. */
 const GAP = 24;
@@ -115,7 +111,7 @@ const CAPTION = 28;
 export async function composeMatch(
   browser: Browser,
   pair: { target: string; story: string; theme: Theme; head: string; css: string; out: string },
-): Promise<void> {
+) {
   const { photograph } = await import('../board.ts');
   const pictures = [pair.target, pair.story].map((file) => fs.readFileSync(file));
   const sizes = pictures.map(sizeOf);

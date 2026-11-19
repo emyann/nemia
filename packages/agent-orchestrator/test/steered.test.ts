@@ -69,14 +69,14 @@ test('REFUSED: a clock no program was given cannot be moved, and says so', async
 });
 
 /** Whether `file`, a path from the repository's root, is a test's: named `*.test.ts`, or under a `test` folder. */
-const isTestFile = (file: string): boolean => /\.test\.[cm]?[jt]sx?$/.test(file) || file.split('/').includes('test');
+const isTestFile = (file: string) => /\.test\.[cm]?[jt]sx?$/.test(file) || file.split('/').includes('test');
 
 /** Whether `text`, outside its comment lines, imports Effect's testing entry, by an `import`, an `export … from` or `import()`. */
-const importsTesting = (text: string): boolean =>
+const importsTesting = (text: string) =>
   specifiersIn(withoutComments(text), { calls: ['import'] }).some((spec) => /^effect\/testing(?:\/|$)/.test(spec));
 
 /** Where `file`, which is no test's, imports Effect's testing entry: a file that runs reads the clock it is given. */
-function steeredBreaches(file: string, text: string): string[] {
+function steeredBreaches(file: string, text: string) {
   if (isTestFile(file) || !importsTesting(text)) return [];
   return [
     `${file} imports effect/testing, which is for tests alone: a file that runs reads Effect's clock as it is given, and only a ` +
@@ -85,7 +85,7 @@ function steeredBreaches(file: string, text: string): string[] {
 }
 
 /** Every TypeScript file under `dir` of the package, as a path from the repository's root. */
-const sources = (dir: string): string[] =>
+const sources = (dir: string) =>
   fs
     .readdirSync(path.join(PKG, dir), { recursive: true, encoding: 'utf8' })
     .filter((f) => /\.[cm]?tsx?$/.test(f))

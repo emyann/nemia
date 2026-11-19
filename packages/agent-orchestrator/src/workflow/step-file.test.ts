@@ -29,7 +29,7 @@ import { readsMounts } from '../filed/filed.ts';
 import { FILED_AS } from '../keys/filed-as.ts';
 
 /** `lines` with `place: git` before them, unless they say a place already, as every step file must. */
-const placed = (lines: string): string => (/^(place:|workspace: folder)/m.test(lines) ? lines : `place: git\n${lines}`);
+const placed = (lines: string) => (/^(place:|workspace: folder)/m.test(lines) ? lines : `place: git\n${lines}`);
 
 /** A step with this frontmatter and a body, with `place: git` unless it says a place (`placed`), as a folder hands it to the parser. */
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${placed(lines)}\n---\nDo the work.\n`);
@@ -58,7 +58,7 @@ const readLooping = (file: string) => (file === 'review.schema.json' ? JSON.stri
 type Row = { row: string; run: () => unknown; naming?: [at: string, ...named: string[]] };
 
 /** Each row of `rows` as a subtest of `t`: a refusal read as a `WorkflowError` with exit 2 naming what it says; any other, run. */
-function table(rows: readonly Row[]): void {
+function table(rows: readonly Row[]) {
   for (const { row, run, naming } of rows)
     test(row, () => {
       if (!naming) return void run();
@@ -74,7 +74,7 @@ function table(rows: readonly Row[]): void {
 }
 
 /** A row reading step `name` with `lines`, its fields as `is` says. */
-const reads = (row: string, name: string, lines: string, is: Partial<Record<keyof StepSpec, unknown>>): Row => ({
+const reads = (row: string, name: string, lines: string, is: Partial<Record<keyof StepSpec, unknown>>) => ({
   row,
   run: () => {
     const w = fm(name, lines) as Record<string, unknown>;
@@ -83,7 +83,7 @@ const reads = (row: string, name: string, lines: string, is: Partial<Record<keyo
 });
 
 /** A row refusing step `name` with `lines`, its message opening on the step and naming each of `named`. */
-const refuses = (row: string, name: string, lines: string, ...named: string[]): Row => ({
+const refuses = (row: string, name: string, lines: string, ...named: string[]) => ({
   row: `REFUSED: ${row}`,
   run: () => fm(name, lines),
   naming: [`${name}: `, ...named],
@@ -956,7 +956,7 @@ describe('`renderStep`: the parser run backwards, in one canonical form, and ref
         ['1M', '1000k'],
         ['123456', '123456'],
       ] as const
-    ).map(([written, rendered]): Row => ({
+    ).map(([written, rendered]) => ({
       row: `context: ${written} is written ${rendered}`,
       run: () =>
         assert.match(
@@ -1088,12 +1088,12 @@ describe('`renderStep`: the parser run backwards, in one canonical form, and ref
         assert.doesNotMatch(claude, /^(sandbox|permissionMode):/m);
       },
     },
-    ...(['read-only', 'bypassPermissions', 'dontAsk'] as const).map((word): Row => ({
+    ...(['read-only', 'bypassPermissions', 'dontAsk'] as const).map((word) => ({
       row: `REFUSED: a codex draft sending permissionMode: ${word}`,
       run: () => renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: word } as StepDraft),
       naming: ['review: ', `\`permissionMode: ${word}\``, 'former name of `sandbox:`', 'reload it'],
     })),
-    ...(['read-only', 'dontAsk'] as const).map((word): Row => ({
+    ...(['read-only', 'dontAsk'] as const).map((word) => ({
       row: `REFUSED: a codex agent draft sending permissionMode: ${word}`,
       run: () => renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: word }, body: 'You review.' }),
       naming: ['agents/reviewer.md: ', `\`permissionMode: ${word}\``, 'former name of `sandbox:`'],
@@ -1202,7 +1202,7 @@ describe('`renderStep`: the parser run backwards, in one canonical form, and ref
         ['maxAttempts', { maxAttempts: 2 }, '`maxAttempts`', '`retries: N`'],
         ['colour', { colour: 'red' }, '`colour` is not a key a step has'],
       ] as const
-    ).map(([key, more, ...named]): Row => ({
+    ).map(([key, more, ...named]) => ({
       row: `REFUSED: a key no step has, in the parser's words — ${key}`,
       run: () => renderStep({ name: 'review', after: ['implement'], place: 'git', body: 'Review it.', ...more } as unknown as StepDraft),
       naming: ['review: ', ...named],
@@ -1240,7 +1240,7 @@ describe('`renderStep`: the parser run backwards, in one canonical form, and ref
         ],
         [{ output: {} }, 'output:', '`output` has no value'],
       ] as const
-    ).map(([more, lines, named]): Row => ({
+    ).map(([more, lines, named]) => ({
       row: `REFUSED: written as given for the parser to refuse — ${lines.split('\n').at(-1)}`,
       run: () => {
         const text = renderStep({

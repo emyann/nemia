@@ -18,57 +18,57 @@ export const PATH_MODULES = ['node:path', 'node:fs', 'node:fs/promises', 'path',
 export type FileFacts = { consts: ReadonlyMap<string, string>; pathNames: ReadonlySet<string> };
 
 /** `node` without the parentheses, `as`, `satisfies` and `!` around it. */
-export function unwrapped(node: ts.Expression): ts.Expression {
+export function unwrapped(node: ts.Expression) {
   let at = node;
   while (ts.isParenthesizedExpression(at) || ts.isAsExpression(at) || ts.isSatisfiesExpression(at) || ts.isNonNullExpression(at))
     at = at.expression;
-  return at;
+  return at satisfies ts.Expression;
 }
 
 /** The string `node` is: a literal, a template with no substitution, or a `const` of the file that holds one; else `undefined`. */
-export function stringOf(node: ts.Expression | undefined, facts: FileFacts): string | undefined {
-  if (!node) return undefined;
+export function stringOf(node: ts.Expression | undefined, facts: FileFacts) {
+  if (!node) return undefined satisfies string | undefined;
   const at = unwrapped(node);
-  if (ts.isStringLiteral(at) || ts.isNoSubstitutionTemplateLiteral(at)) return at.text;
-  if (ts.isIdentifier(at)) return facts.consts.get(at.text);
-  return undefined;
+  if (ts.isStringLiteral(at) || ts.isNoSubstitutionTemplateLiteral(at)) return at.text satisfies string | undefined;
+  if (ts.isIdentifier(at)) return facts.consts.get(at.text) satisfies string | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /** The literal parts of `node`: its string, or a template's text around its substitutions. */
-export function literalParts(node: ts.Expression, facts: FileFacts): string[] {
+export function literalParts(node: ts.Expression, facts: FileFacts) {
   const at = unwrapped(node);
-  if (ts.isTemplateExpression(at)) return [at.head.text, ...at.templateSpans.map((s) => s.literal.text)];
+  if (ts.isTemplateExpression(at)) return [at.head.text, ...at.templateSpans.map((s) => s.literal.text)] satisfies string[];
   const said = stringOf(at, facts);
-  return said === undefined ? [] : [said];
+  return (said === undefined ? [] : [said]) satisfies string[];
 }
 
 /** The name a call is called by: an identifier's, or the last name of a property access. */
-export function calleeName(call: ts.CallExpression): string | undefined {
+export function calleeName(call: ts.CallExpression) {
   const callee = unwrapped(call.expression);
-  if (ts.isIdentifier(callee)) return callee.text;
-  if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
-  return undefined;
+  if (ts.isIdentifier(callee)) return callee.text satisfies string | undefined;
+  if (ts.isPropertyAccessExpression(callee)) return callee.name.text satisfies string | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /** The identifier a callee is rooted in: `fs` of `fs.promises.stat`, `join` of `join`. */
-export function calleeRoot(call: ts.CallExpression): string | undefined {
+export function calleeRoot(call: ts.CallExpression) {
   let at = unwrapped(call.expression);
   while (ts.isPropertyAccessExpression(at)) at = unwrapped(at.expression);
-  return ts.isIdentifier(at) ? at.text : undefined;
+  return (ts.isIdentifier(at) ? at.text : undefined) satisfies string | undefined;
 }
 
 /** Whether a shell line runs git: its first word is git. */
-export const shellRunsGit = (parts: readonly string[]): boolean => /^\s*git(\s|$)/.test(parts[0] ?? '');
+export const shellRunsGit = (parts: readonly string[]) => /^\s*git(\s|$)/.test(parts[0] ?? '');
 
 /** The arguments of `call`, a list among them given as its elements. */
-export const argumentsOf = (call: ts.CallExpression): ts.Expression[] =>
+export const argumentsOf = (call: ts.CallExpression) =>
   call.arguments.flatMap((arg) => {
     const at = unwrapped(arg);
     return ts.isArrayLiteralExpression(at) ? [...at.elements] : [arg];
-  });
+  }) satisfies ts.Expression[];
 
 /** Whether `call` starts git: a spawn whose command is `'git'`, or a shell line whose first word is git. */
-export function runsGit(call: ts.CallExpression, facts: FileFacts): boolean {
+export function runsGit(call: ts.CallExpression, facts: FileFacts) {
   const name = calleeName(call);
   const first = call.arguments[0];
   if (!name || !first) return false;
@@ -77,11 +77,11 @@ export function runsGit(call: ts.CallExpression, facts: FileFacts): boolean {
 }
 
 /** The facts of a file a matcher reads: each `const` that holds a string, and each name imported from a path module. */
-export function factsOf(source: ts.SourceFile): FileFacts {
+export function factsOf(source: ts.SourceFile) {
   const consts = new Map<string, string>();
   const pathNames = new Set<string>();
   const facts = { consts, pathNames };
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && PATH_MODULES.includes(node.moduleSpecifier.text)) {
       const clause = node.importClause;
       if (clause?.name) pathNames.add(clause.name.text);
@@ -97,5 +97,5 @@ export function factsOf(source: ts.SourceFile): FileFacts {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return facts;
+  return facts satisfies FileFacts;
 }

@@ -53,16 +53,21 @@ const YOURS = path.join(ROOT, 'workflows');
 const DRAFTS = scratch('wf-writers-cli-drafts-');
 
 /** What this CLI's `main` printed on stdout for `nemia <argv>`, or the words it was refused with, its kind (`_tag`) and its exit code. */
-async function said(t: TestContext, ...argv: string[]): Promise<{ out: string; refused?: string; tag?: string; exitCode?: number }> {
-  const out: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void out.push(args.join(' ')));
-  const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+async function said(t: TestContext, ...argv: string[]) {
+  const log = vi.spyOn(console, 'log');
+  const err = vi.spyOn(console, 'error');
+  const out = () => log.mock.calls.map((args) => args.join(' '));
   try {
     await main(argv, engineOf(engine().layer), undefined, undefined, ENV);
-    return { out: out.join('\n') };
+    return { out: out().join('\n') } satisfies { out: string; refused?: string; tag?: string; exitCode?: number };
   } catch (e) {
     const { message, _tag, exitCode } = e as Error & { _tag?: string; exitCode?: number };
-    return { out: out.join('\n'), refused: message, tag: _tag, exitCode };
+    return { out: out().join('\n'), refused: message, tag: _tag, exitCode } satisfies {
+      out: string;
+      refused?: string;
+      tag?: string;
+      exitCode?: number;
+    };
   } finally {
     log.mockRestore();
     err.mockRestore();
@@ -70,32 +75,32 @@ async function said(t: TestContext, ...argv: string[]): Promise<{ out: string; r
 }
 
 /** What the handler of the entry `nemia <argv>` names answers, read by its words (`asked`, `test/typed.ts`), over the test's engine. */
-const answered = <D>(...argv: string[]): Promise<D> => asked(argv, engineOf(engine().layer), undefined, undefined, ENV) as Promise<D>;
+const answered = <D>(...argv: string[]) => asked(argv, engineOf(engine().layer), undefined, undefined, ENV) as Promise<D>;
 
 /** What the handler of `nemia <argv>` was refused with, its kind (`_tag`) and its exit code; none where it answered. */
-async function typed(_t: TestContext, ...argv: string[]): Promise<{ refused?: string; tag?: string; exitCode?: number }> {
+async function typed(_t: TestContext, ...argv: string[]) {
   try {
     await answered(...argv);
-    return {};
+    return {} satisfies { refused?: string; tag?: string; exitCode?: number };
   } catch (e) {
     const { message, _tag, exitCode } = e as Error & { _tag?: string; exitCode?: number };
-    return { refused: message, tag: _tag, exitCode };
+    return { refused: message, tag: _tag, exitCode } satisfies { refused?: string; tag?: string; exitCode?: number };
   }
 }
 
 /** What `program` — an entry's handler, as the api calls it — answers at the test's store. */
-const handled = <A, E>(program: Parameters<typeof runWith<A, E>>[1]): Promise<A> => runWith(engineOf(engine().layer), program);
+const handled = <A, E>(program: Parameters<typeof runWith<A, E>>[1]) => runWith(engineOf(engine().layer), program) satisfies Promise<A>;
 
 /** Each file under `dir`, by its path there, with what it holds: yours as it stands. */
-const snapshot = (dir: string): Record<string, string> =>
-  fs.existsSync(dir)
+const snapshot = (dir: string) =>
+  (fs.existsSync(dir)
     ? Object.fromEntries(
         (fs.readdirSync(dir, { recursive: true }) as string[])
           .sort()
           .filter((f) => fs.statSync(path.join(dir, f)).isFile())
           .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]),
       )
-    : {};
+    : {}) satisfies Record<string, string>;
 
 /** A refusal as a test reads it: its words, its kind (`_tag`) and its exit code. */
 type Refused = { refused?: string; tag?: string; exitCode?: number };
@@ -104,12 +109,7 @@ type Refused = { refused?: string; tag?: string; exitCode?: number };
  * What `act` was refused with, as `tag` with exit 2, yours left as it was, its words naming each of `facts` — the command, the flag, the
  * folder — never asserted as a sentence.
  */
-async function refusedBy(
-  act: () => Promise<Refused>,
-  what: string,
-  tag: 'Invalid' | 'Conflict' | 'Missing',
-  ...facts: string[]
-): Promise<void> {
+async function refusedBy(act: () => Promise<Refused>, what: string, tag: 'Invalid' | 'Conflict' | 'Missing', ...facts: string[]) {
   const before = snapshot(YOURS);
   const { refused: words, tag: kind, exitCode } = await act();
   assert.ok(words, `${what} was refused`);
@@ -119,22 +119,22 @@ async function refusedBy(
 }
 
 /** `nemia <argv>` refused as `refusedBy` says. */
-const refusedAs = (t: TestContext, tag: 'Invalid' | 'Conflict' | 'Missing', argv: string[], ...facts: string[]): Promise<void> =>
+const refusedAs = (t: TestContext, tag: 'Invalid' | 'Conflict' | 'Missing', argv: string[], ...facts: string[]) =>
   refusedBy(() => typed(t, ...argv), `nemia ${argv.join(' ')}`, tag, ...facts);
 
 /** What the handler's `program` was refused with: none where it answered. */
-const refusalOf = async <A, E>(program: Parameters<typeof runWith<A, E>>[1]): Promise<Refused> => {
+const refusalOf = async <A, E>(program: Parameters<typeof runWith<A, E>>[1]) => {
   try {
     await handled(program);
-    return {};
+    return {} satisfies Refused;
   } catch (e) {
     const { message, _tag, exitCode } = e as Error & { _tag?: string; exitCode?: number };
-    return { refused: message, tag: _tag, exitCode };
+    return { refused: message, tag: _tag, exitCode } satisfies Refused;
   }
 };
 
 /** A draft file `name` under the drafts, holding `text`: its path. */
-function drafted(name: string, text: string): string {
+function drafted(name: string, text: string) {
   const file = path.join(DRAFTS, name);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
@@ -158,7 +158,7 @@ const agentDraft = (name: string, text: string) => agentDraftOf(name, text, (fil
 const skillChange = (name: string, text: string) => skillDraftOf(`${name}/SKILL.md`, name, text);
 
 /** The tests' team's `dev` copied as a draft folder `name`, its agents and skills put in yours, where a start finds them. */
-function draftWorkflow(name: string): string {
+function draftWorkflow(name: string) {
   for (const part of ['agents', 'skills']) fs.cpSync(path.join(TEAM, part), path.join(YOURS, part), { recursive: true, force: false });
   const folder = path.join(DRAFTS, 'workflows', name);
   fs.cpSync(path.join(TEAM, 'dev'), folder, { recursive: true });
@@ -358,16 +358,8 @@ describe('REFUSED at shipped defaults: a writer, by its kind and exit 2, naming 
   const skillAt = () => ('version' in sweepMade ? sweepMade.version : assert.fail('a written skill says its version'));
   const repo = (what: string) => [`refuses`, `the repository's ${what}`];
   type Act = (sub: TestContext) => () => Promise<Refused>;
-  const handler =
-    (program: Parameters<typeof runWith<unknown, unknown>>[1]): Act =>
-    () =>
-    () =>
-      refusalOf(program);
-  const typedAt =
-    (argv: string[]): Act =>
-    (sub) =>
-    () =>
-      typed(sub, ...argv);
+  const handler = (program: Parameters<typeof runWith<unknown, unknown>>[1]) => (() => () => refusalOf(program)) satisfies Act;
+  const typedAt = (argv: string[]) => ((sub) => () => typed(sub, ...argv)) satisfies Act;
   const table: Array<[string, () => ['Invalid' | 'Conflict' | 'Missing', Act, ...string[]]]> = [
     [
       'an agent written where one is, naming its version',
@@ -518,18 +510,19 @@ const OBJECTS_HAND: Readonly<Record<string, readonly string[]>> = {
  * The keys an entry's handler may be handed by either side: its positionals, its flags but those the command line alone takes, and those
  * the objects' handlers hand it.
  */
-const handlerKeys = (command: Command): Set<string> =>
+const handlerKeys = (command: Command) =>
   new Set([
     ...command.spec.positionals.map((p) => p.key),
     ...command.spec.flags.flatMap((f) => (f.only?.side !== 'cli' && f.key !== undefined ? [f.key] : [])),
     ...(OBJECTS_HAND[command.name] ?? []),
-  ]);
+  ]) satisfies Set<string>;
 
 /** The keys `handed` that `command`'s handler is never handed by the api: none, where the two sides read one spec. */
-const strayKeys = (command: Command, handed: Args): string[] => Object.keys(handed).filter((key) => !handlerKeys(command).has(key));
+const strayKeys = (command: Command, handed: Args) =>
+  Object.keys(handed).filter((key) => !handlerKeys(command).has(key)) satisfies string[];
 
 /** The entry of the table `name` names, none for a stream the client alone runs (`watch`). */
-const entry = (name: string): Command => TABLE.find((c) => c.name === name) as Command;
+const entry = (name: string) => TABLE.find((c) => c.name === name) as Command;
 
 /** The names of the commands the client holds, which this CLI no longer runs. */
 const MOVED = COMMAND_WORDS.map((w) => w.name);
@@ -579,6 +572,7 @@ describe("a command the client holds is no name of this CLI's: typed here, it pr
       const held = entry(name) as unknown as { handler: (args: Args) => never } | undefined;
       const handler =
         held &&
+        // oxlint-disable-next-line landmines-testing/no-test-doubles -- a handler reached throws, writing nothing
         vi.spyOn(held, 'handler').mockImplementation((args: Args) => {
           handed.push(args);
           throw new Error('handed');

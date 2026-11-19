@@ -218,18 +218,18 @@ type Dashboard = {
 };
 
 /** Every `.ts` file under `dir`, its tests left out. */
-const sourcesUnder = (dir: string): string[] =>
+const sourcesUnder = (dir: string) =>
   fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-    .map((f) => path.join(dir, f));
+    .map((f) => path.join(dir, f)) satisfies string[];
 
 const SOURCE_TEXT = SOURCES.flatMap(sourcesUnder)
   .map((f) => fs.readFileSync(f, 'utf8'))
   .join('\n');
 
 /** Each metric the sources define, by its id, with the names Prometheus shows for it. */
-function scannedMetrics(text: string): Map<string, string[]> {
+function scannedMetrics(text: string) {
   const found = new Map<string, string[]>();
   for (const [, kind, id, options] of text.matchAll(/Metric\.(histogram|gauge|counter)\(\s*'([^']+)'\s*,\s*\{([^}]*)\}/g)) {
     const base = id.replace(/\./g, '_');
@@ -243,16 +243,16 @@ function scannedMetrics(text: string): Map<string, string[]> {
             : [base];
     found.set(id, forms);
   }
-  return found;
+  return found satisfies Map<string, string[]>;
 }
 
 const METRICS = scannedMetrics(SOURCE_TEXT);
 
 /** The attribute keys each `Metric.withAttributes` in `text` gives in an object written there. */
-const attributeKeys = (text: string): string[] =>
+const attributeKeys = (text: string) =>
   [...text.matchAll(/Metric\.withAttributes\(\s*[\w.]+\s*,\s*\{([^}]*)\}/g)].flatMap(([, body]) =>
     [...body.matchAll(/([A-Za-z_]\w*)\s*(?::|,|$)/g)].map(([, key]) => key),
-  );
+  ) satisfies string[];
 
 const tasks = new Map<string, Event[]>();
 const journal: AsyncJournal = {
@@ -284,6 +284,7 @@ const runner: AsyncRunner = {
 };
 
 /** The spans `span` sits under, its parent first. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const ancestorsOf = (span: Tracer.AnySpan): Tracer.AnySpan[] =>
   span._tag === 'Span' && Option.isSome(span.parent) ? [span.parent.value, ...ancestorsOf(span.parent.value)] : [];
 
@@ -291,7 +292,7 @@ const ancestorsOf = (span: Tracer.AnySpan): Tracer.AnySpan[] =>
  * The span names, span attribute keys and log annotation keys of one traced pass that files a run's first step, and the names it gives a
  * span under another of the same name: one name two layers both use, a query on which mixes them.
  */
-async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<string>; annotations: Set<string>; shared: Set<string> }> {
+async function tracedPass() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
   const folder = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -331,7 +332,7 @@ async function tracedPass(): Promise<{ spans: Set<string>; attributes: Set<strin
     attributes: new Set(spans.flatMap((s) => [...s.attributes.keys()])),
     annotations,
     shared: new Set(shared),
-  };
+  } satisfies { spans: Set<string>; attributes: Set<string>; annotations: Set<string>; shared: Set<string> };
 }
 
 const TRACED = await tracedPass();
@@ -395,7 +396,7 @@ const PROMQL_WORDS = new Set(
 );
 
 /** The metric and label names a PromQL expression (or a `label_values` variable query) names. */
-function promNames(expr: string): { metrics: string[]; labels: string[] } {
+function promNames(expr: string) {
   const labels = [...expr.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map(([, l]) => l);
   let text = expr
     .replace(/\{\{\s*\w+\s*\}\}/g, ' ')
@@ -412,28 +413,28 @@ function promNames(expr: string): { metrics: string[]; labels: string[] } {
     text = text.replace(/,\s*\w+\s*\)/, ')');
   }
   const metrics = [...text.matchAll(/(?<![$\w.])([A-Za-z_:][\w:]*)/g)].map(([, m]) => m).filter((m) => !PROMQL_WORDS.has(m));
-  return { metrics, labels: labels.filter(Boolean) };
+  return { metrics, labels: labels.filter(Boolean) } satisfies { metrics: string[]; labels: string[] };
 }
 
 /** The span names, `span.*` keys and `resource.*` keys a TraceQL query names. */
-function traceNames(query: string): { spans: string[]; attributes: string[]; resources: string[] } {
+function traceNames(query: string) {
   const spans = [...query.matchAll(/(?<![\w.])name\s*(=~|!=|=)\s*"([^"]*)"/g)].flatMap(([, op, v]) => (op === '=~' ? v.split('|') : [v]));
   const attributes = [...query.matchAll(/\bspan\.([\w.]+)/g)].map(([, a]) => a);
   const resources = [...query.matchAll(/\bresource\.([\w.]+)/g)].map(([, a]) => a);
-  return { spans, attributes, resources };
+  return { spans, attributes, resources } satisfies { spans: string[]; attributes: string[]; resources: string[] };
 }
 
 /** The labels a LogQL query makes for itself, each with its template as written: one for each stage that formats a label. */
-const templatesMade = (query: string): Map<string, string> =>
+const templatesMade = (query: string) =>
   new Map(
     [...query.matchAll(/\|\s*label_format\s+([A-Za-z_]\w*)\s*=\s*"((?:[^"\\]|\\.)*)"/g)].map(([, label, template]) => [label, template]),
-  );
+  ) satisfies Map<string, string>;
 
 /**
  * The labels a LogQL query makes for itself (`templatesMade`), each with the fields its template names, a field being a `.word` inside
  * the template's double braces, as `{{.step}}` and `{{ if .workflow }}` both name one.
  */
-function labelsMade(query: string): Map<string, string[]> {
+function labelsMade(query: string) {
   const made = new Map<string, string[]>();
   for (const [label, template] of templatesMade(query))
     made.set(
@@ -442,29 +443,34 @@ function labelsMade(query: string): Map<string, string[]> {
         [...body.matchAll(/(?<![\w.])\.([A-Za-z_]\w*)/g)].map(([, field]) => field),
       ),
     );
-  return made;
+  return made satisfies Map<string, string[]>;
 }
 
 /**
  * The stream labels and the fields a LogQL query names: those it filters on, those the templates of its made labels read, and those
  * it counts by, but a label the query makes for itself (`labelsMade`).
  */
-function logNames(query: string): string[] {
+function logNames(query: string) {
   const made = labelsMade(query);
   const text = query.replace(/"(?:[^"\\]|\\.)*"/g, '""');
   const stream = /\{([^}]*)\}/.exec(text);
   const labels = [...(stream?.[1] ?? '').matchAll(/([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)/g)].map(([, l]) => l);
   const fields = [...text.slice(stream ? stream.index + stream[0].length : 0).matchAll(/\|\s*([A-Za-z_]\w*)\s*(?:=~|!~|!=|=|>|<)/g)];
   const grouped = [...text.matchAll(/\b(?:by|without)\s*\(([^)]*)\)/g)].flatMap(([, list]) => list.split(',').map((l) => l.trim()));
-  return [...labels, ...fields.map(([, f]) => f), ...[...made.values()].flat(), ...grouped.filter((l) => l && !made.has(l))];
+  return [
+    ...labels,
+    ...fields.map(([, f]) => f),
+    ...[...made.values()].flat(),
+    ...grouped.filter((l) => l && !made.has(l)),
+  ] satisfies string[];
 }
 
 /** The labels a LogQL query counts by: its first, outermost `by (…)` list. */
-const countedBy = (query: string): string[] =>
+const countedBy = (query: string) =>
   (/\bby\s*\(([^)]*)\)/.exec(query.replace(/"(?:[^"\\]|\\.)*"/g, '""'))?.[1] ?? '')
     .split(',')
     .map((l) => l.trim())
-    .filter(Boolean);
+    .filter(Boolean) satisfies string[];
 
 /**
  * What would draw one nameless bar where `dashboard` means a bar for each series, each said in a line that starts with its panel's
@@ -474,7 +480,7 @@ const countedBy = (query: string): string[] =>
  * drawn; a gauge with no `limit` draws only the first rows; a table of one row draws its bar with no name unless the gauge's
  * `displayName` reads the row's label; and a range query's last point is not the range's count.
  */
-function lokiGaugeFaults(dashboard: Dashboard): string[] {
+function lokiGaugeFaults(dashboard: Dashboard) {
   const faults: string[] = [];
   for (const p of lokiGauges(dashboard)) {
     for (const t of lokiTargets(p)) {
@@ -489,45 +495,49 @@ function lokiGaugeFaults(dashboard: Dashboard): string[] {
     if (!labels.some((l) => p.fieldConfig?.defaults?.displayName === `\${__data.fields.${l}}`))
       faults.push(`${p.title}: a bar not named by its row's label, nameless when the table has one row`);
   }
-  return faults;
+  return faults satisfies string[];
 }
 
 /** The labels a Pyroscope label selector names, each with the value it asks for. */
-const profileLabelsOf = (selector: string): [string, string][] =>
-  [...selector.matchAll(/([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)\s*"([^"]*)"/g)].map(([, label, value]) => [label, value]);
+const profileLabelsOf = (selector: string) =>
+  [...selector.matchAll(/([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)\s*"([^"]*)"/g)].map(([, label, value]) => [label, value]) satisfies [
+    string,
+    string,
+  ][];
 
 /** Every panel of `panels`, a row's own among them. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const allPanels = (panels: Panel[]): Panel[] => panels.flatMap((p) => [p, ...allPanels(p.panels ?? [])]);
 
 /** The targets of `panel` sent to Loki: by their own datasource, else the panel's. */
-const lokiTargets = (panel: Panel): Target[] =>
-  (panel.targets ?? []).filter((t) => (t.datasource?.uid ?? panel.datasource?.uid) === 'loki');
+const lokiTargets = (panel: Panel) =>
+  (panel.targets ?? []).filter((t) => (t.datasource?.uid ?? panel.datasource?.uid) === 'loki') satisfies Target[];
 
 /** The bar gauges of `dashboard` with a query sent to Loki, in the dashboard's order. */
-const lokiGauges = (dashboard: Dashboard): Panel[] =>
-  allPanels(dashboard.panels).filter((p) => p.type === 'bargauge' && lokiTargets(p).length > 0);
+const lokiGauges = (dashboard: Dashboard) =>
+  allPanels(dashboard.panels).filter((p) => p.type === 'bargauge' && lokiTargets(p).length > 0) satisfies Panel[];
 
 /** The bar gauges of `dashboard`, in the dashboard's order. */
-const barGauges = (dashboard: Dashboard): Panel[] => allPanels(dashboard.panels).filter((p) => p.type === 'bargauge');
+const barGauges = (dashboard: Dashboard) => allPanels(dashboard.panels).filter((p) => p.type === 'bargauge') satisfies Panel[];
 
 /**
  * The titles of the bar gauges of `dashboard` that do not write a bar's name above it (`namePlacement`): beside its bar a name gets a
  * share of the panel's width and is cut there (as measured, `tools/observe/README.md`, *Counting a session's errors*), and a gauge
  * that says nothing is left to Grafana's own choice, which may put it beside.
  */
-const namesBeside = (dashboard: Dashboard): string[] =>
+const namesBeside = (dashboard: Dashboard) =>
   barGauges(dashboard)
     .filter((p) => p.options?.namePlacement !== 'top')
-    .map((p) => p.title ?? '');
+    .map((p) => p.title ?? '') satisfies string[];
 
 /** The text a variable's query names: a PromQL query as written, a Tempo tag-values query as the `span.` key whose values it reads. */
-const variableText = (query: unknown): string => {
+const variableText = (query: unknown) => {
   const label = (query as { label?: unknown } | undefined)?.label;
   return typeof query === 'string' ? query : typeof label === 'string' ? `span.${label}` : JSON.stringify(query);
 };
 
 /** Every query `dashboard` sends: each panel's targets, and each query variable's. */
-function queriesOf(dashboard: Dashboard): Query[] {
+function queriesOf(dashboard: Dashboard) {
   const targets = allPanels(dashboard.panels).flatMap((p) =>
     (p.targets ?? []).map((t) => ({
       datasource: t.datasource?.uid ?? p.datasource?.uid ?? '',
@@ -538,15 +548,18 @@ function queriesOf(dashboard: Dashboard): Query[] {
   const variables = (dashboard.templating?.list ?? [])
     .filter((v) => v.type === 'query')
     .map((v) => ({ datasource: v.datasource?.uid ?? '', text: variableText(v.query) }));
-  return [...targets, ...variables];
+  {
+    const made: Query[] = [...targets, ...variables];
+    return made;
+  }
 }
 
 /** The PromQL metric names `dashboard` queries. */
-const promMetricsOf = (dashboard: Dashboard): Set<string> =>
-  new Set(queriesOf(dashboard).flatMap((q) => (q.datasource === 'prometheus' ? promNames(q.text).metrics : [])));
+const promMetricsOf = (dashboard: Dashboard) =>
+  new Set(queriesOf(dashboard).flatMap((q) => (q.datasource === 'prometheus' ? promNames(q.text).metrics : []))) satisfies Set<string>;
 
 /** Every name `dashboard`'s queries use that `known` does not hold, each once. */
-function unknownNames(dashboard: Dashboard, known: Known): string[] {
+function unknownNames(dashboard: Dashboard, known: Known) {
   const unknown = new Set<string>();
   const check = (names: string[], set: Set<string>) => names.filter((n) => !set.has(n)).forEach((n) => unknown.add(n));
   for (const q of queriesOf(dashboard)) {
@@ -568,11 +581,11 @@ function unknownNames(dashboard: Dashboard, known: Known): string[] {
       check([q.profileType ?? ''], known.profileTypes);
     }
   }
-  return [...unknown];
+  return [...unknown] satisfies string[];
 }
 
 /** Each `refId` a panel's server-side expressions read that is none of the panel's queries, said with its panel's title. */
-function strayRefs(dashboard: Dashboard): string[] {
+function strayRefs(dashboard: Dashboard) {
   return allPanels(dashboard.panels).flatMap((p) => {
     const refs = new Set((p.targets ?? []).map((t) => t.refId));
     return (p.targets ?? [])
@@ -580,20 +593,23 @@ function strayRefs(dashboard: Dashboard): string[] {
       .flatMap((t) => [...(t.expression ?? '').matchAll(/^\s*(\w+)\s*$|\$(\w+)/g)].map(([, bare, ref]) => bare ?? ref))
       .filter((ref) => !refs.has(ref))
       .map((ref) => `${p.title}: ${ref}`);
-  });
+  }) satisfies string[];
 }
 
 /** Each span name in `shared` that `dashboard`'s Tempo queries name, each once. */
-const sharedSpansOf = (dashboard: Dashboard, shared: Set<string>): string[] => [
-  ...new Set(queriesOf(dashboard).flatMap((q) => (q.datasource === 'tempo' ? traceNames(q.text).spans.filter((n) => shared.has(n)) : []))),
-];
+const sharedSpansOf = (dashboard: Dashboard, shared: Set<string>) =>
+  [
+    ...new Set(
+      queriesOf(dashboard).flatMap((q) => (q.datasource === 'tempo' ? traceNames(q.text).spans.filter((n) => shared.has(n)) : [])),
+    ),
+  ] satisfies string[];
 
 /**
  * What would show a trace's length where `dashboard` means a span's, each said in a line: a Tempo table naming a span whose target is
  * not `tableType: "spans"` (Grafana's default, a missing one, is a row per trace, its Duration the trace's), or that sorts on any
  * field but its span's `Duration`.
  */
-function spanTableFaults(dashboard: Dashboard): string[] {
+function spanTableFaults(dashboard: Dashboard) {
   const faults: string[] = [];
   for (const p of allPanels(dashboard.panels).filter((p) => p.type === 'table')) {
     const targets = (p.targets ?? []).filter(
@@ -604,13 +620,13 @@ function spanTableFaults(dashboard: Dashboard): string[] {
     const sorts = (p.transformations ?? []).filter((x) => x.id === 'sortBy').flatMap((x) => x.options?.sort ?? []);
     for (const { field } of sorts) if (field !== 'Duration') faults.push(`${p.title}: sorted on ${field}, not its span's Duration`);
   }
-  return faults;
+  return faults satisfies string[];
 }
 
 /** Each metric `METRICS` holds that none of `dashboard`'s queries names in any of its forms, by its id. */
-const unchartedMetrics = (dashboard: Dashboard): string[] => {
+const unchartedMetrics = (dashboard: Dashboard) => {
   const named = promMetricsOf(dashboard);
-  return [...METRICS].filter(([, forms]) => !forms.some((f) => named.has(f))).map(([id]) => id);
+  return [...METRICS].filter(([, forms]) => !forms.some((f) => named.has(f))).map(([id]) => id) satisfies string[];
 };
 
 /** The shipped dashboards, by file name. */
@@ -622,10 +638,10 @@ const DASHBOARDS: Map<string, Dashboard> = new Map(
 );
 
 /** The shipped dashboard titled `title`, as a fresh copy a test may change. */
-const dashboardTitled = (title: string): Dashboard => {
+const dashboardTitled = (title: string) => {
   const found = [...DASHBOARDS.values()].find((d) => d.title === title);
   assert.ok(found, `no dashboard titled ${title} among ${[...DASHBOARDS.values()].map((d) => d.title).join(', ')}`);
-  return structuredClone(found);
+  return structuredClone(found) satisfies Dashboard;
 };
 
 /** A compose service, as far as the checker reads it. */
@@ -635,16 +651,16 @@ type Service = { image?: string; container_name?: string; ports?: string[]; volu
 const PORTS = [3000, 4317, 4318, 4040];
 
 /** What is wrong with `compose`'s one service, each said in a line. */
-function composeFaults(compose: { services?: Record<string, Service> }): string[] {
+function composeFaults(compose: { services?: Record<string, Service> }) {
   const services = Object.values(compose.services ?? {});
-  if (services.length !== 1) return [`${services.length} services, not one`];
+  if (services.length !== 1) return [`${services.length} services, not one`] satisfies string[];
   const [s] = services as [Service];
   const faults: string[] = [];
   if (!/^grafana\/otel-lgtm@sha256:[0-9a-f]{64}$/.test(s.image ?? '')) faults.push(`image ${s.image} is not pinned by a digest`);
   if (s.container_name !== 'nemia-lgtm') faults.push(`container_name ${s.container_name} is not nemia-lgtm`);
   for (const port of PORTS)
     if (!(s.ports ?? []).some((p) => new RegExp(`^(?:[\\d.]+:)?${port}:${port}$`).test(p))) faults.push(`port ${port} is not published`);
-  return faults;
+  return faults satisfies string[];
 }
 
 const COMPOSE = yaml.load(fs.readFileSync(path.join(OBSERVE, 'compose.yaml'), 'utf8')) as { services: Record<string, Service> };
@@ -758,13 +774,13 @@ test('a bar gauge over Loki reads each row of an instant query, named by one lab
 
 test("REFUSED: a bar gauge that reduces Loki's table to one value, counts by several labels, keeps a legendFormat, reads a range, sets no limit, or names no row", () => {
   const TITLE = 'Tool errors, across runs';
-  const faultsWith = (change: (panel: Panel, target: Target) => void): string[] => {
+  const faultsWith = (change: (panel: Panel, target: Target) => void) => {
     const steps = dashboardTitled('Steps');
     const panel = lokiGauges(steps).find((p) => p.title === TITLE);
     const target = panel?.targets?.[0];
     assert.ok(panel?.options?.reduceOptions && panel.fieldConfig?.defaults && target?.expr, `Steps has no ${TITLE}`);
     change(panel, target);
-    return lokiGaugeFaults(steps);
+    return lokiGaugeFaults(steps) satisfies string[];
   };
   const ONE_VALUE = `${TITLE}: reduces Loki's table to one value`;
   const SEVERAL = `${TITLE}: counts by workflow, name, not by one label`;
@@ -832,13 +848,14 @@ test("REFUSED: a bar gauge that reduces Loki's table to one value, counts by sev
 });
 
 /** The values a dashboard's PromQL queries ask of the pass's `phase` label, each alternative of a regex its own. */
-const phasesAsked = (dashboard: Dashboard): string[] =>
+const phasesAsked = (dashboard: Dashboard) =>
   queriesOf(dashboard)
     .filter((q) => q.datasource === 'prometheus')
-    .flatMap((q) => [...q.text.matchAll(/\bphase\s*(?:=~|!~|!=|=)\s*"([^"]*)"/g)].flatMap(([, v]) => v.split('|')));
+    .flatMap((q) => [...q.text.matchAll(/\bphase\s*(?:=~|!~|!=|=)\s*"([^"]*)"/g)].flatMap(([, v]) => v.split('|'))) satisfies string[];
 
 /** The phases a dashboard asks for that the meter has none of (`PHASES`). */
-const strangePhases = (dashboard: Dashboard): string[] => phasesAsked(dashboard).filter((p) => !(PHASES as readonly string[]).includes(p));
+const strangePhases = (dashboard: Dashboard) =>
+  phasesAsked(dashboard).filter((p) => !(PHASES as readonly string[]).includes(p)) satisfies string[];
 
 test("the dashboards ask the pass's phase label only for a phase the meter has", () => {
   for (const [file, d] of DASHBOARDS) assert.deepEqual(strangePhases(d), [], file);
@@ -848,14 +865,14 @@ test("the dashboards ask the pass's phase label only for a phase the meter has",
 const TARGET_FIELDS = ['expr', 'query', 'labelSelector', 'profileTypeId'] as const;
 
 /** `dashboard` with the first query sent to `datasource` holding `from` holding `to` in its place. */
-function withQuery(dashboard: Dashboard, datasource: string, from: string, to: string): Dashboard {
+function withQuery(dashboard: Dashboard, datasource: string, from: string, to: string) {
   const found = allPanels(dashboard.panels)
     .flatMap((p) => (p.targets ?? []).map((t) => ({ t, uid: t.datasource?.uid ?? p.datasource?.uid })))
     .flatMap(({ t, uid }) => (uid === datasource ? TARGET_FIELDS.map((field) => ({ t, field })) : []))
     .find(({ t, field }) => (t[field] ?? '').includes(from));
   assert.ok(found, `no ${datasource} query of ${dashboard.title} holds ${from}`);
   found.t[found.field] = found.t[found.field]!.replace(from, to);
-  return dashboard;
+  return dashboard satisfies Dashboard;
 }
 
 test('REFUSED: a renamed metric, span or attribute, an unbounded label, a log field the code does not annotate, and a profile not sent', () => {
@@ -907,10 +924,10 @@ test("a table of spans shows each span's own duration, and no query names a span
 
 test("REFUSED: a table of a span's traces, a table left to Grafana's default, one sorted off the span, and a query on tick", () => {
   const passes = () => dashboardTitled('Passes');
-  const target = (d: Dashboard, title: string): Target => {
+  const target = (d: Dashboard, title: string) => {
     const found = allPanels(d.panels).find((p) => p.title === title)?.targets?.[0];
     assert.ok(found, `Passes has no ${title}`);
-    return found;
+    return found satisfies Target;
   };
   const traces = passes();
   target(traces, 'Slowest passes').tableType = 'traces';
@@ -932,6 +949,7 @@ test("REFUSED: a table of a span's traces, a table left to Grafana's default, on
 test('System charts every metric the code exports', () => {
   assert.deepEqual(unchartedMetrics(dashboardTitled('System')), []);
   const system = dashboardTitled('System');
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const keep = (panels: Panel[]): Panel[] =>
     panels
       .filter((p) => !(p.targets ?? []).some((t) => (t.expr ?? '').includes('step_rounds_total')))
@@ -942,22 +960,24 @@ test('System charts every metric the code exports', () => {
 });
 
 /** A duration Grafana writes as a count and a unit (`30m`, `1h`), in milliseconds; NaN for any other text. */
-const grafanaMs = (text: string | undefined): number => {
+const grafanaMs = (text: string | undefined) => {
   const [, count, unit] = /^(\d+)([smhd])$/.exec(text ?? '') ?? [];
   return Number(count) * ({ s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[unit] ?? Number.NaN);
 };
 
 /** The panels of the row `title` of `dashboard`: those after it, up to the next row. */
-const rowPanels = (dashboard: Dashboard, title: string): Panel[] => {
+const rowPanels = (dashboard: Dashboard, title: string) => {
   const from = dashboard.panels.findIndex((p) => p.type === 'row' && p.title === title);
   const rest = from < 0 ? [] : dashboard.panels.slice(from + 1);
   const to = rest.findIndex((p) => p.type === 'row');
-  return to < 0 ? rest : rest.slice(0, to);
+  return (to < 0 ? rest : rest.slice(0, to)) satisfies Panel[];
 };
 
 /** The panel of `dashboard` titled `title`, with the window it reads where it sets one of its own. */
-const windowed = (dashboard: Dashboard, title: string): (Panel & { timeFrom?: string }) | undefined =>
-  allPanels(dashboard.panels).find((p) => p.title === title);
+const windowed = (dashboard: Dashboard, title: string) => {
+  const made: (Panel & { timeFrom?: string }) | undefined = allPanels(dashboard.panels).find((p) => p.title === title);
+  return made;
+};
 
 test("System's Disk row draws the store's disk by the code's names, and its largest runs over a window that holds two sweeps", () => {
   const system = dashboardTitled('System');
@@ -1005,11 +1025,14 @@ test("System's Disk row draws the store's disk by the code's names, and its larg
 });
 
 /** The parts of `DISK_KINDS` that have several kinds and of which the seeded label sets `seeded` hold one kind or none. */
-const oneKindParts = (seeded: readonly Record<string, string | undefined>[]): string[] =>
-  DISK_PARTS.filter((part) => DISK_KINDS[part].length > 1 && new Set(seeded.filter((l) => l.part === part).map((l) => l.kind)).size < 2);
+const oneKindParts = (seeded: readonly Record<string, string | undefined>[]) =>
+  DISK_PARTS.filter(
+    (part) => DISK_KINDS[part].length > 1 && new Set(seeded.filter((l) => l.part === part).map((l) => l.kind)).size < 2,
+  ) satisfies string[];
 
 /** The parts of `parts` that `description` does not say in brackets, as a panel names the word a series carries. */
-const unsaidParts = (description: string, parts: readonly string[]): string[] => parts.filter((part) => !description.includes(`(${part})`));
+const unsaidParts = (description: string, parts: readonly string[]) =>
+  parts.filter((part) => !description.includes(`(${part})`)) satisfies string[];
 
 test('REFUSED: a by-part description that leaves a part of the disk unsaid names it', () => {
   const said = (windowed(dashboardTitled('System'), 'On disk, by part') as { description?: string }).description ?? '';
@@ -1053,8 +1076,10 @@ test('REFUSED: a Disk panel asking a misspelt gauge, one kept by run, a largest-
 });
 
 /** The values a TraceQL query asks of the span attribute `key`, each alternative of a regex its own. */
-const askedOf = (query: string, key: string): string[] =>
-  [...query.matchAll(new RegExp(`\\bspan\\.${key}\\s*(?:=~|!~|!=|=)\\s*"([^"]*)"`, 'g'))].flatMap(([, v]) => v.split('|'));
+const askedOf = (query: string, key: string) =>
+  [...query.matchAll(new RegExp(`\\bspan\\.${key}\\s*(?:=~|!~|!=|=)\\s*"([^"]*)"`, 'g'))].flatMap(([, v]) =>
+    v.split('|'),
+  ) satisfies string[];
 
 /**
  * What would make `dashboard` read a finished run's timeline (`TIMELINE_SPAN`) wrong, each said in a line: a query of it asking its `of`
@@ -1062,9 +1087,9 @@ const askedOf = (query: string, key: string): string[] =>
  * query not held to the one factory and the one workflow picked, whose rows would be averaged with those of another workflow, or of a
  * workflow of the same name in another factory; and a `factory` or a `workflow` choice that may hold more than one.
  */
-function timelineFaults(dashboard: Dashboard): string[] {
+function timelineFaults(dashboard: Dashboard) {
   const queries = queriesOf(dashboard).filter((q) => q.datasource === 'tempo' && traceNames(q.text).spans.includes(TIMELINE_SPAN));
-  if (queries.length === 0) return [];
+  if (queries.length === 0) return [] satisfies string[];
   const strange = (key: string, known: readonly string[]) =>
     queries.flatMap((q) =>
       askedOf(q.text, key)
@@ -1079,7 +1104,7 @@ function timelineFaults(dashboard: Dashboard): string[] {
     const pick = dashboard.templating?.list.find((v) => v.name === name);
     return pick?.includeAll === false && pick.multi === false ? [] : [`its ${name} choice may hold more than one ${name}`];
   });
-  return [...new Set([...strange('of', TIMELINE_OF), ...strange('part', TIMELINE_PARTS), ...loose, ...picks])];
+  return [...new Set([...strange('of', TIMELINE_OF), ...strange('part', TIMELINE_PARTS), ...loose, ...picks])] satisfies string[];
 }
 
 test("Timeline reads a finished run's timeline by the values the code gives, for one workflow of one factory at a time", () => {
@@ -1102,11 +1127,11 @@ const RUN_PARTS = TIMELINE_PARTS.filter((part) => part !== 'ran' && part !== 'co
  * The name the panel titled `title` of `dashboard` draws each of a run's parts under: the series Tempo answers for it, by its part,
  * through the panel's `renameByRegex` transformations, in their order.
  */
-function runBarNames(dashboard: Dashboard, title: string): Record<string, string> {
+function runBarNames(dashboard: Dashboard, title: string) {
   const renames = (dashboard.panels.find((p) => p.title === title)?.transformations ?? []).filter((x) => x.id === 'renameByRegex');
   const named = (series: string) =>
     renames.reduce((name, x) => name.replace(new RegExp(x.options?.regex ?? '$^'), x.options?.renamePattern ?? ''), series);
-  return Object.fromEntries(RUN_PARTS.map((part) => [part, named(`{span.part="${part}"}`)]));
+  return Object.fromEntries(RUN_PARTS.map((part) => [part, named(`{span.part="${part}"}`)])) satisfies Record<string, string>;
 }
 
 test('A run: wall and waiting names each part of a run the code gives that is a wait as waiting, and a part it leaves out is refused', () => {
@@ -1174,19 +1199,19 @@ type Counted = {
 };
 
 /** Whether the LogQL query `text` keeps, of its lines, only those whose `tool_name` is (`=`) or is not (`!=`) `tool`. */
-const asksTool = (text: string, op: '=' | '!=', tool: string): boolean => new RegExp(`\\|\\s*tool_name\\s*${op}\\s*"${tool}"`).test(text);
+const asksTool = (text: string, op: '=' | '!=', tool: string) => new RegExp(`\\|\\s*tool_name\\s*${op}\\s*"${tool}"`).test(text);
 
 /** The key of a `Skill` call's parameters that holds the skill's name, as measured (`{"skill_name":"…"}`). */
 const SKILL_KEY = 'skill_name';
 
 /** Each query of `dashboard` that counts denied calls, tool errors or failed skill loads (`Counted`), in the dashboard's order. */
-function countedOf(dashboard: Dashboard): Counted[] {
-  return queriesOf(dashboard).flatMap((q): Counted[] => {
-    if (!q.text.includes('count_over_time')) return [];
+function countedOf(dashboard: Dashboard) {
+  return queriesOf(dashboard).flatMap((q) => {
+    if (!q.text.includes('count_over_time')) return [] satisfies Counted[];
     const denied = q.datasource === 'tempo' && traceNames(q.text).spans.includes(DENIED_SPAN);
     const errors = q.datasource === 'loki' && /\|\s*event_name\s*=\s*"tool_result"\s*\|\s*success\s*=\s*"false"/.test(q.text);
-    if (!denied && !errors) return [];
-    if (errors && !q.text.includes(`{service_name="${CLAUDE_SERVICE}"}`)) return [];
+    if (!denied && !errors) return [] satisfies Counted[];
+    if (errors && !q.text.includes(`{service_name="${CLAUDE_SERVICE}"}`)) return [] satisfies Counted[];
     const filter = (name: string, op: string, value: string) =>
       new RegExp(denied ? `\\bspan\\.${name}\\s*${op}\\s*"\\$${value}"` : `\\|\\s*${name}\\s*${op}\\s*"\\$${value}"`).test(q.text);
     const scope =
@@ -1207,15 +1232,15 @@ function countedOf(dashboard: Dashboard): Counted[] {
         .map((l) => templatesMade(q.text).get(l) ?? '')
         .some((template) => /\.tool_parameters\b/.test(template) && template.includes(SKILL_KEY));
     const what = denied ? 'denied' : skills ? 'skills' : bash ? 'bash' : 'errors';
-    return [{ what, scope, tool, skill, apart: what !== 'errors' || asksTool(q.text, '!=', 'Bash') }];
-  });
+    return [{ what, scope, tool, skill, apart: what !== 'errors' || asksTool(q.text, '!=', 'Bash') }] satisfies Counted[];
+  }) satisfies Counted[];
 }
 
 /** `Counted`, each in a word, sorted: a count of tool errors that does not leave the `Bash` tool's out says so. */
-const countedWords = (dashboard: Dashboard): string[] =>
+const countedWords = (dashboard: Dashboard) =>
   countedOf(dashboard)
     .map((c) => `${c.what} ${c.scope}${c.skill ? ' by skill' : c.tool ? ' by tool' : ''}${c.apart ? '' : ', Bash among them'}`)
-    .sort();
+    .sort() satisfies string[];
 
 const STEPS_COUNTED = [
   'bash across',
@@ -1296,12 +1321,12 @@ test('Steps names each bar above it', () => {
 
 test("REFUSED: a bar of Steps named beside it, or left to Grafana's choice", () => {
   const TITLE = 'Failed skill loads';
-  const besideWith = (change: (panel: Panel) => void): string[] => {
+  const besideWith = (change: (panel: Panel) => void) => {
     const steps = dashboardTitled('Steps');
     const panel = barGauges(steps).find((p) => p.title === TITLE);
     assert.ok(panel?.options, `Steps has no ${TITLE}`);
     change(panel);
-    return namesBeside(steps);
+    return namesBeside(steps) satisfies string[];
   };
   assert.deepEqual(
     besideWith((p) => (p.options!.namePlacement = 'left')),
@@ -1318,13 +1343,13 @@ test("REFUSED: a bar of Steps named beside it, or left to Grafana's choice", () 
 });
 
 /** The tag each of a dashboard's `run` and `session` variables reads its values from, and what the session's All stands for. */
-const picksOf = (dashboard: Dashboard): unknown[] =>
+const picksOf = (dashboard: Dashboard) =>
   ['run', 'session'].map((name) => {
     const variable = dashboard.templating?.list.find((v) => v.name === name) as
       | { query?: { label?: string }; allValue?: string }
       | undefined;
     return [name, variable?.query?.label, variable?.allValue];
-  });
+  }) satisfies unknown[];
 
 test("Steps picks a run and a session as Time does: the run's tag, and the runtime's task", () => {
   assert.deepEqual(picksOf(dashboardTitled('Steps')), [
@@ -1344,9 +1369,9 @@ test("Steps picks a run and a session as Time does: the run's tag, and the runti
 type Link = { type: string; url?: string; title?: string; tags?: string[]; includeVars?: boolean };
 
 /** The links of `dashboard`, and the tags it carries. */
-const linked = (dashboard: Dashboard): { links: Link[]; tags: string[] } => {
+const linked = (dashboard: Dashboard) => {
   const { links, tags } = dashboard as Dashboard & { links?: Link[]; tags?: string[] };
-  return { links: links ?? [], tags: tags ?? [] };
+  return { links: links ?? [], tags: tags ?? [] } satisfies { links: Link[]; tags: string[] };
 };
 
 test('Steps and A run link to Time, with their own choices', () => {
@@ -1368,7 +1393,7 @@ test('Steps and A run link to Time, with their own choices', () => {
 });
 
 /** The uids `dashboard` reaches through its links, a uid as many times as a link reaches it: a tag list's and a `/d/<uid>` link's. */
-const reachedBy = (dashboard: Dashboard): string[] =>
+const reachedBy = (dashboard: Dashboard) =>
   linked(dashboard).links.flatMap((link) => {
     if (link.type === 'dashboards')
       return [...DASHBOARDS.values()]
@@ -1376,12 +1401,12 @@ const reachedBy = (dashboard: Dashboard): string[] =>
         .map((d) => d.uid);
     const uid = /^\/d\/([^/?]+)/.exec(link.url ?? '')?.[1];
     return uid === undefined ? [] : [uid];
-  });
+  }) satisfies string[];
 
 /** The uids `dashboard` reaches more than once through its links. */
-const reachedTwice = (dashboard: Dashboard): string[] => {
+const reachedTwice = (dashboard: Dashboard) => {
   const reached = reachedBy(dashboard);
-  return [...new Set(reached.filter((uid, i) => reached.indexOf(uid) !== i))];
+  return [...new Set(reached.filter((uid, i) => reached.indexOf(uid) !== i))] satisfies string[];
 };
 
 test('REFUSED: a dashboard that reaches another twice through its links', () => {
@@ -1395,26 +1420,27 @@ test('REFUSED: a dashboard that reaches another twice through its links', () => 
 const COLLECTOR_READS = ['full_command'];
 
 /** The attribute of a seeded span a label is drawn from: the collector's own are derived from the command it reads. */
-const seededKey = (label: string): string => (COLLECTOR_ATTRIBUTES.includes(label) ? COLLECTOR_READS[0] : label);
+const seededKey = (label: string) => (COLLECTOR_ATTRIBUTES.includes(label) ? COLLECTOR_READS[0] : label);
 
 /** Every span of `spans`, those under each among them. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const spansUnder = (spans: readonly SpanSeed[]): SpanSeed[] => spans.flatMap((span) => [span, ...spansUnder(span.children ?? [])]);
 
 /** A log field as Loki shows a log attribute: its dots underscores. */
-const lokiField = (key: string): string => key.replace(/\./g, '_');
+const lokiField = (key: string) => key.replace(/\./g, '_');
 
 /** The form Prometheus shows of a seeded metric of `kind`, among the forms of the code's metric. */
-const formOf = (forms: readonly string[], kind: string): string | undefined =>
+const formOf = (forms: readonly string[], kind: string) =>
   forms.find((form) =>
     kind === 'histogram'
       ? form.endsWith('_bucket')
       : kind === 'gauge'
         ? form.endsWith('_ratio')
         : form.endsWith('_total') === (kind === 'total'),
-  );
+  ) satisfies string | undefined;
 
 /** Every name `seed` sends that `known` does not hold or the code gives another kind, each once. */
-function seedUnknown(seed: readonly ServiceSeed[], known: Known): string[] {
+function seedUnknown(seed: readonly ServiceSeed[], known: Known) {
   const unknown = new Set<string>();
   const check = (names: string[], set: Set<string>) => names.filter((n) => !set.has(n)).forEach((n) => unknown.add(n));
   for (const said of seed) {
@@ -1435,28 +1461,28 @@ function seedUnknown(seed: readonly ServiceSeed[], known: Known): string[] {
       known.logFields,
     );
   }
-  return [...unknown];
+  return [...unknown] satisfies string[];
 }
 
 /** How many series rows of attributes make when kept by `labels`: the distinct tuples of their values, a missing one its own. */
-const seriesBy = (rows: readonly Record<string, string | number>[], labels: readonly string[]): number =>
+const seriesBy = (rows: readonly Record<string, string | number>[], labels: readonly string[]) =>
   new Set(rows.map((row) => labels.map((label) => row[seededKey(label)] ?? '').join('\u0000'))).size;
 
 /** The labels each `by (…)` of `text` keeps, `strip` taken off the front of each, a bucket's bound and any without it left out. */
-const keptBy = (text: string, strip = ''): string[][] =>
+const keptBy = (text: string, strip = '') =>
   [...text.matchAll(/\bby\s*\(([^)]*)\)/g)]
     .map(([, list]) => list.split(',').map((label) => label.trim()))
     .map((labels) => labels.filter((label) => label.startsWith(strip) && label !== 'le').map((label) => label.slice(strip.length)))
-    .filter((labels) => labels.length > 0);
+    .filter((labels) => labels.length > 0) satisfies string[][];
 
 /** The labels a LogQL query makes by formatting one, each with the fields its template reads. */
-const madeLabels = (text: string): Map<string, string[]> =>
+const madeLabels = (text: string) =>
   new Map(
     [...text.matchAll(/label_format\s+(\w+)="((?:[^"\\]|\\.)*)"/g)].map(([, label, template]) => [
       label,
       [...new Set([...template.matchAll(/\.(\w+)/g)].map(([, field]) => field))],
     ]),
-  );
+  ) satisfies Map<string, string[]>;
 
 /** What `seed` holds, as a query would find it: its metrics by the name Prometheus shows, its spans by name, its logs by service. */
 function seeded(seed: readonly ServiceSeed[]) {
@@ -1483,24 +1509,29 @@ function seeded(seed: readonly ServiceSeed[]) {
  * `| <field>!="<value>"` after its stream selector, a field a row does not carry read as the empty string. A value that reads a
  * variable (`$`) keeps every row, and so does a filter by a pattern (`=~`, `!~`).
  */
-function keptRows(text: string, rows: readonly Record<string, string | number>[]): Record<string, string | number>[] {
+function keptRows(text: string, rows: readonly Record<string, string | number>[]) {
   const filters = [...text.slice(text.indexOf('}') + 1).matchAll(/\|\s*([A-Za-z_]\w*)\s*(!=|=)\s*"((?:[^"\\]|\\.)*)"/g)]
     .map(([, field, op, value]) => ({ field, op, value }))
     .filter(({ value }) => !value.includes('$'));
-  return rows.filter((row) => filters.every(({ field, op, value }) => (String(row[field] ?? '') === value) === (op === '=')));
+  return rows.filter((row) =>
+    filters.every(({ field, op, value }) => (String(row[field] ?? '') === value) === (op === '=')),
+  ) satisfies Record<string, string | number>[];
 }
 
 /**
  * Why `seed` does not meet the query `text` sent to `datasource`: a name it does not hold, or one series where the query keeps several,
  * counted for a LogQL query over the rows its literal filters keep (`keptRows`).
  */
-function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed[]): string[] {
+function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed[]) {
   const has = seeded(seed);
   if (datasource === 'prometheus') {
     const named = promNames(text).metrics;
     const rows = named.flatMap((metric) => has.metrics.get(metric) ?? []);
     const few = keptBy(text).filter((labels) => seriesBy(rows, labels) < 2);
-    return [...named.filter((metric) => !has.metrics.has(metric)), ...few.map((labels) => `one series by ${labels.join(', ')}`)];
+    return [
+      ...named.filter((metric) => !has.metrics.has(metric)),
+      ...few.map((labels) => `one series by ${labels.join(', ')}`),
+    ] satisfies string[];
   }
   if (datasource === 'tempo') {
     const named = traceNames(text).spans;
@@ -1509,9 +1540,9 @@ function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed
     return [
       ...named.filter((name) => !has.spans.some((span) => span.name === name)),
       ...few.map((labels) => `one series by ${labels.join(', ')}`),
-    ];
+    ] satisfies string[];
   }
-  if (datasource !== 'loki') return [`nothing sent to ${datasource}`];
+  if (datasource !== 'loki') return [`nothing sent to ${datasource}`] satisfies string[];
   const service = /service_name="([^"]*)"/.exec(text)?.[1].replace('$service', DEFAULT_SERVICE_NAME) ?? '';
   const rows = has.logs(service).map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [lokiField(key), value])));
   const fields = new Set([...rows.flatMap((row) => Object.keys(row)), ...LOKI_FIELDS]);
@@ -1520,14 +1551,17 @@ function unmetQuery(datasource: string, text: string, seed: readonly ServiceSeed
   const few = keptBy(text)
     .map((labels) => labels.flatMap((label) => made.get(label) ?? [label]))
     .filter((labels) => seriesBy(kept, labels) < 2);
-  return [...logNames(text).filter((field) => !fields.has(field)), ...few.map((labels) => `one series by ${labels.join(', ')}`)];
+  return [
+    ...logNames(text).filter((field) => !fields.has(field)),
+    ...few.map((labels) => `one series by ${labels.join(', ')}`),
+  ] satisfies string[];
 }
 
 /** An entry of the render's unseeded panels. */
 type Unseeded = (typeof UNSEEDED)[number];
 
 /** Each panel of the dashboard in the file `name` that `seed` does not meet and `unseeded` does not list, as `<title>: <why>`. */
-function unmet(dashboard: Dashboard, name: string, seed: readonly ServiceSeed[], unseeded: readonly Unseeded[] = UNSEEDED): string[] {
+function unmet(dashboard: Dashboard, name: string, seed: readonly ServiceSeed[], unseeded: readonly Unseeded[] = UNSEEDED) {
   const listed = (panel: Panel) => unseeded.some((entry) => entry.dashboard === name && entry.panel === panel.title);
   return allPanels(dashboard.panels)
     .filter((panel) => !listed(panel))
@@ -1542,14 +1576,14 @@ function unmet(dashboard: Dashboard, name: string, seed: readonly ServiceSeed[],
           ),
         )
         .map((why) => `${panel.title}: ${why}`),
-    );
+    ) satisfies string[];
 }
 
 /** Each entry of `unseeded` that names no panel of the shipped dashboards, as `<dashboard>: <panel>`. */
-const strayUnseeded = (unseeded: readonly Unseeded[]): string[] =>
+const strayUnseeded = (unseeded: readonly Unseeded[]) =>
   unseeded
     .filter((entry) => !allPanels(DASHBOARDS.get(`${entry.dashboard}.json`)?.panels ?? []).some((panel) => panel.title === entry.panel))
-    .map((entry) => `${entry.dashboard}: ${entry.panel}`);
+    .map((entry) => `${entry.dashboard}: ${entry.panel}`) satisfies string[];
 
 test("the render's seed sends only names the code emits, or the measured ones", () => {
   assert.deepEqual(seedUnknown(SEED, KNOWN), []);
@@ -1572,9 +1606,10 @@ test("the render's seed sends only names the code emits, or the measured ones", 
 });
 
 /** `seed` with every span named `from` named `to`. */
-const renamed = (seed: readonly ServiceSeed[], from: string, to: string): ServiceSeed[] => {
+const renamed = (seed: readonly ServiceSeed[], from: string, to: string) => {
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const again = (span: SpanSeed): SpanSeed => ({ ...span, name: span.name === from ? to : span.name, children: span.children?.map(again) });
-  return seed.map((said) => ({ ...said, spans: said.spans.map(again) }));
+  return seed.map((said) => ({ ...said, spans: said.spans.map(again) })) satisfies ServiceSeed[];
 };
 
 test('REFUSED: a seed with a renamed span, a metric of another kind, an attribute or a log field the code does not send', () => {
@@ -1592,7 +1627,7 @@ test('REFUSED: a seed with a renamed span, a metric of another kind, an attribut
  * The metrics a daemon births at zero once it holds the store: its own (`DAEMON_SERIES`), and each the api hands `up` as its `series` in
  * its `main.ts`, read off the constant of the api's source that defines it.
  */
-const bornMetrics = (): string[] => {
+const bornMetrics = () => {
   const main = fs.readFileSync(path.join(REPO_ROOT, 'apps', 'api', 'src', 'main.ts'), 'utf8');
   const handed = /\bseries:\s*\[([^\]]*)\]/.exec(main)?.[1] ?? '';
   const api = handed
@@ -1600,16 +1635,16 @@ const bornMetrics = (): string[] => {
     .map((name) => name.trim())
     .filter(Boolean)
     .map((name) => new RegExp(`const ${name} = Metric\\.\\w+\\(\\s*'([^']+)'`).exec(SOURCE_TEXT)?.[1] ?? `${name}, undefined in the api`);
-  return [...new Set([...DAEMON_SERIES.map((series) => series.id), ...api])].sort();
+  return [...new Set([...DAEMON_SERIES.map((series) => series.id), ...api])].sort() satisfies string[];
 };
 
 /** Each metric `seed` seeds across a restart that `born` does not hold, and each of `born` it seeds otherwise or not at all. */
-const restartMismatch = (seed: readonly ServiceSeed[], born: readonly string[]): string[] => {
+const restartMismatch = (seed: readonly ServiceSeed[], born: readonly string[]) => {
   const restarted = seed.flatMap((said) => said.metrics.filter((metric) => metric.restarted).map((metric) => metric.name));
   return [
     ...restarted.filter((name) => !born.includes(name)).map((name) => `${name}: restarted, never born`),
     ...born.filter((name) => !restarted.includes(name)).map((name) => `${name}: born, not restarted`),
-  ];
+  ] satisfies string[];
 };
 
 test("the seed carries across a restart each series a daemon births at zero, the api's among them, and none other", () => {
@@ -1617,15 +1652,16 @@ test("the seed carries across a restart each series a daemon births at zero, the
   assert.ok(born.includes('api.step.follows') && born.includes('pass.duration'), born.join(', '));
   assert.deepEqual(restartMismatch(SEED, born), []);
   const [daemon, ...sessions] = SEED;
-  const seededAs = (name: string, restarted: boolean): ServiceSeed[] => [
-    {
-      ...daemon,
-      metrics: daemon.metrics.map(({ restarted: was, ...metric }) =>
-        (metric.name === name ? restarted : was) ? { ...metric, restarted: true as const } : metric,
-      ),
-    },
-    ...sessions,
-  ];
+  const seededAs = (name: string, restarted: boolean) =>
+    [
+      {
+        ...daemon,
+        metrics: daemon.metrics.map(({ restarted: was, ...metric }) =>
+          (metric.name === name ? restarted : was) ? { ...metric, restarted: true as const } : metric,
+        ),
+      },
+      ...sessions,
+    ] satisfies ServiceSeed[];
   assert.deepEqual(restartMismatch(seededAs('store.runs', true), born), ['store.runs: restarted, never born'], 'one more');
   assert.deepEqual(restartMismatch(seededAs('api.step.follows', false), born), ['api.step.follows: born, not restarted'], 'one fewer');
 });

@@ -27,7 +27,7 @@ export type Steered = {
  *   asked that end within it, and answers once the fibers woken had their turn
  * @throws from `adjust`, when no program was given the layer yet: there is no clock to move
  */
-export function steeredClock(): Steered {
+export function steeredClock() {
   const asked: number[] = [];
   const woken: number[] = [];
   const rung = bell();
@@ -55,10 +55,10 @@ export function steeredClock(): Steered {
       return { ...clock, sleep };
     }),
   );
-  const adjust = async (by: Duration.Input): Promise<void> => {
+  const adjust = async (by: Duration.Input) => {
     if (!made) throw new Error('steeredClock: no program was given this clock yet, so there is none to move; provide its `layer` first');
     await Effect.runPromise(made.adjust(by));
     await new Promise<void>((turn) => setImmediate(turn));
   };
-  return { layer, asked, woken, bell: rung, adjust };
+  return { layer, asked, woken, bell: rung, adjust } satisfies Steered;
 }

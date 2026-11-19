@@ -16,7 +16,7 @@ import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { nameFor, type Sighting, type SpawnRequest, type TaskView, Engine as EngineService } from 'agent-runtime';
+import { nameFor, type Sighting, type SpawnRequest, Engine as EngineService } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from 'test-kit/scratch';
@@ -39,7 +39,7 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
   return repo;
@@ -58,7 +58,7 @@ const folder = (keys: { plan?: string; implement?: string } = {}) => {
 };
 
 /** The engine's store, in memory, as its own tests keep one, noting in `starts` when each attempt began, by its session's name. */
-const memoryJournal = (starts: Map<string, number>): AsyncJournal => {
+const memoryJournal = (starts: Map<string, number>) => {
   const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
   const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
@@ -76,7 +76,7 @@ const memoryJournal = (starts: Map<string, number>): AsyncJournal => {
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
@@ -138,11 +138,11 @@ const engine = () => {
 };
 
 /** Each step's line on `nemia ls`, by name. */
-const statuses = async (e: Engine, id: string): Promise<Record<string, string>> =>
+const statuses = async (e: Engine, id: string) =>
   Object.fromEntries((await runWith(e, list(e, runRecord(ROOT, id)))).steps.map((s) => [s.name, s.message]));
 
 /** What the runtime holds of a task. */
-const stateOf = async (e: Engine, taskId: string): Promise<TaskView> => Effect.runPromise(e.view(taskId));
+const stateOf = async (e: Engine, taskId: string) => Effect.runPromise(e.view(taskId));
 
 /**
  * A run of `folder(keys)` started in a fresh repository, its plan filed and started, and signed with `closeout`: where each test begins.
@@ -376,6 +376,7 @@ test("an answer's turn that was LOST settles its task failed, and a `nemia retry
   h.sessions.delete(h.turn);
   const read = process.hrtime.bigint.bind(process.hrtime);
   vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 10 * 60_000 });
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- steps the monotonic clock, which no seam gives
   const later = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => read() + 10n * 60_000_000_000n);
   try {
     await h.pass(h.run.id);

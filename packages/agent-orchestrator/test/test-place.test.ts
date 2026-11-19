@@ -31,14 +31,14 @@ const OUTSIDE = (() => {
 const SHARED = scratch('wf-test-place-');
 
 /** The first test's part: a repository made at the shared root, and a branch on it. */
-function seeded({ place, world }: TestPlace): void {
+function seeded({ place, world }: TestPlace) {
   world.repository(SHARED, { 'a.txt': 'one\n' });
   world.branch(SHARED, 'work', { 'b.txt': 'two\n' });
   assert.ok('answer' in place.askNow('open', { root: SHARED, isolate: false }));
 }
 
 /** The second test's part: the shared root is no repository of its place, which holds no branch of the first. */
-function unseen({ place }: TestPlace): void {
+function unseen({ place }: TestPlace) {
   const opened = place.askNow('open', { root: SHARED, isolate: false });
   assert.ok('refused' in opened, `a place that never made a repository there knows none: ${JSON.stringify(opened)}`);
   assert.ok('refused' in place.askNow('standing', { repo: SHARED, base: 'main', branches: [] }));
@@ -92,13 +92,13 @@ test('REFUSED: a place made for each test, asked at the head of the file, outsid
 });
 
 /** The modules a source imports, across line breaks. */
-const importsOf = (source: string): string[] => [...source.matchAll(/\b(?:from|import)\s*\(?\s*'([^']+)'/g)].map((m) => m[1]);
+const importsOf = (source: string) => [...source.matchAll(/\b(?:from|import)\s*\(?\s*'([^']+)'/g)].map((m) => m[1]);
 
 /** The modules that start a process or a thread. */
 const STARTS = ['node:child_process', 'child_process', 'node:worker_threads', 'worker_threads', 'node:cluster', 'cluster'];
 
 /** The imports of `sources`, by file, that start a process or a thread. */
-const starting = (sources: Readonly<Record<string, string>>): string[] =>
+const starting = (sources: Readonly<Record<string, string>>) =>
   Object.entries(sources).flatMap(([file, source]) =>
     importsOf(source)
       .filter((m) => STARTS.includes(m))

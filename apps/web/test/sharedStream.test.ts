@@ -19,7 +19,7 @@ class Opened implements StreamLike {
   constructor(url: string) {
     this.url = url;
   }
-  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
     this.#target.addEventListener(type, listener as EventListener);
   }
   close() {
@@ -56,16 +56,19 @@ function browser() {
     },
   };
   const channels = new Set<{ listeners: ((event: { data: never }) => void)[] }>();
-  const channel = (): Channel => {
+  const channel = () => {
     const own = { listeners: [] as ((event: { data: never }) => void)[] };
     channels.add(own);
-    return {
-      postMessage: (message) => {
-        for (const other of channels) if (other !== own) for (const l of other.listeners) l({ data: message as never });
-      },
-      addEventListener: (_type, listener) => own.listeners.push(listener),
-      close: () => channels.delete(own),
-    };
+    {
+      const made: Channel = {
+        postMessage: (message) => {
+          for (const other of channels) if (other !== own) for (const l of other.listeners) l({ data: message as never });
+        },
+        addEventListener: (_type, listener) => own.listeners.push(listener),
+        close: () => channels.delete(own),
+      };
+      return made;
+    }
   };
   const open = (url: string) => {
     const s = new Opened(url);

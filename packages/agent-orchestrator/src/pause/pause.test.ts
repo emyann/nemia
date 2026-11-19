@@ -29,8 +29,8 @@ import {
 } from './pause.ts';
 
 const PAUSE: Pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
-const step = (name: string, after: string[] = [], more: Partial<StepSpec> = {}): StepSpec => ({ name, after, body: `do ${name}`, ...more });
-const run = (steps: RepositoryRun['steps'], rest: Partial<RepositoryRun> = {}): RepositoryRun => ({
+const step = (name: string, after: string[] = [], more: Partial<StepSpec> = {}) => ({ name, after, body: `do ${name}`, ...more });
+const run = (steps: RepositoryRun['steps'], rest: Partial<RepositoryRun> = {}) => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',
@@ -189,7 +189,7 @@ const ATTEMPT = { startedAt: '2026-10-04T12:00:00.000Z', spawnedAt: null, endedA
 const view = (
   phase: FinishingView['phase'],
   more: { settled?: 'succeeded'; attempts?: number; admission?: string; stopRequested?: true } = {},
-): FinishingView => ({
+) => ({
   phase,
   ...(more.admission ? { admission: more.admission } : {}),
   state: {

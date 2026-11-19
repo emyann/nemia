@@ -5,13 +5,13 @@
 import { Effect } from 'effect';
 
 /** A program run for its caller: refused. */
-export const promiseFace = (n: number): Promise<number> => Effect.runPromise(Effect.succeed(n));
+export const promiseFace = (n: number) => Effect.runPromise(Effect.succeed(n)) satisfies Promise<number>;
 
 /** An engine whose verbs answer Promises: refused. */
-export const promiseEngine = () => ({ file: (brief: string): Promise<string> => Effect.runPromise(Effect.succeed(brief)), size: () => 1 });
+export const promiseEngine = () => ({ file: (brief: string) => Effect.runPromise(Effect.succeed(brief)) satisfies Promise<string>, size: () => 1 });
 
 /** A pure function: taken. */
-export const pure = (n: number): number => n + 1;
+export const pure = (n: number) => (n + 1);
 
 /** A verb as an Effect: taken. */
-export const verb = (n: number): Effect.Effect<number> => Effect.succeed(n);
+export const verb = (n: number) => Effect.succeed(n) satisfies Effect.Effect<number>;

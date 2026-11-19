@@ -29,37 +29,38 @@ type Side = DoorSide<WorkflowDoorShape>;
 export type WorkflowSide = Side & { readonly defs: WorkflowDefs };
 
 /** The Agent door a side's Workflow door reads agents through: what a walk writes an agent with. */
-const agentsOn = (side: Side): AgentDoorShape => {
+const agentsOn = (side: Side) => {
   const { defs } = side as Partial<WorkflowSide>;
   assert.ok(defs, `the ${side.layer} side gives its Workflow door no Agent door: give the side its defs`);
-  return defs.agents;
+  return defs.agents satisfies AgentDoorShape;
 };
 
 /** `scribe` written on a side as an agent of yours, through the Agent door its Workflow door reads through. */
-const scribeOn = (side: Side): void => {
+const scribeOn = (side: Side) => {
   done(agentsOn(side).agents.write(AgentName.read('scribe'), anAgent(), undefined, { dir: `${side.root}/workflows/agents` }));
 };
 
 /** A workflow of one step, `build`, naming the agent `scribe`. */
-const scribed = (): WorkflowDraft => aWorkflow([{ ...aStep('build'), agent: 'scribe' }]);
+const scribed = () => aWorkflow([{ ...aStep('build'), agent: 'scribe' }]) satisfies WorkflowDraft;
 
 /** The strict schema of one required string field, `field`, as a step's `output:` file holds it. */
-export const schemaOf = (field: string): string =>
+export const schemaOf = (field: string) =>
   `${JSON.stringify({ type: 'object', properties: { [field]: { type: 'string' } }, required: [field], additionalProperties: false })}\n`;
 
 /** A workflow of one step, `build`, whose `output:` names the schema it carries beside a script, `check.ts`. */
-export const carried = (field = 'pages'): WorkflowDraft => ({
-  steps: [{ ...aStep('build'), output: { file: 'build.schema.json' } }],
-  files: [
-    { path: 'build.schema.json', text: schemaOf(field) },
-    { path: 'check.ts', text: 'process.exit(0);\n' },
-  ],
-});
+export const carried = (field = 'pages') =>
+  ({
+    steps: [{ ...aStep('build'), output: { file: 'build.schema.json' } }],
+    files: [
+      { path: 'build.schema.json', text: schemaOf(field) },
+      { path: 'check.ts', text: 'process.exit(0);\n' },
+    ],
+  }) satisfies WorkflowDraft;
 
 /** `carried()` carrying `file` besides: what a refusal of that one file is proven on, the rest of the draft writing. */
-const withFile = (file: { path: string; text: string }): WorkflowDraft => {
+const withFile = (file: { path: string; text: string }) => {
   const draft = carried();
-  return { ...draft, files: [...(draft.files ?? []), file] };
+  return { ...draft, files: [...(draft.files ?? []), file] } satisfies WorkflowDraft;
 };
 
 /** A picture's bytes as a carried text: a NUL among them, so it is no text (`textIn`), built from its code. */
@@ -89,19 +90,20 @@ const agentOf = (steps: readonly { name: string; agent?: { name: string }; model
   steps.map((s) => [s.name, s.agent?.name, s.model]);
 
 /** A step drafted as the builder sends one: its name, the steps it waits on, and its words. */
-export const aStep = (name: string, after: string[] = []): StepDraft => ({ name, after, place: 'git', body: `Do ${name}.` });
+export const aStep = (name: string, after: string[] = []) => ({ name, after, place: 'git', body: `Do ${name}.` }) satisfies StepDraft;
 
 /** A workflow drafted as the builder sends one: `plan`, then `build` waiting on it, unless other steps are given. */
-export const aWorkflow = (steps: StepDraft[] = [aStep('plan'), aStep('build', ['plan'])], readme?: string): WorkflowDraft => ({
-  steps,
-  ...(readme !== undefined && { readme }),
-});
+export const aWorkflow = (steps: StepDraft[] = [aStep('plan'), aStep('build', ['plan'])], readme?: string) =>
+  ({
+    steps,
+    ...(readme !== undefined && { readme }),
+  }) satisfies WorkflowDraft;
 
 /** The folder of yours `name` on a side: `<root>/workflows/<name>`. */
-export const yoursOn = ({ root }: Side, name: string): WorkflowDir => WorkflowDir.read(`${root}/workflows/${name}`);
+export const yoursOn = ({ root }: Side, name: string) => WorkflowDir.read(`${root}/workflows/${name}`) satisfies WorkflowDir;
 
 /** `name` written on a side as a new workflow, at the version it is at after. */
-const written = (side: Side, name: string, draft: WorkflowDraft = aWorkflow()): string =>
+const written = (side: Side, name: string, draft: WorkflowDraft = aWorkflow()) =>
   done(side.door.workflows.write(yoursOn(side, name), draft)).version;
 
 /** What a refused write leaves: still nothing there. */

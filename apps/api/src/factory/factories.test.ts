@@ -28,7 +28,7 @@ import { Effect } from 'effect';
 import { TABLE_ACCEPT, tableLines } from 'objects';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
-const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
+const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
 type WorkflowStepPage = import('objects').WorkflowStepPage;
@@ -40,13 +40,13 @@ type Schedule = import('objects').Schedule;
 type ScheduleList = import('objects').ScheduleList;
 type Table = import('objects').Table;
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** A git repository with one commit, as `nemia start` reads its HEAD. */
-const gitRepo = (prefix: string): string => {
+const gitRepo = (prefix: string) => {
   const repo = scratch(prefix);
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -83,19 +83,19 @@ for (const [name, repos] of [
 }
 hireAgent({ factory: 'hired', agent: 'ada', step: 'alpha/implement' });
 
-const get = async <T>(url: string): Promise<{ status: number; body: T }> => {
+const get = async <T>(url: string) => {
   const res = await app.request(url);
   return { status: res.status, body: (await res.json()) as T };
 };
-const said = (body: unknown): string => (body as { error: string }).error;
-const names = (listings: WorkflowListing[]): string[] => listings.map((w) => w.name);
-const runFiles = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
+const said = (body: unknown) => (body as { error: string }).error;
+const names = (listings: WorkflowListing[]) => listings.map((w) => w.name);
+const runFiles = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
 
 const post = (url: string, body: unknown) =>
   app.request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 /** That `text` names every one of `facts`. */
-const saysAll = (text: string, facts: string[]): void => {
+const saysAll = (text: string, facts: string[]) => {
   for (const fact of facts) assert.ok(text.includes(fact), `${fact}: ${text}`);
 };
 
@@ -390,7 +390,7 @@ describe('a person works in a factory with hires: the listing names what is unfi
  * The switch off, as shipped, for the test `t`, and the factory `trio` filed on a repository of its own whose workflow `delta` names its
  * agent in its step: removed, with the switch put back, once the test ends.
  */
-function asShipped(t: { onTestFinished: (fn: () => void) => void }): string {
+function asShipped(t: { onTestFinished: (fn: () => void) => void }) {
   const was = process.env.WF_DEFAULT_FACTORY_STARTS;
   delete process.env.WF_DEFAULT_FACTORY_STARTS;
   const repoT = gitRepo('nemia-api-factory-t-');
@@ -771,7 +771,7 @@ describe("a person sets a workflow's cost line on a factory: the Factory answers
 });
 
 /** The cell of `row` under the column `name` of `table`. */
-const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+const cellOf = (table: Table, row: Table['rows'][number], name: string) =>
   row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
 
 test('the factories asked as a Table answer the columns of a factory, the default row first, its metadata alone, and a line each', async () => {

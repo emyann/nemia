@@ -20,14 +20,14 @@ fs.mkdirSync(inbox, { recursive: true });
 fs.writeFileSync(path.join(inbox, 'kept-card.md'), 'Keep this card.\n');
 
 /** The inbox folder as it is: each file's name and text, to show a refusal wrote nothing. */
-const inboxAsIs = (): Array<[string, string]> =>
+const inboxAsIs = () =>
   fs
     .readdirSync(inbox)
     .sort()
     .map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
 
 /** The status, the `error` and the `field` of a response, which must be a JSON object. */
-const refusal = async (res: Response): Promise<{ status: number; error: unknown; field: unknown }> => {
+const refusal = async (res: Response) => {
   assert.match(res.headers.get('content-type') ?? '', /application\/json/, `${res.status}: answered as JSON`);
   const body = (await res.json()) as { error?: unknown; field?: unknown };
   return { status: res.status, error: body.error, field: body.field };
@@ -51,7 +51,7 @@ test('REFUSED: a card verb sent a body HttpApi does not decode — not JSON, or 
 });
 
 /** A card's file body whose JSON is `bytes` long, all of it the card's text. */
-const cardOfBytes = (bytes: number): string => {
+const cardOfBytes = (bytes: number) => {
   const frame = JSON.stringify({ body: '' }).length;
   return JSON.stringify({ body: 'x'.repeat(bytes - frame) });
 };

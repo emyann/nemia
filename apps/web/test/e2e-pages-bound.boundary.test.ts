@@ -20,7 +20,7 @@ import { PAGES_BOUND_MS, PHASES, type PageTiming, type ShardPages } from './e2e/
 import { scratch } from 'test-kit/scratch';
 
 /** A page's timing whose phases are its whole time, split evenly: made up here, as `timing.ts` asks, never a wait. */
-const timed = (name: string, ms: number): PageTiming => ({
+const timed = (name: string, ms: number) => ({
   name,
   theme: 'dark',
   worker: 0,
@@ -29,7 +29,7 @@ const timed = (name: string, ms: number): PageTiming => ({
 });
 
 /** A directory holding one shard file per entry of `shards`, named as a shard run names it (`pages-<i>-of-<n>.json`). */
-function dirOf(shards: readonly ShardPages[]): string {
+function dirOf(shards: readonly ShardPages[]) {
   const dir = scratch('nemia-pages-bound-');
   for (const shard of shards)
     fs.writeFileSync(path.join(dir, `pages-${shard.shard}-of-${shard.of}.json`), `${JSON.stringify(shard, undefined, 2)}\n`);
@@ -37,7 +37,7 @@ function dirOf(shards: readonly ShardPages[]): string {
 }
 
 /** The command, run as the `e2e-bound` job runs it: `node test/e2e/pages-bound.ts <dir>`, from the web app. */
-function verdictOf(...dirs: string[]): { status: number; said: string } {
+function verdictOf(...dirs: string[]) {
   const ran = spawnSync(process.execPath, [path.join(import.meta.dirname, 'e2e', 'pages-bound.ts'), ...dirs], {
     encoding: 'utf8',
     timeout: 60_000,
@@ -49,7 +49,7 @@ function verdictOf(...dirs: string[]): { status: number; said: string } {
  * Four shards of one run whose pages cost `ms` all together: two pages a shard, each a ninth of it, and the last shard's second page —
  * `slowest` — carrying the two ninths left over, so the page a refusal must name is the slowest in fact and not by its name alone.
  */
-const fourShards = (ms: number): ShardPages[] => {
+const fourShards = (ms: number) => {
   const each = Math.floor(ms / 9);
   return [1, 2, 3, 4].map((shard) => ({
     shard,

@@ -16,7 +16,7 @@ import { objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testing';
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -50,7 +50,7 @@ write(
 );
 
 /** The run's object answers 200 (`objectOf` throws otherwise), its warning on its status. */
-const warningOf = async (): Promise<string | null> => (await objectOf(app, R)).status.warning;
+const warningOf = async () => (await objectOf(app, R)).status.warning;
 
 describe('a run of a factory that hires an agent into a step reads its folder with the hires, and warns once that folder truly breaks', () => {
   const s = story(test);

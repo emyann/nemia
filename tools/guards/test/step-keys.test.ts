@@ -40,11 +40,11 @@ const DEBT: Readonly<Record<string, number>> = {
 };
 
 /** The name a member is written under, where it is written as a name or a string. */
-const memberName = (name: ts.PropertyName | undefined): string | undefined =>
+const memberName = (name: ts.PropertyName | undefined) =>
   name !== undefined && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? name.text : undefined;
 
 /** How many step keys `node` lists, where it is an array of strings, an object or a type; zero for anything else. */
-const keysListed = (node: ts.Node): { count: number; at: number } => {
+const keysListed = (node: ts.Node) => {
   if (ts.isArrayLiteralExpression(node)) {
     const named = node.elements.filter((e) => ts.isStringLiteralLike(e) && KEYS.has(e.text)).length;
     return { count: named, at: AT_LEAST.array };
@@ -63,10 +63,10 @@ const keysListed = (node: ts.Node): { count: number; at: number } => {
 };
 
 /** Each list of the step keys `text` writes, as `<line>: <how many keys>`. */
-const listsIn = (file: string, text: string): string[] => {
+const listsIn = (file: string, text: string) => {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const found: string[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     const { count, at } = keysListed(node);
     if (count >= at) found.push(`${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}: ${count} step keys`);
     ts.forEachChild(node, visit);
@@ -76,14 +76,14 @@ const listsIn = (file: string, text: string): string[] => {
 };
 
 /** Whether `file` is source a layer ships: under a package's or an app's `src`, no test, outside the two that own the keys. */
-const shipped = (file: string): boolean =>
+const shipped = (file: string) =>
   /^(apps|packages)\/[^/]+\/src\/.*\.tsx?$/.test(file) &&
   !/\.test\.tsx?$/.test(file) &&
   !file.includes('/test/') &&
   !OWNERS.some((owner) => file.startsWith(owner));
 
 /** Each file that lists the step keys again, with how many lists it holds and where. */
-const listed = (read: (file: string) => string | undefined = textOf): Record<string, string[]> =>
+const listed = (read: (file: string) => string | undefined = textOf) =>
   Object.fromEntries(
     files()
       .filter(shipped)

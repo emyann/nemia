@@ -37,7 +37,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -183,9 +183,9 @@ const folder = (implementKeys = '') => {
 };
 
 /** A run this file started on a repository: a repository run, whose repository and base branch are on its record. */
-const repositoryRunOf = (run: Run): RepositoryRun => {
+const repositoryRunOf = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
-  return run;
+  return run satisfies RepositoryRun;
 };
 
 /** `nemia start`, for real, over a fresh repository, the steps working in the checkout itself. */
@@ -193,7 +193,7 @@ const started = async (dir: string) =>
   repositoryRunOf(await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
 
 /** The engine's store, in memory, as its own tests keep one. */
-const memoryJournal = (): AsyncJournal => {
+const memoryJournal = () => {
   const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
   const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
@@ -210,22 +210,23 @@ const memoryJournal = (): AsyncJournal => {
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 /** A harness that starts whatever it is asked to, and remembers the order: every session at work. */
-const startsInOrder = (sessions: Map<string, Sighting>): AsyncRunner => ({
-  async spawn(r) {
-    sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
-  },
-  async observe() {
-    return new Map(sessions);
-  },
-  async stop() {},
-  async logs() {
-    return '';
-  },
-});
+const startsInOrder = (sessions: Map<string, Sighting>) =>
+  ({
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
+    async stop() {},
+    async logs() {
+      return '';
+    },
+  }) satisfies AsyncRunner;
 
 test("REFUSED without the momentum: at a ceiling of one, the runtime admits a run's next step before a newer run's first step filed ahead of it — and, with no priority, the newer run", async () => {
   const a = await started(folder());

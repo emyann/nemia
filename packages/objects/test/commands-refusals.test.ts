@@ -15,32 +15,32 @@ const RETRY = words('retry');
 const SAY = words('say');
 
 /** The refusal's words `parseArgv` throws on `argv` as a `CommandRefused`, or none. */
-function refusalOf(argv: readonly string[], spec: Spec): string | undefined {
+function refusalOf(argv: readonly string[], spec: Spec) {
   try {
     parseArgv(spec, argv);
-    return undefined;
+    return undefined satisfies string | undefined;
   } catch (err) {
     assert.ok(err instanceof CommandRefused, String(err));
-    return err.message;
+    return err.message satisfies string | undefined;
   }
 }
 
 /** That `said` is a refusal, and names each of `fixes`: the command, the flag, the value or the form its fix turns on. */
-function names(said: string | null | undefined, ...fixes: string[]): void {
+function names(said: string | null | undefined, ...fixes: string[]) {
   assert.ok(said, 'refused');
   for (const fix of fixes) assert.ok(said.includes(fix), `${said} names ${fix}`);
 }
 
 /** What the command `name` refuses of `argv` before anything is asked, its parser's words or its check's; null where it takes it. */
-function refusedBy(name: string, argv: readonly string[]): string | null {
+function refusedBy(name: string, argv: readonly string[]) {
   const command = words(name);
   try {
     const args: Args | undefined = parseArgv(command.spec, argv);
     assert.ok(args, `nemia ${name} ${argv.join(' ')} is given too little`);
-    return command.check?.(args) ?? null;
+    return (command.check?.(args) ?? null) satisfies string | null;
   } catch (err) {
     assert.ok(err instanceof CommandRefused, String(err));
-    return err.message;
+    return err.message satisfies string | null;
   }
 }
 
@@ -126,18 +126,13 @@ const STRAY: ReadonlyArray<readonly [string, readonly string[], 'missing' | 'fla
 type Refused = readonly [row: string, command: string, argv: readonly string[], said: readonly string[] | null, not?: readonly string[]];
 
 const REFUSALS: readonly Refused[] = [
-  ...[[], ['--until', 'a'], ['-x', '--off']].map((argv): Refused => [
-    `hold, the run left out: ${argv.join(' ')}`,
-    'hold',
-    argv,
-    ['nemia hold takes the run first', '--off'],
-  ]),
-  ...[['--until'], ['--until', '--off'], ['--until', '-a'], ['--until=']].map((argv): Refused => [
-    `hold, --until given no run: ${argv.join(' ')}`,
-    'hold',
-    ['r-x', ...argv],
-    ['--until takes the run to wait on'],
-  ]),
+  ...[[], ['--until', 'a'], ['-x', '--off']].map(
+    (argv) => [`hold, the run left out: ${argv.join(' ')}`, 'hold', argv, ['nemia hold takes the run first', '--off']] satisfies Refused,
+  ),
+  ...[['--until'], ['--until', '--off'], ['--until', '-a'], ['--until=']].map(
+    (argv) =>
+      [`hold, --until given no run: ${argv.join(' ')}`, 'hold', ['r-x', ...argv], ['--until takes the run to wait on']] satisfies Refused,
+  ),
   ['hold, --until and --off', 'hold', ['r-x', '--until', 'a', '--off'], ['takes --until or --off, not both', 'lift the hold first']],
   ['hold, --off with --why', 'hold', ['r-x', '--off', '--why', 'w'], ['nemia hold --off', 'takes no --why or --by']],
   ['hold, a flag it does not take', 'hold', ['r-x', '--after', 'a'], ['nemia hold does not take --after']],
@@ -169,18 +164,24 @@ const REFUSALS: readonly Refused[] = [
     [['-x'], '-x'],
     [['a', '-x', 'b'], '-x'],
     [['a', '--delete-branches=yes'], '--delete-branches=yes'],
-  ].map(([argv, arg]): Refused => [
-    `rm, a flag it does not take: ${(argv as string[]).join(' ')}`,
-    'rm',
-    argv as string[],
-    [`nemia rm does not take ${arg as string}.`, '--delete-branches', '--force-unmerged'],
-  ]),
-  ...[['a', '--force-unmerged'], ['--force-unmerged']].map((argv): Refused => [
-    `rm, --force-unmerged alone: ${argv.join(' ')}`,
-    'rm',
-    argv,
-    ['--force-unmerged forces --delete-branches', 'alone deletes nothing'],
-  ]),
+  ].map(
+    ([argv, arg]) =>
+      [
+        `rm, a flag it does not take: ${(argv as string[]).join(' ')}`,
+        'rm',
+        argv as string[],
+        [`nemia rm does not take ${arg as string}.`, '--delete-branches', '--force-unmerged'],
+      ] satisfies Refused,
+  ),
+  ...[['a', '--force-unmerged'], ['--force-unmerged']].map(
+    (argv) =>
+      [
+        `rm, --force-unmerged alone: ${argv.join(' ')}`,
+        'rm',
+        argv,
+        ['--force-unmerged forces --delete-branches', 'alone deletes nothing'],
+      ] satisfies Refused,
+  ),
   ['rm, --delete-branches naming no run', 'rm', ['--delete-branches'], ['nemia rm <runId> [<runId> ...]', 'nemia ls']],
   ['rm, nothing: its runner prints the help', 'rm', [], null],
   ['rm, a run with both switches', 'rm', ['a', '--delete-branches', '--force-unmerged'], null],
@@ -188,24 +189,25 @@ const REFUSALS: readonly Refused[] = [
     [['--artifact'], '--artifact'],
     [['a', '-x'], '-x'],
     [['--yes=1'], '--yes=1'],
-  ].map(([argv, arg]): Refused => [
-    `prune, a flag it does not take: ${(argv as string[]).join(' ')}`,
-    'prune',
-    argv as string[],
-    [`nemia prune does not take ${arg as string}.`, '--unmerged, --artifacts and --yes'],
-  ]),
+  ].map(
+    ([argv, arg]) =>
+      [
+        `prune, a flag it does not take: ${(argv as string[]).join(' ')}`,
+        'prune',
+        argv as string[],
+        [`nemia prune does not take ${arg as string}.`, '--unmerged, --artifacts and --yes'],
+      ] satisfies Refused,
+  ),
   ['prune, a run with every switch', 'prune', ['a', '--unmerged', '--artifacts', '--yes'], null],
 
   ['logs, a run and a step', 'logs', ['r', 's'], null],
   ['logs, a word more', 'logs', ['r', 's', 'extra'], ['nemia logs', "one run's id and one step's name", 'not extra.']],
   ['logs, a flag more', 'logs', ['r', 's', '--tail'], ['nemia logs', "one run's id and one step's name", 'not --tail.']],
 
-  ...[['--from'], ['--from', '--to'], ['--from', '--to', '2026-09-30'], ['--from', '']].map((argv): Refused => [
-    `stats, --from given no day: ${JSON.stringify(argv)}`,
-    'stats',
-    argv,
-    ['--from takes a day', 'YYYY-MM-DD'],
-  ]),
+  ...[['--from'], ['--from', '--to'], ['--from', '--to', '2026-09-30'], ['--from', '']].map(
+    (argv) =>
+      [`stats, --from given no day: ${JSON.stringify(argv)}`, 'stats', argv, ['--from takes a day', 'YYYY-MM-DD']] satisfies Refused,
+  ),
   ['stats, --agent given nothing', 'stats', ['--agent='], ["--agent takes an agent's name"]],
   ['stats, --by given a flag', 'stats', ['--by=--line'], ['--by', 'agent, step, factory, workflow, repo']],
   ['stats, --by twice', 'stats', ['--by', 'agent', '--by', 'step'], ['nemia stats takes --by once']],
@@ -227,22 +229,30 @@ const REFUSALS: readonly Refused[] = [
   ],
   ['stats, a whole query', 'stats', ['--from', '2026-09-01', '--to', '2026-09-30', '--by', 'agent', '--repo', '/r'], null],
 
-  ...STRAY.flatMap(([command, required, where]): Refused[] => [
-    [`${command}, a flag it does not take after its arguments`, command, [...required, '--nope'], [`nemia ${command}`, '--nope']],
-    ...(required.length > 0
-      ? [
-          where === 'missing'
-            ? ([
-                `${command}, a flag where its arguments stand: the argument left out`,
-                command,
-                ['--nope'],
-                [`nemia ${command} takes`],
-                ['--nope'],
-              ] as const)
-            : ([`${command}, a flag where its arguments stand: the flag`, command, ['--nope'], [`nemia ${command}`, '--nope']] as const),
-        ]
-      : []),
-  ]),
+  ...STRAY.flatMap(
+    ([command, required, where]) =>
+      [
+        [`${command}, a flag it does not take after its arguments`, command, [...required, '--nope'], [`nemia ${command}`, '--nope']],
+        ...(required.length > 0
+          ? [
+              where === 'missing'
+                ? ([
+                    `${command}, a flag where its arguments stand: the argument left out`,
+                    command,
+                    ['--nope'],
+                    [`nemia ${command} takes`],
+                    ['--nope'],
+                  ] as const)
+                : ([
+                    `${command}, a flag where its arguments stand: the flag`,
+                    command,
+                    ['--nope'],
+                    [`nemia ${command}`, '--nope'],
+                  ] as const),
+            ]
+          : []),
+      ] satisfies Refused[],
+  ),
   ['factory, a word it has no command of', 'factory', ['frob'], ['nemia factory does not take frob', 'nemia factory --help']],
   ['factory move, no --to', 'factory move', ['f'], ['--to <context>', 'nemia config get-contexts']],
   ['factory move, --repo with no =', 'factory move', ['f', '--to', 'b', '--repo', '/src/a'], ['--repo <source>=<url|path>', '/src/a']],

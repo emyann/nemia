@@ -19,14 +19,13 @@ const UNFILLED = 'review';
 const REVIEWER = 'reviewer-e2e';
 
 /** The factory's file `text` with `hires` in place of the seed's. */
-const withHires = (text: string, hires: Record<string, string>): string =>
-  JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
+const withHires = (text: string, hires: Record<string, string>) => JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
 
 /**
  * Open the pane's start on a fresh load of the floor, with no bar open (one would cover the pane under 1600), and the side sheet it
  * opens.
  */
-async function openStart(page: Page): Promise<Locator> {
+async function openStart(page: Page) {
   const floor = new URL(page.url());
   floor.searchParams.delete('bar');
   await page.goto(floor.href, { waitUntil: 'load' });
@@ -38,7 +37,7 @@ async function openStart(page: Page): Promise<Locator> {
 }
 
 /** Picks `workflow` in the bar, and the start it offers. */
-async function pickWorkflow(bar: Locator, workflow: string): Promise<Locator> {
+async function pickWorkflow(bar: Locator, workflow: string) {
   await bar.locator(`[data-workflow="repo:${workflow}"]`).click();
   const form = bar.locator(`form[aria-label="Start a run of ${workflow}"]`);
   await expectVisible(form, `picked, ${workflow} offers its start`);
@@ -46,7 +45,7 @@ async function pickWorkflow(bar: Locator, workflow: string): Promise<Locator> {
 }
 
 /** A half-typed brief is not lost to one Escape: the first leaves its field, the brief kept and the bar open; the second closes the bar. */
-async function keptOnEscape(page: Page, bar: Locator, form: Locator): Promise<void> {
+async function keptOnEscape(page: Page, bar: Locator, form: Locator) {
   const brief = form.getByRole('textbox');
   await brief.fill(BRIEF);
   await page.keyboard.press('Escape');
@@ -65,7 +64,7 @@ async function keptOnEscape(page: Page, bar: Locator, form: Locator): Promise<vo
  * The factory on two repositories: no repository to pick; `workflow`, picked by name, unwired says the attach, and wired to `checkout`'s
  * folder name in the factory's file says it, offering its start there. The file is put back.
  */
-async function severalRepos(page: Page, workflow: string, checkout: string, theme: string): Promise<void> {
+async function severalRepos(page: Page, workflow: string, checkout: string, theme: string) {
   const factory = FACTORIES.hiring.name;
   const { back } = onSeveralRepos(store!);
   try {
@@ -120,7 +119,7 @@ export default {
     const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
     const runsBefore = fs.readdirSync(runsDir).sort();
     const filesDir = path.join(store!, 'files', factory);
-    const kept = (): string[] => (fs.existsSync(filesDir) ? fs.readdirSync(filesDir) : []);
+    const kept = () => (fs.existsSync(filesDir) ? fs.readdirSync(filesDir) : []) satisfies string[];
     const filesBefore = new Set(kept());
     const theme = await themeOf(page);
     const other = await page.context().newPage();

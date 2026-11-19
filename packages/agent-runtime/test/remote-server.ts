@@ -151,39 +151,43 @@ const STATES: Record<StateWord, TaskState> = {
 /** A step after which the turn is over: the task ended, or waits on its caller. */
 const endsTurn = (s: Step) => s.state !== undefined && s.state !== 'working';
 
-const textPart = (text: string): Part => ({
-  content: { $case: 'text', value: text },
-  metadata: undefined,
-  filename: '',
-  mediaType: 'text/plain',
-});
+const textPart = (text: string) =>
+  ({
+    content: { $case: 'text', value: text },
+    metadata: undefined,
+    filename: '',
+    mediaType: 'text/plain',
+  }) satisfies Part;
 
 /** A card's bearer scheme named `token`, and a check of the header it asks for. */
-export const bearer = (token: string): Security => ({
-  schemes: { token: { scheme: { $case: 'httpAuthSecurityScheme', value: { description: '', scheme: 'Bearer', bearerFormat: '' } } } },
-  requirements: [{ schemes: { token: { list: [] } } }],
-  accepts: (h) => h.authorization === `Bearer ${token}`,
-});
+export const bearer = (token: string) =>
+  ({
+    schemes: { token: { scheme: { $case: 'httpAuthSecurityScheme', value: { description: '', scheme: 'Bearer', bearerFormat: '' } } } },
+    requirements: [{ schemes: { token: { list: [] } } }],
+    accepts: (h) => h.authorization === `Bearer ${token}`,
+  }) satisfies Security;
 
 /** A card's API key named `key`, in `location` under `name`, and a check of a header that carries it. */
-export const apiKey = (key: string, location: 'header' | 'query' | 'cookie' = 'header', name = 'X-Api-Key'): Security => ({
-  schemes: { key: { scheme: { $case: 'apiKeySecurityScheme', value: { description: '', location, name } } } },
-  requirements: [{ schemes: { key: { list: [] } } }],
-  accepts: (h) => h[name.toLowerCase()] === key,
-});
+export const apiKey = (key: string, location: 'header' | 'query' | 'cookie' = 'header', name = 'X-Api-Key') =>
+  ({
+    schemes: { key: { scheme: { $case: 'apiKeySecurityScheme', value: { description: '', location, name } } } },
+    requirements: [{ schemes: { key: { list: [] } } }],
+    accepts: (h) => h[name.toLowerCase()] === key,
+  }) satisfies Security;
 
 /** A card that asks for mutual TLS, which a plain HTTP server cannot check: every request is refused. */
-export const mtls = (): Security => ({
-  schemes: { cert: { scheme: { $case: 'mtlsSecurityScheme', value: { description: '' } } } },
-  requirements: [{ schemes: { cert: { list: [] } } }],
-  accepts: () => false,
-});
+export const mtls = () =>
+  ({
+    schemes: { cert: { scheme: { $case: 'mtlsSecurityScheme', value: { description: '' } } } },
+    requirements: [{ schemes: { cert: { list: [] } } }],
+    accepts: () => false,
+  }) satisfies Security;
 
 /**
  * A remote agent started as `o` says, listening once it returns. Steps a `move` hands a task before its executor waits
  * for them are queued for that task, and the executor's wait is kept by task until a step, a cancel or the close ends it.
  */
-export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer> {
+export async function remoteServer(o: ServerOptions = {}) {
   const bindings = o.bindings ?? ['JSONRPC', 'HTTP+JSON'];
   const script = o.script ?? (() => []);
   const counts: Record<string, number> = {};
@@ -201,10 +205,10 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   const waiting = new Map<string, (steps: Step[] | 'cancelled') => void>();
   let base = '';
 
-  const next = (taskId: string): Promise<Step[] | 'cancelled'> => {
+  const next = (taskId: string) => {
     const ready = queued.get(taskId)?.shift();
-    if (ready) return Promise.resolve(ready);
-    return new Promise((resolve) => waiting.set(taskId, resolve));
+    if (ready) return Promise.resolve(ready) satisfies Promise<Step[] | 'cancelled'>;
+    return new Promise((resolve) => waiting.set(taskId, resolve)) satisfies Promise<Step[] | 'cancelled'>;
   };
 
   const publish = (bus: ExecutionEventBus, taskId: string, contextId: string, s: Step) => {
@@ -339,44 +343,45 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
     },
   };
 
-  const card = (): AgentCard => ({
-    name: 'test agent',
-    description: 'A remote A2A agent a test started.',
-    version: '1.0.0',
-    supportedInterfaces: bindings.map((b) => ({
-      url: `${o.interfacesAt ?? `${base}${prefix}`}${b === 'JSONRPC' ? '/a2a/jsonrpc' : b === 'HTTP+JSON' ? '/a2a/rest' : '/a2a/grpc'}`,
-      protocolBinding: b,
-      tenant: '',
-      protocolVersion: '1.0',
-    })),
-    provider: undefined,
-    documentationUrl: undefined,
-    iconUrl: undefined,
-    capabilities: { streaming: o.streaming ?? false, pushNotifications: false, extensions: [], extendedAgentCard: false },
-    securitySchemes: o.security?.schemes ?? {},
-    securityRequirements: o.security?.requirements ?? [],
-    defaultInputModes: ['text/plain'],
-    defaultOutputModes: ['text/plain', 'application/json'],
-    skills: [],
-    signatures: [],
-  });
+  const card = () =>
+    ({
+      name: 'test agent',
+      description: 'A remote A2A agent a test started.',
+      version: '1.0.0',
+      supportedInterfaces: bindings.map((b) => ({
+        url: `${o.interfacesAt ?? `${base}${prefix}`}${b === 'JSONRPC' ? '/a2a/jsonrpc' : b === 'HTTP+JSON' ? '/a2a/rest' : '/a2a/grpc'}`,
+        protocolBinding: b,
+        tenant: '',
+        protocolVersion: '1.0',
+      })),
+      provider: undefined,
+      documentationUrl: undefined,
+      iconUrl: undefined,
+      capabilities: { streaming: o.streaming ?? false, pushNotifications: false, extensions: [], extendedAgentCard: false },
+      securitySchemes: o.security?.schemes ?? {},
+      securityRequirements: o.security?.requirements ?? [],
+      defaultInputModes: ['text/plain'],
+      defaultOutputModes: ['text/plain', 'application/json'],
+      skills: [],
+      signatures: [],
+    }) satisfies AgentCard;
 
   const handler = new DefaultRequestHandler(card(), new InMemoryTaskStore(), executor);
   const subscriptions = { refuse: false, mute: false };
   const forgotten = new Set<string>();
   const notFound = (id: string) => new TaskNotFoundError(`Task not found: ${id}`);
-  const unfound = async function* (id: string): AsyncGenerator<never> {
+  const unfound = async function* (id: string) {
     yield* [];
     throw notFound(id);
   };
   const streams = new Set<http.ServerResponse>();
   let closing: () => void = () => {};
   const closed = new Promise<void>((resolve) => (closing = resolve));
-  const refused = async function* (): AsyncGenerator<never> {
+  const refused = async function* () {
     yield* [];
     throw new Error('the test refuses this subscription');
   };
-  const muted = async function* <A>(inner: AsyncGenerator<A>): AsyncGenerator<A> {
+  const muted = async function* <A>(inner: AsyncGenerator<A>) {
     const first = await inner.next();
     if (!first.done) yield first.value;
     await closed;
@@ -465,5 +470,5 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
-  };
+  } satisfies RemoteServer;
 }

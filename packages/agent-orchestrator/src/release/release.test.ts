@@ -36,21 +36,22 @@ const CURRENT: Current = { ...INSTALL, dir: INSTALL.root };
 const STORE = '/home/me/.agent-workflows';
 
 /** A lease standing as `kind`, held by `pid`, with the release given. */
-const lease = (kind: 'ticking' | 'stopped' | 'gone', pid = 4242, release?: Running): DaemonStanding => ({
-  kind,
-  file: {
-    pid,
-    by: 'api',
-    startedAt: '2026-10-06T07:00:00.000Z',
-    cwd: '/',
-    every: 4000,
-    passedAt: null,
-    ...(release ? { release: leaseRelease(release) } : {}),
-  },
-  last: 0,
-  quiet: 0,
-  identity: 'same',
-});
+const lease = (kind: 'ticking' | 'stopped' | 'gone', pid = 4242, release?: Running) =>
+  ({
+    kind,
+    file: {
+      pid,
+      by: 'api',
+      startedAt: '2026-10-06T07:00:00.000Z',
+      cwd: '/',
+      every: 4000,
+      passedAt: null,
+      ...(release ? { release: leaseRelease(release) } : {}),
+    },
+    last: 0,
+    quiet: 0,
+    identity: 'same',
+  }) satisfies DaemonStanding;
 
 describe('REFUSED: a tag that climbs out of releases/, hides as a dot folder, holds a space or is the pointer; a plain tag passes', () => {
   const rows: readonly (readonly [string, string, RegExp | null])[] = [

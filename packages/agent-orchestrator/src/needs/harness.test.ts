@@ -12,7 +12,7 @@ import type { HarnessDeclaration, HarnessNeeds } from 'agent-runtime/vocabulary'
 import { harnessNeedsOf, harnessOfNeed, versionIn } from './harness.ts';
 
 /** A harness's needs as an adapter declares them, its sign-in's fixes `fixes`. */
-const needsWith = (fixes: HarnessNeeds['signIn']['fixes']): HarnessNeeds => ({
+const needsWith = (fixes: HarnessNeeds['signIn']['fixes']) => ({
   program: 'tool',
   title: 'Tool',
   pin: '1.2.3',
@@ -24,7 +24,7 @@ const needsWith = (fixes: HarnessNeeds['signIn']['fixes']): HarnessNeeds => ({
 });
 
 /** A declaration that can nothing but declares `needs`. */
-const declared = (needs?: HarnessNeeds): HarnessDeclaration => ({ can: [], ...(needs === undefined ? {} : { needs }) });
+const declared = (needs?: HarnessNeeds) => ({ can: [], ...(needs === undefined ? {} : { needs }) });
 
 const TOKEN = { harness: 'tool', maker: 'tool make-token', keep: 'nemia tool-token set' };
 

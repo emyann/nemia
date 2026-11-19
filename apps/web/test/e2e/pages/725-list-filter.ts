@@ -7,7 +7,7 @@ import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
 /** Waits for the address's filter, `?q=`, to be `q`, or to be gone for `undefined`, refusing past the wait. */
-async function addressHolds(page: Page, q: string | undefined, assertion: string): Promise<void> {
+async function addressHolds(page: Page, q: string | undefined, assertion: string) {
   await page
     .waitForURL((url) => (url.searchParams.get('q') ?? undefined) === q, { timeout: WAIT_MS })
     .catch(() => {
@@ -16,7 +16,7 @@ async function addressHolds(page: Page, q: string | undefined, assertion: string
 }
 
 /** Opens `route` on the board the page is on, and waits for its reads. */
-async function open(page: Page, route: string): Promise<void> {
+async function open(page: Page, route: string) {
   await page.goto(new URL(route, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }

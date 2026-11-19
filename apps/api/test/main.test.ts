@@ -62,7 +62,7 @@ const minted = new Map<string, string>();
  * The headers a request to the api serving the store at `root` presents: a token the person holds, minted into that store through the
  * package's token door, since no route the api answers takes a request with none.
  */
-function asPerson(root: string): { authorization: string } {
+function asPerson(root: string) {
   let token = minted.get(root);
   if (token === undefined) {
     token = Effect.runSync(
@@ -188,7 +188,7 @@ test('the api refuses a PORT that is not a port: exit 2, the fix on stderr, noth
 });
 
 /** A store whose `releases/current` names a built release `v1`: a store that runs an install. */
-function installedStore(): string {
+function installedStore() {
   const root = scratch('nemia-api-installed-');
   const release = path.join(root, 'releases', 'v1');
   fs.mkdirSync(release, { recursive: true });
@@ -330,7 +330,7 @@ test('(f) --no-tick serves the board and writes no lease', async (t) => {
  * answered: `answered` with a status line, `closed` where the server had let the connection go before the call was written, and `reset`
  * where it let it go as the call reached it — what an MCP host's pool met (`ECONNRESET`).
  */
-async function callAfterPause(port: number, pauseMs: number, authorization = ''): Promise<'answered' | 'reset' | 'closed'> {
+async function callAfterPause(port: number, pauseMs: number, authorization = '') {
   const socket = net.connect({ port, host: '127.0.0.1' });
   let heard = '';
   socket.on('data', (chunk: Buffer) => (heard += chunk.toString('latin1')));
@@ -447,7 +447,7 @@ test('an api started --no-tick exports a server span per request, with the HTTP 
 });
 
 /** Each series a body posted to `/v1/metrics` names, by its metric's name and its attributes' values, with its value or its count. */
-const postedSeries = (body: string): Record<string, number> => {
+const postedSeries = (body: string) => {
   type Point = { attributes: { value: { stringValue?: string } }[]; asDouble?: number; asInt?: number; count?: number | string };
   type Posted = { name: string; sum?: { dataPoints: Point[] }; histogram?: { dataPoints: Point[] } };
   const { resourceMetrics } = JSON.parse(body) as { resourceMetrics: { scopeMetrics: { metrics: Posted[] }[] }[] };
@@ -487,7 +487,7 @@ const metricOf = async (url: string, root: string, name: string) =>
  * A folder run whose one step signed off, written into the store at `root` as `nemia start` and the engine would leave it: the run's
  * record and its task's journal, which the daemon's next pass judges and says on the feed.
  */
-function signedOffRun(root: string): void {
+function signedOffRun(root: string) {
   const at = new Date().toISOString();
   const work = path.join(root, 'runs', 'r-hub', 'work', 'write');
   fs.mkdirSync(work, { recursive: true });

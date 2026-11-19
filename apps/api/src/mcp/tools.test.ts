@@ -22,7 +22,7 @@ const ENDPOINTS = new Map(
 );
 
 /** Whether `schema`, or the schema it carries headers on, is a stream of server-sent events. */
-const streams = (schema: unknown): boolean => {
+const streams = (schema: unknown) => {
   const inner = HttpApiSchema.isWithHeaders(schema) ? schema.schema : schema;
   return typeof inner === 'object' && inner !== null && '_tag' in inner && inner._tag === 'StreamSse';
 };
@@ -144,7 +144,7 @@ test('REFUSED: a link that sends by default a key its endpoint’s query does no
 });
 
 /** The keys a tool's description says, each the word before a key line's first colon, read off the lines `keysSaid` writes. */
-const keysSaidBy = (description: string, keys: readonly string[]): Set<string> =>
+const keysSaidBy = (description: string, keys: readonly string[]) =>
   new Set(
     description
       .split('\n')
@@ -153,7 +153,7 @@ const keysSaidBy = (description: string, keys: readonly string[]): Set<string> =
   );
 
 /** Every key of a tool's input: its own, and each key of a member of its `anyOf`. */
-const inputKeys = (input: (typeof TOOLS)[number]['inputSchema']): string[] => [
+const inputKeys = (input: (typeof TOOLS)[number]['inputSchema']) => [
   ...new Set([
     ...Object.keys(input.properties),
     ...(input.anyOf ?? []).flatMap((member) => Object.keys((member.properties ?? {}) as Record<string, unknown>)),
@@ -218,7 +218,7 @@ test('a key that is an identified schema whole is said by its words, and each me
 });
 
 /** The description `name` carries on its endpoint (`OpenApi.Description`), read off the `Api` as the API page reads it. */
-const saidOfEndpoint = (name: ApiEndpointName): string => {
+const saidOfEndpoint = (name: ApiEndpointName) => {
   const endpoint = ENDPOINTS.get(name);
   assert.ok(endpoint, `${name} is an endpoint of the Api`);
   const said = Context.getOption(endpoint.annotations, OpenApi.Description);

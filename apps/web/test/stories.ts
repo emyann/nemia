@@ -20,9 +20,9 @@ export const CATEGORIES = ['Look/', 'Frame/', 'Store/', 'Factory/', 'Run/', 'Pag
  * Every file among `files` that owes a story (`owesAStory`) and has no `<Part>.stories.tsx` beside it.
  * @param files Every file of the board, by its path from the workspace root.
  */
-export const storyless = (files: readonly string[]): string[] => {
+export const storyless = (files: readonly string[]) => {
   const all = new Set(files);
-  return files.filter((file) => owesAStory(file) && !all.has(file.replace(/\.tsx$/, '.stories.tsx')));
+  return files.filter((file) => owesAStory(file) && !all.has(file.replace(/\.tsx$/, '.stories.tsx'))) satisfies string[];
 };
 
 /** One story of a module: its export's name, whether it or its meta gives args, and whether its axe only warns. */
@@ -32,22 +32,22 @@ export type StoryFact = { name: string; args: boolean; todo: boolean };
 export type StoryModule = { title: string | null; stories: StoryFact[] };
 
 /** The object literal `node` is, under any `satisfies`, `as` or parentheses, or undefined for anything else. */
-const objectOf = (node: ts.Expression | undefined): ts.ObjectLiteralExpression | undefined => {
+const objectOf = (node: ts.Expression | undefined) => {
   let at = node;
   while (at && (ts.isSatisfiesExpression(at) || ts.isAsExpression(at) || ts.isParenthesizedExpression(at))) at = at.expression;
-  return at && ts.isObjectLiteralExpression(at) ? at : undefined;
+  return (at && ts.isObjectLiteralExpression(at) ? at : undefined) satisfies ts.ObjectLiteralExpression | undefined;
 };
 
 /** The property `name` of `object`, written as a key with a value. */
-const propertyOf = (object: ts.ObjectLiteralExpression | undefined, name: string): ts.Expression | undefined => {
+const propertyOf = (object: ts.ObjectLiteralExpression | undefined, name: string) => {
   for (const one of object?.properties ?? [])
     if (ts.isPropertyAssignment(one) && (ts.isIdentifier(one.name) || ts.isStringLiteral(one.name)) && one.name.text === name)
-      return one.initializer;
-  return undefined;
+      return one.initializer satisfies ts.Expression | undefined;
+  return undefined satisfies ts.Expression | undefined;
 };
 
 /** Whether `object` sets its a11y test to the word that only warns, under `parameters`. */
-const todoIn = (object: ts.ObjectLiteralExpression | undefined): boolean => {
+const todoIn = (object: ts.ObjectLiteralExpression | undefined) => {
   const test = propertyOf(objectOf(propertyOf(objectOf(propertyOf(object, 'parameters')), 'a11y')), 'test');
   return test !== undefined && ts.isStringLiteral(test) && test.text === 'todo';
 };
@@ -56,7 +56,7 @@ const todoIn = (object: ts.ObjectLiteralExpression | undefined): boolean => {
  * The meta and the stories of a story module's source: the default export's title, args and axe, and each exported `const`.
  * @param source The story module's text.
  */
-export const storyModuleOf = (source: string): StoryModule => {
+export const storyModuleOf = (source: string) => {
   const file = ts.createSourceFile('story.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const consts = new Map<string, ts.ObjectLiteralExpression | undefined>();
   const exported: string[] = [];
@@ -85,7 +85,7 @@ export const storyModuleOf = (source: string): StoryModule => {
       const story = consts.get(name);
       return { name, args: metaArgs || propertyOf(story, 'args') !== undefined, todo: metaTodo || todoIn(story) };
     }),
-  };
+  } satisfies StoryModule;
 };
 
 /**
@@ -93,14 +93,14 @@ export const storyModuleOf = (source: string): StoryModule => {
  * @param file The story file, from the workspace root.
  * @param module What `storyModuleOf` read of it.
  */
-export const argless = (file: string, module: StoryModule): string[] =>
-  module.stories.filter((story) => !story.args).map((story) => `${file}#${story.name}`);
+export const argless = (file: string, module: StoryModule) =>
+  module.stories.filter((story) => !story.args).map((story) => `${file}#${story.name}`) satisfies string[];
 
 /**
  * Whether `module`'s title opens with none of `CATEGORIES`, or it has none.
  * @param module What `storyModuleOf` read of a story file.
  */
-export const offCategory = (module: StoryModule): boolean =>
+export const offCategory = (module: StoryModule) =>
   module.title === null || !CATEGORIES.some((category) => module.title?.startsWith(category));
 
 /**
@@ -108,14 +108,14 @@ export const offCategory = (module: StoryModule): boolean =>
  * @param file The story file, from the workspace root.
  * @param module What `storyModuleOf` read of it.
  */
-export const a11yTodos = (file: string, module: StoryModule): string[] =>
-  module.stories.filter((story) => story.todo).map((story) => `${file}#${story.name}`);
+export const a11yTodos = (file: string, module: StoryModule) =>
+  module.stories.filter((story) => story.todo).map((story) => `${file}#${story.name}`) satisfies string[];
 
 /** The board's source folder, from the workspace root. */
 const SRC = 'apps/web/src';
 
 /** Whether `file` may draw with React Aria and shadcn's parts: the kit and shadcn's own `ui/`, the vendored `ai-elements/`, the look. */
-const ofAnotherSystem = (file: string): boolean => /^apps\/web\/src\/components\/(ui|ai-elements|look)\//.test(file);
+const ofAnotherSystem = (file: string) => /^apps\/web\/src\/components\/(ui|ai-elements|look)\//.test(file);
 
 /** One name a file takes from a second component system: the module by its canonical spelling, and the name it exports. */
 export type Taken = { module: string; name: string };
@@ -124,19 +124,19 @@ export type Taken = { module: string; name: string };
  * The module `spec` names, spelled as the map keys it: `@/components/ui/<part>` for a file of shadcn's `ui/` (anything there but the
  * kit), `@/lib/classes` for the shared class strings, `react-aria-components` (or one of its subpaths) as written; null for any other.
  */
-const canonicalOf = (file: string, spec: string): string | null => {
-  if (spec === 'react-aria-components' || spec.startsWith('react-aria-components/')) return spec;
+const canonicalOf = (file: string, spec: string) => {
+  if (spec === 'react-aria-components' || spec.startsWith('react-aria-components/')) return spec satisfies string | null;
   const at = spec.startsWith('@/')
     ? path.posix.join(SRC, spec.slice(2))
     : spec.startsWith('.')
       ? path.posix.join(path.posix.dirname(file), spec)
       : null;
-  if (at === null) return null;
+  if (at === null) return null satisfies string | null;
   const bare = at.replace(/\.tsx?$/, '').replace(/\/index$/, '');
-  if (bare === `${SRC}/lib/classes`) return '@/lib/classes';
+  if (bare === `${SRC}/lib/classes`) return '@/lib/classes' as const satisfies string | null;
   if (bare.startsWith(`${SRC}/components/ui/`) && !/^apps\/web\/src\/components\/ui\/ds(\/|$)/.test(bare))
-    return `@/${bare.slice(SRC.length + 1)}`;
-  return null;
+    return `@/${bare.slice(SRC.length + 1)}` satisfies string | null;
+  return null satisfies string | null;
 };
 
 /**
@@ -144,10 +144,10 @@ const canonicalOf = (file: string, spec: string): string | null => {
  * alias read as the name it renames), a default as `default`, and a namespace, a bare or a dynamic import as `*`. `import type` and
  * `export … from` count as imports.
  */
-const importedNames = (source: string): { spec: string; names: string[] }[] => {
+const importedNames = (source: string) => {
   const file = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const found: { spec: string; names: string[] }[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const clause = node.importClause;
       const names: string[] = [];
@@ -174,7 +174,7 @@ const importedNames = (source: string): { spec: string; names: string[] }[] => {
     ts.forEachChild(node, visit);
   };
   visit(file);
-  return found;
+  return found satisfies { spec: string; names: string[] }[];
 };
 
 /**
@@ -185,8 +185,8 @@ const importedNames = (source: string): { spec: string; names: string[] }[] => {
  * @param file The file, from the workspace root.
  * @param source Its text.
  */
-export const secondSystem = (file: string, source: string): Taken[] => {
-  if (!file.startsWith(`${SRC}/`) || ofAnotherSystem(file)) return [];
+export const secondSystem = (file: string, source: string) => {
+  if (!file.startsWith(`${SRC}/`) || ofAnotherSystem(file)) return [] satisfies Taken[];
   const keys = new Set<string>();
   const taken: Taken[] = [];
   for (const { spec, names } of importedNames(source)) {
@@ -198,7 +198,7 @@ export const secondSystem = (file: string, source: string): Taken[] => {
       taken.push({ module, name });
     }
   }
-  return taken;
+  return taken satisfies Taken[];
 };
 
 /** The elements a control drawn by hand is: each is the kit's to draw. */
@@ -214,7 +214,7 @@ const INPUT_KINDS = ['checkbox', 'radio'];
  * ` type="<kind>"` where `element` sets its `type` to a literal of `INPUT_KINDS`, else nothing: a spread or another type is a plain
  * input.
  */
-const typeOf = (element: ts.JsxOpeningElement | ts.JsxSelfClosingElement): string => {
+const typeOf = (element: ts.JsxOpeningElement | ts.JsxSelfClosingElement) => {
   for (const one of element.attributes.properties) {
     if (!ts.isJsxAttribute(one) || !ts.isIdentifier(one.name) || one.name.text !== 'type') continue;
     const at = one.initializer;
@@ -232,7 +232,7 @@ const typeOf = (element: ts.JsxOpeningElement | ts.JsxSelfClosingElement): strin
 /**
  * Whether a JSX element sits inside the look's `CutField`, which draws the frame of a field and leaves its input to the page.
  */
-const framedByCutField = (element: ts.Node): boolean => {
+const framedByCutField = (element: ts.Node) => {
   for (let at = element.parent; at; at = at.parent)
     if (ts.isJsxElement(at) && ts.isIdentifier(at.openingElement.tagName) && at.openingElement.tagName.text === 'CutField') return true;
   return false;
@@ -248,12 +248,12 @@ const framedByCutField = (element: ts.Node): boolean => {
  * @param file The file, from the workspace root.
  * @param source Its text.
  */
-export const handDrawn = (file: string, source: string): string[] => {
-  if (!file.startsWith(`${SRC}/`) || ofAnotherSystem(file)) return [];
+export const handDrawn = (file: string, source: string) => {
+  if (!file.startsWith(`${SRC}/`) || ofAnotherSystem(file)) return [] satisfies string[];
   const found = new Set<string>();
   const tree = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const controls: readonly string[] = CONTROL_ELEMENTS;
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (
       (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
       ts.isIdentifier(node.tagName) &&
@@ -271,7 +271,7 @@ export const handDrawn = (file: string, source: string): string[] => {
   for (const { spec, names } of importedNames(source))
     if (canonicalOf(file, spec) === '@/lib/classes')
       for (const name of names) if (strings.includes(name)) found.add(`@/lib/classes:${name}`);
-  return [...found];
+  return [...found] satisfies string[];
 };
 
 /**
@@ -291,10 +291,10 @@ export const mapGaps: MapGaps = (taken, mapped) => ({
  * `waitFor(() => expect(<…>.getBy…(…)).toBeVisible())`.
  * @param source A story module's text.
  */
-export const seenOnceFound = (source: string): number[] => {
+export const seenOnceFound = (source: string) => {
   const tree = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const lines: number[] = [];
-  const found = (node: ts.Expression): boolean =>
+  const found = (node: ts.Expression) =>
     ts.isAwaitExpression(node) &&
     ts.isCallExpression(node.expression) &&
     /^findBy|^findAllBy/.test(
@@ -304,7 +304,7 @@ export const seenOnceFound = (source: string): number[] => {
           ? node.expression.expression.text
           : '',
     );
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'toBeVisible') {
       let on: ts.Expression = node.expression.expression;
       if (ts.isPropertyAccessExpression(on) && on.name.text === 'not') on = on.expression;
@@ -320,5 +320,5 @@ export const seenOnceFound = (source: string): number[] => {
     ts.forEachChild(node, visit);
   };
   visit(tree);
-  return lines;
+  return lines satisfies number[];
 };

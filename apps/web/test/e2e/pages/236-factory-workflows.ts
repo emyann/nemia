@@ -35,7 +35,7 @@ const GONE = 'gone';
 const stepFile = (body: string) => `---\nharness: claude\nmodel: sonnet\nplace: git\n---\n${body}\n`;
 
 /** Writes TREED's file and its tree, and TWIN's file; returns what takes them back. */
-function written(): () => void {
+function written() {
   const file = path.join(store!, 'factories', `${TREED}.json`);
   const folder = path.join(store!, 'factories', TREED);
   const workflows = path.join(folder, 'tree', 'workflows');
@@ -62,20 +62,20 @@ function written(): () => void {
   put(file, `${JSON.stringify({ volumes: worked([path.join(store!, 'elsewhere')]), template: TEMPLATE }, null, 2)}\n`);
   const twin = path.join(store!, 'factories', `${TWIN.name}.json`);
   put(twin, `${JSON.stringify({ volumes: worked(TWIN.repos.map((repo) => path.join(store!, repo))) }, null, 2)}\n`);
-  return () => {
+  return (() => {
     fs.rmSync(twin, { force: true });
     fs.rmSync(file, { force: true });
     fs.rmSync(folder, { recursive: true, force: true });
-  };
+  }) satisfies () => void;
 }
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
 
 /** Refuses unless the page reaches `pathname` under the factory TREED's path within the wait. */
-async function expectIn(page: Page, pathname: string, assertion: string): Promise<void> {
+async function expectIn(page: Page, pathname: string, assertion: string) {
   try {
     await page.waitForURL((url) => url.pathname === `/factories/${TREED}${pathname}`, { timeout: WAIT_MS });
   } catch {

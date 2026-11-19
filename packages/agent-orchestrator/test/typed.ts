@@ -40,7 +40,7 @@ type Data = Readonly<Record<string, unknown>>;
 export type StartedAnswer = Started & { readonly facts: RunStartedFacts };
 
 /** `started`, what a start's handler answered, with the facts the api answers of its run beside it (`startedFacts`). */
-export const factsOf = (started: Started): StartedAnswer => ({ ...started, facts: startedFacts(started) });
+export const factsOf = (started: Started) => ({ ...started, facts: startedFacts(started) }) satisfies StartedAnswer;
 
 /**
  * The engine, place and store a call is made over: the store `env` names, and the engine and place the test gives, each a fresh
@@ -50,17 +50,20 @@ export const factsOf = (started: Started): StartedAnswer => ({ ...started, facts
 export type Over = { readonly e?: Engine; readonly place?: Place; readonly env?: Env };
 
 /** `entry`'s handler run on `input`, over what `over` names: its data, or its refusal thrown. */
-export function handled<D extends object, I>(entry: Pick<Command<D, I>, 'handler'>, input: I, over: Over = {}): Promise<D> {
+export function handled<D extends object, I>(entry: Pick<Command<D, I>, 'handler'>, input: I, over: Over = {}) {
   const env = over.env ?? process.env;
-  return runWith(over.e ?? engineOf(testEngine().layer), placedIn(env, over.place ?? testPlace().place, entry.handler(input)));
+  return runWith(
+    over.e ?? engineOf(testEngine().layer),
+    placedIn(env, over.place ?? testPlace().place, entry.handler(input)),
+  ) satisfies Promise<D>;
 }
 
 /** The entry `words` name, the longest whose name they open with, and the words after it; refused where no entry is named. */
-function namedIn(words: readonly string[]): { entry: (typeof TABLE)[number]; rest: string[] } {
+function namedIn(words: readonly string[]) {
   const opens = (name: string) => name.split(' ').every((word, i) => words[i] === word);
   const entry = TABLE.filter((c) => opens(c.name)).sort((a, b) => b.name.length - a.name.length)[0];
   if (entry === undefined) throw new Invalid({ message: `${words.join(' ')} names no entry of the command table: name one of TABLE` });
-  return { entry, rest: words.slice(entry.name.split(' ').length) };
+  return { entry, rest: words.slice(entry.name.split(' ').length) } satisfies { entry: (typeof TABLE)[number]; rest: string[] };
 }
 
 /**
@@ -68,7 +71,7 @@ function namedIn(words: readonly string[]): { entry: (typeof TABLE)[number]; res
  * refuse it, where it is given too little to act on, and where what it parsed is not what the handler takes. `_demand` is unread: no
  * daemon is started.
  */
-export async function typed(argv: readonly string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<Data> {
+export async function typed(argv: readonly string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) {
   const { entry, rest } = namedIn(renamedIn(argv).words);
   if (entry.handler === undefined)
     throw new Invalid({ message: `${entry.name} has no handler: it is a runner of the CLI's own, driven through main` });
@@ -88,7 +91,7 @@ export async function typed(argv: readonly string[], e?: Engine, _demand?: unkno
  * What `argv` answers, run as `typed` runs it: a `start` of a card by its card, of a workflow's name by its folder (`foldered`), with its
  * facts beside it (`factsOf`).
  */
-async function answered(argv: readonly string[], e?: Engine, demand?: unknown, place?: Place, env?: Env): Promise<Data> {
+async function answered(argv: readonly string[], e?: Engine, demand?: unknown, place?: Place, env?: Env) {
   if (argv[0] !== 'start') return typed(argv, e, demand, place, env);
   const card = cardNamed(argv[1] ?? '', env ?? process.env);
   const over = { ...(e && { e }), ...(place && { place }), ...(env && { env }) };
@@ -103,18 +106,18 @@ async function answered(argv: readonly string[], e?: Engine, demand?: unknown, p
  * Run `id`'s listing in what an `ls` answered (`RunsListed`): its steps' rows, what waits on a person, its hold and its ending. Fails the
  * test where the answer has no run `id`, or holds it unjudged.
  */
-export function listedRow(listed: RunsListed, id: string): Listing {
+export function listedRow(listed: RunsListed, id: string) {
   const row = listed.runs.find((r) => r.run.id === id);
   if (row === undefined) throw new Error(`nemia ls answered no run ${id}: it answered ${listed.runs.map((r) => r.run.id).join(', ')}`);
   if ('said' in row.listed) throw new Error(`nemia ls answered run ${id} unjudged: ${row.listed.said}`);
-  return row.listed;
+  return row.listed satisfies Listing;
 }
 
 /** Step `name`'s row in a run's listing (`listedRow`). Fails the test where it has none. */
-export function stepRow(listing: Listing, name: string): Listing['steps'][number] {
+export function stepRow(listing: Listing, name: string) {
   const row = listing.steps.find((s) => s.name === name);
   if (row === undefined) throw new Error(`the listing has no step ${name}: it has ${listing.steps.map((s) => s.name).join(', ')}`);
-  return row;
+  return row satisfies Listing['steps'][number];
 }
 
 /**
@@ -122,13 +125,13 @@ export function stepRow(listing: Listing, name: string): Listing['steps'][number
  * `typed` runs it, its answer answered (a `start`'s with its `facts`, an `ls`'s as its `RunsListed`) and, of a `logs`, its output
  * printed; a verb of this machine on `main`. It takes what `main` takes, so a story's stage is given it as its `main`.
  */
-export async function told(argv: string[], e?: Engine, demand?: unknown, place?: Place, env?: Env): Promise<Data | undefined> {
+export async function told(argv: string[], e?: Engine, demand?: unknown, place?: Place, env?: Env) {
   const words = renamedIn(argv).words;
   if (!MOVED.some((name) => name.split(' ').every((word, i) => words[i] === word))) {
     await main(argv, e, demand as Parameters<typeof main>[2], place, env);
     return undefined;
   }
-  const data = await answered(argv, e, demand, place, env);
+  const data: Data = await answered(argv, e, demand, place, env);
   if (argv[0] === 'logs') for (const line of String(data.output ?? '').split('\n')) console.log(line);
   return data;
 }
@@ -141,10 +144,10 @@ const MOVED: readonly string[] = COMMAND_WORDS.map((w) => w.name);
  * `--factory`'s tree's `workflows/<name>`, then the repository's (`--repo`, else the factory's, else where it is typed), else the
  * store's; a path, or a name in none, left as typed. A factory with one repository gives the run its `--repo`, as the api does.
  */
-function foldered(argv: readonly string[], env: Env): readonly string[] {
+function foldered(argv: readonly string[], env: Env) {
   const at = argv.findIndex((word) => word === '--workflows');
   const name = at < 0 ? undefined : argv[at + 1];
-  if (name === undefined || name.includes('/')) return argv;
+  if (name === undefined || name.includes('/')) return argv satisfies readonly string[];
   const repoAt = argv.indexOf('--repo');
   const factoryAt = argv.indexOf('--factory');
   const factory = factoryAt < 0 ? undefined : readFactoriesAt(env.WF_ROOT ?? '').find((f) => f.name === argv[factoryAt + 1]);
@@ -157,23 +160,28 @@ function foldered(argv: readonly string[], env: Env): readonly string[] {
   ].find((dir) => fs.existsSync(dir));
   const named = found === undefined ? argv : argv.map((word, i) => (i === at + 1 ? found : word));
   const [only, ...more] = worked;
-  return repoAt < 0 && only !== undefined && more.length === 0 ? [...named, '--repo', only] : named;
+  return (repoAt < 0 && only !== undefined && more.length === 0 ? [...named, '--repo', only] : named) satisfies readonly string[];
 }
 
 /** The card of the store's inbox `given` names, by its file or its name, as the client sends a card it names; else none. */
-function cardNamed(given: string, env: Env): string | undefined {
+function cardNamed(given: string, env: Env) {
   const inbox = path.join(env.WF_ROOT ?? '', 'inbox');
   const named = !given.includes('/') && fs.existsSync(path.join(inbox, given.endsWith('.md') ? given : `${given}.md`));
   const inInbox = named ? given : path.relative(inbox, path.resolve(given));
-  return inInbox.startsWith('..') || path.isAbsolute(inInbox) || inInbox === '' ? undefined : inInbox.replace(/\.md$/, '');
+  return (inInbox.startsWith('..') || path.isAbsolute(inInbox) || inInbox === '' ? undefined : inInbox.replace(/\.md$/, '')) satisfies
+    | string
+    | undefined;
 }
 
 /**
  * The flags of a card's `start`, read by its words: `--brief` its `instead`, a file's text where it names one here, as the client reads
  * it.
  */
-function cardFlags(rest: readonly string[]): StartInput {
+function cardFlags(rest: readonly string[]) {
   const { brief: _card, instead, ...flags } = Schema.decodeUnknownSync(StartInput)(parseArgv(START.spec, ['card', ...rest]) ?? {});
-  if (instead === undefined) return flags;
-  return { ...flags, instead: fs.existsSync(instead) && fs.statSync(instead).isFile() ? fs.readFileSync(instead, 'utf8') : instead };
+  if (instead === undefined) return flags satisfies StartInput;
+  return {
+    ...flags,
+    instead: fs.existsSync(instead) && fs.statSync(instead).isFile() ? fs.readFileSync(instead, 'utf8') : instead,
+  } satisfies StartInput;
 }

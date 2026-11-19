@@ -18,7 +18,7 @@ import { main as cli } from '../src/cli/main.ts';
 import { engineOf, type Engine } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { factsOf, typed, type StartedAnswer } from './typed.ts';
+import { factsOf, typed } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 import { COMMAND_WORDS } from 'objects';
 import type { Place } from '../src/runner.ts';
@@ -38,13 +38,15 @@ const ENV: Env = {
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `cli`.
  */
-const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
+const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? typed(argv, e, undefined, place, env)
+    : cli(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrCli, engineOf, env: ENV });
 const { runPlaced } = stage;
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
@@ -81,7 +83,7 @@ const SIGNED = { outcome: 'done', summary: 'the plan', artifacts: [], needs: nul
 const frozenModels = (id: string) => Object.fromEntries((runRecord(ROOT, id).workflow ?? []).map((s) => [s.name, s.model]));
 
 /** What `nemia start` answered, with the facts the client words, over an engine of its own that is asked nothing. */
-const startedBy = async (argv: string[]): Promise<StartedAnswer> => {
+const startedBy = async (argv: string[]) => {
   const own = testEngine();
   const started = factsOf((await stage.main(argv, engineOf(own.layer))) as Started);
   unasked(own);

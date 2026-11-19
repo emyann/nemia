@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Run, TaskPhase } from '../src/run.ts';
+import type { TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
@@ -44,7 +44,7 @@ const LOOPING = {
 };
 
 /** A repository with one commit on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -54,7 +54,7 @@ const aRepo = (): string => {
 };
 
 /** A workflow folder of the steps given, each `name` with its frontmatter lines. */
-const folder = (steps: Record<string, string>, extra: Record<string, string> = {}): string => {
+const folder = (steps: Record<string, string>, extra: Record<string, string> = {}) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, keys] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${keys ? `${keys}\n` : ''}---\n${name} it\n`);
@@ -63,7 +63,7 @@ const folder = (steps: Record<string, string>, extra: Record<string, string> = {
 };
 
 /** `nemia start` over a fresh repository, the steps working in its checkout unless `isolate`, each then in a worktree of its own. */
-const started = async (dir: string, isolate = false): Promise<Run> =>
+const started = async (dir: string, isolate = false) =>
   await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate }));
 
 /**
@@ -329,7 +329,7 @@ test("each question a pass asks its place is one call of its place phase, and ea
   t.onTestFinished(() => {
     process.env.PATH = was;
   });
-  const gitRan = (): number => (fs.existsSync(ran) ? fs.readFileSync(ran, 'utf8').split('\n').filter(Boolean).length : 0);
+  const gitRan = () => (fs.existsSync(ran) ? fs.readFileSync(ran, 'utf8').split('\n').filter(Boolean).length : 0);
   const placed = async () => {
     const e = meteredEngine(b.e);
     const program = Effect.gen(function* () {

@@ -36,13 +36,14 @@ const serve = async (t: { onTestFinished: (fn: () => void | Promise<void>) => vo
   return s;
 };
 
-const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({
-  brief: 'paint the fence',
-  cwd: '/nowhere/in/particular',
-  harness: 'remote',
-  closeoutSchema: { type: 'object' },
-  ...o,
-});
+const task = (o: Partial<TaskSpec> = {}) =>
+  ({
+    brief: 'paint the fence',
+    cwd: '/nowhere/in/particular',
+    harness: 'remote',
+    closeoutSchema: { type: 'object' },
+    ...o,
+  }) satisfies TaskSpec;
 
 /** Rung on each moment a follower is handed. */
 const rung = bell();
@@ -59,14 +60,14 @@ const drained = (stream: Stream.Stream<Followed, RunnerError>, got: Followed[]) 
   );
 
 /** Each moment as a line a reader can compare: its kind, then what it carries; an event by its role and text, its id aside. */
-const shown = (ms: readonly Followed[]): string[] =>
+const shown = (ms: readonly Followed[]) =>
   ms.map((m) =>
     m.kind === 'state'
       ? `state ${m.state}`
       : m.kind === 'partial'
         ? `partial ${m.key} ${JSON.stringify(m.text)}${m.append ? ' +' : ''}${m.last ? ' last' : ''}`
         : `events ${m.events.map((e) => `${e.role} ${JSON.stringify(e.text)}`).join(', ')}`,
-  );
+  ) satisfies string[];
 const ids = (ms: readonly Followed[]) => ms.flatMap((m) => (m.kind === 'events' ? m.events.map((e) => e.id) : []));
 const failure = (exit: Exit.Exit<void, RunnerError>) => {
   assert.ok(Exit.isFailure(exit), 'the follow failed');
@@ -119,7 +120,7 @@ const reads = (s: RemoteServer) => s.counts.getTask ?? 0;
  * Whether a `fetch` made with `args` asks for a subscription, on either binding: REST's `:subscribe`, or JSON-RPC's `SubscribeToTask`.
  * Counted where the client makes it, a request given up before the server reads it included.
  */
-const subscribes = ([input, init]: unknown[]): boolean => {
+const subscribes = ([input, init]: unknown[]) => {
   const url = input instanceof Request ? input.url : String(input);
   const body = (init as RequestInit | undefined)?.body;
   return new URL(url).pathname.endsWith(':subscribe') || (typeof body === 'string' && body.includes('"SubscribeToTask"'));
@@ -148,7 +149,7 @@ const entryFile = (root: string, name: string) => path.join(root, 'remote', `${e
  * The send lease of the session `name` placed past its bound, by the entry on disk and not by waiting: `sentAt` long ago and the
  * monotonic stamp taken off, so `sendHeld` judges it on the wall clock and finds it lapsed.
  */
-const lapseSend = (root: string, name: string): void => {
+const lapseSend = (root: string, name: string) => {
   const file = entryFile(root, name);
   const entry = JSON.parse(fs.readFileSync(file, 'utf8')) as { sentAt: string; sending: { mono?: unknown } };
   const sending = { ...entry.sending };

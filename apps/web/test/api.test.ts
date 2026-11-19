@@ -10,8 +10,9 @@ import { readGone, retryUnlessGone } from '../src/lib/api/gone.ts';
 import { runObjectQuery } from '../src/lib/api/run.ts';
 import { sayToStep } from '../src/lib/api/asks.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
-import { coded, decidable, type Word } from './run-fixtures.ts';
+import { coded, decidable, type Word } from './run.fixture.ts';
 import { bell, until, WAITED } from './waits.ts';
+import { apiAnswers } from './network.ts';
 
 const { workflowNameOf } = await import('../src/lib/api/workflows.ts');
 
@@ -19,21 +20,16 @@ const { startRun } = await import('../src/lib/api/workflows.ts');
 
 /** POST /api/namespaces/default/runs answering each start with `answer()`, for the length of the test: the requests the board sent. */
 function starting(t: { onTestFinished: (fn: () => void) => void }, answer: () => Response) {
-  const before = globalThis.fetch;
   const sent: Array<{ url: string; init: RequestInit | undefined }> = [];
-  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
+  apiAnswers(async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({ url: String(url), init });
     return answer();
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent;
 }
 
 /** A request's body as text: the objects' client sends its JSON as bytes. */
-const text = (body: BodyInit | null | undefined): string =>
-  typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array);
+const text = (body: BodyInit | null | undefined) => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
 
 const answered = (status: number, body: object, statusText = '') =>
   new Response(JSON.stringify(body), { status, statusText, headers: { 'content-type': 'application/json' } });
@@ -108,17 +104,15 @@ test(
   async (t) => {
     const answers: Array<(body: object) => void> = [];
     const rang = bell();
-    const before = globalThis.fetch;
-    globalThis.fetch = async () => {
+    apiAnswers(async () => {
       const body = await new Promise<object>((resolve) => {
         answers.push(resolve);
         rang.ring();
       });
       return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
-    };
+    });
     const client = new QueryClient();
     t.onTestFinished(() => {
-      globalThis.fetch = before;
       client.clear();
     });
 
@@ -190,30 +184,22 @@ function asking(
   body: string,
   sent: Array<{ url: string; init: RequestInit }>,
 ) {
-  const before = globalThis.fetch;
-  globalThis.fetch = (async (url: string, init: RequestInit) => {
+  apiAnswers(async (url: string, init: RequestInit) => {
     sent.push({ url, init });
     return new Response(body, { status, headers: { 'content-type': 'application/json' } });
-  }) as typeof fetch;
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
 }
 
 const { askRound } = await import('../src/lib/api/asks.ts');
 
 describe("each ask of a run's page: posted as the api takes it, read back, and refused in the api's words", () => {
-  test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async (t) => {
-    const before = globalThis.fetch;
+  test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async () => {
     const sent: Array<{ url: string; init: RequestInit }> = [];
     let answer = () =>
       new Response(JSON.stringify({ at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.', after: null }), { status: 202 });
-    globalThis.fetch = (async (url: string, init: RequestInit) => {
+    apiAnswers(async (url: string, init: RequestInit) => {
       sent.push({ url, init });
       return answer();
-    }) as typeof fetch;
-    t.onTestFinished(() => {
-      globalThis.fetch = before;
     });
     assert.deepEqual(await sayToStep('default', 'r 1', 'implement', 'Widen it.'), {
       at: '2026-09-14T16:06:19.851Z',
@@ -268,7 +254,7 @@ describe("each ask of a run's page: posted as the api takes it, read back, and r
     asking(t, 409, JSON.stringify({ error: refusal }), sent);
     await assert.rejects(askTry('default', 'r-1', 'working', { mode: 'continue' }), (err: Error) => err.message === refusal);
 
-    globalThis.fetch = async () => new Response(JSON.stringify({ file: '/f' }), { status: 202 });
+    apiAnswers(async () => new Response(JSON.stringify({ file: '/f' }), { status: 202 }));
     await assert.rejects(
       askTry('default', 'r-1', 'implement', { mode: 'continue' }),
       (err: Error) =>
@@ -277,7 +263,7 @@ describe("each ask of a run's page: posted as the api takes it, read back, and r
         ) && /before asking again/.test(err.message),
     );
 
-    globalThis.fetch = async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' });
+    apiAnswers(async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' }));
     await assert.rejects(
       askTry('default', 'r-1', 'implement', { mode: 'continue' }),
       (err: Error) => err.message === 'POST /api/namespaces/default/runs/r-1/steps/implement/retry answered 502 Bad Gateway',
@@ -340,18 +326,16 @@ describe("a run's reads: gone on a 404 alone, its last read kept, any other fail
     assert.equal(workflowNameOf('C:\\code\\app\\workflows\\dev'), 'dev');
   });
   test("the run object's read: a 404 is the run gone, said at once, its last read kept, asked of the run's own route", async (t) => {
-    const before = globalThis.fetch;
     const asked: string[] = [];
-    globalThis.fetch = (async (url: string) => {
+    apiAnswers(async (url: string) => {
       asked.push(url);
       return new Response(JSON.stringify({ error: "No run 'r-1' in this store." }), {
         status: 404,
         headers: { 'content-type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
     const client = new QueryClient();
     t.onTestFinished(() => {
-      globalThis.fetch = before;
       client.clear();
     });
     const last = { kind: 'Run' } as unknown as RunObject.Run;

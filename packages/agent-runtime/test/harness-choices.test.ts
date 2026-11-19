@@ -17,7 +17,7 @@ type Choices = typeof HARNESS_CHOICES;
 const configOf = (key: keyof Choices, word: string) => (key === 'effort' ? { effort: word } : { permissionMode: word });
 
 /** Where `table` offers a harness a word `configRefusal` would refuse of it, each worded with the runtime's refusal. */
-function refusedWords(table: Choices): string[] {
+function refusedWords(table: Choices) {
   const out: string[] = [];
   for (const key of Object.keys(table) as (keyof Choices)[])
     for (const [harness, words] of Object.entries(table[key]))
@@ -32,7 +32,7 @@ function refusedWords(table: Choices): string[] {
  * Where `table` breaks the fence's shape: a harness `fenceReach` fences by mode with no `permissionMode` list or a `sandbox` one, one
  * fenced by sandbox the reverse, and a harness that is not one of `DEFAULT_HARNESSES`.
  */
-function choicesBreaks(table: Choices): string[] {
+function choicesBreaks(table: Choices) {
   const out: string[] = [];
   const named = new Set(Object.values(table).flatMap((byHarness) => Object.keys(byHarness)));
   for (const harness of named)

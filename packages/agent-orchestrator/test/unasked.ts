@@ -8,7 +8,7 @@ import { afterEach } from 'vitest';
 import type { TestEngine } from 'agent-runtime/testing';
 
 /** Throws where `engine` was asked to file, stop, say or forget anything. */
-export function unasked(engine: TestEngine): void {
+export function unasked(engine: TestEngine) {
   const { filings, stopped, said, forgets } = engine;
   assert.deepEqual(
     { filings, stopped, said, forgets },
@@ -18,6 +18,6 @@ export function unasked(engine: TestEngine): void {
 }
 
 /** `unasked` of the engine `engine` answers, after each test of the file. */
-export function heldUnasked(engine: () => TestEngine): void {
+export function heldUnasked(engine: () => TestEngine) {
   afterEach(() => unasked(engine()));
 }

@@ -96,7 +96,7 @@ const post = (url: string, body: unknown, token: string) =>
   app.request(url, { method: 'POST', headers: headersOf(token), body: JSON.stringify(body) });
 
 /** The status and the refusal word of `res`. */
-const refusalOf = async (res: Response): Promise<[number, string | undefined]> => [
+const refusalOf = async (res: Response) => [
   res.status,
   res.status === 403 ? ((await res.json()) as { reason?: string }).reason : undefined,
 ];

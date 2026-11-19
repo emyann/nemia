@@ -24,7 +24,7 @@ const standIn = eachTest(testEngine);
 const app = eachTest(() => appOver(standIn(), stand()));
 
 /** A standing token minted through the token door over the harness's store, under `name`, held by `holder` (the person where left out). */
-const minted = (name: string, holder?: TokenHolder): string =>
+const minted = (name: string, holder?: TokenHolder) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).persons.mint(name, holder);
@@ -61,7 +61,7 @@ const send = (method: 'GET' | 'POST' | 'DELETE', url: string, bearer: string | n
   });
 
 /** The refusal word an answer carries. */
-const reasonOf = async (res: Response): Promise<string | undefined> => ((await res.json()) as { reason?: string }).reason;
+const reasonOf = async (res: Response) => ((await res.json()) as { reason?: string }).reason;
 
 test("a person's token mints a token of the person's, and one for an agent bound to a factory and narrowed, each answered once", async () => {
   const mine = await send('POST', '/api/tokens', personToken, { name: 'tokens-phone' });

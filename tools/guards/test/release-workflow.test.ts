@@ -29,8 +29,8 @@ const RELEASE = '.github/workflows/release.yml';
 const LABEL_CHECK = '.github/workflows/release-label.yml';
 const NOTES = '.github/release.yml';
 
-const text = (file: string): string => fs.readFileSync(path.join(ROOT, file), 'utf8');
-const parse = (source: string): Workflow => yaml.load(source) as Workflow;
+const text = (file: string) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+const parse = (source: string) => yaml.load(source) as Workflow;
 
 /** The command every job of the release runs, followed by its verb. */
 const TOOL = 'node tools/release/release.ts';
@@ -94,12 +94,12 @@ const CHECK_STEP = 'check';
 /** The check job's own grants: the workflow's two reads, and the commit status a dispatched run posts. */
 const JOB_GRANTS = { contents: 'read', 'pull-requests': 'read', statuses: 'write' };
 
-const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const sortedKeys = (value: Record<string, string> | undefined) =>
   Object.fromEntries(Object.entries(value ?? {}).sort(([a], [b]) => a.localeCompare(b)));
 
 /** Where a workflow takes an expression into a command line, rather than through env: a label or a branch name is anyone's to write. */
-function interpolationDrift(workflow: Workflow, file: string): string[] {
+function interpolationDrift(workflow: Workflow, file: string) {
   return Object.entries(workflow.jobs).flatMap(([name, job]) =>
     (job.steps ?? [])
       .filter((step) => step.run?.includes('${{') === true)
@@ -111,7 +111,7 @@ function interpolationDrift(workflow: Workflow, file: string): string[] {
 }
 
 /** The release workflow against `JOBS`: its triggers, its token, and each job's verb, wait, grants and concurrency. */
-function releaseDrift(workflow: Workflow): string[] {
+function releaseDrift(workflow: Workflow) {
   const sentences: string[] = [];
   if (!same(workflow.on?.push?.branches, ['main']))
     sentences.push(`${RELEASE} does not run on a push to main: give it on.push.branches [main], so every landing is read`);
@@ -153,7 +153,7 @@ function releaseDrift(workflow: Workflow): string[] {
 type ReleaseJob = Job & { outputs?: Record<string, string>; 'runs-on'?: string };
 
 /** The tag job's outputs: the tag main names, and whether its release lacks its assets, from its step `due`. */
-function dueDrift(workflow: Workflow): string[] {
+function dueDrift(workflow: Workflow) {
   const job = workflow.jobs.tag as ReleaseJob | undefined;
   const due = (job?.steps ?? []).find((step) => step.id === 'due');
   const outputs = job?.outputs ?? {};
@@ -173,7 +173,7 @@ function dueDrift(workflow: Workflow): string[] {
 }
 
 /** The archive's matrix: built where the tag job says the assets are due, one leg per platform on its runner, at the tag. */
-function archiveDrift(workflow: Workflow): string[] {
+function archiveDrift(workflow: Workflow) {
   const job = workflow.jobs.archive as ReleaseJob | undefined;
   if (job === undefined) return [];
   const sentences: string[] = [];
@@ -198,7 +198,7 @@ function archiveDrift(workflow: Workflow): string[] {
 }
 
 /** The upload: every asset with --clobber onto the tag's release, `latest.json` in the last call, then the draft published. */
-function uploadDrift(workflow: Workflow): string[] {
+function uploadDrift(workflow: Workflow) {
   const lines = (workflow.jobs.upload?.steps ?? [])
     .flatMap((step) => (step.run ?? '').split('\n'))
     .filter((line) => line.includes('gh release '));
@@ -227,7 +227,7 @@ function uploadDrift(workflow: Workflow): string[] {
  * without it, under the default queue, the one pending — and a pull request opened with its labels on fires opened and labeled
  * together, so a cancelled run was what branch protection read for the required context (#665).
  */
-function labelDrift(workflow: Workflow): string[] {
+function labelDrift(workflow: Workflow) {
   const sentences: string[] = [];
   const pr = workflow.on?.pull_request;
   if (!same([...(pr?.types ?? [])].sort(), [...TYPES].sort()))
@@ -287,7 +287,7 @@ function labelDrift(workflow: Workflow): string[] {
 type Notes = { changelog?: { exclude?: { labels?: string[] }; categories?: { title?: string; labels?: string[] }[] } };
 
 /** `.github/release.yml` against `LABELS`: a category for each label that releases, in order, `internal` left out, the catch-all last. */
-function categoryDrift(config: Notes, labels: readonly Label[]): string[] {
+function categoryDrift(config: Notes, labels: readonly Label[]) {
   const sentences: string[] = [];
   const categories = config.changelog?.categories ?? [];
   const released = labels.filter((label) => label.bump !== 'none').map((label) => [label.name]);
@@ -305,7 +305,7 @@ function categoryDrift(config: Notes, labels: readonly Label[]): string[] {
 }
 
 /** Every clause, over a release workflow, a label workflow and a notes configuration, given as text. */
-const drift = (release: string, label: string, notes: string, labels: readonly Label[] = LABELS): string[] => [
+const drift = (release: string, label: string, notes: string, labels: readonly Label[] = LABELS) => [
   ...releaseDrift(parse(release)),
   ...labelDrift(parse(label)),
   ...categoryDrift(yaml.load(notes) as Notes, labels),
@@ -328,13 +328,13 @@ test('the shipped release workflows and notes configuration agree with the relea
 });
 
 /** `sentences` refuse once, naming `token`. */
-const refused = (sentences: string[], token: string, why: string): void => {
+const refused = (sentences: string[], token: string, why: string) => {
   assert.equal(sentences.length, 1, `${why}: ${sentences.join(' | ')}`);
   assert.ok(sentences[0].includes(token), `${why}: the sentence names ${token}`);
 };
 
 /** The shipped text of `file` with `from` replaced once by `to`, refusing a replacement that changed nothing. */
-const planted = (file: string, from: string, to: string): string => {
+const planted = (file: string, from: string, to: string) => {
   const source = text(file);
   assert.ok(source.includes(from), `${file} holds ${JSON.stringify(from)} today`);
   return source.replace(from, to);

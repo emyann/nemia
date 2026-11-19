@@ -11,7 +11,8 @@ import { failing, JOURNAL_WALKS, LAYER_ONLY, unwalked, walksOn, type Side } from
 import { scratch } from 'test-kit/scratch';
 
 /** The door a layer gives. */
-const sideOf = (layer: Layer.Layer<Journal>): Side => ({ journal: Effect.runSync(Effect.provide(Effect.service(Journal), layer)) });
+const sideOf = (layer: Layer.Layer<Journal>) =>
+  ({ journal: Effect.runSync(Effect.provide(Effect.service(Journal), layer)) }) satisfies Side;
 
 const SIDES = {
   files: () => sideOf(Journal.files(scratch('ae-journal-walks-'))),
@@ -29,9 +30,9 @@ test('every method of the door is walked, or named as one no walk can ask of eve
 });
 
 test('REFUSED: a door that lets a refused append through fails each invariant walk', async () => {
-  const lax = (): Side => {
+  const lax = () => {
     const { journal } = SIDES.memory();
-    return { journal: { ...journal, append: (...args) => journal.append(...args).pipe(Effect.catch(() => Effect.void)) } };
+    return { journal: { ...journal, append: (...args) => journal.append(...args).pipe(Effect.catch(() => Effect.void)) } } satisfies Side;
   };
   const failed = await failing(lax);
   for (const reason of ['filed-twice', 'not-filed', 'malformed-id', 'attempt-out-of-order'])

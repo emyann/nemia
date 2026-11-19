@@ -31,19 +31,19 @@ import { NOTHING_READ, standingReader } from '../standing/standing.verb.ts';
 import { parentRecord, stepsOf, stepsOrNone, stepsOrWhy, unloadedOf } from './steps.verb.ts';
 
 /** `run`'s record with no frozen workflow, its folder `dir`: what a record written before `nemia start` froze one holds. */
-const unfrozen = (dir: string): Run => {
+const unfrozen = (dir: string) => {
   const base = aRun('r-unfrozen');
   assert.ok(isRepositoryRun(base));
   const run: Run = { ...base, repo: path.dirname(dir), workflowDir: dir };
   delete run.workflow;
-  return run;
+  return run satisfies Run;
 };
 
 /** The failure `program` ends with, or the defect it dies of; fails the test where it succeeds. */
-const failureOf = <A, E>(program: Effect.Effect<A, E>): unknown => {
+const failureOf = <A, E>(program: Effect.Effect<A, E>) => {
   const exit = Effect.runSync(Effect.exit(program));
   assert.ok(Exit.isFailure(exit), 'the read was refused');
-  return exit.cause.reasons[0] && 'error' in exit.cause.reasons[0] ? exit.cause.reasons[0].error : exit.cause;
+  return (exit.cause.reasons[0] && 'error' in exit.cause.reasons[0] ? exit.cause.reasons[0].error : exit.cause) satisfies unknown;
 };
 
 test('an unfrozen record whose folder only the Workflow door holds reads its steps from the door, in run order', () => {

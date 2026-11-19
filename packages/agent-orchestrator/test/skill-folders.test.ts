@@ -27,16 +27,16 @@ const runPlaced = runGiven(() => stand().layer, ENV);
 const RUNS = path.join(ROOT, 'runs');
 
 /** The runs the store holds, by what their folder lists. */
-const runsNow = (): string[] => (fs.existsSync(RUNS) ? fs.readdirSync(RUNS).sort() : []);
+const runsNow = () => (fs.existsSync(RUNS) ? fs.readdirSync(RUNS).sort() : []);
 
 /** The skill `name` of the folder `folder` of `repo`, where a session there finds it. */
-const nested = (repo: string, folder: string, name: string): string => path.join(repo, folder, '.claude', 'skills', name);
+const nested = (repo: string, folder: string, name: string) => path.join(repo, folder, '.claude', 'skills', name);
 /** The folder of skills the run froze for its step `step`, whose agent is `agent`. */
-const frozen = (run: { id: string }, step = 'implement', agent = 'implementer'): string =>
+const frozen = (run: { id: string }, step = 'implement', agent = 'implementer') =>
   path.join(agentFilesDir(ROOT, run, step), `nemia-${agent}`, 'skills');
 
 /** The files of `dir`, by name, each with its text. */
-const filesOf = (dir: string): Record<string, string> =>
+const filesOf = (dir: string) =>
   Object.fromEntries(
     fs
       .readdirSync(dir)
@@ -45,7 +45,7 @@ const filesOf = (dir: string): Record<string, string> =>
   );
 
 /** The refusal `fn` throws, by its message. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -55,7 +55,7 @@ function refusal(fn: () => unknown): string {
 }
 
 /** The refusal the program `ran` is rejected with, by its message. */
-async function rejection(ran: () => Promise<unknown>): Promise<string> {
+async function rejection(ran: () => Promise<unknown>) {
   try {
     await ran();
   } catch (err) {
@@ -74,7 +74,7 @@ const KIT_STEPS = [
 const KIT_GIVEN = ['apps/x:kit-build', 'apps/x:kit-spec'];
 
 /** A copy of the tests' team whose implementer and reviewer each add `KIT_GIVEN` to their own skills: its `dev` folder. */
-function kitTeam(): string {
+function kitTeam() {
   const team = teamCopy('wf-skill-folders-team-');
   for (const [file, line] of [
     ['implementer.md', 'skills: implement-a-change\n'],
@@ -89,7 +89,7 @@ function kitTeam(): string {
 }
 
 /** A repository the stand-in knows, holding the two skills of its nested folder `apps/x`, one with a script and a file beside it. */
-function kitRepo(): string {
+function kitRepo() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   for (const name of ['kit-build', 'kit-spec']) {
     fs.mkdirSync(nested(repo, 'apps/x', name), { recursive: true });

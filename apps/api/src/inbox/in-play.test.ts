@@ -50,12 +50,10 @@ fs.writeFileSync(
 );
 
 /** The cards `GET /api/cards` lists, as name and state, by name. */
-const listed = async (): Promise<[string, string][]> => {
+const listed = async () => {
   const res = await app().request('/api/cards');
   assert.equal(res.status, 200, await res.clone().text());
-  return ((await res.json()) as CardList).items
-    .map((c): [string, string] => [c.metadata.name, c.status.state])
-    .sort(([a], [b]) => a.localeCompare(b));
+  return ((await res.json()) as CardList).items.map((c) => [c.metadata.name, c.status.state]).sort(([a], [b]) => a.localeCompare(b));
 };
 
 const cardText = () => fs.readFileSync(path.join(root, 'inbox', `${CARD}.md`), 'utf8');

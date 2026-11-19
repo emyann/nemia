@@ -145,7 +145,7 @@ const HANDED: Row[] = [
     name: 'REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr, once, as the engine is built',
     check: async (t) => {
       withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
-      const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const said = vi.spyOn(console, 'error');
       engineNow();
       const lines = said.mock.calls.map((c) => String(c[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
       assert.equal(lines.length, 1, lines.join('\n'));

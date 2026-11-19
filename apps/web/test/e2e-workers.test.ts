@@ -22,7 +22,7 @@ import {
 const SEVEN = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
 /** What the workers `asks` names draw from `queue`, each ask in its turn: the worker, and the page it was handed or null. */
-function drawn<P>(queue: PageQueue<P>, asks: readonly number[]): Array<[number, P | null]> {
+function drawn<P>(queue: PageQueue<P>, asks: readonly number[]) {
   return asks.map((worker) => [worker, queue.next()]);
 }
 

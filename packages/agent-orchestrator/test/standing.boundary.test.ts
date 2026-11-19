@@ -29,11 +29,11 @@ const ENV: NodeJS.ProcessEnv = {
 };
 
 /** Git in `dir`, its stdout trimmed. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** A commit on the branch `dir` has checked out, of `file` written with `text`. */
-function commit(dir: string, file: string, text: string): string {
+function commit(dir: string, file: string, text: string) {
   fs.writeFileSync(path.join(dir, file), text);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', file);
@@ -70,8 +70,7 @@ function repository() {
 }
 
 /** `standing` of the git place, in `env`, its request as given: one the contract's type refuses is how a malformed request is sent. */
-const standing = (asked: object, env: NodeJS.ProcessEnv = ENV): PlaceOutcome<'standing'> =>
-  gitPlace({ env }).askNow('standing', asked as never);
+const standing = (asked: object, env: NodeJS.ProcessEnv = ENV) => gitPlace({ env }).askNow('standing', asked as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
 function answerOf(outcome: PlaceOutcome<'standing'>) {
@@ -169,7 +168,7 @@ test('standing asked of no branch answers the heads alone, whatever the base', (
 });
 
 /** Whether `commit` is within `base` in `dir`, as git's `merge-base --is-ancestor` says: `yes`, `no` (its exit 1), or `unknown`. */
-function within(dir: string, commit: string, base: string): 'yes' | 'no' | 'unknown' {
+function within(dir: string, commit: string, base: string) {
   try {
     git(dir, 'merge-base', '--is-ancestor', commit, base);
     return 'yes';

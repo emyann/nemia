@@ -62,7 +62,7 @@ const statusOf = async (id: string, step: string) => {
 };
 
 /** A workflow folder of the steps named, each after those `after` gives it. */
-const folder = (steps: Record<string, string | null>): string => {
+const folder = (steps: Record<string, string | null>) => {
   const dir = scratch('wf-run-object-team-');
   for (const [name, after] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${after ? `after: ${after}\n` : ''}place: git\n---\n${name} it\n`);
@@ -97,11 +97,11 @@ const threeRuns = async () => {
 const object = async (id: string) =>
   await runWith(e(), Effect.provideService(runObject(runRecord(ROOT, id), { memo: { said: new Map() } }), StoreRoot, ROOT));
 
-const handled = <D>(entry: { handler: (...a: never[]) => unknown }, args: Record<string, string>): Promise<D> =>
-  runWith(e(), (entry.handler as (a: Record<string, string>, env: Env, home: string) => never)(args, ENV, ROOT));
+const handled = <D>(entry: { handler: (...a: never[]) => unknown }, args: Record<string, string>) =>
+  runWith(e(), (entry.handler as (a: Record<string, string>, env: Env, home: string) => never)(args, ENV, ROOT)) satisfies Promise<D>;
 
 /** What a promise rejects with. */
-const refusal = async (p: Promise<unknown>): Promise<{ exitCode?: number }> => {
+const refusal = async (p: Promise<unknown>) => {
   try {
     await p;
   } catch (err) {

@@ -54,7 +54,7 @@ const OTHER = harnessesWithNeeds(HARNESS_DECLARATIONS).find((h) => h !== DEFAULT
 const FLAG = path.join(ROOT, 'tool-installed');
 
 /** A workflow of one step, its README `readme`, its step's frontmatter `head`. */
-const workflow = (readme: string, head = 'place: git'): string => {
+const workflow = (readme: string, head = 'place: git') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'workflow-'));
   fs.writeFileSync(path.join(dir, 'README.md'), readme);
   fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${head}\n---\nimplement it\n`);
@@ -62,7 +62,7 @@ const workflow = (readme: string, head = 'place: git'): string => {
 };
 
 /** A workflow of one step whose README declares the need `tool`, met while `FLAG` is there. */
-const needing = (): string =>
+const needing = () =>
   workflow(
     [
       '---',
@@ -80,14 +80,14 @@ const needing = (): string =>
   );
 
 /** A repository with one commit. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'README.md': 'readme\n' });
   return repo;
 };
 
 /** What `promise` was refused with, which must be a refusal. */
-const refusedBy = async (promise: Promise<unknown>): Promise<unknown> => {
+const refusedBy = async (promise: Promise<unknown>) => {
   try {
     await promise;
   } catch (err) {
@@ -225,12 +225,12 @@ describe("a run's workflow need of scope repository is checked in the run's repo
   });
   const s = story(test);
   const tick = (id: string) => stage.runWith(b.e, advanceRun(runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
-  const marked = (): string => {
+  const marked = () => {
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stage.place().world.repository(repo, { 'README.md': 'readme\n', 'only-here': '' });
     return repo;
   };
-  const scoped = (scope: string[]): string =>
+  const scoped = (scope: string[]) =>
     workflow(
       [
         '---',

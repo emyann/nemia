@@ -18,14 +18,13 @@ const UNFILLED = 'review';
  * The factory's file `text` with `hires` in place of the seed's, whose hire into `dev/implement`, a step whose file names its agent, leaves
  * `dev` unread in the factory.
  */
-const withHires = (text: string, hires: Record<string, string>): string =>
-  JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
+const withHires = (text: string, hires: Record<string, string>) => JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
 
 /** A card on the Inbox page, by its name. */
-const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
+const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
 
 /** Open the card's start on a fresh load of the Inbox. */
-async function openStart(page: Page): Promise<Locator> {
+async function openStart(page: Page) {
   await page.goto(page.url(), { waitUntil: 'load' });
   await idle(page);
   const item = cardIn(page, CARD);
@@ -39,7 +38,7 @@ async function openStart(page: Page): Promise<Locator> {
  * Start; then wiring it to the checkout's folder name: the start says the checkout as text. Never a Repository list. The caller writes the
  * file back.
  */
-async function wiredOnTwo(page: Page, factoryFile: string, theme: string): Promise<void> {
+async function wiredOnTwo(page: Page, factoryFile: string, theme: string) {
   const factory = FACTORIES.hiring.name;
   const checkout = path.join(store!, 'checkout');
   const second = path.join(store!, FACTORIES.bare);
@@ -92,7 +91,7 @@ export default {
     const runsBefore = fs.readdirSync(runsDir).sort();
     const theme = await themeOf(page);
     const other = await page.context().newPage();
-    let unhire = (): void => {};
+    let unhire = () => {};
     try {
       fs.writeFileSync(factoryFile, withHires(factoryText, {}));
       fs.writeFileSync(cardFile, `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\n${BODY}\n`);

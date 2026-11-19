@@ -39,7 +39,7 @@ const runPlaced = runGiven(gitPlaceLayer, ENV);
 const files = filesStoreAt(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -49,7 +49,7 @@ const aRepo = (): string => {
 };
 
 /** A workflow folder of one step, `implement`, with the frontmatter lines it is given. */
-const oneStep = (lines: string): string => {
+const oneStep = (lines: string) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${/^place:/m.test(lines) ? '' : 'place: git\n'}${lines}\n---\nimplement it\n`);
   return dir;
@@ -122,7 +122,7 @@ const pass = async (id: string) => {
 };
 
 /** The ids of the tasks the engine has a record of. */
-const listed = async (): Promise<string[]> => (await Effect.runPromise(e.list())).views.map((v) => v.id);
+const listed = async () => (await Effect.runPromise(e.list())).views.map((v) => v.id);
 
 /** A run of `workflowDir` on `repo` started, its step filed and started, and signed with `closeout`. */
 const signed = async (workflowDir: string, closeout: object, repo = aRepo()) => {

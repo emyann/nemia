@@ -42,7 +42,7 @@ const NOW = '2026-11-05T13:00:00.000Z';
 const HOUR = 3_600_000;
 
 /** `nemia <argv>` run on its entry's handler (`typed.ts`), over the stage's engine. */
-const typed = async (...argv: string[]): Promise<void> => {
+const typed = async (...argv: string[]) => {
   await stage.main(argv);
 };
 

@@ -24,7 +24,7 @@ const MIDDLE = { width: 1024, height: 900 };
 const PHONE = { width: 390, height: 844 };
 
 /** That on a phone the three frames stack, each under the one before it, each as wide as the others. */
-async function expectStacked(strip: Locator): Promise<void> {
+async function expectStacked(strip: Locator) {
   const boxes = await strip.locator('[data-strip-frame]').evaluateAll((frames) =>
     frames.map((f) => ({
       top: Math.round(f.getBoundingClientRect().top),
@@ -37,19 +37,18 @@ async function expectStacked(strip: Locator): Promise<void> {
 }
 
 /** What the api answers at `url`, read in the page as the board reads it. */
-const answer = <T>(page: Page, url: string): Promise<T> =>
-  page.evaluate(async (at) => (await (await fetch(at)).json()) as unknown, url) as Promise<T>;
+const answer = <T>(page: Page, url: string) => page.evaluate(async (at) => (await (await fetch(at)).json()) as unknown, url) as Promise<T>;
 
 /** The value a sticker of `strip` labelled `label` shows. */
-const stickerOf = (strip: Locator, label: string): Locator =>
+const stickerOf = (strip: Locator, label: string) =>
   strip
     .locator('[data-sticker]')
     .filter({ has: strip.page().getByText(label, { exact: true }) })
     .locator('span')
-    .last();
+    .last() satisfies Locator;
 
 /** Every finished run of every factory, read page by page to the last, as the api answers them. */
-async function everyFinished(page: Page): Promise<FinishedRun[]> {
+async function everyFinished(page: Page) {
   const runs: FinishedRun[] = [];
   let from: string | undefined;
   do {
@@ -80,10 +79,10 @@ async function expected(page: Page) {
 }
 
 /** The agents' count as the strip says it: `1 OF 2`, the count alone with no total. */
-const agentsSaid = ({ agents }: Strip): string => `${agents.count}${agents.hired === null ? '' : ` OF ${agents.hired}`}`;
+const agentsSaid = ({ agents }: Strip) => `${agents.count}${agents.hired === null ? '' : ` OF ${agents.hired}`}`;
 
 /** That each of the six stickers reads what `want` says. */
-async function expectStickers(strip: Locator, want: Strip): Promise<void> {
+async function expectStickers(strip: Locator, want: Strip) {
   const stickers: Array<[string, string]> = [
     ['Wait on you', String(want.waitsOnYou)],
     ['In flight', String(want.inFlight)],
@@ -97,7 +96,7 @@ async function expectStickers(strip: Locator, want: Strip): Promise<void> {
 }
 
 /** That the three frames' tops stand on one line, and the six stickers on one line: the row did not wrap. */
-async function expectOneRow(strip: Locator): Promise<void> {
+async function expectOneRow(strip: Locator) {
   const tops = await strip
     .locator('[data-strip-frame]')
     .evaluateAll((frames) => frames.map((f) => Math.round(f.getBoundingClientRect().top)));
@@ -116,7 +115,7 @@ async function expectOneRow(strip: Locator): Promise<void> {
 }
 
 /** That each agent's row is cut short with an ellipsis where it runs out of room, and never wraps onto a second line. */
-async function expectRowsCut(strip: Locator): Promise<void> {
+async function expectRowsCut(strip: Locator) {
   const rows = await strip.locator('[data-agent-words]').evaluateAll((all) =>
     all.map((w) => {
       const style = getComputedStyle(w);
@@ -131,7 +130,7 @@ async function expectRowsCut(strip: Locator): Promise<void> {
  * dollars over their tokens, its rows the kinds `tokensBreakdown` gives for `want`'s sum, and Escape closes it. A seed whose day counts no
  * tokens refuses: the preview would prove nothing.
  */
-async function expectSpentPreview(page: Page, strip: Locator, want: Strip): Promise<void> {
+async function expectSpentPreview(page: Page, strip: Locator, want: Strip) {
   if (!want.spentTokens) throw new Refused("the seed's day counts tokens on a run Spent counts, for its preview to be read");
   const breakdown = tokensBreakdown(want.spentTokens, `${dollars(want.spentUsd)} today`);
   const tile = strip.locator('[data-stat-tile="spent"]');

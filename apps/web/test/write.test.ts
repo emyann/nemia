@@ -15,25 +15,24 @@ import { dropCard, fileCard, queueCard, startCard } from '../src/lib/api/inbox.t
 import { AgentRefusal, createAgent, removeAgent, tryAgent, type AgentDraft } from '../src/lib/api/agents.ts';
 import { copySkill, saveSkill, SkillRefusal, type SkillDraft } from '../src/lib/api/skills.ts';
 import { BuildRefusal, saveWorkflow, startRun } from '../src/lib/api/workflows.ts';
-import { stepSpec, workflow, workflowObject } from './library-fixtures.ts';
+import { stepSpec, workflow, workflowObject } from './library.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** Every request answered with `body` — as JSON, or as it is when a string — with `status`, for the length of the test: what was sent. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200, statusText = '') {
-  const before = globalThis.fetch;
   const sent: Array<{ url: string; init: RequestInit | undefined }> = [];
-  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
+  apiAnswers(async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({ url: String(url), init });
     return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, statusText });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent;
 }
 
 /** A request's body as text: the objects' client sends its JSON as bytes. */
-const text = (body: BodyInit | null | undefined): string | undefined =>
-  body === undefined || body === null || typeof body === 'string' ? (body ?? undefined) : new TextDecoder().decode(body as Uint8Array);
+const text = (body: BodyInit | null | undefined) =>
+  (body === undefined || body === null || typeof body === 'string'
+    ? (body ?? undefined)
+    : new TextDecoder().decode(body as Uint8Array)) satisfies string | undefined;
 
 const FIX =
   'The board and the api were built apart: restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.';
@@ -52,11 +51,11 @@ const unread = (route: string, at: string, found: string, may: string) => (err: 
 };
 
 /** The error `promise` rejects with; fails where it resolves. */
-const rejection = (promise: Promise<unknown>): Promise<unknown> =>
+const rejection = (promise: Promise<unknown>) =>
   promise.then(
     (value) => assert.fail(`resolved with ${JSON.stringify(value)}`),
     (err: unknown) => err,
-  );
+  ) satisfies Promise<unknown>;
 
 const MAY = 'The thing may be written: look at it before writing it again.';
 

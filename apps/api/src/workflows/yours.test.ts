@@ -12,7 +12,7 @@ import { StoreRoot } from '../store.ts';
 import type { YourStore } from './yours.ts';
 
 /** `GET /api/store`, asked through `on`. */
-const storeOn = async (on: typeof app): Promise<YourStore> => {
+const storeOn = async (on: typeof app) => {
   const res = await on.request('/api/store');
   assert.equal(res.status, 200);
   return (await res.json()) as YourStore;

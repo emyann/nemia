@@ -53,7 +53,7 @@ export const answer = path.join(bin, 'usage-answer');
 const mode = path.join(bin, 'usage-mode');
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`), their request id made `@ID@`. */
-export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): string =>
+export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered') =>
   fs
     .readFileSync(path.join(import.meta.dirname, 'fixtures', `get-usage-${name === 'plan' ? '' : `${name}-`}2.1.278.json`), 'utf8')
     .replace('"request_id":"usage-1"', '"request_id":"@ID@"');
@@ -138,7 +138,7 @@ export const NO_TOKEN = { 'x-harness-token': 'none' } as const;
  * `PERSON_TOKEN` kept in the store `home`, as the record a standing token the person minted is kept by (`person-tokens/<digest>.json`),
  * so an app over a store of a test's own takes it too. Idempotent.
  */
-export function seatPerson(home: string): void {
+export function seatPerson(home: string) {
   const dir = path.join(home, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = path.join(dir, `${tokenDigest(PERSON_TOKEN)}.json`);
@@ -166,7 +166,7 @@ class Tokened extends Request {
 globalThis.Request = Tokened;
 
 /** How many calls of `verb` the fake has answered. */
-const callsOf = (verb: string): number =>
+const callsOf = (verb: string) =>
   fs
     .readFileSync(calls, 'utf8')
     .split('\n')
@@ -176,16 +176,16 @@ const callsOf = (verb: string): number =>
  * How many times the quota has been asked of the fake: one usage control request the stand-in answered each, never a shape of the
  * SDK's argv, which is the SDK's and changes with it.
  */
-export const asks = (): number => callsOf('usage');
+export const asks = () => callsOf('usage');
 
 /**
  * Whether the ask whose process is `pid` ended once its stdin was closed. By pid, not by a count: an ask an earlier test started may end
  * after a later test has read a count, and move it by two.
  */
-export const askEnded = (pid: number): boolean => fs.readFileSync(calls, 'utf8').split('\n').includes(`usage-ended pid=${pid}`);
+export const askEnded = (pid: number) => fs.readFileSync(calls, 'utf8').split('\n').includes(`usage-ended pid=${pid}`);
 
 /** What the fake answers the next usage control requests with, and how it takes them. */
-export function usageAnswer(text: string, how: 'answer' | 'exit' = 'answer'): void {
+export function usageAnswer(text: string, how: 'answer' | 'exit' = 'answer') {
   fs.writeFileSync(answer, text);
   fs.writeFileSync(mode, how);
 }
@@ -195,14 +195,15 @@ export function usageAnswer(text: string, how: 'answer' | 'exit' = 'answer'): vo
  * file reaches it (`./harness.ts` from `test/`, `../../test/harness.ts` from a folder of `src/`) — a node builtin, the api, the package —
  * or it has none, or it imports something with `import()` before it.
  */
-export function unharnessed(text: string, harness = './harness.ts'): string | null {
+export function unharnessed(text: string, harness = './harness.ts') {
   const fix = `Make \`import '${harness}'\` first`;
   const first = /^\s*import\b[^;]*?['"]([^'"]+)['"]/m.exec(text);
   const dynamic = /\bimport\s*\(\s*['"`]/.exec(text);
-  if (!first) return `it imports no harness. ${fix}.`;
-  if (dynamic && dynamic.index < first.index) return `it imports a module with import() before any static import. ${fix}, above it.`;
-  if (first[1] !== harness) return `its first import is ${first[1]}. ${fix}, above it.`;
-  return null;
+  if (!first) return `it imports no harness. ${fix}.` satisfies string | null;
+  if (dynamic && dynamic.index < first.index)
+    return `it imports a module with import() before any static import. ${fix}, above it.` satisfies string | null;
+  if (first[1] !== harness) return `its first import is ${first[1]}. ${fix}, above it.` satisfies string | null;
+  return null satisfies string | null;
 }
 
 /**
@@ -211,9 +212,11 @@ export function unharnessed(text: string, harness = './harness.ts'): string | nu
  *
  * @param config the text of the api's `vitest.config.ts`
  */
-export function configUnharnessed(config: string): string | null {
+export function configUnharnessed(config: string) {
   const files = /\bsetupFiles:\s*\[([^\]]*)\]/.exec(config)?.[1];
   const first = files === undefined ? undefined : /^\s*['"]([^'"]+)['"]/.exec(files)?.[1];
-  if (first === './test/harness.ts') return null;
-  return "the Vitest config runs its test files without the harness first. Make its `setupFiles` begin with './test/harness.ts'.";
+  if (first === './test/harness.ts') return null satisfies string | null;
+  return "the Vitest config runs its test files without the harness first. Make its `setupFiles` begin with './test/harness.ts'." as const satisfies
+    | string
+    | null;
 }

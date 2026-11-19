@@ -39,27 +39,28 @@ type Walk = { name: string; step: string; worlds: Array<[string, World]> };
 
 const AT = '2026-11-04T09:00:00.000Z';
 
-const world = (steps: StepSpec[]): World => ({
-  steps,
-  run: run(Object.fromEntries(steps.map((s) => [s.name, null]))),
-  phase: {},
-  said: {},
-  asked: {},
-  spend: {},
-  verdict: {},
-});
+const world = (steps: StepSpec[]) =>
+  ({
+    steps,
+    run: run(Object.fromEntries(steps.map((s) => [s.name, null]))),
+    phase: {},
+    said: {},
+    asked: {},
+    spend: {},
+    verdict: {},
+  }) satisfies World;
 
-const walk = (name: string, of: string, steps: StepSpec[], ...moves: Move[]): Walk => {
+const walk = (name: string, of: string, steps: StepSpec[], ...moves: Move[]) => {
   const worlds: Array<[string, World]> = [['before anything is filed', world(steps)]];
   for (const [label, move] of moves) {
     const last = worlds[worlds.length - 1];
     assert.ok(last, `${name}: a walk starts from a world`);
     worlds.push([label, move(last[1])]);
   }
-  return { name, step: of, worlds };
+  return { name, step: of, worlds } satisfies Walk;
 };
 
-const wordOf = (w: World, name: string): StepStatus => {
+const wordOf = (w: World, name: string) => {
   const def = w.steps.find((s) => s.name === name);
   assert.ok(def, `the walk reads ${name}, which its workflow has`);
   const words = runWords(
@@ -71,114 +72,127 @@ const wordOf = (w: World, name: string): StepStatus => {
     (id) => w.spend[id],
     (s) => w.verdict[s],
   );
-  return words.get(def.name) ?? 'pending';
+  return (words.get(def.name) ?? ('pending' as const)) satisfies StepStatus;
 };
 
 const recordOf = (w: World, name: string) => w.run.steps[name] ?? { taskId: null };
-const withRecord = (w: World, name: string, record: Run['steps'][string]): World => ({
-  ...w,
-  run: { ...w.run, steps: { ...w.run.steps, [name]: record } },
-});
+const withRecord = (w: World, name: string, record: Run['steps'][string]) =>
+  ({
+    ...w,
+    run: { ...w.run, steps: { ...w.run.steps, [name]: record } },
+  }) satisfies World;
 
 /** A step filed for the first time: its task running, no closeout yet. */
-const file = (name: string, taskId: string): Move => [
-  `${name} filed as ${taskId}`,
-  (w) => ({
-    ...withRecord(w, name, { ...recordOf(w, name), taskId }),
-    phase: { ...w.phase, [taskId]: 'running' },
-    said: { ...w.said, [name]: undefined },
-  }),
-];
-const settle = (taskId: string, phase: TaskPhase, facts: { asked?: CloseoutAsked; spend?: Partial<TaskSpend> } = {}): Move => [
-  `${taskId} settled ${phase}`,
-  (w) => ({
-    ...w,
-    phase: { ...w.phase, [taskId]: phase },
-    ...(facts.asked !== undefined ? { asked: { ...w.asked, [taskId]: facts.asked } } : {}),
-    ...(facts.spend ? { spend: { ...w.spend, [taskId]: { ...spent(0), ...facts.spend } } } : {}),
-  }),
-];
-const sign = (name: string, said: Closeout): Move => [
-  `${name} signed ${said.outcome}`,
-  (w) => ({ ...w, said: { ...w.said, [name]: said } }),
-];
-const fileCheck = (name: string, checkId: string): Move => [
-  `${name}'s check filed as ${checkId}`,
-  (w) => ({ ...withRecord(w, name, { ...recordOf(w, name), check: { taskId: checkId } }), phase: { ...w.phase, [checkId]: 'running' } }),
-];
-const checkEnds = (name: string, checkId: string, phase: TaskPhase, verdict: Verdict): Move => [
-  `${name}'s check ${checkId} ended ${phase}, ${verdict}`,
-  (w) => ({ ...w, phase: { ...w.phase, [checkId]: phase }, verdict: { ...w.verdict, [name]: verdict } }),
-];
-const approve = (name: string, n: number): Move => [
-  `${name} approved, try ${n}`,
-  (w) => ({ ...w, run: { ...w.run, approvals: [...(w.run.approvals ?? []), { step: name, try: n, at: AT }] } }),
-];
-const accept = (name: string, n: number): Move => [
-  `${name} accepted at its cap, try ${n}`,
-  (w) => ({ ...w, run: { ...w.run, acceptances: [...(w.run.acceptances ?? []), { step: name, try: n, at: AT, message: 'enough' }] } }),
-];
+const file = (name: string, taskId: string) =>
+  [
+    `${name} filed as ${taskId}`,
+    (w) => ({
+      ...withRecord(w, name, { ...recordOf(w, name), taskId }),
+      phase: { ...w.phase, [taskId]: 'running' },
+      said: { ...w.said, [name]: undefined },
+    }),
+  ] satisfies Move;
+const settle = (taskId: string, phase: TaskPhase, facts: { asked?: CloseoutAsked; spend?: Partial<TaskSpend> } = {}) =>
+  [
+    `${taskId} settled ${phase}`,
+    (w) => ({
+      ...w,
+      phase: { ...w.phase, [taskId]: phase },
+      ...(facts.asked !== undefined ? { asked: { ...w.asked, [taskId]: facts.asked } } : {}),
+      ...(facts.spend ? { spend: { ...w.spend, [taskId]: { ...spent(0), ...facts.spend } } } : {}),
+    }),
+  ] satisfies Move;
+const sign = (name: string, said: Closeout) =>
+  [`${name} signed ${said.outcome}`, (w) => ({ ...w, said: { ...w.said, [name]: said } })] satisfies Move;
+const fileCheck = (name: string, checkId: string) =>
+  [
+    `${name}'s check filed as ${checkId}`,
+    (w) => ({ ...withRecord(w, name, { ...recordOf(w, name), check: { taskId: checkId } }), phase: { ...w.phase, [checkId]: 'running' } }),
+  ] satisfies Move;
+const checkEnds = (name: string, checkId: string, phase: TaskPhase, verdict: Verdict) =>
+  [
+    `${name}'s check ${checkId} ended ${phase}, ${verdict}`,
+    (w) => ({ ...w, phase: { ...w.phase, [checkId]: phase }, verdict: { ...w.verdict, [name]: verdict } }),
+  ] satisfies Move;
+const approve = (name: string, n: number) =>
+  [
+    `${name} approved, try ${n}`,
+    (w) => ({ ...w, run: { ...w.run, approvals: [...(w.run.approvals ?? []), { step: name, try: n, at: AT }] } }),
+  ] satisfies Move;
+const accept = (name: string, n: number) =>
+  [
+    `${name} accepted at its cap, try ${n}`,
+    (w) => ({ ...w, run: { ...w.run, acceptances: [...(w.run.acceptances ?? []), { step: name, try: n, at: AT, message: 'enough' }] } }),
+  ] satisfies Move;
 /** A try filed (`nextTry`): a new session, or for a recheck the same task with its check to file again. */
-const retry = (name: string, n: number, mode: RetryMode, taskId?: string, budget?: number): Move => [
-  `${name} tried again (${mode}${budget === undefined ? '' : `, --budget ${budget}`})`,
-  (w) => {
-    const record = nextTry(recordOf(w, name), { step: name, try: n, mode, by: 'ask', ...(budget === undefined ? {} : { budget }) }, taskId);
-    const moved = withRecord(w, name, record);
-    return taskId === undefined
-      ? { ...moved, verdict: { ...w.verdict, [name]: undefined } }
-      : {
-          ...moved,
-          phase: { ...w.phase, [taskId]: 'running' },
-          said: { ...w.said, [name]: undefined },
-          verdict: { ...w.verdict, [name]: undefined },
-        };
-  },
-];
+const retry = (name: string, n: number, mode: RetryMode, taskId?: string, budget?: number) =>
+  [
+    `${name} tried again (${mode}${budget === undefined ? '' : `, --budget ${budget}`})`,
+    (w) => {
+      const record = nextTry(
+        recordOf(w, name),
+        { step: name, try: n, mode, by: 'ask', ...(budget === undefined ? {} : { budget }) },
+        taskId,
+      );
+      const moved = withRecord(w, name, record);
+      return taskId === undefined
+        ? { ...moved, verdict: { ...w.verdict, [name]: undefined } }
+        : {
+            ...moved,
+            phase: { ...w.phase, [taskId]: 'running' },
+            said: { ...w.said, [name]: undefined },
+            verdict: { ...w.verdict, [name]: undefined },
+          };
+    },
+  ] satisfies Move;
 /** A round filed (`roundFiled`): the target filed again as `taskId`, every other step of the loop unfiled. */
-const round = (looping: string, target: string, n: number, taskId: string, by: 'again' | 'ask'): Move => [
-  `${looping}'s round ${n} filed (${by}), ${target} as ${taskId}`,
-  (w) => ({
-    ...w,
-    run: { ...w.run, steps: roundFiled(w.steps, w.run, { step: looping, target, round: n, by }, taskId) },
-    phase: { ...w.phase, [taskId]: 'running' },
-    said: {},
-    verdict: {},
-  }),
-];
+const round = (looping: string, target: string, n: number, taskId: string, by: 'again' | 'ask') =>
+  [
+    `${looping}'s round ${n} filed (${by}), ${target} as ${taskId}`,
+    (w) => ({
+      ...w,
+      run: { ...w.run, steps: roundFiled(w.steps, w.run, { step: looping, target, round: n, by }, taskId) },
+      phase: { ...w.phase, [taskId]: 'running' },
+      said: {},
+      verdict: {},
+    }),
+  ] satisfies Move;
 /** The work sent back from an ending that stopped (`Retry.back`): the work tried again, and the ending's try moved behind (`sentBack`). */
-const sendBack = (work: string, n: number, taskId: string, ending: string): Move => [
-  `${work} tried again, ${ending} sent back with it`,
-  (w) => {
-    const tried = retry(work, n, 'continue', taskId)[1](w);
-    return {
-      ...withRecord(tried, ending, sentBack(recordOf(tried, ending))),
-      said: { ...tried.said, [ending]: undefined },
-      verdict: { ...tried.verdict, [ending]: undefined },
-    };
-  },
-];
+const sendBack = (work: string, n: number, taskId: string, ending: string) =>
+  [
+    `${work} tried again, ${ending} sent back with it`,
+    (w) => {
+      const tried = retry(work, n, 'continue', taskId)[1](w);
+      return {
+        ...withRecord(tried, ending, sentBack(recordOf(tried, ending))),
+        said: { ...tried.said, [ending]: undefined },
+        verdict: { ...tried.verdict, [ending]: undefined },
+      };
+    },
+  ] satisfies Move;
 /** A person names a condition's route for a try (`nemia route`), as `runRecord` composes their file onto its record. */
-const routeNamed = (name: string, route: string, n: number): Move => [
-  `${name} routed ${route} by a person, try ${n}`,
-  (w) => withRecord(w, name, { ...recordOf(w, name), route: { route, try: n, by: 'person' } }),
-];
+const routeNamed = (name: string, route: string, n: number) =>
+  [
+    `${name} routed ${route} by a person, try ${n}`,
+    (w) => withRecord(w, name, { ...recordOf(w, name), route: { route, try: n, by: 'person' } }),
+  ] satisfies Move;
 /** A workflow node's card filed (`StepRecord.sent`). */
-const cardSent = (name: string): Move => [
-  `${name}'s card filed`,
-  (w) => withRecord(w, name, { ...recordOf(w, name), sent: { card: `r-1-${name}`, at: AT } }),
-];
-const landed = (name: string, how: { commit: string } | { aborted: string }): Move => [
-  `${name}'s landing ${'commit' in how ? 'committed' : 'aborted'}`,
-  (w) => withRecord(w, name, { ...recordOf(w, name), landed: how }),
-];
+const cardSent = (name: string) =>
+  [`${name}'s card filed`, (w) => withRecord(w, name, { ...recordOf(w, name), sent: { card: `r-1-${name}`, at: AT } })] satisfies Move;
+const landed = (name: string, how: { commit: string } | { aborted: string }) =>
+  [
+    `${name}'s landing ${'commit' in how ? 'committed' : 'aborted'}`,
+    (w) => withRecord(w, name, { ...recordOf(w, name), landed: how }),
+  ] satisfies Move;
 
-const spent = (usd: number): TaskSpend => ({ usd, measured: 1, unmeasured: 0, budgetEnded: false });
-const done = (output?: Record<string, unknown>): Closeout => ({
-  outcome: 'done',
-  summary: 'did it',
-  artifacts: [],
-  ...(output ? { output } : {}),
-});
+const spent = (usd: number) => ({ usd, measured: 1, unmeasured: 0, budgetEnded: false }) satisfies TaskSpend;
+const done = (output?: Record<string, unknown>) =>
+  ({
+    outcome: 'done',
+    summary: 'did it',
+    artifacts: [],
+    ...(output ? { output } : {}),
+  }) satisfies Closeout;
 const BLOCKED: Closeout = { outcome: 'blocked', summary: 'stuck', artifacts: [], needs: 'a decision' };
 
 /** A step with no check and no gate. */
@@ -195,10 +209,11 @@ const LOOPING: OutputSchema = {
   required: ['findings', 'again'],
   additionalProperties: false,
 };
-const loop = (rounds: number): StepSpec[] => [
-  { ...step('implement'), check: 'npm test' },
-  { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds },
-];
+const loop = (rounds: number) =>
+  [
+    { ...step('implement'), check: 'npm test' },
+    { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds },
+  ] satisfies StepSpec[];
 /** A loop with a checked step between its target and its looping step. */
 const LOOP_THROUGH_TEST: StepSpec[] = [
   step('implement'),
@@ -211,11 +226,8 @@ const BUDGETED_LOOP: StepSpec[] = [step('implement'), { ...loop(3)[1], budget: 1
 const ENDING: StepSpec[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true, check: 'landing receipt' }];
 
 /** One step's work to a sign-off: filed, signed, and its session settled. */
-const works = (name: string, taskId: string, said: Closeout = done()): Move[] => [
-  file(name, taskId),
-  sign(name, said),
-  settle(taskId, 'succeeded'),
-];
+const works = (name: string, taskId: string, said: Closeout = done()) =>
+  [file(name, taskId), sign(name, said), settle(taskId, 'succeeded')] satisfies Move[];
 
 const SURFACE: OutputSchema = {
   type: 'object',
@@ -515,7 +527,7 @@ const PAIRS = READ.flatMap((w) =>
   w.words.slice(1).map(([label, to], i) => ({ walk: w.name, label, from: w.words[i]?.[1] ?? 'pending', to })),
 );
 
-const key = (from: StepStatus, to: StepStatus): string => `${from} → ${to}`;
+const key = (from: StepStatus, to: StepStatus) => `${from} → ${to}`;
 
 test('every pair of words a walk reads through stepStatus is a move the step machine draws', () => {
   for (const p of PAIRS) {

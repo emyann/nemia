@@ -15,7 +15,7 @@ const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const PAGE = path.join(ROOT, 'apps', 'docs', 'src', 'content', 'docs', 'glossary.mdx');
 
 /** A scratch repository holding `files`, by path from its root. */
-const repoWith = (files: Record<string, unknown>): string => {
+const repoWith = (files: Record<string, unknown>) => {
   const root = scratch('docs-glossary-');
   for (const [file, body] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -51,6 +51,7 @@ const FIXTURE = {
 const facts = (faults: Fault[]) => faults.map(({ kind, context, type }) => ({ kind, context, ...(type ? { type } : {}) }));
 
 /** The text of a node, its children's put together. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const textOf = (node: RootContent): string =>
   'value' in node ? node.value : 'children' in node ? node.children.map((c) => textOf(c as RootContent)).join('') : '';
 
@@ -93,13 +94,14 @@ test('the page is drawn one section per context, in the fence’s order, each te
 
 test('the plugin replaces the fence by the sections, and refuses a fence that is wrong', () => {
   const root = repoWith(FIXTURE);
-  const page = (fence: string): Root => ({
-    type: 'root',
-    children: [
-      { type: 'paragraph', children: [{ type: 'text', value: 'Intro.' }] },
-      { type: 'code', lang: 'glossary', meta: null, value: fence } satisfies Code,
-    ],
-  });
+  const page = (fence: string) =>
+    ({
+      type: 'root',
+      children: [
+        { type: 'paragraph', children: [{ type: 'text', value: 'Intro.' }] },
+        { type: 'code', lang: 'glossary', meta: null, value: fence } satisfies Code,
+      ],
+    }) satisfies Root;
   const tree = page('runtime\nplanning\n');
   remarkGlossary({ root })(tree, { path: path.join(root, 'apps/docs/src/content/docs/glossary.mdx') });
   assert.deepEqual(

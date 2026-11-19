@@ -101,14 +101,14 @@ const seeded = () => vi.useFakeTimers({ toFake: ['Date'], now: NOW });
 const at = (ms: number) => new Date(NOW + ms).toISOString();
 
 /** A holder's file, written as `nemia up` writes one — its process's start with its pid — over what is there. */
-const holdBy = (pid: number, over: Record<string, unknown> = {}): string => {
+const holdBy = (pid: number, over: Record<string, unknown> = {}) => {
   const text = `${JSON.stringify({ pid, startedAt: minutesAgo(30), cwd: '/elsewhere', every: 4000, passedAt: minutesAgo(0.05), procStart: procStartOf(pid), ...over }, null, 2)}\n`;
   fs.writeFileSync(FILE, text);
   return text;
 };
 
 /** A duration as `durationWord` prints it (3s, 16m11s, 1h05m, 2d03h) in milliseconds; NaN for a word that is not wholly such pairs. */
-const msOfWord = (word: string): number => {
+const msOfWord = (word: string) => {
   if (!/^(?:\d+[dhms])+$/.test(word)) return NaN;
   const unit = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1000 } as const;
   return [...word.matchAll(/(\d+)([dhms])/g)].reduce((ms, [, n, u]) => ms + Number(n) * unit[u as keyof typeof unit], 0);
@@ -121,7 +121,7 @@ const STALE = '15m00s';
  * Whether `line` is `nemia up`'s takeover of a stale holder `pid` at every 4000ms: that pid, a silence over the bound it names, and the
  * fixture's own, `silent`.
  */
-const saysStale = (line: string, pid: number, silent: string): boolean => {
+const saysStale = (line: string, pid: number, silent: string) => {
   const silence = new RegExp(
     `^ {3}took ${ROOT} over from pid ${pid}, alive but silent for (\\S+), over the ${STALE} that is stale at every 4000ms — `,
   ).exec(line)?.[1];
@@ -152,7 +152,7 @@ const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9
 
 /** An engine whose tick counts the passes and runs `each` on each, which may throw to stop the daemon. */
 /** A pass's report that did nothing, with what a test says of it. */
-const pass = (said: Partial<TickReport> = {}): TickReport => ({
+const pass = (said: Partial<TickReport> = {}) => ({
   tasks: 0,
   actions: 0,
   running: {},
@@ -172,7 +172,7 @@ const engineOf = (
 ) => {
   const state = {
     passes: 0,
-    tick: async (): Promise<TickReport> => {
+    tick: async () => {
       state.passes++;
       each(state.passes);
       return pass();
@@ -193,22 +193,21 @@ const engineOf = (
 /** What a verb printed, line by line, and what it threw: one the client holds on its entry's handler, its lines said (`told`). */
 const typed = async (t: TestContext, argv: string[], e: Engine) => {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.map(String).join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   let threw: unknown;
   try {
     await told(argv, e, undefined, stand().place, ENV);
   } catch (err) {
     threw = err;
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.map(String).join(' ')]));
     log.mockRestore();
   }
   return { printed, threw };
 };
 
 /** What `nemia ls` answers (`RunsListed`), and its line on who ticks the store, in the daemon's own words (`daemonLine`), now. */
-const listed = async (e: Engine): Promise<{ runs: RunsListed['runs']; daemon: string }> => {
+const listed = async (e: Engine) => {
   const answered = (await told(['ls'], e, undefined, stand().place, ENV)) as RunsListed;
   return { runs: answered.runs, daemon: daemonLine(answered.daemon, Date.now()) };
 };
@@ -942,26 +941,24 @@ test('`nemia up` says a task the runtime left out once while it lasts, and again
     if (e.passes > byPass.length) throw STOP;
     return pass({ tasks: 2, unreadable: byPass[e.passes - 1] });
   });
-  const errors: string[] = [];
-  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-    errors.push(args.map(String).join(' '));
-  });
+  const errorsSpy = vi.spyOn(console, 'error');
+  const errors = () => errorsSpy.mock.calls.flatMap((args) => [args.map(String).join(' ')]);
   const { threw } = await typed(t, ['up', '1'], e);
   assert.equal(threw, STOP);
-  const said = errors.filter((l) => l.includes('left out: '));
+  const said = errors().filter((l) => l.includes('left out: '));
   assert.deepEqual(
     said.map((l) => l.slice(10)),
     [`left out: ${bad}`, `left out: ${feed}`, `left out: ${bad}`],
-    errors.join('\n'),
+    errors().join('\n'),
   );
   assert.ok(
     said.every((l) => /^\d\d:\d\d:\d\d  left out: /.test(l)),
     'stamped as the daemon stamps every line',
   );
-  errors.length = 0;
+  errorsSpy.mockClear();
   e.setTick(async () => pass({ tasks: 2, unreadable: [bad, feed] }));
   assert.equal((await typed(t, ['tick'], e)).threw, undefined);
-  assert.deepEqual(errors, [`left out: ${bad}`, `left out: ${feed}`]);
+  assert.deepEqual(errors(), [`left out: ${bad}`, `left out: ${feed}`]);
 });
 
 /** A pass's cost as the meter writes one: every phase, and two harnesses observed. */
@@ -1016,8 +1013,8 @@ describe('what a pass kept reads back: its cost, the recent passes, the ceilings
     assert.deepEqual(parsePassCost(JSON.stringify(older)), older, 'a file an older tick wrote');
   });
   test('the recent passes keep the last `keep`, the oldest left out first, and one that does not read left out, the file named once', async () => {
-    const errors: string[] = [];
-    vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => errors.push(line) > 0) as never);
+    const errorsSpy = vi.spyOn(process.stderr, 'write');
+    const errors = () => errorsSpy.mock.calls.flatMap(([line]) => [String(line)]);
     fs.rmSync(recentFile(ROOT), { force: true });
     try {
       assert.deepEqual(recentPasses(ROOT), [], 'none before any pass kept one');
@@ -1033,8 +1030,8 @@ describe('what a pass kept reads back: its cost, the recent passes, the ceilings
         recentPasses(ROOT).map((r) => r.ms),
         [3, 5],
       );
-      assert.equal(errors.length, 1, errors.join(''));
-      assert.ok(errors[0].startsWith(`${recentFile(ROOT)}: 2 of its passes`), errors[0]);
+      assert.equal(errors().length, 1, errors().join(''));
+      assert.ok(errors()[0].startsWith(`${recentFile(ROOT)}: 2 of its passes`), errors()[0]);
       recordRecentPass(ROOT, { ...COST, ms: 6 }, 3);
       assert.deepEqual(
         recentPasses(ROOT).map((r) => r.ms),
@@ -1386,10 +1383,10 @@ describe('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that can
   });
   let env: Env = { ...ENV, WF_MEMORY_LIMIT: '4Gi', WF_CGROUP_PARENT: 'agents.slice' };
   const asked: Array<string | undefined> = [];
-  const noted = (parent?: string): void => void asked.push(parent);
+  const noted = (parent?: string) => void asked.push(parent);
   const refusing = (parent?: string) => (noted(parent), 'this host has no systemd user manager.');
   test('a host that holds one starts, and so does any host with WF_MEMORY_LIMIT unset, never probed', async () => {
-    const holding = (parent?: string): undefined => {
+    const holding = (parent?: string) => {
       noted(parent);
       return undefined;
     };

@@ -21,7 +21,7 @@ const PKG = path.join(import.meta.dirname, '..');
 const isTest = (file: string) => file.endsWith('.test.ts');
 
 /** The package's source under `src/`, tests beside the code left out, by path from the package. */
-const sourceFiles = (): string[] =>
+const sourceFiles = () =>
   fs
     .readdirSync(path.join(PKG, 'src'), { recursive: true, encoding: 'utf8' })
     .map((f) => `src/${f.split(path.sep).join('/')}`)
@@ -45,7 +45,7 @@ const WHY = {
 };
 
 /** Where `file` imports what its folder may not: each breach, worded with what to do instead. */
-function pathBreaches(file: string, imports: Import[]): string[] {
+function pathBreaches(file: string, imports: Import[]) {
   const out: string[] = [];
   for (const { spec } of imports) {
     const target = resolved(file, spec);
@@ -111,7 +111,7 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or an entry; 
 });
 
 /** The files that sit flat in `src/` and are not one of the entries, each worded with what to do instead. */
-const flatBreaches = (files: readonly string[]): string[] =>
+const flatBreaches = (files: readonly string[]) =>
   files
     .filter((f) => !f.slice('src/'.length).includes('/') && !ENTRIES.includes(f))
     .map((f) => `${f} sits flat in src/: only the entries ${ENTRIES.join(', ')} do — put it in its feature's folder`);
@@ -141,7 +141,7 @@ const STAND_IN = { entry: 'src/testing.ts', made: 'src/service/test-engine.ts', 
  * Where `file`, a file of `src` or `bin` that runs, takes the engine's stand-in: an import of the testing entry or of the stand-in's
  * file, or its name written in code. The stand-in's own three files are let through.
  */
-function standInBreaches(file: string, text: string): string[] {
+function standInBreaches(file: string, text: string) {
   if (Object.values(STAND_IN).includes(file) || isTest(file)) return [];
   const why = 'the stand-in is for tests alone — a file that runs asks the `Engine` service, and whoever runs it gives the real one';
   const targets = importsIn(text).map(({ spec }) => resolved(file, spec));
@@ -153,7 +153,7 @@ function standInBreaches(file: string, text: string): string[] {
 }
 
 /** The package's files that run, under `src/` and `bin/`, by path from the package. */
-const runFiles = (): string[] => [...sourceFiles(), ...fs.readdirSync(path.join(PKG, 'bin')).map((f) => `bin/${f}`)];
+const runFiles = () => [...sourceFiles(), ...fs.readdirSync(path.join(PKG, 'bin')).map((f) => `bin/${f}`)];
 
 test("REFUSED: a file of src or bin that takes the engine's stand-in, by its entry, its file or its name", () => {
   const why = 'the stand-in is for tests alone — a file that runs asks the `Engine` service, and whoever runs it gives the real one';

@@ -37,19 +37,19 @@ const HOMEDIR_ALLOWED: Readonly<Record<string, string>> = {
 };
 
 /** `text` with every comment blanked and its line breaks kept, so a store named in prose is passed over. */
-const uncommented = (text: string): string => text.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*/g, (found) => found.replace(/[^\n]/g, ' '));
+const uncommented = (text: string) => text.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*/g, (found) => found.replace(/[^\n]/g, ' '));
 
 /** Each line of `text` outside a comment that matches `what`, by its line and the line's own words. */
-const linesMatching = (text: string, what: RegExp): string[] => {
+const linesMatching = (text: string, what: RegExp) => {
   const clean = uncommented(text);
   return clean.split('\n').flatMap((line, i) => (what.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
 };
 
 /** Each line of `text` that names the engine's default store, or reads `AE_ROOT`. */
-export const engineStoreNamed = (text: string): string[] => linesMatching(text, /\.agent-engine|AE_ROOT/);
+export const engineStoreNamed = (text: string) => linesMatching(text, /\.agent-engine|AE_ROOT/);
 
 /** Each line of `text` that reads the person's home directory. */
-export const homedirRead = (text: string): string[] => linesMatching(text, /\bos\.homedir\s*\(/);
+export const homedirRead = (text: string) => linesMatching(text, /\bos\.homedir\s*\(/);
 
 test('REFUSED: a store named or a home read in a source file is found, by line; one named in a comment is passed over', () => {
   const store = '.agent-' + 'engine';
@@ -73,7 +73,7 @@ test('REFUSED: a store named or a home read in a source file is found, by line; 
 });
 
 /** Every file of `src` that is no test, by its path from `src`. */
-const sources = (): string[] =>
+const sources = () =>
   fs
     .readdirSync(SRC, { recursive: true, encoding: 'utf8' })
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))

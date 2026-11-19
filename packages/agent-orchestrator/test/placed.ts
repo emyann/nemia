@@ -28,7 +28,7 @@ type RunWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>) =>
 export type Given = Layer.Layer<PlaceService> | (() => Layer.Layer<PlaceService>);
 
 /** The layer `given` names now. */
-const layerOf = (given: Given): Layer.Layer<PlaceService> => (typeof given === 'function' ? given() : given);
+const layerOf = (given: Given) => (typeof given === 'function' ? given() : given) satisfies Layer.Layer<PlaceService>;
 
 /** The package's own loader, for the one module a runner takes only when a program first runs, and synchronously. */
 const load = createRequire(import.meta.url);
@@ -37,8 +37,10 @@ const load = createRequire(import.meta.url);
  * `program` given the proposals pass a tick's pass is composed with, its module loaded only now (the file's head says why), and at
  * once, so a program a test runs with `Effect.runSync` stays synchronous.
  */
-const withProposals = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, ProposalsAct>> =>
-  Effect.suspend(() => (load('../src/apply/pass.verb.ts') as typeof import('../src/apply/pass.verb.ts')).withProposalsPass(program));
+const withProposals = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+  Effect.suspend(() =>
+    (load('../src/apply/pass.verb.ts') as typeof import('../src/apply/pass.verb.ts')).withProposalsPass(program),
+  ) satisfies Effect.Effect<A, E, Exclude<R, ProposalsAct>>;
 
 /**
  * A `runWith` over `given`: `program` run over the engine `e`, given the place `given` holds then, the store's root and settings `env`
@@ -48,22 +50,26 @@ const withProposals = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<
  */
 export const runOver =
   (runWith: RunWith, given: Given, env: Env = process.env) =>
-  <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig | ProposalsAct>): Promise<A> =>
-    runWith(e, withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(env))));
+  <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig | ProposalsAct>) =>
+    runWith(e, withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(env)))) satisfies Promise<A>;
 
 /** A runner over `given`: `program`, which asks the place and no engine, run given the place `given` holds then, and the proposals pass. */
 export const runGiven =
   (given: Given, env: Env = process.env) =>
-  <A, E>(program: Effect.Effect<A, E, PlaceService | StoreRoot | StoreConfig | ProposalsAct>): Promise<A> =>
-    Effect.runPromise(withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(env))));
+  <A, E>(program: Effect.Effect<A, E, PlaceService | StoreRoot | StoreConfig | ProposalsAct>) =>
+    Effect.runPromise(
+      withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(env))),
+    ) satisfies Promise<A>;
 
 /** `program` given the place `given` holds now and the proposals pass, and still to be run. */
 export const givenPlace =
   (given: Given, env: Env = process.env) =>
-  <A, E, R>(
-    program: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E, Exclude<Exclude<Exclude<R, ProposalsAct>, PlaceService>, StoreRoot | StoreConfig>> =>
-    Effect.provide(Effect.provide(withProposals(program), layerOf(given)), storeConfigLayer(env));
+  <A, E, R>(program: Effect.Effect<A, E, R>) =>
+    Effect.provide(Effect.provide(withProposals(program), layerOf(given)), storeConfigLayer(env)) satisfies Effect.Effect<
+      A,
+      E,
+      Exclude<Exclude<Exclude<R, ProposalsAct>, PlaceService>, StoreRoot | StoreConfig>
+    >;
 
 /** The makers `eachTest` was given in this file, in order, each with what it made for the test or `describe` running now. */
 const makers: { make: () => unknown; now?: { readonly made: unknown } }[] = [];
@@ -79,7 +85,7 @@ const at: { head?: unknown; started: boolean; running: boolean; making: boolean;
 };
 
 /** Every maker made anew, in the order given, so a later one reads the earlier ones' new makes. */
-const makeAll = (): void => {
+const makeAll = () => {
   at.making = true;
   try {
     for (const m of makers) m.now = { made: m.make() };
@@ -89,10 +95,10 @@ const makeAll = (): void => {
 };
 
 /** The test or `describe` at the head of the file that `task` belongs to. */
-const headOf = (task: { suite?: unknown; file: unknown }): unknown => {
+const headOf = (task: { suite?: unknown; file: unknown }) => {
   let top: { suite?: unknown } = task;
   while (top.suite && top.suite !== task.file) top = top.suite;
-  return top;
+  return top satisfies unknown;
 };
 
 /**
@@ -103,7 +109,7 @@ const headOf = (task: { suite?: unknown; file: unknown }): unknown => {
  *
  * @param make what is made anew for each test or `describe` at the head of the file
  */
-export function eachTest<A>(make: () => A): () => A {
+export function eachTest<A>(make: () => A) {
   const mine: { make: () => unknown; now?: { readonly made: unknown } } = { make };
   makers.push(mine);
   if (makers.length === 1) {
@@ -123,7 +129,7 @@ export function eachTest<A>(make: () => A): () => A {
       at.running = false;
     });
   }
-  return () => {
+  return (() => {
     if (!at.started) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
     if (!at.running && !at.making && !at.early) {
       makeAll();
@@ -131,5 +137,5 @@ export function eachTest<A>(make: () => A): () => A {
     }
     if (!mine.now) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
     return mine.now.made as A;
-  };
+  }) satisfies () => A;
 }

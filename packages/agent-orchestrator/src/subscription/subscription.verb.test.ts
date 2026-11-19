@@ -40,7 +40,7 @@ const e = {
  * The command line `argv` read as `spec` reads it, refused as the CLI refuses it, decoded through the entry's `input` as the CLI decodes
  * it, then handed to its handler over `e`.
  */
-const typed = async <D extends object>(command: typeof SUBSCRIBE | typeof UNSUBSCRIBE, argv: string[]): Promise<D> => {
+const typed = async <D extends object>(command: typeof SUBSCRIBE | typeof UNSUBSCRIBE, argv: string[]) => {
   const args = parseArgv(command.spec, argv);
   assert.ok(args, `${argv.join(' ')} reads`);
   const refused = command.check?.(args);
@@ -53,7 +53,7 @@ const typed = async <D extends object>(command: typeof SUBSCRIBE | typeof UNSUBS
 };
 
 /** The message `f` refuses with, at exit 2. */
-const refusal = async (f: () => Promise<unknown>): Promise<string> => {
+const refusal = async (f: () => Promise<unknown>) => {
   try {
     await f();
   } catch (err) {
@@ -69,7 +69,7 @@ const feed = path.join(ROOT, 'feed.jsonl');
  * `args` as the api hands them over — a body read, with no command line to read them off — refused as the route refuses them, then handed
  * to the handler over `e`.
  */
-const handed = async <D extends object>(args: Record<string, unknown>): Promise<D> => {
+const handed = async <D extends object>(args: Record<string, unknown>) => {
   const refused = SUBSCRIBE.check?.(args as never);
   if (refused) throw Object.assign(new Error(refused), { exitCode: 2 });
   return (await runWith(e, storeGiven(ROOT, ENV)(SUBSCRIBE.handler(args as never)) as never)) as D;

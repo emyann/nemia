@@ -36,13 +36,13 @@ const over = <A, E>(planted: Planted, program: Effect.Effect<A, E>) =>
   Effect.runSyncExit(planting(planted, program).pipe(Effect.provide(subscriptionDoorMemory())));
 
 /** The success of `exit`, or a failure of the test naming what it failed with. */
-const ok = <A, E>(exit: Exit.Exit<A, E>): A => {
+const ok = <A, E>(exit: Exit.Exit<A, E>) => {
   if (Exit.isSuccess(exit)) return exit.value;
   throw new Error(`expected a success, got ${String(exit.cause)}`);
 };
 
 /** The error `exit` failed with. */
-const failed = <A, E>(exit: Exit.Exit<A, E>): unknown => {
+const failed = <A, E>(exit: Exit.Exit<A, E>) => {
   assert.ok(Exit.isFailure(exit));
   const found = exit.cause.reasons.find((r) => r._tag === 'Fail');
   return found && 'error' in found ? found.error : undefined;

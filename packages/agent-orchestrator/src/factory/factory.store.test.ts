@@ -53,18 +53,18 @@ type Refusal = Error & { exitCode?: number; _tag?: string };
 /** Refused by kind, exit 2, and the facts its words name — never its sentence. */
 const refused =
   (tag: 'Missing' | 'Conflict' | 'Invalid', ...facts: string[]) =>
-  (err: Refusal): true => {
+  (err: Refusal) => {
     assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
     names(err.message, ...facts);
-    return true;
+    return true as const satisfies true;
   };
 
 /** The paths of `volumes` that are writable: the repositories a factory works on. */
-const writable = (volumes: readonly { path: string; readOnly: boolean }[] | undefined): string[] | undefined =>
-  volumes?.filter((v) => !v.readOnly).map((v) => v.path);
+const writable = (volumes: readonly { path: string; readOnly: boolean }[] | undefined) =>
+  volumes?.filter((v) => !v.readOnly).map((v) => v.path) satisfies string[] | undefined;
 
 /** The factories `nemia factory ls` reads, by name: each with the repositories it works on, or the file that does not read and why. */
-const listedBy = async (): Promise<Array<[string, unknown]>> => {
+const listedBy = async () => {
   const { factories } = (await main(['factory', 'ls'], noEngine())) as {
     factories: Array<{ name: string; volumes?: readonly { path: string; readOnly: boolean }[]; file: string; error?: string }>;
   };
@@ -74,21 +74,21 @@ const listedBy = async (): Promise<Array<[string, unknown]>> => {
 /** The files in the factories folder, hidden ones too, by name. */
 const filed = () => (fs.existsSync(FACTORIES) ? fs.readdirSync(FACTORIES).sort() : []);
 /** The repositories the factory `name`'s file works on: its writable volumes' paths. */
-const reposIn = (name: string): unknown => writable(JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')).volumes);
+const reposIn = (name: string) => writable(JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')).volumes) as unknown;
 /** The factory `name`'s file, as JSON. */
-const fileOf = (name: string): Record<string, unknown> => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8'));
+const fileOf = (name: string) => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')) as Record<string, unknown>;
 /** The bytes of the factory `name`'s file. */
-const bytesOf = (name: string): Buffer => fs.readFileSync(path.join(FACTORIES, `${name}.json`));
+const bytesOf = (name: string) => fs.readFileSync(path.join(FACTORIES, `${name}.json`)) satisfies Buffer;
 
 /** An empty folder of factories, and a plain directory to name as a repository: no `.git`, which the store asks for of none (the verb asks
  * the place). */
-const fresh = (): string => {
+const fresh = () => {
   fs.rmSync(FACTORIES, { recursive: true, force: true });
   return fs.mkdtempSync(path.join(ROOT, 'repo-'));
 };
 
 /** `fresh`, and the factory `pipao` filed on its repository, with `workflows` attached: the repository. */
-const pipao = (...workflows: string[]): string => {
+const pipao = (...workflows: string[]) => {
   const repo = fresh();
   addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
   for (const workflow of workflows) attachWorkflowAt(ROOT, { factory: 'pipao', workflow });
@@ -100,6 +100,7 @@ test('REFUSED: two adds of one name, the second while the first is between its w
   const second = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const link = fs.linkSync;
   let raced: unknown;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a second add between write and link: a race no seam gives
   const mocked = vi.spyOn(fs, 'linkSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     mocked.mockRestore();
     raced = addFactoryAt(ROOT, { name: 'pipao', volumes: [second].map((r) => `${r}:rw`) });
@@ -304,10 +305,10 @@ describe('REFUSED: `nemia factory` typed with a subcommand, a flag or an argumen
 });
 
 /** `pipao` attaching `build` and hiring `agora` into its review: the file's bytes, to compare. */
-const hiring = (): Buffer => {
+const hiring = () => {
   pipao('build');
   hireAgentAt(ROOT, { factory: 'pipao', agent: 'agora', step: 'build/review' });
-  return bytesOf('pipao');
+  return bytesOf('pipao') satisfies Buffer;
 };
 
 describe('REFUSED: `nemia factory hire` and `fire`, nothing written', () => {
@@ -342,12 +343,15 @@ describe('REFUSED: `nemia factory hire` and `fire`, nothing written', () => {
       'Invalid',
       ['`Pipao`'],
     ],
-    ...['build', 'build/a/b', 'build/.x', '/x'].map((step): [string, () => unknown, 'Invalid', string[]] => [
-      `a hire whose step is not <workflow>/<step>: ${step}`,
-      () => hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step }),
-      'Invalid',
-      [`--step ${step}`],
-    ]),
+    ...['build', 'build/a/b', 'build/.x', '/x'].map(
+      (step) =>
+        [
+          `a hire whose step is not <workflow>/<step>: ${step}`,
+          () => hireAgentAt(ROOT, { factory: 'pipao', agent: 'ada', step }),
+          'Invalid',
+          [`--step ${step}`],
+        ] satisfies [string, () => unknown, 'Invalid', string[]],
+    ),
     [
       'a hire whose agent is no name is Invalid',
       () => hireAgentAt(ROOT, { factory: 'pipao', agent: 'a/b', step: 'build/implement' }),
@@ -448,7 +452,7 @@ describe('REFUSED: `nemia factory attach` and `detach`, nothing written', () => 
 });
 
 describe('REFUSED: an attach naming a repository the factory has no folder of that name for, nothing written; one named is written to its file, and a detach takes it off', () => {
-  const shop = (): string => {
+  const shop = () => {
     const repo = fresh();
     addFactoryAt(ROOT, { name: 'shop', volumes: [repo].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: 'shop', workflow: 'dev' });

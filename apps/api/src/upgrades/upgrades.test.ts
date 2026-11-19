@@ -48,7 +48,7 @@ const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: stri
   });
 
 /** The event names of a server-sent stream's text, in order. */
-const eventsOf = (text: string): string[] => [...text.matchAll(/^event: ?(.*)$/gm)].map((m) => m[1] ?? '');
+const eventsOf = (text: string) => [...text.matchAll(/^event: ?(.*)$/gm)].map((m) => m[1] ?? '');
 
 /** The store's floor, `store.json`, recorded as `tag` for the test, and taken away after it. */
 const floorAt = (t: { onTestFinished: (fn: () => void) => void }, tag: string) => {

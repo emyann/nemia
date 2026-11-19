@@ -18,7 +18,7 @@ const DENSEST = 11;
  * Draws the look's ground under `page` as one colour, its densest, where `measure` reads no ground drawn as an image; answers what
  * draws it as it was.
  */
-async function flattened(page: Page): Promise<() => Promise<void>> {
+async function flattened(page: Page) {
   const grounds = page.locator('[data-scan-lines]');
   await grounds.evaluateAll(
     (all, [hue, share]) => {
@@ -31,14 +31,14 @@ async function flattened(page: Page): Promise<() => Promise<void>> {
     },
     [paint.alive, DENSEST] as const,
   );
-  return () =>
+  return (() =>
     grounds.evaluateAll((all) => {
       for (const ground of all as HTMLElement[]) {
         ground.style.backgroundImage = ground.dataset.groundWas ?? '';
         ground.style.backgroundColor = '';
         delete ground.dataset.groundWas;
       }
-    });
+    })) satisfies () => Promise<void>;
 }
 
 /**
@@ -46,7 +46,7 @@ async function flattened(page: Page): Promise<() => Promise<void>> {
  *
  * @throws `Refused` when the page shows no text, or a text whose ground could still not be read: an unmeasured text is never passed
  */
-export async function failingPairs(page: Page): Promise<string[]> {
+export async function failingPairs(page: Page) {
   const restore = await flattened(page);
   try {
     const { pairs, scheme } = await measure(page.locator('[data-runs-page]'));
@@ -69,8 +69,8 @@ export async function failingPairs(page: Page): Promise<string[]> {
  * turned and put back, each once the colours have made their turn; and the measure sees a pair that is: each of `dimmed`, a selector
  * of a text the page shows, dimmed on purpose, fails it, in each scheme.
  */
-export async function contrastHolds(page: Page, dimmed: readonly string[]): Promise<void> {
-  const scheme = (await themeOf(page)) as 'light' | 'dark';
+export async function contrastHolds(page: Page, dimmed: readonly string[]) {
+  const scheme = await themeOf(page);
   const other = scheme === 'dark' ? 'light' : 'dark';
   for (const turned of [other, scheme] as const) {
     await page.emulateMedia({ colorScheme: turned });

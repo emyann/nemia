@@ -35,7 +35,7 @@ const BEFORE_SHA = '075bc076c62ecde2cce8558766c0139cb6747b55';
 const HEAD = '332db4b48aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 /** The shapes the allowlist is for, read off the file it is for, so no string of that shape is written in this one. */
-const stubShapes = (): string[] => {
+const stubShapes = () => {
   const found = [...fs.readFileSync(path.join(ROOT, STUBS), 'utf8').matchAll(/(?:tok|key)-[\da-f]{4}-SECRET(?:-[\da-f]{4})?/g)].map(
     (m) => m[0],
   );
@@ -43,14 +43,12 @@ const stubShapes = (): string[] => {
 };
 
 /** A secret of another rule, and one of the same rule and another shape: the controls, generated so neither is written down. */
-const controls = (): { Secret: string; RuleID: string }[] => [
+const controls = () => [
   { Secret: `ghp_${crypto.randomBytes(18).toString('hex')}`, RuleID: 'github-pat' },
   { Secret: crypto.randomBytes(32).toString('hex'), RuleID: 'generic-api-key' },
 ];
 
-type Finding = { File: string; RuleID: string; Secret: string; StartLine: number };
-
-const findings = (file: string, secrets: readonly { Secret: string; RuleID: string }[]): Finding[] =>
+const findings = (file: string, secrets: readonly { Secret: string; RuleID: string }[]) =>
   secrets.map((s, at) => ({ File: `./${file}`, RuleID: s.RuleID, Secret: s.Secret, StartLine: at + 1 }));
 
 /**
@@ -59,7 +57,7 @@ const findings = (file: string, secrets: readonly { Secret: string; RuleID: stri
  * where it was not), and exits `STUB_EXIT`. It reads both out of its own directory, so nothing of the test's reaches the step's
  * environment but the exit code.
  */
-function workspace(): { dir: string; log: string; reports: string } {
+function workspace() {
   const dir = scratch('ci-scan-');
   const log = path.join(dir, 'gitleaks.log');
   const reports = path.join(dir, 'reports');
@@ -89,7 +87,7 @@ function workspace(): { dir: string; log: string; reports: string } {
 }
 
 /** A step of the job, run as GitHub runs it: `bash -e` over a file, in the workspace, with nothing of this run's in its environment. */
-function verdictOf(run: string, dir: string, env: Record<string, string>): { status: number; said: string } {
+function verdictOf(run: string, dir: string, env: Record<string, string>) {
   const file = path.join(scratch('ci-scan-step-'), 'step.sh');
   fs.writeFileSync(file, run);
   const ran = spawnSync('bash', ['-e', file], {
@@ -102,9 +100,9 @@ function verdictOf(run: string, dir: string, env: Record<string, string>): { sta
 }
 
 /** The `--log-opts` value the step handed the binary: the commits it actually read, which no reading of the YAML gives. */
-const rangeIn = (log: string): string => /--log-opts (\S+)/.exec(fs.readFileSync(log, 'utf8'))?.[1] ?? '';
+const rangeIn = (log: string) => /--log-opts (\S+)/.exec(fs.readFileSync(log, 'utf8'))?.[1] ?? '';
 
-const scanRun = (): string => {
+const scanRun = () => {
   const step = scanStep(readWorkflow());
   assert.ok(step?.run !== undefined, 'the scan job has its scan step today');
   return step.run;
@@ -187,7 +185,7 @@ test('a scan that reads every failure as a leak is what --exit-code 2 is for, an
 });
 
 /** The self-check step's `run`, and the reports it is to be handed: a count per file, of the stub shapes or of anything else. */
-const allowlistRun = (): string => {
+const allowlistRun = () => {
   const step = allowlistStep(readWorkflow());
   assert.ok(step?.run !== undefined, 'the scan job has its self-check step today');
   return step.run;

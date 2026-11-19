@@ -13,14 +13,14 @@ const NAME_PX = 12;
 const EVENT_PX = 10;
 
 /** The text size `element` is shown at, in the page's own pixels: its font's size scaled by the zoom its canvas draws it at. */
-const shownPx = (element: Locator): Promise<number> =>
+const shownPx = (element: Locator) =>
   element.evaluate((e) => {
     const el = e as HTMLElement;
     return (parseFloat(getComputedStyle(el).fontSize) * el.getBoundingClientRect().height) / el.offsetHeight;
-  });
+  }) satisfies Promise<number>;
 
 /** The smallest text size any element of `elements` is shown at, in the page's own pixels. */
-const smallestPx = async (elements: Locator): Promise<number> => Math.min(...(await Promise.all((await elements.all()).map(shownPx))));
+const smallestPx = async (elements: Locator) => Math.min(...(await Promise.all((await elements.all()).map(shownPx))));
 
 export default {
   /**

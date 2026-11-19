@@ -38,7 +38,7 @@ const answered = (page: Page, method: 'PUT' | 'DELETE', what: Written) =>
   page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === ROUTES[what], { timeout: WAIT_MS });
 
 /** Press `button` in `section`, wait for the api's answer to `method` on the route of `what`, and refuse any but a 200. */
-async function wrote(page: Page, section: Locator, button: string, method: 'PUT' | 'DELETE', what: Written = 'instruction'): Promise<void> {
+async function wrote(page: Page, section: Locator, button: string, method: 'PUT' | 'DELETE', what: Written = 'instruction') {
   const [answer] = await Promise.all([answered(page, method, what), section.getByRole('button', { name: button, exact: true }).click()]);
   if (answer.status() !== 200) throw new Refused(`${button} writes — the api answered ${answer.status()}: ${await answer.text()}`);
   await idle(page);
@@ -48,7 +48,7 @@ async function wrote(page: Page, section: Locator, button: string, method: 'PUT'
  * The factory's rules, above its instruction: none yet, and no Clear offered; written, they are the store's file, said saved, and read
  * again on a reload; cleared, asked twice, the file is gone. The instruction's block says it is Nemia's, told to no step.
  */
-async function keepRules(page: Page, kept: string): Promise<void> {
+async function keepRules(page: Page, kept: string) {
   const section = page.locator('section[data-factory-rules]');
   const instruction = page.locator('section[data-factory-instruction]');
   const above = await section.evaluate(
@@ -95,14 +95,13 @@ async function keepRules(page: Page, kept: string): Promise<void> {
 }
 
 /** The cost lines the factory's file keeps, as it reads now. */
-const costLinesIn = (factoryFile: string): unknown =>
-  (JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as { costLines?: unknown }).costLines;
+const costLinesIn = (factoryFile: string) => (JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as { costLines?: unknown }).costLines;
 
 /**
  * The factory's cost lines: a row per workflow it offers, none set yet and nothing to clear; a line typed and saved is the factory's
  * file's `costLines`, shown on the row and read again on a reload; cleared, the file keeps none and the row says so.
  */
-async function setCostLine(page: Page, factoryFile: string): Promise<void> {
+async function setCostLine(page: Page, factoryFile: string) {
   const { workflow, usd } = LINED;
   const section = page.locator('[data-cost-lines]');
   const row = section.locator(`[data-cost-line="${workflow}"]`);
@@ -132,7 +131,7 @@ async function setCostLine(page: Page, factoryFile: string): Promise<void> {
 }
 
 /** Where the section says the instruction is kept, and the file it names. */
-async function expectKept(section: Locator, kept: 'store' | 'folder', file: string, assertion: string): Promise<void> {
+async function expectKept(section: Locator, kept: 'store' | 'folder', file: string, assertion: string) {
   await expectVisible(section.locator(`[data-instruction-kept="${kept}"]`), assertion);
   const shown = await section.locator('[data-instruction-file]').textContent();
   if (shown !== file) throw new Refused(`${assertion}: the file it names is ${file} — it names ${JSON.stringify(shown)}`);
@@ -142,7 +141,7 @@ async function expectKept(section: Locator, kept: 'store' | 'folder', file: stri
  * The floor's Settings leads to the factory's settings page, whose sidebar still picks the factory, and which reads the instruction from
  * `NEMIA.md`, no file there yet.
  */
-async function followSettings(page: Page, section: Locator, checkout: string): Promise<void> {
+async function followSettings(page: Page, section: Locator, checkout: string) {
   await page.locator('[data-floor-options]').getByRole('link', { name: 'Settings', exact: true }).click();
   await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/settings`, { timeout: WAIT_MS });
   await idle(page);
@@ -161,7 +160,7 @@ async function followSettings(page: Page, section: Locator, checkout: string): P
 }
 
 /** Pointed at a file of the folder, the instruction reads it, and the factory's file names it; Back to NEMIA.md undoes it. */
-async function pointAtFile(page: Page, section: Locator, checkout: string, factoryFile: string): Promise<void> {
+async function pointAtFile(page: Page, section: Locator, checkout: string, factoryFile: string) {
   await section.getByRole('textbox', { name: /Or read it from a file/ }).fill(README);
   await wrote(page, section, 'Read this file', 'PUT');
   await expectKept(section, 'folder', path.join(checkout, README), 'pointed at a file, the instruction is read from it');
@@ -176,7 +175,7 @@ async function pointAtFile(page: Page, section: Locator, checkout: string, facto
 }
 
 /** Kept in the store, the words are written there and read again on a reload; cleared, asked twice, the store keeps none. */
-async function keepInStore(page: Page, section: Locator, stored: string): Promise<void> {
+async function keepInStore(page: Page, section: Locator, stored: string) {
   await wrote(page, section, 'Keep it in the store instead', 'PUT');
   await expectKept(section, 'store', stored, 'kept in the store, the instruction is read from the store');
   if (await section.getByRole('button', { name: 'Read this file' }).isEnabled())
@@ -204,7 +203,7 @@ async function keepInStore(page: Page, section: Locator, stored: string): Promis
 }
 
 /** The settings page on a phone's screen, the words kept in the store, in a page of its own. */
-async function onPhone(page: Page, theme: string): Promise<void> {
+async function onPhone(page: Page, theme: string) {
   const phone = await page.context().newPage();
   try {
     await phone.setViewportSize({ width: 390, height: 844 });
@@ -219,7 +218,7 @@ async function onPhone(page: Page, theme: string): Promise<void> {
 }
 
 /** A factory's file as the door reads it: one written before the counter reads as generation 1, so writing it 1 changes nothing. */
-const asRead = (text: string): Record<string, unknown> => ({ generation: 1, ...(JSON.parse(text) as Record<string, unknown>) });
+const asRead = (text: string) => ({ generation: 1, ...(JSON.parse(text) as Record<string, unknown>) }) as Record<string, unknown>;
 
 export default {
   /**

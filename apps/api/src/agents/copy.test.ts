@@ -30,7 +30,7 @@ const SKILLS = path.join(root, 'workflows', 'skills');
 const from = scratch('nemia-api-copy-from-');
 
 /** An agent file written into the folder copied from, with the frontmatter lines `keys` and the skill `scouting` beside it. */
-function source(name: string, keys: string[], body = 'Scout the ground.'): string {
+function source(name: string, keys: string[], body = 'Scout the ground.') {
   fs.mkdirSync(path.join(from, 'agents'), { recursive: true });
   fs.mkdirSync(path.join(from, 'skills', 'scouting'), { recursive: true });
   fs.writeFileSync(
@@ -51,14 +51,14 @@ const copy = (body: unknown) =>
   });
 
 /** What yours holds: each file under the library's agents and skills, by its path, and the copies' records. */
-const held = (): string[] =>
+const held = () =>
   [AGENTS, SKILLS, path.join(root, 'agent-sources')]
     .filter((dir) => fs.existsSync(dir))
     .flatMap((dir) => fs.readdirSync(dir, { recursive: true, encoding: 'utf8' }).map((f) => path.join(dir, f)))
     .sort();
 
 /** A copy refused with `status` and words `pattern` matches, and yours as it was. */
-async function refused(body: unknown, status: number, pattern: RegExp): Promise<void> {
+async function refused(body: unknown, status: number, pattern: RegExp) {
   const before = held();
   const res = await copy(body);
   const { error } = (await res.json()) as { error: string };

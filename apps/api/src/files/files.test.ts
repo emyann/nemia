@@ -23,7 +23,7 @@ import { runsAtOnce } from 'agent-orchestrator';
 import { TEAM } from '../../test/team.ts';
 import { OBJECT_BODY_LIMIT } from '../objects/serve.ts';
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -48,7 +48,7 @@ write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hire
 const BEARER = { authorization: 'Bearer harness-person-token-0123456789abcdefghijklmnopq' };
 
 /** A form of one part, `file`, holding `bytes` named `name`, as `nemia start --input` sends each file. */
-const formOf = (name: string, bytes: Buffer, type = 'image/png'): FormData => {
+const formOf = (name: string, bytes: Buffer, type = 'image/png') => {
   const form = new FormData();
   form.append('file', new Blob([new Uint8Array(bytes)], { type }), name);
   return form;
@@ -74,13 +74,13 @@ const post = (url: string, body: unknown) =>
   });
 
 /** What the factory's files folder holds now. */
-const kept = (): string[] => {
+const kept = () => {
   const dir = path.join(root, 'files', 'acme');
   return fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [];
 };
 
 /** The run directories of the store now. */
-const runCount = (): number => fs.readdirSync(path.join(root, 'runs')).length;
+const runCount = () => fs.readdirSync(path.join(root, 'runs')).length;
 
 test('three pictures of 3 MB in all, each uploaded, start a card whose run holds each byte for byte, past the 1 MiB of an object write', async () => {
   const pictures = [

@@ -36,7 +36,7 @@ const app = eachTest(() => appOver(standIn(), stand()));
 const exposed = eachTest(() => appOver(standIn(), stand(), storeConfigLayer({ ...process.env, WF_ROOT: root, WF_EXPOSED: '1' })));
 
 /** A token minted through the token door over the harness's store, under `name`, held by `holder` (the person where left out). */
-const minted = (name: string, holder?: TokenHolder): string =>
+const minted = (name: string, holder?: TokenHolder) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).persons.mint(name, holder);
@@ -84,7 +84,7 @@ const get = (on: () => ReturnType<typeof appOver>, url: string, bearer?: string)
  * `callerGate`, at a path the api answers (`needOf` says `token`), answering the caller the gate put on the request; a refusal answered by
  * the api's one map (`answerError`).
  */
-const whoIs = async (headers: Record<string, string>): Promise<ProposalCaller> => {
+const whoIs = async (headers: Record<string, string>) => {
   const { runtime } = appOf(Layer.mergeAll(liveOf(), Engine.over(standIn().layer), stand().layer));
   const gated = new Hono<ApiEnv>()
     .use(async (c, next) => {
@@ -100,10 +100,10 @@ const whoIs = async (headers: Record<string, string>): Promise<ProposalCaller> =
 };
 
 /** The refusal word a 401 answers. */
-const reasonOf = async (res: Response): Promise<string | undefined> => ((await res.json()) as { reason?: string }).reason;
+const reasonOf = async (res: Response) => ((await res.json()) as { reason?: string }).reason;
 
 /** The refusal word a 401 answers and whether it says the store is exposed, the board's token page reading both. */
-const refusalOf = async (res: Response): Promise<{ reason?: string; exposed?: boolean }> => {
+const refusalOf = async (res: Response) => {
   const { reason, exposed } = (await res.json()) as { reason?: string; exposed?: boolean };
   return { reason, exposed };
 };
@@ -194,7 +194,7 @@ const OPEN_ROUTES = ['POST /api/pairings', 'POST /api/pairings/:id/claim', 'POST
 const ROUTES = Object.values(Api.groups).flatMap((group) => Object.values(group.endpoints).map((e) => `${e.method} ${e.path}`));
 
 /** `path` with every name filled in by one no object has. */
-const filled = (path: string): string => path.replace(/:[A-Za-z]+/g, 'nothing-here');
+const filled = (path: string) => path.replace(/:[A-Za-z]+/g, 'nothing-here');
 
 test('needOf: exactly three routes of the Api need no token, each named by its method and path; every other one needs a token', () => {
   const none = ROUTES.filter((route) => {
@@ -279,7 +279,7 @@ test('a bearer is judged before the cookie: a live bearer passes beside a forged
 });
 
 /** The `Set-Cookie` of `res`'s answer, split into its attributes, each in lower case but the first. */
-const setCookieOf = (res: Response): string[] =>
+const setCookieOf = (res: Response) =>
   (res.headers.get('set-cookie') ?? '').split(';').map((part, i) => (i === 0 ? part.trim() : part.trim().toLowerCase()));
 
 test("the board's sign-in renews itself: a GET the person's cookie alone signed in sets the same cookie again, kept thirty days", async () => {

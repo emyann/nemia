@@ -25,20 +25,21 @@ type Walk = DoorWalk<SkillDoorShape>;
 type Side = DoorSide<SkillDoorShape>;
 
 /** A skill drafted as the board's form sends one: `tidy-notes` unless named, with a description and instructions. */
-export const aSkill = (name = 'tidy-notes', more: Partial<SkillDraft> = {}): SkillDraft => ({
-  name,
-  title: 'Tidy notes',
-  description: 'Rewrites a folder of notes, one fact a line.',
-  tags: ['notes'],
-  body: '# Tidy notes\n\nRead each note, then write it again.',
-  ...more,
-});
+export const aSkill = (name = 'tidy-notes', more: Partial<SkillDraft> = {}) =>
+  ({
+    name,
+    title: 'Tidy notes',
+    description: 'Rewrites a folder of notes, one fact a line.',
+    tags: ['notes'],
+    body: '# Tidy notes\n\nRead each note, then write it again.',
+    ...more,
+  }) satisfies SkillDraft;
 
 /** The store's library on a side: `<root>/workflows/skills`, where a skill of yours is written. */
-export const libraryOn = ({ root }: Side): string => `${root}/workflows/skills`;
+export const libraryOn = ({ root }: Side) => `${root}/workflows/skills`;
 
 /** `name`, as the door takes it. */
-const named = (name: string): SkillName => SkillName.read(name);
+const named = (name: string) => SkillName.read(name) satisfies SkillName;
 
 /** A skill's other text files, as a write gives them: one two folders down, one beside its SKILL.md. */
 const OTHERS = [
@@ -47,11 +48,11 @@ const OTHERS = [
 ];
 
 /** `draft` made in the library of a side (or in `at`, anywhere), at the version its write answered. */
-const made = (side: Side, draft: SkillChange & SkillDraft = aSkill(), at = libraryOn(side)): string =>
+const made = (side: Side, draft: SkillChange & SkillDraft = aSkill(), at = libraryOn(side)) =>
   done(side.door.skills.write(named(draft.name), draft, undefined, at, { anywhere: at !== libraryOn(side) })).version;
 
 /** What a refused act leaves of the library: the skills it holds. */
-const left = (side: Side): readonly string[] => done(side.door.skills.list(libraryOn(side)));
+const left = (side: Side) => done(side.door.skills.list(libraryOn(side))) satisfies readonly string[];
 
 /** The other text files of the skill `name` of the library on a side. */
 const othersOf = (side: Side, name = 'tidy-notes') => done(side.door.skills.others(named(name), libraryOn(side)));
@@ -63,13 +64,13 @@ const refusedWrite = (side: Side, draft: SkillChange, version?: string) => ({
 });
 
 /** A found skill as a walk compares it: its folder, or `refused` for a name the package refuses to choose for. */
-const shown = (at: string | WorkflowError | undefined): unknown => (at instanceof WorkflowError ? { refused: at._tag } : at);
+const shown = (at: string | WorkflowError | undefined) => (at instanceof WorkflowError ? { refused: at._tag } : at) satisfies unknown;
 
 /** What the store's own lookup finds, a workflow of yours being started: `<root>/workflows/dev`, the store its home. */
 const foundOn = (side: Side) => done(side.door.skills.found({ dir: `${side.root}/workflows/dev`, places: { home: side.root } }));
 
 /** A source to copy from on a side, outside the store's library: `<root>/source/skills`, holding `tidy-notes`. */
-const sourceOn = (side: Side): string => {
+const sourceOn = (side: Side) => {
   const at = `${side.root}/source/skills`;
   made(side, aSkill(), at);
   return at;

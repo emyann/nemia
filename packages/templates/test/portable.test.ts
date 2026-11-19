@@ -65,7 +65,7 @@ const PATTERNS: Record<string, RegExp> = {
 };
 
 /** `word` as a pattern, whole and in any case: no letter, digit or `$` before a word that opens on one, nor after one that ends on one. */
-const wholeWord = (word: string): RegExp =>
+const wholeWord = (word: string) =>
   PATTERNS[word] ??
   new RegExp(
     `${/^[\w$]/.test(word) ? '(?<![\\w$])' : ''}${word.replace(/[-.*+?^${}()|[\]\\/]/g, '\\$&')}${/[\w$]$/.test(word) ? '(?![\\w$])' : ''}`,
@@ -95,11 +95,11 @@ const ALLOWED: Array<{ what: string; files: RegExp; pattern: RegExp }> = [
 ];
 
 /** The text of `file` with what `ALLOWED` lets through where it stands taken out. */
-const readable = (file: string, text: string): string =>
+const readable = (file: string, text: string) =>
   ALLOWED.filter(({ files }) => files.test(file)).reduce((left, { pattern }) => left.replace(pattern, ''), text);
 
 /** Where `files` say one of `words`, past what is let through: a line each, `<file>: <word>`. */
-const oursIn = (files: Map<string, string>, words: readonly string[] = REPOSITORY_WORDS): string[] =>
+const oursIn = (files: Map<string, string>, words: readonly string[] = REPOSITORY_WORDS) =>
   [...files].flatMap(([file, text]) =>
     words.filter((word) => wholeWord(word).test(readable(file, text))).map((word) => `${file}: ${word}`),
   );
@@ -144,13 +144,13 @@ const HOLDS: Array<[RegExp, (file: string) => string]> = [
 ];
 
 /** The name `file` must hold, or none where no rule takes it. */
-const holdOf = (file: string): string | undefined => HOLDS.find(([pattern]) => pattern.test(file))?.[1](file);
+const holdOf = (file: string) => HOLDS.find(([pattern]) => pattern.test(file))?.[1](file);
 
 /** Every file of sdlc, by its path from the template, with its text. */
-const sdlc = (): Map<string, string> => new Map(filesUnder(SDLC).map((file) => [file, fs.readFileSync(path.join(SDLC, file), 'utf8')]));
+const sdlc = () => new Map(filesUnder(SDLC).map((file) => [file, fs.readFileSync(path.join(SDLC, file), 'utf8')]));
 
 /** Each skill an agent of `files` names that is not a role's, and each MCP server one names: a line each, `<file>: <name>`. */
-const foreign = (files: Map<string, string>): string[] =>
+const foreign = (files: Map<string, string>) =>
   [...files]
     .filter(([file]) => /^agents\/[\w-]+\/agent\.yaml$/.test(file))
     .flatMap(([file, text]) => {

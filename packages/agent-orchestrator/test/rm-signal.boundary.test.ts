@@ -31,7 +31,7 @@ const RUNNER = path.join(import.meta.dirname, '..', 'src', 'runner.ts');
 const FORGET = path.join(import.meta.dirname, '..', 'src', 'forget', 'commands.verb.ts');
 
 /** Git in `cwd`, with a fixed identity, its stdout trimmed. */
-const git = (cwd: string, ...args: string[]): string =>
+const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
     cwd,
     encoding: 'utf8',
@@ -39,14 +39,14 @@ const git = (cwd: string, ...args: string[]): string =>
   }).trim();
 
 /** The processes of the group `pgid` leads, by pid, as `ps` lists them now. */
-const groupOf = (pgid: number): string[] =>
+const groupOf = (pgid: number) =>
   spawnSync('ps', ['-o', 'pid=', '-g', String(pgid)], { encoding: 'utf8' })
     .stdout.split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
 
 /** Kill the group `pgid` leads: false when it has no process left. */
-function killGroup(pgid: number): boolean {
+function killGroup(pgid: number) {
   try {
     process.kill(-pgid, 'SIGKILL');
     return true;
@@ -56,7 +56,7 @@ function killGroup(pgid: number): boolean {
 }
 
 /** Until `ok()` holds, asked every 20ms: a group killed is gone once `ps` no longer lists it. */
-async function waitFor(ok: () => boolean): Promise<void> {
+async function waitFor(ok: () => boolean) {
   while (!ok()) await new Promise((resolve) => setTimeout(resolve, 20));
 }
 

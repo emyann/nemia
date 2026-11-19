@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { TaskSpec } from 'agent-runtime';
-import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
+import type { Run, TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
@@ -30,7 +30,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A run this file started on a repository, as `isLanded` reads one: a repository run. */
-const repositoryRun = (run: Run): RepositoryRun => {
+const repositoryRun = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
@@ -50,7 +50,7 @@ const git = (cwd: string, ...args: string[]) =>
   }).trim();
 
 /** A repository with one file committed on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'add.ts'), 'export const add = (a, b) => a + b;\n');
@@ -63,7 +63,7 @@ const aRepo = (): string => {
  * `implement → ship`, with the team's `dev/ship.md` as its ending — its keys and its agent — with only its `after:` changed, since this
  * folder has no review.
  */
-const folder = (): string => {
+const folder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   assert.match(SHIP_MD, /^after: review$/m);

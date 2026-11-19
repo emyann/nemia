@@ -9,7 +9,7 @@ import { upgraded, FEED_VERSION, type Codes, type FeedLine, type InvolvedKind } 
 import { parseSelectors, selects } from '../watch/selector.ts';
 
 /** A signed line of `kind`, as a `nemia` of either side of the rename wrote it, under `codes`. */
-const signed = (kind: InvolvedKind, codes: { reason: string; on?: string; via?: string }, waits = false): FeedLine =>
+const signed = (kind: InvolvedKind, codes: { reason: string; on?: string; via?: string }, waits = false) =>
   ({
     at: '2026-10-24T04:00:00.000Z',
     run: 'r-1',
@@ -39,7 +39,7 @@ const CONVERTED: ReadonlyArray<[string, InvolvedKind, Codes]> = [
 ];
 
 /** The codes of a line as the fold reads it: its reason and what qualifies it. */
-const codesOfLine = (line: FeedLine): Codes => ({
+const codesOfLine = (line: FeedLine) => ({
   reason: line.reason!,
   ...(line.on ? { on: line.on } : {}),
   ...(line.via ? { via: line.via } : {}),

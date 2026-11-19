@@ -54,10 +54,10 @@ const ENV: Env = {
 };
 const stage = staged({ runWith, main: told, engineOf, env: ENV });
 /** The commit run `id`'s implement branch is at in the test place: what a check filed on it records (`CheckTask.tip`). */
-const filedOn = (id: string): string | null => {
+const filedOn = (id: string) => {
   const r = runRecord(ROOT, id);
   const branch = r.steps.implement?.branch;
-  return isRepositoryRun(r) && branch ? stage.place().world.tip(r.repo, branch) : null;
+  return (isRepositoryRun(r) && branch ? stage.place().world.tip(r.repo, branch) : null) satisfies string | null;
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -94,7 +94,7 @@ const over = <A, E>(program: Parameters<typeof stage.runWith<A, E>>[1]) => stage
 /** What the engine was filed with for the task `id`. */
 const specOf = (id: string) => stage.board().tasks.get(id)!.spec;
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
@@ -116,13 +116,13 @@ const looped = (reviewKeys = '', implementKeys = '', after: Record<string, strin
   return dir;
 };
 /** A looped run started on a fresh repository, the steps working in its checkout, and its first pass ticked: implement filed. */
-const startedLoop = async (dir: string): Promise<string> => {
+const startedLoop = async (dir: string) => {
   const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false }));
   await tick(run.id);
   return run.id;
 };
 /** The task the record names for `step` now. */
-const taskOf = (id: string, step: string): string => runRecord(ROOT, id).steps[step].taskId!;
+const taskOf = (id: string, step: string) => runRecord(ROOT, id).steps[step].taskId!;
 /**
  * A round up to review's word: implement's try now signs off as `implementSaid`, its check is filed and passes having printed `printed`,
  * then review is filed and signs off saying `again`. The pass that reads that word is the caller's.
@@ -144,27 +144,27 @@ const asksOf = (id: string, kind: string) =>
 const dataUnder = (brief: string, heading: string) =>
   JSON.parse(new RegExp(`${heading}\\n[\\s\\S]*?\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\``).exec(brief)![1]);
 /** A step's record without the revisions every filing pins (`pinned`, `closeoutHash`, `declared`), whose subject is `revisions.test.ts`. */
-const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
+const filedAs = (record: StepRecord | undefined) => {
   const { pinned: _, closeoutHash: __, declared: ___, ...rest } = record ?? { taskId: null };
-  return rest;
+  return rest satisfies Partial<StepRecord>;
 };
 /** That `err` is a refusal of kind `tag` with exit 2, naming each of `facts`. */
 const refusedAs =
   (tag: string, ...facts: string[]) =>
-  (err: Error & { exitCode?: number; _tag?: string }): true => {
+  (err: Error & { exitCode?: number; _tag?: string }) => {
     assert.equal(err._tag, tag, err.message);
     assert.equal(err.exitCode, 2, err.message);
     names(err.message, ...facts);
-    return true;
+    return true as const satisfies true;
   };
 /**
  * `nemia <argv>` typed on the stage, as a person types it, run on its entry's handler (`told`): each hint it says of a former spelling as
  * the one to type now (`renamedIn`, which the client prints on stderr). The lines it prints are the client's (`apps/cli/test`).
  */
-const typedOn = async (argv: string[]): Promise<{ hints: string[] }> => {
+const typedOn = async (argv: string[]) => {
   await stage.main(argv);
   const { hint } = renamedIn(argv);
-  return { hints: hint === undefined ? [] : [hint] };
+  return { hints: hint === undefined ? [] : [hint] } satisfies { hints: string[] };
 };
 /** A wf pictures line a check printed, naming the picture `n`. */
 const named = (n: string) => `wf pictures: named ${n}`;

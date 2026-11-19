@@ -14,7 +14,7 @@ import { until, WAITED } from 'agent-runtime/testing';
 import { StoreRoot } from '../config/root.store.ts';
 import { emitFeed, FEED_FOLLOWERS, feedHubLayer } from '../feed/feed.verb.ts';
 import { feedSize } from '../feed/feed.store.ts';
-import type { FeedLine, FeedWords } from '../feed/feed.ts';
+import type { FeedLine } from '../feed/feed.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors } from '../watch/selector.ts';
 import { steeredClock } from '../../test/steered.ts';
@@ -28,7 +28,7 @@ const ROOT = scratch('wf-await-');
  * What a pass judged: `run` at `word`, and each of `also` at its word, each labelled with its id alone, as a run with no labels of a
  * person's is. A run a pass leaves out is said `removed`, so a pass names every run of its test that still stands.
  */
-const judged = (run: string, word: string, also: Readonly<Record<string, string>> = {}): ReadonlyMap<string, FeedWords> =>
+const judged = (run: string, word: string, also: Readonly<Record<string, string>> = {}) =>
   new Map([[run, word] as const, ...Object.entries(also)].map(([id, said]) => [id, { run: { word: said }, steps: [] }]));
 
 /** A runtime with a hub and no logger over the file's store, the process a waiter and the writer share: let go once `t` ends. */

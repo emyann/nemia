@@ -13,12 +13,12 @@ import { app } from '../src/app.ts';
 import { Effect } from 'effect';
 import { engine } from 'agent-orchestrator';
 
-import { objectOf, type ObjectStep } from './run-reads.ts';
+import { objectOf } from './run-reads.ts';
 
 const NOW = Date.now();
 const at = (s: number) => new Date(NOW + s * 1000).toISOString();
 const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -27,7 +27,7 @@ const write = (file: string, text: string): void => {
 const jobOf = (taskId: string) => path.join(root, 'engine', 'runs', 'claude', `ae_${taskId.replace(/[^a-zA-Z0-9]+/g, '_')}_1`);
 
 /** A task filed on `claude`, spawned once and not ended: a job at work, its run file held by this process, its capture `said`. */
-const atWork = (taskId: string, said: object[]): void => {
+const atWork = (taskId: string, said: object[]) => {
   write(
     path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
     jsonl([
@@ -63,7 +63,7 @@ write(
 );
 
 /** The steps of the run object (`GET /api/runs/:id`, `status.steps`), by name: `objectOf` throws unless it answers 200. */
-const stepsOf = async (): Promise<Map<string, ObjectStep>> => new Map((await objectOf(app, RUN)).status.steps.map((s) => [s.name, s]));
+const stepsOf = async () => new Map((await objectOf(app, RUN)).status.steps.map((s) => [s.name, s]));
 
 test("REFUSED: a run's detail says why one step's session alone could not be read, in the runtime's words, and nothing once a request reads it", async () => {
   atWork('t-build', [result('yesterday')]);

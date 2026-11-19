@@ -9,14 +9,14 @@ import type { Page } from 'playwright';
 import { expectNone } from './checks.ts';
 
 /** What has the focus, as its marks say it: its `data-` attributes' names, and its text. */
-export const focused = (page: Page): Promise<{ marks: string[]; text: string }> =>
+export const focused = (page: Page) =>
   page.evaluate(() => {
     const at = document.activeElement as HTMLElement | null;
     return { marks: at ? Object.keys(at.dataset) : [], text: at?.textContent ?? '' };
-  });
+  }) satisfies Promise<{ marks: string[]; text: string }>;
 
 /** Presses Tab until what has the focus carries `mark`, a `data-` attribute by its camel-cased name. */
-export async function tabTo(page: Page, mark: string): Promise<void> {
+export async function tabTo(page: Page, mark: string) {
   for (let i = 0; i < 40; i += 1) {
     await page.keyboard.press('Tab');
     if ((await focused(page)).marks.includes(mark)) return;
@@ -25,21 +25,21 @@ export async function tabTo(page: Page, mark: string): Promise<void> {
 }
 
 /** Waits for two frames of the page: what a press started has been drawn. */
-export const drawn = (page: Page): Promise<void> =>
+export const drawn = (page: Page) =>
   page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
 
 /** Where the router of the story the page draws stands, as its search, and how many times it has moved. */
-export const standing = (page: Page): Promise<{ search: string; moves: number }> =>
+export const standing = (page: Page) =>
   page.locator('[data-story-ground]').evaluate((ground) => {
     const at = ground.getAttribute('data-at') ?? '';
     return { search: at.includes('?') ? at.slice(at.indexOf('?')) : '', moves: Number(ground.getAttribute('data-moves')) };
-  });
+  }) satisfies Promise<{ search: string; moves: number }>;
 
 /**
  * Enter on what has the focus, in the story the page draws, leads its router to `search` by one move, and the page's own address
  * stays where it was.
  */
-export async function entersOnce(page: Page, search: string, what: string): Promise<void> {
+export async function entersOnce(page: Page, search: string, what: string) {
   const before = { ...(await standing(page)), url: page.url() };
   await page.keyboard.press('Enter');
   await expectNone(

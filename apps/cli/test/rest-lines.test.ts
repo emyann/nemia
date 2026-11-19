@@ -12,53 +12,59 @@ import { levelLines } from '../src/commands/rest/nemia.ts';
 import { healthLines, statsLine, statsLines, type StatsRead } from '../src/commands/rest/stats-lines.ts';
 
 /** A headline with nothing measured, `more` over it. */
-const headline = (more: Partial<StatsHeadline> = {}): StatsHeadline => ({
-  runs: 0,
-  landed: null,
-  rounds: null,
-  firstTry: null,
-  costPerLanded: null,
-  timePerLanded: null,
-  tries: 0,
-  refused: 0,
-  gateWaitMs: null,
-  deniedPerTry: null,
-  skillsPerTry: null,
-  ...more,
-});
+const headline = (more: Partial<StatsHeadline> = {}) =>
+  ({
+    runs: 0,
+    landed: null,
+    rounds: null,
+    firstTry: null,
+    costPerLanded: null,
+    timePerLanded: null,
+    tries: 0,
+    refused: 0,
+    gateWaitMs: null,
+    deniedPerTry: null,
+    skillsPerTry: null,
+    ...more,
+  }) satisfies StatsHeadline;
 
 /** A step row of `tries` tries with nothing measured, `more` over it. */
-const stepRow = (step: string, more: Partial<StatsStepRow> = {}): StatsStepRow => ({
-  step,
-  agent: 'planner',
-  tries: 1,
-  ranMs: null,
-  checkMs: null,
-  costUsd: null,
-  costTries: 0,
-  checks: { passed: 0, refused: 0, unfinished: 0 },
-  gateWaitMs: null,
-  deniedCalls: null,
-  deniedTries: 0,
-  denials: [],
-  skillLoads: null,
-  skillTries: 0,
-  skills: [],
-  rules: [],
-  ...more,
-});
+const stepRow = (step: string, more: Partial<StatsStepRow> = {}) =>
+  ({
+    step,
+    agent: 'planner',
+    tries: 1,
+    ranMs: null,
+    checkMs: null,
+    costUsd: null,
+    costTries: 0,
+    checks: { passed: 0, refused: 0, unfinished: 0 },
+    gateWaitMs: null,
+    deniedCalls: null,
+    deniedTries: 0,
+    denials: [],
+    skillLoads: null,
+    skillTries: 0,
+    skills: [],
+    rules: [],
+    ...more,
+  }) satisfies StatsStepRow;
 
 /** A group with nothing in it, `more` over it. */
-const group = (more: Partial<StatsGroup> = {}): StatsGroup => ({
-  total: headline(),
-  days: [],
-  steps: [],
-  tiles: { last: { ...headline(), from: '2026-09-17', to: '2026-09-30' }, before: { ...headline(), from: '2026-09-03', to: '2026-09-16' } },
-  marks: [],
-  tallies: [],
-  slowLandings: [],
-  ...more,
-});
+const group = (more: Partial<StatsGroup> = {}) =>
+  ({
+    total: headline(),
+    days: [],
+    steps: [],
+    tiles: {
+      last: { ...headline(), from: '2026-09-17', to: '2026-09-30' },
+      before: { ...headline(), from: '2026-09-03', to: '2026-09-16' },
+    },
+    marks: [],
+    tallies: [],
+    slowLandings: [],
+    ...more,
+  }) satisfies StatsGroup;
 
 /** Health with nothing kept. */
 const NO_HEALTH: StatsHealth = {
@@ -73,17 +79,18 @@ const NO_HEALTH: StatsHealth = {
 };
 
 /** Stats of `all`, nothing else, `more` over it. */
-const stats = (all: StatsGroup = group(), more: Partial<StatsRead> = {}): StatsRead => ({
-  from: null,
-  to: '2026-09-30',
-  by: null,
-  filters: {},
-  all,
-  groups: [],
-  unreadable: [],
-  health: NO_HEALTH,
-  ...more,
-});
+const stats = (all: StatsGroup = group(), more: Partial<StatsRead> = {}) =>
+  ({
+    from: null,
+    to: '2026-09-30',
+    by: null,
+    filters: {},
+    all,
+    groups: [],
+    unreadable: [],
+    health: NO_HEALTH,
+    ...more,
+  }) satisfies StatsRead;
 
 /** Whether a line of `words` reads as `line`. */
 const hasLine = (words: readonly string[], line: RegExp) =>
@@ -328,22 +335,23 @@ describe('`statsLines` and `statsLine`: the stats in words, — where nothing wa
 });
 
 /** Where Nemia is with nothing filed, `more` over it. */
-const where = (more: Partial<typeof NemiaLevel.Type> = {}): typeof NemiaLevel.Type => ({
-  level: 'manual',
-  since: null,
-  task: null,
-  phase: null,
-  sessionId: null,
-  reach: [],
-  bridge: null,
-  stopped: false,
-  rests: true,
-  spend: null,
-  allows: [],
-  factories: [{ factory: 'default', level: 'manual', default: 'manual', own: null, raise: null }],
-  untrusted: null,
-  ...more,
-});
+const where = (more: Partial<typeof NemiaLevel.Type> = {}) =>
+  ({
+    level: 'manual',
+    since: null,
+    task: null,
+    phase: null,
+    sessionId: null,
+    reach: [],
+    bridge: null,
+    stopped: false,
+    rests: true,
+    spend: null,
+    allows: [],
+    factories: [{ factory: 'default', level: 'manual', default: 'manual', own: null, raise: null }],
+    untrusted: null,
+    ...more,
+  }) satisfies typeof NemiaLevel.Type;
 
 test("`nemia level`'s lines: the store, each factory and its raise, her session, why her folder could not be trusted, her spend and how to reach her", () => {
   assert.deepEqual(levelLines(where()), [

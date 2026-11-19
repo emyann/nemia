@@ -68,14 +68,14 @@ beforeEach(() => {
 });
 
 /** A workflow folder of the one step `work`, with the frontmatter `front`. */
-const team = (front: string): string => {
+const team = (front: string) => {
   const dir = scratch('wf-runlist-team-');
   fs.writeFileSync(path.join(dir, 'work.md'), `---\n${front}\n---\nwork it\n`);
   return dir;
 };
 
 /** A run of one step, `work`, advanced one pass so its step is filed: in a repository of its own, or a folder run's (`place: folder`). */
-const started = async (front = 'place: git', gates: string[] = []): Promise<{ id: string; dir: string }> => {
+const started = async (front = 'place: git', gates: string[] = []) => {
   const dir = team(front);
   const repo = scratch('wf-runlist-repo-');
   stand().world.repository(repo, {});
@@ -111,7 +111,7 @@ const listOf = (memo: InformerMemo, wrap: <A, E, R>(p: Effect.Effect<A, E, R>) =
   runWith(e(), wrap(runList(e(), { home: ROOT, memo, verify: verifiesRest(ENV) }, { memo: { said: new Map() } }, {})));
 
 /** `f` with `WF_VERIFY_REST` off: what the informer alone answers. */
-async function unverified<T>(f: () => Promise<T>): Promise<T> {
+async function unverified<T>(f: () => Promise<T>) {
   ENV.WF_VERIFY_REST = '0';
   try {
     return await f();

@@ -11,36 +11,37 @@ import { needsOf } from './judged.verb.ts';
 const at = (s: number) => new Date(Date.parse('2026-10-06T06:00:00.000Z') + s * 1000).toISOString();
 
 /** A task at work on its first attempt, its session unread where `unreadWhy` is given. */
-const working = (taskId: string, unreadWhy?: string): TaskView => ({
-  id: taskId,
-  phase: 'starting',
-  sessionId: null,
-  ...(unreadWhy === undefined ? {} : { unreadWhy }),
-  state: {
-    taskId,
-    brief: 'Build it.',
-    cwd: '/nowhere',
-    attempts: [
-      {
-        n: 1,
-        startedAt: at(1),
-        spawnedAt: at(1),
-        ended: null,
-        endedAt: null,
-        reason: null,
-        nativeId: null,
-        usage: null,
-        exitCode: null,
-      },
-    ],
-    said: [],
-    inputs: [],
-    closed: false,
-    stopRequested: false,
-    settled: null,
-    filedAt: at(0),
-  },
-});
+const working = (taskId: string, unreadWhy?: string) =>
+  ({
+    id: taskId,
+    phase: 'starting',
+    sessionId: null,
+    ...(unreadWhy === undefined ? {} : { unreadWhy }),
+    state: {
+      taskId,
+      brief: 'Build it.',
+      cwd: '/nowhere',
+      attempts: [
+        {
+          n: 1,
+          startedAt: at(1),
+          spawnedAt: at(1),
+          ended: null,
+          endedAt: null,
+          reason: null,
+          nativeId: null,
+          usage: null,
+          exitCode: null,
+        },
+      ],
+      said: [],
+      inputs: [],
+      closed: false,
+      stopRequested: false,
+      settled: null,
+      filedAt: at(0),
+    },
+  }) satisfies TaskView;
 
 const run = {
   id: 'r-unread',

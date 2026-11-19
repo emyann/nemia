@@ -32,14 +32,14 @@ const ENV: NodeJS.ProcessEnv = {
 };
 
 /** Git in `dir`, its stdout trimmed. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** Git in `dir` whose failure is expected, as a merge that conflicts: whether it exited 0. */
-const gitOk = (dir: string, ...args: string[]): boolean => spawnSync('git', args, { cwd: dir, env: ENV, stdio: 'ignore' }).status === 0;
+const gitOk = (dir: string, ...args: string[]) => spawnSync('git', args, { cwd: dir, env: ENV, stdio: 'ignore' }).status === 0;
 
 /** A new repository on `main` with one commit of `f` and `g`. */
-function repository(): string {
+function repository() {
   const dir = scratch('wf-git-skill-');
   git(dir, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(dir, 'f'), 'base\n');
@@ -50,7 +50,7 @@ function repository(): string {
 }
 
 /** A branch `name` off main with `file` set to `text` in one commit, main checked out again; its tip. */
-function branched(dir: string, name: string, file: string, text: string): string {
+function branched(dir: string, name: string, file: string, text: string) {
   git(dir, 'switch', '-q', '-c', name);
   fs.writeFileSync(path.join(dir, file), text);
   git(dir, 'commit', '-q', '-am', `${name} sets ${file}`);
@@ -60,7 +60,7 @@ function branched(dir: string, name: string, file: string, text: string): string
 }
 
 /** A repository with `wf/x/a` staged as a merge into main that conflicts on `f`; the branch's tip. */
-function conflicted(dir: string): string {
+function conflicted(dir: string) {
   const tip = branched(dir, 'wf/x/a', 'f', 'theirs\n');
   fs.writeFileSync(path.join(dir, 'f'), 'ours\n');
   git(dir, 'commit', '-q', '-am', 'main sets f');
@@ -69,39 +69,39 @@ function conflicted(dir: string): string {
 }
 
 /** A repository with `wf/x/a` staged as a clean merge into main, not committed; the branch's tip. */
-function staged(dir: string): string {
+function staged(dir: string) {
   const tip = branched(dir, 'wf/x/a', 'g', 'theirs\n');
   git(dir, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
   return tip;
 }
 
 /** Whether a merge is in progress in `dir`. */
-const merging = (dir: string): boolean => gitOk(dir, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD');
+const merging = (dir: string) => gitOk(dir, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD');
 
 /** `verb` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
-const run = <V extends PlaceVerb>(verb: V, request: object): PlaceOutcome<V> => gitPlace({ env: ENV }).askNow(verb, request as never);
+const run = <V extends PlaceVerb>(verb: V, request: object) => gitPlace({ env: ENV }).askNow(verb, request as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
-function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceOutcome<V>, { answer: unknown }>['answer'] {
+function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>) {
   assert.ok('answer' in outcome, `an answer expected, got ${JSON.stringify(outcome)}`);
   return outcome.answer;
 }
 
 /** The file `open` names for a merge staged in the checkout `root`, or a failure where it names none. */
-function stagedOf(root: string): string {
+function stagedOf(root: string) {
   const { inProgressFile } = answerOf(run('open', { root, isolate: true }));
   assert.ok(inProgressFile !== undefined, `open named no file of a merge in progress for ${root}`);
   return inProgressFile;
 }
 
 /** The words of a refusal, or a failure naming what it was instead. */
-function refusalOf(outcome: PlaceOutcome<PlaceVerb>): string {
+function refusalOf(outcome: PlaceOutcome<PlaceVerb>) {
   assert.ok('refused' in outcome, `a refusal expected, got ${JSON.stringify(outcome)}`);
   return outcome.refused;
 }
 
 /** The words of an unread outcome, or a failure naming what it was instead. */
-function unreadOf(outcome: PlaceOutcome<PlaceVerb>): string {
+function unreadOf(outcome: PlaceOutcome<PlaceVerb>) {
   assert.ok('unread' in outcome, `unread expected, got ${JSON.stringify(outcome)}`);
   return outcome.unread.said;
 }
@@ -132,7 +132,7 @@ const READ_FORMS = [
 ];
 
 /** The text of the section `name` of `skill`, up to the next heading of the same level. */
-function sectionOf(skill: string, name: string): string {
+function sectionOf(skill: string, name: string) {
   const start = skill.indexOf(`## ${name}\n`);
   assert.ok(start >= 0, `SKILL.md holds a section ${name}`);
   const rest = skill.slice(start);
@@ -141,7 +141,7 @@ function sectionOf(skill: string, name: string): string {
 }
 
 /** The first line of the section `name` of `skill` after its heading. */
-const openerOf = (skill: string, name: string): string => sectionOf(skill, name).split('\n').slice(1).find(Boolean) ?? '';
+const openerOf = (skill: string, name: string) => sectionOf(skill, name).split('\n').slice(1).find(Boolean) ?? '';
 
 test("SKILL.md holds the sections a brief told no command sends a step to, every template names only holes the code fills, and the skill forbids nothing a team's fence holds", () => {
   const skill = fs.readFileSync(path.join(GIT_SKILL, 'SKILL.md'), 'utf8');
@@ -392,10 +392,7 @@ const HELD_TRIES = 6;
  * Asks `ask` of a place made by `make` at a deadline doubling from `FIRST_DEADLINE_MS` until git was where `marker` says at it: the
  * outcome, the deadline it was asked at, and what `make` made. A try that missed is no failure, `HELD_TRIES` of them is.
  */
-function heldAsked<M extends { readonly marker: string }>(
-  make: () => M,
-  ask: (made: M, deadlineMs: number) => PlaceOutcome<PlaceVerb>,
-): { outcome: PlaceOutcome<PlaceVerb>; deadlineMs: number; made: M } {
+function heldAsked<M extends { readonly marker: string }>(make: () => M, ask: (made: M, deadlineMs: number) => PlaceOutcome<PlaceVerb>) {
   for (let tries = 1, deadlineMs = FIRST_DEADLINE_MS; ; tries++, deadlineMs *= 2) {
     const made = make();
     const outcome = ask(made, deadlineMs);
@@ -471,7 +468,7 @@ test('a handoff held past its deadline by a clean filter leaves no index.lock, a
  * A repository whose `handoff` is held: a clean filter runs `/bin/sh` on a script of its own in git's process group — `trap` set as `on`
  * says, then a marker touched and a long sleep waited on — past any deadline. The repository, the shell's script and the marker.
  */
-function heldPlace(on: string): { dir: string; shell: string; marker: string } {
+function heldPlace(on: string) {
   const dir = repository();
   const held = scratch('wf-place-held-');
   const marker = path.join(held, 'in-the-shell');
@@ -545,7 +542,7 @@ test('REFUSED: land with no merge in progress, either act, and a commit git will
 });
 
 /** Every ref of `dir` with its commit, HEAD and what the checkout and index hold: what a trial merge must leave as it was. */
-const untouched = (dir: string): string =>
+const untouched = (dir: string) =>
   [git(dir, 'for-each-ref', '--format=%(refname) %(objectname)'), git(dir, 'rev-parse', 'HEAD'), git(dir, 'status', '--porcelain')].join(
     '\n',
   );
@@ -624,7 +621,7 @@ test('REFUSED: seal of a repository that holds a commit, which it leaves, and of
 });
 
 /** A clone of a new repository, made by git, and the repository it was cloned from, which then moves on one commit. */
-function behindOrigin(): { origin: string; clone: string; from: string; to: string } {
+function behindOrigin() {
   const origin = repository();
   const clone = path.join(scratch('wf-git-skill-follow-'), 'clone');
   git(path.dirname(clone), 'clone', '-q', origin, clone);

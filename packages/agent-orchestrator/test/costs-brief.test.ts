@@ -57,14 +57,14 @@ const tapped = () => {
 /** The engine's pass is the stand-in's to make; the run's, as the daemon makes it, over the tapped engine. */
 const tick = (id: string) => stage.runWith(tapped(), advanceRun(runRecord(ROOT, id)));
 /** The task the record names for `step` now. */
-const taskOf = (id: string, step: string): string => runRecord(ROOT, id).steps[step].taskId!;
+const taskOf = (id: string, step: string) => runRecord(ROOT, id).steps[step].taskId!;
 /** The brief the task `taskId` was filed with. */
-const briefOf = (taskId: string): string => stage.board().tasks.get(taskId)!.spec.brief;
+const briefOf = (taskId: string) => stage.board().tasks.get(taskId)!.spec.brief;
 /** The tasks viewed since the mark that belong to no run but `id`. */
 const othersViewed = (id: string) => viewed.filter((taskId) => !taskId.startsWith(id));
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;

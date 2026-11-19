@@ -31,7 +31,7 @@ const EXEMPT = ['refuses'];
 const inCall = new AsyncLocalStorage<true>();
 
 /** Run every method of the A2A agent inside `inCall`, for the length of `f`; put them back after. */
-const marked = async <A>(f: () => Promise<A>): Promise<A> => {
+const marked = async <A>(f: () => Promise<A>) => {
   const proto = HarnessHandler.prototype as unknown as Record<string, unknown>;
   const names = Object.getOwnPropertyNames(proto).filter((k) => k !== 'constructor' && typeof proto[k] === 'function');
   const kept = new Map(names.map((k) => [k, proto[k] as (...a: unknown[]) => unknown]));

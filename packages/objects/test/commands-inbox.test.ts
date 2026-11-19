@@ -6,7 +6,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
-  type Args,
   CommandRefused,
   INBOX_ADD_WORDS,
   INBOX_EDIT_WORDS,
@@ -21,7 +20,7 @@ import {
 } from 'objects';
 
 /** What `words` read of `argv`, its `check` run on it: the arguments, or the refusal's words where it refused. */
-const read = (words: CommandWords, argv: readonly string[]): Args | string => {
+const read = (words: CommandWords, argv: readonly string[]) => {
   try {
     const args = parseArgv(words.spec, argv);
     if (args === undefined) return `too little: ${words.name}`;
@@ -33,7 +32,7 @@ const read = (words: CommandWords, argv: readonly string[]): Args | string => {
 };
 
 /** Refused, naming each of `named`. */
-const refuses = (words: CommandWords, argv: readonly string[], ...named: string[]): void => {
+const refuses = (words: CommandWords, argv: readonly string[], ...named: string[]) => {
   const said = read(words, argv);
   assert.equal(typeof said, 'string', `${words.name} ${argv.join(' ')} was taken: ${JSON.stringify(said)}`);
   for (const n of named) assert.ok(String(said).includes(n), `${n} is not named in: ${String(said)}`);

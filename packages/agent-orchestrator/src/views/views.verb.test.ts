@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
-import { engineOf, type TaskView } from '../runtime-client.ts';
+import { engineOf } from '../runtime-client.ts';
 import { admissionWaitOf } from './views.verb.ts';
 
 const engine = eachTest(testEngine);
@@ -22,7 +22,7 @@ describe("`admissionWaitOf`: a queued task's wait as its view says it; none for 
     e = engineOf(stand.layer);
     id = await Effect.runPromise(e.file({ brief: 'implement', cwd: '/tmp' }));
   });
-  const viewed = async (): Promise<ReadonlyMap<string, TaskView>> => new Map([[id, await Effect.runPromise(e.view(id))]]);
+  const viewed = async () => new Map([[id, await Effect.runPromise(e.view(id))]]);
   test('a memory wait: the need and the room', async () => {
     stand.plantWait(id, { for: 'memory', needBytes: 3 * GI, roomBytes: GI });
     assert.deepEqual(admissionWaitOf(await viewed())(id), { for: 'memory', needBytes: 3 * GI, roomBytes: GI });

@@ -6,20 +6,20 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Invalid } from '../refusal/refusal.ts';
-import { continueToken, continuedAfter, pageOf, type Paged } from './page.ts';
+import { continueToken, continuedAfter, pageOf } from './page.ts';
 
 const names = ['a', 'b', 'c', 'd', 'e'];
-const same = (n: string): string => n;
+const same = (n: string) => n;
 
 /** The refusal's kind an answer is, or `ok`. */
-const kindOf = (answer: unknown): string => (answer instanceof Invalid ? answer._tag : 'ok');
+const kindOf = (answer: unknown) => (answer instanceof Invalid ? answer._tag : 'ok');
 
 /** What an answer holds, failing the test where it is a refusal. */
-const ok = <A>(answer: A | Invalid): A => {
+const ok = <A>(answer: A | Invalid) => {
   if (answer instanceof Invalid) assert.fail(`refused ${answer._tag}`);
   return answer;
 };
-const page = (sorted: readonly string[], asked: Parameters<typeof pageOf>[2]): Paged<string> => ok(pageOf(sorted, same, asked));
+const page = (sorted: readonly string[], asked: Parameters<typeof pageOf>[2]) => ok(pageOf(sorted, same, asked));
 
 test('a token reads back to the name it was made of, a name of any letters included', () => {
   for (const name of ['a', 'cache-the-views-k2q9', 'é/ü?+=']) assert.equal(ok(continuedAfter(continueToken(name))), name);

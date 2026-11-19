@@ -4,10 +4,10 @@
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { elapsedMs, leftOf, purseOf, type Instant } from './clock.ts';
+import { elapsedMs, leftOf, purseOf } from './clock.ts';
 
 const T0 = Date.parse('2026-10-02T12:00:00Z');
-const read = (wallMs: number, monoMs?: number, boot = 'b-1'): Instant => ({
+const read = (wallMs: number, monoMs?: number, boot = 'b-1') => ({
   at: T0 + wallMs,
   ...(monoMs !== undefined ? { mono: { boot, ms: monoMs } } : {}),
 });

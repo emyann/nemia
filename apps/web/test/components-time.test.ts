@@ -14,7 +14,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { at } from './markup-fixtures.ts';
+import { at } from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');

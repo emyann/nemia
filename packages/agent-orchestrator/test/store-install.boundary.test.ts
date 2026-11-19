@@ -35,7 +35,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -188,7 +188,7 @@ const folder = (implementKeys = '') => {
  * own, npm's `.package-lock.json`), so no registry is asked. npm's record of what it installed is what the
  * lockfile named, as npm would leave it; the run reads the disk instead.
  */
-const aNodeRepo = (include?: string): string => {
+const aNodeRepo = (include?: string) => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'node-repo-'));
   const put = (rel: string, text: string) => {
     fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true });
@@ -282,6 +282,7 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
 
 test("a worktree whose main packages could only be linked — its store on another filesystem — says so in the run's notes: a fenced step's reads under them are denied", async () => {
   const run = await isolated(aNodeRepo());
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- EXDEV, which one scratch disk cannot give
   vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   });
@@ -408,7 +409,7 @@ const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
 const cardText = (keys: string, body: string) => `---\n${keys}\n---\n${body}\n`;
 
 /** A plan folder holding these files, by name — a function of the folder, so a card can name a workflow by a path from it. */
-const aPlan = (files: (dir: string) => Record<string, string>): string => {
+const aPlan = (files: (dir: string) => Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   for (const [file, text] of Object.entries(files(dir))) fs.writeFileSync(path.join(dir, file), text);
   return dir;
@@ -495,7 +496,7 @@ test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `
 });
 
 /** `aNodeRepo`, as Nemia keeps a factory's repository named by URL: moved under the store's `clones/`, and never installed. */
-const aClone = (): string => {
+const aClone = () => {
   const made = aNodeRepo();
   const clone = path.join(ROOT, 'clones', 'localhost', 'o', path.basename(made));
   fs.mkdirSync(path.dirname(clone), { recursive: true });
@@ -508,7 +509,7 @@ const aClone = (): string => {
  * An `npm` first on PATH for the rest of the test, which appends a line to `calls` each time it runs, says `npm error boom` and exits 1:
  * what an install the run did not need would leave, and an install that fails.
  */
-const failingNpm = (t: TestContext): { calls: string } => {
+const failingNpm = (t: TestContext) => {
   const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
   const calls = path.join(bin, 'calls');
   fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\necho "$@" >> '${calls}'\necho 'npm error boom' >&2\nexit 1\n`, { mode: 0o755 });
@@ -521,7 +522,7 @@ const failingNpm = (t: TestContext): { calls: string } => {
 };
 
 /** Whether a worktree's `node_modules` was made from its checkout's tree — hardlinked, its workspace package its own — and not by npm. */
-const linkedFromCheckout = (wt: string, pkg = 'x'): boolean =>
+const linkedFromCheckout = (wt: string, pkg = 'x') =>
   !fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')) &&
   fs.realpathSync(path.join(wt, 'node_modules', pkg)) === fs.realpathSync(path.join(wt, 'packages', pkg));
 
@@ -621,7 +622,7 @@ const lockfileGains = (wt: string, name: string) => {
 };
 
 /** Whether `name` resolves, in the worktree's tree, to the worktree's own `packages/<name>`. */
-const resolvesHere = (wt: string, name: string): boolean => {
+const resolvesHere = (wt: string, name: string) => {
   try {
     return fs.realpathSync(path.join(wt, 'node_modules', name)) === fs.realpathSync(path.join(wt, 'packages', name));
   } catch {

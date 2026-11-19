@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
-import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, shapesKept, type StepOutput, type StepSpec } from '../step/step.ts';
+import { CLOSEOUT_FIELDS, COUNTS, type OutputSchema, refuse, shapesKept, type StepOutput, type StepSpec } from '../step/step.ts';
 import {
   declarationOf,
   DEFAULT_HARNESS,
@@ -22,6 +22,7 @@ import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
 import { bareSkillOf, GIVEN_SKILL_FORMS, givenSkillOf, ONE_BARE_NAME, sameBareIn } from './given-skill.ts';
 import type { PlaceKind } from 'objects';
+import { isObject } from 'effect/Predicate';
 
 /**
  * `harness:` as written: one of `HARNESSES`, or `a2a:<name>`, or refused. `claude-detached`, retired, is refused by its name: every session

@@ -76,12 +76,12 @@ describe('a volume read as a path or as the folder its clone is kept in, one rep
 });
 
 /** `nemia <argv>` on `place` (this test's by default), run onto its entry's handler as the api calls it. */
-async function typed(_t: TestContext, argv: string[], place: Place = stand().place): Promise<void> {
+async function typed(_t: TestContext, argv: string[], place: Place = stand().place) {
   await handlerOf(argv, engineOf(engine().layer), undefined, place, ENV);
 }
 
 /** A repository of this test's place at a folder of its own, one commit on it, and its `file://` URL. */
-function origin(): { dir: string; url: string; head: string } {
+function origin() {
   const dir = path.join(scratch('wf-clones-origin-'), 'o', 'r');
   fs.mkdirSync(dir, { recursive: true });
   stand().world.repository(dir, { 'a.txt': 'one\n' });
@@ -89,7 +89,7 @@ function origin(): { dir: string; url: string; head: string } {
 }
 
 /** Where the store keeps the clone of `dir`'s `file://` URL. */
-const cloneOf = (dir: string): string => path.join(ROOT, 'clones', 'localhost', ...dir.split(path.sep).filter(Boolean));
+const cloneOf = (dir: string) => path.join(ROOT, 'clones', 'localhost', ...dir.split(path.sep).filter(Boolean));
 
 /** One sweep of the clones on `place`, the warnings it said pushed onto `warned`. */
 const swept = (place: Place, memory: ReturnType<typeof freshCloneMemory>, warned: string[]) =>

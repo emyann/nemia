@@ -31,7 +31,7 @@ async function asked(method: string, url: string, body?: unknown, headers: Recor
 }
 
 /** What nemia proposes: `tries`, as `rule` gives it. */
-function propose(rule: Record<string, unknown>): void {
+function propose(rule: Record<string, unknown>) {
   fs.mkdirSync(path.dirname(PROPOSED), { recursive: true });
   fs.writeFileSync(
     PROPOSED,

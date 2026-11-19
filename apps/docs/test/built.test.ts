@@ -11,14 +11,14 @@ import { faultsOf, PAGES } from '../built.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** A built page holding `figures`, each the words of one SVG. */
-const page = (figures: string[]): string =>
+const page = (figures: string[]) =>
   `<html><body>${figures.map((words) => `<svg viewBox="0 0 10 10"><title>${words}</title></svg>`).join('')}</body></html>`;
 
 /**
  * A fixture `dist/` as the build writes it: every page, the lifecycle on the runtime's, Nemia's machine on hers, a proposal's on its,
  * the models on theirs, a sequence.
  */
-const built = (figuresOf: Record<string, string[]> = {}): string => {
+const built = (figuresOf: Record<string, string[]> = {}) => {
   const dist = scratch('docs-built-');
   const drawn: Record<string, string[]> = {
     runtime: ['a task waits in input-required'],

@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gitPlace } from '../place/git/place.ts';
-import type { Made, PlaceOutcome } from '../src/runner.ts';
+import type { PlaceOutcome } from '../src/runner.ts';
 import { worktreeInclude } from '../place/git/git.ts';
 import { scratch } from 'test-kit/scratch';
 
@@ -26,11 +26,11 @@ const ENV: NodeJS.ProcessEnv = {
 };
 
 /** Git in `dir`, its stdout trimmed. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** A new repository on `main` with one commit of `f`, `g` and a `.gitignore` that ignores `.env.local` and `config/local/`. */
-function repository(): string {
+function repository() {
   const dir = scratch('wf-git-make-');
   git(dir, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(dir, 'f'), 'base\n');
@@ -42,7 +42,7 @@ function repository(): string {
 }
 
 /** A branch `name` off main with `file` set to `text` in one commit, main checked out again; its tip. */
-function branched(dir: string, name: string, file: string, text: string): string {
+function branched(dir: string, name: string, file: string, text: string) {
   git(dir, 'switch', '-q', '-c', name);
   fs.writeFileSync(path.join(dir, file), text);
   git(dir, 'commit', '-q', '-am', `${name} sets ${file}`);
@@ -52,13 +52,13 @@ function branched(dir: string, name: string, file: string, text: string): string
 }
 
 /** Where a step's worktree is asked for: a folder of its own outside the repository, not made yet. */
-const atOf = (step: string): string => path.join(scratch('wf-git-make-at-'), 'worktrees', 'r-1', step);
+const atOf = (step: string) => path.join(scratch('wf-git-make-at-'), 'worktrees', 'r-1', step);
 
 /** `make` of the git place, in `ENV`, its request as given. */
-const make = (request: object): PlaceOutcome<'make'> => gitPlace({ env: ENV }).askNow('make', request as never);
+const make = (request: object) => gitPlace({ env: ENV }).askNow('make', request as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
-function madeOf(outcome: PlaceOutcome<'make'>): Made {
+function madeOf(outcome: PlaceOutcome<'make'>) {
   assert.ok('answer' in outcome, `an answer expected, got ${JSON.stringify(outcome)}`);
   return outcome.answer;
 }

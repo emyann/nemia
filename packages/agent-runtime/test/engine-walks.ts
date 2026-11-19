@@ -43,6 +43,7 @@ const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const SESSION_KEYS = ['sessionId', 'nativeId', 'resumeFrom'];
 
 /** `value` as both sides say it, read after its own JSON: see the file's head. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function toldOf(value: unknown, key?: string): unknown {
   if (typeof value === 'string') {
     if (key !== undefined && SESSION_KEYS.includes(key)) return '<session>';
@@ -58,15 +59,15 @@ function toldOf(value: unknown, key?: string): unknown {
 }
 
 /** What a walk answered, as both sides say it. */
-export const told = (value: unknown): unknown => toldOf(value === undefined ? null : JSON.parse(JSON.stringify(value)));
+export const told = (value: unknown) => toldOf(value === undefined ? null : JSON.parse(JSON.stringify(value)));
 
 /** What a verb answers: its answer, `null` for none, or `{ refused }` naming the tag of what it failed with. */
-export async function asked<A, E>(verb: Effect.Effect<A, E>): Promise<A | null | { refused: string }> {
+export async function asked<A, E>(verb: Effect.Effect<A, E>) {
   const exit = await Effect.runPromiseExit(verb);
-  if (Exit.isSuccess(exit)) return exit.value ?? null;
+  if (Exit.isSuccess(exit)) return (exit.value ?? null) satisfies A | null | { refused: string };
   const failed = Cause.squash(exit.cause) as { _tag?: string; message?: string };
   if (failed._tag === undefined) throw new Error(`a verb died: ${failed.message}`);
-  return { refused: failed._tag };
+  return { refused: failed._tag } satisfies A | null | { refused: string };
 }
 
 /** A task as the walks file one. */
@@ -514,8 +515,8 @@ const TRANSCRIPT: readonly Walk[] = [
 ];
 
 /** A forget's report, as far as both sides say it: whether anything went, and the tasks it names. */
-const reported = (report: Awaited<ReturnType<typeof asked<{ forgotten: boolean; tasks: { taskId: string }[] }, unknown>>>): unknown =>
-  report && 'tasks' in report ? { forgotten: report.forgotten, tasks: report.tasks.map((t) => t.taskId) } : report;
+const reported = (report: Awaited<ReturnType<typeof asked<{ forgotten: boolean; tasks: { taskId: string }[] }, unknown>>>) =>
+  (report && 'tasks' in report ? { forgotten: report.forgotten, tasks: report.tasks.map((t) => t.taskId) } : report) satisfies unknown;
 
 const FORGET: readonly Walk[] = [
   {
@@ -542,8 +543,8 @@ const FORGET: readonly Walk[] = [
 ];
 
 /** The tasks a `kept` names, sorted, or the refusal it gave: the sizes are each side's own (`APART`). */
-const named = (report: Awaited<ReturnType<typeof asked<{ tasks: { taskId: string }[] }, unknown>>>): unknown =>
-  report && 'tasks' in report ? report.tasks.map((t) => t.taskId).sort() : report;
+const named = (report: Awaited<ReturnType<typeof asked<{ tasks: { taskId: string }[] }, unknown>>>) =>
+  (report && 'tasks' in report ? report.tasks.map((t) => t.taskId).sort() : report) satisfies unknown;
 
 const KEPT: readonly Walk[] = [
   {
@@ -832,13 +833,13 @@ export const unwalked = (
   verbs: readonly string[],
   walks: Readonly<Record<string, readonly Walk[] | undefined>> = WALKS,
   unkept: readonly string[] = UNKEPT,
-): string[] => verbs.filter((verb) => !walks[verb]?.length && !unkept.includes(verb));
+) => verbs.filter((verb) => !walks[verb]?.length && !unkept.includes(verb)) satisfies string[];
 
 /** What `walk` answers on `side`, as both sides say it. */
-export const walked = async (walk: Walk, side: Side): Promise<unknown> => told(await walk.walk(side));
+export const walked = async (walk: Walk, side: Side) => told(await walk.walk(side));
 
 /** The walks of `verb` that a side `sideOf` makes, a new one for each, does not answer as the contract says, by name. */
-export async function failing(verb: Kept, sideOf: () => Side): Promise<string[]> {
+export async function failing(verb: Kept, sideOf: () => Side) {
   const failed: string[] = [];
   for (const walk of WALKS[verb]) {
     try {
@@ -854,10 +855,10 @@ export async function failing(verb: Kept, sideOf: () => Side): Promise<string[]>
  * Every walk of the contract as a test of the side `sideOf` makes, a new one for each: its name, `<verb>: <walk>`, and its body. The
  * file of a side declares each with `test`, so the runner counts the test as that file's.
  */
-export const walksOn = (sideOf: () => Side): (readonly [name: string, body: () => Promise<void>])[] =>
+export const walksOn = (sideOf: () => Side) =>
   Object.entries(WALKS).flatMap(([verb, walks]) =>
     walks.map((walk) => [`${verb}: ${walk.name}`, async () => assert.deepStrictEqual(await walked(walk, sideOf()), walk.says)] as const),
-  );
+  ) satisfies (readonly [name: string, body: () => Promise<void>])[];
 
 /**
  * One thing the stand-in cannot say as the engine does: what it is, why, the sequence that shows it, and what the stand-in answers,
@@ -972,4 +973,4 @@ export const APART: readonly Apart[] = [
 ];
 
 /** What the sequence of `apart` answers on `side`, as both sides say it. */
-export const apartOn = async (apart: Apart, side: Side): Promise<unknown> => told(await apart.walk(side));
+export const apartOn = async (apart: Apart, side: Side) => told(await apart.walk(side));

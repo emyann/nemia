@@ -14,7 +14,7 @@ export const TEAM = path.join(import.meta.dirname, 'fixtures', 'team');
 export const TEAM_DEV = path.join(TEAM, 'dev');
 
 /** A copy of the team in a folder of its own, for a test that changes a file of it: the copy, holding `agents/`, `skills/` and `dev/`. */
-export function teamCopy(prefix = 'wf-team-'): string {
+export function teamCopy(prefix = 'wf-team-') {
   const root = scratch(prefix);
   fs.cpSync(TEAM, root, { recursive: true });
   return root;
@@ -39,7 +39,7 @@ export const STEP_OUTPUT_SCHEMA = `${JSON.stringify(
  * The team's `dev/implement` in the copy `workflows` given a closeout schema of its own: `output: implement.schema.json` on its line, the
  * schema beside it (`STEP_OUTPUT_SCHEMA`), and `output` offered on its agent's `overridable:` line, which a step's own `output:` needs.
  */
-export function plantStepOutput(workflows: string): void {
+export function plantStepOutput(workflows: string) {
   const agent = path.join(workflows, 'agents', 'implementer.md');
   fs.writeFileSync(agent, fs.readFileSync(agent, 'utf8').replace('overridable: fence, skills\n', 'overridable: output, fence, skills\n'));
   const step = path.join(workflows, 'dev', 'implement.md');

@@ -75,7 +75,7 @@ const aPass = (e: Engine) => runWith(e, passStanding(listRuns(ROOT)));
 const tick = (e: Engine, id: string) => runWith(e, advanceRun(runRecord(ROOT, id)));
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
@@ -95,7 +95,7 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
 };
 
 /** `planned()`'s workflow under `repo`'s `workflows/`, by the name a card started in `repo` finds it: a card names its workflow so. */
-const plannedIn = (repo: string): string => {
+const plannedIn = (repo: string) => {
   const dir = planned();
   fs.cpSync(dir, path.join(repo, 'workflows', path.basename(dir)), { recursive: true });
   return path.basename(dir);

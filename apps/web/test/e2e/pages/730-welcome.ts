@@ -102,8 +102,8 @@ export default {
     let planted: keyof typeof READS = 'fresh';
     const answer = (route: Route) =>
       route.request().method() === 'GET'
-        // oxlint-disable-next-line landmines-testing/no-test-doubles -- readiness planted: the seat's machine has its own
-        ? route.fulfill({
+        ? // oxlint-disable-next-line landmines-testing/no-test-doubles -- readiness planted: the seat's machine has its own
+          route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({ ready: false, ran: false, pieces: READS[planted] }),

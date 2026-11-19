@@ -30,6 +30,7 @@ type Config = {
   options?: Record<string, unknown>;
   ignorePatterns?: string[];
   jsPlugins?: { name: string; specifier: string }[];
+  extends?: string[];
 };
 
 /** A config's text read as oxlint reads it: JSON with comments. */
@@ -77,7 +78,8 @@ const typeAware = () => {
 
 /**
  * A fixture that breaks a type-aware rule, a rule of the top level, a rule an override sets for one folder, the comment
- * plugin's rule, and one under an ignore pattern, in a scratch tree beside the whole config (its plugins made absolute) and `fastText`.
+ * plugin's rule, and one under an ignore pattern, in a scratch tree beside the whole config (its plugins and the config it extends
+ * made absolute) and `fastText`.
  */
 const tree = (fastText: string) => {
   const dir = scratch('lint-fast-');
@@ -87,7 +89,10 @@ const tree = (fastText: string) => {
     ...entry,
     specifier: entry.specifier.startsWith('.') ? path.join(ROOT, entry.specifier) : require.resolve(entry.specifier),
   }));
-  fs.writeFileSync(path.join(dir, FULL), JSON.stringify({ ...full, $schema: undefined, jsPlugins }));
+  fs.writeFileSync(
+    path.join(dir, FULL),
+    JSON.stringify({ ...full, $schema: undefined, jsPlugins, extends: full.extends?.map((entry) => path.join(ROOT, entry)) }),
+  );
   fs.writeFileSync(path.join(dir, FAST), fastText);
   fs.writeFileSync(
     path.join(dir, 'tsconfig.json'),

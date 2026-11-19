@@ -930,11 +930,13 @@ describe('reading her chat: one stream opened after the first read, from its cur
   const told = story(test);
   let open = () => {};
   told.test('the first read answered, one stream is opened from its cursor, whoever reads her', async () => {
-    apiAnswers(async () =>
-      new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }));
+    apiAnswers(
+      async () =>
+        new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
     open = reading({ setState, tryAgain: () => {} });
     await until(() => state.live);
     for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));

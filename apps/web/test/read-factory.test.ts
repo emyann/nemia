@@ -143,9 +143,7 @@ function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: 
     sent.push({
       method,
       url,
-      body: init?.body
-        ? JSON.parse(init.body)
-        : undefined,
+      body: init?.body ? JSON.parse(init.body) : undefined,
     });
     return new Response(JSON.stringify(answer(url, method)), { status: 200, headers: { 'content-type': 'application/json' } });
   });

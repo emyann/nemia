@@ -200,8 +200,8 @@ async function raisesBanner(page: Page) {
   let planted: keyof typeof PLANTED_READS = 'waits';
   const answer = (route: Route) =>
     route.request().method() === 'GET'
-      // oxlint-disable-next-line landmines-testing/no-test-doubles -- readiness planted: the seat's machine has its own
-      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
+      ? // oxlint-disable-next-line landmines-testing/no-test-doubles -- readiness planted: the seat's machine has its own
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
       : route.fallback();
   await page.route(READINESS_ROUTE, answer);
   try {

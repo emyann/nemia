@@ -33,6 +33,7 @@ type Rule = (typeof RULES)[number];
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
 type Config = {
   jsPlugins: { name: string; specifier: string }[];
+  extends?: string[];
   rules: Record<string, unknown>;
   overrides: Block[];
   [key: string]: unknown;
@@ -412,7 +413,12 @@ function plantsMeasured(config: Config) {
     ceilings.push({ files: [`at/${file}`], rules: { [rule]: withMax(config.rules[rule], at) } });
   }
   const { options: _options, $schema: _schema, ignorePatterns: _ignored, ...rest } = config;
-  const used = { ...rest, jsPlugins: resolvedPlugins(config), overrides: [...exemptions, ...ceilings] };
+  const used = {
+    ...rest,
+    jsPlugins: resolvedPlugins(config),
+    extends: config.extends?.map((entry) => path.join(ROOT, entry)),
+    overrides: [...exemptions, ...ceilings],
+  };
   return { measures: measure(dir, path.join(dir, '.oxlintrc.json'), used, ['on', 'under', 'at', ...exempt]), plants } satisfies {
     measures: Measures;
     plants: ReturnType<typeof plantsOf>;

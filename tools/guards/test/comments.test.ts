@@ -39,7 +39,13 @@ const SELF = path
   .join('/');
 
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
-type Config = { jsPlugins: { name: string; specifier: string }[]; overrides: Block[]; ignorePatterns?: string[]; [key: string]: unknown };
+type Config = {
+  jsPlugins: { name: string; specifier: string }[];
+  extends?: string[];
+  overrides: Block[];
+  ignorePatterns?: string[];
+  [key: string]: unknown;
+};
 
 /**
  * Whether the config's ignore pattern `glob` skips `file`, a path from the root: as a glob from the root, a folder and all under it, and
@@ -125,6 +131,7 @@ function lint(fixtures: Record<string, string>) {
   const used = {
     ...rest,
     jsPlugins: config.jsPlugins.map((entry) => ({ ...entry, specifier: resolvePlugin(entry.specifier) })),
+    extends: config.extends?.map((entry) => path.join(ROOT, entry)),
     overrides: [{ ...block, files: ['on/**'] }],
   };
   fs.writeFileSync(path.join(dir, '.oxlintrc.json'), JSON.stringify(used));

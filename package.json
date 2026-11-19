@@ -38,7 +38,7 @@
     "board:stop": "npm run board:stop --workspace web",
     "storybook": "npm run storybook --workspace web",
     "release:check": "npm run typecheck && npm test",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@emyann/tsverify": "0.9.1",

@@ -63,13 +63,13 @@ function stepIn(tree: string, workflow: string, step: string): { front: Record<s
 /** The check of the step `workflow/step` of `tree`. */
 const checkOf = (tree: string, workflow: string, step: string): string => String(stepIn(tree, workflow, step).front.check ?? '');
 
-/** The steps whose check and note differ by way. */
 /**
  * The one expression an applied tree keeps: a step's workspace, which a rule names and the filing writes (`${{ workspace }}`), where a
  * parameter's is written at apply.
  */
 const FILED = '${{ workspace }}';
 
+/** The steps whose check and note differ by way. */
 const WAYS = [
   ['build', 'implement'],
   ['build', 'land'],

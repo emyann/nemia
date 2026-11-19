@@ -89,6 +89,7 @@ export const filedConfig = <Own extends object>(
 ) => {
   const others = [...(stepMounts(step, run.mounts) ?? []), ...volumeMounts(step, run.volumes), ...folders(filedFolders(step, steps, t))];
   const placed = placedOf(step, run, t, others);
+  const owned = placed.own(ownWith(step, run.harnessSettings, t.own));
   return {
     model: t.model,
     effort: step.effort,
@@ -101,15 +102,11 @@ export const filedConfig = <Own extends object>(
     ...mountsOf(placed.mounts.map(mountOf)),
     ...serversOf(step, t.servers),
     ...placed.servedFrom,
-    ...stepFilesEnv(
-      step,
-      t.runArtifacts,
-      { workflowFiles: t.workflowFiles, carriedFiles: t.carriedFiles },
-      run.labels,
-      t.sessionToken,
-      placed.env,
-    ),
-    ...placed.own(ownWith(step, run.harnessSettings, t.own)),
+    ...stepFilesEnv(step, t.runArtifacts, { workflowFiles: t.workflowFiles, carriedFiles: t.carriedFiles }, run.labels, t.sessionToken, {
+      ...placed.env,
+      ...owned.env,
+    }),
+    ...owned.own,
   };
 };
 
@@ -129,7 +126,7 @@ const placedOf = (
   mounts: Mount[];
   servedFrom: { projectMcpFrom?: string };
   env: Record<string, string>;
-  own: <Own extends object>(own: Own) => Own;
+  own: <Own extends object>(own: Own) => { own: Own; env: Record<string, string> };
 } => {
   const ws = t.workspace;
   const start = ws === undefined ? undefined : startOf(step, ws, t.start);
@@ -141,20 +138,23 @@ const placedOf = (
       mounts: others,
       servedFrom: {},
       env: {},
-      own: (own) => own,
+      own: (own) => ({ own, env: {} }),
     };
   const mounts = [worked, ...others.filter((m) => m.path !== worked.path && m.path !== start.cwd)];
   const reads = addedFolderReadsOf(step.harness ?? DEFAULT_HARNESS);
   const memory = reads === undefined ? undefined : memoryFilesOf(memoryFolders(mounts, worked.path, run));
-  const load = memory?.load === true && reads !== undefined ? { [reads.memoryEnv]: '1' } : {};
   const skills = homeSkills(t.start, mounts, worked.path, run);
   return {
     rule: (r) => inWorkspace(r, ws),
     denies: start.denies,
     mounts,
     servedFrom: { projectMcpFrom: t.start?.mcp === true ? start.cwd : worked.path },
-    env: { [WORKSPACE]: worked.path, ...load },
-    own: (own) => inHomeOwn(own, step, skills, { key: reads?.memoryExcludes, excludes: memory?.excludes ?? [] }),
+    env: { [WORKSPACE]: worked.path },
+    own: (own) => {
+      const given = inHomeOwn(own, step, skills, { key: reads?.memoryExcludes, excludes: memory?.excludes ?? [] });
+      const loads = memory?.load === true && reads !== undefined && given.skipped;
+      return { own: given.own, env: loads ? { [reads.memoryEnv]: '1' } : {} };
+    },
   };
 };
 
@@ -207,34 +207,44 @@ const homeSkills = (found: StartFound | undefined, mounts: readonly Mount[], wor
 
 /**
  * A step's own harness arguments for a session in the home: its closed list of skills (`enabledSkills`) with `skills` added, and its
- * harness's settings given the folders whose memory files are skipped (`skipped.excludes`, under the setting its harness reads them by,
- * `skipped.key`) where an added folder's load. A list left open (`'default'`) stays open; settings given as a file, which nothing
- * rewrites, are left as they are.
+ * harness's settings given the folders whose memory files are skipped (`skipped.excludes`, added to those the settings already skip,
+ * under the setting its harness reads them by, `skipped.key`) where an added folder's load. A list left open (`'default'`) stays open.
+ * Settings given as a file, which nothing rewrites, or that are no object, are left as they are, and the answer says the folders could
+ * not be skipped (`skipped: false`), so the filing loads no added folder's memory file.
  */
 function inHomeOwn<Own extends object>(
   own: Own,
   step: Pick<StepSpec, 'harness'>,
   skills: readonly string[],
   skipped: { key: string | undefined; excludes: readonly string[] },
-): Own {
+): { own: Own; skipped: boolean } {
   const { key, excludes } = skipped;
   const listed: unknown = Reflect.get(own, 'enabledSkills');
   const withSkills = Array.isArray(listed) && skills.length ? { ...own, enabledSkills: [...new Set([...listed, ...skills])] } : own;
-  if (!excludes.length || key === undefined) return withSkills;
+  if (!excludes.length) return { own: withSkills, skipped: true };
+  if (key === undefined) return { own: withSkills, skipped: false };
   const harness = step.harness ?? DEFAULT_HARNESS;
   const rendered: unknown = Reflect.get(withSkills, harness);
   const flags = typeof rendered === 'object' && rendered !== null ? rendered : {};
-  const given = 'settings' in flags && typeof flags.settings === 'string' ? flags.settings : undefined;
-  let parsed: unknown = {};
-  try {
-    parsed = given === undefined ? {} : JSON.parse(given);
-  } catch {
-    return withSkills;
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return withSkills;
-  const settings = JSON.stringify({ ...parsed, [key]: excludes });
-  return { ...withSkills, [harness]: { ...flags, settings } };
+  const parsed = settingsObject('settings' in flags ? flags.settings : undefined);
+  if (parsed === undefined) return { own: withSkills, skipped: false };
+  const kept: unknown = parsed[key];
+  const before = Array.isArray(kept) ? kept.filter((e): e is string => typeof e === 'string') : [];
+  const settings = JSON.stringify({ ...parsed, [key]: [...new Set([...before, ...excludes])] });
+  return { own: { ...withSkills, [harness]: { ...flags, settings } }, skipped: true };
 }
+
+/** A harness's settings given inline as a JSON object, read; none given reads as an empty one, and a file or no object as undefined. */
+const settingsObject = (given: unknown): Record<string, unknown> | undefined => {
+  if (given === undefined) return {};
+  if (typeof given !== 'string') return undefined;
+  try {
+    const parsed: unknown = JSON.parse(given);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 /**
  * The variable a step's session in its factory's home finds its workspace in: the folder it works on, added beside the home, where its

@@ -137,6 +137,24 @@ describe('filedConfig in a home: where the session starts, the workspace beside 
       );
     assert.ok(claudeMdExcludes.includes('/beside/**'), 'the volume left off is skipped');
   });
+  test("a step's own excludes are kept beside the folders skipped, and settings no exclude can be written into load no added folder's CLAUDE.md", () => {
+    const run = { volumes: [{ path: '/vol', readOnly: true, claudeMd: true as const }] };
+    const kept = filed(DESIGN, {
+      workspace: WS,
+      start: found(),
+      run,
+      own: { claude: { settings: '{"claudeMdExcludes":["**/vendor/**"]}' } },
+    });
+    assert.deepEqual(JSON.parse((kept as unknown as { claude: { settings: string } }).claude.settings), {
+      claudeMdExcludes: ['**/vendor/**', `${WS}/**`, '/runs/r/artifacts/design/**'],
+    });
+    assert.equal(kept.env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD, '1');
+    for (const settings of ['/etc/claude/settings.json', '["a list"]']) {
+      const unwritten = filed(DESIGN, { workspace: WS, start: found(), run, own: { claude: { settings } } });
+      assert.equal(unwritten.env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD, undefined, settings);
+      assert.equal((unwritten as unknown as { claude: { settings: string } }).claude.settings, settings, 'left as given');
+    }
+  });
   test('the switches of a mount never reach the runtime, which takes a path, a mode and `ruled` alone', () => {
     const config = filed(DESIGN, { workspace: WS, start: found(), run: { volumes: [{ path: '/vol', readOnly: true, claudeMd: true }] } });
     for (const m of config.mounts ?? [])

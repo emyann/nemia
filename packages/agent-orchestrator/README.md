@@ -3608,7 +3608,9 @@ start in their workspace, filed as they were.
 Each volume has two switches, the person's (`nemia factory volume add <factory> <path|url>:ro|:rw --claude-md on|off --skills on|off`,
 kept by an add that names none, and refused in a proposal as every volume is): `claudeMd`, off by default, loads the volume's
 CLAUDE.md files into the sessions that start in the home (Claude Code's `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`, one switch for
-every added folder, so each other added folder is skipped by `claudeMdExcludes`); and `skills`, on by default, offers the skills of
+every added folder, so each other added folder is named in the settings' `claudeMdExcludes`, beside the step's own, which Claude Code
+skips, measured in `packages/agent-runtime/docs/harness.md`; a step whose settings are a file, which nothing rewrites, loads no added
+folder's at all); and `skills`, on by default, offers the skills of
 its `.claude/skills` beside the step's own, read from the step's workspace at filing. A run freezes the switches at start. The
 repository's skills and CLAUDE.md files stay code a session may change on its branch, reviewed like any other file: steering a
 session cannot write is the home's.

@@ -276,12 +276,19 @@ Bash `cd repo/src && cat a.txt`, not with `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CL
 root `CLAUDE.md` loaded at start; without it, none of the added folder's did. A skill in `repo/.claude/skills/` was listed with no
 variable.
 
+Measured by live cases of `test/live-sdk.boundary.test.ts`, on the Claude Code the SDK bundles (`CLAUDE_CODE_VERSION`, `test/sdk-pin.ts`),
+each run handing its answer over (`sdk-<version>-excludes.json`, `sdk-<version>-untrusted-home.json`); a run that finds either no
+longer so fails, and a bump runs them again:
+
+- with the variable set, the settings' `claudeMdExcludes` skips an added folder's `CLAUDE.md` named by `<path>/**`, as the
+  orchestrator writes it, while another added folder's loads, beside a control in which both load. Its documentation says it applies
+  to User, Project and Local memory, and an added folder's may be none of them: where this stops holding, a volume switched on loads
+  every added folder's;
+- a job whose `cwd` is a folder Claude Code was never asked to trust applies that folder's `.claude/settings.json` (an output style,
+  read off its `init` line) and lists its skills.
+
 Not measured yet, and leaned on (the card that added the home, `factory: where a session starts, and the folder it works on`):
 
-- whether `claudeMdExcludes`, with the variable set, skips an added folder's `CLAUDE.md`: its documentation says it applies to User,
-  Project and Local memory, and an added folder's may be none of them. Where it does not, a volume switched on loads every added
-  folder's;
-- whether a job whose `cwd` is a home Claude Code never trusted applies the home's `.claude/settings.json` and lists its skills;
 - whether a Bash `cd <added folder>` holds for the session's next Bash call;
 - whether a skill of an added folder's `.claude/skills` is enabled by its bare name in `Options.skills`.
 

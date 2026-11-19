@@ -58,7 +58,7 @@ export type StandingMemo = Map<string, KeptStood>;
 type KeptStood = ReadonlyMap<string, { readonly baseRef: string; readonly known: KnownStood }>;
 
 /** A memo that holds nothing: what a daemon starts with. */
-export const freshStandingMemo = () => new Map();
+export const freshStandingMemo = () => new Map() satisfies StandingMemo as StandingMemo;
 
 /** A full commit id, as git names one in SHA-1 or SHA-256: a name that moves, as `main` does, is none. */
 const OBJECT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
@@ -238,7 +238,9 @@ export const NO_SNAPSHOT = 'no pass has read where it stands yet: nemia up reads
  * @param file `standing.json` as read (`readStanding`), or undefined where no pass wrote it.
  */
 export const snapshotStanding = (file: StandingFile | undefined) =>
-  file ? { read: byKey(file.places), at: file.at, unasked: 'the last pass did not ask it' } : { read: new Map(), unasked: NO_SNAPSHOT };
+  (file
+    ? { read: byKey(file.places), at: file.at, unasked: 'the last pass did not ask it' }
+    : { read: new Map(), unasked: NO_SNAPSHOT }) satisfies PassStanding as PassStanding;
 
 /**
  * What the tick's last pass read of where the branches stand (`readStanding`, `snapshotStanding`), with no process: what `nemia ls`, the

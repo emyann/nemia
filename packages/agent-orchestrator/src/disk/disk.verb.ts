@@ -167,7 +167,7 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
   );
   const read = {
     bytes: roots.map((root) => root.own ?? 0),
-    kinds: roots.map(() => undefined),
+    kinds: roots.map<Record<string, number> | undefined>(() => undefined),
     unread: roots.map(() => 0),
     read: roots.map(() => true),
   };

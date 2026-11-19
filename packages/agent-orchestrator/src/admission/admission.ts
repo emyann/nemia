@@ -156,7 +156,7 @@ function scopedOf(typed: Typed & Named, scope: Scope) {
     const level = scope.factoryOf(factory);
     if (!atLeast(level, scope.atLeast)) return below(line, '', factory, level, scope.atLeast) satisfies AdmissionAnswer | undefined;
   }
-  return undefined satisfies AdmissionAnswer | undefined;
+  return undefined;
 }
 
 /**
@@ -248,7 +248,7 @@ export function policyAllows(typed: Typed, table: readonly Entry[], auto: Policy
 /** The ask of a command of `table` the person is asked every time (`asksAlways`) typed on the shell line `line`, or undefined for none. */
 function alwaysAsked(line: string, table: readonly Entry[]) {
   const typed = typedIn(line, table).find((t) => table.find((e) => e.name === t.name)?.asksAlways);
-  if (typed === undefined) return undefined satisfies AdmissionAnswer | undefined;
+  if (typed === undefined) return undefined;
   return {
     decision: 'ask',
     message: `${['nemia', typed.name, ...typed.args].join(' ')} is yours, asked every time: no allow reaches it.`,
@@ -276,7 +276,7 @@ export function admissionOf(
   auto?: PolicyReads,
 ) {
   const line = call.input.command;
-  if (call.tool !== 'Bash' || typeof line !== 'string') return undefined satisfies AdmissionAnswer | undefined;
+  if (call.tool !== 'Bash' || typeof line !== 'string') return undefined;
   const inScope = scope === undefined ? undefined : scopeOf(line, table, scope);
   if (inScope !== undefined) return inScope satisfies AdmissionAnswer | undefined;
   const always = alwaysAsked(line, table);
@@ -286,5 +286,5 @@ export function admissionOf(
     if (why !== undefined && !policyAllows(typed, table, auto))
       return { decision: 'ask', message: why } satisfies AdmissionAnswer | undefined;
   }
-  return undefined satisfies AdmissionAnswer | undefined;
+  return undefined;
 }

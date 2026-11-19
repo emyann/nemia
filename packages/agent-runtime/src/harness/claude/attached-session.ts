@@ -196,7 +196,7 @@ export const heldAtHook = async (hold: HookHold, input: unknown, id: string | un
     if (hold.over()) return (await cutWhileHeld(signal, hold.ends)) satisfies object | undefined;
   }
   callStarted(hold.calls, id, input);
-  return undefined satisfies object | undefined;
+  return undefined;
 };
 
 /** Nothing, once the call's `signal` or the session's end (`ends`) says it is over. */

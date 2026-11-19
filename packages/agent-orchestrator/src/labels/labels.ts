@@ -102,13 +102,24 @@ export function parseLabelEdits(texts: readonly string[]) {
         : at < 0 && text.length > 1 && text.endsWith('-')
           ? { key: text.slice(0, -1), op: 'remove' }
           : undefined;
-    if (edit === undefined) return { refused: `${JSON.stringify(text)} is no label edit: ${EDIT_FORM}` };
+    if (edit === undefined)
+      return { refused: `${JSON.stringify(text)} is no label edit: ${EDIT_FORM}` } satisfies
+        | { readonly edits: readonly LabelChange[] }
+        | { readonly refused: string } as { readonly edits: readonly LabelChange[] } | { readonly refused: string };
     const refusal = edit.op === 'set' ? labelRefusal(edit.key, edit.value) : labelKeyRefusal(edit.key);
-    if (refusal) return { refused: refusal };
-    if (edits.some((e) => e.key === edit.key)) return { refused: `${edit.key} is edited twice in one list: give each key one edit` };
+    if (refusal)
+      return { refused: refusal } satisfies { readonly edits: readonly LabelChange[] } | { readonly refused: string } as
+        | { readonly edits: readonly LabelChange[] }
+        | { readonly refused: string };
+    if (edits.some((e) => e.key === edit.key))
+      return { refused: `${edit.key} is edited twice in one list: give each key one edit` } satisfies
+        | { readonly edits: readonly LabelChange[] }
+        | { readonly refused: string } as { readonly edits: readonly LabelChange[] } | { readonly refused: string };
     edits.push(edit);
   }
-  return { edits };
+  return { edits } satisfies { readonly edits: readonly LabelChange[] } | { readonly refused: string } as
+    | { readonly edits: readonly LabelChange[] }
+    | { readonly refused: string };
 }
 
 /**

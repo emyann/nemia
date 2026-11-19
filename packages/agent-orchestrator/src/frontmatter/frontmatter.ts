@@ -174,7 +174,7 @@ export function frontmatterValues(block: string) {
   const doc = parseDocument(block);
   const [error] = doc.errors;
   if (error !== undefined) throw error;
-  return doc.toJS();
+  return doc.toJS() satisfies unknown as unknown;
 }
 
 /**
@@ -237,14 +237,14 @@ const scalarOf = (value: string, type?: Scalar.Type) => {
 
 /** A node for `value`: a scalar, a flow list of scalars, or a map. */
 function nodeOf(doc: Document, value: FrontmatterValue, type?: Scalar.Type) {
-  if (typeof value === 'string') return scalarOf(value, type);
+  if (typeof value === 'string') return scalarOf(value, type) satisfies unknown as unknown;
   if (Array.isArray(value)) {
     const seq = new YAMLSeq();
     seq.flow = true;
     seq.items = value.map((item) => nodeOf(doc, item as FrontmatterValue));
-    return seq;
+    return seq satisfies unknown as unknown;
   }
-  return doc.createNode(value);
+  return doc.createNode(value) satisfies unknown as unknown;
 }
 
 /** One `key: value` written in `type`, as lines. */

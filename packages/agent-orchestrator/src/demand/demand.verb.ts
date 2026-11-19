@@ -49,7 +49,7 @@ export const liveDemandHost = (root: string) =>
 /** The login service of the store `host` serves: the unit or agent whose `WF_ROOT` is the store, as named and started; or null. */
 function storeService(host: DemandHost) {
   const system = systemOf(host.machine());
-  if ('refusal' in system) return null satisfies (ServiceNamed & { start: () => void }) | null;
+  if ('refusal' in system) return null;
   const { root } = host.roots();
   const read = system.system === 'systemd' ? unitRead : plistRead;
   const folder = path.dirname(unitPathOf(system.system, DEFAULT_NAME, host.dirs()));
@@ -62,7 +62,7 @@ function storeService(host: DemandHost) {
       | (ServiceNamed & { start: () => void })
       | null;
   }
-  return null satisfies (ServiceNamed & { start: () => void }) | null;
+  return null;
 }
 
 /** The lease once it ticks, or the start's end, read every `pollMs`; undefined once `waitMs` has passed with neither. */

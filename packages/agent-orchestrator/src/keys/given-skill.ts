@@ -43,7 +43,7 @@ export function sameBareIn(names: readonly string[]) {
     const first = names.slice(0, i).find((before) => before !== name && bareSkillOf(before) === bareSkillOf(name));
     if (first !== undefined) return [first, name] satisfies [string, string] | undefined;
   }
-  return undefined satisfies [string, string] | undefined;
+  return undefined;
 }
 
 /** The two forms of a name on a `skills:` line, said after a refusal of one that is neither. */

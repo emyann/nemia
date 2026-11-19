@@ -32,7 +32,7 @@ export const answerFlag = (verb: 'retry' | 'approve') =>
 /** The `--answer` values typed, in the order given: none where none were. */
 const typedOf = (args: Args) => {
   const value = args.answer;
-  return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  return (Array.isArray(value) ? value : typeof value === 'string' ? [value] : []) satisfies readonly string[] as readonly string[];
 };
 
 /** The text under `key`, or undefined where none was given. */

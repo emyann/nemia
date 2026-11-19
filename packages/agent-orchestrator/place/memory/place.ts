@@ -16,7 +16,7 @@ import { inventory, open, report, root, standing, status, trial, type Reply } fr
 import { cloned, exported, follow, handoff, initialized, land, make, remove, seal } from './writes.ts';
 import type { Held, World } from './world.ts';
 import { PlaceService, threwWords, unreadNow, type Place } from '../../src/place/place.store.ts';
-import type { PlaceDeclared, PlaceRequests, PlaceVerb } from '../../src/place/place.ts';
+import type { PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb } from '../../src/place/place.ts';
 
 /** Each verb's body, over what the place holds. */
 const VERBS: { readonly [V in PlaceVerb]: (held: Held, request: PlaceRequests[V]) => Reply<V> } = {
@@ -70,11 +70,11 @@ export function testPlace() {
   const askNow = <V extends PlaceVerb>(verb: V, request: PlaceRequests[V]) => {
     try {
       const reply = VERBS[verb](held, request);
-      return 'refused' in reply ? { refused: reply.refused } : { answer: reply };
+      return ('refused' in reply ? { refused: reply.refused } : { answer: reply }) satisfies PlaceOutcome<V> as PlaceOutcome<V>;
     } catch (threw) {
-      return unreadNow(verb, threwWords(verb, threw));
+      return unreadNow(verb, threwWords(verb, threw)) satisfies PlaceOutcome<V> as PlaceOutcome<V>;
     }
   };
   const place: Place = { declared, askNow, ask: (verb, request) => Effect.sync(() => askNow(verb, request)) };
-  return { place, layer: PlaceService.layer(place), world: worldOf(held) };
+  return { place, layer: PlaceService.layer(place), world: worldOf(held) } satisfies TestPlace as TestPlace;
 }

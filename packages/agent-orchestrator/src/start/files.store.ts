@@ -64,7 +64,7 @@ export type FileBegun = {
  * @param now The time it is now, in milliseconds.
  */
 export function fileBegun(home: string, namespace: string, now: number) {
-  if (!namespaceKept(namespace)) return undefined satisfies FileBegun | undefined;
+  if (!namespaceKept(namespace)) return undefined;
   filesPruned(home, now);
   const dir = filesDir(home, namespace);
   fs.mkdirSync(dir, { recursive: true });

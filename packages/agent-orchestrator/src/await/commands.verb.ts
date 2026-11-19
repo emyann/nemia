@@ -33,7 +33,7 @@ export type WaitInput = typeof WaitInput.Type;
 /** The selectors under `selector`, in the order given, or none. */
 const selectorsOf = (args: Args | WaitInput) => {
   const value = args['selector'];
-  return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  return (Array.isArray(value) ? value : typeof value === 'string' ? [value] : []) satisfies readonly string[] as readonly string[];
 };
 
 /** The text under `key`, or undefined where none was given. */

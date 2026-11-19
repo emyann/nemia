@@ -14,7 +14,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { git, gitSays, isDirectory, refused } from '../git.ts';
+import { git, gitSays, isDirectory, refused, type Reply } from '../git.ts';
 import { cameOnto, landedBy } from '../landed.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
@@ -32,7 +32,7 @@ function mergeHeads(checkout: string, file: string) {
 /** The verb's body. */
 export function* status({ repo: checkout, tips }: PlaceRequests['status']) {
   const file = isDirectory(checkout) ? yield* gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
-  if (file === undefined) return refused(`${checkout} is not a git repository, so no merge can be staged there`);
+  if (file === undefined) return refused(`${checkout} is not a git repository, so no merge can be staged there`) satisfies Reply<'status'>;
   const heads = mergeHeads(checkout, file);
   const shas = new Set(Object.values(tips));
   const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
@@ -43,7 +43,13 @@ export function* status({ repo: checkout, tips }: PlaceRequests['status']) {
   const head = yield* gitSays(checkout, ['rev-parse', '--verify', '--quiet', 'HEAD']);
   const conflicted = Boolean(yield* gitSays(checkout, ['ls-files', '--unmerged']));
   const landed = head && !missing.length ? yield* cameIn(checkout, head, Object.values(tips), heads) : undefined;
-  return { merging, conflicted, missing, ...(head ? { tip: head } : {}), ...(landed ? { landedBy: landed } : {}) };
+  return {
+    merging,
+    conflicted,
+    missing,
+    ...(head ? { tip: head } : {}),
+    ...(landed ? { landedBy: landed } : {}),
+  } satisfies Reply<'status'>;
 }
 
 /**

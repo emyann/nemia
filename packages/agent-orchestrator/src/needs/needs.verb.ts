@@ -469,7 +469,7 @@ const checkedHeld = Effect.fnUntraced(function* (memo: NeedsMemo, need: Need, at
  */
 const sweptOnly = (need: Need, of: { fromPlace: boolean; own: readonly Need[]; harnessed: readonly Need[]; repository: string }) => {
   if (of.fromPlace) return (isRepositoryNeed(need) ? repositoryCheckOf(need, of.repository) : undefined) satisfies CheckAt | undefined;
-  if (of.own.some((n) => n.name === need.name)) return undefined satisfies CheckAt | undefined;
+  if (of.own.some((n) => n.name === need.name)) return undefined;
   return (of.harnessed.some((h) => h.name === need.name) ? harnessCheckOf(need) : undefined) satisfies CheckAt | undefined;
 };
 

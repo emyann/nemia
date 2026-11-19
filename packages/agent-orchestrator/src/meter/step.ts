@@ -502,7 +502,7 @@ export type TimelineFact = {
  */
 export function timelineFacts(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, FactView>, outcome: string) {
   const tl = timeline(run, views, steps);
-  if (tl.run.inFlight > 0) return null satisfies TimelineFact[] | null;
+  if (tl.run.inFlight > 0) return null;
   return timelineRows(run, tl, steps).map((r) => {
     const step = steps.find((s) => s.name === r.step);
     return {

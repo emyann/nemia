@@ -180,7 +180,9 @@ function proposalRuleWords(rule: ProposalPolicyRule) {
 
 /** A value read as a list of names, or undefined where it is not one. */
 const namesOf = (value: unknown) =>
-  Array.isArray(value) && value.every((v) => typeof v === 'string' && v.trim() !== '') ? value : undefined;
+  (Array.isArray(value) && value.every((v) => typeof v === 'string' && v.trim() !== '') ? value : undefined) satisfies
+    | string[]
+    | undefined as string[] | undefined;
 
 /** Why the fields of `rule` other than its id and answer are no rule's, or undefined where they are. */
 function shapeRefusal(rule: Record<string, unknown>, at: string) {

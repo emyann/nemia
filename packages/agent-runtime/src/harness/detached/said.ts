@@ -165,12 +165,12 @@ export const keptText = (
 export const replaceCapture = (file: string, key: SaidKey, kept: string) => {
   try {
     const { size, mtimeMs, atimeMs } = fs.statSync(file);
-    if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined satisfies SaidKey | undefined as SaidKey | undefined;
+    if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined;
     replaceFile(file, kept, { times: { atimeMs, mtimeMs } });
     const now = fs.statSync(file);
     return { size: now.size, mtimeMs: now.mtimeMs } satisfies SaidKey | undefined as SaidKey | undefined;
   } catch {
-    return undefined satisfies SaidKey | undefined as SaidKey | undefined;
+    return undefined;
   }
 };
 

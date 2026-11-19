@@ -466,4 +466,4 @@ export const healthOf = (lines: readonly RollupLine[]) => {
 export type SeriesMemo = Map<string, { stamp: string; lines: RollupLine[] }>;
 
 /** A memo with nothing kept. */
-export const seriesMemo = () => new Map();
+export const seriesMemo = () => new Map() satisfies SeriesMemo as SeriesMemo;

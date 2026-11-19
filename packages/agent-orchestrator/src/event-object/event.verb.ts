@@ -47,7 +47,7 @@ const eventsAfter = Effect.fn('eventsAfter')(function* (cursor: number, limit?: 
 export const eventKept = (query: Pick<EventQuery, 'namespace' | 'labelSelector'>) => {
   const selectors = parseSelectors(query.labelSelector ?? []);
   return (line: FeedLine, start: number, end: number) => {
-    if (!selects(selectors, line)) return undefined satisfies Event | undefined;
+    if (!selects(selectors, line)) return undefined;
     const event = eventOf(line, start, end);
     return (query.namespace === undefined || event.metadata.namespace === query.namespace ? event : undefined) satisfies Event | undefined;
   };

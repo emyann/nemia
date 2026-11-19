@@ -524,6 +524,7 @@ const anys = (record: string, configs: string[]) => {
   const byFile = new Map<string, Stripped[]>();
   for (const entry of stripped) byFile.set(path.resolve(entry.file), [...(byFile.get(path.resolve(entry.file)) ?? []), entry]);
   const seen = new Set<string>();
+  const fixes: [string, string, string][] = [];
   for (const config of configs) {
     const read = ts.readConfigFile(config, ts.sys.readFile);
     const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(config));
@@ -543,15 +544,79 @@ const anys = (record: string, configs: string[]) => {
         if (/\bany\b/.test(inferred) && !/\bany\b/.test(entry.declared)) {
           const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
           console.log(`${entry.file}:${line} ${entry.name} ${entry.declared} -> ${inferred}`);
+          if (process.env.FIX === '1' && /^[A-Za-z_$][\w$]*$/.test(entry.name) && !['try', 'of'].includes(entry.name)) fixes.push([entry.file, entry.name, entry.declared]);
         }
       }
     }
   }
+  for (const [file, name, declared] of new Map(fixes.map((fix) => [`${fix[0]}:${fix[1]}`, fix])).values()) {
+    try {
+      pin(`${file}:${name}`, declared, true);
+    } catch (error) {
+      console.log(String(error));
+    }
+  }
+};
+
+const pin = (site: string, type: string, upcast: boolean) => {
+  const [file, name] = site.split(':') as [string, string];
+  const text = readFileSync(file, 'utf8');
+  const source = parse(file, text);
+  const edits: Edit[] = [];
+  for (const node of functionsOf(source).filter((each) => nameOf(each) === name)) {
+    const values = isGenerator(node) ? [] : returnsOf(node);
+    if (isGenerator(node)) {
+      const visit = (child: ts.Node) => {
+        if (isFunctionWithBody(child) || ts.isClassLike(child)) return;
+        if (ts.isReturnStatement(child) && child.expression !== undefined) values.push(child.expression);
+        ts.forEachChild(child, visit);
+      };
+      ts.forEachChild((node as ts.FunctionLikeDeclaration).body!, visit);
+    }
+    for (const value of values) {
+      const start = value.getStart(source);
+      const bare =
+        ts.isParenthesizedExpression(value) ||
+        ts.isIdentifier(value) ||
+        ts.isCallExpression(value) ||
+        ts.isPropertyAccessExpression(value) ||
+        ts.isObjectLiteralExpression(value) ||
+        ts.isArrayLiteralExpression(value);
+      if (!bare) edits.push({ start, end: start, text: '(' });
+      edits.push({
+        start: value.getEnd(),
+        end: value.getEnd(),
+        text: `${bare ? '' : ')'} satisfies ${type}${upcast ? ` as ${type}` : ''}`,
+      });
+    }
+  }
+  if (edits.length === 0) throw new Error(`${site}: no return found`);
+  writeFileSync(file, apply(text, edits));
+  console.log(`${site}: ${edits.filter((each) => each.text !== '(').length} returns pinned`);
+};
+
+const unkeep = (file: string, line: number) => {
+  const text = readFileSync(file, 'utf8');
+  const source = parse(file, text);
+  const lines = text.split('\n');
+  if (!(lines[line - 1] ?? '').includes(RULE)) throw new Error(`${file}:${line}: no disable of the rule`);
+  const node = functionsOf(source).find((each) => {
+    const typeLine = each.type === undefined ? -1 : source.getLineAndCharacterOfPosition(each.type.getStart(source)).line;
+    const startLine = source.getLineAndCharacterOfPosition(each.getStart(source)).line;
+    return each.type !== undefined && (typeLine === line || startLine === line);
+  });
+  if (node === undefined) throw new Error(`${file}:${line}: no function under the disable`);
+  const from = closeParenOf(node, source)!;
+  const start = text.split('\n').slice(0, line - 1).join('\n').length + (line > 1 ? 1 : 0);
+  const end = start + lines[line - 1]!.length + 1;
+  writeFileSync(file, apply(text, [{ start: from.getEnd(), end: node.type!.getEnd(), text: '' }, { start, end, text: '' }]));
 };
 
 const [mode, record, ...rest] = process.argv.slice(2);
 if (mode === 'sweep' && record !== undefined && rest[0] !== undefined) sweep(record, rest[0], rest.slice(1));
 else if (mode === 'anys' && record !== undefined) anys(record, rest);
+else if (mode === 'unkeep' && record !== undefined && rest[0] !== undefined) unkeep(record, Number(rest[0]));
+else if (mode === 'pin' && record !== undefined && rest[0] !== undefined) pin(record, rest[0], rest[1] === 'as');
 else {
   console.error('usage: node tools/infer-returns.ts sweep <record.json> <tsconfig|-> <folder>… | anys <record.json> <tsconfig>…');
   process.exit(2);

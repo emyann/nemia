@@ -12,7 +12,16 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import type { Settings } from '../config/config.store.ts';
 import { reservedFor } from '../service/index.ts';
-import { PHASES, RECENT_KEPT, recentOf, type AlsoKept, type PassCost, type Phase, type RecentPass } from '../meter/index.ts';
+import {
+  PHASES,
+  RECENT_KEPT,
+  recentOf,
+  type AlsoKept,
+  type PassCost,
+  type Phase,
+  type RecentPass,
+  type PassCostRead,
+} from '../meter/index.ts';
 import {
   DAEMON_FILE,
   daemonStanding as standingOf,
@@ -34,9 +43,9 @@ import { alive } from '../process/alive.store.ts';
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string) => {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) satisfies unknown as unknown;
   } catch {
-    return undefined;
+    return undefined satisfies unknown as unknown;
   }
 };
 
@@ -92,10 +101,12 @@ export function lastCeilings(home: string) {
   try {
     text = fs.readFileSync(tickFile(home), 'utf8');
   } catch {
-    return undefined;
+    return undefined satisfies { sessions: number; runs: number } | undefined as { sessions: number; runs: number } | undefined;
   }
   const c = jsonOr(text);
-  return isCeilings(c) ? { sessions: c.sessions, runs: c.runs } : undefined;
+  return (isCeilings(c) ? { sessions: c.sessions, runs: c.runs } : undefined) satisfies { sessions: number; runs: number } | undefined as
+    | { sessions: number; runs: number }
+    | undefined;
 }
 
 /**
@@ -159,7 +170,7 @@ const isPassCost = Schema.is(
  */
 export const parsePassCost = (text: string) => {
   const c = jsonOr(text);
-  return isPassCost(c) ? c : undefined;
+  return (isPassCost(c) ? c : undefined) satisfies PassCostRead | undefined as PassCostRead | undefined;
 };
 
 /**
@@ -171,9 +182,9 @@ export function lastPassCost(home: string) {
   try {
     text = fs.readFileSync(statsFile(home), 'utf8');
   } catch {
-    return undefined;
+    return undefined satisfies PassCostRead | undefined as PassCostRead | undefined;
   }
-  return parsePassCost(text);
+  return parsePassCost(text) satisfies PassCostRead | undefined as PassCostRead | undefined;
 }
 
 /**

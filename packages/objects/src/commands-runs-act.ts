@@ -31,7 +31,7 @@ export const CANCEL_WORDS = {
 /** The values under `key`, in the order given, or none. */
 const listOf = (args: Args, key: string) => {
   const value = args[key];
-  return Array.isArray(value) ? value : [];
+  return (Array.isArray(value) ? value : []) satisfies readonly string[] as readonly string[];
 };
 
 /** `nemia hold`'s two forms, as each of its refusals ends on them. */

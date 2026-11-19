@@ -209,7 +209,7 @@ export function refOf(addname: string) {
   const dot = addname.indexOf('.');
   const kind = addname.slice(0, dot);
   const name = addname.slice(dot + 1);
-  if (dot < 1 || !name || (kind !== 'Agent' && kind !== 'Skill' && kind !== 'McpServer')) return undefined satisfies LibraryRef | undefined;
+  if (dot < 1 || !name || (kind !== 'Agent' && kind !== 'Skill' && kind !== 'McpServer')) return undefined;
   return { kind, name } satisfies LibraryRef | undefined;
 }
 

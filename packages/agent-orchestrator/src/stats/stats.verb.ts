@@ -100,7 +100,7 @@ type RunRead = { id: string; facts: RunFacts; unreadable: boolean; keeps: boolea
 export type StatsMemo = { cursor?: number; runs: Map<string, { stamp: string; read: RunRead }> };
 
 /** A memo that holds nothing: what a serving process starts with. */
-export const freshStatsMemo = () => ({ runs: new Map() });
+export const freshStatsMemo = () => ({ runs: new Map() }) satisfies StatsMemo as StatsMemo;
 
 /**
  * How `stats` reads: `memo`, the memo it answers runs from and keeps them in, none by default, which reads every run; and `verify`, which

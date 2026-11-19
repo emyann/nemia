@@ -482,7 +482,7 @@ function toolsPiece(home: string, facts: ReadinessFacts) {
  * person types (`typed`) is offered as its own command, which no server starts.
  */
 const needFixes = (need: Need, state: NeedState, at?: FixAt, fixes = need.fixes ?? []) =>
-  fixes.flatMap((fix, index) => {
+  fixes.flatMap<ReadinessFix>((fix, index) => {
     if ((fix.kind === 'removes') !== (state === 'met')) return [] satisfies ReadinessFix[];
     if (fix.kind === 'typed') return [typed(fix.message, fix.command)] satisfies ReadinessFix[];
     return [

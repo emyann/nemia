@@ -60,20 +60,21 @@ type State = {
   versions: Map<string, number>;
 };
 
-const stateOf = () => ({
-  records: new Map(),
-  cancelled: new Map(),
-  cancellers: new Map(),
-  pruned: new Map(),
-  holds: new Map(),
-  unheld: new Map(),
-  labels: new Map(),
-  said: new Map(),
-  refresh: new Map(),
-  asks: new Map(),
-  forgetting: new Map(),
-  versions: new Map(),
-});
+const stateOf = () =>
+  ({
+    records: new Map(),
+    cancelled: new Map(),
+    cancellers: new Map(),
+    pruned: new Map(),
+    holds: new Map(),
+    unheld: new Map(),
+    labels: new Map(),
+    said: new Map(),
+    refresh: new Map(),
+    asks: new Map(),
+    forgetting: new Map(),
+    versions: new Map(),
+  }) satisfies State as State;
 
 /** The marks the stand-in holds of `id` (`runMarkOf`), which each writer of one asks the machine with, as the files' writers do. */
 const marksIn = (st: State, id: string) =>
@@ -81,7 +82,7 @@ const marksIn = (st: State, id: string) =>
 
 /** A change to what the stand-in holds of `id`: its stamp moves. */
 const touch = (st: State, id: string) => void st.versions.set(id, (st.versions.get(id) ?? 0) + 1);
-const asksOf = (st: State, id: string) => st.asks.get(id) ?? new Map();
+const asksOf = (st: State, id: string) => (st.asks.get(id) ?? new Map()) satisfies Map<string, Held> as Map<string, Held>;
 const waiting = (st: State, id: string, of: AskOf) =>
   [...asksOf(st, id).values()].filter((h) => !h.done && h.person.of === of).map((h) => structuredClone(h.person.ask));
 

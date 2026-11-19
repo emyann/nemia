@@ -64,7 +64,7 @@ export const readEntry = (file: string) => {
   try {
     return upgraded(JSON.parse(fs.readFileSync(file, 'utf8')) as Entry) satisfies Entry | undefined;
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined satisfies Entry | undefined;
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw e;
   }
 };

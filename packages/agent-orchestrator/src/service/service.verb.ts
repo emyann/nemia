@@ -14,7 +14,7 @@ import { daemonStanding, thisProcess } from '../daemon/daemon.store.ts';
 import { putPause, readPause, resumePause } from '../pause/pause.store.ts';
 import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { asked, drained, EngineService, tried, type TaskView } from '../runtime-client.ts';
-import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal, type Pause } from '../pause/pause.ts';
+import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal, type Finishing, type Pause } from '../pause/pause.ts';
 import { timeoutAt } from '../pause/pause-timeout.store.ts';
 import { pointedEntry } from '../release/index.ts';
 import { runningRelease } from '../release/version.verb.ts';
@@ -107,7 +107,7 @@ export const attachedCalls = <E, R>(list: (ids?: readonly string[]) => Effect.Ef
       ({ views }) => {
         const live = views.filter((v) => v.state.restartPolicy === 'Always' && v.state.settled === null);
         ids ??= live.map((v) => v.id);
-        return live.flatMap((v) =>
+        return live.flatMap<Finishing>((v) =>
           v.calling
             ? [{ run: v.state.labels?.run ?? v.id, step: v.state.labels?.step ?? v.id, kind: 'session', calling: v.calling.tool }]
             : [],
@@ -242,7 +242,7 @@ const stateOf = (at: Placed, host: ServiceHost) => {
   try {
     return ops(at, host).state() satisfies UnitState | null as UnitState | null;
   } catch {
-    return null satisfies UnitState | null as UnitState | null;
+    return null;
   }
 };
 
@@ -555,7 +555,7 @@ export type ServiceStatus = { readonly service: ServiceRead; readonly lines: rea
 /** The service as installed: what its file says it runs, and the checkout its entry is of. */
 const installedRead = (at: Placed) => {
   const text = readUnit(at.file);
-  if (text === null) return null satisfies ServiceRead['unit'] as ServiceRead['unit'];
+  if (text === null) return null;
   const read = at.system === 'systemd' ? unitRead(text) : plistRead(text);
   const checkout = read.entry === undefined ? undefined : checkoutOf(read.entry);
   return { ...read, ...(checkout !== undefined ? { checkout } : {}) } satisfies ServiceRead['unit'] as ServiceRead['unit'];

@@ -136,7 +136,7 @@ export const pushesOf = (source: PushSource) => {
 
   const joined = (name: string, me: Follower) => {
     const run = runOf(name);
-    if (run === undefined) return undefined satisfies [Followed[], SessionState] | undefined;
+    if (run === undefined) return undefined;
     const fanned = fannedOf(name);
     fanned.followers.add(me);
     const state = attachedStateOf(run);

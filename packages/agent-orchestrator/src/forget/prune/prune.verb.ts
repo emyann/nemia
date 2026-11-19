@@ -435,7 +435,9 @@ const finished = Effect.fnUntraced(function* (r: Marked, outcome: PlaceOutcome<'
 function removedOf({ place, worktrees }: Sized, outcome: PlaceOutcome<'remove'>) {
   if (!('answer' in outcome)) {
     const said = unansweredWords(outcome);
-    return { removed: [], left: worktrees.map((w) => ({ path: w.path, unread: said })) };
+    return { removed: [], left: worktrees.map((w) => ({ path: w.path, unread: said })) } satisfies Pick<Pruning, 'left'> & {
+      removed: Pruning['worktrees'];
+    } as Pick<Pruning, 'left'> & { removed: Pruning['worktrees'] };
   }
   const gone = new Set(outcome.answer.removed);
   const own = new Set(worktrees.map((w) => w.path));
@@ -444,7 +446,7 @@ function removedOf({ place, worktrees }: Sized, outcome: PlaceOutcome<'remove'>)
     left: outcome.answer.left
       .filter((l) => own.has(l.path))
       .map((l) => ({ path: l.path, git: l.said, fix: sayFilled(place.say.inspect, { path: l.path }) })),
-  };
+  } satisfies Pick<Pruning, 'left'> & { removed: Pruning['worktrees'] } as Pick<Pruning, 'left'> & { removed: Pruning['worktrees'] };
 }
 
 /** Remove the run's files directory, and answer what it freed, and what would not go when not all of it did. */

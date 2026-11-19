@@ -38,7 +38,7 @@ import { linkRefusal } from '../folder/folder.ts';
 import { agentUsers } from '../folder/folder.store.ts';
 import { agentVersion } from './read.store.ts';
 import { copySkillFiles, preloads, readSkillRules, skillsFor, skillVersion } from '../skills/read.store.ts';
-import { appliesOf } from '../skills/skills.ts';
+import { appliesOf, type SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolderAt } from '../folder/write.store.ts';
 import { isDirectory, runsDir } from '../record/record.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -116,14 +116,14 @@ export function writeAgentFiles(home: string, run: Pick<Run, 'id'>, steps: reado
  */
 export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: StepSpec) {
   const agent = step.agent;
-  if (!agent?.skills) return new Map();
+  if (!agent?.skills) return new Map() satisfies Map<string, string> as Map<string, string>;
   const skills = path.join(agentFilesDir(home, run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
       const version = skillVersion(path.join(skills, bareSkillOf(name)));
       return version === null ? [] : [[name, version] as const];
     }),
-  );
+  ) satisfies Map<string, string> as Map<string, string>;
 }
 
 /**
@@ -136,7 +136,7 @@ export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: 
  */
 export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: StepSpec) {
   const agent = step.agent;
-  if (!agent?.skills) return new Map();
+  if (!agent?.skills) return new Map() satisfies Map<string, SkillRule[]> as Map<string, SkillRule[]>;
   const skills = path.join(agentFilesDir(home, run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
@@ -148,7 +148,7 @@ export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: Ste
         throw err;
       }
     }),
-  );
+  ) satisfies Map<string, SkillRule[]> as Map<string, SkillRule[]>;
 }
 
 /**
@@ -161,7 +161,7 @@ export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: Ste
  */
 export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: StepSpec) {
   const agent = step.agent;
-  if (!agent?.skills) return new Map();
+  if (!agent?.skills) return new Map() satisfies Map<string, string[]> as Map<string, string[]>;
   const skills = path.join(agentFilesDir(home, run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
@@ -169,7 +169,7 @@ export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: S
       const globs = fs.existsSync(file) ? appliesOf(fs.readFileSync(file, 'utf8')) : [];
       return globs.length ? [[name, globs] as const] : [];
     }),
-  );
+  ) satisfies Map<string, string[]> as Map<string, string[]>;
 }
 
 /**

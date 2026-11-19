@@ -67,10 +67,10 @@ const rootOwner = (top: string, key: string | null, factory: string) => {
 /** The owner of a file under the tree's `workflows/`, by its path's segments: a Workflow, an Agent, a Skill, or none. */
 const workflowsOwner = (segments: readonly string[]) => {
   const [top, folder, file] = segments;
-  if (top !== 'workflows' || folder === undefined) return null satisfies ResolutionOwner | null;
+  if (top !== 'workflows' || folder === undefined) return null;
   if (folder === 'skills')
     return (segments.length >= 4 && file !== undefined ? { kind: 'Skill', name: file } : null) satisfies ResolutionOwner | null;
-  if (segments.length !== 3 || file === undefined) return null satisfies ResolutionOwner | null;
+  if (segments.length !== 3 || file === undefined) return null;
   if (folder === 'agents') {
     const agent = agentOfFile(file);
     return (agent === null ? null : { kind: 'Agent', name: agent }) satisfies ResolutionOwner | null;

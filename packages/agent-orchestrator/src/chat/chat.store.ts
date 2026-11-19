@@ -169,7 +169,9 @@ const appendLine = (file: string, value: unknown) => {
  * @param dir The folder the chat is kept in, which holds its folder `chat/`.
  */
 export const readOutbox = (dir: string) =>
-  linesOf(outboxFile(dir), OutboxSchema).map(({ from, ...e }) => (from === undefined ? { ...e } : { ...e, from: { ...from } }));
+  linesOf(outboxFile(dir), OutboxSchema).map(({ from, ...e }) =>
+    from === undefined ? { ...e } : { ...e, from: { ...from } },
+  ) satisfies OutboxEntry[] as OutboxEntry[];
 
 /**
  * The keeper's marks of what it delivered, in the order it delivered them.

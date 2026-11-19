@@ -140,7 +140,7 @@ export function customOf(home: string, name: string) {
 /** Where the agent `name` of yours in the store `home` was copied from, and how that file stands now; null for one never copied. */
 function copiedOf(home: string, name: string) {
   const record = readCopyRecord(home, name);
-  if (record === null) return null satisfies AgentCopiedFrom | null;
+  if (record === null) return null;
   const now = sourceVersion(record.source, home);
   return {
     source: record.source,

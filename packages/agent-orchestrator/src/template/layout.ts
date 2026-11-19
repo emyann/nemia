@@ -146,7 +146,7 @@ export function documentFile(file: string, template: string) {
   if (file === 'nemia.yaml')
     return { kind: 'FactoryTemplate', name: template } satisfies DocumentFile | undefined as DocumentFile | undefined;
   if (file === 'nemia.lock.yaml') return { kind: 'Lock', name: undefined } satisfies DocumentFile | undefined as DocumentFile | undefined;
-  if (parts.length !== 3) return undefined satisfies DocumentFile | undefined as DocumentFile | undefined;
+  if (parts.length !== 3) return undefined;
   const [holder, name, leaf] = parts;
   if (holder === 'workflows' && leaf === 'workflow.yaml')
     return { kind: 'Workflow', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
@@ -154,7 +154,7 @@ export function documentFile(file: string, template: string) {
     return { kind: 'Agent', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
   if (holder === 'skills' && leaf === 'skill.yaml')
     return { kind: 'Skill', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
-  return undefined satisfies DocumentFile | undefined as DocumentFile | undefined;
+  return undefined;
 }
 
 /** The files an agent's folder may hold. */
@@ -529,20 +529,13 @@ function leafRefusal(leaf: Leaf, value: unknown, at: ReadonlyArray<string | numb
 }
 
 /** What a map at `at` breaks of its `fields` shape: a required key missing, a key it has no place for, and each value's own breaks. */
-function fieldsRefusals(
-  file: string,
-  shape: Extract<Shape, { fields: unknown }>,
-  value: unknown,
-  at: ReadonlyArray<string | number>,
-  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-): Refusal[] {
+function fieldsRefusals(file: string, shape: Extract<Shape, { fields: unknown }>, value: unknown, at: ReadonlyArray<string | number>) {
   if (!isMap(value)) return [{ file, at, message: `${spelled(at)} is a map of keys, and here it is ${JSON.stringify(value)}.` }];
   const known = Object.keys(shape.fields);
   const missing = (shape.required ?? [])
     .filter((key) => !(key in value))
     .map((key) => ({ file, at, message: `${spelled(at)} has no \`${key}\`, which it requires: write it.` }));
-  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-  const each = Object.entries(value).flatMap(([key, held]): Refusal[] => {
+  const each = Object.entries(value).flatMap(([key, held]) => {
     const inner = shape.fields[key] ?? shape.rest;
     if (inner !== undefined) return shapeRefusals(file, inner, held, [...at, key]);
     const message = `${spelled([...at, key])} is no key of ${spelled(at)}, which holds ${known.join(', ')}: rename it, or remove it.`;

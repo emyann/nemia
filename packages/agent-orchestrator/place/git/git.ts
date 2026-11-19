@@ -74,7 +74,7 @@ export function failedWords(err: unknown, lines = 4) {
 
 /** `command` run, and what it printed as it printed it; it throws `Failed` when it does not exit 0. */
 export function* printed(command: Command) {
-  const ran = yield command;
+  const ran: Ran = yield command;
   if (ran.error || ran.status !== 0) throw new Failed(command, ran);
   return ran.stdout;
 }

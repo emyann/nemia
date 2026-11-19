@@ -598,14 +598,14 @@ function renamedFields(fields: object) {
  * @param step The step as the record holds it.
  */
 export function asNamed(step: FrozenStep) {
-  if (isNamed(step)) return step;
+  if (isNamed(step)) return step satisfies StepSpec as StepSpec;
   const fields = renamedFields(step) as StepSpec;
-  if (!step.agent) return fields;
+  if (!step.agent) return fields satisfies StepSpec as StepSpec;
   const { keys, given } = step.agent;
   const agent = {
     ...harnessPromptAsNamed(step.agent),
     keys: [...new Set(keys.map((key) => (key === 'workspace' && step.workspace === 'folder' ? 'place' : (keyNamed(key) as StepKey))))],
     given: renamedFields(given),
   };
-  return { ...fields, agent };
+  return { ...fields, agent } satisfies StepSpec as StepSpec;
 }

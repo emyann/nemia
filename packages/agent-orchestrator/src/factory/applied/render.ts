@@ -153,7 +153,7 @@ const STEP_WORDS = [
 /** A template's `route:` (`TemplateRoute`) as the parser's `RouteEval`, which the step's file writes as YAML flow; undefined for none. */
 function routeEvalOf(route: unknown) {
   if (route === 'judge') return { kind: 'judge' } satisfies RouteEval | undefined;
-  if (!isMap(route)) return undefined satisfies RouteEval | undefined;
+  if (!isMap(route)) return undefined;
   if (typeof route.script === 'string') return { kind: 'script', script: route.script } satisfies RouteEval | undefined;
   if (typeof route.from === 'string' && isMap(route.table))
     return {
@@ -161,7 +161,7 @@ function routeEvalOf(route: unknown) {
       from: route.from,
       table: Object.fromEntries(Object.entries(route.table).map(([k, v]) => [k, String(v)])),
     } satisfies RouteEval | undefined;
-  return undefined satisfies RouteEval | undefined;
+  return undefined;
 }
 
 /**

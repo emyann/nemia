@@ -62,7 +62,7 @@ const MOVE_SPEC: Spec = {
 /** The values of a many flag, as the parser collected them. */
 const valuesOf = (args: Args, key: string) => {
   const value = args[key];
-  return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  return (Array.isArray(value) ? value : typeof value === 'string' ? [value] : []) satisfies readonly string[] as readonly string[];
 };
 
 /** The refusal of a `--repo` or `--volume` value with no `=`, or with nothing on either side of it; null where each holds one. */

@@ -85,18 +85,19 @@ const inDoubt = (d: FollowDeps, name: string) =>
  * @param answers The subscription's answers.
  * @param stop The controller of the subscription's request, aborted as the stream is asked to end.
  */
-export const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: AbortController) => ({
-  [Symbol.asyncIterator]: () => {
-    const it = answers[Symbol.asyncIterator]();
-    return {
-      next: () => it.next(),
-      return: async (value?: unknown) => {
-        stop.abort();
-        return (await it.return?.(value)) ?? { done: true, value: undefined };
-      },
-    };
-  },
-});
+export const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: AbortController) =>
+  ({
+    [Symbol.asyncIterator]: () => {
+      const it = answers[Symbol.asyncIterator]();
+      return {
+        next: () => it.next(),
+        return: async (value?: unknown) => {
+          stop.abort();
+          return (await it.return?.(value)) ?? { done: true, value: undefined };
+        },
+      };
+    },
+  }) satisfies AsyncIterable<StreamResponse> as AsyncIterable<StreamResponse>;
 
 /** The Task `taskId` read whole, its history in full; `undefined` when the agent no longer has it. */
 const taskRead = async (d: FollowDeps, taskId: string) => {

@@ -465,7 +465,7 @@ export function cardsListed(
   const listed = files
     .filter((f) => !f.file.startsWith('.') && !isReadme(f.file))
     .sort((a, b) => a.file.localeCompare(b.file))
-    .map(({ file, text }) => {
+    .map<CardListing>(({ file, text }) => {
       if (!file.endsWith('.md')) {
         return {
           name: file,
@@ -569,7 +569,7 @@ export type WiredFactory = Pick<Factory, 'volumes' | 'workflowRepos'>;
 export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, factories: ReadonlyMap<string, WiredFactory>) {
   const factory = l.factory === null ? undefined : factories.get(l.factory);
   const workflow = cardWorkflowName(l.workflow);
-  if (factory === undefined || workflow === undefined) return null satisfies string | null as string | null;
+  if (factory === undefined || workflow === undefined) return null;
   const of = workflowRepo(namedRepos(factory), factory.workflowRepos, workflow);
   return ('repo' in of ? of.repo : null) satisfies string | null as string | null;
 }
@@ -899,7 +899,7 @@ export function queueRefusal(card: InboxCard, where: string, startedAs: readonly
       | string
       | undefined as string | undefined;
   }
-  return undefined satisfies string | undefined as string | undefined;
+  return undefined;
 }
 
 /**

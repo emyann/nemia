@@ -21,7 +21,9 @@ const AT_ONCE = 4;
 export const rootOf = (place: Place, dir: string) =>
   Effect.map(place.ask('root', { dir }), (outcome) =>
     'answer' in outcome ? { root: outcome.answer.root ?? undefined } : { unasked: unansweredWords(outcome) },
-  );
+  ) satisfies Effect.Effect<{ readonly root: string | undefined } | { readonly unasked: string }> as Effect.Effect<
+    { readonly root: string | undefined } | { readonly unasked: string }
+  >;
 
 /** The harnesses' trusts of `dir` that are not given now, one a harness's folder. */
 function lacking(factory: string, dir: string, root: string | undefined) {

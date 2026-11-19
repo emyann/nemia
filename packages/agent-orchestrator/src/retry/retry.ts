@@ -853,7 +853,7 @@ function recheckFirst(
       sessionNeeds(raise),
     ] satisfies [string, string, string] | undefined;
   const exit = raise ? undefined : persons();
-  if (exit === undefined) return undefined satisfies [string, string, string] | undefined;
+  if (exit === undefined) return undefined;
   return [
     `${command} --recheck`,
     `its check exited ${exit}, which its \`checkFailurePolicy:\` names a person's to answer, so no retry was spent on it. Answer what its check said, then run the check again, and nothing else`,

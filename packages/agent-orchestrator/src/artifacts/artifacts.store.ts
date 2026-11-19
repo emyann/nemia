@@ -71,8 +71,23 @@ export function missingArtifacts(
  */
 function placedWhy(file: string, dir: string) {
   const place = artifactPlace(file, dir);
-  if (place !== 'files') return place;
-  return isFileIn(file, dir) ? undefined : 'missing';
+  if (place !== 'files')
+    return place satisfies 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined as
+      | 'outside'
+      | 'escapes'
+      | 'configuration'
+      | 'reserved'
+      | 'missing'
+      | 'workspace'
+      | undefined;
+  return (isFileIn(file, dir) ? undefined : 'missing') satisfies
+    | 'outside'
+    | 'escapes'
+    | 'configuration'
+    | 'reserved'
+    | 'missing'
+    | 'workspace'
+    | undefined as 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined;
 }
 
 /**
@@ -189,8 +204,7 @@ function branchOf(place: Place, run: Run, stepName: string, files: readonly stri
  */
 function workspaceArtifact(run: Run, stepName: string, file: string, dir: string, onBranch: OnBranch) {
   const rel = path.normalize(file);
-  if (isFileIn(path.join(dir, rel), dir))
-    return undefined satisfies Omit<MissingArtifact, 'path'> | undefined as Omit<MissingArtifact, 'path'> | undefined;
+  if (isFileIn(path.join(dir, rel), dir)) return undefined;
   const { workspace } = run.steps[stepName] ?? {};
   const at = workspace ? inWorkspace(workspace, rel) : { kind: 'absent' as const };
   if (at.kind === 'outside')
@@ -204,7 +218,7 @@ function workspaceArtifact(run: Run, stepName: string, file: string, dir: string
     return { why: 'not known', said: there.unknown } satisfies Omit<MissingArtifact, 'path'> | undefined as
       | Omit<MissingArtifact, 'path'>
       | undefined;
-  if (there === 'file') return undefined satisfies Omit<MissingArtifact, 'path'> | undefined as Omit<MissingArtifact, 'path'> | undefined;
+  if (there === 'file') return undefined;
   if (at.kind === 'file')
     return { why: 'not collected' } satisfies Omit<MissingArtifact, 'path'> | undefined as Omit<MissingArtifact, 'path'> | undefined;
   return { why: there === 'directory' ? 'directory' : 'not there' } satisfies Omit<MissingArtifact, 'path'> | undefined as

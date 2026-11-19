@@ -70,8 +70,7 @@ export const answersIn = (view: TaskView | undefined) => (view?.state.holdOpen ?
  * @param e The engine the pass reads through.
  * @param views The views the runtime's pass reported (`TickReport.views`).
  */
-// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
+export function reportedEngine(e: Engine, views: readonly TaskView[]) {
   const kept = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
   let writes = 0;
   const keep = (read: readonly TaskView[], at: number) => {
@@ -84,7 +83,8 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
       const at = writes;
       return e.view(taskId).pipe(Effect.tap((read) => Effect.sync(() => keep([read], at))));
     });
-  const list = (ids: readonly string[]) =>
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
+  const list = (ids: readonly string[]): ReturnType<Engine['list']> =>
     Effect.suspend(() => {
       const wanted = [...new Set(ids)];
       const missing = wanted.filter((id) => !kept.has(id));
@@ -696,7 +696,7 @@ export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
  * The runs a pass reads as runs others wait on (`Parents`), none read yet, through `git`.
  * @param git What reads the runs' branches.
  */
-export const passParents = (git: BranchReader) => ({ git, read: new Map() });
+export const passParents = (git: BranchReader) => ({ git, read: new Map() }) satisfies Parents as Parents;
 
 /**
  * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply

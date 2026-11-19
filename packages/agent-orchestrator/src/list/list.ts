@@ -622,7 +622,7 @@ function judgedRow(status: StepStatus, verdictOf: () => Verdict | undefined, hel
     return { message: 'denied', ...coded({ reason: 'Denied' }) } satisfies
       | (CodedStep & { message: string; verdict?: CheckVerdict; note?: string })
       | undefined;
-  return undefined satisfies (CodedStep & { message: string; verdict?: CheckVerdict; note?: string }) | undefined;
+  return undefined;
 }
 
 /**

@@ -52,12 +52,12 @@ import {
   renamedIn,
   withProposalsPass,
   type Env,
+  type Pass,
 } from '../runner.ts';
 import { printed, answered, HELP, placedIn, usage, WF_HINT, type Engine } from './flags.ts';
 import { admitRun } from './runs.ts';
 
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
-type Pass = Effect.Success<ReturnType<typeof tickRun>>;
 
 /**
  * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `waiting` for one a person alone stops, `failed`
@@ -192,14 +192,14 @@ async function commanded(
   demand: (root: string) => DemandHost,
   place: Place,
 ) {
-  if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual) satisfies void as void;
+  if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual);
   const args = parseArgv(command.spec, rest);
-  if (args === undefined) return console.log(HELP) satisfies void as void;
+  if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
   if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand(wfRoot(env))));
   const runner = RUNS.get(command.name);
-  if (runner) return runner(env, args, e, place) satisfies void as void;
+  if (runner) return runner(env, args, e, place);
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const entry: Served & Partial<Pick<Command, 'print' | 'note'>> = command;
@@ -239,8 +239,7 @@ const NAMES = TABLE.filter((c) => c.only?.side !== 'api' && !MOVED.includes(c.na
 function namedIn(argv: readonly string[]) {
   const opens = (name: string) => name.split(' ').every((word, i) => argv[i] === word);
   const name = [...NAMES, ...MOVED].filter(opens).sort((a, b) => b.length - a.length)[0];
-  if (name === undefined || MOVED.includes(name))
-    return undefined satisfies { name: string; rest: string[] } | undefined as { name: string; rest: string[] } | undefined;
+  if (name === undefined || MOVED.includes(name)) return undefined;
   return { name, rest: argv.slice(name.split(' ').length) } satisfies { name: string; rest: string[] } | undefined as
     | { name: string; rest: string[] }
     | undefined;
@@ -267,14 +266,14 @@ export async function main(
   const renamed = renamedIn(argv);
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);
   const named = namedIn(renamed.words);
-  if (named === undefined) return console.log(HELP) satisfies void as void;
+  if (named === undefined) return console.log(HELP);
   const exempt = named.name === 'version' || named.rest.includes('--help');
   const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(wfRoot(env)), wfRoot(env), env);
   if (trial !== null) throw new Conflict({ message: trial });
   const e = given ?? engine(env);
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
-  if (command === undefined) return console.log(HELP) satisfies void as void;
-  return commanded(env, command, named.rest, e, demand, place) satisfies void as void;
+  if (command === undefined) return console.log(HELP);
+  return commanded(env, command, named.rest, e, demand, place);
 }
 
 /**

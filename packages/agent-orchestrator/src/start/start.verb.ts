@@ -684,7 +684,7 @@ export const repoFor = (home: string, name: string | undefined, named: string | 
  */
 export const wiredRepoFor = (home: string, name: string, workflow: string) => {
   const factory = filedAtOnce(home, name);
-  if (factory === undefined) return undefined satisfies string | undefined as string | undefined;
+  if (factory === undefined) return undefined;
   const of = wiredRepo(factory, workflow);
   if ('repo' in of) return of.repo satisfies string | undefined as string | undefined;
   throw new Invalid({ message: of.message });

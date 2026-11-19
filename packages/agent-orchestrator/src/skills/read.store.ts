@@ -331,8 +331,7 @@ function followed(walk: Walked, at: string, named: string, held: readonly string
 }
 
 /** The files of the real folder `dir`, each by its path in the skill from `under`, a followed linked folder walked as the folder it is. */
-// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-function filesUnder(walk: Walked, dir: string, under: string, held: readonly string[]): SkillFile[] {
+function filesUnder(walk: Walked, dir: string, under: string, held: readonly string[]) {
   // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry): SkillFile[] => {
     const file = path.join(under, entry.name);

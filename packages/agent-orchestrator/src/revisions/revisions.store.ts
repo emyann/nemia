@@ -114,13 +114,13 @@ function entriesIn(file: string) {
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch {
-    return [];
+    return [] satisfies Revision[] as Revision[];
   }
   try {
     const raw: unknown = JSON.parse(text);
-    return Array.isArray(raw) ? raw.filter(isRevision) : [];
+    return (Array.isArray(raw) ? raw.filter(isRevision) : []) satisfies Revision[] as Revision[];
   } catch {
-    return [];
+    return [] satisfies Revision[] as Revision[];
   }
 }
 
@@ -145,14 +145,14 @@ function ledgerIn(dir: string) {
         return revisionNow(of(at), hash, when);
       },
     },
-  } satisfies LedgerLayer;
+  } satisfies LedgerLayer satisfies LedgerLayer as LedgerLayer;
 }
 
 /**
  * The ledger's files of the store `root`, as a layer of the door.
  * @param root The store's folder.
  */
-export const ledgerFiles = (root: string) => ledgerIn(path.join(root, 'revisions'));
+export const ledgerFiles = (root: string) => ledgerIn(path.join(root, 'revisions')) satisfies LedgerLayer as LedgerLayer;
 
 /**
  * The Ledger door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the

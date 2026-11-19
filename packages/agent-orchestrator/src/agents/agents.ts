@@ -857,7 +857,7 @@ const notHeldRefusal = (what: 'agent' | 'skill', named: string, kind: 'none' | '
       kind: 'Missing',
       message: `${named} is not there: it was removed since it was read. Write it as a new ${what} to have it back.`,
     } satisfies VersionRefused | null;
-  if (kind === 'none') return null satisfies VersionRefused | null;
+  if (kind === 'none') return null;
   return {
     kind: 'Conflict',
     message: `${named} is there already, and is no ${what}. Give the new ${what} another name, or remove what is there first.`,

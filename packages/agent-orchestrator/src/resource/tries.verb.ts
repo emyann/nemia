@@ -213,7 +213,7 @@ export function closeoutIn(
 ) {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
   const c = said === undefined ? undefined : parseCloseout(said);
-  if (!c || 'error' in c) return null satisfies StepCloseout | null;
+  if (!c || 'error' in c) return null;
   const fields = outputFields(step).filter((field) => field !== LOOP_REPLIES);
   const { given, missing: lacked } = declaredOutput(step, c, fields);
   const owed = taskId === run.steps[name]?.taskId ? new Set(filedOwed(step, run, c)) : undefined;
@@ -254,7 +254,7 @@ function shapesServed(step: StepSpec, fields: readonly string[]) {
  */
 export function unreadableIn(taskId: string | null, views: Views, turn?: number) {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
-  if (said === undefined) return null satisfies StepUnreadable | null as StepUnreadable | null;
+  if (said === undefined) return null;
   const c = parseCloseout(said);
   return ('error' in c ? { error: c.error, raw: said } : null) satisfies StepUnreadable | null as StepUnreadable | null;
 }

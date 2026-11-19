@@ -508,5 +508,5 @@ export function checkTemplate(
     ...sharedFileRefusals(folder, held, lines),
     ...textRefusals(folder, held, text),
   ];
-  return all.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  return all.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0)) satisfies Refusal[] as Refusal[];
 }

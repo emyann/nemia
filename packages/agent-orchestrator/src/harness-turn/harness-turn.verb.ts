@@ -106,14 +106,14 @@ const turnRead = Effect.fnUntraced(function* (record: TurnRecord) {
     if (verdict.state === 'running')
       return {
         ...base,
-        state: 'running',
+        state: 'running' as const,
         message: `a check turn runs through ${title}, capped at ${costWords(TURN_BUDGET_USD)}`,
         fixes: [],
       };
     if (verdict.state === 'passed')
       return {
         ...base,
-        state: 'passed',
+        state: 'passed' as const,
         message: `${title} answered a check turn${cost}`,
         fixes: [],
         ...(seen.answer === undefined ? {} : { answer: seen.answer }),
@@ -125,7 +125,7 @@ const turnRead = Effect.fnUntraced(function* (record: TurnRecord) {
     const needs = (yield* NeedsMemory)?.harnessNeeds ?? needsMemo(yield* StoreRoot).harnessNeeds;
     return {
       ...base,
-      state: 'failed',
+      state: 'failed' as const,
       failure,
       message: `${title}'s check turn failed: ${FAILURE_WORDS[failure]}${cost}${words === undefined ? '' : `: ${words}`}`,
       fixes: turnFixes(record.harness, needs),

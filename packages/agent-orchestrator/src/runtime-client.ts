@@ -449,7 +449,7 @@ export function readRemote(root: string) {
   try {
     entries = readRemoteAgents(file);
   } catch (err) {
-    return { agents: new Map(), refused: new Map(), unread: (err as Error).message };
+    return { agents: new Map(), refused: new Map(), unread: (err as Error).message } satisfies RemoteRead as RemoteRead;
   }
   const agents = new Map<string, RemoteAgent>();
   const refused = new Map<string, string>();
@@ -458,7 +458,7 @@ export function readRemote(root: string) {
     if (why) refused.set(name, `${file}: \`${name}\`: ${why}`);
     else agents.set(name, agent as RemoteAgent);
   }
-  return { agents, refused };
+  return { agents, refused } satisfies RemoteRead as RemoteRead;
 }
 
 /**
@@ -476,7 +476,7 @@ export const refusalsOf = (read: RemoteRead) => (read.unread ? [read.unread] : [
 export function remoteAgents(root: string) {
   const read = readRemote(root);
   if (read.unread) throw new Invalid({ message: read.unread });
-  return read.agents;
+  return read.agents satisfies ReadonlyMap<string, RemoteAgent> as ReadonlyMap<string, RemoteAgent>;
 }
 
 /**

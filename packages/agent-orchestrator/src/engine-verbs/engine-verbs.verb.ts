@@ -24,7 +24,7 @@ export type VerbKind = { readonly phase?: Phase; readonly changes: Changes };
 const first = ([id]: unknown[]) => [id];
 
 /** The tasks a verb's first argument lists. */
-const listed = ([ids]: unknown[]) => (Array.isArray(ids) ? ids : []);
+const listed = ([ids]: unknown[]) => (Array.isArray(ids) ? ids : []) satisfies readonly unknown[] as readonly unknown[];
 
 /** Every verb of the engine: its phase (a journal read is `journals`, a verb that changes a task `act`) and what it changes. */
 export const ENGINE_VERBS = {

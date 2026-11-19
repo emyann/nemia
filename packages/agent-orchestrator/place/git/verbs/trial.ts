@@ -15,12 +15,13 @@ import type { PlaceRequests, TrialMerge } from '../../../src/place/place.ts';
 function* tried(repo: string, { onto, branch }: { readonly onto: string; readonly branch: string }) {
   try {
     yield* printed({ cmd: 'git', cwd: repo, args: ['merge-tree', '--write-tree', '--name-only', '--no-messages', onto, branch] });
-    return { clean: true };
+    return { clean: true } satisfies TrialMerge as TrialMerge;
   } catch (err) {
     if (!(err instanceof Failed)) throw err;
     const { status, stdout, stderr, message } = err;
-    if (status === 1 && stdout) return { clean: false, conflicts: stdout.split('\n').slice(1).filter(Boolean) };
-    return { unknown: (stderr || message).trim().split('\n')[0] || `git merge-tree exited ${status}` };
+    if (status === 1 && stdout)
+      return { clean: false, conflicts: stdout.split('\n').slice(1).filter(Boolean) } satisfies TrialMerge as TrialMerge;
+    return { unknown: (stderr || message).trim().split('\n')[0] || `git merge-tree exited ${status}` } satisfies TrialMerge as TrialMerge;
   }
 }
 

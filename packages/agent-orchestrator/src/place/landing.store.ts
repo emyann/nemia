@@ -36,7 +36,8 @@ export type StatusMemo = {
  * @param heads Every branch of a run's repository and its commit, or undefined where they were not read.
  * @param place The place asked.
  */
-export const statusMemo = (heads: StatusMemo['heads'], place: Place) => ({ reads: new Map(), heads, place });
+export const statusMemo = (heads: StatusMemo['heads'], place: Place) =>
+  ({ reads: new Map(), heads, place }) satisfies StatusMemo as StatusMemo;
 
 /**
  * Whether a merge is staged in `run`'s checkout, as a `stat` of the file the place named at `open` (`stagedFile`) says, with no process.

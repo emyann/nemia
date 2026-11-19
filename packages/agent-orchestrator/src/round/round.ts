@@ -124,7 +124,7 @@ function askedRound(
     at.status === 'exhausted' || held
       ? asks.find((a) => a.step === step.name && a.round === at.round && (!over.length || (a.budget !== undefined && a.budget > above)))
       : undefined;
-  if (!ask || !step.loop) return undefined satisfies Round | undefined;
+  if (!ask || !step.loop) return undefined;
   return {
     step: step.name,
     target: step.loop,
@@ -170,7 +170,7 @@ export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskI
     return was ? [[b, sentBack(was)]] : [];
   });
   const refiled = { ...next, ...Object.fromEntries(back) };
-  return { ...refiled, [r.target]: { ...(refiled[r.target] ?? { taskId: null }), ...filed } };
+  return { ...refiled, [r.target]: { ...(refiled[r.target] ?? { taskId: null }), ...filed } } satisfies Run['steps'] as Run['steps'];
 }
 
 /**

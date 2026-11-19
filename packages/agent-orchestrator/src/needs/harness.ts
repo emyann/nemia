@@ -86,7 +86,7 @@ export const harnessOfNeed = (need: string, declarations: Readonly<Record<string
         | { readonly name: string; readonly part: HarnessPart; readonly needs: HarnessNeeds }
         | undefined;
   }
-  return undefined satisfies { readonly name: string; readonly part: HarnessPart; readonly needs: HarnessNeeds } | undefined;
+  return undefined;
 };
 
 /**

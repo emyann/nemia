@@ -252,7 +252,7 @@ const levelHeld = (read: () => FactoryLevelFile | undefined) => {
   try {
     return read() satisfies FactoryLevelFile | undefined as FactoryLevelFile | undefined;
   } catch {
-    return undefined satisfies FactoryLevelFile | undefined as FactoryLevelFile | undefined;
+    return undefined;
   }
 };
 

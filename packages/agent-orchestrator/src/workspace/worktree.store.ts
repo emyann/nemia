@@ -166,9 +166,9 @@ export function keptNotes(repo: string, kept: CheckoutKept) {
 /** A lockfile's text, parsed; null where it does not parse, which `lockfileParting` reads as parting at `package-lock.json`. */
 function parsedLock(text: string) {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) satisfies unknown as unknown;
   } catch {
-    return null;
+    return null satisfies unknown as unknown;
   }
 }
 
@@ -472,7 +472,7 @@ export async function keepWorktreeInstalled(home: string, runId: string, repo: s
     tree,
     parting: tree === 'own' ? worktreeParts(worktree) : null,
   });
-  if (due.act === 'keep') return undefined satisfies Reinstalled | undefined;
+  if (due.act === 'keep') return undefined;
   if (due.act === 'reprovision') {
     try {
       clearDeps(worktree);
@@ -688,10 +688,10 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
  * @param steps The run's workflow.
  * @param step The step whose workspace is cut.
  */
-// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-export function ranShape(run: Pick<Run, 'steps'>, steps: readonly StepSpec[], step: StepSpec): { steps: StepSpec[]; step: StepSpec } {
+export function ranShape(run: Pick<Run, 'steps'>, steps: readonly StepSpec[], step: StepSpec) {
   const byName = new Map(steps.map((s) => [s.name, s]));
-  const through = (name: string, seen: ReadonlySet<string> = new Set()) => {
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
+  const through = (name: string, seen: ReadonlySet<string> = new Set()): string[] => {
     const s = byName.get(name);
     if (s?.routes === undefined || seen.has(name)) return [name];
     const [first] = [...s.after].sort();

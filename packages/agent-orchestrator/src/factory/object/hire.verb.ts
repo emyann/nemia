@@ -69,9 +69,9 @@ const stepFiles = (dir: string) => {
       .readdirSync(dir)
       .filter((f) => f.endsWith('.md') && f !== 'README.md')
       .sort()
-      .map((f) => ({ name: f.slice(0, -'.md'.length) }));
+      .map((f) => ({ name: f.slice(0, -'.md'.length) })) satisfies StepRead[] as StepRead[];
   } catch {
-    return [];
+    return [] satisfies StepRead[] as StepRead[];
   }
 };
 

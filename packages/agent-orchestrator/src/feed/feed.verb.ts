@@ -239,7 +239,7 @@ const readOn = (at: Following) =>
           ],
         ] as const),
     }),
-  ) satisfies Woken;
+  ) satisfies Woken as Woken satisfies Woken as Woken;
 
 /**
  * One wake of a reader at `at`: an item of the hub (`published`), or a beat (undefined). An item that ends at or before the cursor was
@@ -265,7 +265,7 @@ const wake = (at: Following, published: FeedPublished | undefined) => {
       onFailure: () => readOn(at),
       onSuccess: (end) => ((end?.cursor ?? 0) === at.cursor ? Effect.succeed([at, []] as const) : readOn(at)),
     }),
-  ) satisfies Woken;
+  ) satisfies Woken as Woken;
 };
 
 /**
@@ -275,7 +275,7 @@ const wake = (at: Following, published: FeedPublished | undefined) => {
 const wakeAll = (at: Following, taken: NonEmptyReadonlyArray<FeedPublished | undefined>) =>
   Effect.reduce(
     taken,
-    () => [at, []] satisfies readonly [Following, Followed[]],
+    () => [at, []] satisfies readonly [Following, Followed[]] as readonly [Following, Followed[]],
     ([now, handed], published) => Effect.map(wake(now, published), ([next, more]) => [next, [...handed, ...more]] as const),
   ) satisfies Woken as Woken;
 

@@ -116,7 +116,7 @@ export const checked = (wrong: string | null | undefined) => (wrong ? Effect.fai
  */
 export const selectorTexts = (args: Args) => {
   const value = args['selector'];
-  return typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
+  return (typeof value === 'string' ? [value] : Array.isArray(value) ? value : []) satisfies readonly string[] as readonly string[];
 };
 
 /**

@@ -21,6 +21,7 @@ import {
   type TakenBack,
   type Run,
   type Unheld,
+  type Pruned,
 } from './record.ts';
 import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
 import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
@@ -133,7 +134,8 @@ const FolderRecordSchema = Kept({
 
 const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));
 
-const fieldOf = (value: unknown, key: PropertyKey) => (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined);
+const fieldOf = (value: unknown, key: PropertyKey) =>
+  (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined) satisfies unknown as unknown;
 
 /** `text` cut to its first 60 characters and marked `…` where it was cut, as the runtime quotes a value it refuses. */
 const shown = (text: string) => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
@@ -264,12 +266,15 @@ export const pruneFile = (home: string, id: string) => path.join(runsDir(home), 
  */
 export function readPruned(home: string, id: string) {
   const marker = markerOf(pruneFile(home, id));
-  if (!marker) return undefined;
+  if (!marker) return undefined satisfies Pruned | undefined as Pruned | undefined;
   const [at, worktrees, artifacts] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'worktrees'), fieldOf(marker.json, 'artifacts')];
   const [artifactsAt, artifactsBytes] = [fieldOf(artifacts, 'at'), fieldOf(artifacts, 'bytes')];
   const pruned = { at: isText(at) ? at : '', worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [] };
-  if (artifacts === undefined) return pruned;
-  return { ...pruned, artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 } };
+  if (artifacts === undefined) return pruned satisfies Pruned | undefined as Pruned | undefined;
+  return {
+    ...pruned,
+    artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 },
+  } satisfies Pruned | undefined as Pruned | undefined;
 }
 
 /**
@@ -302,7 +307,7 @@ export const holdFile = (home: string, id: string) => path.join(runsDir(home), `
  */
 function readHold(home: string, id: string) {
   const marker = markerOf(holdFile(home, id));
-  if (!marker) return undefined;
+  if (!marker) return undefined satisfies Hold | undefined as Hold | undefined;
   const [at, until] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'until')];
   const [why, by] = [wordsOf(fieldOf(marker.json, 'why'), WHY_CAP), wordsOf(fieldOf(marker.json, 'by'), BY_CAP)];
   return {
@@ -311,7 +316,7 @@ function readHold(home: string, id: string) {
     ...(why ? { why } : {}),
     ...(by ? { by } : {}),
     ...actorIn(fieldOf(marker.json, 'actor')),
-  };
+  } satisfies Hold | undefined as Hold | undefined;
 }
 
 /**
@@ -328,7 +333,7 @@ export const writeHold = (
   until: readonly string[],
   { why, by, actor }: Pick<Hold, 'why' | 'by' | 'actor'> = {},
 ) => {
-  if (runMarkMove(marksAt(home, id), 'hold').kind !== 'edge') return null satisfies Hold | null as Hold | null;
+  if (runMarkMove(marksAt(home, id), 'hold').kind !== 'edge') return null;
   fs.mkdirSync(runsDir(home), { recursive: true });
   const hold: Hold = {
     at: new Date().toISOString(),
@@ -341,7 +346,7 @@ export const writeHold = (
     fs.writeFileSync(holdFile(home, id), JSON.stringify(hold, null, 2), { flag: 'wx' });
     return hold satisfies Hold | null as Hold | null;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null satisfies Hold | null as Hold | null;
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null;
     throw err;
   }
 };
@@ -358,10 +363,10 @@ export const unheldFile = (home: string, id: string) => path.join(runsDir(home),
 /** Who lifted the run's last hold by hand, read: undefined where no file is there, or it does not read as one. */
 function readUnheld(home: string, id: string) {
   const marker = markerOf(unheldFile(home, id));
-  if (!marker) return undefined;
+  if (!marker) return undefined satisfies Unheld | undefined as Unheld | undefined;
   const since = fieldOf(marker.json, 'since');
   const { actor } = actorIn(fieldOf(marker.json, 'actor'));
-  return isText(since) && actor ? { since, actor } : undefined;
+  return (isText(since) && actor ? { since, actor } : undefined) satisfies Unheld | undefined as Unheld | undefined;
 }
 
 /**
@@ -407,7 +412,10 @@ export const runRecord = (home: string, id: string) => within('records', () => r
 /** The run's hold (`holdFile`) and who last lifted one by hand (`unheldFile`), each where its file is there, as the run carries them. */
 const heldOf = (home: string, id: string) => {
   const [hold, unheld] = [readHold(home, id), readUnheld(home, id)];
-  return { ...(hold ? { hold } : {}), ...(unheld ? { unheld } : {}) };
+  return { ...(hold ? { hold } : {}), ...(unheld ? { unheld } : {}) } satisfies Pick<Run, 'hold' | 'unheld'> as Pick<
+    Run,
+    'hold' | 'unheld'
+  >;
 };
 
 const readRecord = (home: string, id: string) => {
@@ -444,7 +452,7 @@ const readRecord = (home: string, id: string) => {
     ...(saidBefore ? { saidBefore } : {}),
     ...(standing.length ? { approvals: standing } : {}),
     ...(acceptances.length ? { acceptances } : {}),
-  };
+  } satisfies Run as Run;
 };
 
 /**
@@ -538,12 +546,12 @@ function readSaidBefore(home: string, id: string) {
 export const markCancelled = (home: string, id: string, actor?: Actor) => {
   fs.mkdirSync(runsDir(home), { recursive: true });
   const at = new Date().toISOString();
-  if (runMarkMove(marksAt(home, id), 'cancel').kind !== 'edge') return readCancelled(home, id)?.at || at;
+  if (runMarkMove(marksAt(home, id), 'cancel').kind !== 'edge') return (readCancelled(home, id)?.at || at) satisfies string as string;
   try {
     fs.writeFileSync(cancelFile(home, id), actor ? JSON.stringify({ at, actor }) : at, { flag: 'wx' });
-    return at;
+    return at satisfies string as string;
   } catch {
-    return readCancelled(home, id)?.at || at;
+    return (readCancelled(home, id)?.at || at) satisfies string as string;
   }
 };
 
@@ -555,13 +563,15 @@ export const markCancelled = (home: string, id: string, actor?: Actor) => {
  */
 export function readCancelled(home: string, id: string) {
   const file = cancelFile(home, id);
-  if (!fs.existsSync(file)) return undefined;
+  if (!fs.existsSync(file)) return undefined satisfies { at: string; by?: Actor } | undefined as { at: string; by?: Actor } | undefined;
   const text = readText(file).trim();
   const json = text.startsWith('{') ? jsonOr(text) : undefined;
   const at = fieldOf(json, 'at');
-  if (!isText(at)) return { at: text };
+  if (!isText(at)) return { at: text } satisfies { at: string; by?: Actor } | undefined as { at: string; by?: Actor } | undefined;
   const { actor } = actorIn(fieldOf(json, 'actor'));
-  return { at: at.trim(), ...(actor ? { by: actor } : {}) };
+  return { at: at.trim(), ...(actor ? { by: actor } : {}) } satisfies { at: string; by?: Actor } | undefined as
+    | { at: string; by?: Actor }
+    | undefined;
 }
 
 /**
@@ -1098,7 +1108,8 @@ export const restStamps = (home: string) =>
     } catch {
       return new Map();
     }
-    const stat = (at: string, depth: number) => {
+    // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
+    const stat = (at: string, depth: number): string => {
       const s = fs.statSync(at, { bigint: true, throwIfNoEntry: false });
       if (!s) return 'gone';
       const own = `${s.ino}:${s.size}:${s.mtimeNs}`;
@@ -1119,7 +1130,7 @@ export const restStamps = (home: string) =>
       stamps.set(id, [...parts, `${name}=${stat(path.join(runsDir(home), name), 0)}`]);
     }
     return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
-  });
+  }) satisfies Map<string, string> as Map<string, string>;
 
 /** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
 const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause' | 'saidBefore'>) =>

@@ -122,7 +122,7 @@ function missOf(rule: PolicyRule, site: GateSite) {
     const because = rule.when.includes(condition) ? neverHolds(site, condition) : null;
     if (because !== null) return { rule: rule.id, why: 'never-holds', condition, because } satisfies RuleMiss | undefined;
   }
-  return undefined satisfies RuleMiss | undefined;
+  return undefined;
 }
 
 /** A gate's row: the rules that reach it, those proposed that would, the misses, and, given facts, what keeps each rule now. */

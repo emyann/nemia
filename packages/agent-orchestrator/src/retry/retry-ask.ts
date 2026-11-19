@@ -372,7 +372,7 @@ const pausedNote = (r: Retry) =>
  */
 export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]) {
   const last = run.steps[step]?.tries?.at(-1);
-  if (!last) return undefined satisfies RetryAsk | undefined as RetryAsk | undefined;
+  if (!last) return undefined;
   const n = tryOf(run, step);
   return answers.find(
     (a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.cause && a.model === last.model,

@@ -70,7 +70,7 @@ export function answeredRoute(
       | { kind: 'unsigned' }
       | undefined;
   }
-  return undefined satisfies { kind: 'route'; route: string } | { kind: 'unsigned' } | undefined;
+  return undefined;
 }
 
 /**

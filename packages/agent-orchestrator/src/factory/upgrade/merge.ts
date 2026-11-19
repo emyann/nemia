@@ -180,15 +180,15 @@ const jsonQuoted = (value: unknown, hire: boolean) =>
  * none).
  */
 function jsonChosen(slot: Slot, choice: Choice | undefined) {
-  if (choice === undefined) return undefined;
-  if (choice === 'ours') return slot.sides?.[1];
-  if (choice === 'theirs') return slot.sides?.[2];
+  if (choice === undefined) return undefined satisfies unknown as unknown;
+  if (choice === 'ours') return slot.sides?.[1] satisfies unknown as unknown;
+  if (choice === 'theirs') return slot.sides?.[2] satisfies unknown as unknown;
   const text = choice.text;
-  if (slot.hire) return text.trim();
+  if (slot.hire) return text.trim() satisfies unknown as unknown;
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) satisfies unknown as unknown;
   } catch {
-    return text.trim();
+    return text.trim() satisfies unknown as unknown;
   }
 }
 
@@ -198,7 +198,7 @@ type Slot = { key: string; hire: boolean; value?: unknown; conflict?: Conflict; 
 /** `factory.json` merged by key, its workflows as a set, its hires by step, any other key whole; none where a side is no object. */
 function wiringMerge(base: string, ours: string, theirs: string) {
   const [b, o, t] = [objectOf(base), objectOf(ours), objectOf(theirs)];
-  if (b === undefined || o === undefined || t === undefined) return undefined satisfies FileMerge | undefined;
+  if (b === undefined || o === undefined || t === undefined) return undefined;
   const slots: Slot[] = [];
   const same = (x?: unknown, y?: unknown) => JSON.stringify(x) === JSON.stringify(y);
   const add = (key: string, hire: boolean, sides: [unknown, unknown, unknown]) => {
@@ -348,7 +348,7 @@ function unrelatedText(path: string, ours: string, theirs: string) {
  */
 function unrelatedWiring(ours: string, theirs: string) {
   const [o, t] = [objectOf(ours), objectOf(theirs)];
-  if (o === undefined || t === undefined) return undefined satisfies FileMerge | undefined;
+  if (o === undefined || t === undefined) return undefined;
   const slots: Slot[] = [];
   const json = (value: unknown) => (value === undefined ? undefined : JSON.stringify(value));
   const add = (key: string, hire: boolean, sides: [unknown, unknown, unknown], asked: boolean) => {

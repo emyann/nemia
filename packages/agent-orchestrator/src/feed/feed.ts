@@ -317,7 +317,7 @@ export const leftEndedLine = (run: string, note: string, at: string) =>
 export type FeedFold = { said: Map<string, FeedSaid>; shots: Map<string, number> };
 
 /** A fold of nothing. */
-export const freshFold = () => ({ said: new Map(), shots: new Map() });
+export const freshFold = () => ({ said: new Map(), shots: new Map() }) satisfies FeedFold as FeedFold;
 
 /**
  * A process's fold of the feed, as far as it has read it: the byte it read to (`cursor`), and the generation of the feed it read
@@ -327,7 +327,7 @@ export const freshFold = () => ({ said: new Map(), shots: new Map() });
 export type FeedMemo = { cursor: number; generation?: number; fold: FeedFold };
 
 /** A fold of nothing: what a process that has read no feed starts from. */
-export const freshMemo = () => ({ cursor: 0, fold: freshFold() });
+export const freshMemo = () => ({ cursor: 0, fold: freshFold() }) satisfies FeedMemo as FeedMemo;
 
 /** Where the fold keeps what a line is about, derived the same from a v0 line and a v1 one. */
 const foldKey = (involved: Involved) => `${involved.kind}/${involved.name}`;

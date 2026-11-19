@@ -104,14 +104,19 @@ export const renderedAt = Effect.fn('renderedAt')(function* (source: string, set
 
 /** The template opened as `read`, rendered with `sets` over `held` where it is given, or why it is not (`renderedAt`). */
 function renderOpened(read: OpenTemplate, given: readonly string[], held: Params | undefined) {
-  if (read.problems.length) return { problems: read.problems.map(problemLine), name: read.name };
+  if (read.problems.length)
+    return { problems: read.problems.map(problemLine), name: read.name } satisfies RenderedAt | Unrendered as RenderedAt | Unrendered;
   const spec = (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec;
   const declared = spec.parameters ?? {};
   const { sets, dropped } = held === undefined ? { sets: given, dropped: [] } : overlaid(declared, held, given);
   const { params, refusals } = resolveParams(declared, sets);
-  if (refusals.length) return { problems: refusals, version: spec.version, name: read.name };
+  if (refusals.length)
+    return { problems: refusals, version: spec.version, name: read.name } satisfies RenderedAt | Unrendered as RenderedAt | Unrendered;
   const rendered = renderFactory(read, params);
-  if (rendered.refusals.length) return { problems: rendered.refusals, version: spec.version, name: read.name };
+  if (rendered.refusals.length)
+    return { problems: rendered.refusals, version: spec.version, name: read.name } satisfies RenderedAt | Unrendered as
+      | RenderedAt
+      | Unrendered;
   const entries: Entry[] = [
     ...rendered.files.map((file) => ({ path: file.path, bytes: Buffer.from(file.text) })),
     ...rendered.copies.map((copy) => {
@@ -119,7 +124,7 @@ function renderOpened(read: OpenTemplate, given: readonly string[], held: Params
       return { path: copy.path, bytes: Buffer.from(from.bytes), mode: from.mode };
     }),
   ];
-  return { name: read.name, version: spec.version, params, entries, dropped };
+  return { name: read.name, version: spec.version, params, entries, dropped } satisfies RenderedAt | Unrendered as RenderedAt | Unrendered;
 }
 
 /** A condition, as Kubernetes words one. */

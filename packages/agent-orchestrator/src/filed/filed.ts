@@ -11,7 +11,7 @@ import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { fenceReach, unruledIn } from 'agent-runtime/vocabulary';
 import { filedSettings, SETTINGS_HARNESS } from '../harness-settings/harness-settings.ts';
-import { splitServers, type FactoryServers } from '../factory/servers/index.ts';
+import { splitServers, type FactoryServer, type FactoryServers } from '../factory/servers/index.ts';
 import type { HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
 import type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
 import { handedFolders } from './handed-folders/handed-folders.ts';
@@ -322,10 +322,21 @@ export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | un
  * did.
  */
 const serversOf = (step: Pick<StepSpec, 'agent'>, record: FactoryServers | undefined) => {
-  if (step.agent === undefined) return { projectMcp: [] };
-  if (step.agent.mcp === undefined) return {};
+  if (step.agent === undefined)
+    return { projectMcp: [] } satisfies { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } as {
+      projectMcp?: string[];
+      mcp?: Record<string, FactoryServer>;
+    };
+  if (step.agent.mcp === undefined)
+    return {} satisfies { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } as {
+      projectMcp?: string[];
+      mcp?: Record<string, FactoryServer>;
+    };
   const { mcp, checkout } = splitServers(step.agent.mcp, record);
-  return { projectMcp: checkout, ...(mcp === undefined ? {} : { mcp }) };
+  return { projectMcp: checkout, ...(mcp === undefined ? {} : { mcp }) } satisfies {
+    projectMcp?: string[];
+    mcp?: Record<string, FactoryServer>;
+  } as { projectMcp?: string[]; mcp?: Record<string, FactoryServer> };
 };
 
 /** `mounts` as a config holds them: the key, or none for no folder. */

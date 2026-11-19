@@ -60,7 +60,7 @@ export function readRemoteAgents(file: string) {
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return new Map();
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return new Map() satisfies RemoteAgents as RemoteAgents;
     throw e;
   }
   let json: unknown;
@@ -103,7 +103,7 @@ export function readRemoteAgents(file: string) {
       `\`${short}\` and \`${long}\` are both declared, and their secrets' variables can meet: \`${envNameOf(long, 'token')}\` is ${long}'s secret for a scheme its card calls \`token\`, and ${short}'s for one its card calls \`${rest}-token\` — so a card the other party writes could name a scheme that is given ${long}'s secret. Rename one so that neither begins with the other and a dash.`,
     );
   }
-  return agents;
+  return agents satisfies RemoteAgents as RemoteAgents;
 }
 
 /**
@@ -116,5 +116,5 @@ function meetingOf(names: readonly string[]) {
     const long = names.find((n) => n.startsWith(`${short}-`));
     if (long) return [short, long] satisfies [string, string] | undefined;
   }
-  return undefined satisfies [string, string] | undefined;
+  return undefined;
 }

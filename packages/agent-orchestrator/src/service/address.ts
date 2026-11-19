@@ -39,21 +39,17 @@ const groupsOf = (side: string, last: boolean) => {
 const v6Of = (text: string) => {
   const bare = text.replace(/^\[(.*)\]$/, '$1').replace(/%.*$/, '');
   const halves = bare.split('::');
-  if (halves.length > 2) return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
+  if (halves.length > 2) return undefined;
   const [head = '', tail] = halves;
   const before = groupsOf(head, tail === undefined);
   const after = tail === undefined ? [] : groupsOf(tail, true);
-  if (before === undefined || after === undefined)
-    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
+  if (before === undefined || after === undefined) return undefined;
   const missing = 8 - before.length - after.length;
-  if (tail === undefined ? missing !== 0 : missing < 1)
-    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
+  if (tail === undefined ? missing !== 0 : missing < 1) return undefined;
   const all = [...before, ...Array<number>(Math.max(missing, 0)).fill(0), ...after];
   const [g0, g1, g2, g3, g4, g5, g6, g7] = all;
-  if (g0 === undefined || g1 === undefined || g2 === undefined || g3 === undefined)
-    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
-  if (g4 === undefined || g5 === undefined || g6 === undefined || g7 === undefined)
-    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
+  if (g0 === undefined || g1 === undefined || g2 === undefined || g3 === undefined) return undefined;
+  if (g4 === undefined || g5 === undefined || g6 === undefined || g7 === undefined) return undefined;
   return [g0, g1, g2, g3, g4, g5, g6, g7] satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
 };
 

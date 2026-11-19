@@ -122,8 +122,7 @@ export const takenArchive = (at: string) =>
  * @param problems Given a problem for each link found.
  * @param under The path under `dir` walked now; empty for `dir` itself.
  */
-// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-export function walkFolder(dir: string, problems: Problem[], under = ''): string[] {
+export function walkFolder(dir: string, problems: Problem[], under = '') {
   return (
     fs
       .readdirSync(path.join(dir, under), { withFileTypes: true })

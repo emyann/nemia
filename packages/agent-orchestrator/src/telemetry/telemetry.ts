@@ -74,7 +74,7 @@ const TOOL_DETAILS = 'NEMIA_TOOL_DETAILS';
  */
 export function sessionTelemetryOf(env: Readonly<Record<string, string | undefined>>) {
   const otlp = otlpOf(env);
-  if (!otlp) return undefined satisfies { endpoint: string; toolDetails?: true } | undefined;
+  if (!otlp) return undefined;
   return (env[TOOL_DETAILS]?.trim() === '1' ? { endpoint: otlp.url, toolDetails: true } : { endpoint: otlp.url }) satisfies
     | { endpoint: string; toolDetails?: true }
     | undefined;

@@ -36,7 +36,7 @@ const jsonOf = (text: string) =>
     try: () => JSON.parse(text),
     catch: () =>
       new Invalid({ message: `${text} is not JSON: quote it, as '{"commit":"","pr":""}', '"french"' or false. Nothing was changed.` }),
-  });
+  }) satisfies Effect.Effect<unknown, Invalid> as Effect.Effect<unknown, Invalid>;
 
 /**
  * `nemia factory setting set`: a harness setting given to every session on its harness of the factory's runs started after, a second of

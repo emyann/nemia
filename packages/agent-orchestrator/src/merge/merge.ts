@@ -130,7 +130,7 @@ export function mergeDue(
 ) {
   const merge = mergePending(run, looping, asks)?.merge;
   const back = merge && loopDone(status) ? backOf(steps, run, looping, stopped) : undefined;
-  if (!merge || !back) return undefined satisfies Round | undefined;
+  if (!merge || !back) return undefined;
   return {
     step: looping.name,
     target: merge.target,

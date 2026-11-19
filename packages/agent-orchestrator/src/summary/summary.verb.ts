@@ -232,7 +232,7 @@ export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: 
     atWork: atWork(run, views),
     tokens: runTokens(run, views),
     toDecide: judged.toDecide,
-  };
+  } satisfies JudgedFields as JudgedFields;
 }
 
 /**

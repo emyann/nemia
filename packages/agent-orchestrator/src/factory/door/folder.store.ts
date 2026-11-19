@@ -39,8 +39,7 @@ export function folderPathRefusal(at: string) {
 export const staysWithStore = (at: string) => (FOLDER_STAYS as readonly string[]).includes(firstPiece(at, '/'));
 
 /** The regular files under `dir`, by their path from `top` split by `/`; a link, a device or a socket is no file of it. */
-// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
-function filesUnder(top: string, dir: string): TreeFile[] {
+function filesUnder(top: string, dir: string) {
   // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry): TreeFile[] => {
     const at = path.join(dir, entry.name);

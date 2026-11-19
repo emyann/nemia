@@ -7,7 +7,7 @@
  * reset: one with commits of its own, a merge in progress, changes not committed or no branch is left as it is, and said, with what to
  * do. Refuses a `repo` that is no directory, or no git repository.
  */
-import { failedWords, git, gitSays, isDirectory, printed, refused } from '../git.ts';
+import { failedWords, git, gitSays, isDirectory, printed, refused, type Reply } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** Git asks no one at a terminal for a credential: one the machine does not hold fails the fetch at once. */
@@ -54,38 +54,41 @@ function* heldBack(repo: string, branch: string, upstream: string, own: number) 
 
 /** The verb's body. */
 export function* follow({ repo }: PlaceRequests['follow']) {
-  if (!isDirectory(repo)) return refused(`${repo} is not a directory, so there is no checkout to follow its remote`);
+  if (!isDirectory(repo))
+    return refused(`${repo} is not a directory, so there is no checkout to follow its remote`) satisfies Reply<'follow'>;
   if ((yield* gitSays(repo, ['rev-parse', '--git-dir'])) === undefined)
-    return refused(`${repo} is not a git repository, so there is no checkout to follow its remote: name the factory's repository`);
+    return refused(
+      `${repo} is not a git repository, so there is no checkout to follow its remote: name the factory's repository`,
+    ) satisfies Reply<'follow'>;
   const branch = yield* gitSays(repo, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
   if (!branch) {
-    if (!(yield* gitSays(repo, ['remote']))) return { state: 'no-upstream' };
+    if (!(yield* gitSays(repo, ['remote']))) return { state: 'no-upstream' } satisfies Reply<'follow'>;
     return {
       state: 'left',
       message: `${repo} is on no branch, so it follows no remote: check out its base branch there (git -C ${repo} switch <branch>)`,
-    };
+    } satisfies Reply<'follow'>;
   }
   const upstream = yield* upstreamOf(repo, branch);
-  if (!upstream) return { state: 'no-upstream' };
+  if (!upstream) return { state: 'no-upstream' } satisfies Reply<'follow'>;
   const { name } = upstream;
   const failed = yield* unfetched(repo, upstream);
-  if (failed) return { state: 'unfetched', upstream: name, message: failed };
+  if (failed) return { state: 'unfetched', upstream: name, message: failed } satisfies Reply<'follow'>;
   const [own = 0, behind = 0] = (yield* git(repo, ['rev-list', '--left-right', '--count', `HEAD...${name}`])).split(/\s+/).map(Number);
-  if (behind === 0) return { state: own === 0 ? 'up-to-date' : 'ahead', upstream: name };
+  if (behind === 0) return { state: own === 0 ? 'up-to-date' : 'ahead', upstream: name } satisfies Reply<'follow'>;
   const left = (why: string) => ({
     state: 'left' as const,
     upstream: name,
     message: `${repo} is ${behind} commit(s) behind ${name} ${why}`,
   });
   const held = yield* heldBack(repo, branch, name, own);
-  if (held) return left(held);
+  if (held) return left(held) satisfies Reply<'follow'>;
   const from = yield* git(repo, ['rev-parse', 'HEAD']);
   try {
     yield* git(repo, ['merge', '--ff-only', '--quiet', name]);
   } catch (err) {
     return left(
       `and git would not fast-forward it: ${failedWords(err)} — move what it names away, then ${branch} follows before the next step`,
-    );
+    ) satisfies Reply<'follow'>;
   }
-  return { state: 'fast-forwarded', upstream: name, from, to: yield* git(repo, ['rev-parse', 'HEAD']) };
+  return { state: 'fast-forwarded', upstream: name, from, to: yield* git(repo, ['rev-parse', 'HEAD']) } satisfies Reply<'follow'>;
 }

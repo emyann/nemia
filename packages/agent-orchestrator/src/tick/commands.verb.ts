@@ -35,7 +35,7 @@ export const TICK: Ran = {
 /** Refused of `nemia up`'s arguments: an interval beside `--stats`, which ticks nothing, or one `everyOf` refuses. */
 function upRefusal(args: Args) {
   const every = textOf(args, 'every');
-  if (every === undefined) return null satisfies string | null as string | null;
+  if (every === undefined) return null;
   if (args.stats === true)
     return `nemia up --stats reads what the last pass cost and ticks nothing, so it takes no ${every}: nemia up --stats alone, or nemia up ${every} to tick.` satisfies
       | string

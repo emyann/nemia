@@ -72,9 +72,9 @@ const timeoutRead = (value: unknown) => (typeof value === 'number' && Number.isS
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string) => {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) satisfies unknown as unknown;
   } catch {
-    return undefined;
+    return undefined satisfies unknown as unknown;
   }
 };
 

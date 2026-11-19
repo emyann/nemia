@@ -85,7 +85,7 @@ function* held(repo: string, w: Listed) {
     clean,
     onBranch: !w.detached || (clean === true && Boolean(contained)),
     ...(changes?.length ? { changes } : {}),
-  };
+  } satisfies Held as Held;
 }
 
 /** The verb's body. */

@@ -47,13 +47,14 @@ const tableOf = <Item extends { readonly metadata: ObjectMeta }>(
   page: { readonly metadata: { readonly continue?: string }; readonly items: readonly Item[] },
   columns: readonly TableColumnDefinition[],
   cells: (item: Item) => readonly string[],
-) => ({
-  kind: 'Table',
-  apiVersion: 'meta.k8s.io/v1',
-  metadata: page.metadata.continue === undefined ? {} : { continue: page.metadata.continue },
-  columnDefinitions: columns,
-  rows: page.items.map((item) => ({ cells: cells(item), object: partialOf(item.metadata) })),
-});
+) =>
+  ({
+    kind: 'Table',
+    apiVersion: 'meta.k8s.io/v1',
+    metadata: page.metadata.continue === undefined ? {} : { continue: page.metadata.continue },
+    columnDefinitions: columns,
+    rows: page.items.map((item) => ({ cells: cells(item), object: partialOf(item.metadata) })),
+  }) satisfies Table as Table;
 
 /** What a definition's note says: why it does not read, and the origin that shadows it, `; `-joined; `''` for neither. */
 const definitionNote = (error: string | null, shadowedBy: string | undefined) =>

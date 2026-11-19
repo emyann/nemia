@@ -5,7 +5,7 @@
  * start.verb.ts).
  */
 import { refuse, STEP_KEYS, type StepKey, type StepSpec } from '../step/step.ts';
-import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS } from 'agent-runtime/vocabulary';
+import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS, type HarnessDeclaration } from 'agent-runtime/vocabulary';
 
 /** The harness a step runs on when it names none: the runtime's. */
 export { DEFAULT_HARNESS };
@@ -30,7 +30,8 @@ export const declarationOf = (harness: string | undefined) => {
  * How harness `harness` matches its permission rules, and the tool sets measured on it: `undefined` where it declares none. Pure.
  * @param harness The harness's name, or undefined for the default one.
  */
-export const rulesOf = (harness: string | undefined) => declarationOf(harness)?.rules;
+export const rulesOf = (harness: string | undefined) =>
+  declarationOf(harness)?.rules satisfies HarnessDeclaration['rules'] as HarnessDeclaration['rules'];
 
 /**
  * The key harness `harness`'s fence is named by — its mode, or `sandbox` — `DEFAULT_HARNESS`'s where it is `undefined`, and `undefined`

@@ -408,7 +408,7 @@ export function readResolutions(home: string, name: string) {
 export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt) =>
   (resolutions !== undefined && choicesApply(resolutions, merge)
     ? resolutions.choices
-    : {}) satisfies Resolutions['choices'] as Resolutions['choices'];
+    : {}) satisfies Resolutions['choices'] as Resolutions['choices'] satisfies Resolutions['choices'] as Resolutions['choices'];
 
 /**
  * The proposals of `resolutions`, by the key of the owner each resolves (`ownerKey`), that resolve the merge `merge`: those recorded
@@ -429,4 +429,4 @@ export const proposalsFor = (resolutions: Resolutions | undefined, merge: MergeA
  * @param resolutions The choices to write.
  */
 export const writeResolutions = (home: string, name: string, resolutions: Resolutions) =>
-  writeWhole(resolutionsFile(home, name), `${JSON.stringify(resolutions, null, 2)}\n`) satisfies void as void;
+  writeWhole(resolutionsFile(home, name), `${JSON.stringify(resolutions, null, 2)}\n`);

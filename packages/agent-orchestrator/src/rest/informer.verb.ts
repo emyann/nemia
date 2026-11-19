@@ -71,7 +71,8 @@ export type InformerMemo<T = Judgement, O = RunObject> = {
 };
 
 /** An informer that holds nothing: what a serving process starts with. */
-export const informerMemo = <T = Judgement, O = RunObject>() => ({ runs: new Map(), hits: 0, objectHits: 0 });
+export const informerMemo = <T = Judgement, O = RunObject>() =>
+  ({ runs: new Map(), hits: 0, objectHits: 0 }) satisfies InformerMemo<T, O> as InformerMemo<T, O>;
 
 /**
  * The listed object kept for the run `id` on the very entry that holds `judgement`, the one this read was served or judged: none where

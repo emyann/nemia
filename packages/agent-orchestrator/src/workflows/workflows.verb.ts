@@ -26,7 +26,7 @@ import { isDirectory } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
-import { stillNeeded } from '../folder/folder.ts';
+import { stillNeeded, type Fills } from '../folder/folder.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import type { Places } from '../skills/read.store.ts';
 import type { WorkflowRemoved, WorkflowWritten } from '../folder/write.store.ts';
@@ -101,9 +101,9 @@ export function factoryDraftIn(
 
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
 const writeJudgedOf = (where: Where, home: string) =>
-  where.from === 'factory' && where.factory !== undefined
+  (where.from === 'factory' && where.factory !== undefined
     ? factoryWriteOf(home, where.factory, where.name)
-    : { places: placesOf(where, home) };
+    : { places: placesOf(where, home) }) satisfies { places: Places; fills?: Fills } as { places: Places; fills?: Fills };
 
 /**
  * The folder of yours a writer (`who`) names, `<home>/workflows/<name>`, or of a factory's tree, `<tree>/workflows/<name>`, as the

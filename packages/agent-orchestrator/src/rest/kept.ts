@@ -19,7 +19,7 @@ import type { Run } from '../record/record.ts';
 export type RecordMemo<P> = { runs: Map<string, { stamp: string; of: P }> };
 
 /** A memo that holds nothing: what a serving process starts with, one per read. */
-export const recordMemo = <P>() => ({ runs: new Map() });
+export const recordMemo = <P>() => ({ runs: new Map() }) satisfies RecordMemo<P> as RecordMemo<P>;
 
 /**
  * What a read reads the memo through: the store stamped before any record is read, the reader of one run by id

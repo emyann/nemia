@@ -78,7 +78,7 @@ function hireRefused(factory: Parameters<WiringRefusal>[0], step: string, agent:
 
 /** Why `factory` cannot attach `workflow` on its repository named `repo`: a folder name none or several of its repositories have. */
 function attachRefused(factory: Parameters<WiringRefusal>[0], workflow: string, repo: string | undefined) {
-  if (repo === undefined) return null satisfies WiringRefused | null;
+  if (repo === undefined) return null;
   const count = reposNamed(factory, repo);
   return (count === 1 ? null : invalid(repoNameRefusal(factory, workflow, repo, count))) satisfies WiringRefused | null;
 }
@@ -94,7 +94,7 @@ function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string) 
   if (holds(factory.schedules, workflow)) return invalid(scheduledDetachRefusal(factory.name, workflow)) satisfies WiringRefused | null;
   if (factory.costLines !== undefined && holds(factory.costLines, workflow))
     return invalid(costLinedDetachRefusal(factory.name, workflow)) satisfies WiringRefused | null;
-  return null satisfies WiringRefused | null;
+  return null;
 }
 
 /**

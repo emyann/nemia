@@ -40,20 +40,20 @@ const AnswerSchema = Schema.Struct({
  * @param text The text of the script's answer file, or undefined where it left none.
  */
 export function scriptAnswerOf(text: string | undefined) {
-  if (text === undefined) return undefined satisfies ScriptAnswer | undefined;
+  if (text === undefined) return undefined;
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
-    return undefined satisfies ScriptAnswer | undefined;
+    return undefined;
   }
   const decoded = Schema.decodeUnknownResult(AnswerSchema)(raw);
-  if (Result.isFailure(decoded)) return undefined satisfies ScriptAnswer | undefined;
+  if (Result.isFailure(decoded)) return undefined;
   const { route, why, unsure } = decoded.success;
   if (route !== undefined && unsure === undefined)
     return { kind: 'route', route, ...(why === undefined ? {} : { why }) } satisfies ScriptAnswer | undefined;
   if (unsure !== undefined && route === undefined) return { kind: 'unsure', unsure } satisfies ScriptAnswer | undefined;
-  return undefined satisfies ScriptAnswer | undefined;
+  return undefined;
 }
 
 /**
@@ -89,5 +89,5 @@ export const scriptCloseouts =
         | undefined;
     if (read?.kind === 'blocked')
       return { outcome: 'blocked', summary: summaryLine(read.unsure), artifacts: [], needs: read.unsure } satisfies Closeout | undefined;
-    return undefined satisfies Closeout | undefined;
+    return undefined;
   };

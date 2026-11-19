@@ -402,16 +402,16 @@ function fileText(given: string) {
  * refused where it is not there (`Invalid`); none of them refused as the command line refuses it.
  */
 function choiceOf(args: Args) {
-  if (args.ours === true) return 'ours';
-  if (args.theirs === true) return 'theirs';
+  if (args.ours === true) return 'ours' satisfies Choice as Choice;
+  if (args.theirs === true) return 'theirs' satisfies Choice as Choice;
   const text = textOf(args, 'text');
-  if (text !== undefined) return { text };
+  if (text !== undefined) return { text } satisfies Choice as Choice;
   const file = textOf(args, 'file');
   if (file === undefined)
     throw new Invalid({
       message: FACTORY_RESOLVE_WORDS.spec.oneWay ?? 'nemia factory resolve takes one choice: --ours, --theirs, --text or --file.',
     });
-  return { text: fileText(file) };
+  return { text: fileText(file) } satisfies Choice as Choice;
 }
 
 /**

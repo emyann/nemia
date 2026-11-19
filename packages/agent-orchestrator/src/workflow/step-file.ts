@@ -635,7 +635,7 @@ function checkPolicyOf(step: string, text: string | undefined, check: string | u
  * spec carries it — `judge`, the JSON text `readKeys` keeps of its map, or the map in YAML flow. Undefined for none.
  */
 function routeDrafted(step: string, drafted: unknown) {
-  if (drafted == null) return undefined satisfies RouteEval | undefined as RouteEval | undefined;
+  if (drafted == null) return undefined;
   if (typeof drafted === 'object' && 'kind' in drafted)
     return drafted as RouteEval satisfies RouteEval | undefined as RouteEval | undefined;
   if (typeof drafted !== 'string') return routeOf(step, JSON.stringify(drafted)) satisfies RouteEval | undefined as RouteEval | undefined;

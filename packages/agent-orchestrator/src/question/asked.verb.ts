@@ -112,7 +112,7 @@ export const answerFlag = (verb: 'retry' | 'approve') =>
  */
 export const typedOf = (args: Args) => {
   const value = args.answer;
-  return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  return (Array.isArray(value) ? value : typeof value === 'string' ? [value] : []) satisfies readonly string[] as readonly string[];
 };
 
 /**

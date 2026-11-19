@@ -114,7 +114,7 @@ const sorted = (names: Iterable<string>) => [...new Set(names)].sort() satisfies
 
 /** The hires `was` becomes as `now`, by step in order: each added, dropped, or given another agent. */
 function hireChanges(was: Hires, now: Hires) {
-  return sorted([...Object.keys(was), ...Object.keys(now)]).flatMap((step) => {
+  return sorted([...Object.keys(was), ...Object.keys(now)]).flatMap<HireChange>((step) => {
     const before = was[step];
     const after = now[step];
     if (before === undefined && after !== undefined) return [{ step, kind: 'added', now: after }] satisfies HireChange[];

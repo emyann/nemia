@@ -62,7 +62,7 @@ export function readStanding(home: string) {
   try {
     text = fs.readFileSync(standingFile(home), 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined satisfies StandingFile | undefined as StandingFile | undefined;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
   let json: unknown;

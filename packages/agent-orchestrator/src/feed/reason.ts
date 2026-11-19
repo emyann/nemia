@@ -160,7 +160,7 @@ export type Reason = keyof typeof REASONS;
 export const REASON_CODES = Object.keys(REASONS) as readonly Reason[];
 
 /** What the table says of one reason, read as the one shape every entry has. */
-const entryOf = (reason: Reason) => REASONS[reason];
+const entryOf = (reason: Reason) => REASONS[reason] satisfies Entry as Entry;
 
 /**
  * How serious a reason is, by the table: what a line's `type` says.

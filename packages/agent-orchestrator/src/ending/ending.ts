@@ -129,7 +129,7 @@ export function landingDue(
   merge: () => MergeState | { readonly unread: string },
 ) {
   const settled = landingSettled(step, run, phaseOf);
-  if (!settled) return undefined satisfies Landing | undefined;
+  if (!settled) return undefined;
   const { check } = settled;
   const ended = SETTLED.has(settled.session) && (TRIED_FROM.has(own) || own === 'budget exhausted');
   const nothing = ended
@@ -139,7 +139,7 @@ export function landingDue(
   const read = merge();
   if ('unread' in read) return { act: 'wait', why: read.unread } satisfies Landing | undefined;
   const { merging, conflicted, missing, tip } = read;
-  if (merging === 'other') return undefined satisfies Landing | undefined;
+  if (merging === 'other') return undefined;
   const ours = merging === 'ours';
   const onHead = !ours && merging === 'none' && missing.length === 0;
   const end = (why: string, refused: { refusedOn?: string } = {}) =>
@@ -340,17 +340,16 @@ export function toDecide(
   statusOf: (step: string) => StepStatus,
   standings: readonly BranchStanding[] = [],
 ) {
-  if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined satisfies ToDecide | undefined;
+  if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
   const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
   if (waiting && !run.pruned) {
-    if (approvedFirst(waiting, run) && !run.steps[waiting.name]?.taskId && resultOnBase(standings))
-      return undefined satisfies ToDecide | undefined;
+    if (approvedFirst(waiting, run) && !run.steps[waiting.name]?.taskId && resultOnBase(standings)) return undefined;
     const filed = Boolean(run.steps[waiting.name]?.taskId);
     return { kind: 'approve', step: waiting.name, says: filed ? null : firstLine(ownNote(waiting)) || null, filed } satisfies
       | ToDecide
       | undefined;
   }
-  if (status !== 'succeeded' || merges(steps)) return undefined satisfies ToDecide | undefined;
+  if (status !== 'succeeded' || merges(steps)) return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
   return (ahead.length ? { kind: 'result', branches: ahead } : undefined) satisfies ToDecide | undefined;
 }

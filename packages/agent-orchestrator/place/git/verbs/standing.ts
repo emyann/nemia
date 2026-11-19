@@ -18,7 +18,7 @@
  * rest. A git older than 2.41 lists no distance at all: each branch is then asked one by one. Refuses a repository git cannot list and,
  * where a branch is asked of, a `base` git cannot read.
  */
-import { Failed, git, gitSays, isDirectory, refused } from '../git.ts';
+import { Failed, git, gitSays, isDirectory, refused, type Asking } from '../git.ts';
 import type { BranchStood, PlaceRequests } from '../../../src/place/place.ts';
 
 /** A branch asked of: its name, the tip its run recorded, the commit its run was cut at, and what was last read of it. */
@@ -102,14 +102,21 @@ function* stoodOne(repo: string, base: string, one: Asked, listed: Listing) {
 function* listed(repo: string, base: string, asked: readonly Asked[]) {
   const bases = [...new Set([base, ...asked.filter((a) => !a.known).map((a) => a.baseRef)])];
   const whole = yield* listing(repo, bases);
-  if (whole) return whole;
+  if (whole) return whole satisfies Listing | string as Listing | string;
   const bare = yield* listing(repo, []);
-  if (!bare) return `git cannot list the branches of ${repo}: it is no git repository, or git cannot read it`;
+  if (!bare)
+    return `git cannot list the branches of ${repo}: it is no git repository, or git cannot read it` satisfies Listing | string as
+      | Listing
+      | string;
   if ((yield* gitSays(repo, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])) === undefined)
-    return `git cannot read ${base} in ${repo}, the base the branches are asked of: is it a branch of that repository?`;
+    return `git cannot read ${base} in ${repo}, the base the branches are asked of: is it a branch of that repository?` satisfies
+      | Listing
+      | string as Listing | string;
   const readable = new Set(((yield* gitSays(repo, ['rev-list', '--no-walk', '--ignore-missing', ...bases.slice(1)])) ?? '').split('\n'));
   const without = bases.filter((b, i) => i === 0 || readable.has(b));
-  return (without.length < bases.length ? yield* listing(repo, without) : undefined) ?? { heads: bare.heads, ahead: new Map() };
+  return ((without.length < bases.length ? yield* listing(repo, without) : undefined) ?? { heads: bare.heads, ahead: new Map() }) satisfies
+    | Listing
+    | string as Listing | string;
 }
 
 /** The verb's body. */

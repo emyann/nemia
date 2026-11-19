@@ -146,7 +146,7 @@
     },
     {
       "term": "Commands",
-      "meaning": "a Factory's sub-resource at `/api/factories/<name>/commands`: the lines a person types for it, built off the command table — attach, rm, add, schedule, trust, volume — and the line that takes back each schedule, by workflow, and each volume, by name (`FactoryCommands`, `packages/objects/src/factory.ts`).",
+      "meaning": "a Factory's sub-resource at `/api/factories/<name>/commands`: the lines a person types for it, built off the command table — attach, rm, add, schedule, trust, volume — the line that takes back each schedule, by workflow, and each volume, by name, and, where the factory has a home, the line that opens a person's own session there (`home`) (`FactoryCommands`, `packages/objects/src/factory.ts`).",
       "type": "FactoryCommands"
     },
     {

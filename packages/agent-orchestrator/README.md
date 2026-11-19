@@ -3622,7 +3622,9 @@ cache under that digest and starts the person's session there, their repository 
 glossary). Nothing of the store is written, and the live tree is never handed out to edit: a home changes by a proposal.
 
 Each volume has two switches, the person's (`nemia factory volume add <factory> <path|url>:ro|:rw --claude-md on|off --skills on|off`,
-kept by an add that names none, and refused in a proposal as every volume is): `claudeMd`, off by default, loads the volume's
+kept by an add that names none; or one set without giving the volume again, by its stored name, by `nemia factory volume set <factory>
+<volume> --claude-md on|off --skills on|off`, the Volume's PATCH, which the board's switches send, decided by `volumeSwitched`
+(`contracts/volume-switch.contract.ts`); refused in a proposal as every volume is): `claudeMd`, off by default, loads the volume's
 CLAUDE.md files into the sessions that start in the home (Claude Code's `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`, one switch for
 every added folder, so each other added folder is named in the settings' `claudeMdExcludes`, beside the step's own, which Claude Code
 skips, measured in `packages/agent-runtime/docs/harness.md`; a step whose settings are a file, which nothing rewrites, loads no added

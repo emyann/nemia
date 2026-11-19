@@ -117,7 +117,7 @@
     },
     {
       "term": "Volume switch",
-      "meaning": "what a factory's volume gives the sessions that start in the factory's home, a person's setting on the volume in the factory's own file that no proposal changes: `claudeMd`, whether its CLAUDE.md files load (off by default), and `skills`, whether the skills of its `.claude/skills` are offered beside a step's own (on by default), each set by `nemia factory volume add <factory> <path|url>:ro|:rw --claude-md on|off --skills on|off` and kept by an add that names none (`withVolume`, `packages/agent-orchestrator/src/factory/volume/volume.ts`). A run freezes them at start, a switch left at its default unwritten (`switchesOf`, `packages/agent-orchestrator/src/factory/factory.ts`).",
+      "meaning": "what a factory's volume gives the sessions that start in the factory's home, a person's setting on the volume in the factory's own file that no proposal changes: `claudeMd`, whether its CLAUDE.md files load (off by default), and `skills`, whether the skills of its `.claude/skills` are offered beside a step's own (on by default), each set by `nemia factory volume add <factory> <path|url>:ro|:rw --claude-md on|off --skills on|off` and kept by an add that names none (`withVolume`, `packages/agent-orchestrator/src/factory/volume/volume.ts`), or set alone by `nemia factory volume set <factory> <volume> --claude-md on|off --skills on|off`, the Volume's PATCH, the other kept (`volumeSwitched`, `packages/agent-orchestrator/src/factory/volume/volume.ts`). A run freezes them at start, a switch left at its default unwritten (`switchesOf`, `packages/agent-orchestrator/src/factory/factory.ts`).",
       "type": "VolumeSwitches"
     },
     {

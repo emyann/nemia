@@ -87,6 +87,7 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['factory server add', 'cli'],
       ['factory server rm', 'cli'],
       ['factory volume add', 'cli'],
+      ['factory volume set', 'typed'],
       ['factory volume rm', 'cli'],
       ['factory setting set', 'typed'],
       ['factory setting rm', 'typed'],

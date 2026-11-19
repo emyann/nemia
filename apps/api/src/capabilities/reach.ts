@@ -220,45 +220,12 @@ function stepReach(
           : `Its tools have no \`Skill\`, so it cannot load a skill — its session still lists the repository's skills (measured, ${measuredTools.harness} ${measuredTools.version}).`,
       };
 
-  const standing: string[] = [];
-  const takenBack: StepReachAllowed['takenBack'][number][] = [];
-  const askedBack: StepReachAllowed['asked'][number][] = [];
-  const unused: string[] = [];
-  for (const { rule } of capabilities.allowed) {
-    const by = takenBackBy(rule, denied);
-    const asks = by ? undefined : takenBackBy(rule, asked);
-    const tool = ruleOf(rule)?.tool;
-    if (by) takenBack.push({ rule, by });
-    else if (asks) askedBack.push({ rule, by: asks });
-    else if (tool !== undefined && !has(tool)) unused.push(rule);
-    else standing.push(rule);
-  }
   const narrowerAsks = (rule: string) => narrowerRules(rule, asked).filter((ask) => !takenBackBy(ask, denied));
-  const bashTaken = removed.find((r) => r.name === 'Bash');
-  const hasBash = names.includes('Bash');
-  const allowed: StepReachAllowed = {
-    rules: standing,
-    takenBack,
-    asked: askedBack,
-    unused,
-    bash: hasBash
-      ? standing.flatMap((rule) => {
-          const r = ruleOf(rule);
-          if (r?.tool !== 'Bash') return [];
-          return [{ rule, command: r.scope ?? '*', except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }];
-        })
-      : [],
-    exceptions: standing
-      .map((rule) => ({ rule, except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }))
-      .filter((e) => e.except.length > 0 || e.asks.length > 0),
+  const allowed = allowedOf(rules, capabilities.allowed, { denied, asked, has, narrowerAsks }, names.includes('Bash'), {
     dontAsk,
     askDenier,
-    why: hasBash
-      ? null
-      : bashTaken
-        ? `\`Bash\` is denied by ${bashTaken.rule} (${bashTaken.source}), so it runs no command, whatever the settings allow.`
-        : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.',
-  };
+    bashTaken: removed.find((r) => r.name === 'Bash'),
+  });
 
   const covering = (rules: readonly CapabilityRule[], command: string) =>
     rules.find((d) => {
@@ -293,6 +260,67 @@ function stepReach(
     asked,
     allowed,
     readOnly,
+  };
+}
+
+/**
+ * What the settings' allow rules give a Claude Code step (objects' `StepReachAllowed`): deny, then ask, then allow, each allow rule taken
+ * back by the first deny or ask rule that matches the whole of it, or unused where its tool is not the step's.
+ * @param rules The harness's rules, which match a rule against another.
+ * @param allow The settings' allow rules, in their order.
+ * @param over The deny and ask rules that hold for the step, whether it has a tool, and the narrower ask rules under a rule.
+ * @param hasBash Whether the step has Bash, without which no Bash rule stands as a command.
+ * @param mode Whether the step runs in `dontAsk`, why what asks is denied, and the deny that took Bash, if one did.
+ */
+function allowedOf(
+  { ruleOf, takenBackBy, narrowerRules }: ClaudeRules,
+  allow: readonly CapabilityRule[],
+  over: {
+    denied: readonly CapabilityRule[];
+    asked: readonly CapabilityRule[];
+    has: (tool: string) => boolean;
+    narrowerAsks: (rule: string) => string[];
+  },
+  hasBash: boolean,
+  mode: { dontAsk: boolean; askDenier: StepReachAllowed['askDenier']; bashTaken: RemovedTool | undefined },
+): StepReachAllowed {
+  const { denied, asked, has, narrowerAsks } = over;
+  const standing: string[] = [];
+  const takenBack: Array<StepReachAllowed['takenBack'][number]> = [];
+  const askedBack: Array<StepReachAllowed['asked'][number]> = [];
+  const unused: string[] = [];
+  for (const { rule } of allow) {
+    const by = takenBackBy(rule, denied);
+    const asks = by ? undefined : takenBackBy(rule, asked);
+    const tool = ruleOf(rule)?.tool;
+    if (by) takenBack.push({ rule, by });
+    else if (asks) askedBack.push({ rule, by: asks });
+    else if (tool !== undefined && !has(tool)) unused.push(rule);
+    else standing.push(rule);
+  }
+  const { bashTaken } = mode;
+  return {
+    rules: standing,
+    takenBack,
+    asked: askedBack,
+    unused,
+    bash: hasBash
+      ? standing.flatMap((rule) => {
+          const r = ruleOf(rule);
+          if (r?.tool !== 'Bash') return [];
+          return [{ rule, command: r.scope ?? '*', except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }];
+        })
+      : [],
+    exceptions: standing
+      .map((rule) => ({ rule, except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }))
+      .filter((e) => e.except.length > 0 || e.asks.length > 0),
+    dontAsk: mode.dontAsk,
+    askDenier: mode.askDenier,
+    why: hasBash
+      ? null
+      : bashTaken
+        ? `\`Bash\` is denied by ${bashTaken.rule} (${bashTaken.source}), so it runs no command, whatever the settings allow.`
+        : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.',
   };
 }
 

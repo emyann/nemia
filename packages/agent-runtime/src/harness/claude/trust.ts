@@ -1,7 +1,7 @@
 /**
  * Claude Code's trust of a folder: the trust a person gives by running Claude Code there once and accepting the prompt, kept per path in
  * its `.claude.json` as `projects["<path>"].hasTrustDialogAccepted`. Read by `claudeTrusts`, and written by `claudeTrust`, which sets
- * that one key, and `claudeUntrust`, which removes the entries of a folder Nemia made and is removing, each leaving every other key as
+ * that one key, and `claudeUntrust`, which removes the entries of a folder its caller made and is removing, each leaving every other key as
  * it was and replacing the file only while it holds what was read: the file is Claude Code's, rewritten by every session on the machine.
  */
 import type { ClaudeKeyUnder } from '../../../contracts/trust-taken-back.contract.ts';
@@ -167,7 +167,7 @@ export function claudeTrust(key: string, file: string = claudeConfigFile(), read
  * @param key A key of a `.claude.json`'s `projects`, as written.
  * @param folder The folder taken back, resolved.
  */
-export const claudeKeyUnder: ClaudeKeyUnder = (key, folder) => key === folder || key.startsWith(`${folder}/`);
+export const claudeKeyUnder: ClaudeKeyUnder = (key, folder) => key === folder || key.startsWith(folder + '/');
 
 /** What `claudeUntrustText` answers: no record under the folder, the text without them and the keys it took, or why it cannot be read. */
 type UntrustText = { readonly none: true } | { readonly text: string; readonly took: readonly string[] } | { readonly unread: string };

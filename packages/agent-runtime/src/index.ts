@@ -212,7 +212,7 @@ export { REMOTE_DECLARATION } from './a2a/vocabulary.ts';
 export { ADDED_FOLDER_READS, addedFolderReadsOf, CONFIG_FOLDERS, configFolderIn, type AddedFolderReads } from './harness/config-folders.ts';
 /**
  * A harness's trust of a folder, off its own file: whether it is given (`trustedFolder`), what it is in a person's words
- * (`folderTrust`), the act of giving it (`trustFolder`), and of taking it back from a folder Nemia made and every folder inside it
+ * (`folderTrust`), the act of giving it (`trustFolder`), and of taking it back from a folder its caller made and every folder inside it
  * (`untrustFolder`); each `undefined` for a harness that keeps none.
  */
 export {

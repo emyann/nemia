@@ -251,7 +251,8 @@ describe('untrustFolder: the records of a folder and of every folder inside it a
       check: () => {
         const file = configWith(BESIDE);
         const bytes = fs.readFileSync(file);
-        assert.deepEqual(untrustFolder('claude', HOME, file), { took: [], refused: null });
+        const taken = untrustFolder('claude', HOME, file);
+        assert.deepEqual([taken?.took, taken?.refused, taken?.file], [[], null, file]);
         assert.ok(fs.readFileSync(file).equals(bytes));
       },
     },
@@ -259,7 +260,8 @@ describe('untrustFolder: the records of a folder and of every folder inside it a
       name: 'a file that is not there is left not there',
       check: () => {
         const none = path.join(scratch('ae-trust-'), '.claude.json');
-        assert.deepEqual(untrustFolder('claude', HOME, none), { took: [], refused: null });
+        const taken = untrustFolder('claude', HOME, none);
+        assert.deepEqual([taken?.took, taken?.refused, taken?.file], [[], null, none]);
         assert.equal(fs.existsSync(none), false);
       },
     },

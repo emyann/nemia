@@ -1,7 +1,7 @@
 /**
  * A harness's trust of a folder: whether it trusts one (`trustedFolder`, for a caller that refuses to file a background session where
  * its spawn would be refused), what that trust is in a person's words (`folderTrust`), the act of giving it (`trustFolder`), and the
- * act of taking it back from a folder Nemia made and is removing, with every folder inside it (`untrustFolder`). Each answers
+ * act of taking it back from a folder its caller made and is removing, with every folder inside it (`untrustFolder`). Each answers
  * `undefined` for a harness that keeps no trust of a folder, which is given nothing.
  */
 import os from 'node:os';
@@ -106,7 +106,7 @@ export type FolderUntrusted = {
 
 /**
  * Takes back harness `harness`'s trust of the folder `dir` and of every folder inside it, by removing their records from the harness's
- * own file (`file`, its default when absent): for a folder Nemia made and is removing, such as a run's home, so the file does not grow
+ * own file (`file`, its default when absent): for a folder its caller made and is removing, such as a run's home, so the file does not grow
  * with every run. Refused, nothing written, where `dir` is the home directory or a folder holding it, whose records are a person's.
  * `undefined`, and nothing written, for a harness that keeps no trust of a folder.
  * @param harness The harness's name.
@@ -122,7 +122,7 @@ export function untrustFolder(harness: string, dir: string, file?: string): Fold
       harness: 'Claude Code',
       file: at,
       took: [],
-      refused: `${folder} holds the home directory, whose records in ${at} are a person's: name the folder Nemia made, inside it`,
+      refused: `${folder} holds the home directory, whose records in ${at} are a person's: name the folder you made, inside it`,
     };
   return { harness: 'Claude Code', file: at, ...claudeUntrust(folder, at) };
 }

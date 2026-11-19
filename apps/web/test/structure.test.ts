@@ -247,7 +247,7 @@ const KIND_NAMES: ReadonlySet<string> = new Set(KINDS.flatMap((kind) => [kind, `
 
 /**
  * Each file under `src/lib/api` named `*.gen.ts`, and each declaration of `src` of a Schema named as a kind of `objects`
- * (`KIND_NAMES`): a `const` whose value is built from `Schema` or `decodes`. The board reads a kind through `lib/api/objects.ts`.
+ * (`KIND_NAMES`): a `const` whose value is built from `Schema`. The board reads a kind through `lib/api/objects.ts`.
  */
 function kindSchemaBreaks(texts: ReadonlyMap<string, string>): string[] {
   const out: string[] = [];
@@ -261,7 +261,7 @@ function kindSchemaBreaks(texts: ReadonlyMap<string, string>): string[] {
         ts.isIdentifier(node.name) &&
         KIND_NAMES.has(node.name.text) &&
         node.initializer !== undefined &&
-        /^(?:Schema\.|decodes\b)/.test(node.initializer.getText(source))
+        /^Schema\./.test(node.initializer.getText(source))
       )
         out.push(
           `${file} declares a Schema ${node.name.text}, a kind of objects: import its Schema from 'objects' and read it through lib/api/objects.ts`,
@@ -287,7 +287,7 @@ test('REFUSED: a generated file under lib/api, and a Schema of src named as a ki
     'a RunSchema',
   );
   assert.equal(
-    planted('src/lib/api/y.ts', 'const Run = Schema.Struct({});\nconst CardList = decodes<X>()(Schema.Struct({}));\n').length,
+    planted('src/lib/api/y.ts', 'const Run = Schema.Struct({});\nconst CardList = Schema.Array(Schema.Struct({}));\n').length,
     2,
   );
   assert.deepEqual(

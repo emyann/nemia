@@ -4,7 +4,6 @@
  */
 import { Schema, Struct } from 'effect';
 import { DEFINITION_ORIGINS, STEP_KEYS, StepKeys, type CardSkill, type DefinitionOrigin } from 'objects';
-import { decodes } from './decodes.ts';
 
 /** One thing an agent says it can do, in the A2A protocol's words: `objects`' `CardSkill`. */
 export type AgentSkill = CardSkill;
@@ -90,7 +89,7 @@ export const StepKeySchema = Schema.Literals(STEP_KEYS);
 export const WorkflowStepSpecSchema = Schema.Struct(Struct.map(StepKeys.schema.fields, Schema.requiredKey));
 
 /** Decodes the keys a step takes from an agent, each only where the agent sets it (`KeyForm.agents`). */
-export const StepSpecPartSchema = decodes<Partial<WorkflowStepSpec>>()(WorkflowStepSpecSchema.mapFields(Struct.map(Schema.optionalKey)));
+export const StepSpecPartSchema = WorkflowStepSpecSchema.mapFields(Struct.map(Schema.optionalKey));
 
 /** One key of a card or a step, as its page lays them out: `objects`' `KeyRow`. */
 export type { KeyRow } from 'objects';

@@ -1,9 +1,10 @@
 /**
- * A person's targets set beside the stories they are for: `shoot.ts --targets <dir>` reads the folder's
+ * A person's targets set beside the stories they are for: `changed.ts --targets <dir>` reads the folder's
  * `target-<story id>[-light|-dark].png` (`targetsOf`; a name with no theme is for both, every other file ignored), pairs each with
- * the story's picture at the head (`matchesOf`, which names the targets whose story no story file holds, with the nearest ids), and
+ * the story's approved picture at the head (`matchesOf`: the dark one, and the light one of a light canary; it names the targets whose
+ * story no story file holds, with the nearest ids, and a light target of a story that is no canary, which has no light picture), and
  * composes each pair into one picture (`composeMatch`): the target on the left, the story on the right, scaled to one height, each
- * captioned, on the board's ground, in the Chromium `shoot.ts` already runs.
+ * captioned, on the board's ground.
  */
 import fs from 'node:fs';
 import type { Browser } from 'playwright';
@@ -33,7 +34,10 @@ export const targetsOf = (names: readonly string[]): Target[] =>
     return [{ file, id, themes: theme === 'light' || theme === 'dark' ? [theme] : THEMES }];
   });
 
-/** One match: the story and theme, and the file names of the target, the story's picture at the head, and the match written. */
+/**
+ * One match: the story and theme, the target's file name, the story's approved picture at the head (from the board's folder), and the
+ * match written.
+ */
 export type Match = { id: string; theme: Theme; target: string; story: string; match: string };
 
 /** A target whose story id no story holds: its file, and the ids nearest it. */
@@ -56,27 +60,39 @@ const nearestOf = (id: string, known: readonly string[]): string[] =>
   [...known].sort((a, b) => distance(id, a) - distance(id, b) || a.localeCompare(b)).slice(0, 3);
 
 /**
- * Each target of `targets` paired with its story's picture in each theme it is of, one match per story and theme, a target naming its
- * theme winning over one naming none; and each target whose id is none of `known`, with the nearest.
+ * Each target of `targets` paired with its story's approved picture in each theme it is of that the story has one in, one match per
+ * story and theme, a target naming its theme winning over one naming none: the dark picture of every story, the light one of a canary
+ * alone. Beside them, each target whose id is none of `known`, with the nearest, and each target that names the light theme of a story
+ * that is no canary (`lightless`).
  * @param targets The targets read off the folder (`targetsOf`).
  * @param known Every story id of the board.
+ * @param canaries The stories approved in the light theme too (`LIGHT_CANARIES`).
  */
-export function matchesOf(targets: readonly Target[], known: readonly string[]): { matches: Match[]; unknown: Unknown[] } {
+export function matchesOf(
+  targets: readonly Target[],
+  known: readonly string[],
+  canaries: readonly string[],
+): { matches: Match[]; unknown: Unknown[]; lightless: string[] } {
   const held = new Set(known);
   const unknown = targets
     .filter((target) => !held.has(target.id))
     .map((target) => ({ file: target.file, nearest: nearestOf(target.id, known) }));
+  const lightless = targets
+    .filter((target) => held.has(target.id) && target.themes.length === 1 && target.themes[0] === 'light' && !canaries.includes(target.id))
+    .map((target) => target.file);
   const chosen = new Map<string, Match>();
   for (const target of targets) {
     if (!held.has(target.id)) continue;
     for (const theme of target.themes) {
+      if (theme === 'light' && !canaries.includes(target.id)) continue;
       const key = `${target.id}-${theme}`;
       if (chosen.has(key) && target.themes.length > 1) continue;
-      chosen.set(key, { id: target.id, theme, target: target.file, story: `story-${key}.png`, match: `match-${key}.png` });
+      const story = `test/approved/${theme === 'light' ? 'light/' : ''}${target.id}.png`;
+      chosen.set(key, { id: target.id, theme, target: target.file, story, match: `match-${key}.png` });
     }
   }
   const matches = [...chosen.values()].sort((a, b) => a.id.localeCompare(b.id) || THEMES.indexOf(a.theme) - THEMES.indexOf(b.theme));
-  return { matches, unknown };
+  return { matches, unknown, lightless };
 }
 
 /** A PNG's width and height, read off its header. */

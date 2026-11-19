@@ -41,8 +41,10 @@ export const LOOK_RUNS: readonly LookRun[] = [
     what: 'stories',
     command: 'npm',
     args: ['run', 'stories'],
-    said: 'every story in Chromium, its render, its play function and axe (npm run stories)',
-    again: 'run them again from apps/web, npm run stories, or one file, npx vitest run --project=storybook <file>.stories.tsx',
+    said: 'every story in Chromium, its render, its play function, axe and its approved picture, in the pinned place (npm run stories)',
+    again:
+      'run them again from apps/web, npm run stories -- <file>.stories.tsx; a story whose picture differs leaves its reference, actual ' +
+      'and diff in .vitest/attachments/approved, and npm run stories -- --update <file>.stories.tsx approves a change you meant',
   },
 ];
 

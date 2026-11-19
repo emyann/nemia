@@ -239,17 +239,32 @@ test('the e2e visits every page once, in the dark theme, and pictures none, unle
   assert.deepEqual(picturedOf(plan), []);
 });
 
-test('--photos visits every page in light, then dark, and pictures each', () => {
+test('--photos visits every page in the dark theme alone, and pictures each; --light visits light first and pictures it too', () => {
   const plan = planOf(['--photos'], ABC);
   assert.deepEqual(namesOf(plan.visit), ['a', 'b', 'c']);
-  assert.deepEqual(plan.themes, ['light', 'dark']);
+  assert.deepEqual(plan.themes, ['dark']);
   assert.deepEqual(picturedOf(plan), ['a', 'b', 'c']);
+  assert.deepEqual([plan.photos, plan.light], [true, false], 'what run.ts hands its workers');
+  const light = planOf(['--photos', '--light'], ABC);
+  assert.deepEqual(light.themes, ['light', 'dark']);
+  assert.deepEqual(picturedOf(light), ['a', 'b', 'c']);
+  assert.deepEqual([light.photos, light.light], [true, true]);
+  assert.deepEqual(planOf(['--light', '--photos', '--pages', 'b'], ABC).themes, ['light', 'dark'], 'in either order of the flags');
+});
+
+test('REFUSED: --light without --photos, which pictures nothing', () => {
+  for (const argv of [['--light'], ['--light', '--pages', 'b'], ['--look', '--light']])
+    assert.throws(
+      () => planOf(argv, ABC),
+      (e: Error) => e instanceof Error && e.message.includes('--photos'),
+      argv.join(' '),
+    );
 });
 
 test('--pages visits only the pages named, in the order of the pages, and --photos pictures only those', () => {
   const photos = planOf(['--photos', '--pages', 'b'], ABC);
   assert.deepEqual(namesOf(photos.visit), ['b'], 'a page reads only the seed and what it writes itself: no page before it is visited');
-  assert.deepEqual(photos.themes, ['light', 'dark']);
+  assert.deepEqual(photos.themes, ['dark']);
   assert.deepEqual(picturedOf(photos), ['b']);
   const named = planOf(['--pages', 'c,a'], ABC);
   assert.deepEqual(namesOf(named.visit), ['a', 'c'], 'in the order of the pages, not of the names, and b left out');
@@ -258,8 +273,9 @@ test('--pages visits only the pages named, in the order of the pages, and --phot
   assert.deepEqual(picturedOf(planOf(['--pages', 'a,c', '--photos'], ABC)), ['a', 'c'], 'in either order of the flags');
 });
 
-test('--contrast measures what --photos pictures, and is refused without it, saying to add --photos', () => {
+test('--contrast measures what --photos pictures, in light then dark, and is refused without it, saying to add --photos', () => {
   assert.equal(planOf(['--photos', '--contrast'], ABC).measured, true);
+  assert.deepEqual(planOf(['--photos', '--contrast'], ABC).themes, ['light', 'dark'], 'the measure reads both schemes');
   assert.deepEqual(planOf(['--contrast', '--photos', '--pages', 'b'], ABC).themes, ['light', 'dark']);
   assert.equal(planOf(['--photos'], ABC).measured, false);
   assert.equal(planOf([], ABC).measured, false);
@@ -347,15 +363,11 @@ test('REFUSED: --pages with no page after it', () => {
 test('REFUSED: a flag the e2e does not know', () => {
   assert.throws(
     () => planOf(['--colour'], ABC),
-    (e: Error) =>
-      /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not --colour\b/.test(
-        e.message,
-      ),
+    (e: Error) => e instanceof Error && e.message.includes('--colour') && e.message.includes('--light'),
   );
   assert.throws(
     () => planOf(['b'], ABC),
-    (e: Error) =>
-      /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not b\b/.test(e.message),
+    (e: Error) => e instanceof Error && e.message.includes('not b:'),
   );
 });
 

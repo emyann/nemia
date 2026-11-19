@@ -57,7 +57,7 @@ function refuse(why: string): never {
  * @param files The plan folder's entries: each file's name there, and a markdown file's text.
  * @param where What a refusal calls the folder; `the plan folder` when absent.
  */
-export function parsePlan(files: readonly PlanFile[], where = 'the plan folder'): Card[] {
+export function parsePlan(files: readonly PlanFile[], where = 'the plan folder') {
   const stray = files
     .map((f) => f.file)
     .filter((f) => !f.endsWith('.md') && !isReadme(f))
@@ -81,7 +81,7 @@ export function parsePlan(files: readonly PlanFile[], where = 'the plan folder')
 }
 
 /** One card, from its file's text. */
-function parseCard(file: string, text: string): Card {
+function parseCard(file: string, text: string) {
   const { block, body } = splitFrontmatter(file, text);
   const keys = block === null ? {} : readCardKeys(file, block);
   if (keys.workflow === undefined) {
@@ -98,7 +98,7 @@ function parseCard(file: string, text: string): Card {
  * @param file The card's file name, as a refusal names it.
  * @param body Everything below the card's frontmatter.
  */
-export function bodyOf(file: string, body: string): string {
+export function bodyOf(file: string, body: string) {
   if (!body)
     refuse(
       `${file}: the body is empty. A card's body is its run's brief — what the run is asked to do — and a card with nothing to ask is not a card. Write it below the frontmatter.`,
@@ -107,7 +107,7 @@ export function bodyOf(file: string, body: string): string {
 }
 
 /** A card's `after:`, as the cards it names — refused when it names none, or one twice. `[]` for a card with no `after:`. */
-function afterOf(file: string, after: string | undefined): string[] {
+function afterOf(file: string, after: string | undefined) {
   const names =
     after === undefined
       ? []
@@ -144,7 +144,7 @@ export type StartCard = { file: string; workflow?: string; after: string[]; body
  * @param text The file's whole text.
  * @param after The run ids `nemia start` was given by `--after`; empty when it was given none.
  */
-export function cardToStart(file: string, text: string, after: readonly string[]): StartCard | null {
+export function cardToStart(file: string, text: string, after: readonly string[]) {
   let split: { block: string | null; body: string };
   try {
     split = splitFrontmatter(file, text);
@@ -173,11 +173,11 @@ const KEY_WORD = /^[A-Za-z][\w-]*$/;
  * What `nemia start` says of `key` in the frontmatter of `file`, a key a plan's card lacks: that the block is read as a card's, never as
  * the brief, and the fix — the inbox, whose cards read their keys, else the line or the block deleted.
  */
-const startUnknown = (file: string, key: string): string =>
+const startUnknown = (file: string, key: string) =>
   `${file}: \`${key}\` is not a key a plan's card has: nemia start reads a file that opens with a frontmatter block as a plan's card, whose keys are ${CARD_KEYS.join(' and ')}, and never takes the block into its brief. If they are an inbox card's keys, file it in the inbox, whose cards read them: nemia inbox add ${file}, then nemia start the card it files (nemia inbox --help). Else delete the line, or the whole block to start the file as a brief.`;
 
 /** A card's frontmatter as key → value: every line a key a card has, set once, to something. */
-function readCardKeys(file: string, block: string): Partial<Record<CardKey, string>> {
+function readCardKeys(file: string, block: string) {
   return frontmatterKeys(file, block, CARD_KEYS, (key) =>
     key === 'repo'
       ? `${file}: \`repo\` is not a key a plan's card has: a plan works on one repository, the one nemia start <folder> --repo <r> is given, and a card started by hand works on nemia start's --repo. \`repo:\` is an inbox card's — delete the line, or file the idea in the inbox: nemia inbox add <file> --repo <r>.`
@@ -195,12 +195,7 @@ function readCardKeys(file: string, block: string): Partial<Record<CardKey, stri
  * @param keys The keys a card of its kind has.
  * @param unknown The words of the refusal of a key not in `keys`, given that key.
  */
-export function frontmatterKeys<K extends string>(
-  file: string,
-  block: string,
-  keys: readonly K[],
-  unknown: (key: string) => string,
-): Partial<Record<K, string>> {
+export function frontmatterKeys<K extends string>(file: string, block: string, keys: readonly K[], unknown: (key: string) => string) {
   const read: Partial<Record<K, string>> = {};
   for (const entry of readFrontmatter(file, block).entries) {
     const { key } = entry;
@@ -226,7 +221,7 @@ export function frontmatterKeys<K extends string>(
  * wait on each other, named round the cycle — none of them could ever start.
  * @param cards The plan's cards, in any order.
  */
-export function planOrder(cards: readonly Card[]): Card[] {
+export function planOrder(cards: readonly Card[]) {
   const names = new Set(cards.map((c) => c.name));
   for (const card of cards) {
     for (const a of card.after) {
@@ -268,7 +263,7 @@ export function planOrder(cards: readonly Card[]): Card[] {
  * A cycle among cards none of which can go next. Each waits on a card still among them — the plan has every card named, and none names
  * itself — so following the first such parent from any card comes back round.
  */
-function cycleIn(pending: readonly Card[]): Card[] {
+function cycleIn(pending: readonly Card[]) {
   const byName = new Map(pending.map((c) => [c.name, c]));
   const walked: Card[] = [];
   let at: Card | undefined = pending[0];
@@ -288,7 +283,7 @@ export type Planned = { card: Card; runId: string; workflowDir: string };
  * names it, and what it waits on — each card by name, with the run `nemia ls` will name.
  * @param started The cards started, in the order they were started, each with its run.
  */
-export function planLines(started: readonly Planned[]): string[] {
+export function planLines(started: readonly Planned[]) {
   const idOf = new Map(started.map((p) => [p.card.name, p.runId]));
   const cardWidth = Math.max(...started.map((p) => p.card.name.length));
   const runWidth = Math.max(...started.map((p) => p.runId.length));
@@ -302,7 +297,7 @@ export function planLines(started: readonly Planned[]): string[] {
 }
 
 /** A path as a shell reads it back whatever is in it: in single quotes, and a quote inside closed, escaped and opened again. */
-const quoted = (p: string): string => `'${p.replace(/'/g, `'\\''`)}'`;
+const quoted = (p: string) => `'${p.replace(/'/g, `'\\''`)}'`;
 
 /**
  * Why `nemia start <folder>` stopped part-way, and what to do: the card whose `nemia start` refused and its refusal, the runs already
@@ -317,7 +312,7 @@ export function planStopped(
   stopped: { card: Card; why: string; rest: readonly Card[] },
   started: readonly Planned[],
   opts: { dir: string; repo: string; folderOf: (card: Card) => string },
-): string {
+) {
   const idOf = new Map(started.map((p) => [p.card.name, p.runId]));
   const ran = started.length
     ? `The runs it started stand, and the tick files each as its edges allow: ${started.map((p) => `${p.card.name} (${p.runId})`).join(', ')}. Cancel one with nemia cancel <runId>.`

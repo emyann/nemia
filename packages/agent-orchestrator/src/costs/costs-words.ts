@@ -5,18 +5,18 @@
 import type { StepCost, WorkflowCosts } from './costs.ts';
 
 /** An amount in USD, to two decimals. */
-const usd = (amount: number): string => amount.toFixed(2);
+const usd = (amount: number) => amount.toFixed(2);
 
 /** How many, with its noun in the plural past one. */
-const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? '' : 's'}`;
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
 /** A step's line: the median and p90 of what it cost a run, and its tries a run. */
-const stepLine = (s: StepCost, runs: number): string =>
+const stepLine = (s: StepCost, runs: number) =>
   `- ${s.step}: median ${usd(s.median)}, p90 ${usd(s.p90)}; tries a run median ${s.tries.median}, max ${s.tries.max}` +
   (s.runs < runs ? ` (cost measured in ${plural(s.runs, 'run')})` : '');
 
 /** The whole run's line: its cost, over the runs fully measured where that is fewer, and its rounds. */
-function runLine(c: WorkflowCosts): string {
+function runLine(c: WorkflowCosts) {
   const cost =
     c.run.median === null || c.run.p90 === null
       ? 'no run had every session measured'
@@ -30,7 +30,7 @@ function runLine(c: WorkflowCosts): string {
  * most a line per step and three more; or one line saying no run of the workflow has finished in this factory yet.
  * @param c What runs of the workflow cost, over the window of its newest finished runs (`costsOf`).
  */
-export function costsSection(c: WorkflowCosts): string {
+export function costsSection(c: WorkflowCosts) {
   const head = ['', '## What runs of this workflow cost', ''];
   if (!c.runs)
     return [...head, `No run of \`${c.workflow}\` has finished in this factory yet: there is no measured cost to go by.`].join('\n');

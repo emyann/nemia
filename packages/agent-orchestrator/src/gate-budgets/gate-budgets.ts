@@ -53,7 +53,7 @@ export function gateBudgets(
   steps: readonly StepSpec[],
   said: Closeout | { error: string } | undefined,
   spendOf: SpendOf,
-): GateBudgets | undefined {
+) {
   if (!hasGate(step, run)) return undefined;
   const proposed = proposedBudgets(step, said);
   const approval = approvalOf(run, step.name);
@@ -87,7 +87,7 @@ export function gateBudgets(
 type RunBound = { most: number; uncapped: string[] };
 
 /** The run's bound: each step counted at the larger of its cap (here, else in force) and what its tries have cost. */
-function runBound(run: Run, steps: readonly StepSpec[], budgets: readonly GateBudget[], spendOf: SpendOf): RunBound {
+function runBound(run: Run, steps: readonly StepSpec[], budgets: readonly GateBudget[], spendOf: SpendOf) {
   const uncapped: string[] = [];
   let most = 0;
   for (const s of steps) {
@@ -100,13 +100,13 @@ function runBound(run: Run, steps: readonly StepSpec[], budgets: readonly GateBu
 }
 
 /** The bound in words, naming the steps with no cap. */
-const boundWords = ({ most, uncapped }: RunBound): string =>
+const boundWords = ({ most, uncapped }: RunBound) =>
   uncapped.length
     ? `at most ${dollars(most)} under these caps, but for ${uncapped.join(', ')}, which ${uncapped.length > 1 ? 'have' : 'has'} no cap`
     : `at most ${dollars(most)} under these caps`;
 
 /** The sentence of a line passed: the most, the line, the factory that set it and the workflow it is set for. */
-const lineWords = (run: Run, most: number, line: number): string =>
+const lineWords = (run: Run, most: number, line: number) =>
   `at most ${dollars(most)} under these caps passes the cost line of ${dollars(line)} factory ${run.factory ?? 'default'} sets for ${basename(run.workflowDir)}`;
 
 /**
@@ -116,12 +116,7 @@ const lineWords = (run: Run, most: number, line: number): string =>
  * @param said A step's closeout, by its name, or undefined where it has none.
  * @param spendOf What each try of a step has cost, read from its task.
  */
-export const gatesBudgets = (
-  run: Run,
-  steps: readonly StepSpec[],
-  said: (step: string) => Closeout | undefined,
-  spendOf: SpendOf,
-): Record<string, GateBudgets> =>
+export const gatesBudgets = (run: Run, steps: readonly StepSpec[], said: (step: string) => Closeout | undefined, spendOf: SpendOf) =>
   Object.fromEntries(
     steps.flatMap((s) => {
       const at = gateBudgets(run, s, steps, said(s.name), spendOf);

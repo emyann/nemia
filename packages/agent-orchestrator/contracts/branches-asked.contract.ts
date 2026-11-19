@@ -24,7 +24,7 @@ export type RunAsked = {
 };
 
 /** A run whose standings decide something: it cut worktrees, nobody called it off, and it is no longer running. */
-const decides = (r: RunAsked): boolean => r.isolate && !r.cancelled && !r.running;
+const decides = (r: RunAsked) => r.isolate && !r.cancelled && !r.running;
 
 const branchesAskedSpec = spec<(r: RunAsked) => readonly string[]>({
   ensures: {

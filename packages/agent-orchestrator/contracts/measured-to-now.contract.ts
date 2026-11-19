@@ -11,7 +11,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 import type { RunState } from 'objects';
 
 /** Whether `state` is that of a run whose work has not stopped: it waits on a person, or something of it moves. */
-const going = (state: RunState | undefined): boolean => state === 'waiting' || state === 'inFlight';
+const going = (state: RunState | undefined) => state === 'waiting' || state === 'inFlight';
 
 const measuredToNowSpec = spec<(state: RunState | undefined) => boolean>({
   ensures: {

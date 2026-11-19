@@ -16,7 +16,7 @@ import { inventory, open, report, root, standing, status, trial, type Reply } fr
 import { cloned, exported, follow, handoff, initialized, land, make, remove, seal } from './writes.ts';
 import type { Held, World } from './world.ts';
 import { PlaceService, threwWords, unreadNow, type Place } from '../../src/place/place.store.ts';
-import type { PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb } from '../../src/place/place.ts';
+import type { PlaceDeclared, PlaceRequests, PlaceVerb } from '../../src/place/place.ts';
 
 /** Each verb's body, over what the place holds. */
 const VERBS: { readonly [V in PlaceVerb]: (held: Held, request: PlaceRequests[V]) => Reply<V> } = {
@@ -65,9 +65,9 @@ export const declared: PlaceDeclared = {
 export type TestPlace = { readonly place: Place; readonly layer: Layer.Layer<PlaceService>; readonly world: World };
 
 /** A new test place, which holds nothing yet and shares nothing with another. */
-export function testPlace(): TestPlace {
+export function testPlace() {
   const held: Held = { repositories: new Map(), made: 0 };
-  const askNow = <V extends PlaceVerb>(verb: V, request: PlaceRequests[V]): PlaceOutcome<V> => {
+  const askNow = <V extends PlaceVerb>(verb: V, request: PlaceRequests[V]) => {
     try {
       const reply = VERBS[verb](held, request);
       return 'refused' in reply ? { refused: reply.refused } : { answer: reply };

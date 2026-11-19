@@ -16,7 +16,7 @@ export type RunModels = Readonly<Record<string, string>>;
  * a pair with no `=`, a blank step or model, one with a space in it, and a step named twice.
  * @param pairs Each `<step>=<model>` as written.
  */
-export function modelsOf(pairs: readonly string[]): { models: Record<string, string> } | { why: string } {
+export function modelsOf(pairs: readonly string[]) {
   const models: Record<string, string> = {};
   for (const pair of pairs) {
     const at = pair.indexOf('=');
@@ -34,7 +34,7 @@ export function modelsOf(pairs: readonly string[]): { models: Record<string, str
  * The models as a card's `model:` line and `nemia start` say them: `implement=fable, review=opus`.
  * @param models The model of each step, by the step's name.
  */
-export const modelsText = (models: RunModels): string =>
+export const modelsText = (models: RunModels) =>
   Object.entries(models)
     .map(([step, model]) => `${step}=${model}`)
     .join(', ');
@@ -49,7 +49,7 @@ export const modelsText = (models: RunModels): string =>
  * @param models The model of each step named, by the step's name.
  * @param said What named a step's model, as a refusal opens on.
  */
-export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, said: (step: string) => string): string | undefined {
+export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, said: (step: string) => string) {
   for (const [name, model] of Object.entries(models)) {
     const step = steps.find((s) => s.name === name);
     if (!step) return `${said(name)}: the workflow has no step ${name} — its steps are ${steps.map((s) => s.name).join(', ')}.`;
@@ -69,7 +69,7 @@ export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, sai
  * @param steps The workflow's steps.
  * @param models The model of each step named, by the step's name; undefined where none is named.
  */
-export const withModels = <S extends Pick<StepSpec, 'name' | 'model'>>(steps: readonly S[], models: RunModels | undefined): S[] =>
+export const withModels = <S extends Pick<StepSpec, 'name' | 'model'>>(steps: readonly S[], models: RunModels | undefined) =>
   steps.map((s) => {
     const model = models?.[s.name];
     return model === undefined ? s : { ...s, model };

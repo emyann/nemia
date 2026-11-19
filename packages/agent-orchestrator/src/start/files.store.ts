@@ -16,14 +16,14 @@ import { FACTORY_NAME } from '../factory/factory.ts';
 const FILE_ID = new RegExp(`^${FILE_ID_PREFIX}[0-9a-f]{32}$`);
 
 /** The namespace's name as the store keeps it: `default`, or a factory's. */
-const namespaceKept = (namespace: string): boolean => namespace === 'default' || FACTORY_NAME.test(namespace);
+const namespaceKept = (namespace: string) => namespace === 'default' || FACTORY_NAME.test(namespace);
 
 /**
  * The folder the files of `namespace` are kept in, under the store's `files/`.
  * @param home The store's root.
  * @param namespace The namespace, a factory's name or `default`.
  */
-export const filesDir = (home: string, namespace: string): string => path.join(home, 'files', namespace);
+export const filesDir = (home: string, namespace: string) => path.join(home, 'files', namespace);
 
 /**
  * Every file of every namespace last written longer ago than `FILE_KEPT_FOR` before `now`, let go of, its bytes, its record and a part
@@ -31,7 +31,7 @@ export const filesDir = (home: string, namespace: string): string => path.join(h
  * @param home The store's root.
  * @param now The time it is now, in milliseconds.
  */
-export function filesPruned(home: string, now: number): string[] {
+export function filesPruned(home: string, now: number) {
   const root = path.join(home, 'files');
   const gone: string[] = [];
   for (const namespace of fs.existsSync(root) ? fs.readdirSync(root) : []) {
@@ -63,8 +63,8 @@ export type FileBegun = {
  * @param namespace The namespace it is uploaded to.
  * @param now The time it is now, in milliseconds.
  */
-export function fileBegun(home: string, namespace: string, now: number): FileBegun | undefined {
-  if (!namespaceKept(namespace)) return undefined;
+export function fileBegun(home: string, namespace: string, now: number) {
+  if (!namespaceKept(namespace)) return undefined satisfies FileBegun | undefined;
   filesPruned(home, now);
   const dir = filesDir(home, namespace);
   fs.mkdirSync(dir, { recursive: true });
@@ -80,7 +80,7 @@ export function fileBegun(home: string, namespace: string, now: number): FileBeg
       if (open) fs.closeSync(fd);
       open = false;
     },
-  };
+  } satisfies FileBegun | undefined;
 }
 
 /**
@@ -89,7 +89,7 @@ export function fileBegun(home: string, namespace: string, now: number): FileBeg
  * @param namespace The namespace it was uploaded to.
  * @param file The file object: its id, name, media type, size and when it was uploaded.
  */
-export function fileKept(home: string, namespace: string, file: FileObject): FileObject {
+export function fileKept(home: string, namespace: string, file: FileObject) {
   const dir = filesDir(home, namespace);
   fs.renameSync(path.join(dir, `${file.id}.part`), path.join(dir, file.id));
   fs.writeFileSync(path.join(dir, `${file.id}.json`), JSON.stringify(file));
@@ -102,7 +102,7 @@ export function fileKept(home: string, namespace: string, file: FileObject): Fil
  * @param namespace The namespace it was uploaded to.
  * @param id The file's id.
  */
-export function fileDropped(home: string, namespace: string, id: string): void {
+export function fileDropped(home: string, namespace: string, id: string) {
   if (!FILE_ID.test(id) || !namespaceKept(namespace)) return;
   for (const name of [`${id}.part`, id, `${id}.json`]) fs.rmSync(path.join(filesDir(home, namespace), name), { force: true });
 }
@@ -114,7 +114,7 @@ export function fileDropped(home: string, namespace: string, id: string): void {
  * @param namespace The namespace a start that names it runs in.
  * @param id The id the start names.
  */
-export function fileAt(home: string, namespace: string, id: string): { file: FileObject; path: string } | undefined {
+export function fileAt(home: string, namespace: string, id: string) {
   if (!FILE_ID.test(id) || !namespaceKept(namespace)) return undefined;
   const dir = filesDir(home, namespace);
   const bytes = path.join(dir, id);

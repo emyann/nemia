@@ -3,7 +3,6 @@
  * attempt ended (`endWords`), and the engine's word for it (`engineWord`, `wordOfView`). Over a view shape written out here (`WordView`),
  * since a pure file imports no runtime.
  */
-import { type TaskPhase } from '../record/record.ts';
 import { signedAndHeld, type AttemptClock, type AttemptReason, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
 import type { AttemptMemory, OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import type { AttemptEnd, EnginePhase } from 'objects';
@@ -79,7 +78,7 @@ export type WordView = TaskClock & {
  * one place outside `views/` the word is compared (`harnessBlocked` reads it off a view); a word elsewhere is said, never compared.
  * @param word The engine's word for the task; null or undefined where it says none.
  */
-export const blockedWord = (word: string | null | undefined): boolean => word === 'needs-human';
+export const blockedWord = (word: string | null | undefined) => word === 'needs-human';
 
 /**
  * The phase a task stands in, off the engine's view of it: `unknown` for a task the engine has no record of, its settled end once it
@@ -87,7 +86,7 @@ export const blockedWord = (word: string | null | undefined): boolean => word ==
  * one.
  * @param v The engine's view of the task; undefined where it has none.
  */
-export const phaseOfView = (v: WordView | undefined): TaskPhase => {
+export const phaseOfView = (v: WordView | undefined) => {
   if (!v) return 'unknown';
   if (v.state.settled) return v.state.settled;
   if (signedAndHeld(v)) return 'succeeded';
@@ -100,10 +99,7 @@ export const phaseOfView = (v: WordView | undefined): TaskPhase => {
  * tick answers (`e.answer`) or closes (`e.close`), and nothing else is. Off views already read.
  * @param views The engine's views of tasks, by task id.
  */
-export const waitsForWord =
-  (views: ReadonlyMap<string, WordView>) =>
-  (taskId: string): boolean =>
-    views.get(taskId)?.phase === 'input-required';
+export const waitsForWord = (views: ReadonlyMap<string, WordView>) => (taskId: string) => views.get(taskId)?.phase === 'input-required';
 
 /**
  * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement, off what the runtime
@@ -114,7 +110,7 @@ export const waitsForWord =
  * @param state The task's state, which says whether it asked for a closing statement.
  * @param a The attempt; undefined for none, which never ended unsigned.
  */
-export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined): boolean =>
+export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined) =>
   state.closeoutSchema !== undefined &&
   a !== undefined &&
   a.closeout === undefined &&
@@ -129,12 +125,12 @@ export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined
  * @param state The task's state, which says whether it asked for a closing statement.
  * @param a The attempt.
  */
-export const endWords = (state: WordView['state'], a: WordAttempt): { ended: EngineOutcome | null; reason: AttemptEnd | null } =>
-  a.limit === 'budget'
+export const endWords = (state: WordView['state'], a: WordAttempt) =>
+  (a.limit === 'budget'
     ? { ended: 'failed', reason: 'budget' }
     : unsignedEnd(state, a)
       ? { ended: 'failed', reason: 'unsigned' }
-      : { ended: a.ended, reason: a.reason };
+      : { ended: a.ended, reason: a.reason }) satisfies { ended: EngineOutcome | null; reason: AttemptEnd | null };
 
 /**
  * The engine's own word for a task's phase, off views already read — but `unknown` for a task it has no record of, as `phaseOfView` has it:
@@ -142,10 +138,7 @@ export const endWords = (state: WordView['state'], a: WordAttempt): { ended: Eng
  * prints beside a step, and what the feed words it from (`feedPhase`).
  * @param views The engine's views of tasks, by task id.
  */
-export const engineWord =
-  (views: ReadonlyMap<string, WordView>) =>
-  (taskId: string): EnginePhase | 'unknown' =>
-    wordOfView(views.get(taskId));
+export const engineWord = (views: ReadonlyMap<string, WordView>) => (taskId: string) => wordOfView(views.get(taskId));
 
 /**
  * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
@@ -153,7 +146,7 @@ export const engineWord =
  * it, so `nemia ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
  * @param v The engine's view of the task; undefined where it has none.
  */
-export const wordOfView = (v: WordView | undefined): EnginePhase | 'unknown' =>
+export const wordOfView = (v: WordView | undefined) =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;
 
 /**
@@ -162,7 +155,7 @@ export const wordOfView = (v: WordView | undefined): EnginePhase | 'unknown' =>
  * continuation not yet started. Undefined for a task that is neither, or settled.
  * @param v The engine's view of the task; undefined where it has none.
  */
-export const parkedOf = (v: WordView | undefined): { after?: string; cut?: string } | undefined => {
+export const parkedOf = (v: WordView | undefined) => {
   if (!v || v.state.settled) return undefined;
   if (v.heldBack) return v.heldBack.after ? { after: v.heldBack.after.tool } : {};
   const attempts: readonly WordAttempt[] = v.state.attempts;
@@ -178,7 +171,7 @@ export const parkedOf = (v: WordView | undefined): { after?: string; cut?: strin
  * `blocked`.
  * @param state The task's attempts and the answers a person gave it.
  */
-export const currentTurn = <A extends { turn?: number }>(state: { attempts: readonly A[]; inputs?: readonly unknown[] }): A[] =>
+export const currentTurn = <A extends { turn?: number }>(state: { attempts: readonly A[]; inputs?: readonly unknown[] }) =>
   state.attempts.filter((a) => (a.turn ?? 0) === (state.inputs?.length ?? 0));
 
 /**
@@ -187,7 +180,7 @@ export const currentTurn = <A extends { turn?: number }>(state: { attempts: read
  * former journal, or a task under no limit. Read off the view on every pass, never off a transition.
  * @param v The engine's view of the task; undefined where it has none.
  */
-export const killedMemoryOf = (v: WordView | undefined): AttemptMemory | undefined =>
+export const killedMemoryOf = (v: WordView | undefined) =>
   v
     ? currentTurn(v.state)
         .reverse()

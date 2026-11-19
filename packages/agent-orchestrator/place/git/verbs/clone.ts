@@ -9,17 +9,17 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { failedWords, gitSays, isDirectory, printed, refused, type Asking, type Reply } from '../git.ts';
+import { failedWords, gitSays, isDirectory, printed, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** Git asks no one at a terminal for a credential: one the machine does not hold fails the clone at once. */
 const NO_PROMPT = { GIT_TERMINAL_PROMPT: '0' };
 
 /** `text` with the password of each URL in it taken out: `scheme://user:secret@host` said as `scheme://user@host`. */
-export const withoutPassword = (text: string): string => text.replace(/([a-z][a-z0-9+.-]*:\/\/[^/@\s:]*):[^/@\s]*@/gi, '$1@');
+export const withoutPassword = (text: string) => text.replace(/([a-z][a-z0-9+.-]*:\/\/[^/@\s:]*):[^/@\s]*@/gi, '$1@');
 
 /** The host a URL names, scp-like `user@host:path` too; undefined where it names none. */
-function hostOf(url: string): string | undefined {
+function hostOf(url: string) {
   const scp = /^[^/:@\s]+@([^/:\s]+):/.exec(url);
   if (scp) return scp[1];
   try {
@@ -33,7 +33,7 @@ function hostOf(url: string): string | undefined {
  * What to set up on the machine Nemia's daemon runs on so that git can clone `url`, by its form: ssh and scp-like, http(s), or anything
  * else.
  */
-export function setupFor(url: string): string {
+export function setupFor(url: string) {
   const host = hostOf(url) ?? 'its host';
   if (/^ssh:\/\//i.test(url) || /^[^/:@\s]+@[^/:\s]+:/.test(url))
     return `give the machine Nemia's daemon runs on an SSH key that ${host} accepts, and add ${host}'s host key to ~/.ssh/known_hosts (ssh -T <user>@${host} once checks both), then ask again`;
@@ -43,13 +43,13 @@ export function setupFor(url: string): string {
 }
 
 /** Whether `dir` is the top of a repository of its own, and not a folder inside another one. */
-function* isRepository(dir: string): Asking<boolean> {
+function* isRepository(dir: string) {
   const top = yield* gitSays(dir, ['rev-parse', '--path-format=absolute', '--show-toplevel']);
   return top !== undefined && top === fs.realpathSync(dir);
 }
 
 /** The verb's body. */
-export function* clone({ url, into }: PlaceRequests['clone']): Asking<Reply<'clone'>> {
+export function* clone({ url, into }: PlaceRequests['clone']) {
   if (!path.isAbsolute(into)) return refused(`${into} is not an absolute path: name the folder to clone into from the root`);
   const there = fs.statSync(into, { throwIfNoEntry: false });
   if (there?.isDirectory() && (yield* isRepository(into))) return { repo: into, made: false };

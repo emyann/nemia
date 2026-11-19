@@ -8,7 +8,7 @@ import { attemptVerdict } from '../check/index.ts';
 import { summaryLine, type Closeout } from '../closeout/index.ts';
 import { stepTaskId, tryOf, type Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
-import { scriptRoute, type ScriptAnswer, type ScriptRead } from '../route/index.ts';
+import { scriptRoute, type ScriptAnswer } from '../route/index.ts';
 
 /** A task's last attempt, as far as a script condition reads it: its exit and the answer file the runtime kept. */
 export type AttemptOf = (taskId: string) => { exitCode?: number | null; reason?: string | null; terminationMessage?: string } | undefined;
@@ -17,10 +17,8 @@ export type AttemptOf = (taskId: string) => { exitCode?: number | null; reason?:
  * The last attempt of each task the pass viewed.
  * @param views The views of the tasks the pass viewed, by task id: their attempts.
  */
-export const attemptIn =
-  (views: ReadonlyMap<string, { state: { attempts: readonly NonNullable<ReturnType<AttemptOf>>[] } }>): AttemptOf =>
-  (taskId) =>
-    views.get(taskId)?.state.attempts.at(-1);
+export const attemptIn = (views: ReadonlyMap<string, { state: { attempts: readonly NonNullable<ReturnType<AttemptOf>>[] } }>) =>
+  ((taskId) => views.get(taskId)?.state.attempts.at(-1)) satisfies AttemptOf;
 
 /**
  * A condition whose eval is a script.
@@ -41,20 +39,21 @@ const AnswerSchema = Schema.Struct({
  * both `route` and `unsure` or with neither, or a field of the wrong type.
  * @param text The text of the script's answer file, or undefined where it left none.
  */
-export function scriptAnswerOf(text: string | undefined): ScriptAnswer | undefined {
-  if (text === undefined) return undefined;
+export function scriptAnswerOf(text: string | undefined) {
+  if (text === undefined) return undefined satisfies ScriptAnswer | undefined;
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
-    return undefined;
+    return undefined satisfies ScriptAnswer | undefined;
   }
   const decoded = Schema.decodeUnknownResult(AnswerSchema)(raw);
-  if (Result.isFailure(decoded)) return undefined;
+  if (Result.isFailure(decoded)) return undefined satisfies ScriptAnswer | undefined;
   const { route, why, unsure } = decoded.success;
-  if (route !== undefined && unsure === undefined) return { kind: 'route', route, ...(why === undefined ? {} : { why }) };
-  if (unsure !== undefined && route === undefined) return { kind: 'unsure', unsure };
-  return undefined;
+  if (route !== undefined && unsure === undefined)
+    return { kind: 'route', route, ...(why === undefined ? {} : { why }) } satisfies ScriptAnswer | undefined;
+  if (unsure !== undefined && route === undefined) return { kind: 'unsure', unsure } satisfies ScriptAnswer | undefined;
+  return undefined satisfies ScriptAnswer | undefined;
 }
 
 /**
@@ -63,7 +62,7 @@ export function scriptAnswerOf(text: string | undefined): ScriptAnswer | undefin
  * @param run The run whose record holds the condition's current task.
  * @param attemptOf The last attempt of each task the pass viewed (`attemptIn`).
  */
-export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf): ScriptRead | undefined {
+export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf) {
   const taskId = run.steps[step.name]?.taskId;
   if (!isScript(step) || !taskId || taskId !== stepTaskId(run, step.name, tryOf(run, step.name))) return undefined;
   const attempt = attemptOf(taskId);
@@ -80,12 +79,15 @@ export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf): Scri
  * @param closeoutOf How each step signed off as the pass read it, or undefined where it has not: what every other step reads.
  */
 export const scriptCloseouts =
-  (steps: readonly StepSpec[], attemptOf: AttemptOf, run: Run, closeoutOf: (step: string) => Closeout | undefined) =>
-  (name: string): Closeout | undefined => {
+  (steps: readonly StepSpec[], attemptOf: AttemptOf, run: Run, closeoutOf: (step: string) => Closeout | undefined) => (name: string) => {
     const step = steps.find((s) => s.name === name);
-    if (!isScript(step)) return closeoutOf(name);
+    if (!isScript(step)) return closeoutOf(name) satisfies Closeout | undefined;
     const read = scriptRead(step, run, attemptOf);
-    if (read?.kind === 'route') return { outcome: 'done', summary: `route ${read.route}`, artifacts: [], output: { route: read.route } };
-    if (read?.kind === 'blocked') return { outcome: 'blocked', summary: summaryLine(read.unsure), artifacts: [], needs: read.unsure };
-    return undefined;
+    if (read?.kind === 'route')
+      return { outcome: 'done', summary: `route ${read.route}`, artifacts: [], output: { route: read.route } } satisfies
+        | Closeout
+        | undefined;
+    if (read?.kind === 'blocked')
+      return { outcome: 'blocked', summary: summaryLine(read.unsure), artifacts: [], needs: read.unsure } satisfies Closeout | undefined;
+    return undefined satisfies Closeout | undefined;
   };

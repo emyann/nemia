@@ -28,18 +28,17 @@ import {
   type Interrupt,
   type PauseRuns,
   type PausedNow,
-  type RunTasks,
 } from './pause.ts';
 
 /** The timeout `text` says, in milliseconds; refused `Invalid` where it is out of its form. */
-const timeoutGiven = (text: string): number => {
+const timeoutGiven = (text: string) => {
   const ms = timeoutOf(text);
   if (ms === undefined) throw new Invalid({ message: `--timeout: ${timeoutRefusal(text)}: as nemia pause --timeout 10m` });
   return ms;
 };
 
 /** A run as a pause at once first reads it: whether a person called it off, and every current task of its steps. */
-const runTasks = (run: Run): RunTasks => ({
+const runTasks = (run: Run) => ({
   id: run.id,
   ...(run.cancelledAt === undefined ? {} : { cancelledAt: run.cancelledAt }),
   tasks: currentTasks(run),

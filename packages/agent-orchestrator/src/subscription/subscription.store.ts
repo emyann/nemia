@@ -77,7 +77,7 @@ export type SubscriptionDoorShape = DoorOf<SubscriptionLayer, SubscriptionName>;
  * A name a subscription already has, as a refusal: the files say so by `EEXIST`, the memory by its own.
  * @param name The subscription's name that is taken.
  */
-export const subscriptionTaken = (name: string): Conflict =>
+export const subscriptionTaken = (name: string) =>
   new Conflict({
     message: `a subscription is already named ${name}: nemia unsubscribe ${name} removes it first, or name this one otherwise.`,
   });
@@ -86,7 +86,7 @@ export const subscriptionTaken = (name: string): Conflict =>
  * A name no subscription has, as the refusal of its drop.
  * @param name The name the drop asked for.
  */
-export const noSubscription = (name: string): Missing =>
+export const noSubscription = (name: string) =>
   new Missing({ message: `no subscription is named ${name}: nemia subscribe ${name} <task> puts one.` });
 
 /** A name a subscription or a delivery is written under, as `SubscriptionName.OnCreate` checks it. */
@@ -117,7 +117,7 @@ const selectorsChecked = (name: string, selectors: readonly string[]) =>
  * The door over `layer`: each method as `doorOf` makes it, each write's name and value checked before the layer writes.
  * @param layer The layer that reads and writes the subscriptions: the files or the memory.
  */
-export function subscriptionDoorOver(layer: SubscriptionLayer): SubscriptionDoorShape {
+export function subscriptionDoorOver(layer: SubscriptionLayer) {
   const door = doorOf<SubscriptionLayer, SubscriptionName>(layer);
   return {
     ...door,
@@ -140,7 +140,7 @@ export function subscriptionDoorOver(layer: SubscriptionLayer): SubscriptionDoor
           return yield* door.deliveries.write(name, delivery);
         }),
     },
-  };
+  } satisfies SubscriptionDoorShape;
 }
 
 /** What the deliverer's file ends on. */
@@ -150,21 +150,21 @@ const STATE = '.state.json';
  * The folder of the subscriptions of the store `home`.
  * @param home The store's root folder.
  */
-export const subscriptionsAt = (home: string): string => path.join(home, 'subscriptions');
+export const subscriptionsAt = (home: string) => path.join(home, 'subscriptions');
 
 /**
  * A subscription's file in the store `home`, the person's.
  * @param home The store's root folder.
  * @param name The subscription's name.
  */
-export const subscriptionFileAt = (home: string, name: string): string => path.join(subscriptionsAt(home), `${name}.json`);
+export const subscriptionFileAt = (home: string, name: string) => path.join(subscriptionsAt(home), `${name}.json`);
 
 /**
  * Where the deliverer is with a subscription in the store `home`, its own file.
  * @param home The store's root folder.
  * @param name The subscription's name.
  */
-export const deliveryFileAt = (home: string, name: string): string => path.join(subscriptionsAt(home), `${name}${STATE}`);
+export const deliveryFileAt = (home: string, name: string) => path.join(subscriptionsAt(home), `${name}${STATE}`);
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 const Bytes = Schema.Natural;
@@ -207,7 +207,7 @@ const DeliverySchema = Schema.StructWithRest(
 );
 
 /** The file's text, counted as read, or undefined where there is none. */
-const textOf = (file: string): string | undefined => {
+const textOf = (file: string) => {
   try {
     const text = fs.readFileSync(file, 'utf8');
     countRead(Buffer.byteLength(text));
@@ -219,7 +219,7 @@ const textOf = (file: string): string | undefined => {
 };
 
 /** `text` decoded by `schema`, or why it does not read: not JSON, or its first field that is not what nemia writes. */
-function decoded<S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string): { value: S['Type'] } | { error: string } {
+function decoded<S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: string) {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -233,7 +233,7 @@ function decoded<S extends Schema.ConstraintDecoder<unknown>>(schema: S, text: s
 }
 
 /** The names the folder `dir` holds files for, each once and sorted, the person's and the deliverer's apart. */
-function namesIn(dir: string): { subscriptions: string[]; deliveries: string[] } {
+function namesIn(dir: string) {
   let files: string[];
   try {
     files = fs.readdirSync(dir).sort();
@@ -247,7 +247,7 @@ function namesIn(dir: string): { subscriptions: string[]; deliveries: string[] }
 }
 
 /** How a person puts a subscription again once one of theirs was left out, and what a selector takes. */
-const retype = (name: string): string =>
+const retype = (name: string) =>
   `nemia unsubscribe ${name} removes it, and nemia subscribe ${name} <task> -l <selector> puts it again — ${SELECTOR_FORM}`;
 
 /**
@@ -264,7 +264,7 @@ function selectorsOf(
   read: { selectors?: readonly string[]; wake?: readonly string[] },
   left: (words: string) => void,
 ) {
-  const out = (why: string): undefined => {
+  const out = (why: string) => {
     left(`nemia: the subscription ${file} ${why}: it is not delivered (${retype(name)}).`);
     return undefined;
   };
@@ -289,7 +289,7 @@ function selectorsOf(
  * The files of the store `home`, as a layer of the door: the subscriptions' folder, the person's files and the deliverer's.
  * @param home The store's root folder.
  */
-export function subscriptionFiles(home: string): SubscriptionLayer {
+export function subscriptionFiles(home: string) {
   const dir = subscriptionsAt(home);
   const fileOf = (name: string) => subscriptionFileAt(home, name);
   const stateOf = (name: string) => deliveryFileAt(home, name);
@@ -297,7 +297,7 @@ export function subscriptionFiles(home: string): SubscriptionLayer {
     subscriptions: {
       list: () => {
         const left: Left[] = [];
-        const listed = namesIn(dir).subscriptions.flatMap((name): Listed[] => {
+        const listed = namesIn(dir).subscriptions.flatMap((name) => {
           const text = textOf(fileOf(name));
           if (text === undefined) return [];
           const read = decoded(SubscriptionSchema, text);
@@ -354,7 +354,7 @@ export function subscriptionFiles(home: string): SubscriptionLayer {
       },
       drop: (name) => fs.rmSync(stateOf(name), { force: true }),
     },
-  };
+  } satisfies SubscriptionLayer;
 }
 
 /**
@@ -370,11 +370,10 @@ export const SubscriptionDoor = Context.Reference<SubscriptionDoorShape>('agent-
  * The Subscription door over the files of the store `root`, as a layer: for a program that names its root by the door.
  * @param root The store's root folder.
  */
-export const subscriptionDoorFiles = (root: string): Layer.Layer<never> =>
-  Layer.succeed(SubscriptionDoor)(subscriptionDoorOver(subscriptionFiles(root)));
+export const subscriptionDoorFiles = (root: string) => Layer.succeed(SubscriptionDoor)(subscriptionDoorOver(subscriptionFiles(root)));
 
 /** An act of the door over the files at the root `home`, run at once: a refusal is thrown as it is. */
-const atRoot = <A>(home: string, act: (door: SubscriptionDoorShape) => Effect.Effect<A, unknown>): A =>
+const atRoot = <A>(home: string, act: (door: SubscriptionDoorShape) => Effect.Effect<A, unknown>) =>
   Effect.runSync(act(subscriptionDoorOver(subscriptionFiles(home))));
 
 const named = SubscriptionName.read;
@@ -385,7 +384,7 @@ const named = SubscriptionName.read;
  * @param home The store's root folder.
  * @param said Told the words of each file left out, or undefined to tell them to nothing.
  */
-export function listSubscriptions(home: string, said?: (line: string) => void): Listed[] {
+export function listSubscriptions(home: string, said?: (line: string) => void) {
   const { listed, left } = atRoot(home, (door) => door.subscriptions.list());
   for (const one of left) said?.(one.words);
   return listed;
@@ -395,7 +394,7 @@ export function listSubscriptions(home: string, said?: (line: string) => void): 
  * The names of the deliverer's files at the root `home` (`deliveries.list`).
  * @param home The store's root folder.
  */
-export const listDeliveries = (home: string): string[] => atRoot(home, (door) => door.deliveries.list());
+export const listDeliveries = (home: string) => atRoot(home, (door) => door.deliveries.list());
 
 /**
  * Puts a subscription at the root `home` (`subscriptions.put`).
@@ -403,7 +402,7 @@ export const listDeliveries = (home: string): string[] => atRoot(home, (door) =>
  * @param name The subscription's name.
  * @param subscription The subscription to write.
  */
-export const putSubscription = (home: string, name: string, subscription: Subscription): void =>
+export const putSubscription = (home: string, name: string, subscription: Subscription) =>
   atRoot(home, (door) => door.subscriptions.put(named(name), subscription));
 
 /**
@@ -411,7 +410,7 @@ export const putSubscription = (home: string, name: string, subscription: Subscr
  * @param home The store's root folder.
  * @param name The subscription's name.
  */
-export const dropSubscription = (home: string, name: string): void => atRoot(home, (door) => door.subscriptions.drop(named(name)));
+export const dropSubscription = (home: string, name: string) => atRoot(home, (door) => door.subscriptions.drop(named(name)));
 
 /**
  * Where the deliverer is with a subscription at the root `home`, or undefined; a file that does not read told to `said`.
@@ -419,7 +418,7 @@ export const dropSubscription = (home: string, name: string): void => atRoot(hom
  * @param name The subscription's name.
  * @param said Told the words of a file that does not read, or undefined to tell them to nothing.
  */
-export function readDelivery(home: string, name: string, said?: (line: string) => void): KeptDelivery | undefined {
+export function readDelivery(home: string, name: string, said?: (line: string) => void) {
   const read = atRoot(home, (door) => door.deliveries.read(named(name)));
   if (read !== null && 'unread' in read) said?.(read.unread);
   return read !== null && 'kept' in read ? read.kept : undefined;
@@ -431,7 +430,7 @@ export function readDelivery(home: string, name: string, said?: (line: string) =
  * @param name The subscription's name.
  * @param delivery Where the deliverer is with it: its cursor, its digest and whose it is.
  */
-export const writeDelivery = (home: string, name: string, delivery: KeptDelivery): void =>
+export const writeDelivery = (home: string, name: string, delivery: KeptDelivery) =>
   atRoot(home, (door) => door.deliveries.write(named(name), delivery));
 
 /**
@@ -439,4 +438,4 @@ export const writeDelivery = (home: string, name: string, delivery: KeptDelivery
  * @param home The store's root folder.
  * @param name The subscription's name.
  */
-export const dropDelivery = (home: string, name: string): void => atRoot(home, (door) => door.deliveries.drop(named(name)));
+export const dropDelivery = (home: string, name: string) => atRoot(home, (door) => door.deliveries.drop(named(name)));

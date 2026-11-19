@@ -33,19 +33,27 @@ export const WSL_SYSTEMD_WORDS =
  * saying how to turn it on; Linux without it; any other platform. Starting the daemon by hand works on each.
  * @param machine What the machine is: its platform, whether it is WSL, and whether systemd runs as its init.
  */
-export function systemOf(machine: Machine): { system: ServiceSystem } | { refusal: string } {
-  if (machine.platform === 'darwin') return { system: 'launchd' };
-  if (machine.platform === 'linux' && machine.systemd) return { system: 'systemd' };
+export function systemOf(machine: Machine) {
+  if (machine.platform === 'darwin')
+    return { system: 'launchd' } satisfies { system: ServiceSystem } | { refusal: string } as
+      | { system: ServiceSystem }
+      | { refusal: string };
+  if (machine.platform === 'linux' && machine.systemd)
+    return { system: 'systemd' } satisfies { system: ServiceSystem } | { refusal: string } as
+      | { system: ServiceSystem }
+      | { refusal: string };
   const byHand = 'Until then, start the daemon by hand: npm start in apps/api, or nemia up.';
   if (machine.platform === 'linux' && machine.wsl)
     return {
       refusal: `nemia service: this WSL distro runs without systemd, so it has no login service to install — ${WSL_SYSTEMD_WORDS}. ${byHand}`,
-    };
+    } satisfies { system: ServiceSystem } | { refusal: string } as { system: ServiceSystem } | { refusal: string };
   if (machine.platform === 'linux')
-    return { refusal: `nemia service: this Linux runs without systemd as its init, so there is no user unit to install. ${byHand}` };
+    return {
+      refusal: `nemia service: this Linux runs without systemd as its init, so there is no user unit to install. ${byHand}`,
+    } satisfies { system: ServiceSystem } | { refusal: string } as { system: ServiceSystem } | { refusal: string };
   return {
     refusal: `nemia service: ${machine.platform} has no login service nemia installs: systemd on Linux, launchd on macOS. ${byHand}`,
-  };
+  } satisfies { system: ServiceSystem } | { refusal: string } as { system: ServiceSystem } | { refusal: string };
 }
 
 /** A name for an environment variable: a letter or `_`, then letters, digits and `_`. */
@@ -62,11 +70,14 @@ export const OWN_KEYS = ['WF_ROOT', 'PATH'] as const;
  * The environment as given on the command line, `KEY=VALUE` each, split at its first `=`; a word with none keeps an empty key's place.
  * @param given The words given with `--env`, in their order.
  */
-export const envPairs = (given: readonly string[]): [string, string][] => given.map(envPair);
+export const envPairs = (given: readonly string[]) => given.map(envPair) satisfies [string, string][];
 
 /** One word of the environment as given, `KEY=VALUE`, split at its first `=`; a word with none is the key, with an empty value. */
-function envPair(word: string): [string, string] {
-  return word.includes('=') ? [word.slice(0, word.indexOf('=')), word.slice(word.indexOf('=') + 1)] : [word, ''];
+function envPair(word: string) {
+  return (word.includes('=') ? [word.slice(0, word.indexOf('=')), word.slice(word.indexOf('=') + 1)] : [word, '']) satisfies [
+    string,
+    string,
+  ];
 }
 
 /**
@@ -74,7 +85,7 @@ function envPair(word: string): [string, string] {
  * install writes itself (`OWN_KEYS`), or a value holding a control character, which would end the unit's line and start another.
  * @param given The words given with `--env`, in their order.
  */
-export function envRefusal(given: readonly string[]): string | null {
+export function envRefusal(given: readonly string[]) {
   const seen = new Set<string>();
   for (const entry of given) {
     const [key, value] = envPair(entry);
@@ -99,7 +110,7 @@ export function envRefusal(given: readonly string[]): string | null {
  * @param root The root folder of the store the service is of.
  * @param defaultRoot The default store's root folder.
  */
-export function nameRefusal(name: string | undefined, root: string, defaultRoot: string): string | null {
+export function nameRefusal(name: string | undefined, root: string, defaultRoot: string) {
   if (name !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(name))
     return `nemia service: --name ${name} is not a service's name: lowercase letters, digits and -, like nemia-trial.`;
   if (root === defaultRoot) return null;
@@ -128,7 +139,7 @@ export type ServiceSpec = {
  * Why a path of the spec cannot be written into a unit, or null: one holding a control character, which would end its line.
  * @param spec The spec's paths: its node, its entry and the folder it runs in.
  */
-export const specRefusal = (spec: Pick<ServiceSpec, 'node' | 'entry' | 'cwd'>): string | null => {
+export const specRefusal = (spec: Pick<ServiceSpec, 'node' | 'entry' | 'cwd'>) => {
   const bad = (['node', 'entry', 'cwd'] as const).find((k) => CONTROL.test(spec[k]));
   return bad
     ? `nemia service install: the ${bad} path ${JSON.stringify(spec[bad])} holds a control character: move it to a path without one.`
@@ -136,19 +147,19 @@ export const specRefusal = (spec: Pick<ServiceSpec, 'node' | 'entry' | 'cwd'>): 
 };
 
 /** A specifier escaped for any line of a unit: `%` is systemd's, and `%%` is one. */
-const percent = (text: string): string => text.replaceAll('%', '%%');
+const percent = (text: string) => text.replaceAll('%', '%%');
 
 /** A word quoted for a unit's line: `\` and `"` escaped inside double quotes, and `%` as a specifier. */
-const quoted = (text: string): string => `"${percent(text.replaceAll('\\', '\\\\').replaceAll('"', '\\"'))}"`;
+const quoted = (text: string) => `"${percent(text.replaceAll('\\', '\\\\').replaceAll('"', '\\"'))}"`;
 
 /** A word of `ExecStart=`, where systemd also expands `$`: `$$` is one. */
-const argWord = (text: string): string => quoted(text).replaceAll('$', '$$$$');
+const argWord = (text: string) => quoted(text).replaceAll('$', '$$$$');
 
 /** The unit's description: which store's daemon it runs, and from which checkout. */
-const describe = (spec: ServiceSpec, root: string): string => `Nemia daemon of the store ${root}, from the checkout ${spec.checkout}`;
+const describe = (spec: ServiceSpec, root: string) => `Nemia daemon of the store ${root}, from the checkout ${spec.checkout}`;
 
 /** The store a spec's environment names. */
-const rootOf = (spec: ServiceSpec): string => spec.env.find(([k]) => k === 'WF_ROOT')?.[1] ?? '';
+const rootOf = (spec: ServiceSpec) => spec.env.find(([k]) => k === 'WF_ROOT')?.[1] ?? '';
 
 /**
  * The systemd user unit for `spec`: started at login (`default.target`), restarted on failure five seconds on but never after a refusal
@@ -161,7 +172,7 @@ const rootOf = (spec: ServiceSpec): string => spec.env.find(([k]) => k === 'WF_R
  * written here and held above the runtime's in `service.test.ts`, which reads the runtime's rather than repeat it.
  * @param spec The service: its name, node, entry, folder and environment.
  */
-export const unitText = (spec: ServiceSpec): string =>
+export const unitText = (spec: ServiceSpec) =>
   [
     '[Unit]',
     `Description=${percent(describe(spec, rootOf(spec)))}`,
@@ -186,18 +197,18 @@ export const unitText = (spec: ServiceSpec): string =>
   ].join('\n');
 
 /** Text escaped for XML: the five entities. */
-const xml = (text: string): string =>
+const xml = (text: string) =>
   text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 
 /** A plist's string. */
-const str = (text: string): string => `<string>${xml(text)}</string>`;
+const str = (text: string) => `<string>${xml(text)}</string>`;
 
 /**
  * The launchd agent for `spec`: loaded and started at login (`RunAtLoad`), started again when it exits unsuccessfully, at most every 30
  * seconds, and its process group left alone when it stops (`AbandonProcessGroup`), so the runtime's detached work lives on.
  * @param spec The service: its name, node, entry, folder, environment and log file.
  */
-export const plistText = (spec: ServiceSpec): string =>
+export const plistText = (spec: ServiceSpec) =>
   [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
@@ -228,7 +239,7 @@ export const plistText = (spec: ServiceSpec): string =>
  * @param name The service's name.
  * @param dirs The user's home, and the folder of its settings.
  */
-export const unitPathOf = (system: ServiceSystem, name: string, dirs: { home: string; configHome: string }): string =>
+export const unitPathOf = (system: ServiceSystem, name: string, dirs: { home: string; configHome: string }) =>
   system === 'systemd' ? `${dirs.configHome}/systemd/user/${name}.service` : `${dirs.home}/Library/LaunchAgents/${name}.plist`;
 
 /**
@@ -236,22 +247,21 @@ export const unitPathOf = (system: ServiceSystem, name: string, dirs: { home: st
  * `WF_CGROUP_PARENT` at: `<name>-sessions.slice`, a name `cgroupParent` reads. Its dash places it under systemd's `<name>.slice`.
  * @param name The service's name.
  */
-export const sessionsSliceOf = (name: string): string => `${name}-sessions.slice`;
+export const sessionsSliceOf = (name: string) => `${name}-sessions.slice`;
 
 /**
  * The sessions' slice's file, beside the service's user unit under `configHome` (`~/.config`).
  * @param name The service's name.
  * @param dirs The folder of the user's settings (`configHome`).
  */
-export const slicePathOf = (name: string, dirs: { configHome: string }): string =>
-  `${dirs.configHome}/systemd/user/${sessionsSliceOf(name)}`;
+export const slicePathOf = (name: string, dirs: { configHome: string }) => `${dirs.configHome}/systemd/user/${sessionsSliceOf(name)}`;
 
 /**
  * The sessions' slice of the service `name`: its ceiling (`MemoryMax=`) at `ceilingBytes`, what the machine allocates to sessions, so a
  * burst of sessions that grow together is killed inside the slice, never the daemon, sshd or the machine. Written in bytes, so that no
  * suffix's base is in question.
  */
-export const sliceText = ({ name, ceilingBytes }: { name: string; ceilingBytes: number }): string =>
+export const sliceText = ({ name, ceilingBytes }: { name: string; ceilingBytes: number }) =>
   [
     '[Unit]',
     `Description=${percent(`Sessions of the Nemia daemon ${name}, held together to what the machine allocates`)}`,
@@ -266,14 +276,14 @@ export const sliceText = ({ name, ceilingBytes }: { name: string; ceilingBytes: 
  * @param system The system that starts the service.
  * @param name The service's name.
  */
-export const unitName = (system: ServiceSystem, name: string): string => (system === 'systemd' ? `${name}.service` : name);
+export const unitName = (system: ServiceSystem, name: string) => (system === 'systemd' ? `${name}.service` : name);
 
 /**
  * The file launchd writes what the agent `name` prints into, under `home`'s `Library/Logs`.
  * @param home The user's home folder.
  * @param name The agent's name.
  */
-export const launchdLogs = (home: string, name: string): string => `${home}/Library/Logs/${name}.log`;
+export const launchdLogs = (home: string, name: string) => `${home}/Library/Logs/${name}.log`;
 
 /**
  * How a person reads the service's log: `journalctl --user -u <unit>` for systemd, the file launchd writes for launchd.
@@ -281,7 +291,7 @@ export const launchdLogs = (home: string, name: string): string => `${home}/Libr
  * @param name The service's name.
  * @param home The user's home folder, under which launchd writes the log.
  */
-export const logsLine = (system: ServiceSystem, name: string, home: string): string =>
+export const logsLine = (system: ServiceSystem, name: string, home: string) =>
   system === 'systemd' ? `journalctl --user -u ${unitName(system, name)}` : `less ${launchdLogs(home, name)}`;
 
 /**
@@ -292,18 +302,18 @@ export const logsLine = (system: ServiceSystem, name: string, home: string): str
  * @param file The path of the agent's file, which launchd bootstraps.
  * @param uid The user's id, whose GUI domain launchd bootstraps into.
  */
-export const startLine = (system: ServiceSystem, name: string, file: string, uid: number): string =>
+export const startLine = (system: ServiceSystem, name: string, file: string, uid: number) =>
   system === 'systemd' ? `systemctl --user start ${unitName(system, name)}` : `launchctl bootstrap gui/${uid} ${file}`;
 
 /** A unit's double-quoted word read back: its escapes undone, `$$` too where it is a word of `ExecStart=`. */
-const unquoted = (word: string, exec: boolean): string => {
+const unquoted = (word: string, exec: boolean) => {
   const inner = word.replace(/^"|"$/g, '').replaceAll('%%', '%');
   const plain = inner.replace(/\\(["\\])/g, '$1');
   return exec ? plain.replaceAll('$$', '$') : plain;
 };
 
 /** The double-quoted words of a unit's line. */
-const words = (line: string): string[] => [...line.matchAll(/"(?:[^"\\]|\\.)*"/g)].map((m) => m[0]);
+const words = (line: string) => [...line.matchAll(/"(?:[^"\\]|\\.)*"/g)].map((m) => m[0]);
 
 /** What a unit's or a plist's text says it runs: its node, its entry, its folder and its environment, read back as written. */
 export type UnitRead = { node?: string; entry?: string; cwd?: string; env: [string, string][] };
@@ -312,7 +322,7 @@ export type UnitRead = { node?: string; entry?: string; cwd?: string; env: [stri
  * A unit's text read back (`unitText`): its `ExecStart=`, `WorkingDirectory=` and each `Environment=`, as the values were given.
  * @param text The unit's text.
  */
-export function unitRead(text: string): UnitRead {
+export function unitRead(text: string) {
   const lines = text.split('\n');
   const value = (key: string) => lines.find((l) => l.startsWith(`${key}=`))?.slice(key.length + 1);
   const [node, entry] = words(value('ExecStart') ?? '').map((w) => unquoted(w, true));
@@ -320,35 +330,35 @@ export function unitRead(text: string): UnitRead {
   const env = lines
     .filter((l) => l.startsWith('Environment='))
     .flatMap((l) => words(l).map((w) => unquoted(w, false)))
-    .map((pair): [string, string] => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]);
-  return { node, entry, cwd, env };
+    .map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)] satisfies [string, string]);
+  return { node, entry, cwd, env } satisfies UnitRead;
 }
 
 /** Text unescaped from XML. */
-const unxml = (text: string): string =>
+const unxml = (text: string) =>
   text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&apos;', "'").replaceAll('&amp;', '&');
 
 /**
  * A plist's text read back (`plistText`): its program's two arguments, its folder and its environment.
  * @param text The plist's text.
  */
-export function plistRead(text: string): UnitRead {
+export function plistRead(text: string) {
   const strings = (block: string) =>
     [...block.matchAll(/<string>([\s\S]*?)<\/string>/g)].flatMap(([, inner]) => (inner === undefined ? [] : [unxml(inner)]));
   const [node, entry] = strings(/<key>ProgramArguments<\/key><array>([\s\S]*?)<\/array>/.exec(text)?.[1] ?? '');
   const cwd = strings(/<key>WorkingDirectory<\/key>(<string>[\s\S]*?<\/string>)/.exec(text)?.[1] ?? '')[0];
   const envBlock = /<key>EnvironmentVariables<\/key>\s*<dict>([\s\S]*?)<\/dict>/.exec(text)?.[1] ?? '';
   const env = [...envBlock.matchAll(/<key>([\s\S]*?)<\/key><string>([\s\S]*?)<\/string>/g)].flatMap(
-    ([, key, value]): Array<[string, string]> => (key === undefined || value === undefined ? [] : [[unxml(key), unxml(value)]]),
+    ([, key, value]) => (key === undefined || value === undefined ? [] : [[unxml(key), unxml(value)]]) satisfies Array<[string, string]>,
   );
-  return { node, entry, cwd, env };
+  return { node, entry, cwd, env } satisfies UnitRead;
 }
 
 /**
  * `systemctl --user show -p ActiveState,UnitFileState,MainPID` read: `MainPID=0` is no process.
  * @param text What `systemctl --user show` printed.
  */
-export function systemdState(text: string): UnitState {
+export function systemdState(text: string) {
   const value = (key: string) => new RegExp(`^${key}=(.*)$`, 'm').exec(text)?.[1]?.trim() ?? '';
   const pid = Number(value('MainPID'));
   return { active: value('ActiveState') || 'unknown', enabled: value('UnitFileState') || 'unknown', pid: pid > 0 ? pid : null };
@@ -358,7 +368,7 @@ export function systemdState(text: string): UnitState {
  * `launchctl print gui/<uid>/<label>` read: its `state` and `pid`; a label it does not know is not loaded.
  * @param text What `launchctl print` printed, or null where it did not know the label.
  */
-export function launchdState(text: string | null): UnitState {
+export function launchdState(text: string | null) {
   if (text === null) return { active: 'not loaded', enabled: 'not loaded', pid: null };
   const state = /^\s*state = (.*)$/m.exec(text)?.[1]?.trim() ?? 'unknown';
   const pid = Number(/^\s*pid = (\d+)$/m.exec(text)?.[1]);
@@ -395,7 +405,7 @@ export type HolderOf = 'service' | 'other' | 'none';
  * @param lease Where the store's lease stands: ticking, and by which pid, or not.
  * @param state The unit's state as the system says it, or null where it could not be asked.
  */
-export const holderOfLease = (lease: DaemonStanding, state: UnitState | null): HolderOf => {
+export const holderOfLease = (lease: DaemonStanding, state: UnitState | null) => {
   if (lease.kind !== 'ticking') return 'none';
   return state?.pid === lease.file.pid ? 'service' : 'other';
 };
@@ -405,11 +415,11 @@ export const holderOfLease = (lease: DaemonStanding, state: UnitState | null): H
  * @param pid The pid of the daemon that holds the store.
  * @param name The service's name: named with `--name` where it is not the default.
  */
-export const takeOverLine = (pid: number, name: string): string =>
+export const takeOverLine = (pid: number, name: string) =>
   `nemia service install${name === DEFAULT_NAME ? '' : ` --name ${name}`} --take-over ${pid}`;
 
 /** The service's own lines: installed or not, its state, what it runs, and from which checkout. */
-const unitLines = (read: ServiceRead): string[] => {
+const unitLines = (read: ServiceRead) => {
   if (read.unit === null)
     return [`service ${read.name} (${read.system}): not installed — no ${read.file}; nemia service install writes it`];
   const state = read.state;
@@ -421,7 +431,7 @@ const unitLines = (read: ServiceRead): string[] => {
 };
 
 /** The lease's line, and who of the service and another daemon holds it. */
-const leaseLines = (lease: DaemonStanding, read: ServiceRead, now: number): string[] => {
+const leaseLines = (lease: DaemonStanding, read: ServiceRead, now: number) => {
   if (lease.kind === 'none') return [`daemon: none has held this store (no ${DAEMON_FILE})`];
   if (lease.kind === 'unreadable') return [`daemon: none known — ${DAEMON_FILE} does not read as a holder`];
   const holder = holderOfLease(lease, read.state);
@@ -434,7 +444,7 @@ const leaseLines = (lease: DaemonStanding, read: ServiceRead, now: number): stri
 };
 
 /** Whether the user's services outlive their login sessions, in words: lingering on or off, and what off means. */
-const lingerLine = (linger: boolean | undefined, system: ServiceSystem, user: string): string[] => {
+const lingerLine = (linger: boolean | undefined, system: ServiceSystem, user: string) => {
   if (system !== 'systemd') return [];
   if (linger === undefined) return ['lingering: unknown — loginctl did not say'];
   return linger
@@ -454,7 +464,7 @@ export const statusLines = (
   lease: DaemonStanding,
   linger: boolean | undefined,
   { now, user, pause }: { now: number; user: string; pause: Pause | null },
-): string[] => [
+) => [
   ...unitLines(read),
   ...leaseLines(lease, read, now),
   ...(pause ? [`pause: ${pauseWords(pause)}`] : []),

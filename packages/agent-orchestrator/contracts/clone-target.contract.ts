@@ -32,17 +32,17 @@ export type CloneTarget =
 export const joinedFolderPure = assume(joinedFolder, { pure: true });
 
 /** Whether git reads `given` as a local path: no colon, or a slash before the first colon. */
-const isPath = (given: string): boolean => {
+const isPath = (given: string) => {
   const colon = given.indexOf(':');
   const slash = given.indexOf('/');
   return colon < 0 || (slash >= 0 && slash < colon);
 };
 
 /** Whether `given` is written in the scheme form, `<scheme>://…`. */
-const hasScheme = (given: string): boolean => given.includes('://');
+const hasScheme = (given: string) => given.includes('://');
 
 /** Whether the scheme form names a scheme a clone is made over. */
-const knownScheme = (given: string): boolean =>
+const knownScheme = (given: string) =>
   given.startsWith('https://') ||
   given.startsWith('http://') ||
   given.startsWith('ssh://') ||
@@ -50,7 +50,7 @@ const knownScheme = (given: string): boolean =>
   given.startsWith('file://');
 
 /** The scheme form's authority: what lies between `://` and the next slash, or nothing for the scp-like form. */
-const authorityOf = (given: string): string => {
+const authorityOf = (given: string) => {
   const at = given.indexOf('://');
   if (at < 0) return '';
   const rest = given.slice(at).slice(3);
@@ -62,14 +62,14 @@ const authorityOf = (given: string): string => {
  * Whether the scheme form carries a password: a colon in the user part, before the authority's last `@` — said as an `@` after the
  * authority's first colon, which is the same.
  */
-const holdsPassword = (given: string): boolean => {
+const holdsPassword = (given: string) => {
   const authority = authorityOf(given);
   const colon = authority.indexOf(':');
   return colon >= 0 && authority.slice(colon).includes('@');
 };
 
 /** Whether a clone's folder stays under `clones/`: relative, a host and a path at least, no segment empty, `.` or `..`. */
-const staysUnder = (folder: string): boolean =>
+const staysUnder = (folder: string) =>
   folder.includes('/') &&
   !folder.startsWith('/') &&
   !folder.endsWith('/') &&
@@ -82,7 +82,7 @@ const staysUnder = (folder: string): boolean =>
   !folder.includes('/../');
 
 /** Whether `text` holds none of what a folder of a clone may not: a space, a `%`, a backslash, a colon or an `@`. */
-const plain = (text: string): boolean =>
+const plain = (text: string) =>
   !text.includes(' ') && !text.includes('%') && !text.includes('\\') && !text.includes(':') && !text.includes('@');
 
 const cloneTargetSpec = spec<(given: string) => CloneTarget>({

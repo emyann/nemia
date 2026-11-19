@@ -83,7 +83,7 @@ const CHECK_SPEC: Spec = {
 };
 
 /** The line that says the digest of a template's content. */
-const digestLine = (digest: string | undefined): string => `digest of the content: ${digest ?? 'none'}`;
+const digestLine = (digest: string | undefined) => `digest of the content: ${digest ?? 'none'}`;
 
 /** The folder or archive `folder`, read through the Template door and checked: it passes with its digest, or every problem is refused. */
 export const lintedTemplate = Effect.fn('templateLint')(function* (folder: string) {

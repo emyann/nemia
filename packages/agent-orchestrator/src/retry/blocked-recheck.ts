@@ -41,7 +41,7 @@ export const blockedRecheckRead = (
   blocked: boolean,
   phaseOf: (taskId: string) => TaskPhase,
   tipOf: TipOf | undefined,
-): BlockedRecheckRead => {
+) => {
   const taskId = record?.taskId;
   const last = record?.tries?.at(-1);
   const check = last?.check;

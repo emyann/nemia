@@ -20,14 +20,13 @@ import {
   type WorkflowSpec,
 } from 'objects';
 import { tried } from '../runtime-client.ts';
-import { Invalid, type Refusal } from '../refusal/refusal.ts';
+import { Invalid } from '../refusal/refusal.ts';
 import { refOf, writeLibraryAdd } from '../library/library.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { factoryWriteOf } from '../workflows/workflows.verb.ts';
 import { AgentDoor, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
-import type { AgentDraft } from '../agents/agents.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt, workflowSpecReadme } from '../folder/folder.store.ts';
 import { stepDraftOf } from '../propose/index.ts';
@@ -38,13 +37,13 @@ import { FactoryName } from '../factory/factory.model.ts';
 import { ownAgentRefusal } from '../factory/wiring/own-agent.store.ts';
 import { wire } from '../factory/wiring/wire.verb.ts';
 import { withoutEntry } from '../factory/wiring/index.ts';
-import { treeDir, type ProposalNeeds, type ProposalPlace } from '../propose/current.verb.ts';
+import { treeDir, type ProposalPlace } from '../propose/current.verb.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
 import type { Entry } from '../factory/applied/applied.store.ts';
 import { verbOf } from '../propose/propose.verb.ts';
 
 /** An Agent's spec as the Agent door's draft. */
-const agentDraftOf = (name: string, spec: AgentSpec): AgentDraft => ({
+const agentDraftOf = (name: string, spec: AgentSpec) => ({
   name,
   ...(spec.role !== undefined && { role: spec.role }),
   ...(spec.description !== undefined && { description: spec.description }),
@@ -63,7 +62,7 @@ const counted = (kind: RevisionKind, object: ProposedObject, version: string) =>
   );
 
 /** The revision of a kind the ledger does not count. */
-const uncounted = (object: ProposedObject): string => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}`;
+const uncounted = (object: ProposedObject) => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}`;
 
 /** The agents' folder of a factory's tree, `workflows/agents/`, as its files' paths in the tree begin. */
 const TREE_AGENTS = `workflows/${AGENTS_FOLDER}/`;
@@ -237,12 +236,7 @@ const factoryWritten = (factory: string, object: ProposedObject) =>
  * @param object The object the proposal names, written by its kind: a workflow, an agent, a skill, a hire, a server or the factory.
  * @param against The tree whose agents a Workflow is judged against; absent, the factory's tree.
  */
-export const objectWritten = (
-  place: ProposalPlace,
-  factory: string,
-  object: ProposedObject,
-  against?: readonly Entry[],
-): Effect.Effect<string, Refusal, ProposalNeeds> => {
+export const objectWritten = (place: ProposalPlace, factory: string, object: ProposedObject, against?: readonly Entry[]) => {
   const written = (() => {
     switch (object.kind) {
       case 'Workflow':

@@ -7,11 +7,11 @@
  * would refuse as written (`worktreeInclude`), each line named, before anything of the run is written.
  */
 import path from 'node:path';
-import { git, gitSays, isDirectory, readInclude, refusalLines, refused, type Asking, type Reply } from '../git.ts';
+import { git, gitSays, isDirectory, readInclude, refusalLines, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** Why `root`'s `.worktreeinclude` cannot serve a run that cuts worktrees, in words that name the fix; undefined when it can. */
-function includeRefusal(root: string): string | undefined {
+function includeRefusal(root: string) {
   const include = readInclude(root);
   if (typeof include === 'string') return `${include}: write it as a file, one gitignored path per line, or remove it`;
   if (!include?.refused.length) return undefined;
@@ -20,7 +20,7 @@ function includeRefusal(root: string): string | undefined {
 }
 
 /** The verb's body. */
-export function* open({ root, isolate }: PlaceRequests['open']): Asking<Reply<'open'>> {
+export function* open({ root, isolate }: PlaceRequests['open']) {
   if (!isDirectory(root)) return refused(`${root} is not a directory: name a git repository with --repo`);
   if ((yield* gitSays(root, ['rev-parse', '--git-dir'])) === undefined)
     return refused(`${root} is not a git repository: run git init there and commit once, or name a repository with --repo`);

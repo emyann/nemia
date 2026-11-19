@@ -4,7 +4,7 @@
  * Whether `pid` is a live process on this host: a signal 0 delivered, or refused for want of permission, which still means it is there.
  * @param pid The process id asked of.
  */
-export function alive(pid: number): boolean {
+export function alive(pid: number) {
   try {
     process.kill(pid, 0);
     return true;

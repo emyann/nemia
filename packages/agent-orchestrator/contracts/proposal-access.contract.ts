@@ -16,14 +16,14 @@ export type Access = { readonly allows: readonly string[]; readonly denies: read
 export type AccessChange = ObjectsAccessChange;
 
 /** Whether `after` holds a rule `before` does not. */
-const gained = (before: readonly string[], after: readonly string[]): boolean => after.some((rule) => !before.includes(rule));
+const gained = (before: readonly string[], after: readonly string[]) => after.some((rule) => !before.includes(rule));
 
 /** Whether the change reaches further: an allow gained, a deny lost, or a mode that reaches further. */
-const widening = (before: Access, after: Access): boolean =>
+const widening = (before: Access, after: Access) =>
   gained(before.allows, after.allows) || gained(after.denies, before.denies) || after.mode > before.mode;
 
 /** Whether the change reaches less somewhere: an allow lost, a deny gained, or a mode that reaches less. */
-const narrowing = (before: Access, after: Access): boolean =>
+const narrowing = (before: Access, after: Access) =>
   gained(after.allows, before.allows) || gained(before.denies, after.denies) || after.mode < before.mode;
 
 const accessChangeSpec = spec<(before: Access, after: Access) => AccessChange>({

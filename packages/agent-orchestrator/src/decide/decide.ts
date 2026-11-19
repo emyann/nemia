@@ -103,31 +103,26 @@ export type Decision =
 export type Landed = boolean | 'unchanged';
 
 /** Whether a step's task is still live, `pending` or `running`: never for a step with no task. */
-function liveTask(taskId: string | null | undefined, phaseOf: (taskId: string) => TaskPhase): boolean {
+function liveTask(taskId: string | null | undefined, phaseOf: (taskId: string) => TaskPhase) {
   return taskId ? ['pending', 'running'].includes(phaseOf(taskId)) : false;
 }
 
 /** Whether a step's current check exited refusing the work (`refusedCheck`): never for a step with no check on its record. */
-function refusedOwnCheck(
-  run: Run,
-  name: string,
-  phaseOf: (taskId: string) => TaskPhase,
-  verdictOf: (step: string) => Verdict | undefined,
-): boolean {
+function refusedOwnCheck(run: Run, name: string, phaseOf: (taskId: string) => TaskPhase, verdictOf: (step: string) => Verdict | undefined) {
   const check = run.steps[name]?.check;
   return check !== undefined && refusedCheck(phaseOf(check.taskId), verdictOf(name));
 }
 
 /** `landed`, asked once per branch: a second call for the same branch returns what the first read. */
-function once(landed: (branch: string) => Landed): (branch: string) => Landed {
+function once(landed: (branch: string) => Landed) {
   const said = new Map<string, Landed>();
-  return (branch) => {
+  return ((branch) => {
     const known = said.get(branch);
     if (known !== undefined) return known;
     const read = landed(branch);
     said.set(branch, read);
     return read;
-  };
+  }) satisfies (branch: string) => Landed;
 }
 
 /**
@@ -155,9 +150,9 @@ function once(landed: (branch: string) => Landed): (branch: string) => Landed {
  * @param landed Asks git whether a result branch is on the base branch.
  * @param assessed The run's assessment off `read`; `assess` on it by default.
  */
-export function decision(read: AssessRead, landed: (branch: string) => Landed, assessed: Assessment = assess(read)): Decision {
+export function decision(read: AssessRead, landed: (branch: string) => Landed, assessed: Assessment = assess(read)) {
   const { steps, run, phaseOf, signedOff: closeoutOf, asked: askedCloseout, verdictOf, spendOf, checkout } = read;
-  if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
+  if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt } satisfies Decision;
 
   const { status, ready, retry, round } = assessed;
   const standingOf = assessed.stepWords;
@@ -173,7 +168,7 @@ export function decision(read: AssessRead, landed: (branch: string) => Landed, a
     return {
       kind: 'running',
       waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort(),
-    };
+    } satisfies Decision;
   }
 
   const branches = resultSteps(steps)
@@ -192,7 +187,7 @@ export function decision(read: AssessRead, landed: (branch: string) => Landed, a
     branches.every((b) => stands(b) !== false);
   const awaitingApproval = byHand ? [] : atGate;
   const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(stands);
-  if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'landed', branches };
+  if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'landed', branches } satisfies Decision;
 
   const named = (...want: StepStatus[]) =>
     [...standingOf]
@@ -225,7 +220,7 @@ export function decision(read: AssessRead, landed: (branch: string) => Landed, a
           awaitingApproval.length
         ? 'waiting'
         : 'succeeded';
-  if (onBase && outcome === 'succeeded') return { kind: 'landed', branches };
+  if (onBase && outcome === 'succeeded') return { kind: 'landed', branches } satisfies Decision;
   return {
     kind: 'awaiting',
     outcome,
@@ -242,11 +237,11 @@ export function decision(read: AssessRead, landed: (branch: string) => Landed, a
     denied,
     awaitingApproval,
     direct,
-  };
+  } satisfies Decision;
 }
 
 /** Whether the session of a step's current try was ended at its budget: its `budget exhausted`, kept by a recheck on the same task. */
-const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
+const budgetStopped = (run: Run, name: string, spendOf: SpendOf) => {
   const taskId = run.steps[name]?.taskId;
   return Boolean(taskId && spendOf(taskId)?.budgetEnded);
 };
@@ -263,7 +258,7 @@ const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
  * @param used What the step's current try used, or undefined where nothing was read of it.
  * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
-export function costLine(step: StepSpec | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
+export function costLine(step: StepSpec | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf) {
   const all = stepSpend(run, name, spendOf);
   const current = used?.costUsd !== undefined ? dollars(used.costUsd) : all.live ? `${dollars(all.live.usd)} so far` : 'not measured';
   const read = readWords(used, step?.context);
@@ -283,7 +278,7 @@ export function costLine(step: StepSpec | undefined, run: Run, name: string, use
  * @param run The run's record.
  * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
-export function runCostLines(run: Run, spendOf: SpendOf): string[] {
+export function runCostLines(run: Run, spendOf: SpendOf) {
   const said = runCostWords(run, spendOf);
   return said === null ? [] : [`cost  ${said}`];
 }
@@ -295,7 +290,7 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
  * @param run The run's record.
  * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
-export function runCostWords(run: Run, spendOf: SpendOf): string | null {
+export function runCostWords(run: Run, spendOf: SpendOf) {
   const spent = runSpend(run, spendOf);
   if (!spent.measured && !spent.unmeasured && !spent.live) return null;
   if (!spent.measured && !spent.live) return 'run not measured';
@@ -328,7 +323,7 @@ export type DecideCommand = {
  * The label of an offer's command, its verb's: an approval (`nemia approve` of a loop out of rounds: a gate's approval is no offer), a
  * refresh of the base (`nemia refresh --base`), a send-back with its objection, or once more.
  */
-const labelOf = (command: string): DecideCommand['label'] => {
+const labelOf = (command: string) => {
   if (command.startsWith('nemia approve ')) return 'approve';
   if (command.startsWith('nemia refresh ') && command.endsWith(' --base')) return 'refresh';
   return command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
@@ -343,8 +338,8 @@ function waitingAtGates(
   run: Run,
   statusOf: ReadonlyMap<string, StepStatus>,
   words: ReadonlyMap<string, StepStatus>,
-): string[] {
-  const waits = (name: string): boolean =>
+) {
+  const waits = (name: string) =>
     statusOf.get(name) === 'awaiting approval' || (!run.steps[name]?.taskId && words.get(name) === 'awaiting approval');
   return steps
     .filter((s) => waits(s.name))
@@ -353,10 +348,10 @@ function waitingAtGates(
 }
 
 /** For each step waiting at its gate on you (`awaitingApproval`), its approval and a send-back for each step it names (`sendBackTo`). */
-function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly string[]): DecideCommand[] {
+function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly string[]) {
   return steps
     .filter((s) => waiting.includes(s.name))
-    .flatMap((step): DecideCommand[] => {
+    .flatMap((step) => {
       const approve = `nemia approve ${run.id} ${step.name}`;
       return [
         {
@@ -365,14 +360,17 @@ function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly str
           said: `${step.name} waits at its gate — with words: ${approve} --message "<words>"`,
           step: step.name,
         },
-        ...sendBackTo(step, run).map((name): DecideCommand => ({
-          label: 'send back',
-          command: `nemia retry ${run.id} ${name} --message "<objection>"`,
-          said: null,
-          step: name,
-        })),
-      ];
-    });
+        ...sendBackTo(step, run).map(
+          (name) =>
+            ({
+              label: 'send back',
+              command: `nemia retry ${run.id} ${name} --message "<objection>"`,
+              said: null,
+              step: name,
+            }) satisfies DecideCommand,
+        ),
+      ] satisfies DecideCommand[];
+    }) satisfies DecideCommand[];
 }
 
 /**
@@ -388,23 +386,29 @@ function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly str
  * @param d The run's decision.
  * @param offers The once-more, approve and send-back offers for its steps, round's then retry's.
  */
-export function choicesOf(steps: readonly StepSpec[], run: Run, d: Decision, offers: readonly Offer[]): DecideCommand[] {
-  if (d.kind !== 'awaiting') return [];
+export function choicesOf(steps: readonly StepSpec[], run: Run, d: Decision, offers: readonly Offer[]) {
+  if (d.kind !== 'awaiting') return [] satisfies DecideCommand[];
   const once = [
-    ...offers.map(({ step, command, said }): DecideCommand => ({ label: labelOf(command), command, said, step })),
+    ...offers.map(({ step, command, said }) => ({ label: labelOf(command), command, said, step }) satisfies DecideCommand),
     ...gateChoices(steps, run, d.awaitingApproval),
   ];
   if (!isRepositoryRun(run))
-    return [...once, { label: 'forget it', command: `nemia rm ${run.id}`, said: 'forgets the run with its folders and files', step: null }];
+    return [
+      ...once,
+      { label: 'forget it', command: `nemia rm ${run.id}`, said: 'forgets the run with its folders and files', step: null },
+    ] satisfies DecideCommand[];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
-    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said, step: null }];
+    return [
+      ...once,
+      { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said, step: null },
+    ] satisfies DecideCommand[];
   }
   const first = merges(steps) ? undefined : d.branches[0];
-  if (!first) return once;
+  if (!first) return once satisfies DecideCommand[];
   return [
     ...once,
     { label: 'land it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null, step: null },
     { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null, step: null },
-  ];
+  ] satisfies DecideCommand[];
 }

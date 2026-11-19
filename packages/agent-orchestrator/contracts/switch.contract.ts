@@ -95,7 +95,7 @@ const unrelatedKeySpec = spec<(ours: string | undefined, theirs: string | undefi
 export type UnrelatedKey = Implementation<typeof unrelatedKeySpec>;
 
 /** Whether every name of `names` is in `of`. */
-const within = (names: readonly (string | undefined)[], of: readonly (string | undefined)[]): boolean =>
+const within = (names: readonly (string | undefined)[], of: readonly (string | undefined)[]) =>
   names.every((name) => of.some((o) => o === name));
 
 const unrelatedSetSpec = spec<(ours: readonly string[], theirs: readonly string[]) => { taken: readonly string[] } | { ask: true }>({

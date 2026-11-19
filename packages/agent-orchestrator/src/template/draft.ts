@@ -14,7 +14,7 @@ import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillN
 import { FACTORY_RULES_FILE } from '../factory/rules/rules.ts';
 import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
-import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step, type TemplateRoute } from './layout.ts';
+import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS } from './layout.ts';
 import { checkFailurePolicyOf } from '../check/index.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
@@ -106,20 +106,20 @@ const PLACED = new Set<string>([
 ]);
 
 /** A list as today's lines write one: comma-separated, each trimmed. */
-const listOf = (written: string): string[] =>
+const listOf = (written: string) =>
   written
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 
 /** The fence key of `harness` that takes one word, which today's `permissionMode:` and `sandbox:` lines both name. */
-const isWordKey = (key: string): boolean => Object.values(HARNESS_KNOBS).some((knobs) => knobs.fence.key === key);
+const isWordKey = (key: string) => Object.values(HARNESS_KNOBS).some((knobs) => knobs.fence.key === key);
 
 /**
  * The block of `harness` that `keys`, a step's own or an agent's, write: its model, effort and context as written, and its fence, a word
  * under the harness's fence key and each tool list read as the loader reads it. Undefined where they write none.
  */
-function blockOf(file: string, keys: Readonly<Record<string, string | undefined>>, harness: string): Profile | undefined {
+function blockOf(file: string, keys: Readonly<Record<string, string | undefined>>, harness: string) {
   const fence: Record<string, string | readonly string[]> = {};
   for (const key of HARNESS_FENCE_KEYS) {
     const written = keys[key];
@@ -135,13 +135,13 @@ function blockOf(file: string, keys: Readonly<Record<string, string | undefined>
 }
 
 /** The step keys of `step` the template has no place for. */
-const unplaced = (step: StepSource): string[] => Object.keys(step.keys).filter((key) => !PLACED.has(key));
+const unplaced = (step: StepSource) => Object.keys(step.keys).filter((key) => !PLACED.has(key));
 
 /**
  * The wiring of `step` of `workflow`, typed, in the template's order: a former `workspace: main` written as `base` (`baseSpelled`), and its
  * own `output:`, a file of the workflow's folder, named from the template's root.
  */
-function wiringOf(workflow: string, step: StepSource): Partial<Step> {
+function wiringOf(workflow: string, step: StepSource) {
   const keys = baseSpelled(step.keys);
   const wired: Record<string, unknown> = {};
   if (keys.after !== undefined) wired.after = listOf(keys.after);
@@ -155,7 +155,7 @@ function wiringOf(workflow: string, step: StepSource): Partial<Step> {
 }
 
 /** What `keys` say of routing: a condition's routes, its `route:` and its ends, a node's `when:`, a workflow node's workflow. */
-function routingOf(keys: Readonly<Partial<Record<string, unknown>>>): Partial<Step> {
+function routingOf(keys: Readonly<Partial<Record<string, unknown>>>) {
   const wired: Record<string, unknown> = {};
   for (const key of ROUTE_LISTS) {
     const written = keys[key];
@@ -170,7 +170,7 @@ function routingOf(keys: Readonly<Partial<Record<string, unknown>>>): Partial<St
 }
 
 /** A line's YAML value, read by the step's own frontmatter reader, or the line itself where it does not read as YAML. */
-const flowOf = (written: string): unknown => {
+const flowOf = (written: string) => {
   try {
     return readFrontmatter('route', `route: ${written}`).entries[0]?.value ?? written;
   } catch {
@@ -182,7 +182,7 @@ const flowOf = (written: string): unknown => {
  * A `route:` as the template writes it, from the step's line: `judge`, or the map its YAML flow reads as (`{ script }`, `{ from, table }`),
  * or the parser's `RouteEval` (its `kind` dropped). Undefined for none of them: the line is carried as written, for the check to refuse.
  */
-function templateRoute(written: unknown): TemplateRoute | undefined {
+function templateRoute(written: unknown) {
   const value = typeof written === 'string' ? flowOf(written) : written;
   if (typeof value === 'string') return value.trim() === 'judge' ? 'judge' : undefined;
   if (typeof value !== 'object' || value === null) return undefined;
@@ -195,7 +195,7 @@ function templateRoute(written: unknown): TemplateRoute | undefined {
 }
 
 /** What `keys` of a step of `workflow` say of the store and its closeout: its reads, its own schema from the template's root, its tally. */
-function closeoutOf(workflow: string, file: string, keys: Readonly<Partial<Record<string, string>>>): Partial<Step> {
+function closeoutOf(workflow: string, file: string, keys: Readonly<Partial<Record<string, string>>>) {
   return {
     ...(keys.reads === undefined ? {} : { reads: readsNamesOf(file, keys.reads) }),
     ...(keys.output === undefined ? {} : { output: { path: `workflows/${workflow}/${path.posix.normalize(keys.output)}` } }),
@@ -207,7 +207,7 @@ function closeoutOf(workflow: string, file: string, keys: Readonly<Partial<Recor
  * `step` of `workflow` as the template writes it, the agent it is hired from (`hired`) giving the harness its block is for where it names
  * none.
  */
-function stepOf(workflow: string, step: StepSource, hired: AgentSource | undefined): Step {
+function stepOf(workflow: string, step: StepSource, hired: AgentSource | undefined) {
   const harness = step.keys.harness ?? hired?.agent.keys.harness ?? DEFAULT_HARNESS;
   const overrides: Record<string, unknown> = {};
   if (step.keys.harness !== undefined) overrides.harness = step.keys.harness;
@@ -219,7 +219,7 @@ function stepOf(workflow: string, step: StepSource, hired: AgentSource | undefin
 }
 
 /** The agent `found` as the template writes it: its spec and the files of its folder. */
-function agentFiles(found: AgentSource): DraftFile[] {
+function agentFiles(found: AgentSource) {
   const { agent } = found;
   const harness = agent.keys.harness ?? DEFAULT_HARNESS;
   const block = isRemoteHarness(harness) ? undefined : blockOf(found.file, agent.keys, harness);
@@ -242,7 +242,7 @@ function agentFiles(found: AgentSource): DraftFile[] {
 }
 
 /** What of the agent `found` the template has no place for: a harness prompt, a remote, or a key the loader reads no other way. */
-function agentRefusals(found: AgentSource): string[] {
+function agentRefusals(found: AgentSource) {
   const { agent } = found;
   const keys = Object.keys(agent.keys).filter((key) => key !== 'output' && key !== 'harness' && !PLACED.has(key));
   if (agent.harnessPrompt !== undefined) keys.push('harnessPrompt');
@@ -250,7 +250,7 @@ function agentRefusals(found: AgentSource): string[] {
 }
 
 /** Why `key`, written in `file`, is refused: the template has no place for it. */
-const unplacedWords = (file: string, key: string): string =>
+const unplacedWords = (file: string, key: string) =>
   `${file}: \`${key}:\` has no place in a template, which holds a step's wiring, reads, own closeout schema and tally, and its harness's block. Remove the line, and export again. Nothing was written.`;
 
 /** A document of `kind` named `name`, with what a person reads of it and its `spec`. */
@@ -262,13 +262,13 @@ const documentOf = (kind: string, name: string, description: string | null | und
 });
 
 /** Whether the workflow file `other` is carried: a README, or a file that is no .md or .yaml. */
-const carried = (other: string): boolean => /^readme\.md$/i.test(other) || !/\.(md|yaml)$/.test(other);
+const carried = (other: string) => /^readme\.md$/i.test(other) || !/\.(md|yaml)$/.test(other);
 
 /** What a draft gathers while it maps: its files, where each came from, the refusals, and the agents and skills to carry. */
 type Gathered = Draft & { agents: Map<string, string>; skills: Map<string, string> };
 
 /** The agent `step` is filled by: its own `agent:`, or the factory's hire; both refused, naming each. */
-function filledBy(source: Source, workflow: string, step: StepSource, into: Gathered): string | undefined {
+function filledBy(source: Source, workflow: string, step: StepSource, into: Gathered) {
   const hired = source.factory?.hires[`${workflow}/${step.name}`];
   const own = step.keys.agent;
   if (own !== undefined && hired !== undefined)
@@ -279,9 +279,9 @@ function filledBy(source: Source, workflow: string, step: StepSource, into: Gath
 }
 
 /** The workflow `workflow` mapped into `into`: its document, its steps' files and its carried files, and who fills each step. */
-function gatherWorkflow(source: Source, workflow: WorkflowSource, into: Gathered, hires: Record<string, string>): void {
+function gatherWorkflow(source: Source, workflow: WorkflowSource, into: Gathered, hires: Record<string, string>) {
   const folder = `workflows/${workflow.name}`;
-  const steps = workflow.steps.flatMap((step): Step[] => {
+  const steps = workflow.steps.flatMap((step) => {
     into.refusals.push(...unplaced(step).map((key) => unplacedWords(step.file, key)));
     const agent = filledBy(source, workflow.name, step, into);
     if (agent !== undefined) {
@@ -313,7 +313,7 @@ function gatherWorkflow(source: Source, workflow: WorkflowSource, into: Gathered
 }
 
 /** The agents gathered, each mapped into `into` with the skills it names, or refused: none found, or the loader's refusal of it. */
-function gatherAgents(source: Source, into: Gathered): void {
+function gatherAgents(source: Source, into: Gathered) {
   for (const [name, by] of [...into.agents].sort(([a], [b]) => a.localeCompare(b))) {
     const found = source.agent(name);
     if (found === undefined || 'refused' in found) {
@@ -333,7 +333,7 @@ function gatherAgents(source: Source, into: Gathered): void {
  * The skills gathered, each carried whole, a place skill and a builtin skill of Nemia left out and said, one named with its folder left
  * out and said too, with where it was read, or refused: none found, or the loader's refusal of it.
  */
-function gatherSkills(source: Source, into: Gathered): void {
+function gatherSkills(source: Source, into: Gathered) {
   for (const [name, by] of [...into.skills].sort(([a], [b]) => a.localeCompare(b))) {
     const found = source.skill(name);
     if (found === 'place') into.from.push({ part: `skills/${name}/`, from: 'left out: a builtin place skill' });
@@ -357,7 +357,7 @@ function gatherSkills(source: Source, into: Gathered): void {
  * Refused, each by name, nothing to write: a key the template has no place for, a step filled twice, an agent or a skill not found.
  * @param source What the draft is made from: the template's name, its workflows and factory, and how each agent and skill named is found.
  */
-export function draftOf(source: Source): Draft {
+export function draftOf(source: Source) {
   const into: Gathered = { files: [], from: [], refusals: [], agents: new Map(), skills: new Map() };
   const hires: Record<string, string> = {};
   for (const workflow of source.workflows) gatherWorkflow(source, workflow, into, hires);

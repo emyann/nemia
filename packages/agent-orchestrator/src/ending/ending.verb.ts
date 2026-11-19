@@ -33,7 +33,7 @@ import type { PassStanding } from '../standing/standing.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** A task the engine holds in flight, as `inFlight` counts one: its step is in the checkout now. Pure. */
-const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phase === 'running';
+const inFlightPhase = (phase: TaskPhase) => phase === 'pending' || phase === 'running';
 
 /**
  * Which run's `workspace: base` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
@@ -219,7 +219,7 @@ export function landEnding(
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
   memo: StatusMemo,
-): { notes: string[]; landed: boolean } {
+) {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
   if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run) || !runsAtOnce(home).runs.exists(run.id))
@@ -268,23 +268,33 @@ export function landEnding(
  * Commit the merge staged in `run`'s checkout with `message` through its place (`landThrough`), and abort it where the place refuses the
  * commit: what to write on the step's record, with its note, or why the next pass tries again.
  */
-function committedThrough(
-  run: RepositoryRun,
-  message: string,
-  memo: StatusMemo,
-): { landed: LandingRecord; note: string } | { again: string } {
+function committedThrough(run: RepositoryRun, message: string, memo: StatusMemo) {
   const made = landThrough(run, { act: 'commit', message }, memo);
-  if ('commit' in made) return { landed: made, note: `its check passed on the merge, and ${landedWords(run, made)}` };
-  if ('aborted' in made) return { again: 'the place answered an abort where the run asked a commit of its merge' };
-  if ('unread' in made) return { again: `the run could not commit its merge (${made.unread})` };
+  if ('commit' in made)
+    return { landed: made, note: `its check passed on the merge, and ${landedWords(run, made)}` } satisfies
+      | { landed: LandingRecord; note: string }
+      | { again: string } as { landed: LandingRecord; note: string } | { again: string };
+  if ('aborted' in made)
+    return { again: 'the place answered an abort where the run asked a commit of its merge' } satisfies
+      | { landed: LandingRecord; note: string }
+      | { again: string } as { landed: LandingRecord; note: string } | { again: string };
+  if ('unread' in made)
+    return { again: `the run could not commit its merge (${made.unread})` } satisfies
+      | { landed: LandingRecord; note: string }
+      | { again: string } as { landed: LandingRecord; note: string } | { again: string };
   const why = `the place refused the commit of its merge: ${made.refused}`;
   const refused = abortedThrough(run, memo);
-  if (refused) return { again: `${why}; and the run could not abort the merge either (${refused})` };
-  return { landed: { aborted: why }, note: `${why}, so the run aborted the merge; nothing landed on ${run.branch}` };
+  if (refused)
+    return { again: `${why}; and the run could not abort the merge either (${refused})` } satisfies
+      | { landed: LandingRecord; note: string }
+      | { again: string } as { landed: LandingRecord; note: string } | { again: string };
+  return { landed: { aborted: why }, note: `${why}, so the run aborted the merge; nothing landed on ${run.branch}` } satisfies
+    | { landed: LandingRecord; note: string }
+    | { again: string } as { landed: LandingRecord; note: string } | { again: string };
 }
 
 /** Abort the merge staged in `run`'s checkout through its place (`landThrough`): undefined once it has, else why not, in words. */
-function abortedThrough(run: RepositoryRun, memo: StatusMemo): string | undefined {
+function abortedThrough(run: RepositoryRun, memo: StatusMemo) {
   const taken = landThrough(run, { act: 'abort' }, memo);
   if ('aborted' in taken) return undefined;
   if ('commit' in taken) return 'the place answered a commit where the run asked an abort';

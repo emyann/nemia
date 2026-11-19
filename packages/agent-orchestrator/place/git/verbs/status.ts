@@ -14,12 +14,12 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { git, gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import { git, gitSays, isDirectory, refused } from '../git.ts';
 import { cameOnto, landedBy } from '../landed.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The commits MERGE_HEAD names in `checkout`, none when no merge is in progress. */
-function mergeHeads(checkout: string, file: string): string[] {
+function mergeHeads(checkout: string, file: string) {
   const at = path.resolve(checkout, file);
   if (!fs.existsSync(at)) return [];
   return fs
@@ -30,7 +30,7 @@ function mergeHeads(checkout: string, file: string): string[] {
 }
 
 /** The verb's body. */
-export function* status({ repo: checkout, tips }: PlaceRequests['status']): Asking<Reply<'status'>> {
+export function* status({ repo: checkout, tips }: PlaceRequests['status']) {
   const file = isDirectory(checkout) ? yield* gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
   if (file === undefined) return refused(`${checkout} is not a git repository, so no merge can be staged there`);
   const heads = mergeHeads(checkout, file);
@@ -50,7 +50,7 @@ export function* status({ repo: checkout, tips }: PlaceRequests['status']): Aski
  * The first commit of `head`'s first-parent line that holds every one of `tips`, each already in `head`: undefined where none was asked
  * of, or a merge of one is in progress, so a pass with a merge staged pays no walk.
  */
-function* cameIn(checkout: string, head: string, tips: readonly string[], heads: readonly string[]): Asking<string | undefined> {
+function* cameIn(checkout: string, head: string, tips: readonly string[], heads: readonly string[]) {
   if (!tips.length || tips.some((sha) => heads.includes(sha))) return undefined;
   let point: ReturnType<typeof cameOnto>;
   for (const [i, sha] of tips.entries()) {
@@ -64,4 +64,4 @@ function* cameIn(checkout: string, head: string, tips: readonly string[], heads:
 }
 
 /** Git's rows, one a line, each split on its spaces; none where git printed nothing. */
-const rowsOf = (said: string): string[][] => (said ? said.split('\n').map((row) => row.trim().split(' ')) : []);
+const rowsOf = (said: string) => (said ? said.split('\n').map((row) => row.trim().split(' ')) : []);

@@ -41,7 +41,7 @@ export const FREE_A_SWEEP = 4;
 export type FreeMemory = { judged: Set<string>; said: Map<string, string>; turn: number };
 
 /** What a daemon's sweeps remember when it starts: nothing. */
-export const freshFreeMemory = (): FreeMemory => ({ judged: new Set(), said: new Map(), turn: 0 });
+export const freshFreeMemory = () => ({ judged: new Set(), said: new Map(), turn: 0 }) satisfies FreeMemory;
 
 /** What one sweep did: each run it freed, as its prune answered, and each line it said of a run it left. */
 export type Freed = { readonly freed: readonly Pruning[]; readonly said: readonly string[] };
@@ -50,13 +50,13 @@ export type Freed = { readonly freed: readonly Pruning[]; readonly said: readonl
 type Swept = { readonly id: string; readonly ready: Sized } | { readonly id: string; readonly words: string | null };
 
 /** Why a judgement, a sizing or a removal that failed did: its refusal's or its defect's own message, on one line. */
-const whyOf = (cause: Cause.Cause<unknown>): string => {
+const whyOf = (cause: Cause.Cause<unknown>) => {
   const err = Cause.squash(cause);
   return firstPiece(err instanceof Error ? err.message : String(err), '\n');
 };
 
 /** What is to be said of a run the judgement left: nothing of one with nothing listed, whose empty folder goes; else `freeSaid`. */
-function leftWords(home: string, id: string, judged: Exclude<Judged, { ready: unknown }>): string | null {
+function leftWords(home: string, id: string, judged: Exclude<Judged, { ready: unknown }>) {
   if (judged.pruning.kind === 'nothing') {
     dropEmpty(resolved(path.join(home, 'worktrees', id)));
     return null;
@@ -79,14 +79,16 @@ const swept = Effect.fnUntraced(function* (id: string) {
 });
 
 /** A group of one repository's runs after its removal: what was done with each; one that failed leaves each as it was, in its words. */
-function freedTogether({ group, exit }: { group: readonly Sized[]; exit: Exit.Exit<readonly Pruning[], unknown> }): readonly Pruning[] {
-  if (Exit.isSuccess(exit)) return exit.value;
+function freedTogether({ group, exit }: { group: readonly Sized[]; exit: Exit.Exit<readonly Pruning[], unknown> }) {
+  if (Exit.isSuccess(exit)) return exit.value satisfies readonly Pruning[];
   const why = whyOf(exit.cause);
-  return group.map((r): Pruning => ({ id: r.run.id, kind: 'refused', refusal: why, worktrees: [], left: [] }));
+  return group.map(
+    (r) => ({ id: r.run.id, kind: 'refused', refusal: why, worktrees: [], left: [] }) satisfies Pruning,
+  ) satisfies readonly Pruning[];
 }
 
 /** What is to be said of a run after its removal: nothing when every worktree went, else each line of what was left. */
-const afterWords = (p: Pruning): string | null => {
+const afterWords = (p: Pruning) => {
   if (p.kind !== 'pruned') return p.refusal ?? null;
   return p.left.length
     ? pruneLines({ ...p, worktrees: [] })
@@ -96,7 +98,7 @@ const afterWords = (p: Pruning): string | null => {
 };
 
 /** The memory without what it holds of a run that is no candidate any more, nor left untaken: freed, or no longer finished. */
-function forgotten(memory: FreeMemory, candidates: readonly string[]): void {
+function forgotten(memory: FreeMemory, candidates: readonly string[]) {
   const standing = new Set(candidates);
   for (const id of memory.judged) if (!standing.has(id)) memory.judged.delete(id);
   for (const id of memory.said.keys()) if (!standing.has(id)) memory.said.delete(id);
@@ -202,7 +204,7 @@ export const sweepLoop = <A, E, R>(
   every: Duration.Input,
   words: string,
   { done, failed: onFailed }: { done?: (answered: A) => void; failed?: () => void } = {},
-): Effect.Effect<never, never, R> => {
+) => {
   let failed: string | undefined;
   const sweep = Effect.suspend(once).pipe(
     Effect.andThen((answered) =>

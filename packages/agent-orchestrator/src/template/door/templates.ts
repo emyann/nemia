@@ -10,7 +10,7 @@ import { SKILL_NAME } from '../../keys/index.ts';
  * Why `source` names no template's place: a path that is not absolute, or not as `path.resolve` writes it.
  * @param source The template's place as recorded.
  */
-export const templateSourceRefusal = (source: string): string | null =>
+export const templateSourceRefusal = (source: string) =>
   path.isAbsolute(source) && path.resolve(source) === source
     ? null
     : `${JSON.stringify(source)} is no template's place: name its folder or archive by its whole path, ${path.resolve(source)}.`;
@@ -19,7 +19,7 @@ export const templateSourceRefusal = (source: string): string | null =>
  * Why `name` names no template: a template is named by its folder, lowercase words joined by dashes (`SKILL_NAME`).
  * @param name The name given.
  */
-export const templateNameRefusal = (name: string): string | null =>
+export const templateNameRefusal = (name: string) =>
   SKILL_NAME.test(name)
     ? null
     : `a template is named by its folder, and ${name} is not a name: lowercase words joined by dashes. Name another folder.`;
@@ -28,7 +28,7 @@ export const templateNameRefusal = (name: string): string | null =>
  * Why `at` is no path in a template's folder: absolute, with a backslash, or a part empty, `.` or `..`.
  * @param at The path asked of.
  */
-export const treePathRefusal = (at: string): string | null =>
+export const treePathRefusal = (at: string) =>
   at.startsWith('/') || at.includes('\\') || at.split('/').some((part) => part === '' || part === '.' || part === '..')
     ? `${at} is no path in a template's folder: write parts joined by /, none empty, . or .., never absolute.`
     : null;
@@ -42,19 +42,21 @@ export type Problem = { file: string; line?: number; col?: number; message: stri
  * directory. A folder whose name is a template's is named as a path, `./<name>`.
  * @param given The `--template` word as typed.
  */
-export const sourceGiven = (given: string): string => (templateNameRefusal(given) === null ? given : path.resolve(given));
+export const sourceGiven = (given: string) =>
+  (templateNameRefusal(given) === null ? given : path.resolve(given)) satisfies string as string;
 
 /**
  * The name a recorded source fixes with no read of it: a builtin template's is the name it is recorded by; a folder's or an archive's is
  * read off it (an archive's is the top folder inside it), so none is said where it cannot be read.
  * @param source The template's source as recorded.
  */
-export const nameOfSource = (source: string): string | undefined => (templateNameRefusal(source) === null ? source : undefined);
+export const nameOfSource = (source: string) =>
+  (templateNameRefusal(source) === null ? source : undefined) satisfies string | undefined as string | undefined;
 
 /**
  * The folder a recorded source is read from, for a line that cannot fail: a name's folder in `builtins`, a path as it is.
  * @param source The template's source as recorded.
  * @param builtins The folder of builtin templates.
  */
-export const builtinPlace = (source: string, builtins: string): string =>
+export const builtinPlace = (source: string, builtins: string) =>
   templateNameRefusal(source) === null ? path.join(builtins, source) : source;

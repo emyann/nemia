@@ -24,7 +24,7 @@ export const A2A_AGENTS_FILE = 'a2a-agents.json';
  * Where the file is, in the store at `home`.
  * @param home The store's home folder.
  */
-export const remoteAgentsFile = (home: string): string => path.join(home, A2A_AGENTS_FILE);
+export const remoteAgentsFile = (home: string) => path.join(home, A2A_AGENTS_FILE);
 
 /** One agent as the file gives it: the runtime's `RemoteAgent`, whose keys the runtime judges (`remoteConfigRefusal`). */
 export type RemoteEntry = Record<string, unknown>;
@@ -33,7 +33,7 @@ export type RemoteEntry = Record<string, unknown>;
 export type RemoteAgents = ReadonlyMap<string, RemoteEntry>;
 
 /** A word of a variable's name: upper case, and anything but a letter or a digit an underscore. */
-const envWord = (word: string): string => word.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+const envWord = (word: string) => word.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 
 /**
  * The environment variable that holds the secret for the scheme `scheme` of the agent the file declares as `name`:
@@ -42,7 +42,7 @@ const envWord = (word: string): string => word.toUpperCase().replace(/[^A-Z0-9]/
  * @param name The agent's name, as the file declares it.
  * @param scheme The security scheme's name, as the agent's card gives it.
  */
-export const envNameOf = (name: string, scheme: string): string => `WF_A2A_${envWord(name)}_${envWord(scheme)}`;
+export const envNameOf = (name: string, scheme: string) => `WF_A2A_${envWord(name)}_${envWord(scheme)}`;
 
 /** A refusal of the file, with the fix: exit code 2, as every refusal a person acts on. */
 function refuse(file: string, why: string): never {
@@ -55,7 +55,7 @@ function refuse(file: string, why: string): never {
  * meet (`meetingOf`). What each entry holds is the runtime's to judge, once the client has it (`readRemote` in runtime-client.ts).
  * @param file The path of the file.
  */
-export function readRemoteAgents(file: string): RemoteAgents {
+export function readRemoteAgents(file: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -111,10 +111,10 @@ export function readRemoteAgents(file: string): RemoteAgents {
  * is the other, a dash and more (`acme` and `acme-internal`), since a dash and an underscore are both `_` there and a name holds no
  * underscore.
  */
-function meetingOf(names: readonly string[]): [string, string] | undefined {
+function meetingOf(names: readonly string[]) {
   for (const short of names) {
     const long = names.find((n) => n.startsWith(`${short}-`));
-    if (long) return [short, long];
+    if (long) return [short, long] satisfies [string, string] | undefined;
   }
-  return undefined;
+  return undefined satisfies [string, string] | undefined;
 }

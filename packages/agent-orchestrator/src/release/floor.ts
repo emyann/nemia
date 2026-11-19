@@ -24,7 +24,7 @@ export const STORE_READABLE_FROM: Version = { major: 1, minor: 26, patch: 0 };
  * `tools/release/install.sh` reads one.
  * @param text The version as a tag or `release.json` writes it.
  */
-export function parseVersion(text: string): Version | null {
+export function parseVersion(text: string) {
   const parts = /^v?(\d{1,9})\.(\d{1,9})\.(\d{1,9})$/.exec(text);
   if (parts === null) return null;
   const [, major, minor, patch] = parts;
@@ -35,14 +35,14 @@ export function parseVersion(text: string): Version | null {
  * A version as its tag is written: `v1.2.3`.
  * @param v The version to write.
  */
-export const versionTag = (v: Version): string => `v${v.major}.${v.minor}.${v.patch}`;
+export const versionTag = (v: Version) => `v${v.major}.${v.minor}.${v.patch}`;
 
 /**
  * Whether `a` is an older release than `b`.
  * @param a The version asked of.
  * @param b The version it is compared with.
  */
-export const olderThan = (a: Version, b: Version): boolean =>
+export const olderThan = (a: Version, b: Version) =>
   a.major !== b.major ? a.major < b.major : a.minor !== b.minor ? a.minor < b.minor : a.patch < b.patch;
 
 /**

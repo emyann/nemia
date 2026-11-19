@@ -63,7 +63,7 @@ type Pass = Effect.Success<ReturnType<typeof tickRun>>;
  * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `waiting` for one a person alone stops, `failed`
  * for one in which a step broke — and what the pass did to it.
  */
-function tickRunLine(r: Pass['runs'][number]): string {
+function tickRunLine(r: Pass['runs'][number]) {
   const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
   const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
   const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
@@ -74,7 +74,7 @@ function tickRunLine(r: Pass['runs'][number]): string {
 }
 
 /** What `nemia tick` prints of a run: its line (`tickRunLine`), then its notes, a line each. */
-function tickRunLines(r: Pass['runs'][number]): void {
+function tickRunLines(r: Pass['runs'][number]) {
   console.log(tickRunLine(r));
   for (const note of r.notes) console.log(`   ${note}`);
 }
@@ -83,7 +83,7 @@ function tickRunLines(r: Pass['runs'][number]): void {
  * A pass's lines on `nemia tick`: the pause it read and what finishes under it, what failed or was left out and what it forgot of removed
  * runs on stderr, then what it refused, the queue's card and each run; returns it.
  */
-function tickLines(pass: Pass): Pass {
+function tickLines(pass: Pass) {
   const { runs: results, queue, feedError, refused, unreadable, forgetting, pause } = pass;
   if (pause) for (const line of pausedLines(pause)) console.log(line);
   if (feedError) console.error(feedError);
@@ -93,14 +93,14 @@ function tickLines(pass: Pass): Pass {
   if (queue) console.log(queueLine(queue));
   if (!results.length && !queue && !unreadable?.length) console.log('no runs');
   for (const r of results) tickRunLines(r);
-  return pass;
+  return pass satisfies Pass as Pass;
 }
 
 /**
  * `nemia tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is
  * refused, with no way to force it. A queued card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
-async function tickVerb(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+async function tickVerb(env: Env, args: Args, e: Engine, place: Place) {
   const stats = args.stats === true;
   const held = storeRefusal(wfRoot(env), 'tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
@@ -110,7 +110,7 @@ async function tickVerb(env: Env, args: Args, e: Engine, place: Place): Promise<
 }
 
 /** `nemia up --stats`: what the last pass cost, read off the store at `home`, ticking nothing, and who wrote it. */
-function upStats(home: string): void {
+function upStats(home: string) {
   const cost = lastPassCost(home);
   const daemon = storeRefusal(home, 'tick') !== undefined;
   if (!cost)
@@ -134,7 +134,7 @@ function upStats(home: string): void {
  * where the file is readable by others, and says once, as it takes the store, the warning of a kept token near or past its year
  * (`tokenWarningLine`).
  */
-function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<void> {
+function upVerb(env: Env, args: Args, e: Engine, place: Place) {
   const store = wfRoot(env);
   if (args.stats === true) return upStats(store);
   const signedIn = loadClaudeToken(env);
@@ -191,15 +191,15 @@ async function commanded(
   e: Engine,
   demand: (root: string) => DemandHost,
   place: Place,
-): Promise<void> {
-  if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual);
+) {
+  if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual) satisfies void as void;
   const args = parseArgv(command.spec, rest);
-  if (args === undefined) return console.log(HELP);
+  if (args === undefined) return console.log(HELP) satisfies void as void;
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
   if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand(wfRoot(env))));
   const runner = RUNS.get(command.name);
-  if (runner) return runner(env, args, e, place);
+  if (runner) return runner(env, args, e, place) satisfies void as void;
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const entry: Served & Partial<Pick<Command, 'print' | 'note'>> = command;
@@ -215,7 +215,7 @@ async function commanded(
  * typed entry takes, its input erased as the table holds it (`tableEntry`).
  */
 function inputOf<D extends object, I>(command: Served<D, I>, args: Args): I;
-function inputOf(command: Served, args: Args): Args {
+function inputOf(command: Served, args: Args) {
   if (command.input === undefined) return args;
   const decoded = Schema.decodeUnknownExit(command.input)(args);
   if (decoded._tag === 'Success') return decoded.value as Args;
@@ -236,11 +236,14 @@ const NAMES = TABLE.filter((c) => c.only?.side !== 'api' && !MOVED.includes(c.na
  * command the client holds (`MOVED`) is longer, so its words print the help rather than reach a name that heads it (`agents`). A name
  * that heads others (`agents`, before `agents card`) given a word none of them is gets that word, and refuses it in its own words.
  */
-function namedIn(argv: readonly string[]): { name: string; rest: string[] } | undefined {
+function namedIn(argv: readonly string[]) {
   const opens = (name: string) => name.split(' ').every((word, i) => argv[i] === word);
   const name = [...NAMES, ...MOVED].filter(opens).sort((a, b) => b.length - a.length)[0];
-  if (name === undefined || MOVED.includes(name)) return undefined;
-  return { name, rest: argv.slice(name.split(' ').length) };
+  if (name === undefined || MOVED.includes(name))
+    return undefined satisfies { name: string; rest: string[] } | undefined as { name: string; rest: string[] } | undefined;
+  return { name, rest: argv.slice(name.split(' ').length) } satisfies { name: string; rest: string[] } | undefined as
+    | { name: string; rest: string[] }
+    | undefined;
 }
 
 /**
@@ -260,18 +263,18 @@ export async function main(
   demand: (root: string) => DemandHost = liveDemandHost,
   place: Place = builtinGitPlace,
   env: Env = process.env,
-): Promise<void> {
+) {
   const renamed = renamedIn(argv);
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);
   const named = namedIn(renamed.words);
-  if (named === undefined) return console.log(HELP);
+  if (named === undefined) return console.log(HELP) satisfies void as void;
   const exempt = named.name === 'version' || named.rest.includes('--help');
   const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(wfRoot(env)), wfRoot(env), env);
   if (trial !== null) throw new Conflict({ message: trial });
   const e = given ?? engine(env);
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
-  if (command === undefined) return console.log(HELP);
-  return commanded(env, command, named.rest, e, demand, place);
+  if (command === undefined) return console.log(HELP) satisfies void as void;
+  return commanded(env, command, named.rest, e, demand, place) satisfies void as void;
 }
 
 /**
@@ -279,7 +282,7 @@ export async function main(
  * @param argv The command line after the program's name.
  * @param e The engine the commands talk to, or undefined for the board under `WF_ROOT`.
  */
-export function aliased(argv: string[], e?: Engine): Promise<void> {
+export function aliased(argv: string[], e?: Engine) {
   process.stderr.write(`${WF_HINT}\n`);
   return main(argv, e);
 }

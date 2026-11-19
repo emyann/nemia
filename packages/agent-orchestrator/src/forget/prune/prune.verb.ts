@@ -11,7 +11,6 @@ import { isDeepStrictEqual } from 'node:util';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, type Engine } from '../../runtime-client.ts';
 import type { StepSpec } from '../../step/step.ts';
-import type { MergeState } from '../../place/place.ts';
 import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune.ts';
 import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, type Pruned, type Run } from '../../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../../status/status.ts';
@@ -27,7 +26,7 @@ import { askCheckoutStatus, checkoutStatus, stagedHere, statusMemo, type StatusM
 import { headsOver, standingLive } from '../../standing/standing.verb.ts';
 import { handOffOwed } from '../../tick/advance.verb.ts';
 import { readAndAdopt } from '../../adopt/run-adopt.verb.ts';
-import { Conflict, Invalid, type Refusal } from '../../refusal/refusal.ts';
+import { Conflict, Invalid } from '../../refusal/refusal.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 
 /**
@@ -39,7 +38,7 @@ import { StoreRoot } from '../../config/root.store.ts';
  * @param steps Its workflow's steps, or undefined where its workflow does not read.
  * @param memo The place's answers already read, so one checkout is asked once.
  */
-export function merging(run: Run, steps: readonly StepSpec[] | undefined, memo: StatusMemo): MergeState['merging'] {
+export function merging(run: Run, steps: readonly StepSpec[] | undefined, memo: StatusMemo) {
   if (!readsCheckout(run, steps)) return 'none';
   const read = checkoutStatus(run, steps ?? [], memo);
   if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
@@ -92,13 +91,14 @@ export const prune = Effect.fn('prune')(function* (
 });
 
 /** A run ready to prune as a listing says it: each worktree and its files with what removing them frees, nothing touched. */
-export const prunableOf = ({ run, worktrees, files }: Sized): Pruning => ({
-  id: run.id,
-  kind: 'prunable',
-  worktrees,
-  ...(files ? { artifacts: files } : {}),
-  left: [],
-});
+export const prunableOf = ({ run, worktrees, files }: Sized) =>
+  ({
+    id: run.id,
+    kind: 'prunable',
+    worktrees,
+    ...(files ? { artifacts: files } : {}),
+    left: [],
+  }) satisfies Pruning as Pruning;
 
 /** A run `judging` found ready to prune: the run as judged, its place, its folder of worktrees, each worktree listed, and its files. */
 export type Ready = {
@@ -149,10 +149,11 @@ export const judging = Effect.fn('prune.judging')(function* (
   const refusedId = idRefusal(id, 'prune');
   if (refusedId) throw new Invalid({ message: refusedId });
   const run = runsAtOnce(home).runs.read(id);
-  const refused = (refusal: string, facts?: PruneFacts): Judged => ({
-    pruning: { id, kind: 'refused', refusal, worktrees: [], left: [] },
-    ...(facts ? { facts } : {}),
-  });
+  const refused = (refusal: string, facts?: PruneFacts) =>
+    ({
+      pruning: { id, kind: 'refused', refusal, worktrees: [], left: [] },
+      ...(facts ? { facts } : {}),
+    }) satisfies Judged as Judged;
   const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });
   if (!isRepositoryRun(run)) return refused(folder ?? '');
 
@@ -195,7 +196,7 @@ export const sized = Effect.fn('prune.sized')(function* (ready: Ready) {
  * A run's frozen steps, or, for a record with no frozen workflow whose folder does not load, why (`unfrozen`): the run is judged without
  * them, and its facts say why.
  */
-const frozenSteps = (run: Run): Effect.Effect<{ steps?: StepSpec[]; unfrozen?: string }, Refusal> =>
+const frozenSteps = (run: Run) =>
   Effect.map(stepsOrWhy(run), (read) => ('steps' in read ? { steps: read.steps } : { unfrozen: read.unloaded }));
 
 /** The run's worktrees inside `within` as its place's inventory read them (`runWorktrees`), the record's paths read as git names them. */
@@ -210,7 +211,7 @@ function placeWorktrees(run: RepositoryRun, steps: readonly StepSpec[] | undefin
 }
 
 /** Why a run with no worktree left — nor, under `--artifacts`, a files directory — has nothing to prune. */
-function nothingLeft(run: RepositoryRun, artifacts: boolean): Pruning {
+function nothingLeft(run: RepositoryRun, artifacts: boolean) {
   const worktrees =
     run.pruned?.worktrees.length || (run.pruned && !run.pruned.artifacts)
       ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (nemia prune)`
@@ -220,21 +221,23 @@ function nothingLeft(run: RepositoryRun, artifacts: boolean): Pruning {
   const nothing = !artifacts
     ? worktrees
     : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
-  return { id: run.id, kind: 'nothing', nothing, worktrees: [], left: [] };
+  return { id: run.id, kind: 'nothing', nothing, worktrees: [], left: [] } satisfies Pruning as Pruning;
 }
 
 /**
  * What is left of a run pruned before with no worktree listed: the place's `remove` of nothing, which prunes git's list of worktrees
  * whose directory is gone, and its folder of worktrees, once empty.
  */
-const forgetGone = ({ run, place, within }: Left): Effect.Effect<void> =>
-  place.place.ask('remove', { repo: run.repo, workspaces: [], branches: [] }).pipe(Effect.andThen(Effect.sync(() => dropEmpty(within))));
+const forgetGone = ({ run, place, within }: Left) =>
+  place.place
+    .ask('remove', { repo: run.repo, workspaces: [], branches: [] })
+    .pipe(Effect.andThen(Effect.sync(() => dropEmpty(within)))) satisfies Effect.Effect<void> as Effect.Effect<void>;
 
 /**
  * What a removal left behind and why (`leftWhy`), said on stderr; nothing for none.
  * @param why Why a removal left something behind, or null where it left nothing.
  */
-export const sayLeft = (why: string | null): void => {
+export const sayLeft = (why: string | null) => {
   if (why !== null) process.stderr.write(`${why}\n`);
 };
 
@@ -243,7 +246,7 @@ export const sayLeft = (why: string | null): void => {
  * for another reason is left too, its reason said on stderr (`leftWhy`).
  * @param within The folder to remove.
  */
-export function dropEmpty(within: string): void {
+export function dropEmpty(within: string) {
   try {
     fs.rmdirSync(within);
   } catch (err) {
@@ -301,7 +304,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
  * One worktree as `pruneRefusal` judges it, from what the place's inventory read: its hold (`heldWorktree`), each change it holds
  * uncommitted — and that its status did not read, where nobody holds it — and the place's command for it (`say`).
  */
-function pruneFact(run: RepositoryRun, place: RunPlaceRead, w: Held): PruneFacts['worktrees'][number] {
+function pruneFact(run: RepositoryRun, place: RunPlaceRead, w: Held) {
   const hold = heldWorktree(w);
   const fix = !hold
     ? sayFilled(place.say.inspect, { path: w.path })
@@ -321,7 +324,7 @@ type Marked = Sized & { readonly now: string; readonly base: Pruned | undefined;
  * judgement, every worktree that mark lists kept, and its files counted as gone when they are to go. The read and the write are one
  * stretch nothing else of this process runs in.
  */
-function marked(home: string, ready: Sized, now: string): Marked {
+function marked(home: string, ready: Sized, now: string) {
   const base = runsAtOnce(home).runs.pruned(ready.run.id);
   const filesBefore = base?.artifacts;
   const mine: Pruned = {
@@ -345,7 +348,7 @@ function marked(home: string, ready: Sized, now: string): Marked {
  * are added to those gone before. A prune that removed nothing, with a worktree it listed still standing or none listed, leaves the
  * mark as it reads without it (`takenBack`): gone on a run never pruned, as it was on one that was.
  */
-function settle(home: string, r: Marked, removed: Pruning['worktrees'], freed: number | undefined): void {
+function settle(home: string, r: Marked, removed: Pruning['worktrees'], freed: number | undefined) {
   const current = runsAtOnce(home).runs.pruned(r.run.id);
   const untouched = isDeepStrictEqual(current, r.mine);
   const theirs = untouched ? r.base : current;
@@ -361,13 +364,13 @@ function settle(home: string, r: Marked, removed: Pruning['worktrees'], freed: n
  * and no files while this prune listed worktrees, which stand. Such a mark is another prune's own, put there before its removal, and
  * says nothing went: restored, it would leave a run nothing was removed from reading pruned once both prunes are over.
  */
-function takenBack(r: Marked): Pruned | undefined {
+function takenBack(r: Marked) {
   const empty = r.base !== undefined && !r.base.worktrees.length && !r.base.artifacts;
   return empty && r.worktrees.length > 0 ? undefined : r.base;
 }
 
 /** The mark `theirs` at `at`, with the worktrees `went` it does not list yet, and the files' bytes `freed` at `now` over those before. */
-function markWith(theirs: Pruned | undefined, went: Pruning['worktrees'], freed: number | undefined, at: string, now: string): Pruned {
+function markWith(theirs: Pruned | undefined, went: Pruning['worktrees'], freed: number | undefined, at: string, now: string) {
   const before = theirs?.worktrees ?? [];
   const held = new Set(before.map((w) => w.path));
   const files = freed === undefined ? theirs?.artifacts : { at: now, bytes: (theirs?.artifacts?.bytes ?? 0) + freed };
@@ -429,10 +432,7 @@ const finished = Effect.fnUntraced(function* (r: Marked, outcome: PlaceOutcome<'
  * What the place's `remove` did with one run's worktrees: those it removed, and those it left, in git's words, or every one, when it did
  * not answer.
  */
-function removedOf(
-  { place, worktrees }: Sized,
-  outcome: PlaceOutcome<'remove'>,
-): Pick<Pruning, 'left'> & { removed: Pruning['worktrees'] } {
+function removedOf({ place, worktrees }: Sized, outcome: PlaceOutcome<'remove'>) {
   if (!('answer' in outcome)) {
     const said = unansweredWords(outcome);
     return { removed: [], left: worktrees.map((w) => ({ path: w.path, unread: said })) };
@@ -561,7 +561,7 @@ const turned = Effect.fnUntraced(function* (
       if (pruning !== undefined) done.set(id, { id, pruning });
     });
   }
-  return judged.map((l): Turned => done.get(l.id) ?? ('failed' in l ? l : { id: l.id, pruning: l.pruning }));
+  return judged.map((l) => done.get(l.id) ?? ('failed' in l ? l : { id: l.id, pruning: l.pruning }));
 });
 
 /**
@@ -600,6 +600,7 @@ export const freeingMany = Effect.fn('prune.freeingMany')(function* (
  * link — a home directory on another disk, or macOS's `/var` in `/private/var` — would otherwise hold no worktree git lists.
  * @param p The path, absolute or relative to the working folder.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function resolved(p: string): string {
   try {
     return fs.realpathSync(p);

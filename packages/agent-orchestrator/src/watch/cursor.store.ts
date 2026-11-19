@@ -13,7 +13,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** What the cursor file holds: one decimal number of bytes, and a newline. */
-const cursorText = (cursor: number): string => `${cursor}\n`;
+const cursorText = (cursor: number) => `${cursor}\n`;
 
 /**
  * The cursor `file` holds — or undefined where there is no such file, which is a watch's first: it starts where it was told to, and
@@ -21,7 +21,7 @@ const cursorText = (cursor: number): string => `${cursor}\n`;
  * watch that read it as 0 would say every line of the feed again.
  * @param file The cursor file.
  */
-export function cursorFileStart(file: string): number | undefined {
+export function cursorFileStart(file: string) {
   if (fs.statSync(file, { throwIfNoEntry: false }) === undefined) return undefined;
   const trimmed = fs.readFileSync(file, 'utf8').trim();
   if (!/^\d+$/.test(trimmed))
@@ -39,7 +39,7 @@ export function cursorFileStart(file: string): number | undefined {
  * @param file The cursor file.
  * @param cursor The feed position to keep, in bytes.
  */
-export function keepCursor(file: string, cursor: number): void {
+export function keepCursor(file: string, cursor: number) {
   const dir = path.dirname(file);
   if (fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() !== true)
     throw new Invalid({ message: `${dir} is no directory, so ${file} cannot be written: make it, or name a cursor file in one that is` });
@@ -50,4 +50,4 @@ export function keepCursor(file: string, cursor: number): void {
  * Rewrites `file` to 0: what a watch keeps when the feed was cut under it, and it reads on from the start of the feed there is now.
  * @param file The cursor file.
  */
-export const cutCursorFile = (file: string): void => keepCursor(file, 0);
+export const cutCursorFile = (file: string) => keepCursor(file, 0);

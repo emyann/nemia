@@ -6,4 +6,4 @@
  * @param host The clone's host.
  * @param rest The clone's path on its host.
  */
-export const joinedFolder = (host: string, rest: string): string => host + '/' + rest;
+export const joinedFolder = (host: string, rest: string) => host + '/' + rest;

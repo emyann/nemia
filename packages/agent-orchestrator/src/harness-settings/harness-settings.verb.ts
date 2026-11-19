@@ -11,15 +11,7 @@ import { FactoryDoor, filedFactory, refuseName } from '../factory/door/factories
 import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Factory } from '../factory/factory.ts';
-import {
-  harnessSettingsRefusal,
-  isHarnessSettings,
-  type HarnessSettings,
-  settingKeyOf,
-  settingsNamed,
-  withoutSetting,
-  withSetting,
-} from './harness-settings.ts';
+import { harnessSettingsRefusal, isHarnessSettings, settingKeyOf, settingsNamed, withoutSetting, withSetting } from './harness-settings.ts';
 
 /**
  * What `nemia factory setting set` takes: the factory, the setting as `<harness>.<key>`, and its value as JSON text, read by the handler
@@ -39,9 +31,9 @@ const keyOf = (spelled: string) => {
 };
 
 /** `text` read as JSON, or `Invalid` naming how to quote it. */
-const jsonOf = (text: string): Effect.Effect<unknown, Invalid> =>
+const jsonOf = (text: string) =>
   Effect.try({
-    try: (): unknown => JSON.parse(text),
+    try: () => JSON.parse(text),
     catch: () =>
       new Invalid({ message: `${text} is not JSON: quote it, as '{"commit":"","pr":""}', '"french"' or false. Nothing was changed.` }),
   });
@@ -100,7 +92,7 @@ export const FACTORY_SETTING_RM: Served<{ file: string; removed: string }, Setti
  * that a factory may not set); none in the default factory, and for a factory that names none.
  * @param factory The factory the run starts in, or undefined for the default factory.
  */
-export const settingsAt = (factory: Factory | undefined): Effect.Effect<HarnessSettings | undefined, Invalid> => {
+export const settingsAt = (factory: Factory | undefined) => {
   const settings = factory?.harnessSettings;
   if (factory === undefined || settings === undefined) return Effect.succeed(undefined);
   if (isHarnessSettings(settings)) return Effect.succeed(settings);

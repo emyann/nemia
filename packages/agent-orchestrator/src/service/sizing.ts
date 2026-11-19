@@ -28,7 +28,7 @@ export const MIB_PER_SESSION = 2560;
  * The floor kept for the daemon and the machine on a machine of `memoryMiB`, in MiB: an eighth of it, and 1 GiB at least.
  * @param memoryMiB The machine's memory, in MiB.
  */
-export const reservedFor = (memoryMiB: number): number => Math.max(1024, Math.floor(memoryMiB / 8));
+export const reservedFor = (memoryMiB: number) => Math.max(1024, Math.floor(memoryMiB / 8));
 
 /**
  * The sessions at once, the limit and the request of each and the floor kept, in MiB, on a machine of `memoryMiB` and `cpus`.
@@ -86,7 +86,7 @@ export const ceilingFit: CeilingFitOf = (slice) => {
  * out, said as found.
  * @param machine The machine's memory, in MiB, and its CPUs.
  */
-export const sizeRefusal = (machine: Machine): string | null =>
+export const sizeRefusal = (machine: Machine) =>
   Number.isInteger(machine.memoryMiB) &&
   Number.isInteger(machine.cpus) &&
   machine.memoryMiB >= 2048 &&

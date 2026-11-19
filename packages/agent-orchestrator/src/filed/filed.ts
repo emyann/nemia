@@ -11,7 +11,7 @@ import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { fenceReach, unruledIn } from 'agent-runtime/vocabulary';
 import { filedSettings, SETTINGS_HARNESS } from '../harness-settings/harness-settings.ts';
-import { splitServers, type FactoryServer, type FactoryServers } from '../factory/servers/index.ts';
+import { splitServers, type FactoryServers } from '../factory/servers/index.ts';
 import type { HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
 import type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
 import { handedFolders } from './handed-folders/handed-folders.ts';
@@ -94,7 +94,7 @@ export const filedConfig = <Own extends object>(
  * (`SETTINGS_HARNESS`): its rendered `settings` laid over the allowed ones (`filedSettings`), a step with no agent given the harness's key
  * for them. As they were for a run that froze none, on another harness, and on a remote agent.
  */
-function ownWith<Own extends object>(step: Pick<StepSpec, 'harness'>, frozen: Run['harnessSettings'], own: Own): Own {
+function ownWith<Own extends object>(step: Pick<StepSpec, 'harness'>, frozen: Run['harnessSettings'], own: Own) {
   const harness = step.harness ?? DEFAULT_HARNESS;
   const given = frozen?.[SETTINGS_HARNESS];
   if (harness !== SETTINGS_HARNESS || given === undefined) return own;
@@ -150,7 +150,7 @@ const stepFilesEnv = (
   copies: { workflowFiles: string | undefined; carriedFiles: string | undefined },
   labels: Run['labels'],
   sessionToken: string | undefined,
-): { env: Record<string, string> } => ({
+) => ({
   env: {
     [STEP_FILES]: stepFilesOf(step, runArtifacts),
     ...(copies.workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: copies.workflowFiles }),
@@ -161,7 +161,7 @@ const stepFilesEnv = (
 });
 
 /** A step's files directory, the run's artifacts folder of that step under `runArtifacts`: what `STEP_FILES` names to its session. */
-const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string): string => path.join(runArtifacts, step.name);
+const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string) => path.join(runArtifacts, step.name);
 
 /**
  * The step's own files directory (`stepFilesOf`), read-only, for a step whose permission mode writes outside its directory only where a
@@ -176,7 +176,7 @@ const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string): string
  * @param step The step to file.
  * @param runArtifacts The run's artifacts folder, absolute, under which the step's files directory is.
  */
-export const ownMounts = (step: StepSpec, runArtifacts: string): Mount[] => {
+export const ownMounts = (step: StepSpec, runArtifacts: string) => {
   const own = stepFilesOf(step, runArtifacts);
   return local(step.harness) && writesOutsideByRule(modeOf(step)) && unruledIn(step.harness ?? DEFAULT_HARNESS, own) === undefined
     ? [{ path: own, readOnly: true }]
@@ -230,7 +230,7 @@ export const filedFolders = (
     carriedFiles?: string;
     runs?: readonly HandedRunFolders[];
   },
-): FiledFolders => ({
+) => ({
   own: ownMounts(step, t.runArtifacts),
   handed: handedMounts(step, steps, t.runArtifacts),
   store: readsMounts(step, t.inbox),
@@ -245,7 +245,7 @@ export const filedFolders = (
  * A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the handed runs', the store's, the run's
  * inputs, then the run's copies of its workflow folder and of its carried files.
  */
-const folders = (f: FiledFolders): Mount[] => [
+const folders = (f: FiledFolders) => [
   ...(f.own ?? []),
   ...f.handed,
   ...(f.runs ?? []),
@@ -256,7 +256,7 @@ const folders = (f: FiledFolders): Mount[] => [
 ];
 
 /** Whether a step's harness reads the disk only through what it is filed: neither a remote agent nor one fenced by a sandbox. */
-const local = (harness: string | undefined): boolean => !isRemoteHarness(harness) && !sandboxed(harness ?? DEFAULT_HARNESS);
+const local = (harness: string | undefined) => !isRemoteHarness(harness) && !sandboxed(harness ?? DEFAULT_HARNESS);
 
 /**
  * The store's folders a step's `reads:` names, each read-only: the inbox (`inbox`, its absolute path) when it names it. It reads the
@@ -265,7 +265,7 @@ const local = (harness: string | undefined): boolean => !isRemoteHarness(harness
  * @param step The step to file: its harness and its `reads:`.
  * @param inbox The store's inbox folder, absolute.
  */
-export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: string): Mount[] =>
+export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: string) =>
   local(step.harness) && step.reads?.includes('inbox') ? [{ path: inbox, readOnly: true }] : [];
 
 /**
@@ -277,11 +277,8 @@ export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: st
  * @param steps Every step of the run's workflow, which says whether it is a folder team.
  * @param dir The run's inputs folder, absolute, or undefined for a run given no input.
  */
-export const inputsMounts = (
-  step: Pick<StepSpec, 'harness'>,
-  steps: readonly Pick<StepSpec, 'place'>[],
-  dir: string | undefined,
-): Mount[] => (dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : []);
+export const inputsMounts = (step: Pick<StepSpec, 'harness'>, steps: readonly Pick<StepSpec, 'place'>[], dir: string | undefined) =>
+  dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : [];
 
 /**
  * The folders of each run this one is handed (`found`), each read-only, for a step whatever steps it comes after: it reads another run's
@@ -306,7 +303,7 @@ export const handedRunMounts: HandedRunMounts = (step, found) =>
  * @param step The step to file: its harness.
  * @param dir The run's copy of the folder to mount, absolute, or undefined where the record names none.
  */
-export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | undefined): Mount[] => {
+export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | undefined) => {
   const harness = step.harness ?? DEFAULT_HARNESS;
   return dir !== undefined && fenceReach(harness)?.by === 'mode' && unruledIn(harness, dir) === undefined
     ? [{ path: dir, readOnly: true }]
@@ -324,10 +321,7 @@ export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | un
  * None for a step with no agent, and no key at all for an agent frozen before it named any, whose sessions load the whole file as they
  * did.
  */
-const serversOf = (
-  step: Pick<StepSpec, 'agent'>,
-  record: FactoryServers | undefined,
-): { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } => {
+const serversOf = (step: Pick<StepSpec, 'agent'>, record: FactoryServers | undefined) => {
   if (step.agent === undefined) return { projectMcp: [] };
   if (step.agent.mcp === undefined) return {};
   const { mcp, checkout } = splitServers(step.agent.mcp, record);
@@ -335,7 +329,7 @@ const serversOf = (
 };
 
 /** `mounts` as a config holds them: the key, or none for no folder. */
-const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { mounts } : {});
+const mountsOf = (mounts: Mount[]) => (mounts.length ? { mounts } : {});
 
 /**
  * The model a try runs on: a fresh one on the model it asked for, or the step's; any other on the one its session was started on.
@@ -343,5 +337,5 @@ const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { m
  * @param record The step's record, whose tries say the model its session was started on; undefined for a step with none.
  * @param how How the try runs: fresh or continued, and the model it asked for.
  */
-export const tryModel = (step: StepSpec, record: StepRecord | undefined, how: Pick<RetryHow, 'mode' | 'model'>): string | undefined =>
+export const tryModel = (step: StepSpec, record: StepRecord | undefined, how: Pick<RetryHow, 'mode' | 'model'>) =>
   how.mode === 'fresh' ? (how.model ?? step.model) : sessionModel(step, record);

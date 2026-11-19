@@ -33,14 +33,14 @@ export type FactoryInstruction = {
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const instructionFolder = (home: string, name: string): string => instructionFolderAt(home, name);
+export const instructionFolder = (home: string, name: string) => instructionFolderAt(home, name);
 
 /**
  * The folder the store `home` keeps the factory `name`'s instruction in (`instructionFolder`). Refused: a bad name (`Invalid`).
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function instructionFolderAt(home: string, name: string): string {
+export function instructionFolderAt(home: string, name: string) {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name);
@@ -51,23 +51,23 @@ export function instructionFolderAt(home: string, name: string): string {
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const instructionFile = (home: string, name: string): string => path.join(instructionFolder(home, name), DEFAULT_INSTRUCTION);
+export const instructionFile = (home: string, name: string) => path.join(instructionFolder(home, name), DEFAULT_INSTRUCTION);
 
 /**
  * The file the store `home` keeps the factory `name`'s instruction in (`instructionFile`).
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const instructionFileAt = (home: string, name: string): string => path.join(instructionFolderAt(home, name), DEFAULT_INSTRUCTION);
+export const instructionFileAt = (home: string, name: string) => path.join(instructionFolderAt(home, name), DEFAULT_INSTRUCTION);
 
 /** Whether the folder `inner` is `outer` or inside it, both as `path.resolve` spells them: on a separator, never a prefix. */
-const inside = (outer: string, inner: string): boolean => {
+const inside = (outer: string, inner: string) => {
   const relative = path.relative(outer, inner);
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 };
 
 /** The real path of `file`, every link followed, or undefined when a link leads nowhere. */
-function realOf(file: string): string | undefined {
+function realOf(file: string) {
   try {
     return fs.realpathSync(file);
   } catch {
@@ -76,7 +76,7 @@ function realOf(file: string): string | undefined {
 }
 
 /** The words of `file`, which `lstat` says is there; or why it does not read: no file, or a link where the store keeps its own. */
-function readThere(file: string, links: boolean): InstructionRead {
+function readThere(file: string, links: boolean) {
   const stat = fs.statSync(file, { throwIfNoEntry: false });
   if (!links && fs.lstatSync(file).isSymbolicLink())
     return { words: null, error: `${file} is a link, and the store keeps its own file: write the instruction again to replace it.` };
@@ -89,7 +89,7 @@ function readThere(file: string, links: boolean): InstructionRead {
  * Why the file of a folder-kept instruction (`at`) may not be read, or undefined: a path its factory's file names that leaves the folder
  * — written there by hand — or a link, the file's or a folder's on its way, whose target is outside the folder.
  */
-function outsideFolder(at: Extract<InstructionPlace, { in: 'folder' }>): string | undefined {
+function outsideFolder(at: Extract<InstructionPlace, { in: 'folder' }>) {
   const folder = path.resolve(at.folder);
   const file = path.resolve(at.file);
   if (!inside(folder, file) || file === folder)
@@ -106,7 +106,7 @@ function outsideFolder(at: Extract<InstructionPlace, { in: 'folder' }>): string 
  * store, a link is not read; in a folder, a link is followed only while its target stays inside the folder. Nothing is written.
  * @param at Where the instruction is kept: in the store, or in a folder of the factory's, with its file.
  */
-export function readInstructionAt(at: InstructionPlace): InstructionRead {
+export function readInstructionAt(at: InstructionPlace) {
   if (at.in === 'folder') {
     const outside = outsideFolder(at);
     if (outside) return { words: null, error: outside };
@@ -126,7 +126,7 @@ export function readInstructionAt(at: InstructionPlace): InstructionRead {
  * @param name The factory's name.
  * @param file The file the store keeps the text at; the store's own file by default.
  */
-export const storeKeeps = (home: string, name: string, file = instructionFile(home, name)): boolean =>
+export const storeKeeps = (home: string, name: string, file = instructionFile(home, name)) =>
   fs.lstatSync(file, { throwIfNoEntry: false }) !== undefined;
 
 /**
@@ -146,7 +146,7 @@ export function writeInstructionText(
   words: string,
   file = instructionFile(home, name),
   storeFile = instructionFile(home, name),
-): string {
+) {
   if (!words.trim())
     throw new Invalid({
       message: `the instruction of ${name} is blank. Write the words Nemia is to know of the factory, or clear it: nemia factory instruct ${name} --clear. Nothing was written.`,
@@ -170,7 +170,7 @@ export function writeInstructionText(
  * @param name The factory's name.
  * @param file The file to remove; the store's own file by default.
  */
-export function clearInstructionText(home: string, name: string, file = instructionFile(home, name)): boolean {
+export function clearInstructionText(home: string, name: string, file = instructionFile(home, name)) {
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;
   fs.rmSync(file, { recursive: true, force: true });
   return true;
@@ -181,7 +181,7 @@ export function clearInstructionText(home: string, name: string, file = instruct
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function removeInstructionFolder(home: string, name: string): string | null {
+export function removeInstructionFolder(home: string, name: string) {
   const folder = instructionFolder(home, name);
   if (!fs.lstatSync(folder, { throwIfNoEntry: false })) return null;
   fs.rmSync(folder, { recursive: true, force: true });

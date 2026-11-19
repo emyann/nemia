@@ -18,7 +18,7 @@ export type { LibraryAddRefused, LibraryAddState, LibraryAddWrite, LibraryKind, 
 export const libraryAddsOf: LibraryAddsOf = (recorded, derived) => recorded ?? derived;
 
 /** Whether `held` holds an origin of `of`. */
-const holdsAny = (held: readonly Origin[], of: readonly Origin[]): boolean => held.some((origin) => of.includes(origin));
+const holdsAny = (held: readonly Origin[], of: readonly Origin[]) => held.some((origin) => of.includes(origin));
 
 /**
  * What an add is in its factory, from the origins that hold its name.
@@ -50,11 +50,11 @@ export const libraryAddRefusal: LibraryAddRefusal = (does, held, added) => {
  * The add `ref` as its object's name, `<kind>.<name>`, as a Hire is named `<workflow>.<step>`.
  * @param ref The add.
  */
-export const addName = (ref: LibraryRef): string => `${ref.kind}.${ref.name}`;
+export const addName = (ref: LibraryRef) => `${ref.kind}.${ref.name}`;
 
 /**
  * Whether two adds name one item.
  * @param a An add.
  * @param b The add it is compared with.
  */
-export const sameAdd = (a: LibraryRef, b: LibraryRef): boolean => a.kind === b.kind && a.name === b.name;
+export const sameAdd = (a: LibraryRef, b: LibraryRef) => a.kind === b.kind && a.name === b.name;

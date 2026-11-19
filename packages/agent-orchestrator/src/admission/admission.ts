@@ -37,7 +37,7 @@ export type Typed = { name: string; class: CommandClass; args: string[] };
 const PARTS = /[;&|()\n`]+|[^\s;&|()`'"]+/g;
 
 /** Whether a part of a shell line ends a command. */
-const ends = (part: string): boolean => /^[;&|()\n`]/.test(part);
+const ends = (part: string) => /^[;&|()\n`]/.test(part);
 
 /** The programs the table is typed under: the command, by any path, and its former name. */
 const PROGRAMS = ['nemia', 'wf'];
@@ -49,7 +49,7 @@ const PROGRAMS = ['nemia', 'wf'];
  * @param line The shell line the agent is about to run.
  * @param table The command table, whose entries served on the api's side alone are never typed.
  */
-export function typedIn(line: string, table: readonly Entry[]): Typed[] {
+export function typedIn(line: string, table: readonly Entry[]) {
   const parts = line.match(PARTS) ?? [];
   const served = table.filter((e) => e.only?.side !== 'api').map((e) => ({ entry: e, words: e.name.split(' ') }));
   const typed: Typed[] = [];
@@ -77,24 +77,24 @@ export type Named = { runs: string[]; factories: string[]; unread: boolean };
 const REDIRECT = /^\d*[<>]/;
 
 /** The words of a command, its redirections and their targets left out. */
-const unredirected = (args: readonly string[]): string[] =>
+const unredirected = (args: readonly string[]) =>
   args.filter((a, i) => {
     const before = args[i - 1];
     return !REDIRECT.test(a) && !(before !== undefined && /^\d*[<>]+&?$/.test(before));
   });
 
 /** The values `args` holds under `key`, one or many. */
-const valuesAt = (args: Readonly<Record<string, unknown>>, key: string): string[] => {
+const valuesAt = (args: Readonly<Record<string, unknown>>, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? [value] : Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 };
 
 /** Whether `spec` files a run or a factory under one of the keys admission scopes. */
-const scoped = (spec: Spec): boolean =>
+const scoped = (spec: Spec) =>
   [...spec.positionals.map((p) => p.key), ...spec.flags.map((f) => f.key)].some((k) => k === RUN_KEY || k === FACTORY_KEY);
 
 /** What the command `typed`, of `table`, names, read by its entry's spec. */
-function namedBy(typed: Typed, table: readonly Entry[]): Named {
+function namedBy(typed: Typed, table: readonly Entry[]) {
   const spec = table.find((e) => e.name === typed.name)?.spec;
   if (spec === undefined || !scoped(spec)) return { runs: [], factories: [], unread: false };
   let args: Readonly<Record<string, unknown>> | undefined;
@@ -112,7 +112,7 @@ function namedBy(typed: Typed, table: readonly Entry[]): Named {
  * @param line The shell line the agent is about to run.
  * @param table The command table, whose entries' specs read each command's words.
  */
-export const namedIn = (line: string, table: readonly Entry[]): Array<Typed & Named> =>
+export const namedIn = (line: string, table: readonly Entry[]) =>
   typedIn(line, table).map((typed) => ({ ...typed, ...namedBy(typed, table) }));
 
 /**
@@ -126,47 +126,53 @@ export type Scope = {
 };
 
 /** How a factory's level is raised, as the refusal says it: the store's for the default factory, else the factory's own. */
-const raiseWords = (factory: string, least: Level): string =>
+const raiseWords = (factory: string, least: Level) =>
   factory === DEFAULT_NAMESPACE ? `nemia level ${least}` : `nemia level ${least} --factory ${factory} [--for <duration>]`;
 
 /** The denial of `line`, which acts on the factory `factory` at `level`, below `least`, through `what`. */
-const below = (line: string, what: string, factory: string, level: Level, least: Level): AdmissionAnswer => ({
-  decision: 'deny',
-  message: `${line} acts on ${what}the factory ${factory}, at ${level}: below ${least}, it is left alone. Raising it is the person's: ${raiseWords(factory, least)}.`,
-});
+const below = (line: string, what: string, factory: string, level: Level, least: Level) =>
+  ({
+    decision: 'deny',
+    message: `${line} acts on ${what}the factory ${factory}, at ${level}: below ${least}, it is left alone. Raising it is the person's: ${raiseWords(factory, least)}.`,
+  }) satisfies AdmissionAnswer;
 
 /** Scope's answer for one typed command: a denial where it names a run or factory below the floor, an ask where it cannot be read. */
-function scopedOf(typed: Typed & Named, scope: Scope): AdmissionAnswer | undefined {
+function scopedOf(typed: Typed & Named, scope: Scope) {
   const line = ['nemia', typed.name, ...typed.args].join(' ');
   if (typed.unread)
-    return { decision: 'ask', message: `${line} does not read as its command, so admission cannot read the runs it acts on.` };
+    return { decision: 'ask', message: `${line} does not read as its command, so admission cannot read the runs it acts on.` } satisfies
+      | AdmissionAnswer
+      | undefined;
   for (const runId of typed.runs) {
     const run = scope.runOf(runId);
     if (run === undefined)
-      return { decision: 'ask', message: `${line} names ${runId}, which does not read, so admission cannot read its factory.` };
-    if (!atLeast(run.level, scope.atLeast)) return below(line, `${runId} of `, run.factory, run.level, scope.atLeast);
+      return { decision: 'ask', message: `${line} names ${runId}, which does not read, so admission cannot read its factory.` } satisfies
+        | AdmissionAnswer
+        | undefined;
+    if (!atLeast(run.level, scope.atLeast))
+      return below(line, `${runId} of `, run.factory, run.level, scope.atLeast) satisfies AdmissionAnswer | undefined;
   }
   for (const factory of typed.factories) {
     const level = scope.factoryOf(factory);
-    if (!atLeast(level, scope.atLeast)) return below(line, '', factory, level, scope.atLeast);
+    if (!atLeast(level, scope.atLeast)) return below(line, '', factory, level, scope.atLeast) satisfies AdmissionAnswer | undefined;
   }
-  return undefined;
+  return undefined satisfies AdmissionAnswer | undefined;
 }
 
 /**
  * Scope's answer for the shell line `line`: a denial where any command on it acts on a run or a factory below the floor, first; else an ask
  * where one cannot be read; else none.
  */
-function scopeOf(line: string, table: readonly Entry[], scope: Scope): AdmissionAnswer | undefined {
+function scopeOf(line: string, table: readonly Entry[], scope: Scope) {
   const answers = namedIn(line, table).flatMap((typed) => scopedOf(typed, scope) ?? []);
-  return answers.find((a) => a.decision === 'deny') ?? answers[0];
+  return (answers.find((a) => a.decision === 'deny') ?? answers[0]) satisfies AdmissionAnswer | undefined;
 }
 
 /** Whether a command's words raise a step's cap. */
-const raises = (args: readonly string[]): boolean => args.some((a) => a === '--budget' || a.startsWith('--budget='));
+const raises = (args: readonly string[]) => args.some((a) => a === '--budget' || a.startsWith('--budget='));
 
 /** Whether a retry's words ask for another round of a loop (`--round`, what `nemia round` was), which is always the person's. */
-const rounds = (args: readonly string[]): boolean => args.includes('--round');
+const rounds = (args: readonly string[]) => args.includes('--round');
 
 /**
  * Why a typed answer is asked of the person, or undefined where it waits on no one. A retry asks where it raises a cap (`--budget`), asks
@@ -174,7 +180,7 @@ const rounds = (args: readonly string[]): boolean => args.includes('--round');
  * since it only answers what waits.
  * @param waitOf Why the step of a run waits on the person, or undefined where it waits on no one.
  */
-export function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined): string | undefined {
+export function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined) {
   const line = ['nemia', name, ...args].join(' ');
   if (name !== 'retry') return `${line} answers what waits on you: it is yours to give.`;
   if (raises(args)) return `${line} raises a step's cap: a budget is yours to raise.`;
@@ -203,7 +209,7 @@ export type PolicyReads = {
  * @param typed The answer command typed on the line, with its words.
  * @param table The command table, whose entry of the typed command's name gives the spec its words are read by.
  */
-export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string; step: string } | undefined {
+export function answerOf(typed: Typed, table: readonly Entry[]) {
   const spec = table.find((e) => e.name === typed.name)?.spec;
   if (spec === undefined) return undefined;
   let args: Readonly<Record<string, unknown>> | undefined;
@@ -227,7 +233,7 @@ export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string
  * @param table The command table, whose entry's spec reads the run and step the answer names.
  * @param auto What admission reads at `auto`; undefined where no rule is read, and nothing is let through.
  */
-export function policyAllows(typed: Typed, table: readonly Entry[], auto: PolicyReads | undefined): boolean {
+export function policyAllows(typed: Typed, table: readonly Entry[], auto: PolicyReads | undefined) {
   if (auto === undefined || !(RULE_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args) || rounds(typed.args))
     return false;
   const answer = answerOf(typed, table);
@@ -240,10 +246,13 @@ export function policyAllows(typed: Typed, table: readonly Entry[], auto: Policy
 }
 
 /** The ask of a command of `table` the person is asked every time (`asksAlways`) typed on the shell line `line`, or undefined for none. */
-function alwaysAsked(line: string, table: readonly Entry[]): AdmissionAnswer | undefined {
+function alwaysAsked(line: string, table: readonly Entry[]) {
   const typed = typedIn(line, table).find((t) => table.find((e) => e.name === t.name)?.asksAlways);
-  if (typed === undefined) return undefined;
-  return { decision: 'ask', message: `${['nemia', typed.name, ...typed.args].join(' ')} is yours, asked every time: no allow reaches it.` };
+  if (typed === undefined) return undefined satisfies AdmissionAnswer | undefined;
+  return {
+    decision: 'ask',
+    message: `${['nemia', typed.name, ...typed.args].join(' ')} is yours, asked every time: no allow reaches it.`,
+  } satisfies AdmissionAnswer | undefined;
 }
 
 /**
@@ -265,16 +274,17 @@ export function admissionOf(
   waitOf: (runId: string, step: string) => string | undefined,
   scope?: Scope,
   auto?: PolicyReads,
-): AdmissionAnswer | undefined {
+) {
   const line = call.input.command;
-  if (call.tool !== 'Bash' || typeof line !== 'string') return undefined;
+  if (call.tool !== 'Bash' || typeof line !== 'string') return undefined satisfies AdmissionAnswer | undefined;
   const inScope = scope === undefined ? undefined : scopeOf(line, table, scope);
-  if (inScope !== undefined) return inScope;
+  if (inScope !== undefined) return inScope satisfies AdmissionAnswer | undefined;
   const always = alwaysAsked(line, table);
-  if (always !== undefined) return always;
+  if (always !== undefined) return always satisfies AdmissionAnswer | undefined;
   for (const typed of typedIn(line, table).filter((t) => t.class === 'answer')) {
     const why = askedOf(typed, waitOf);
-    if (why !== undefined && !policyAllows(typed, table, auto)) return { decision: 'ask', message: why };
+    if (why !== undefined && !policyAllows(typed, table, auto))
+      return { decision: 'ask', message: why } satisfies AdmissionAnswer | undefined;
   }
-  return undefined;
+  return undefined satisfies AdmissionAnswer | undefined;
 }

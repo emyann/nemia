@@ -14,7 +14,6 @@ import { brokenBy } from '../door/door.store.ts';
 import { AgentDoor, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, type SkillDoorShape } from '../skills/skill-door.store.ts';
 import { lookupRoots, type Places } from '../skills/read.store.ts';
-import type { Refusal } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
 
 /**
@@ -22,13 +21,13 @@ import type { SkillsFound } from '../agents/agents.ts';
  * agent they load with. None for a file with no such line, or whose frontmatter never closes; nor for an `agent` with a slash, which
  * names no file of agents/. A `skills` line is given whole: a skill named with its folder holds one (`apps/web:ds-build`).
  */
-function frontmatterNamed(text: string, key: 'agent' | 'skills'): string[] {
+function frontmatterNamed(text: string, key: 'agent' | 'skills') {
   const value = frontmatterKey(text, key);
   return value && (key === 'skills' || !/[\\/]/.test(value)) ? [value] : [];
 }
 
 /** The skills a step file's own `skills:` line adds to its agent's, by name. None for a file with no such line. */
-const addedSkillsIn = (text: string): string[] =>
+const addedSkillsIn = (text: string) =>
   frontmatterNamed(text, 'skills').flatMap((line) =>
     line
       .split(',')
@@ -41,7 +40,7 @@ const addedSkillsIn = (text: string): string[] =>
  * `.json` is read as text whatever its bytes, as the version always read them, so a folder of those alone keeps its word. Any other is
  * held by its text where it is text (`textIn`), else by the digest of its bytes.
  */
-function filesOf(dir: string): VersionFile[] {
+function filesOf(dir: string) {
   let names: string[];
   try {
     names = fs
@@ -52,7 +51,7 @@ function filesOf(dir: string): VersionFile[] {
   } catch {
     names = [];
   }
-  const read = (name: string): VersionFile[1] => {
+  const read = (name: string) => {
     try {
       const bytes = fs.readFileSync(path.join(dir, name));
       if (/\.(md|json)$/.test(name)) return bytes.toString('utf8');
@@ -90,7 +89,7 @@ export type VersionDefs = { readonly agents: AgentDoorShape; readonly skills: Sk
  * The folder's own files and what they name (`VersionNamed`): no agent or skill is read here.
  * @param dir The workflow's folder.
  */
-export function versionNamed(dir: string): VersionNamed {
+export function versionNamed(dir: string) {
   const files = filesOf(dir);
   const texts = files.flatMap(([name, text]) => (name.endsWith('.md') && typeof text === 'string' ? [text] : []));
   return {
@@ -105,7 +104,7 @@ export function versionNamed(dir: string): VersionNamed {
  * @param files Each file directly in the folder, by name, with what it holds.
  * @param gathered What the doors answered of the agents and skills the folder names.
  */
-export const versionDigest = (files: readonly VersionFile[], gathered: VersionGathered): string =>
+export const versionDigest = (files: readonly VersionFile[], gathered: VersionGathered) =>
   createHash('sha256')
     .update(JSON.stringify([...files, ...gathered.agents, ...gathered.added]))
     .digest('hex')
@@ -115,12 +114,7 @@ export const versionDigest = (files: readonly VersionFile[], gathered: VersionGa
  * Where an agent a folder names is, as the version counts it: the first of `roots` whose Agent door holds it, with its version counting the
  * skills `found` beside the workflow; missing where none does, or where the Agent door refuses its name.
  */
-const agentAt = (
-  door: AgentDoorShape,
-  agent: string,
-  roots: readonly string[],
-  found: SkillsFound,
-): Effect.Effect<VersionAgent[1], Refusal> =>
+const agentAt = (door: AgentDoorShape, agent: string, roots: readonly string[], found: SkillsFound) =>
   Effect.gen(function* () {
     if (brokenBy(AgentName.OnCreate, agent) !== null) return { missing: agent };
     for (const root of roots) {
@@ -140,12 +134,7 @@ const agentAt = (
  * @param named The agents and the added skills the folder's files name.
  * @param defs The Agent and Skill doors to read through, or undefined for the program's.
  */
-export const versionGathered = (
-  dir: string,
-  places: Places,
-  named: Pick<VersionNamed, 'agents' | 'added'>,
-  defs?: VersionDefs,
-): Effect.Effect<VersionGathered, Refusal> =>
+export const versionGathered = (dir: string, places: Places, named: Pick<VersionNamed, 'agents' | 'added'>, defs?: VersionDefs) =>
   Effect.gen(function* () {
     if (!named.agents.length && !named.added.length) return { agents: [], added: [] };
     const agentDoor = defs?.agents ?? (yield* AgentDoor);

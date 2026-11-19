@@ -47,15 +47,15 @@ export type CancelPlan =
  * @param read The one read of the run: its record and the phase of each of its tasks.
  * @param assessed The pass's assessment of that read; assessed afresh from it where none is given.
  */
-export function cancelPlan(read: AssessRead, assessed: Assessment = assess(read)): CancelPlan {
+export function cancelPlan(read: AssessRead, assessed: Assessment = assess(read)) {
   const { run, phaseOf } = read;
   const stop = inFlight(run, phaseOf);
-  if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop };
-  if (stop.length) return { kind: 'cancel', stop };
+  if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop } satisfies CancelPlan;
+  if (stop.length) return { kind: 'cancel', stop } satisfies CancelPlan;
 
   const { ready, check, due, waitingOnCheckout, waitingOnPause, status } = assessed;
   const waits = [...assessed.stepWords.values()].some((w) => holdsTheRun(w.status));
   const moving = [ready, check, due.retry, due.round, waitingOnCheckout, waitingOnPause?.steps ?? []].some((names) => names.length > 0);
-  if (!moving && !waits && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
-  return { kind: 'cancel', stop: [] };
+  if (!moving && !waits && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status } satisfies CancelPlan;
+  return { kind: 'cancel', stop: [] } satisfies CancelPlan;
 }

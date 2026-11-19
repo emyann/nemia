@@ -74,10 +74,10 @@ const agentNamed = (name: string) => {
 };
 
 /** A rule with its words. */
-const worded = <R extends PolicyRule>(rule: R): WordedRule<R> => ({ ...rule, words: ruleWords(rule) });
+const worded = <R extends PolicyRule>(rule: R) => ({ ...rule, words: ruleWords(rule) });
 
 /** The proposal rules of `list`. */
-const proposalRulesOf = (list: readonly PolicyRule[]): ProposalPolicyRule[] => list.filter(isProposalRule);
+const proposalRulesOf = (list: readonly PolicyRule[]) => list.filter(isProposalRule);
 
 /**
  * `agent`'s rules in the store `home`, composed from the person's list, the agent's proposal and its custom instruction, `instruction`
@@ -86,7 +86,7 @@ const proposalRulesOf = (list: readonly PolicyRule[]): ProposalPolicyRule[] => l
  * @param agent The agent's name.
  * @param instruction Its custom instruction's words; undefined where there are none.
  */
-export function policyListOf(home: string, agent: string, instruction: string | undefined): PolicyList {
+export function policyListOf(home: string, agent: string, instruction: string | undefined) {
   const confirmed = readConfirmed(home, agent);
   const rules = listInForce(confirmed?.rules);
   const proposed = readProposed(home, agent);
@@ -133,14 +133,14 @@ export const POLICY: Served<PolicyList, PolicyInput> = {
 };
 
 /** The refusal of a proposal that is none. */
-const proposalRefusal = (why: string): Invalid =>
+const proposalRefusal = (why: string) =>
   new Invalid({ message: `${why}. A proposal is JSON: { "rules": [{ "id", "answer", "steps"?, "when", "under"? }], "guidance": ["…"] }.` });
 
 /**
  * The proposal in `words`: its rules and its guidance. Refused (`Invalid`): no JSON, a rule that is none, an id twice, guidance not words.
  * @param words The proposal's text, JSON.
  */
-export function proposalOf(words: string): { rules: PolicyRule[]; guidance: string[] } {
+export function proposalOf(words: string) {
   let raw: unknown;
   try {
     raw = JSON.parse(words);
@@ -155,7 +155,7 @@ export function proposalOf(words: string): { rules: PolicyRule[]; guidance: stri
   if (new Set(ids).size !== ids.length) throw proposalRefusal('the proposal names a rule id twice');
   if (!Array.isArray(guidance) || guidance.some((g) => typeof g !== 'string' || !g.trim()))
     throw proposalRefusal('its guidance is a list of words the machinery cannot hold');
-  const kept = (rule: PolicyRule): PolicyRule =>
+  const kept = (rule: PolicyRule) =>
     isProposalRule(rule)
       ? {
           id: rule.id,
@@ -225,7 +225,7 @@ const withinDelegation = Effect.fnUntraced(function* (home: string, agent: strin
 });
 
 /** The refusal of a confirm with no words. */
-const confirmWordless = (agent: string): string =>
+const confirmWordless = (agent: string) =>
   `nemia policy confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by nemia policy ${agent}.`;
 
 /**

@@ -21,12 +21,13 @@ export type { WatchChanges };
  */
 export const watchChanges: WatchChanges = (sent, now) =>
   [
-    ...now.map((n): WatchChange | null =>
-      !sent.some((s) => s.key === n.key)
-        ? { type: 'ADDED', key: n.key }
-        : sent.find((s) => s.key === n.key)?.version === n.version
-          ? null
-          : { type: 'MODIFIED', key: n.key },
+    ...now.map(
+      (n) =>
+        (!sent.some((s) => s.key === n.key)
+          ? { type: 'ADDED', key: n.key }
+          : sent.find((s) => s.key === n.key)?.version === n.version
+            ? null
+            : { type: 'MODIFIED', key: n.key }) satisfies WatchChange | null,
     ),
-    ...sent.map((s): WatchChange | null => (now.some((n) => n.key === s.key) ? null : { type: 'DELETED', key: s.key })),
+    ...sent.map((s) => (now.some((n) => n.key === s.key) ? null : { type: 'DELETED', key: s.key }) satisfies WatchChange | null),
   ].filter((c) => c !== null);

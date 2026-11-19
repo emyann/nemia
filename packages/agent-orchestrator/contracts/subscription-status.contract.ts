@@ -27,7 +27,7 @@ export type DeliveryKept = {
 export type DeliveredStatus = { readonly cursor: number; readonly pending: number; readonly since?: number };
 
 /** A count: a whole number from 0, safe in a double. */
-const count = (n: number): boolean => Number.isSafeInteger(n) && n >= 0;
+const count = (n: number) => Number.isSafeInteger(n) && n >= 0;
 
 /** Whether the deliverer's file was written for this subscription. */
 const itsOwn = (sub: SubscriptionAsked, kept: DeliveryKept | undefined): kept is DeliveryKept =>

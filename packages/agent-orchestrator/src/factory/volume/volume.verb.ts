@@ -27,7 +27,7 @@ import type { Kept } from '../../command/entry.verb.ts';
 import type { PlaceTrust } from '../../trust/trust.ts';
 
 /** The text under `key`, as the spec read it. */
-const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
+const textOf = (args: Args, key: string) => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
  * A volume added: the factory's file written, the volume, what one of its path was marked before (`null` for none), and what was asked
@@ -128,7 +128,7 @@ export const FACTORY_VOLUME_ADD: Served<Added> = {
  * The workflows `factory`'s wiring places on the repository at `at` by its folder name (`workflowRepos`), where it is the only one of
  * that name: taking it off would leave each with none.
  */
-const wiredOn = (factory: Pick<Factory, 'volumes' | 'workflowRepos'>, at: string): string[] => {
+const wiredOn = (factory: Pick<Factory, 'volumes' | 'workflowRepos'>, at: string) => {
   const name = folderName(at);
   if (workedOn(factory).filter((r) => folderName(r) === name).length !== 1) return [];
   return Object.entries(factory.workflowRepos ?? {})

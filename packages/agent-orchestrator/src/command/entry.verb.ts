@@ -97,7 +97,7 @@ export function tableEntry<D extends object, I>(command: Served<D, I>): Served;
  * A typed entry as the table holds it, its input erased: the one body of both forms of `tableEntry`.
  * @param command The typed entry.
  */
-export function tableEntry<D extends object, I>(command: Served<D, I>): Served {
+export function tableEntry<D extends object, I>(command: Served<D, I>) {
   return command as unknown as Served;
 }
 
@@ -107,15 +107,14 @@ export function tableEntry<D extends object, I>(command: Served<D, I>): Served {
  * straight to its handler, which runs the same words through this, so a request is refused as the command line is.
  * @param wrong What the spec's `check` said was wrong, or null or undefined where nothing was.
  */
-export const checked = (wrong: string | null | undefined): Effect.Effect<void, Invalid> =>
-  wrong ? Effect.fail(new Invalid({ message: wrong })) : Effect.void;
+export const checked = (wrong: string | null | undefined) => (wrong ? Effect.fail(new Invalid({ message: wrong })) : Effect.void);
 
 /**
  * The selectors an entry of the table is given under `selector`, in the order given — `-l` at the command line, each given again for
  * another, and the api's `?selector=`, one or many — none where unset: a list's read takes the runs whose labels one of them takes.
  * @param args The arguments the entry was given, parsed by the command line or sent to the api.
  */
-export const selectorTexts = (args: Args): readonly string[] => {
+export const selectorTexts = (args: Args) => {
   const value = args['selector'];
   return typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
 };
@@ -124,16 +123,18 @@ export const selectorTexts = (args: Args): readonly string[] => {
  * Why the selectors under `selector` are refused, or null where each is one: an entry's `check`.
  * @param args The arguments the entry was given, parsed by the command line or sent to the api.
  */
-export const selectorCheck = (args: Args): string | null => selectorsRefusal(selectorTexts(args)) ?? null;
+export const selectorCheck = (args: Args) => selectorsRefusal(selectorTexts(args)) ?? null;
 
 /**
  * The selectors under `selector`, parsed (`parseSelectors`); refused as `Invalid` (exit 2, 422 on the api) where one is no selector, in
  * the grammar's own words (`selectorsRefusal`), which end on the form it takes. None where none was given.
  * @param args The arguments the entry was given, parsed by the command line or sent to the api.
  */
-export const selectorsIn = (args: Args): Effect.Effect<Selectors, Invalid> => {
+export const selectorsIn = (args: Args) => {
   const refusal = selectorCheck(args);
-  return refusal === null ? Effect.succeed(parseSelectors(selectorTexts(args))) : Effect.fail(new Invalid({ message: refusal }));
+  return (
+    refusal === null ? Effect.succeed(parseSelectors(selectorTexts(args))) : Effect.fail(new Invalid({ message: refusal }))
+  ) satisfies Effect.Effect<Selectors, Invalid>;
 };
 
 /**
@@ -141,24 +142,25 @@ export const selectorsIn = (args: Args): Effect.Effect<Selectors, Invalid> => {
  * another; each line with its whole map; and that label's value beside each line, given again for another (`labelsShown`).
  * @param command The command's name, which the flags' words name.
  */
-export const labelFlags = (command: string): Flag[] => [
-  selectorFlag(command),
-  { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
-  {
-    flag: '-L',
-    kind: 'text',
-    key: 'labelColumns',
-    many: true,
-    takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
-  },
-];
+export const labelFlags = (command: string) =>
+  [
+    selectorFlag(command),
+    { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
+    {
+      flag: '-L',
+      kind: 'text',
+      key: 'labelColumns',
+      many: true,
+      takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
+    },
+  ] satisfies Flag[];
 
 /**
  * What a line of `map`'s ends on as `--show-labels` and `-L` ask under `args` (`labelSegments`): nothing with neither.
  * @param args The arguments the command was given, its `--show-labels` and `-L` among them.
  * @param map The line's labels, each key with its value.
  */
-export const labelsShown = (args: Args, map: Labels): string => {
+export const labelsShown = (args: Args, map: Labels) => {
   const columns = args['labelColumns'];
   return labelSegments(map, { all: args['showLabels'] === true, columns: Array.isArray(columns) ? columns : [] });
 };
@@ -167,19 +169,17 @@ export const labelsShown = (args: Args, map: Labels): string => {
  * What each run's head line ends on as `--show-labels` and `-L` ask under `args`, of the run's whole map (`runLabelMap`).
  * @param args The arguments the command was given, its `--show-labels` and `-L` among them.
  */
-export const runsShown =
-  (args: Args) =>
-  (run: Run): string =>
-    labelsShown(args, runLabelMap(run));
+export const runsShown = (args: Args) => (run: Run) => labelsShown(args, runLabelMap(run));
 
 /**
  * `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes.
  * @param command The command's name, which the flag's words name.
  */
-export const selectorFlag = (command: string): Flag => ({
-  flag: '-l',
-  kind: 'text',
-  key: 'selector',
-  many: true,
-  takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FORM}`,
-});
+export const selectorFlag = (command: string) =>
+  ({
+    flag: '-l',
+    kind: 'text',
+    key: 'selector',
+    many: true,
+    takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FORM}`,
+  }) satisfies Flag;

@@ -16,7 +16,7 @@ import { CardDoor, cardDoorOver, cardTaken, noCardToRewrite, type CardLayer } fr
 export const MEMORY_ROOT = '/memory';
 
 /** A fresh Card door over maps: no card filed, no try written. */
-export function cardDoorMemory(): Layer.Layer<never> {
+export function cardDoorMemory() {
   const cards = new Map<string, { text: string; filedAt: string }>();
   const tries = new Map<string, MissedStart>();
   const where = (name: string) => path.posix.join(MEMORY_ROOT, 'inbox', `${name}.md`);

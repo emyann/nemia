@@ -40,7 +40,7 @@ export type ProcessRelease = LeaseRelease | Running;
 export type RetainMemory = { said: string | undefined };
 
 /** What a daemon's sweeps remember when it starts: nothing. */
-export const freshRetainMemory = (): RetainMemory => ({ said: undefined });
+export const freshRetainMemory = () => ({ said: undefined });
 
 /** What one sweep did: the releases it removed, why it held, the leftovers of a crashed upgrade it removed, and its lines. */
 export type Retained = {
@@ -56,17 +56,17 @@ export type Retained = {
  * @param release The release the process records.
  * @param home The store's folder.
  */
-export function pinnedBy(release: ProcessRelease, home: string): string[] {
-  if (release.kind !== 'install') return [];
-  if (release.tag !== undefined) return [release.tag];
+export function pinnedBy(release: ProcessRelease, home: string) {
+  if (release.kind !== 'install') return [] satisfies string[];
+  if (release.tag !== undefined) return [release.tag] satisfies string[];
   let real: string;
   try {
     real = fs.realpathSync(release.root);
   } catch {
-    return [];
+    return [] satisfies string[];
   }
   const placed = sessionRelease(real, realReleasesDir(home));
-  return placed.kind === 'install' ? [placed.tag] : [];
+  return (placed.kind === 'install' ? [placed.tag] : []) satisfies string[];
 }
 
 /** Deletes a folder or a file moved aside, off the event loop. */

@@ -58,20 +58,23 @@ export type CloseoutSchema = { type: string; properties: Record<string, object>;
  * @param step The step as the run froze it.
  * @param steps The workflow's steps as the run froze them, which say whether the step is a loop's target.
  */
-export function closeoutSchemaOf(step: StepSpec, steps: readonly StepSpec[]): CloseoutSchema {
+export function closeoutSchemaOf(step: StepSpec, steps: readonly StepSpec[]) {
   const replies = isLoopTarget(steps, step.name);
   const properties = { ...step.output?.schema.properties, ...judgeRouteSchema(step) };
-  if (!Object.keys(properties).length && !replies) return CLOSEOUT_SCHEMA;
+  if (!Object.keys(properties).length && !replies) return CLOSEOUT_SCHEMA satisfies CloseoutSchema as CloseoutSchema;
   return {
     ...CLOSEOUT_SCHEMA,
     properties: { ...CLOSEOUT_SCHEMA.properties, ...properties, ...(replies ? { [LOOP_REPLIES]: REPLIES_SCHEMA } : {}) },
     required: [...CLOSEOUT_SCHEMA.required, ...Object.keys(properties), ...(replies ? [LOOP_REPLIES] : [])],
-  };
+  } satisfies CloseoutSchema as CloseoutSchema;
 }
 
 /** What the run adds to a judge's closeout schema (`route: judge`): `route`, one of its routes. Empty for any other step. */
-const judgeRouteSchema = (step: StepSpec): Record<string, object> =>
-  step.route?.kind === 'judge' ? { [JUDGE_ROUTE]: { type: 'string', enum: [...(step.routes ?? [])] } } : {};
+const judgeRouteSchema = (step: StepSpec) =>
+  (step.route?.kind === 'judge' ? { [JUDGE_ROUTE]: { type: 'string', enum: [...(step.routes ?? [])] } } : {}) satisfies Record<
+    string,
+    object
+  > as Record<string, object>;
 
 /**
  * The digest of the schema a step is filed with (`closeoutSchemaOf`), kept on the step's record: read by a later filing that would continue
@@ -80,7 +83,7 @@ const judgeRouteSchema = (step: StepSpec): Record<string, object> =>
  * @param step The step as the run froze it.
  * @param steps The workflow's steps as the run froze them.
  */
-export const closeoutHashOf = (step: StepSpec, steps: readonly StepSpec[]): string => digestOf([closeoutSchemaOf(step, steps)]);
+export const closeoutHashOf = (step: StepSpec, steps: readonly StepSpec[]) => digestOf([closeoutSchemaOf(step, steps)]);
 
 /**
  * What a step says on its way out, as every reader reads it, whichever version it was given in (`parseCloseout`).
@@ -126,12 +129,15 @@ export type Closeout = {
  * (`summaryLine`), the whole text leading the body when the cut changed it. The fields beyond the version's envelope are `output`.
  * @param value The closeout as the engine recorded it: an object, or the text a harness handed back.
  */
-export function parseCloseout(value: unknown): Closeout | { error: string } {
+export function parseCloseout(value: unknown) {
   const read = objectOf(value);
-  if (typeof read === 'string') return { error: read };
+  if (typeof read === 'string') return { error: read } satisfies Closeout | { error: string } as Closeout | { error: string };
   const o = read;
   const v1 = o.apiVersion === CLOSEOUT_V1;
-  if (o.apiVersion !== undefined && !v1) return { error: `apiVersion ${JSON.stringify(o.apiVersion)} is not one this run reads` };
+  if (o.apiVersion !== undefined && !v1)
+    return { error: `apiVersion ${JSON.stringify(o.apiVersion)} is not one this run reads` } satisfies Closeout | { error: string } as
+      | Closeout
+      | { error: string };
   const envelope: readonly string[] = v1 ? V1_FIELDS : V0_FIELDS;
   const rest = Object.entries(o).filter(([k]) => !envelope.includes(k));
   const whole = typeof o.summary === 'string' ? o.summary : '';
@@ -147,11 +153,11 @@ export function parseCloseout(value: unknown): Closeout | { error: string } {
     ...(values.length ? { values } : {}),
     needs: typeof o.needs === 'string' && o.needs ? o.needs : undefined,
     ...(rest.length ? { output: Object.fromEntries(rest) } : {}),
-  };
+  } satisfies Closeout | { error: string } as Closeout | { error: string };
 }
 
 /** A closeout as the object it is, from the object the engine recorded or the text a harness handed back; else why not, in words. */
-function objectOf(value: unknown): Record<string, unknown> | string {
+function objectOf(value: unknown) {
   let raw = value;
   if (typeof raw === 'string') {
     try {
@@ -177,11 +183,7 @@ function objectOf(value: unknown): Record<string, unknown> | string {
  * @param said The step's closeout, or undefined where it gave none, which gives nothing.
  * @param fields The fields asked about: those the step's `output:` declares where none are given.
  */
-export function declaredOutput(
-  step: StepSpec,
-  said: Closeout | undefined,
-  fields: readonly string[] = outputFields(step),
-): { given: Record<string, unknown>; missing: string[] } {
+export function declaredOutput(step: StepSpec, said: Closeout | undefined, fields: readonly string[] = outputFields(step)) {
   const given: Array<[string, unknown]> = [];
   const missing: string[] = [];
   const answered = (field: string, value: unknown) => field !== LOOP_REPLIES || !Array.isArray(value) || value.length > 0;
@@ -201,7 +203,7 @@ export function declaredOutput(
  * @param said The step's closeout.
  * @param fields The fields printed: those the step's `output:` declares where none are given.
  */
-export function outputLines(step: StepSpec, said: Closeout, fields: readonly string[] = outputFields(step)): string[] {
+export function outputLines(step: StepSpec, said: Closeout, fields: readonly string[] = outputFields(step)) {
   const { given, missing } = declaredOutput(step, said, fields);
   const lines: string[] = [];
   for (const [name, value] of Object.entries(given)) {
@@ -214,10 +216,10 @@ export function outputLines(step: StepSpec, said: Closeout, fields: readonly str
 }
 
 /** A value as text: a string as itself, anything else as JSON. */
-const textOf = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
+const textOf = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 /** `name: value` behind `first`, with a string's further lines indented under it behind `next`. */
-const labelled = (name: string, value: unknown, first = '', next = first): string[] => {
+const labelled = (name: string, value: unknown, first = '', next = first) => {
   const [head, ...more] = textOf(value).split('\n');
   return [`${first}${name}: ${head}`, ...more.map((l) => `${next}  ${l}`)];
 };
@@ -227,6 +229,7 @@ const labelled = (name: string, value: unknown, first = '', next = first): strin
  * is, and any other object as its keys and values. What a place holds beside those follows it, the same way.
  * @param where The place, of any shape: an object, a list of places, or a string.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function placeText(where: unknown): string {
   if (!where || typeof where !== 'object') return textOf(where);
   if (Array.isArray(where)) return where.map(placeText).join(', ');
@@ -248,21 +251,21 @@ export function placeText(where: unknown): string {
  * One entry of a listed array. A finding leads with where it is — a `file` and `line` of its own, or a `where` of any shape,
  * as `placeText` prints it, never as JSON — and its other fields follow beneath.
  */
-function itemLines(item: unknown): string[] {
+function itemLines(item: unknown) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     const [head, ...more] = textOf(item).split('\n');
-    return [`  - ${head}`, ...more.map((l) => `    ${l}`)];
+    return [`  - ${head}`, ...more.map((l) => `    ${l}`)] satisfies string[];
   }
   const o = item as Record<string, unknown>;
   const own = typeof o.file === 'string';
   if (own || Object.hasOwn(o, 'where')) {
     const [head, ...more] = placeText(own ? { file: o.file, line: o.line } : o.where).split('\n');
     const rest = Object.entries(o).filter(([k]) => (own ? k !== 'file' && k !== 'line' : k !== 'where'));
-    return [`  - ${head}`, ...more.map((l) => `    ${l}`), ...rest.flatMap(([k, v]) => labelled(k, v, '    '))];
+    return [`  - ${head}`, ...more.map((l) => `    ${l}`), ...rest.flatMap(([k, v]) => labelled(k, v, '    '))] satisfies string[];
   }
   const entries = Object.entries(o);
-  if (!entries.length) return ['  - {}'];
-  return entries.flatMap(([k, v], i) => labelled(k, v, i ? '    ' : '  - ', '    '));
+  if (!entries.length) return ['  - {}'] satisfies string[];
+  return entries.flatMap(([k, v], i) => labelled(k, v, i ? '    ' : '  - ', '    ')) satisfies string[];
 }
 
 /**
@@ -282,7 +285,7 @@ function itemLines(item: unknown): string[] {
  * @param replies Whether the step owes `replies` (`owed`), owes an empty list (`none`), or neither (false, where none is given).
  * @param inFolder Whether the run is a folder run, which has nothing to commit: false where none is given.
  */
-export const closeoutContract = (step?: StepSpec, replies: 'owed' | 'none' | false = false, inFolder = false): string => {
+export const closeoutContract = (step?: StepSpec, replies: 'owed' | 'none' | false = false, inFolder = false) => {
   const output = step?.output;
   const declared =
     step && output
@@ -348,7 +351,7 @@ export const closeoutContract = (step?: StepSpec, replies: 'owed' | 'none' | fal
  * @param steps The workflow's steps as the run froze them.
  * @param name The step's name.
  */
-export const isLoopTarget = (steps: readonly StepSpec[], name: string): boolean => steps.some((s) => s.loop === name);
+export const isLoopTarget = (steps: readonly StepSpec[], name: string) => steps.some((s) => s.loop === name) satisfies boolean as boolean;
 
 /**
  * What the run adds to a loop's target's closeout (`LOOP_REPLIES`): an answer to each finding it was handed. Strict, as every schema handed
@@ -406,6 +409,7 @@ const REFERENCES = ['$ref', '$dynamicRef', '$recursiveRef'];
  * @param node The schema, or a part of it, of any shape.
  * @param at Where `node` is in the whole schema, said in the answer: empty at its root.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function looseAt(node: unknown, at: string): { at: string; why: string } | { at: string; ref: string } | undefined {
   if (!isObject(node)) return undefined;
   const ref = REFERENCES.find((k) => Object.hasOwn(node, k));

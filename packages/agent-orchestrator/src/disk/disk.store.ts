@@ -13,18 +13,22 @@ const BLOCK = 512;
  * A folder counted for itself alone, as a root of `part` of its kind (`kindAt`): its own blocks, the names under it left to roots of
  * their own.
  */
-const alone = (part: DiskPart, at: string): DiskRoot => ({ part, kind: kindAt(part), path: at, own: fs.lstatSync(at).blocks * BLOCK });
+const alone = (part: DiskPart, at: string) =>
+  ({ part, kind: kindAt(part), path: at, own: fs.lstatSync(at).blocks * BLOCK }) satisfies DiskRoot;
 
 /**
  * The roots of a part kept by run, whose folder is `at`: the folder alone, and each name under it a root of its own, by its name and
  * of its kind (`kindAt`). The folder whole as one root where it does not list, so a walk says what did not read of it.
  */
-function runRoots(part: DiskPart, at: string): DiskRoot[] {
+function runRoots(part: DiskPart, at: string) {
   try {
     const names = fs.readdirSync(at);
-    return [alone(part, at), ...names.map((name): DiskRoot => ({ part, kind: kindAt(part, name), name, path: path.join(at, name) }))];
+    return [
+      alone(part, at),
+      ...names.map((name) => ({ part, kind: kindAt(part, name), name, path: path.join(at, name) }) satisfies DiskRoot),
+    ] satisfies DiskRoot[];
   } catch {
-    return [{ part, kind: kindAt(part), path: at }];
+    return [{ part, kind: kindAt(part), path: at }] satisfies DiskRoot[];
   }
 }
 
@@ -37,16 +41,16 @@ function runRoots(part: DiskPart, at: string): DiskRoot[] {
  * @throws When the store's root does not list: there is nothing to size, and a reading of nothing would say the store is empty.
  * @param home The store's directory (`WF_ROOT`).
  */
-export function storeRoots(home: string): DiskRoot[] {
+export function storeRoots(home: string) {
   const names = fs.readdirSync(home);
   return [
     alone('other', home),
-    ...names.flatMap((name): DiskRoot[] => {
+    ...names.flatMap((name) => {
       const part = partOf(name);
       const at = path.join(home, name);
-      return PER_RUN.includes(part) ? runRoots(part, at) : [{ part, kind: kindAt(part), path: at }];
+      return (PER_RUN.includes(part) ? runRoots(part, at) : [{ part, kind: kindAt(part), path: at }]) satisfies DiskRoot[];
     }),
-  ];
+  ] satisfies DiskRoot[] as DiskRoot[];
 }
 
 /**
@@ -54,7 +58,7 @@ export function storeRoots(home: string): DiskRoot[] {
  * machine it is the machine's own disk, whatever the host has left.
  * @param home The store's directory (`WF_ROOT`).
  */
-export function storeFree(home: string): { free: number; size: number } {
+export function storeFree(home: string) {
   const stat = fs.statfsSync(home);
   return { free: stat.bavail * stat.bsize, size: stat.blocks * stat.bsize };
 }

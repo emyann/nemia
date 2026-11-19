@@ -168,7 +168,7 @@ export const isFactoryLine = (line: FeedLine): line is FactoryLine => 'factory' 
  * factory by their names. Pure.
  * @param line The feed's line, of any version.
  */
-export const involvedOf = (line: FeedLine): Involved =>
+export const involvedOf = (line: FeedLine) =>
   line.involved ??
   (isRunLine(line)
     ? line.step === undefined
@@ -181,7 +181,7 @@ export const involvedOf = (line: FeedLine): Involved =>
         : { kind: 'Daemon', name: String(line.daemon) });
 
 /** The labels `line` carries, its own where it has them, else what a v0 line says: its run, and its step where it names one. */
-const labelsOf = (line: FeedLine): FeedLabels =>
+const labelsOf = (line: FeedLine) =>
   line.labels ?? (isRunLine(line) ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) } : {});
 
 /**
@@ -206,8 +206,8 @@ const labelsOf = (line: FeedLine): FeedLabels =>
  * where a classified one would be, so a line written says its fields in one order whichever way its reason came.
  * @param line The line as written or as built, signed or not.
  */
-export function upgraded(line: FeedLine): FeedLine {
-  if (line.apiVersion !== undefined) return current(line);
+export function upgraded(line: FeedLine) {
+  if (line.apiVersion !== undefined) return current(line) satisfies FeedLine;
   const { reason: given, on: givenOn, via: givenVia, ...said } = line;
   const involved = involvedOf(line);
   const { reason, on, via } =
@@ -224,14 +224,14 @@ export function upgraded(line: FeedLine): FeedLine {
     ...(waitsOf(reason) ? { waits: 'person' as const } : {}),
     source: line.source ?? sourceOf(reason),
     message: lineMessage(line),
-  };
+  } satisfies FeedLine;
 }
 
 /**
  * The message a person reads of `line`: its word and its note (`messageOf`) — but for the store's line that says who paused it and why,
  * which reads `store paused by ann · merging by hand`, or `store paused by ann` where no why was given. Pure.
  */
-const lineMessage = (line: FeedLine): string => {
+const lineMessage = (line: FeedLine) => {
   if (!isStoreLine(line) || (!line.by && !line.why)) return messageOf(line);
   return `${line.word}${line.by ? ` by ${line.by}` : ''}${line.why ? ` · ${line.why}` : ''}`;
 };
@@ -240,7 +240,7 @@ const lineMessage = (line: FeedLine): string => {
  * A signed line with its reason current (`currentOf`): the line as it is where its code is, else the same line under the current code
  * and its qualifier, in the place the reason was. Its other fields — `waits`, `type`, `message` — are its writer's, kept. Pure.
  */
-function current(line: FeedLine): FeedLine {
+function current(line: FeedLine) {
   if (line.reason === undefined) return line;
   const kind = involvedOf(line).kind;
   const now = currentOf({ reason: line.reason, on: line.on, via: line.via }, kind);
@@ -261,8 +261,8 @@ function current(line: FeedLine): FeedLine {
  * the base branch's checkout, which a line written before the word was renamed says `on: 'checkout'`, reads as `base` (`WAIT_ON`).
  * @param line The line's keys as the store's schema decoded them.
  */
-export const lineAsRead = (line: Readonly<Record<string, unknown>>): FeedLine =>
-  upgraded((line.on === 'checkout' ? { ...line, on: 'base' } : line) as unknown as FeedLine);
+export const lineAsRead = (line: Readonly<Record<string, unknown>>) =>
+  upgraded((line.on === 'checkout' ? { ...line, on: 'base' } : line) as unknown as FeedLine) satisfies FeedLine;
 
 /**
  * The line a daemon of pid `pid` writes once it has taken the store, at `at`, saying how the holder it `replaced` ended: stopped (when),
@@ -272,7 +272,7 @@ export const lineAsRead = (line: Readonly<Record<string, unknown>>): FeedLine =>
  * @param at When the daemon took the store, an ISO time.
  * @param now The clock the words of a holder gone without a stop measure by, in ms since the epoch.
  */
-export function startedLine(pid: number, replaced: DaemonStanding, at: string, now: number): DaemonLine {
+export function startedLine(pid: number, replaced: DaemonStanding, at: string, now: number) {
   const gone = takeoverLine(replaced, 'the store', now);
   const note =
     replaced.kind === 'none'
@@ -298,7 +298,7 @@ export function startedLine(pid: number, replaced: DaemonStanding, at: string, n
  * @param note The words naming the run and each process ended.
  * @param at When the sweep ended them, an ISO time.
  */
-export const leftEndedLine = (run: string, note: string, at: string): StoreLine =>
+export const leftEndedLine = (run: string, note: string, at: string) =>
   upgraded({
     at,
     store: STORE,
@@ -317,7 +317,7 @@ export const leftEndedLine = (run: string, note: string, at: string): StoreLine 
 export type FeedFold = { said: Map<string, FeedSaid>; shots: Map<string, number> };
 
 /** A fold of nothing. */
-export const freshFold = (): FeedFold => ({ said: new Map(), shots: new Map() });
+export const freshFold = () => ({ said: new Map(), shots: new Map() });
 
 /**
  * A process's fold of the feed, as far as it has read it: the byte it read to (`cursor`), and the generation of the feed it read
@@ -327,25 +327,25 @@ export const freshFold = (): FeedFold => ({ said: new Map(), shots: new Map() })
 export type FeedMemo = { cursor: number; generation?: number; fold: FeedFold };
 
 /** A fold of nothing: what a process that has read no feed starts from. */
-export const freshMemo = (): FeedMemo => ({ cursor: 0, fold: freshFold() });
+export const freshMemo = () => ({ cursor: 0, fold: freshFold() });
 
 /** Where the fold keeps what a line is about, derived the same from a v0 line and a v1 one. */
-const foldKey = (involved: Involved): string => `${involved.kind}/${involved.name}`;
+const foldKey = (involved: Involved) => `${involved.kind}/${involved.name}`;
 
 /**
  * Where the fold keeps the level last said of the factory `factory`: no `Run/` key, so a run's `removed` neither reads nor forgets it, and
  * no `Step/` one, so no run's `forget` does.
  */
-const levelKey = (factory: string): string => `Level/${factory}`;
+const levelKey = (factory: string) => `Level/${factory}`;
 
 /**
  * Where the fold keeps the conflicts last said of the factory `factory`: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets
  * it.
  */
-const conflictsKey = (factory: string): string => `Conflicts/${factory}`;
+const conflictsKey = (factory: string) => `Conflicts/${factory}`;
 
 /** Where the fold keeps what was last said of the factory `factory`'s library adds: no `Run/` or `Step/` key, as `conflictsKey`. */
-const addsKey = (factory: string): string => `Adds/${factory}`;
+const addsKey = (factory: string) => `Adds/${factory}`;
 
 /** Where the fold keeps the store's readiness last said: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets it. */
 const READINESS_KEY = 'Readiness/store';
@@ -355,21 +355,21 @@ const READINESS_KEY = 'Readiness/store';
  * reads the run off it), the try it belongs to, and the note that tells one occurrence from another — the note last, so `holdOnce` reads
  * it back off the key. A run id and a step name are slugs and carry no `#`, so the note is what follows the second one.
  */
-const onceKey = (involved: Involved, reason: Reason, tried: number | undefined, note: string | undefined): string =>
+const onceKey = (involved: Involved, reason: Reason, tried: number | undefined, note: string | undefined) =>
   `${reason} ${involved.kind}/${involved.name}#${tried ?? 0}#${note ?? ''}`;
 
 /** What a one-shot of `run`, of its step `step` where it is of one, is about: the same `Involved` a line of it carries. */
-const onceInvolved = (run: string, step: string | undefined): Involved =>
-  step === undefined ? { kind: 'Run', name: run } : { kind: 'Step', name: `${run}/${step}` };
+const onceInvolved = (run: string, step: string | undefined) =>
+  (step === undefined ? { kind: 'Run', name: run } : { kind: 'Step', name: `${run}/${step}` }) satisfies Involved;
 
 /** What a one-shot's key says the line is about, as `onceKey` joined it after the reason. */
-const onceAbout = (key: string): string => key.slice(key.indexOf(' ') + 1);
+const onceAbout = (key: string) => key.slice(key.indexOf(' ') + 1);
 
 /** The reason `line` names, its own where it has one, else the word's by the table. */
-const reasonOfLine = (line: FeedLine, involved: Involved): Reason => line.reason ?? reasonOf(line, involved.kind);
+const reasonOfLine = (line: FeedLine, involved: Involved) => (line.reason ?? reasonOf(line, involved.kind)) satisfies Reason;
 
 /** A run and every step and one-shot of it taken out of the fold: what a `removed` line says the store no longer has. */
-function forget(fold: FeedFold, run: string): void {
+function forget(fold: FeedFold, run: string) {
   fold.said.delete(foldKey({ kind: 'Run', name: run }));
   for (const key of fold.said.keys()) if (key.startsWith(`Step/${run}/`)) fold.said.delete(key);
   for (const key of fold.shots.keys())
@@ -377,7 +377,7 @@ function forget(fold: FeedFold, run: string): void {
 }
 
 /** Counts one occurrence of the one-shot `line` says, under its key (`onceKey`). */
-const counted = (fold: FeedFold, line: FeedLine, involved: Involved, reason: Reason): void => {
+const counted = (fold: FeedFold, line: FeedLine, involved: Involved, reason: Reason) => {
   const key = onceKey(involved, reason, line.try, line.note);
   fold.shots.set(key, (fold.shots.get(key) ?? 0) + 1);
 };
@@ -393,7 +393,7 @@ const counted = (fold: FeedFold, line: FeedLine, involved: Involved, reason: Rea
  * @param fold The fold to move, changed in place and answered.
  * @param lines The feed's lines to fold on, in the order they were written.
  */
-export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
+export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]) {
   for (const l of lines) {
     if (isStoreLine(l)) {
       foldStore(fold, l);
@@ -424,7 +424,7 @@ export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
  * any other passed — the processes a finished run left running that the free sweep ended (`LeftEnded`) among them, a deed with no
  * word to stand, so it moves no pause, level or readiness.
  */
-function foldStore(fold: FeedFold, l: StoreLine): void {
+function foldStore(fold: FeedFold, l: StoreLine) {
   const involved = involvedOf(l);
   const reason = reasonOfLine(l, involved);
   if (isOnce(reason)) counted(fold, l, involved, reason);
@@ -437,24 +437,24 @@ function foldStore(fold: FeedFold, l: StoreLine): void {
  * A factory's line `l` folded: its conflicts pending or settled, and its library adds missing or resolved, each kept as the last word said
  * of them, with its reason; any other passed.
  */
-function foldFactory(fold: FeedFold, l: FactoryLine): void {
+function foldFactory(fold: FeedFold, l: FactoryLine) {
   const reason = reasonOfLine(l, involvedOf(l));
   if (reason === 'ConflictsPending' || reason === 'ConflictsSettled') fold.said.set(conflictsKey(l.factory), { ...saidOf(l), reason });
   if (reason === 'AddsMissing' || reason === 'AddsResolved') fold.said.set(addsKey(l.factory), { ...saidOf(l), reason });
 }
 
 /** The word and the note `line` says, as the fold keeps them. */
-const saidOf = (line: FeedLine): FeedSaid => ({ word: line.word, ...(line.note !== undefined ? { note: line.note } : {}) });
+const saidOf = (line: FeedLine) => ({ word: line.word, ...(line.note !== undefined ? { note: line.note } : {}) });
 
 /**
  * Whether the feed owes no line for `b`, having said `a` of it last: the same word and the same note — or, of a run at rest, the same word,
  * whatever the note, since a note moving on a run nothing moves is a change of wording.
  */
-const same = (a: FeedSaid | undefined, b: FeedSaid, atRest: boolean): boolean =>
+const same = (a: FeedSaid | undefined, b: FeedSaid, atRest: boolean) =>
   a !== undefined && a.word === b.word && (atRest || a.note === b.note);
 
 /** The word and the note of a said, as a line carries them. */
-const saidKeys = (said: FeedSaid): { word: string; note?: string } => ({
+const saidKeys = (said: FeedSaid) => ({
   word: said.word,
   ...(said.note !== undefined ? { note: said.note } : {}),
 });
@@ -499,7 +499,7 @@ type About = (o: Once) => Involved;
  * place means — so whoever offers is what keeps them apart: `holdOnce` leaves the absence rule silent about the hold the pass itself
  * lifted, rather than offering the same lift twice and trusting this to notice.
  */
-function oncePast(fold: FeedFold, about: About, offers: readonly Once[]): Once[] {
+function oncePast(fold: FeedFold, about: About, offers: readonly Once[]) {
   const walked = new Map<string, number>();
   const out: Once[] = [];
   for (const o of offers) {
@@ -514,13 +514,13 @@ function oncePast(fold: FeedFold, about: About, offers: readonly Once[]): Once[]
 }
 
 /** The note a hold's put and its lift both carry: the moment the hold was put, which is what tells one hold of a run from the next. */
-const holdSince = (at: string): string => `since ${at}`;
+const holdSince = (at: string) => `since ${at}`;
 
 /**
  * Who lifted the hold or pause a lift's note is of (`note`), where the lift left that (`receipt`, paired by the moment of what it lifted):
  * nobody elsewhere. Pure.
  */
-const liftedBy = (note: string, receipt: { since: string; actor: Actor } | undefined): { actor?: Actor } =>
+const liftedBy = (note: string, receipt: { since: string; actor: Actor } | undefined) =>
   receipt && note === holdSince(receipt.since) ? { actor: receipt.actor } : {};
 
 /**
@@ -551,7 +551,7 @@ function holdOnce(
   lifted: string | undefined,
   holder: Actor | undefined,
   unheld: { since: string; actor: Actor } | undefined,
-): Once[] {
+) {
   const involved = onceInvolved(run, undefined);
   const standing = held === undefined ? undefined : holdSince(held);
   const lifting = lifted === undefined ? undefined : holdSince(lifted);
@@ -603,7 +603,7 @@ export type FeedResumed = { since: string; actor: Actor } | undefined;
  * the note is what the lift is paired by. The lift, read off an absence, carries who lifted it where the lift left that beside the
  * pause's file (`resumed`, paired by the moment of the pause it lifted), and names nobody elsewhere.
  */
-function storeOnce(fold: FeedFold, pause: FeedPause, resumed?: FeedResumed): Once[] {
+function storeOnce(fold: FeedFold, pause: FeedPause, resumed?: FeedResumed) {
   const standing = pause === null ? undefined : holdSince(pause.at);
   const out: Once[] =
     pause !== null && standing !== undefined
@@ -627,7 +627,7 @@ function storeOnce(fold: FeedFold, pause: FeedPause, resumed?: FeedResumed): Onc
 }
 
 /** The store's lines a pass owes the feed (`storeOnce`), each written once per occurrence (`oncePast`), stamped through `upgraded`. */
-const storeLines = (fold: FeedFold, at: string, pause: FeedPause, resumed?: FeedResumed): StoreLine[] =>
+const storeLines = (fold: FeedFold, at: string, pause: FeedPause, resumed?: FeedResumed) =>
   oncePast(fold, () => STORE_INVOLVED, storeOnce(fold, pause, resumed)).map(
     (o) =>
       upgraded({
@@ -653,7 +653,7 @@ export type FeedLevels = readonly FactoryLevel[];
  * The level of `row` in a person's words, the note of its line: `acme is at auto until <its end>, then semi-auto` while a raise
  * stands, else `acme is at semi-auto`. It is what the fold compares, so a raise given a new end is a line of its own. Pure.
  */
-const levelNote = (row: FactoryLevel): string =>
+const levelNote = (row: FactoryLevel) =>
   row.raise === null
     ? `${row.factory} is at ${row.level}`
     : `${row.factory} is at ${row.level} until ${row.raise.until}, then ${row.default}`;
@@ -666,7 +666,7 @@ const levelNote = (row: FactoryLevel): string =>
  * verb that wrote them, so a raise that ends by itself, which nothing writes, is said as a person's `--end` is; a restarted daemon, whose
  * fold is the whole feed, says none again. Each is a person's deed by the table: a raise's end is the stretch the person gave it. Pure.
  */
-function levelLines(fold: FeedFold, at: string, levels: FeedLevels): StoreLine[] {
+function levelLines(fold: FeedFold, at: string, levels: FeedLevels) {
   return levels.flatMap((row) => {
     const said = fold.said.get(levelKey(row.factory));
     const note = levelNote(row);
@@ -691,15 +691,14 @@ function levelLines(fold: FeedFold, at: string, levels: FeedLevels): StoreLine[]
 export type FeedReadiness = Pick<Readiness, 'pieces'>;
 
 /** The read's pieces a run waits on that are missing: `missing`, of cost `run` (a piece that declares no cost is read as `run`). */
-const waitedOn = (read: FeedReadiness): Readiness['pieces'] =>
-  read.pieces.filter((piece) => piece.state === 'missing' && (piece.cost ?? 'run') === 'run');
+const waitedOn = (read: FeedReadiness) => read.pieces.filter((piece) => piece.state === 'missing' && (piece.cost ?? 'run') === 'run');
 
 /**
  * What a `not ready` line says of the missing pieces a run waits on: each by its name, where it is of a factory that factory and its
  * workflow, and the command of its first fix, else its message where it offers none — `mise (nemia/quick): nemia doctor fix mise
  * --factory nemia --workflow quick; …`. Pure.
  */
-const missingNote = (missing: Readiness['pieces']): string =>
+const missingNote = (missing: Readiness['pieces']) =>
   missing
     .map((piece) => {
       const where = piece.factory === undefined ? '' : ` (${[piece.factory, piece.workflow].filter((w) => w !== undefined).join('/')})`;
@@ -718,7 +717,7 @@ const READY_NOTE = 'every piece a run waits on is in place';
  * the feed never called not ready is never said ready. A second piece missing, or one of two put back, moves the note, and is said.
  * The tick's judgement of the daemon's read. Pure.
  */
-function readinessLines(fold: FeedFold, at: string, read: FeedReadiness): StoreLine[] {
+function readinessLines(fold: FeedFold, at: string, read: FeedReadiness) {
   const said = fold.said.get(READINESS_KEY);
   const missing = waitedOn(read);
   const due: FeedSaid | undefined =
@@ -754,7 +753,7 @@ export const conflictsDue: ConflictsDue = (said, pending) =>
  * for one of three conflicts, which rewords the message, writes no line; a restarted daemon, whose fold is the whole feed, says none
  * again. Pure.
  */
-function conflictLines(fold: FeedFold, at: string, conflicts: FeedConflicts): FactoryLine[] {
+function conflictLines(fold: FeedFold, at: string, conflicts: FeedConflicts) {
   return conflicts.flatMap(({ factory, pending, message }) => {
     const said = fold.said.get(conflictsKey(factory))?.reason;
     const due = conflictsDue(said === 'ConflictsPending' || said === 'ConflictsSettled' ? said : undefined, pending);
@@ -794,7 +793,7 @@ export const addsMissingDue: AddsMissingDue = (said, missing) =>
  * (`addsMissingDue`, reading the reason the fold keeps under `addsKey`), its note what to do. Compared by its reason alone, as
  * `conflictLines` compares, so a second add going missing beside the first writes no line. Pure.
  */
-function addsLines(fold: FeedFold, at: string, adds: FeedMissing): FactoryLine[] {
+function addsLines(fold: FeedFold, at: string, adds: FeedMissing) {
   return adds.flatMap(({ factory, missing, message }) => {
     const said = fold.said.get(addsKey(factory))?.reason;
     const due = addsMissingDue(said === 'AddsMissing' || said === 'AddsResolved' ? said : undefined, missing);
@@ -814,7 +813,7 @@ function addsLines(fold: FeedFold, at: string, adds: FeedMissing): FactoryLine[]
 }
 
 /** One call a step's sessions were denied, as the one-shot the feed writes of it: the call in its word and as a field of its own. */
-const denialOnce = (d: FeedDenial): Once => ({
+const denialOnce = (d: FeedDenial) => ({
   step: d.step,
   word: `${DENIED}${d.call}`,
   note: `try ${d.try}`,
@@ -826,7 +825,7 @@ const denialOnce = (d: FeedDenial): Once => ({
  * The one-shot a step's closeout read says: `closed out`, its note the try it is of. The note is all the line carries of it — the closeout
  * itself is in the log record `emitFeed` writes beside the line (`FeedCloseout`), never in the feed.
  */
-const closeoutOnce = (c: FeedCloseout): Once => ({
+const closeoutOnce = (c: FeedCloseout) => ({
   step: c.step,
   word: LINE_WORDS.ClosedOut,
   note: `try ${c.try}`,
@@ -838,7 +837,7 @@ const closeoutOnce = (c: FeedCloseout): Once => ({
  * (`acts`), its hold's put and lift (`holdOnce`), each fault the runtime journalled (`faults`) and each closeout its steps gave
  * (`closeouts`) — each written once per occurrence (`oncePast`), stamped through the one door (`upgraded`). Pure.
  */
-function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): RunLine[] {
+function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords) {
   const runLabels = words.labels ?? { run };
   const offers = [
     ...(words.denials ?? []).map(denialOnce),
@@ -901,8 +900,8 @@ export function feedChanges(
   readiness?: FeedReadiness,
   resumed?: FeedResumed,
   missing?: FeedMissing,
-): Array<RunLine | StoreLine | FactoryLine> {
-  const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels): RunLine =>
+) {
+  const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels) =>
     upgraded({
       at,
       run,
@@ -932,12 +931,7 @@ export function feedChanges(
 }
 
 /** The factories' lines a pass owes: their conflicts' where it read them (`conflictLines`), their adds' where it read them. Pure. */
-const factoryChanges = (
-  fold: FeedFold,
-  at: string,
-  conflicts: FeedConflicts | undefined,
-  missing: FeedMissing | undefined,
-): FactoryLine[] => [
+const factoryChanges = (fold: FeedFold, at: string, conflicts: FeedConflicts | undefined, missing: FeedMissing | undefined) => [
   ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
   ...(missing === undefined ? [] : addsLines(fold, at, missing)),
 ];
@@ -953,7 +947,7 @@ const storeChanges = (
   levels: FeedLevels | undefined,
   readiness: FeedReadiness | undefined,
   resumed?: FeedResumed,
-): StoreLine[] => [
+) => [
   ...(pause === undefined ? [] : storeLines(fold, at, pause, resumed)),
   ...(levels === undefined ? [] : levelLines(fold, at, levels)),
   ...(readiness === undefined ? [] : readinessLines(fold, at, readiness)),
@@ -965,7 +959,7 @@ const storeChanges = (
  * · …`; the message `emitFeed` logs.
  * @param l The feed's line to say.
  */
-export const feedSaidWords = (l: FeedLine): string => {
+export const feedSaidWords = (l: FeedLine) => {
   const who = isStoreLine(l) && l.by ? ` by ${l.by}` : '';
   const notes = [isStoreLine(l) ? l.why : undefined, l.note].filter((n) => n);
   const head = isRunLine(l)
@@ -982,7 +976,7 @@ export const feedSaidWords = (l: FeedLine): string => {
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`: what `nemia watch` prints of it.
  * @param l The feed's line to say.
  */
-export const feedLineWords = (l: FeedLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
+export const feedLineWords = (l: FeedLine) => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
 
 /**
  * A line of the feed as its writer publishes it to the live readers in its process (`FeedHub`): the line, and the bytes it was written
@@ -1001,7 +995,7 @@ export type FeedAppended = { lines: FeedLine[]; before: number; after: number; l
  * none, when the file grew by more than the append wrote: another writer appended between the size read before and the one after, and
  * where in that range this append's lines landed is not known, so nothing is vouched for and a reader reads the file. Pure.
  */
-export function publishedOf({ lines, before, after, leading }: FeedAppended): FeedPublished[] {
+export function publishedOf({ lines, before, after, leading }: FeedAppended) {
   const sized = lines.map((line) => ({ line, size: Buffer.byteLength(`${JSON.stringify(line)}\n`) }));
   const written = Buffer.byteLength(leading) + sized.reduce((a, b) => a + b.size, 0);
   if (after !== before + written) return [];
@@ -1093,11 +1087,10 @@ const FEED_WORD: Record<EnginePhase | 'unknown', ListedPhase> = {
  * The engine's word for a task as the feed keeps it (`FEED_WORD`). Pure.
  * @param word The engine's phase of the task, or `unknown`.
  */
-export const feedPhase = (word: EnginePhase | 'unknown'): ListedPhase => FEED_WORD[word];
+export const feedPhase = (word: EnginePhase | 'unknown') => FEED_WORD[word];
 
 /** The runs a person's hold on `run` waits for, none for a hold that names no run; null where nobody holds it, or it was called off. */
-const holdingOn = (run: Pick<Run, 'hold'>, status: Assessment['status']): readonly string[] | null =>
-  run.hold && status !== 'cancelled' ? run.hold.until : null;
+const holdingOn = (run: Pick<Run, 'hold'>, status: Assessment['status']) => (run.hold && status !== 'cancelled' ? run.hold.until : null);
 
 /**
  * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through
@@ -1142,7 +1135,7 @@ export function feedWords(
     lifted?: string;
     holder?: Actor;
   } = {},
-): FeedWords {
+) {
   const waitingWords = onYouWords(l);
   const holding = holdingOn(run, status);
   const held = holding !== null;
@@ -1179,7 +1172,7 @@ export function feedWords(
 }
 
 /** What a line says of its codes: its reason, and its `on` or `via` where it has one. */
-const said = ({ reason, on, via }: { reason: Reason; on?: WaitOn; via?: AnswerVia }): Pick<FeedSaid, 'reason' | 'on' | 'via'> => ({
+const said = ({ reason, on, via }: { reason: Reason; on?: WaitOn; via?: AnswerVia }) => ({
   reason,
   ...(on ? { on } : {}),
   ...(via ? { via } : {}),
@@ -1196,7 +1189,7 @@ const NEEDS_CAP = 200;
  * for a step that did not sign off blocked or said nothing it needs. Its word says `BLOCKED` already (`listing`); this is the question, so
  * a watcher does not have to run `nemia decide` to read it. Pure.
  */
-const needsNote = (c: Closeout | { error: string } | undefined): string => {
+const needsNote = (c: Closeout | { error: string } | undefined) => {
   const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';
   return needs ? `needs: ${needs}` : '';
 };

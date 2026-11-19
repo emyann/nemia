@@ -19,8 +19,7 @@ export type SweptRun = { readonly id: string; readonly finished: boolean; readon
 export type LeftVerdict = 'end' | 'holds' | 'none';
 
 /** Whether `cwd` is the folder `folder` or inside it: a folder named alike beside it (`<folder>2`) is not. */
-const inFolder = (cwd: string | undefined, folder: string): boolean =>
-  cwd !== undefined && (cwd === folder || cwd.startsWith(folder + '/'));
+const inFolder = (cwd: string | undefined, folder: string) => cwd !== undefined && (cwd === folder || cwd.startsWith(folder + '/'));
 
 const leftBehindSpec = spec<(p: LeftProcess, run: SweptRun) => LeftVerdict>({
   requires: ({ input: [, run] }) => run.id !== '' && run.worktree !== '' && !run.worktree.endsWith('/'),

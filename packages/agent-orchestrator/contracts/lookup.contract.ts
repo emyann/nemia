@@ -20,18 +20,16 @@ export type LookupRoot = { readonly repo: string | undefined; readonly has: bool
 export type Looked = { kind: 'found'; at: number } | { kind: 'none' } | { kind: 'both'; at: number; again: number };
 
 /** Whether the root `root` holds the name and may be read for it: no library root, or the name added. */
-const reads = (root: LookupRoot | undefined, added: boolean): boolean => root !== undefined && root.has && (!root.library || added);
+const reads = (root: LookupRoot | undefined, added: boolean) => root !== undefined && root.has && (!root.library || added);
 
 /** Whether no root before `at` holds the name where it may be read. */
-const noneBefore = (roots: readonly LookupRoot[], at: number, added: boolean): boolean =>
-  !roots.slice(0, at).some((root) => reads(root, added));
+const noneBefore = (roots: readonly LookupRoot[], at: number, added: boolean) => !roots.slice(0, at).some((root) => reads(root, added));
 
 /** Whether the root `at` is there, holds the name and may be read for it. */
-const holds = (roots: readonly LookupRoot[], at: number, added: boolean): boolean =>
-  at >= 0 && at < roots.length && reads(roots[at], added);
+const holds = (roots: readonly LookupRoot[], at: number, added: boolean) => at >= 0 && at < roots.length && reads(roots[at], added);
 
 /** Whether a root after `at` holds the name where it may be read and is the other place of the repository `at` is a place of. */
-const heldAgain = (roots: readonly LookupRoot[], at: number, added: boolean): boolean => {
+const heldAgain = (roots: readonly LookupRoot[], at: number, added: boolean) => {
   const first = roots[at];
   return (
     first !== undefined && first.repo !== undefined && roots.slice(at + 1).some((root) => reads(root, added) && root.repo === first.repo)

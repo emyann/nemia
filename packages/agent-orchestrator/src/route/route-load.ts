@@ -14,7 +14,7 @@ import { judgeRefusal, type JudgeFence } from './judge.ts';
  * @param steps The workflow's steps.
  * @param fence How the fence's own judgement tells a judge's fence, handed in by `validate`.
  */
-export function routeRefusal(steps: readonly StepSpec[], fence: JudgeFence): string | undefined {
+export function routeRefusal(steps: readonly StepSpec[], fence: JudgeFence) {
   const byName = new Map(steps.map((s) => [s.name, s]));
   for (const s of steps) {
     const refused =
@@ -28,7 +28,7 @@ export function routeRefusal(steps: readonly StepSpec[], fence: JudgeFence): str
 }
 
 /** Why a node's `when:` takes no route: it waits on no condition or on two, names a route its condition lacks, or one it ends on. */
-function whenRefusal(s: StepSpec, byName: ReadonlyMap<string, StepSpec>): string | undefined {
+function whenRefusal(s: StepSpec, byName: ReadonlyMap<string, StepSpec>) {
   if (s.when === undefined) return undefined;
   const among = s.after.filter((a) => byName.get(a)?.routes !== undefined);
   const [condition] = among;
@@ -48,7 +48,7 @@ function whenRefusal(s: StepSpec, byName: ReadonlyMap<string, StepSpec>): string
 }
 
 /** Why a condition does not close: an `ends:` off its routes, a route nobody takes, a key it cannot use, or a table not closed. */
-function conditionRefusal(c: StepSpec, steps: readonly StepSpec[], byName: ReadonlyMap<string, StepSpec>): string | undefined {
+function conditionRefusal(c: StepSpec, steps: readonly StepSpec[], byName: ReadonlyMap<string, StepSpec>) {
   const routes = c.routes ?? [];
   const notRoute = c.ends?.find((e) => !routes.includes(e));
   if (notRoute !== undefined) {
@@ -63,7 +63,7 @@ function conditionRefusal(c: StepSpec, steps: readonly StepSpec[], byName: Reado
 }
 
 /** Why a workflow node does more than file its card: an agent, a workspace, a check or a gate. */
-function workflowNodeRefusal(w: StepSpec): string | undefined {
+function workflowNodeRefusal(w: StepSpec) {
   if (w.workflow === undefined) return undefined;
   const extra = w.agent != null ? 'an agent' : w.workspace ? 'a workspace' : w.check ? 'a check' : w.gate ? 'a gate' : undefined;
   if (extra === undefined) return undefined;
@@ -80,7 +80,7 @@ const CONDITION_REFUSES: ReadonlyArray<readonly [keyof StepSpec & ('workspace' |
 ];
 
 /** Why a condition carries a key it cannot use: a workspace, a check, retries, a resume, or a budget on any but a judge. */
-function conditionKeyRefusal(c: StepSpec): string | undefined {
+function conditionKeyRefusal(c: StepSpec) {
   const used = CONDITION_REFUSES.find(([key]) => c[key] !== undefined && !(key === 'budget' && c.route?.kind === 'judge'));
   return used && `${c.name}: \`${used[0]}:\` on a condition, and ${used[1]}. Delete the line.`;
 }
@@ -93,7 +93,7 @@ function tableRefusal(
   c: StepSpec,
   table: { from: string; table: Readonly<Record<string, string>> },
   byName: ReadonlyMap<string, StepSpec>,
-): string | undefined {
+) {
   const [producer = '', ...rest] = table.from.split('.');
   const field = rest.join('.');
   const named = `${c.name}: \`route: { from: ${table.from} }\``;

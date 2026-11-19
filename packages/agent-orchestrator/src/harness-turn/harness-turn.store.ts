@@ -18,14 +18,14 @@ export type TurnRecord = typeof TurnRecord.Type;
  * The folder of the check turns' records of the store at `home`, which each turn runs in.
  * @param home The store's root folder.
  */
-export const turnsDir = (home: string): string => path.join(home, 'turns');
+export const turnsDir = (home: string) => path.join(home, 'turns');
 
 /**
  * Writes `record` whole, by a temporary file and a rename, so no reader meets half of one.
  * @param home The store's root folder.
  * @param record The turn's record, written to its id's file.
  */
-export function writeTurnRecord(home: string, record: TurnRecord): void {
+export function writeTurnRecord(home: string, record: TurnRecord) {
   fs.mkdirSync(turnsDir(home), { recursive: true });
   const hidden = path.join(turnsDir(home), `.${record.id}-${process.pid}`);
   fs.writeFileSync(hidden, `${JSON.stringify(record, null, 2)}\n`);
@@ -37,7 +37,7 @@ export function writeTurnRecord(home: string, record: TurnRecord): void {
  * @param home The store's root folder.
  * @param id The turn's id, as a caller gave it.
  */
-export function readTurnRecord(home: string, id: string): TurnRecord | undefined {
+export function readTurnRecord(home: string, id: string) {
   if (id === '' || id.includes('/') || id.startsWith('.')) return undefined;
   try {
     return Schema.decodeUnknownSync(TurnRecord)(JSON.parse(fs.readFileSync(path.join(turnsDir(home), `${id}.json`), 'utf8')));
@@ -51,7 +51,7 @@ export function readTurnRecord(home: string, id: string): TurnRecord | undefined
  * @param home The store's root folder.
  * @param harness The harness's name.
  */
-export function latestTurnRecord(home: string, harness: string): TurnRecord | undefined {
+export function latestTurnRecord(home: string, harness: string) {
   let names: string[];
   try {
     names = fs.readdirSync(turnsDir(home));

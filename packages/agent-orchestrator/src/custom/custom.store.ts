@@ -18,14 +18,14 @@ const STORE_AGENT = 'nemia';
  * Whether `name` is the store's own agent (`STORE_AGENT`), whose open session is told her custom instructions, never frozen at a start.
  * @param name The agent's name.
  */
-export const isStoreAgent = (name: string): boolean => name === STORE_AGENT;
+export const isStoreAgent = (name: string) => name === STORE_AGENT;
 
 /**
  * Refuse, as `Missing`, an agent `name` a run on `repo` could not name: none of the repository's places for agents has it, nor yours in the
  * store `home` (`agentsFor`), and it is not the store's own agent (`STORE_AGENT`); with no repository, none of yours and the builtins. The
  * refusal lists the names there are. A name whose file does not read is one all the same.
  */
-function refuseNoAgent(home: string, name: string, repo: string | undefined): void {
+function refuseNoAgent(home: string, name: string, repo: string | undefined) {
   if (isStoreAgent(name)) return;
   const at = repo === undefined ? undefined : path.resolve(repo);
   const dir = path.join(at ?? home, 'workflows', '_');
@@ -44,7 +44,7 @@ function refuseNoAgent(home: string, name: string, repo: string | undefined): vo
  * @param name The agent's name.
  * @param repo The repository whose places for agents name it too, or undefined for yours and the builtins alone.
  */
-export function customInstructionsFor(home: string, name: string, repo: string | undefined): string | undefined {
+export function customInstructionsFor(home: string, name: string, repo: string | undefined) {
   refuseNoAgent(home, name, repo);
   return readCustomInstructions(home, name);
 }
@@ -58,7 +58,7 @@ export function customInstructionsFor(home: string, name: string, repo: string |
  * @param text The custom instructions, written trimmed and ended by a newline.
  * @param repo The repository whose places for agents name it too, or undefined for yours and the builtins alone.
  */
-export function writeCustomInstructions(home: string, name: string, text: string, repo: string | undefined): string {
+export function writeCustomInstructions(home: string, name: string, text: string, repo: string | undefined) {
   refuseNoAgent(home, name, repo);
   const file = customInstructionsFile(home, name);
   if (!text.trim())
@@ -82,7 +82,7 @@ export function writeCustomInstructions(home: string, name: string, text: string
  * @param name The agent's name.
  * @param repo The repository whose places for agents name it too, or undefined for yours and the builtins alone.
  */
-export function clearCustomInstructions(home: string, name: string, repo: string | undefined): boolean {
+export function clearCustomInstructions(home: string, name: string, repo: string | undefined) {
   refuseNoAgent(home, name, repo);
   const file = customInstructionsFile(home, name);
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;

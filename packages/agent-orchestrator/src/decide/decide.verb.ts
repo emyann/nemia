@@ -191,7 +191,7 @@ export type Decided = {
  * @param lines Each step's line, by step name.
  * @param by Who gave the step's word, or undefined where its file names nobody or it has no word.
  */
-export const saidBy = (lines: Record<string, string>, by: (step: string) => Actor | undefined): Record<string, string> =>
+export const saidBy = (lines: Record<string, string>, by: (step: string) => Actor | undefined) =>
   Object.fromEntries(
     Object.entries(lines).map(([step, line]) => {
       const actor = by(step);
@@ -223,7 +223,7 @@ const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: 
 });
 
 /** For each step, what a person said to its sessions, try by try, off `everyTry`; a task two tries share is read once. */
-function saidOf(run: Run, everyTry: ReadonlyMap<string, TaskView>): Record<string, SaidTo[]> {
+function saidOf(run: Run, everyTry: ReadonlyMap<string, TaskView>) {
   const said: Record<string, SaidTo[]> = {};
   for (const [name, record] of Object.entries(run.steps)) {
     const tasks = [...(record.tries ?? []).map((t) => t.taskId), ...(record.taskId ? [record.taskId] : [])];
@@ -238,7 +238,7 @@ function saidOf(run: Run, everyTry: ReadonlyMap<string, TaskView>): Record<strin
 }
 
 /** For each step with a try, its `cost` line (`costLine`), off what its current try used. */
-const costsOf = (steps: readonly StepSpec[], run: Run, used: Record<string, Usage | undefined>, spendOf: SpendOf): Record<string, string> =>
+const costsOf = (steps: readonly StepSpec[], run: Run, used: Record<string, Usage | undefined>, spendOf: SpendOf) =>
   Object.fromEntries(
     Object.entries(run.steps)
       .filter(([, record]) => record.taskId || record.tries?.length)
@@ -255,7 +255,7 @@ const costsOf = (steps: readonly StepSpec[], run: Run, used: Record<string, Usag
   );
 
 /** For each step whose session the harness blocked and says what it waits for, the line a person acts on (`harnessWaitLine`). */
-function waitingOnOf(id: string, run: Run, views: ReadonlyMap<string, TaskView>): Record<string, string> {
+function waitingOnOf(id: string, run: Run, views: ReadonlyMap<string, TaskView>) {
   const waitingOn: Record<string, string> = {};
   for (const [name, record] of Object.entries(run.steps)) {
     const word = record.taskId ? waitingOf(views)(record.taskId) : undefined;
@@ -268,7 +268,7 @@ function waitingOnOf(id: string, run: Run, views: ReadonlyMap<string, TaskView>)
 }
 
 /** For each step whose current try's sessions were denied a call, the line that names them (`deniedWords`). */
-function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<string, string> {
+function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>) {
   const denied: Record<string, string> = {};
   for (const [name, record] of Object.entries(run.steps)) {
     const words = record.taskId ? deniedWords(deniedOf(views)(record.taskId)) : '';
@@ -284,31 +284,29 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * @param run The run's record.
  * @param read The reading `nemia decide` holds of the run, which the store's refusals are judged on; the answer takes the step's name.
  */
-export const needsRefusedOf =
-  (steps: readonly StepSpec[], run: Run, read: AssessRead) =>
-  (name: string): string | undefined => {
-    const { phaseOf, signedOff, asked, verdictOf, asks, spendOf, checkKillOf, tipOf } = read;
-    const needs = signedOff(name)?.needs;
-    for (const { step, how } of needs ? retriesNamed(needs, run.id) : []) {
-      const refused = retryRefusal(
-        steps,
-        run,
-        step,
-        how,
-        phaseOf,
-        signedOff,
-        asked,
-        verdictOf,
-        asks,
-        () => false,
-        spendOf,
-        checkKillOf,
-        tipOf,
-      );
-      if (refused) return `the nemia retry its needs names is refused: ${refused}`;
-    }
-    return undefined;
-  };
+export const needsRefusedOf = (steps: readonly StepSpec[], run: Run, read: AssessRead) => (name: string) => {
+  const { phaseOf, signedOff, asked, verdictOf, asks, spendOf, checkKillOf, tipOf } = read;
+  const needs = signedOff(name)?.needs;
+  for (const { step, how } of needs ? retriesNamed(needs, run.id) : []) {
+    const refused = retryRefusal(
+      steps,
+      run,
+      step,
+      how,
+      phaseOf,
+      signedOff,
+      asked,
+      verdictOf,
+      asks,
+      () => false,
+      spendOf,
+      checkKillOf,
+      tipOf,
+    );
+    if (refused) return `the nemia retry its needs names is refused: ${refused}`;
+  }
+  return undefined;
+};
 
 /**
  * `nemia decide`'s answer (`Decided`) off a run's one reading (`StepsReading`): its judgement — each step's word, the tries and rounds

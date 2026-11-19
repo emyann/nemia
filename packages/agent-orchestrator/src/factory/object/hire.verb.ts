@@ -15,7 +15,7 @@ import { API_VERSION, type Hire, type HireList, HireSettings } from 'objects';
 import { workflowDirAt } from '../../folder/folder.store.ts';
 import type { Fills } from '../../folder/folder.ts';
 import { fillsOf, type Factory } from '../factory.ts';
-import { hireNamed, hiresCollided, hireStatusOf, type HiredStep, type HireRead } from '../hire/hire.ts';
+import { hireNamed, hiresCollided, hireStatusOf, type HiredStep } from '../hire/hire.ts';
 
 /** The settings a Hire says the origin of, as `objects` names them. */
 const SETTING_KEYS: readonly string[] = Object.keys(HireSettings.fields);
@@ -45,7 +45,7 @@ const valueOf = (step: StepRead, key: string) =>
   (step as unknown as Readonly<Record<string, string | number | boolean | readonly string[] | undefined>>)[key];
 
 /** What a Hire reads of one step: its own `agent:` (`written`, off the read with no hire), and the step as the factory fills it. */
-const readOf = (written: StepRead, filled: StepRead, hired: string | undefined, f: HiringFactory, error?: string): HireRead => {
+const readOf = (written: StepRead, filled: StepRead, hired: string | undefined, f: HiringFactory, error?: string) => {
   const agent = filled.agent;
   return {
     written: written.agent?.name,
@@ -59,11 +59,11 @@ const readOf = (written: StepRead, filled: StepRead, hired: string | undefined, 
 };
 
 /** The refusal of a step its own file and the factory's hire both fill: it names the fix. */
-const bothFill = (f: HiringFactory, workflow: string, step: string, written: string, hired: string): string =>
-  `the step ${step} of ${workflow} names its own agent, ${written}, and the factory ${f.name} hires ${hired} into it too, which a start refuses: fire the hire with nemia factory fire ${f.name} --step ${workflow}/${step}, or take the agent: line out of the step`;
+const bothFill = (f: HiringFactory, workflow: string, step: string, written: string, hired: string) =>
+  `the step ${step} of ${workflow} names its own agent, ${written}, and the factory ${f.name} hires ${hired} into it too, which a start refuses: fire the hire with nemia factory fire ${f.name} --step ${workflow}/${step}, or take the agent: line out of the step` satisfies string as string;
 
 /** The steps of the folder `dir` by their files, for a folder that does not read: each markdown file but its README. */
-const stepFiles = (dir: string): StepRead[] => {
+const stepFiles = (dir: string) => {
   try {
     return fs
       .readdirSync(dir)
@@ -78,7 +78,7 @@ const stepFiles = (dir: string): StepRead[] => {
 /** What a read through the door answered: its steps, or why it refused. */
 const readOrWhy = <E extends { readonly message: string }>(read: Effect.Effect<readonly StepRead[], E>) =>
   read.pipe(
-    Effect.map((steps): { steps: readonly StepRead[]; why: string | undefined } => ({ steps, why: undefined })),
+    Effect.map((steps) => ({ steps, why: undefined })),
     Effect.catch((err: E) => Effect.succeed({ steps: [] as readonly StepRead[], why: err.message })),
   );
 
@@ -129,7 +129,7 @@ const offered = Effect.fn('offered')(function* (f: HiringFactory, home: string) 
 });
 
 /** The error of a step whose name joins to another's: it names both, and the fix. */
-const collided = (namespace: string, name: string, held: readonly HiredStep[]): string =>
+const collided = (namespace: string, name: string, held: readonly HiredStep[]) =>
   `the Hire ${name} of ${namespace} names ${held.map((s) => `the step ${s.step} of ${s.workflow}`).join(' and ')}, whose names join to one: rename one of the steps, or one of the workflows, so that no two join to ${name}`;
 
 /** The Hires of the factory `f`, at the store `home`, filed at `filedAt`, each a step it offers. */
@@ -138,7 +138,7 @@ export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: s
   for (const [workflow, dir] of yield* offered(f, home))
     read.push(...(yield* workflowHires(f, home, workflow, dir).pipe(Effect.orElseSucceed(() => []))));
   const collisions = hiresCollided(read);
-  return read.map(({ workflow, step, hired, read: r }): Hire => {
+  return read.map(({ workflow, step, hired, read: r }) => {
     const name = hireNamed(workflow, step);
     const held = collisions.get(name);
     const spec: Hire['spec'] = { workflow, step, ...(hired === undefined ? {} : { agent: hired }) };
@@ -149,7 +149,7 @@ export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: s
       metadata: { name, namespace: f.name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
       spec,
       status,
-    };
+    } satisfies Hire;
   });
 });
 
@@ -182,7 +182,7 @@ export const hireList = Effect.fn('hireList')(function* (home: string, namespace
  * @param namespace The factory's name.
  * @param name The Hire's name, `<workflow>.<step>`.
  */
-export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: string): Effect.Effect<Hire, Missing | Conflict | Invalid> => {
+export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: string) => {
   const found = hires.filter((h) => h.metadata.name === name);
   const [one, ...rest] = found;
   if (one === undefined)
@@ -190,7 +190,7 @@ export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: str
       new Missing({
         message: `no step of ${namespace} is named ${name}: list its Hires with GET /api/namespaces/${namespace}/hires, each named <workflow>.<step>, or attach the workflow with nemia factory attach ${namespace} <workflow>`,
       }),
-    );
+    ) satisfies Effect.Effect<Hire, Missing | Conflict | Invalid> as Effect.Effect<Hire, Missing | Conflict | Invalid>;
   if (rest.length)
     return Effect.fail(
       new Conflict({
@@ -200,8 +200,11 @@ export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: str
           found.map((h) => ({ workflow: h.spec.workflow, step: h.spec.step })),
         ),
       }),
-    );
-  return Effect.succeed(one);
+    ) satisfies Effect.Effect<Hire, Missing | Conflict | Invalid> as Effect.Effect<Hire, Missing | Conflict | Invalid>;
+  return Effect.succeed(one) satisfies Effect.Effect<Hire, Missing | Conflict | Invalid> as Effect.Effect<
+    Hire,
+    Missing | Conflict | Invalid
+  >;
 };
 
 /** The Hire `name` of the factory `namespace` as an object, read now; refused as `hireNamedIn` refuses. */

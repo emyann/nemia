@@ -56,7 +56,7 @@ export const volumeOnTarget: VolumeOnTargetOf = (volume, typed, refusal) => {
  * on the source.
  * @param volume The volume, by its name and its path on the source.
  */
-export const volumeKey = (volume: Pick<Volume, 'name' | 'path'>): string => volume.name ?? volume.path;
+export const volumeKey = (volume: Pick<Volume, 'name' | 'path'>) => volume.name ?? volume.path;
 
 /**
  * What the target decided of a factory before it files it: its tree (`treeDir`, for a templated one), each source repository's folder on
@@ -80,7 +80,7 @@ export type OnTarget = {
  * @param source The factory on the source, by its volumes.
  * @param repos Each repository's folder on the target, by its path on the source.
  */
-export const renamedFolders = (source: Pick<Factory, 'volumes'>, repos: Readonly<Record<string, string>>): Record<string, string> =>
+export const renamedFolders = (source: Pick<Factory, 'volumes'>, repos: Readonly<Record<string, string>>) =>
   Object.fromEntries(
     workedOn(source).flatMap((repo) => {
       const moved = repos[repo];
@@ -89,7 +89,7 @@ export const renamedFolders = (source: Pick<Factory, 'volumes'>, repos: Readonly
   );
 
 /** `values`, each a repository's folder name, renamed by `renamed`. */
-const renamedIn = (values: Readonly<Record<string, string>>, renamed: Readonly<Record<string, string>>): Record<string, string> =>
+const renamedIn = (values: Readonly<Record<string, string>>, renamed: Readonly<Record<string, string>>) =>
   Object.fromEntries(Object.entries(values).map(([key, value]) => [key, renamed[value] ?? value]));
 
 /**
@@ -97,7 +97,7 @@ const renamedIn = (values: Readonly<Record<string, string>>, renamed: Readonly<R
  * (`onTarget.repos`), with the URL it was cloned from where the target cloned it (`onTarget.origins`) and none where it was given a
  * folder; a read-only one at its decided path (`onTarget.volumes`); its name and its mark kept.
  */
-const volumeOnTargetOf = (volume: Volume, onTarget: OnTarget): Volume => {
+const volumeOnTargetOf = (volume: Volume, onTarget: OnTarget) => {
   const { origin: _origin, ...own } = volume;
   if (volume.readOnly) return { ...own, path: onTarget.volumes[volumeKey(volume)] ?? volume.path };
   const at = onTarget.repos[volume.path] ?? volume.path;
@@ -114,7 +114,7 @@ const volumeOnTargetOf = (volume: Volume, onTarget: OnTarget): Volume => {
  * @param source The factory as the source's file holds it.
  * @param onTarget What the target decided of it.
  */
-export function factoryOnTarget(source: Factory, onTarget: OnTarget): Factory {
+export function factoryOnTarget(source: Factory, onTarget: OnTarget) {
   const { generation: _counted, tree: _tree, ...kept } = source;
   const renamed = renamedFolders(source, onTarget.repos);
   const moved = source.volumes.map((volume) => volumeOnTargetOf(volume, onTarget));
@@ -133,7 +133,7 @@ export function factoryOnTarget(source: Factory, onTarget: OnTarget): Factory {
     ...(source.template === undefined ? {} : { template: { ...source.template, source: onTarget.template ?? source.template.source } }),
     ...(source.workflowRepos === undefined ? {} : { workflowRepos: renamedIn(source.workflowRepos, renamed) }),
     ...(onTarget.instructionKept ? { instruction: { store: true } } : {}),
-  };
+  } satisfies Factory;
 }
 
 /**
@@ -142,7 +142,7 @@ export function factoryOnTarget(source: Factory, onTarget: OnTarget): Factory {
  * repositories), which travels in its folder.
  * @param factory The factory to write.
  */
-export function fileTextOf(factory: Factory): string {
+export function fileTextOf(factory: Factory) {
   const { name: _name, tree: _tree, ...file } = factory;
   if (factory.template === undefined) return `${JSON.stringify(file, null, 2)}\n`;
   const { workflows: _workflows, hires: _hires, revisions: _revisions, workflowRepos: _repos, ...own } = file;
@@ -153,7 +153,7 @@ export function fileTextOf(factory: Factory): string {
 const TREE_WIRING = 'tree/factory.json';
 
 /** The text of `wiring`, a tree's `factory.json`, its workflows' repositories renamed by `renamed`; as it was where it holds none. */
-function wiringRenamed(text: string, renamed: Readonly<Record<string, string>>): string {
+function wiringRenamed(text: string, renamed: Readonly<Record<string, string>>) {
   let wiring: unknown;
   try {
     wiring = JSON.parse(text);
@@ -179,7 +179,7 @@ function wiringRenamed(text: string, renamed: Readonly<Record<string, string>>):
 export function folderOnTarget(
   files: readonly TreeFile[],
   how: { readonly renamed: Readonly<Record<string, string>>; readonly instruction?: string },
-): TreeFile[] {
+) {
   const placed = files
     .filter((file) => how.instruction === undefined || file.path !== DEFAULT_INSTRUCTION)
     .map((file) =>
@@ -196,7 +196,7 @@ export function folderOnTarget(
  * The line a moved card's body ends with: where it came from, its name there and its factory's.
  * @param moved Where the card came from (the source's name), its name there and its factory's.
  */
-export const movedLine = (moved: { readonly from: string; readonly name: string; readonly factory: string }): string =>
+export const movedLine = (moved: { readonly from: string; readonly name: string; readonly factory: string }) =>
   `Moved from ${moved.from}: the card ${moved.name} of the factory ${moved.factory}.`;
 
 /**
@@ -207,7 +207,7 @@ export const movedLine = (moved: { readonly from: string; readonly name: string;
  * @param text The card's text on the source.
  * @param moved Its name on the source, its factory's, and where it came from (the source's name), said in its last line.
  */
-export function cardMoved(text: string, moved: { readonly name: string; readonly factory: string; readonly from: string }): string {
+export function cardMoved(text: string, moved: { readonly name: string; readonly factory: string; readonly from: string }) {
   const card = parseInboxCard(`${moved.name}.md`, text);
   return cardText(
     { ...card, body: `${card.body.trimEnd()}\n\n${movedLine(moved)}` },

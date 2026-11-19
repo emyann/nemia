@@ -14,7 +14,7 @@ import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { trialMerges, type Place } from '../place/place.store.ts';
 import { collisionsOf, othersInFlight, trialsOf, type Collisions, type Theirs } from './collide.ts';
 
-const ahead = (standings: readonly BranchStanding[]): string[] => standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
+const ahead = (standings: readonly BranchStanding[]) => standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
 
 /**
  * What `run`'s ending `ending` reads before it lands (`collisionsOf`): its branches ahead of the base (`standings`, as the decision read
@@ -53,9 +53,9 @@ function collisionsRead(
   place: Place,
   others: readonly RepositoryRun[],
   steps: ReadonlyMap<string, readonly StepSpec[]>,
-): Collisions {
+) {
   const theirs: Theirs[] = others.flatMap((other) =>
     ahead(standingsOf(other, steps.get(other.id) ?? [], git)).map((branch) => ({ run: other.id, branch })),
   );
-  return collisionsOf(run, ending, ours, theirs, trialMerges(run.repo, trialsOf(run.branch, ours, theirs), place));
+  return collisionsOf(run, ending, ours, theirs, trialMerges(run.repo, trialsOf(run.branch, ours, theirs), place)) satisfies Collisions;
 }

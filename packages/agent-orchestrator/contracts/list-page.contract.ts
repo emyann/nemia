@@ -21,17 +21,17 @@ export type PageCut =
 export type PageBounds = { readonly byDefault: number; readonly most: number };
 
 /** A count: a whole number from 0, safe in a double, as an array's length and index are. */
-const count = (n: number): boolean => Number.isSafeInteger(n) && n >= 0;
+const count = (n: number) => Number.isSafeInteger(n) && n >= 0;
 
 /** Whether `?limit=` is one a list takes: none, or a whole number from 1. */
-const limitTaken = (limit: number | null): boolean => limit === null || (Number.isInteger(limit) && limit >= 1);
+const limitTaken = (limit: number | null) => limit === null || (Number.isInteger(limit) && limit >= 1);
 
 /** Bounds a list can keep: a default page of at least one object, no larger than the most. */
-const boundsTaken = (bounds: PageBounds): boolean =>
+const boundsTaken = (bounds: PageBounds) =>
   Number.isSafeInteger(bounds.byDefault) && Number.isSafeInteger(bounds.most) && bounds.byDefault >= 1 && bounds.byDefault <= bounds.most;
 
 /** How many objects a page asked with `limit` holds when the list has that many left: the limit or the default, never past the most. */
-const pageSize = (limit: number | null, bounds: PageBounds): number => {
+const pageSize = (limit: number | null, bounds: PageBounds) => {
   const asked = limit === null ? bounds.byDefault : limit;
   return asked < bounds.most ? asked : bounds.most;
 };

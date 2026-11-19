@@ -18,50 +18,50 @@ import type { StepSpec } from '../step/step.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { POLICY_FOLDER } from '../auto/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { LEVELS, nemiaPrompt, type LevelFile, type NemiaSession, type ToldCustom } from './nemia.ts';
+import { LEVELS, nemiaPrompt, type LevelFile, type NemiaSession } from './nemia.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /**
  * Her folder in the store: her session's working folder.
  * @param home The store's root folder.
  */
-export const nemiaDir = (home: string): string => path.join(home, 'nemia');
+export const nemiaDir = (home: string) => path.join(home, 'nemia');
 
 /**
  * Her memory: the facts she alone writes, one file each.
  * @param home The store's root folder.
  */
-export const memoryDir = (home: string): string => path.join(nemiaDir(home), 'memory');
+export const memoryDir = (home: string) => path.join(nemiaDir(home), 'memory');
 
 /**
  * The person's level, written by `nemia level`.
  * @param home The store's root folder.
  */
-export const levelFile = (home: string): string => path.join(nemiaDir(home), 'level.json');
+export const levelFile = (home: string) => path.join(nemiaDir(home), 'level.json');
 
 /**
  * The instruction her session is filed with: what is built in, then the person's custom words.
  * @param home The store's root folder.
  */
-export const promptFile = (home: string): string => path.join(nemiaDir(home), 'prompt.md');
+export const promptFile = (home: string) => path.join(nemiaDir(home), 'prompt.md');
 
 /**
  * The keeper's record of the person's custom words her session was last filed or told with (`ToldCustom`).
  * @param home The store's root folder.
  */
-export const toldFile = (home: string): string => path.join(nemiaDir(home), 'told.json');
+export const toldFile = (home: string) => path.join(nemiaDir(home), 'told.json');
 
 /**
  * The keeper's record of her session (`NemiaSession`): her tasks and the marks of her current one.
  * @param home The store's root folder.
  */
-export const sessionFile = (home: string): string => path.join(nemiaDir(home), 'session.json');
+export const sessionFile = (home: string) => path.join(nemiaDir(home), 'session.json');
 
 /**
  * The keeper's record of why it could not give her harness's trust to her folder: there only while that write is refused.
  * @param home The store's root folder.
  */
-export const untrustedFile = (home: string): string => path.join(nemiaDir(home), 'untrusted.json');
+export const untrustedFile = (home: string) => path.join(nemiaDir(home), 'untrusted.json');
 
 /**
  * What is built in with her, a plugin folder: her definition, `agents/nemia.md`, which a coding agent that installs the plugin is given
@@ -70,7 +70,7 @@ export const untrustedFile = (home: string): string => path.join(nemiaDir(home),
 export const SHIPPED_NEMIA = path.join(import.meta.dirname, '..', '..', 'nemia');
 
 /** The file that defines her, frontmatter and instruction: the plugin's agent, read by the keeper and by a coding agent alike. */
-export const nemiaDefinition = (): string => path.join(SHIPPED_NEMIA, 'agents', 'nemia.md');
+export const nemiaDefinition = () => path.join(SHIPPED_NEMIA, 'agents', 'nemia.md');
 
 /** The level file as `nemia level` writes it. */
 const LevelSchema = Schema.Struct({
@@ -85,7 +85,7 @@ const LevelSchema = Schema.Struct({
  * does not read as one.
  * @param home The store's root folder.
  */
-export function readLevel(home: string): LevelFile | undefined {
+export function readLevel(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(levelFile(home), 'utf8');
@@ -112,7 +112,7 @@ export function readLevel(home: string): LevelFile | undefined {
  * @param home The store's root folder.
  * @param level The level to write: the level, since when, when the person last set one, and a former task carried on.
  */
-export function writeLevel(home: string, level: LevelFile): void {
+export function writeLevel(home: string, level: LevelFile) {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   writeWhole(levelFile(home), `${JSON.stringify(level)}\n`);
 }
@@ -123,7 +123,7 @@ export function writeLevel(home: string, level: LevelFile): void {
  * her `allowedTools:`, which her fence derives from the command table (`nemiaFence`): a hand list there would drift from it.
  * @param file The path of her definition, the plugin's agent file (nemiaDefinition) when absent.
  */
-export function readNemia(file: string = nemiaDefinition()): StepSpec {
+export function readNemia(file: string = nemiaDefinition()) {
   const text = fs.readFileSync(file, 'utf8');
   if (/^askTools:/m.test(text))
     throw new Invalid({ message: `${file}: her askTools: is derived from the command table: take it out of nemia.md.` });
@@ -138,14 +138,14 @@ export function readNemia(file: string = nemiaDefinition()): StepSpec {
     throw new Invalid({
       message: `${file}: her permissionMode is ${step.permissionMode ?? 'not set'}, and she reads unasked while her fence asks what waits on the person: permissionMode: auto.`,
     });
-  return step;
+  return step satisfies StepSpec;
 }
 
 /** The package she is built into: its `package.json` names its `nemia`. */
 const PACKAGE = path.join(import.meta.dirname, '..', '..');
 
 /** A path's real path, or undefined where it is not there. */
-const realOf = (at: string): string | undefined => {
+const realOf = (at: string) => {
   try {
     return fs.realpathSync(at);
   } catch {
@@ -154,7 +154,7 @@ const realOf = (at: string): string | undefined => {
 };
 
 /** Whether `file`, a real path, is the `nemia` bin its own package's `package.json` declares, the package found from it up. */
-const declaredNemia = (file: string): boolean => {
+const declaredNemia = (file: string) => {
   for (let dir = path.dirname(file); path.dirname(dir) !== dir; dir = path.dirname(dir)) {
     let text: string;
     try {
@@ -175,7 +175,7 @@ const declaredNemia = (file: string): boolean => {
  * package. Undefined where none does: a `nemia` that is another tree's is passed over.
  * @param root The package's folder to search up from, this package's when absent.
  */
-export function ownBin(root: string = PACKAGE): string | undefined {
+export function ownBin(root: string = PACKAGE) {
   let at = realOf(root);
   while (at !== undefined) {
     const under = at;
@@ -197,7 +197,7 @@ export function ownBin(root: string = PACKAGE): string | undefined {
  * store gains is denied at the next.
  * @param home The store's root folder, whose entries are denied.
  */
-export function storeDenies(home: string): string[] {
+export function storeDenies(home: string) {
   let names: string[];
   try {
     names = fs.readdirSync(home).sort();
@@ -234,7 +234,7 @@ const SessionSchema = Schema.Struct({
  * replaces it, so a file a hand broke stops no filing.
  * @param home The store's root folder.
  */
-export function readSession(home: string): NemiaSession | undefined {
+export function readSession(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(sessionFile(home), 'utf8');
@@ -255,7 +255,7 @@ export function readSession(home: string): NemiaSession | undefined {
  * @param home The store's root folder.
  * @param session Her tasks and the marks of her current one.
  */
-export function writeSession(home: string, session: NemiaSession): void {
+export function writeSession(home: string, session: NemiaSession) {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   writeWhole(sessionFile(home), `${JSON.stringify(session)}\n`);
 }
@@ -265,7 +265,7 @@ export function writeSession(home: string, session: NemiaSession): void {
  * named, adopted as her first; else none.
  * @param home The store's root folder.
  */
-export function herTasks(home: string): string[] {
+export function herTasks(home: string) {
   const kept = readSession(home);
   if (kept !== undefined) return kept.tasks;
   const former = readLevel(home)?.task;
@@ -277,7 +277,7 @@ export function herTasks(home: string): string[] {
  * starts her where no task of hers is open (`wakes`): so, but while the keeper's record says it could not trust her folder.
  * @param home The store's root folder.
  */
-export const nemiaChatPlace = (home: string): { tasks: string[]; dir: string; wakes: boolean } => ({
+export const nemiaChatPlace = (home: string) => ({
   tasks: herTasks(home),
   dir: nemiaDir(home),
   wakes: readUntrusted(home) === undefined,
@@ -288,7 +288,7 @@ export const nemiaChatPlace = (home: string): { tasks: string[]; dir: string; wa
  * @param home The store's root folder.
  * @param text The instruction to write.
  */
-export function writePrompt(home: string, text: string): string {
+export function writePrompt(home: string, text: string) {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   fs.writeFileSync(promptFile(home), text);
   return promptFile(home);
@@ -299,7 +299,7 @@ export function writePrompt(home: string, text: string): string {
  * @param home The store's root folder.
  * @param custom The person's custom words for her, or undefined where there are none.
  */
-export function writeTold(home: string, custom: string | undefined): void {
+export function writeTold(home: string, custom: string | undefined) {
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   fs.writeFileSync(toldFile(home), `${JSON.stringify(custom === undefined ? {} : { words: custom })}\n`);
 }
@@ -312,7 +312,7 @@ const ToldSchema = Schema.Struct({ words: Schema.optionalKey(Schema.String) });
  * not read as one: a session filed before the keeper kept them, read off her instruction instead (`customChanged`).
  * @param home The store's root folder.
  */
-export function readTold(home: string): ToldCustom | undefined {
+export function readTold(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(toldFile(home), 'utf8');
@@ -334,7 +334,7 @@ export function readTold(home: string): ToldCustom | undefined {
  * @param home The store's root folder.
  * @param refused The words saying why the trust was refused and what to do, or undefined where it is given.
  */
-export function writeUntrusted(home: string, refused: string | undefined): void {
+export function writeUntrusted(home: string, refused: string | undefined) {
   if (refused === undefined) return fs.rmSync(untrustedFile(home), { force: true });
   fs.mkdirSync(nemiaDir(home), { recursive: true });
   fs.writeFileSync(
@@ -352,7 +352,7 @@ const UntrustedSchema = Schema.Struct({ refused: Schema.String });
  * that does not read as one.
  * @param home The store's root folder.
  */
-export function readUntrusted(home: string): string | undefined {
+export function readUntrusted(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(untrustedFile(home), 'utf8');
@@ -375,7 +375,7 @@ export function readUntrusted(home: string): string | undefined {
  * @param body Her builtin instruction, her definition's body.
  * @param custom The person's custom words for her, or undefined where there are none.
  */
-export function composePrompt(home: string, body: string, custom: string | undefined): string {
+export function composePrompt(home: string, body: string, custom: string | undefined) {
   const file = writePrompt(home, nemiaPrompt(body, custom));
   writeTold(home, custom);
   return file;
@@ -385,7 +385,7 @@ export function composePrompt(home: string, body: string, custom: string | undef
  * The instruction her task was last filed or told with (`promptFile`), or undefined where none was ever written.
  * @param home The store's root folder.
  */
-export function filedPrompt(home: string): string | undefined {
+export function filedPrompt(home: string) {
   try {
     return fs.readFileSync(promptFile(home), 'utf8');
   } catch (err) {
@@ -401,7 +401,7 @@ const FACT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
  * Her facts, by file name, in name order; none where she has written none.
  * @param home The store's root folder.
  */
-export function listFacts(home: string): string[] {
+export function listFacts(home: string) {
   try {
     return fs
       .readdirSync(memoryDir(home), { withFileTypes: true })
@@ -419,7 +419,7 @@ export function listFacts(home: string): string[] {
  * @param home The store's root folder.
  * @param name The fact's name, a file of her memory.
  */
-export function readFact(home: string, name: string): string {
+export function readFact(home: string, name: string) {
   if (!listFacts(home).includes(name)) {
     const kept = listFacts(home);
     throw new Missing({
@@ -434,7 +434,7 @@ export function readFact(home: string, name: string): string {
  * level beyond what is built in. None where the file is not there or holds none.
  * @param home The store's root folder.
  */
-export function promptAllows(home: string): string[] {
+export function promptAllows(home: string) {
   let raw: unknown;
   try {
     const [folder] = CONFIG_FOLDERS;

@@ -41,7 +41,7 @@ export type EngineForgetting = {
  * @param answer What the engine answered of a call to forget tasks.
  * @param ids The ids of the run's tasks.
  */
-export function forgettingOf(answer: EngineAnswer, ids: readonly string[]): EngineForgetting {
+export function forgettingOf(answer: EngineAnswer, ids: readonly string[]) {
   const own = new Set(ids);
   const tasks = answer.tasks.filter((t) => own.has(t.taskId));
   const waiting = answer.waiting.filter((w) => own.has(w.taskId));
@@ -63,19 +63,19 @@ export function forgettingOf(answer: EngineAnswer, ids: readonly string[]): Engi
  * Whether the engine has nothing left to forget of the run: no task waits, none was refused, and the call was not refused.
  * @param f What the engine did with the run's tasks.
  */
-export const forgettingDone = (f: EngineForgetting): boolean => !f.waiting.length && !f.refused.length && f.refusal === undefined;
+export const forgettingDone = (f: EngineForgetting) => !f.waiting.length && !f.refused.length && f.refusal === undefined;
 
 /**
  * Whether the engine refused to forget something of the run: a task by name, or the whole call.
  * @param f What the engine did with the run's tasks.
  */
-export const forgettingRefused = (f: EngineForgetting): boolean => f.refused.length > 0 || f.refusal !== undefined;
+export const forgettingRefused = (f: EngineForgetting) => f.refused.length > 0 || f.refusal !== undefined;
 
 /** `n` tasks, in words. */
-const tasksWord = (n: number): string => `${n} task${n === 1 ? '' : 's'}`;
+const tasksWord = (n: number) => `${n} task${n === 1 ? '' : 's'}`;
 
 /** What `nemia rm` says it forgot of the run `id`'s tasks, or, `dry`, what `nemia prune` says it would; empty when it forgot none. */
-const forgotWords = (f: EngineForgetting, id: string, dry: boolean): string => {
+const forgotWords = (f: EngineForgetting, id: string, dry: boolean) => {
   const n = f.forgotten.length;
   if (!n) return '';
   const size = `${sizeOf(f.journalBytes)} of journal, ${f.feedLines} feed line${f.feedLines === 1 ? '' : 's'}`;
@@ -85,7 +85,7 @@ const forgotWords = (f: EngineForgetting, id: string, dry: boolean): string => {
 };
 
 /** What waits of the run's tasks, and why, and, unless `dry`, that the passes forget it from `marker`; empty when nothing waits. */
-const waitWords = (f: EngineForgetting, marker: string, dry: boolean): string => {
+const waitWords = (f: EngineForgetting, marker: string, dry: boolean) => {
   const one = f.waiting.length === 1;
   if (!f.waiting.length) return '';
   if (dry) return `${tasksWord(f.waiting.length)} of it ${one ? 'is' : 'are'} not to be forgotten yet: ${f.why.join('; ')}`;
@@ -97,7 +97,7 @@ const waitWords = (f: EngineForgetting, marker: string, dry: boolean): string =>
  * The engine's refusals, of tasks by name and of the whole call, in its words, and, unless `dry`, the marker they leave, which only a
  * person removes; empty without one.
  */
-const refusalWords = (f: EngineForgetting, marker: string, dry: boolean): string => {
+const refusalWords = (f: EngineForgetting, marker: string, dry: boolean) => {
   if (!forgettingRefused(f)) return '';
   const refused = dry ? 'would refuse' : 'refused';
   const said = [
@@ -117,7 +117,7 @@ const refusalWords = (f: EngineForgetting, marker: string, dry: boolean): string
  * leaves, which only a person removes. Empty when the engine keeps no task of the run.
  * @param f What the engine did with the run's tasks, or would.
  */
-export function engineWords(f: EngineForgetting, { id, dry = false }: { id: string; dry?: boolean }): string {
+export function engineWords(f: EngineForgetting, { id, dry = false }: { id: string; dry?: boolean }) {
   const marker = f.marker ?? `the marker of ${id}`;
   const left = f.left.length ? `${dry ? 'it would leave' : 'it left'} ${f.left.join('; ')}` : '';
   return [forgotWords(f, id, dry), left, waitWords(f, marker, dry), refusalWords(f, marker, dry)].filter(Boolean).join('; ');
@@ -128,5 +128,5 @@ export function engineWords(f: EngineForgetting, { id, dry = false }: { id: stri
  * @param id The run's id.
  * @param why Why the read failed, in words.
  */
-export const uncountedWords = (id: string, why: string): string =>
+export const uncountedWords = (id: string, why: string) =>
   `${id}: what nemia rm would forget of the engine's tasks of it was not counted: ${why}`;

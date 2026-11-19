@@ -54,14 +54,14 @@ export type BriefPlace = { readonly words?: LandingWords; readonly say?: PlaceSa
  * since its brief is composed before the record moves the try behind — else owed past round 1 (`owesReplies`), none for any other try of
  * a loop's target, and nothing for a step that closes no loop.
  */
-const repliesOf = (step: StepSpec, run: Run, steps: readonly StepSpec[], round?: RoundBriefing): 'owed' | 'none' | false => {
+const repliesOf = (step: StepSpec, run: Run, steps: readonly StepSpec[], round?: RoundBriefing) => {
   if (round) return round.merge ? 'none' : 'owed';
   if (owesReplies(steps, run, step.name)) return 'owed';
   return isLoopTarget(steps, step.name) ? 'none' : false;
 };
 
 /** The conflicts a step's merge left, named with how its place says to see them; nothing for a merge that left none. */
-const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly say: string } | undefined): string[] =>
+const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly say: string } | undefined) =>
   merge?.conflicts.length
     ? [
         '',
@@ -90,7 +90,7 @@ const contractsOf = (
   run: Run,
   steps: readonly StepSpec[],
   at: { artifactsDir?: string; round?: RoundBriefing; words?: LandingWords; inFolder: boolean },
-): string =>
+) =>
   [
     ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, at.words) : checkContract(step.check)] : []),
     ...(at.artifactsDir ? [artifactsContract(at.artifactsDir, endsOnBase(step), at.inFolder)] : []),
@@ -99,24 +99,24 @@ const contractsOf = (
 
 /** What the brief opens with: the precedence (`PRECEDENCE`), then the layers the step is told in its brief (`briefBody`), where it has
  * any. */
-const opened = (step: StepSpec): string => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
+const opened = (step: StepSpec) => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
 
 /**
  * What was said to the step before it was filed, for its first try alone (`saidBeforeSection`): none for a try or a round past it, nor for
  * a filing with a try behind it on the record.
  */
-const saidBeforeOf = (step: StepSpec, run: Run, retry?: RetryBriefing, round?: RoundBriefing): string[] =>
+const saidBeforeOf = (step: StepSpec, run: Run, retry?: RetryBriefing, round?: RoundBriefing) =>
   !retry && !round && !run.steps[step.name]?.tries?.length ? saidBeforeSection(run.saidBefore?.[step.name]) : [];
 
 /**
  * The head of a brief for a step that continues another's session (`resume`), on its first filing: what it is handed (`handed`, what was
  * said before it ran and a person's decisions), and the tree the run installed, never the spec again.
  */
-const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly string[]): string =>
+const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly string[]) =>
   opened(step) + handed.join('') + (tree.length ? ['', headingOf('Where to look'), '', ...tree].join('\n') : '');
 
 /** What a continued session is told of its tree, which the run provisioned again under it: under its own heading, or nothing. */
-const resumedLook = (tree: readonly string[]): string => (tree.length ? ['', '', '## Where to look', '', ...tree, ''].join('\n') : '');
+const resumedLook = (tree: readonly string[]) => (tree.length ? ['', '', '## Where to look', '', ...tree, ''].join('\n') : '');
 
 /**
  * What a step is told. THE decision about what one step knows of another.
@@ -220,17 +220,18 @@ export function composeBrief(
   place: BriefPlace = {},
   merge?: { readonly conflicts: readonly string[]; readonly say: string },
   answers: readonly RetryAsk[] = [],
-): string {
+) {
   const inFolder = placeOf(run) === 'folder';
   const contracts = contractsOf(step, run, steps, { artifactsDir, round, words: place.words, inFolder });
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
   const tree = depsLines(deps);
-  if (retry?.resumed || round?.resumed) return again.slice(1) + resumedLook(tree) + contracts;
+  if (retry?.resumed || round?.resumed) return (again.slice(1) + resumedLook(tree) + contracts) satisfies string as string;
   const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs, answers);
   const saidBefore = saidBeforeOf(step, run, retry, round);
 
-  if (step.resume && !retry && !round) return resumedBrief(step, [saidBefore.join('\n'), ...handed.decided], tree) + given + contracts;
+  if (step.resume && !retry && !round)
+    return (resumedBrief(step, [saidBefore.join('\n'), ...handed.decided], tree) + given + contracts) satisfies string as string;
 
   const earlier = step.after.length
     ? step.after
@@ -252,7 +253,7 @@ export function composeBrief(
       ...(tree.length ? ['', ...tree] : []),
       ...(given ? [given] : []),
       contracts,
-    ].join('\n');
+    ].join('\n') satisfies string as string;
   }
 
   if (earlier.length || tree.length || endsOnBase(step) || inFolder) parts.push('', headingOf('Where to look'), '');
@@ -293,14 +294,14 @@ export function composeBrief(
   if (tree.length) parts.push(...(earlier.length ? [''] : []), ...tree);
 
   parts.push(...(given ? [given] : []), contracts);
-  return parts.join('\n');
+  return parts.join('\n') satisfies string as string;
 }
 
 /**
  * How a step after others reads what they changed against the run's base: the place's own commands (`say.look`), or, with none, where
  * its place's skill says them.
  */
-function laterLook(run: RepositoryRun, say: PlaceSay | undefined): string[] {
+function laterLook(run: RepositoryRun, say: PlaceSay | undefined) {
   const lead = `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed`;
   if (!say) return [`${lead}, ${skillSaid('read')}.`];
   return [`${lead}:`, '', '```', ...say.look.map((line) => sayFilled(line, { baseRef: run.baseRef })), '```'];
@@ -311,13 +312,7 @@ function laterLook(run: RepositoryRun, say: PlaceSay | undefined): string[] {
  * each against the base — in the place's words (`say.results`), or where its place's skill says them — or that the run cut none; the
  * workflow's checks, unless it has its own; and that the checkout is the person's.
  */
-function endingLook(
-  step: StepSpec,
-  run: RepositoryRun,
-  steps: readonly StepSpec[],
-  earlier: readonly string[],
-  say: PlaceSay | undefined,
-): string[] {
+function endingLook(step: StepSpec, run: RepositoryRun, steps: readonly StepSpec[], earlier: readonly string[], say: PlaceSay | undefined) {
   const results = resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
@@ -358,7 +353,7 @@ function handedOf(
   parents: readonly ParentCloseout[] = [],
   costs?: WorkflowCosts,
   answers: readonly RetryAsk[] = [],
-): { parents: string[]; decided: string[] } {
+) {
   return {
     parents: parents.map((p) => handedSection(p)),
     decided: [
@@ -381,7 +376,7 @@ function againSection(
   say: PlaceSay | undefined,
   retry?: RetryBriefing,
   round?: RoundBriefing,
-): string {
+) {
   if (retry) return retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf);
   if (round?.merge) return mergeSection(step, round.merge, round.loop, steps, say);
   return round ? roundSection(step, round, steps, closeoutOf, inFolder) : '';
@@ -398,7 +393,7 @@ function givenSections(
   closeoutOf: (step: string) => Closeout | undefined,
   checked: readonly CheckHanded[] = [],
   say?: PlaceSay,
-): string {
+) {
   return (
     (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') +
     checked.map((c) => checkHandedSection(c)).join('') +
@@ -436,7 +431,7 @@ export function remoteBrief(
   retry?: RetryBriefing,
   parents?: readonly ParentCloseout[],
   answers: readonly RetryAsk[] = [],
-): string {
+) {
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const inputs = run.inputs?.length
     ? [
@@ -468,13 +463,13 @@ export function remoteBrief(
     ...handed,
     ...given,
     ...(retry ? [remoteTrySection(step, retry)] : []),
-  ].join('\n');
+  ].join('\n') satisfies string as string;
 }
 
 /**
  * `## Try <n>` of a step on a remote A2A agent: who asked for it, how the last try ended, and what a person said with it, fenced as data.
  */
-function remoteTrySection(step: StepSpec, r: RetryBriefing): string {
+function remoteTrySection(step: StepSpec, r: RetryBriefing) {
   const who =
     r.by === 'retries'
       ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
@@ -517,7 +512,7 @@ export type ToldLayers = {
  * order of `FENCE_KEYS`: none for a step with no agent, whose fence is no layer over another's. Its `disallowedTools:` is its own rules
  * alone (`ownDenies`), which add to its agent's, and none where it only repeated them.
  */
-function fenceLines(step: StepSpec): ToldLayers['fence'] {
+function fenceLines(step: StepSpec) {
   const own = step.agent?.keys ?? [];
   return FENCE_KEYS.flatMap((key) => {
     const value = key === 'disallowedTools' && step[key] !== undefined ? ownDenies(step) : step[key];
@@ -536,7 +531,7 @@ function fenceLines(step: StepSpec): ToldLayers['fence'] {
  * @param step The frozen step.
  * @param brief The brief it was filed with or would be; null where there is none, and no task.
  */
-export function toldLayers(step: StepSpec, brief: string | null): ToldLayers {
+export function toldLayers(step: StepSpec, brief: string | null) {
   const agent = step.agent;
   const policy = ownNote(step);
   const instructions = agent?.instructions ?? null;
@@ -567,7 +562,7 @@ export function toldLayers(step: StepSpec, brief: string | null): ToldLayers {
  *
  * @param policy The step's own note (`ownNote`), the opening of a rendered step's brief, whose layers above went into its prompt.
  */
-function openingOf(step: StepSpec, policy: string, brief: string): { via: ToldLayers['via']; head: string } | undefined {
+function openingOf(step: StepSpec, policy: string, brief: string) {
   const agent = step.agent;
   const layers: ReadonlyArray<readonly [ComposedLayer, string | undefined]> = [
     ['instructions', agent?.instructions],

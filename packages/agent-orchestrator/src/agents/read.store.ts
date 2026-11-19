@@ -13,15 +13,7 @@ import { Result, Schema } from 'effect';
 import { AGENTS_FOLDER, WorkflowError } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal, stepFiles } from '../folder/folder.ts';
-import {
-  CUSTOM_INSTRUCTIONS_FOLDER,
-  customInstructionsRefusal,
-  isCardFile,
-  parseAgent,
-  type Agent,
-  type Agents,
-  type SkillsFound,
-} from './agents.ts';
+import { CUSTOM_INSTRUCTIONS_FOLDER, customInstructionsRefusal, isCardFile, parseAgent, type Agent, type SkillsFound } from './agents.ts';
 import { lookedUp } from '../skills/skills.ts';
 import {
   addedIn,
@@ -39,7 +31,7 @@ import {
  * @param home The store's root.
  * @param name The agent's name.
  */
-export const customInstructionsFile = (home: string, name: string): string =>
+export const customInstructionsFile = (home: string, name: string) =>
   path.join(path.resolve(home), CUSTOM_INSTRUCTIONS_FOLDER, `${name}.md`);
 
 /**
@@ -47,7 +39,7 @@ export const customInstructionsFile = (home: string, name: string): string =>
  * @param home The store's root.
  * @param name The agent's name.
  */
-export const copyRecordFile = (home: string, name: string): string => path.join(path.resolve(home), 'agent-sources', `${name}.json`);
+export const copyRecordFile = (home: string, name: string) => path.join(path.resolve(home), 'agent-sources', `${name}.json`);
 
 /** What `copyRecordFile` holds: the agent file it was copied from, the version that file was at then (`agentVersion`), and when. */
 const CopyRecordSchema = Schema.Struct({ source: Schema.String, version: Schema.String, at: Schema.String });
@@ -61,7 +53,7 @@ export type CopyRecord = typeof CopyRecordSchema.Type;
  * @param home The store's root.
  * @param name The agent's name.
  */
-export function readCopyRecord(home: string, name: string): CopyRecord | null {
+export function readCopyRecord(home: string, name: string) {
   const file = copyRecordFile(home, name);
   let text: string;
   try {
@@ -87,7 +79,7 @@ export function readCopyRecord(home: string, name: string): CopyRecord | null {
  * @param file The agent's file.
  * @param home The store's root.
  */
-export function sourceSkills(file: string, home: string): SkillsFound {
+export function sourceSkills(file: string, home: string) {
   const holder = path.dirname(path.dirname(path.resolve(file)));
   const repo = path.dirname(holder);
   const inRepo = repositoryRoots(repo).includes(holder);
@@ -98,15 +90,14 @@ export function sourceSkills(file: string, home: string): SkillsFound {
  * The places of the repository `repo` that hold agents and skills, as a start on it looks (`lookupRoots`): its own, then its harness's.
  * @param repo The repository's root.
  */
-export const repositoryRoots = (repo: string): string[] =>
-  lookupRoots(path.join(path.resolve(repo), 'workflows', '_'), { repo: path.resolve(repo) });
+export const repositoryRoots = (repo: string) => lookupRoots(path.join(path.resolve(repo), 'workflows', '_'), { repo: path.resolve(repo) });
 
 /**
  * The version of the agent file `file` now (`agentVersion`), its skills found as `sourceSkills` finds them; null for a file not there.
  * @param file The agent's file.
  * @param home The store's root, whose skills are found last.
  */
-export const sourceVersion = (file: string, home: string): string | null =>
+export const sourceVersion = (file: string, home: string) =>
   agentVersion(path.dirname(path.resolve(file)), path.basename(file, '.md'), sourceSkills(file, home));
 
 /**
@@ -114,7 +105,7 @@ export const sourceVersion = (file: string, home: string): string | null =>
  * @param file The custom instructions' file.
  * @param name The agent's name.
  */
-export const notAFileRefusal = (file: string, name: string): string =>
+export const notAFileRefusal = (file: string, name: string) =>
   `${file} is not a file: custom instructions are one file per agent. Remove it: nemia agents custom ${name} --clear.`;
 
 /**
@@ -124,7 +115,7 @@ export const notAFileRefusal = (file: string, name: string): string =>
  * @param home The store's root.
  * @param name The agent's name.
  */
-export function readCustomInstructions(home: string, name: string): string | undefined {
+export function readCustomInstructions(home: string, name: string) {
   const file = customInstructionsFile(home, name);
   const stat = fs.lstatSync(file, { throwIfNoEntry: false });
   if (!stat) return undefined;
@@ -140,7 +131,7 @@ export function readCustomInstructions(home: string, name: string): string | und
 }
 
 /** `agent` with the person's custom instructions for it from the store `home`, or the refusal of them (`readCustomInstructions`). */
-function withCustom(agent: Agent | WorkflowError, name: string, home: string | undefined): Agent | WorkflowError {
+function withCustom(agent: Agent | WorkflowError, name: string, home: string | undefined) {
   if (home === undefined || agent instanceof Error) return agent;
   try {
     const customInstructions = readCustomInstructions(home, name);
@@ -158,7 +149,7 @@ function withCustom(agent: Agent | WorkflowError, name: string, home: string | u
  * @param workflowDir The workflow's folder, whose root is looked in first.
  * @param places The repository and the store looked in after it, each left out where absent.
  */
-export function agentsFor(workflowDir: string, places: Places = {}): Agents {
+export function agentsFor(workflowDir: string, places: Places = {}) {
   const roots = lookupRoots(workflowDir, places);
   const loaded = roots.map((root) => loadAgents(path.join(root, AGENTS_FOLDER)));
   const found = new Map<string, Agent | WorkflowError>();
@@ -189,7 +180,7 @@ export function agentsFor(workflowDir: string, places: Places = {}): Agents {
  * link is refused by name: an agent's file is its own, as a step's is. None for a folder that is not there.
  * @param dir The folder of agents.
  */
-export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
+export function loadAgents(dir: string) {
   const agents = new Map<string, Agent | WorkflowError>();
   let entries: fs.Dirent[];
   try {
@@ -197,7 +188,7 @@ export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
   } catch {
     return agents;
   }
-  const read = (file: string): string | undefined => {
+  const read = (file: string) => {
     try {
       return fs.readFileSync(path.resolve(dir, file), 'utf8');
     } catch {
@@ -239,7 +230,7 @@ export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
  * @param name The agent's name.
  * @param skills Where its skills are found; absent, in the `skills/` beside `dir`.
  */
-export function agentVersion(dir: string, name: string, skills?: SkillsFound): string | null {
+export function agentVersion(dir: string, name: string, skills?: SkillsFound) {
   const at = path.join(dir, `${name}.md`);
   if (!fs.lstatSync(at, { throwIfNoEntry: false })) return null;
   const text = readForVersion(at);
@@ -262,7 +253,7 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
  * refuses.
  * @param text The agent file's text.
  */
-export function skillNamesIn(text: string): string[] {
+export function skillNamesIn(text: string) {
   const line = frontmatterKey(text, 'skills');
   if (line === undefined || isCardFile(line)) return [];
   return line

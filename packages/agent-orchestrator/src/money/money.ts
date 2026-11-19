@@ -6,10 +6,10 @@
  * refuse.
  * @param usd The amount, in USD.
  */
-export const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
+export const dollars = (usd: number) => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /**
  * A budget as its author writes one: `$3`, `$2.50`.
  * @param usd The budget, in USD.
  */
-export const budgetWord = (usd: number): string => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));
+export const budgetWord = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));

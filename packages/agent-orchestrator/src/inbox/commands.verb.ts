@@ -32,13 +32,13 @@ import { editCard } from '../card-write/card-edit.verb.ts';
 import type { CardReplaced } from '../card-write/card-write.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
 
 /** Every value under `key`, in the order given. */
-const listOf = (args: Args, key: string): string[] => {
+const listOf = (args: Args, key: string) => {
   const value = args[key];
   return Array.isArray(value) ? value.map(String) : [];
 };

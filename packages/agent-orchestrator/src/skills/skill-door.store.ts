@@ -108,7 +108,7 @@ export const draftedSkill = (name: string, draft: SkillDraft) => ({
 });
 
 /** The refusal `definitionVersionRefusal` chose, as the refusal of its kind. */
-const refusalOf = (refused: VersionRefused): Refusal =>
+const refusalOf = (refused: VersionRefused) =>
   refused.kind === 'Missing'
     ? new Missing({ message: refused.message })
     : refused.kind === 'Conflict'
@@ -119,7 +119,7 @@ const refusalOf = (refused: VersionRefused): Refusal =>
  * The door over `layer`: each method as `doorOf` makes it, each name and each write checked before the layer acts.
  * @param layer The layer the door's methods act on, once each name and write is checked.
  */
-export function skillDoorOver(layer: SkillLayer): SkillDoorShape {
+export function skillDoorOver(layer: SkillLayer) {
   const door = doorOf<SkillLayer, SkillName>(layer).skills;
   return {
     skills: {
@@ -159,14 +159,14 @@ export function skillDoorOver(layer: SkillLayer): SkillDoorShape {
           return yield* door.remove(name, at);
         }),
     },
-  };
+  } satisfies SkillDoorShape as SkillDoorShape;
 }
 
 /**
  * The files of the store `home`, as a layer of the door: today's skill folders, read and written by the skills' own functions.
  * @param home The store's root.
  */
-export function skillFiles(home: string): SkillLayer {
+export function skillFiles(home: string) {
   return {
     skills: {
       found: ({ dir, places }) => skillsFor(dir, places),
@@ -186,7 +186,7 @@ export function skillFiles(home: string): SkillLayer {
         return { dir, name };
       },
     },
-  };
+  } satisfies SkillLayer;
 }
 
 /**
@@ -202,4 +202,4 @@ export const SkillDoor = Context.Reference<SkillDoorShape>('agent-orchestrator/S
  * The Skill door over the files of the store `root`, as a layer: for a program that names its root by the door.
  * @param root The store's root.
  */
-export const skillDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(SkillDoor)(skillDoorOver(skillFiles(root)));
+export const skillDoorFiles = (root: string) => Layer.succeed(SkillDoor)(skillDoorOver(skillFiles(root)));

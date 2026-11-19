@@ -19,11 +19,11 @@ export type { Wiring, Adoption, AdoptRefused } from '../../contracts/adopt.contr
 export type { AdoptedCard } from './adopt-refusals.ts';
 
 /** The cards filed and not started whose workflow `offered` leaves out. */
-const strandedCards = (cards: readonly AdoptedCard[], offered: readonly string[]): AdoptedCard[] =>
+const strandedCards = (cards: readonly AdoptedCard[], offered: readonly string[]) =>
   cards.filter((c) => !c.started && c.workflow !== null && !offered.includes(c.workflow));
 
 /** The workflows `schedules` schedule that `offered` leaves out. */
-const strandedSchedules = (schedules: Factory['schedules'], offered: readonly string[]): string[] =>
+const strandedSchedules = (schedules: Factory['schedules'], offered: readonly string[]) =>
   Object.keys(schedules).filter((w) => !offered.includes(w));
 
 /**
@@ -110,18 +110,19 @@ export type AdoptPlan = {
 };
 
 /** `names` sorted, each once. */
-const sorted = (names: Iterable<string>): string[] => [...new Set(names)].sort();
+const sorted = (names: Iterable<string>) => [...new Set(names)].sort() satisfies string[] as string[];
 
 /** The hires `was` becomes as `now`, by step in order: each added, dropped, or given another agent. */
-function hireChanges(was: Hires, now: Hires): HireChange[] {
-  return sorted([...Object.keys(was), ...Object.keys(now)]).flatMap((step): HireChange[] => {
+function hireChanges(was: Hires, now: Hires) {
+  return sorted([...Object.keys(was), ...Object.keys(now)]).flatMap((step) => {
     const before = was[step];
     const after = now[step];
-    if (before === undefined && after !== undefined) return [{ step, kind: 'added', now: after }];
-    if (before !== undefined && after === undefined) return [{ step, kind: 'dropped', was: before }];
-    if (before !== undefined && after !== undefined && before !== after) return [{ step, kind: 'changed', was: before, now: after }];
-    return [];
-  });
+    if (before === undefined && after !== undefined) return [{ step, kind: 'added', now: after }] satisfies HireChange[];
+    if (before !== undefined && after === undefined) return [{ step, kind: 'dropped', was: before }] satisfies HireChange[];
+    if (before !== undefined && after !== undefined && before !== after)
+      return [{ step, kind: 'changed', was: before, now: after }] satisfies HireChange[];
+    return [] satisfies HireChange[];
+  }) satisfies HireChange[];
 }
 
 /**
@@ -132,7 +133,7 @@ function hireChanges(was: Hires, now: Hires): HireChange[] {
  * @param runs The ids of its runs that wait on a person or are in flight.
  * @param rules The store's rules file of the factory, or null where it holds no words.
  */
-export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly string[], rules: string | null): AdoptPlan {
+export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly string[], rules: string | null) {
   const was = new Set(factory.workflows);
   const now = new Set(adoption.wiring.workflows);
   const policy = adoption.wiring.revisions ?? DEFAULT_REVISIONS;
@@ -157,14 +158,14 @@ export function adoptPlan(factory: Factory, adoption: Adoption, runs: readonly s
       cards: strandedCards(adoption.cards, adoption.wiring.workflows),
       schedules: strandedSchedules(factory.schedules, adoption.wiring.workflows),
     },
-  };
+  } satisfies AdoptPlan;
 }
 
 /** `names` as a list a person reads, or `none`. */
-const listed = (names: readonly string[]): string => (names.length ? names.join(', ') : 'none');
+const listed = (names: readonly string[]) => (names.length ? names.join(', ') : 'none');
 
 /** A hire's change as a line: the step, and the agent it had and has. */
-const hireLine = (h: HireChange): string =>
+const hireLine = (h: HireChange) =>
   h.kind === 'added'
     ? `  + ${h.step}: ${h.now ?? ''}`
     : h.kind === 'dropped'
@@ -179,7 +180,7 @@ const hireLine = (h: HireChange): string =>
  * @param digest The plan's digest, printed and carried by the line that takes it over.
  * @param adopt The line to type that takes the factory over.
  */
-export function adoptLines(plan: AdoptPlan, digest: string, adopt: string): string[] {
+export function adoptLines(plan: AdoptPlan, digest: string, adopt: string) {
   const { factory, kept, workflows, hires, revisions, rules, runs, stranded } = plan;
   const blocked = stranded.cards.length > 0 || stranded.schedules.length > 0;
   return [

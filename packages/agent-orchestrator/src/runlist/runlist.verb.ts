@@ -5,7 +5,7 @@
  * the one its object is built on, whose views say when each task was filed, so no record or journal is read again for it. And the state
  * of a run left unjudged, off its record, as the whole list summarizes it (`unjudgedFields`).
  */
-import type { Run as RunObject, RunState, RunStatus } from 'objects';
+import type { Run as RunObject, RunStatus } from 'objects';
 import type { Run } from '../record/record.ts';
 import { stepSpend, taskSpend } from '../status/status.ts';
 import { spentOf } from '../summary/judged.verb.ts';
@@ -31,7 +31,7 @@ type Summarized = Omit<RunSummary, 'startedAt'>;
  * @param judgement The run's judgement on this read: its record, its tasks' views and its steps.
  * @param now The instant the list is read at, in epoch ms.
  */
-export function framePartsOf(summary: Summarized, judgement: Judgement, now: number): FrameParts {
+export function framePartsOf(summary: Summarized, judgement: Judgement, now: number) {
   const { run, views, steps } = judgement;
   const state = kindOf(summary);
   const held = summary.holding?.waitingOnYou ? summary.holding.at : null;
@@ -47,7 +47,7 @@ export function framePartsOf(summary: Summarized, judgement: Judgement, now: num
     waitingSince: waiting ? waitingSinceOf(run, views, steps, summary.waitingOnYou, held) : null,
     finishedAt: finished ? finishedAtOf(summary) : null,
     outcome: finished ? outcomeOf(summary) : null,
-  };
+  } satisfies FrameParts;
 }
 
 /**
@@ -55,14 +55,14 @@ export function framePartsOf(summary: Summarized, judgement: Judgement, now: num
  * @param object The run as the list keeps it.
  * @param parts The frame's parts, measured on this read.
  */
-export const framed = (object: RunObject, parts: FrameParts): RunObject => ({ ...object, status: { ...object.status, ...parts } });
+export const framed = (object: RunObject, parts: FrameParts) => ({ ...object, status: { ...object.status, ...parts } });
 
 /**
  * The state of a run left unjudged (a task of it does not read, or its unfrozen folder does not load), as the whole list summarizes it
  * off its record (`unjudgedFields`): `running` and moving, so in flight, but where nothing of it is judged.
  * @param run The run's record: its id, factory, creation and cancellation.
  */
-export const unjudgedStateOf = (run: Pick<Run, 'id' | 'factory' | 'createdAt' | 'cancelledAt'>): RunState =>
+export const unjudgedStateOf = (run: Pick<Run, 'id' | 'factory' | 'createdAt' | 'cancelledAt'>) =>
   kindOf({
     id: run.id,
     factory: run.factory ?? null,

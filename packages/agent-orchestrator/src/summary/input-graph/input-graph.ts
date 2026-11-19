@@ -39,24 +39,25 @@ export type GraphStep = Pick<StepSpec, 'name' | 'after' | 'input' | 'loop' | 'ro
  * A step as a node of the graph: its name and kind, its ends where it has any, and the workflow it runs where it runs one. Pure.
  * @param step The step.
  */
-export const nodeOf = (step: GraphStep): GraphNode => ({
-  name: step.name,
-  kind: nodeKind(step),
-  ...(step.ends?.length ? { ends: [...step.ends] } : {}),
-  ...(step.workflow !== undefined ? { workflow: step.workflow } : {}),
-});
+export const nodeOf = (step: GraphStep) =>
+  ({
+    name: step.name,
+    kind: nodeKind(step),
+    ...(step.ends?.length ? { ends: [...step.ends] } : {}),
+    ...(step.workflow !== undefined ? { workflow: step.workflow } : {}),
+  }) satisfies GraphNode;
 
 /** The nodes of a routed workflow, or undefined when every step is a step. */
-const nodesOf = (steps: readonly GraphStep[]): GraphNode[] | undefined => {
+const nodesOf = (steps: readonly GraphStep[]) => {
   const nodes = steps.map(nodeOf);
-  return nodes.some((n) => n.kind !== 'step') ? nodes : undefined;
+  return (nodes.some((n) => n.kind !== 'step') ? nodes : undefined) satisfies GraphNode[] | undefined;
 };
 
 /** The edges from `from` to `step`: a route edge per route of its `when:` when `from` is a condition, else one `after` edge. */
-const edgesFrom = (from: string, step: GraphStep, conditions: ReadonlySet<string>): GraphEdge[] =>
-  step.when !== undefined && conditions.has(from)
+const edgesFrom = (from: string, step: GraphStep, conditions: ReadonlySet<string>) =>
+  (step.when !== undefined && conditions.has(from)
     ? [...new Set(step.when)].map((route) => ({ from, to: step.name, kind: 'route', route }))
-    : [{ from, to: step.name, kind: 'after' }];
+    : [{ from, to: step.name, kind: 'after' }]) satisfies GraphEdge[];
 
 /**
  * The graph of a run's steps, once, for every client to draw: so none derives it from `after` on its own, and a step the
@@ -71,7 +72,7 @@ const edgesFrom = (from: string, step: GraphStep, conditions: ReadonlySet<string
  * status/status.ts reads it. Pure.
  * @param steps The run's steps, in the workflow's order.
  */
-export function inputGraphOf(steps: readonly GraphStep[]): ObjectGraph {
+export function inputGraphOf(steps: readonly GraphStep[]) {
   const names = new Set(steps.map((s) => s.name));
   const conditions = new Set(steps.filter((s) => s.routes !== undefined).map((s) => s.name));
   const edges: ObjectGraph['edges'] = [];
@@ -88,5 +89,5 @@ export function inputGraphOf(steps: readonly GraphStep[]): ObjectGraph {
     }
   }
   const nodes = nodesOf(steps);
-  return nodes ? { roots, edges, nodes } : { roots, edges };
+  return (nodes ? { roots, edges, nodes } : { roots, edges }) satisfies ObjectGraph;
 }

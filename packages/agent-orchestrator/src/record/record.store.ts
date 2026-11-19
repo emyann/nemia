@@ -19,7 +19,6 @@ import {
   type Approval,
   type Hold,
   type TakenBack,
-  type Pruned,
   type Run,
   type Unheld,
 } from './record.ts';
@@ -36,7 +35,7 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
-import { runMarkMove, runMarkOf, type RunMark } from '../run-marks/run-marks.ts';
+import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 import { isFilePath } from '../artifacts/artifacts.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -134,18 +133,17 @@ const FolderRecordSchema = Kept({
 
 const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));
 
-const fieldOf = (value: unknown, key: PropertyKey): unknown =>
-  typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
+const fieldOf = (value: unknown, key: PropertyKey) => (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined);
 
 /** `text` cut to its first 60 characters and marked `…` where it was cut, as the runtime quotes a value it refuses. */
-const shown = (text: string): string => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
+const shown = (text: string) => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
 
 /**
  * The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes.
  * @param value The value the schema was given.
  * @param error What the schema refused the value with.
  */
-export function firstRefusal(value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } {
+export function firstRefusal(value: unknown, error: Schema.SchemaError) {
   const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
   const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
@@ -158,7 +156,7 @@ export function firstRefusal(value: unknown, error: Schema.SchemaError): { path:
 }
 
 /** Why a record does not read as a run: its first field that is not what the tick writes, read against the kind of run it says it is. */
-function recordRefusal(raw: unknown): string {
+function recordRefusal(raw: unknown) {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return 'is no run record: it holds no object';
   const kind = fieldOf(raw, 'place') === undefined ? GitRecordSchema : FolderRecordSchema;
   const decoded = Schema.decodeUnknownResult(kind)(raw);
@@ -185,7 +183,7 @@ const saidAlready = new Set<string>();
  * Say `line` on stderr, once a process: a line said before is not said again.
  * @param line The line to say.
  */
-export const sayOnce = (line: string): void => {
+export const sayOnce = (line: string) => {
   if (!saidAlready.has(line) && saidAlready.add(line)) process.stderr.write(`${line}\n`);
 };
 
@@ -193,24 +191,24 @@ const isText = Schema.is(Schema.String);
 const isAmount = Schema.is(Schema.Finite);
 const isList = Schema.is(Schema.Array(Schema.Unknown));
 /** A person's free words off a file, one line within `cap`: none for a value that is not text, or only blanks. */
-const wordsOf = (value: unknown, cap: number): string | undefined => (isText(value) && value.trim() ? oneLine(value, cap) : undefined);
+const wordsOf = (value: unknown, cap: number) => (isText(value) && value.trim() ? oneLine(value, cap) : undefined);
 const isPrunedWorktree = Schema.is(Schema.StructWithRest(Schema.Struct({ path: Schema.String, bytes: Schema.Finite }), Rest));
 
 /** A marker's text as JSON, or undefined where it is not: each field is then read as missing, as a marker that does not read is. */
-const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text));
+const jsonOr = (text: string) => Result.getOrUndefined(Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text));
 
 /**
  * The actor a person's file names (objects' `Actor`), as a key to spread: none where the file names none — one written in-process, or
  * by code older than actors — or names one that does not read as an actor, which is left out rather than refusing what the file asks.
  * @param value What the file holds under its actor's key; undefined where it holds none.
  */
-export const actorIn = (value: unknown): { actor?: Actor } => {
+export const actorIn = (value: unknown) => {
   const read = Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
   return read === undefined ? {} : { actor: read };
 };
 
 /** A person's marker file, as JSON where it reads as JSON (`jsonOr`) — or undefined, when there is no such file to read. */
-const markerOf = (file: string): { json: unknown } | undefined => {
+const markerOf = (file: string) => {
   try {
     return { json: jsonOr(readText(file)) };
   } catch {
@@ -264,7 +262,7 @@ export const pruneFile = (home: string, id: string) => path.join(runsDir(home), 
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export function readPruned(home: string, id: string): Pruned | undefined {
+export function readPruned(home: string, id: string) {
   const marker = markerOf(pruneFile(home, id));
   if (!marker) return undefined;
   const [at, worktrees, artifacts] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'worktrees'), fieldOf(marker.json, 'artifacts')];
@@ -280,7 +278,7 @@ export function readPruned(home: string, id: string): Pruned | undefined {
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export const marksAt = (home: string, id: string): RunMark =>
+export const marksAt = (home: string, id: string) =>
   runMarkOf({
     cancelled: fs.existsSync(cancelFile(home, id)),
     pruned: fs.existsSync(pruneFile(home, id)),
@@ -302,7 +300,7 @@ export const holdFile = (home: string, id: string) => path.join(runsDir(home), `
  * never lifts a hold that names nothing, so only `nemia hold --off` lifts it, and the run files nothing while the file is there
  * (`advance`).
  */
-function readHold(home: string, id: string): Hold | undefined {
+function readHold(home: string, id: string) {
   const marker = markerOf(holdFile(home, id));
   if (!marker) return undefined;
   const [at, until] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'until')];
@@ -329,8 +327,8 @@ export const writeHold = (
   id: string,
   until: readonly string[],
   { why, by, actor }: Pick<Hold, 'why' | 'by' | 'actor'> = {},
-): Hold | null => {
-  if (runMarkMove(marksAt(home, id), 'hold').kind !== 'edge') return null;
+) => {
+  if (runMarkMove(marksAt(home, id), 'hold').kind !== 'edge') return null satisfies Hold | null as Hold | null;
   fs.mkdirSync(runsDir(home), { recursive: true });
   const hold: Hold = {
     at: new Date().toISOString(),
@@ -341,9 +339,9 @@ export const writeHold = (
   };
   try {
     fs.writeFileSync(holdFile(home, id), JSON.stringify(hold, null, 2), { flag: 'wx' });
-    return hold;
+    return hold satisfies Hold | null as Hold | null;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null;
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null satisfies Hold | null as Hold | null;
     throw err;
   }
 };
@@ -358,7 +356,7 @@ export const writeHold = (
 export const unheldFile = (home: string, id: string) => path.join(runsDir(home), `${id}.unheld`);
 
 /** Who lifted the run's last hold by hand, read: undefined where no file is there, or it does not read as one. */
-function readUnheld(home: string, id: string): Unheld | undefined {
+function readUnheld(home: string, id: string) {
   const marker = markerOf(unheldFile(home, id));
   if (!marker) return undefined;
   const since = fieldOf(marker.json, 'since');
@@ -375,7 +373,7 @@ function readUnheld(home: string, id: string): Unheld | undefined {
  * @param at When the hold to lift was put, as its file says.
  * @param actor Who lifts it; absent where the tick lifts it, or the caller is not known.
  */
-export const removeHold = (home: string, id: string, at: string, actor?: Actor): boolean => {
+export const removeHold = (home: string, id: string, at: string, actor?: Actor) => {
   if (runMarkMove(marksAt(home, id), 'lift').kind !== 'edge') return false;
   if (readHold(home, id)?.at !== at) return false;
   if (actor) writeWhole(unheldFile(home, id), JSON.stringify({ since: at, actor } satisfies Unheld, null, 2));
@@ -404,15 +402,15 @@ export const removeHold = (home: string, id: string, at: string, actor?: Actor):
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export const runRecord = (home: string, id: string): Run => within('records', () => readRecord(home, id));
+export const runRecord = (home: string, id: string) => within('records', () => readRecord(home, id)) satisfies Run as Run;
 
 /** The run's hold (`holdFile`) and who last lifted one by hand (`unheldFile`), each where its file is there, as the run carries them. */
-const heldOf = (home: string, id: string): Pick<Run, 'hold' | 'unheld'> => {
+const heldOf = (home: string, id: string) => {
   const [hold, unheld] = [readHold(home, id), readUnheld(home, id)];
   return { ...(hold ? { hold } : {}), ...(unheld ? { unheld } : {}) };
 };
 
-const readRecord = (home: string, id: string): Run => {
+const readRecord = (home: string, id: string) => {
   if (!fs.existsSync(runFile(home, id))) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   countRecord();
   let raw: unknown;
@@ -457,12 +455,12 @@ const readRecord = (home: string, id: string): Run => {
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export const saidDir = (home: string, id: string): string => path.join(runsDir(home), `${id}.said`);
+export const saidDir = (home: string, id: string) => path.join(runsDir(home), `${id}.said`);
 
 const isKeptSaid = Schema.is(Schema.Struct({ step: Schema.String, at: Schema.String, text: Schema.String }));
 
 /** The number of each word kept in `dir`, in the order kept: none where the folder is not there. */
-function keptNumbers(dir: string): number[] {
+function keptNumbers(dir: string) {
   let names: string[];
   try {
     names = fs.readdirSync(dir);
@@ -485,7 +483,7 @@ function keptNumbers(dir: string): number[] {
  * @param step The name of the step the words were said to.
  * @param text The words said.
  */
-export function keepSaid(home: string, id: string, step: string, text: string): SaidBefore {
+export function keepSaid(home: string, id: string, step: string, text: string) {
   const dir = saidDir(home, id);
   fs.mkdirSync(dir, { recursive: true });
   const kept = { at: new Date().toISOString(), text };
@@ -504,7 +502,7 @@ export function keepSaid(home: string, id: string, step: string, text: string): 
  * What was said to each of the run's steps before it was filed, by step, in the order kept: undefined where nothing was. A file that does
  * not read as a word kept is left out, and said once on stderr, naming it.
  */
-function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> | undefined {
+function readSaidBefore(home: string, id: string) {
   const dir = saidDir(home, id);
   const byStep: Record<string, SaidBefore[]> = {};
   for (const n of keptNumbers(dir)) {
@@ -537,7 +535,7 @@ function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> 
  * @param id The run's id.
  * @param actor Who calls the run off; absent where the caller is not known.
  */
-export const markCancelled = (home: string, id: string, actor?: Actor): string => {
+export const markCancelled = (home: string, id: string, actor?: Actor) => {
   fs.mkdirSync(runsDir(home), { recursive: true });
   const at = new Date().toISOString();
   if (runMarkMove(marksAt(home, id), 'cancel').kind !== 'edge') return readCancelled(home, id)?.at || at;
@@ -555,7 +553,7 @@ export const markCancelled = (home: string, id: string, actor?: Actor): string =
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export function readCancelled(home: string, id: string): { at: string; by?: Actor } | undefined {
+export function readCancelled(home: string, id: string) {
   const file = cancelFile(home, id);
   if (!fs.existsSync(file)) return undefined;
   const text = readText(file).trim();
@@ -596,7 +594,7 @@ export const asksDir = (home: string, id: string) => path.join(runsDir(home), `$
  * @param step The step's name.
  * @param n The try asked for, from 1.
  */
-export const askFile = (home: string, id: string, step: string, n: number): string => path.join(asksDir(home, id), `retry-${step}-${n}`);
+export const askFile = (home: string, id: string, step: string, n: number) => path.join(asksDir(home, id), `retry-${step}-${n}`);
 /**
  * The file of a person's `nemia retry --round` of a looping step: `round-<step>-<round>` in the run's asks directory (`asksDir`).
  * @param home The store's root folder.
@@ -604,7 +602,7 @@ export const askFile = (home: string, id: string, step: string, n: number): stri
  * @param step The looping step's name.
  * @param round The round asked for.
  */
-export const roundAskFile = (home: string, id: string, step: string, round: number): string =>
+export const roundAskFile = (home: string, id: string, step: string, round: number) =>
   path.join(asksDir(home, id), `round-${step}-${round}`);
 /**
  * The file of a person's `nemia approve` at a gate: `approve-<step>-<n>` in the run's asks directory (`asksDir`).
@@ -613,8 +611,7 @@ export const roundAskFile = (home: string, id: string, step: string, round: numb
  * @param step The gated step's name.
  * @param n The try approved, from 1.
  */
-export const approvalFile = (home: string, id: string, step: string, n: number): string =>
-  path.join(asksDir(home, id), `approve-${step}-${n}`);
+export const approvalFile = (home: string, id: string, step: string, n: number) => path.join(asksDir(home, id), `approve-${step}-${n}`);
 /**
  * The file of a loop a person ended as it stands: `accept-<step>-<n>` in the run's asks directory (`asksDir`).
  * @param home The store's root folder.
@@ -622,14 +619,13 @@ export const approvalFile = (home: string, id: string, step: string, n: number):
  * @param step The looping step's name.
  * @param n The try accepted, from 1.
  */
-export const acceptFile = (home: string, id: string, step: string, n: number): string =>
-  path.join(asksDir(home, id), `accept-${step}-${n}`);
+export const acceptFile = (home: string, id: string, step: string, n: number) => path.join(asksDir(home, id), `accept-${step}-${n}`);
 
 /**
  * The names of the files in `dir`, sorted; undefined where it cannot be listed, as when it was never made.
  * @param dir The folder listed.
  */
-export const fileNames = (dir: string): string[] | undefined => {
+export const fileNames = (dir: string) => {
   try {
     return fs
       .readdirSync(dir, { withFileTypes: true })
@@ -647,10 +643,9 @@ export const fileNames = (dir: string): string[] | undefined => {
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export const readApprovals = (home: string, id: string): { approvals: Approval[]; notes: string[] } =>
-  within('asks', () => readApprovalsNow(home, id));
+export const readApprovals = (home: string, id: string) => within('asks', () => readApprovalsNow(home, id));
 
-function readApprovalsNow(home: string, id: string, names = fileNames(asksDir(home, id))): { approvals: Approval[]; notes: string[] } {
+function readApprovalsNow(home: string, id: string, names = fileNames(asksDir(home, id))) {
   const approvals: Approval[] = [];
   const notes: string[] = [];
   if (!names) return { approvals, notes };
@@ -700,11 +695,15 @@ const RetryAskFileSchema = Kept({
  * An ask file's JSON, or why it cannot be read.
  * @param file The ask file's path.
  */
-export function heldIn(file: string): { read: unknown } | { unreadable: string } {
+export function heldIn(file: string) {
   try {
-    return { read: JSON.parse(readText(file)) };
+    return { read: JSON.parse(readText(file)) } satisfies { read: unknown } | { unreadable: string } as
+      | { read: unknown }
+      | { unreadable: string };
   } catch (err) {
-    return { unreadable: `unreadable (${err instanceof Error ? err.message : String(err)})` };
+    return { unreadable: `unreadable (${err instanceof Error ? err.message : String(err)})` } satisfies
+      | { read: unknown }
+      | { unreadable: string } as { read: unknown } | { unreadable: string };
   }
 }
 
@@ -713,15 +712,19 @@ export function heldIn(file: string): { read: unknown } | { unreadable: string }
  * @param schema The schema the value is read with.
  * @param value The value read.
  */
-export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): { read: S['Type'] } | { refused: string } {
+export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown) {
   const decoded = Schema.decodeUnknownResult(schema)(value);
-  if (Result.isSuccess(decoded)) return { read: decoded.success };
+  if (Result.isSuccess(decoded))
+    return { read: decoded.success } satisfies { read: S['Type'] } | { refused: string } as { read: S['Type'] } | { refused: string };
   const [key] = firstRefusal(value, decoded.failure).path;
-  return { refused: key === undefined ? '' : String(key) };
+  return { refused: key === undefined ? '' : String(key) } satisfies { read: S['Type'] } | { refused: string } as
+    | { read: S['Type'] }
+    | { refused: string };
 }
 
 /** Why a message is refused: one that is not text, or one with nothing in it. */
-const messageWords = (held: unknown): string => (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text');
+const messageWords = (held: unknown) =>
+  (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text') satisfies string as string;
 
 /** Why an approval file is refused, by the field refused: one written by hand where `nemia approve` would have refused it. */
 const APPROVAL_WORDS: Record<string, string> = {
@@ -737,7 +740,7 @@ const NO_APPROVAL = 'it is not an approval nemia approve wrote';
  * @param step The gated step, from the file's name.
  * @param n The try approved, from the file's name.
  */
-export function approvalIn(file: string, step: string, n: number): Approval | string {
+export function approvalIn(file: string, step: string, n: number) {
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(ApprovalFileSchema, held.read);
@@ -760,15 +763,11 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export function readAcceptances(home: string, id: string): { acceptances: Acceptance[]; notes: string[] } {
+export function readAcceptances(home: string, id: string) {
   return within('asks', () => readAcceptancesNow(home, id));
 }
 
-function readAcceptancesNow(
-  home: string,
-  id: string,
-  names = fileNames(asksDir(home, id)),
-): { acceptances: Acceptance[]; notes: string[] } {
+function readAcceptancesNow(home: string, id: string, names = fileNames(asksDir(home, id))) {
   const acceptances: Acceptance[] = [];
   const notes: string[] = [];
   if (!names) return { acceptances, notes };
@@ -791,19 +790,20 @@ function readAcceptancesNow(
  * @param step The looping step, from the file's name.
  * @param n The try accepted, from the file's name.
  */
-export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
+export function acceptanceIn(file: string, step: string, n: number) {
   const held = heldIn(file);
-  if ('unreadable' in held) return held.unreadable;
+  if ('unreadable' in held) return held.unreadable satisfies Acceptance | string as Acceptance | string;
   const read = readAs(AcceptanceFileSchema, held.read);
   if ('refused' in read) {
-    if (read.refused === 'at') return 'it says no time it was given';
-    if (read.refused !== 'message') return 'it is not an acceptance nemia approve wrote';
-    return isText(fieldOf(held.read, 'message'))
+    if (read.refused === 'at') return 'it says no time it was given' satisfies Acceptance | string as Acceptance | string;
+    if (read.refused !== 'message')
+      return 'it is not an acceptance nemia approve wrote' satisfies Acceptance | string as Acceptance | string;
+    return (isText(fieldOf(held.read, 'message'))
       ? 'its message is empty, and an acceptance is nothing but its reason'
-      : 'it says nothing of why the work is good enough with its findings open';
+      : 'it says nothing of why the work is good enough with its findings open') satisfies Acceptance | string as Acceptance | string;
   }
   const { at, message } = read.read;
-  return { step, try: n, at, message, ...actorIn(fieldOf(held.read, 'actor')) };
+  return { step, try: n, at, message, ...actorIn(fieldOf(held.read, 'actor')) } satisfies Acceptance | string as Acceptance | string;
 }
 
 /**
@@ -814,9 +814,9 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export const readAsks = (home: string, id: string): AsksRead => within('asks', () => readAsksNow(home, id));
+export const readAsks = (home: string, id: string) => within('asks', () => readAsksNow(home, id));
 
-function readAsksNow(home: string, id: string): AsksRead {
+function readAsksNow(home: string, id: string) {
   const read: AsksRead = { asks: [], rounds: [], notes: [] };
   const names = fileNames(asksDir(home, id));
   if (!names) return read;
@@ -844,22 +844,31 @@ function readAsksNow(home: string, id: string): AsksRead {
  * @param step The looping step, from the file's name.
  * @param round The round asked for, from the file's name.
  */
-export function roundAskIn(file: string, step: string, round: number): RoundAsk | string {
+export function roundAskIn(file: string, step: string, round: number) {
   const held = heldIn(file);
-  if ('unreadable' in held) return held.unreadable;
+  if ('unreadable' in held) return held.unreadable satisfies RoundAsk | string as RoundAsk | string;
   const read = readAs(RoundAskFileSchema, held.read);
-  if ('refused' in read) return read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask nemia retry --round wrote';
+  if ('refused' in read)
+    return (read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask nemia retry --round wrote') satisfies RoundAsk | string as
+      | RoundAsk
+      | string;
   const { at, budget } = read.read;
-  return { step, round, ...(budget === undefined ? {} : { budget }), at: isText(at) ? at : '', ...actorIn(fieldOf(held.read, 'actor')) };
+  return {
+    step,
+    round,
+    ...(budget === undefined ? {} : { budget }),
+    at: isText(at) ? at : '',
+    ...actorIn(fieldOf(held.read, 'actor')),
+  } satisfies RoundAsk | string as RoundAsk | string;
 }
 
 /** Why an ask file cannot be read, by the field its schema refused (`refused`) of what it holds (`held`). */
-function askRefusal(refused: string, held: unknown): string {
-  if (refused === 'model') return 'its model is not a name';
-  if (refused === 'message') return messageWords(held);
-  if (refused === 'budget') return BUDGET_WORDS;
-  if (refused === 'interrupted') return 'the task it names as interrupted is not an id';
-  return `it asks for no mode nemia retry knows (${JSON.stringify(fieldOf(held, 'mode'))})`;
+function askRefusal(refused: string, held: unknown) {
+  if (refused === 'model') return 'its model is not a name' satisfies string as string;
+  if (refused === 'message') return messageWords(held) satisfies string as string;
+  if (refused === 'budget') return BUDGET_WORDS satisfies string as string;
+  if (refused === 'interrupted') return 'the task it names as interrupted is not an id' satisfies string as string;
+  return `it asks for no mode nemia retry knows (${JSON.stringify(fieldOf(held, 'mode'))})` satisfies string as string;
 }
 
 /**
@@ -871,14 +880,20 @@ function askRefusal(refused: string, held: unknown): string {
  * @param step The step, from the file's name.
  * @param n The try asked for, from the file's name.
  */
-export function askIn(file: string, step: string, n: number): RetryAsk | string {
+export function askIn(file: string, step: string, n: number) {
   const held = heldIn(file);
-  if ('unreadable' in held) return held.unreadable;
+  if ('unreadable' in held) return held.unreadable satisfies RetryAsk | string as RetryAsk | string;
   const read = readAs(RetryAskFileSchema, upgradeAsk(held.read));
-  if ('refused' in read) return askRefusal(read.refused, held.read);
+  if ('refused' in read) return askRefusal(read.refused, held.read) satisfies RetryAsk | string as RetryAsk | string;
   const { mode, model, message, budget, interrupted, at } = read.read;
-  if (message !== undefined && mode === 'recheck') return 'it carries a message and asks for a recheck, which files no session to read it';
-  if (budget !== undefined && mode === 'recheck') return 'it carries a budget and asks for a recheck, which files no session to spend it';
+  if (message !== undefined && mode === 'recheck')
+    return 'it carries a message and asks for a recheck, which files no session to read it' satisfies RetryAsk | string as
+      | RetryAsk
+      | string;
+  if (budget !== undefined && mode === 'recheck')
+    return 'it carries a budget and asks for a recheck, which files no session to spend it' satisfies RetryAsk | string as
+      | RetryAsk
+      | string;
   return {
     step,
     try: n,
@@ -889,7 +904,7 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
     ...(interrupted === undefined ? {} : { interrupted }),
     at: isText(at) ? at : '',
     ...actorIn(fieldOf(held.read, 'actor')),
-  };
+  } satisfies RetryAsk | string as RetryAsk | string;
 }
 
 /**
@@ -899,11 +914,11 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export function readAnswers(home: string, id: string): RetryAsk[] {
+export function readAnswers(home: string, id: string) {
   return within('asks', () => readAnswersNow(home, id));
 }
 
-function readAnswersNow(home: string, id: string): RetryAsk[] {
+function readAnswersNow(home: string, id: string) {
   const answers: RetryAsk[] = [];
   for (const dir of [asksDir(home, id), path.join(asksDir(home, id), 'done')]) {
     const names = fileNames(dir) ?? [];
@@ -923,7 +938,7 @@ function readAnswersNow(home: string, id: string): RetryAsk[] {
  * @param file The ask's file, in the run's asks directory.
  * @param ask What the ask holds.
  */
-export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acceptance | MergeAskHeld): boolean {
+export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acceptance | MergeAskHeld) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const whole = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}`);
   fs.writeFileSync(whole, `${JSON.stringify(ask, null, 2)}\n`, { flag: 'wx' });
@@ -956,7 +971,7 @@ export function consumeAsks(
   asks: readonly RetryAsk[],
   rounds: readonly RoundAsk[],
   voided: readonly RetryAsk[] = [],
-): void {
+) {
   within('act', () =>
     doneWith(home, run.id, [
       ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askFile(home, run.id, a.step, a.try)),
@@ -977,7 +992,7 @@ export function consumeAsks(
  * @param id The run's id.
  * @param spent The paths of the ask files spent.
  */
-export function doneWith(home: string, id: string, spent: readonly string[]): void {
+export function doneWith(home: string, id: string, spent: readonly string[]) {
   for (const file of spent) {
     const done = path.join(asksDir(home, id), 'done', path.basename(file));
     try {
@@ -1001,7 +1016,7 @@ export function doneWith(home: string, id: string, spent: readonly string[]): vo
  * @param n The try the approval opened the gate of, from 1.
  * @param takenBack When, and by whom, the approval was taken back.
  */
-export function takeBackApproval(home: string, id: string, step: string, n: number, takenBack: TakenBack): string | null {
+export function takeBackApproval(home: string, id: string, step: string, n: number, takenBack: TakenBack) {
   return within('act', () => {
     const file = approvalFile(home, id, step, n);
     const held = heldIn(file);
@@ -1024,7 +1039,7 @@ export function takeBackApproval(home: string, id: string, step: string, n: numb
 /**
  * The first of `done`, `done.2`, `done.3`, … no file holds; `done` itself past a thousand, where the link then refuses and moves nothing.
  */
-const keptName = (done: string): string => {
+const keptName = (done: string) => {
   for (let n = 1; n <= 1000; n++) {
     const name = n === 1 ? done : `${done}.${n}`;
     if (!lstatOf(name)) return name;
@@ -1041,7 +1056,7 @@ const keptName = (done: string): string => {
  * @param said Where a record that does not read is said; once a process on stderr where absent.
  * @param kept The run kept for an id, or undefined where its record is to be read; every record is read where absent.
  */
-export const listRuns = (home: string, said: (line: string) => void = sayOnce, kept?: (id: string) => Run | undefined): Run[] =>
+export const listRuns = (home: string, said: (line: string) => void = sayOnce, kept?: (id: string) => Run | undefined) =>
   within('records', () =>
     fs.existsSync(runsDir(home))
       ? fs
@@ -1059,7 +1074,7 @@ export const listRuns = (home: string, said: (line: string) => void = sayOnce, k
           })
           .sort((a, b) => a.id.localeCompare(b.id))
       : [],
-  );
+  ) satisfies Run[] as Run[];
 
 /**
  * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they
@@ -1074,7 +1089,7 @@ export const listRuns = (home: string, said: (line: string) => void = sayOnce, k
  * While a run's stamp holds, a pass does not read its record again: the memo hands its run to `listRuns`.
  * @param home The store's root folder.
  */
-export const restStamps = (home: string): Map<string, string> =>
+export const restStamps = (home: string) =>
   within('records', () => {
     const stamps = new Map<string, string[]>();
     let names: string[];
@@ -1083,7 +1098,7 @@ export const restStamps = (home: string): Map<string, string> =>
     } catch {
       return new Map();
     }
-    const stat = (at: string, depth: number): string => {
+    const stat = (at: string, depth: number) => {
       const s = fs.statSync(at, { bigint: true, throwIfNoEntry: false });
       if (!s) return 'gone';
       const own = `${s.ino}:${s.size}:${s.mtimeNs}`;
@@ -1107,7 +1122,7 @@ export const restStamps = (home: string): Map<string, string> =>
   });
 
 /** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
-const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause' | 'saidBefore'>): string =>
+const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause' | 'saidBefore'>) =>
   JSON.stringify(run, null, 2);
 
 /**
@@ -1136,12 +1151,12 @@ export const writeRun = (home: string, { pause: _, labels: __, saidBefore: ___, 
  * @param home The store's root folder.
  * @param run The run the pass read, as it writes it back.
  */
-export const rewriteRun = (home: string, run: Run): boolean => within('act', () => rewriteNow(home, run));
+export const rewriteRun = (home: string, run: Run) => within('act', () => rewriteNow(home, run));
 
 const rewriteNow = (
   home: string,
   { approvals: _, acceptances: __, pruned: ___, hold: ____, labels: ______, pause: _____, saidBefore: _______, ...run }: Run,
-): boolean => {
+) => {
   let fd: number;
   try {
     fd = fs.openSync(runFile(home, run.id), 'r+');
@@ -1170,8 +1185,8 @@ const rewriteNow = (
  * @param run The run, by its id.
  * @param step The step's name.
  */
-export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string): string =>
-  path.join(runsDir(home), run.id, 'artifacts', step);
+export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string) =>
+  path.join(runsDir(home), run.id, 'artifacts', step) satisfies string as string;
 
 /**
  * The directory `nemia start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file
@@ -1183,14 +1198,14 @@ export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string): 
  * @param home The store's root folder.
  * @param run The run, by its id.
  */
-export const inputsDir = (home: string, run: Pick<Run, 'id'>): string => inputsRoot(runsDir(home), run.id);
+export const inputsDir = (home: string, run: Pick<Run, 'id'>) => inputsRoot(runsDir(home), run.id) satisfies string as string;
 
 /**
  * The directory `nemia start --card` copies each card a run is handed into, as `<name>.md`: `cards/` under its inputs (`inputsDir`).
  * @param home The store's root folder.
  * @param run The run, by its id.
  */
-export const cardsDir = (home: string, run: Pick<Run, 'id'>): string => path.join(inputsDir(home, run), CARDS_FOLDER);
+export const cardsDir = (home: string, run: Pick<Run, 'id'>) => path.join(inputsDir(home, run), CARDS_FOLDER);
 
 /**
  * What is at a path, its link not followed: undefined where nothing is.
@@ -1205,7 +1220,7 @@ export const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false })
  * @param dir The folder.
  * @param rel The file's path under it.
  */
-export function statUnder(dir: string, rel: string): fs.Stats | undefined {
+export function statUnder(dir: string, rel: string) {
   if (!isFilePath(rel)) return undefined;
   const parts = rel.split('/');
   let at = dir;
@@ -1222,7 +1237,7 @@ export function statUnder(dir: string, rel: string): fs.Stats | undefined {
  * Whether a path is a directory, a link to one followed: false where nothing is there.
  * @param at The path.
  */
-export const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
+export const isDirectory = (at: string) => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
  * A run id a person can read.
@@ -1233,7 +1248,7 @@ export const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { th
  * suffix tells them which part of it. The random tail keeps two runs of the same request apart.
  * @param brief The run's brief, whose words the id is made of.
  */
-export const runId = (brief: string): string => {
+export const runId = (brief: string) => {
   const slug = brief
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')

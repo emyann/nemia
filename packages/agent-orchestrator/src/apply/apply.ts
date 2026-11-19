@@ -2,7 +2,7 @@
  * What the pass does with an approved proposal (`contracts/proposal-apply.contract.ts`): wait on its run, drop it with a run called off,
  * mark it stale where its objects moved, send a lapsed agent's approval back to the person, or apply it. Pure.
  */
-import type { ProposalApply, ProposingRun } from '../../contracts/proposal-apply.contract.ts';
+import type { ProposalApply } from '../../contracts/proposal-apply.contract.ts';
 import type { RunStatusWord } from 'objects';
 import { runOver } from '../run-ending/run-ending.ts';
 
@@ -30,7 +30,7 @@ export type RunState = RunStatusWord | 'gone';
  * @param run The id of the proposing run; undefined where the proposal names none.
  * @param state The run's state as the pass read it; undefined where it was not read on this pass.
  */
-export const proposingRunOf = (run: string | undefined, state: RunState | undefined): ProposingRun => {
+export const proposingRunOf = (run: string | undefined, state: RunState | undefined) => {
   if (run === undefined) return 'none';
   if (state === undefined) return 'going';
   if (state === 'gone') return 'ended';

@@ -9,14 +9,14 @@
  * A branch git does not have is left out of every answer, never answered as one that changed nothing. Refuses a repository that is no
  * directory, a base git cannot read, and a git command that fails, in git's words. Throws when git cannot be started at all.
  */
-import { failedWords, isDirectory, printed, refused, type Asking, type Reply } from '../git.ts';
+import { failedWords, isDirectory, printed, refused } from '../git.ts';
 import type { ChangedFile, FileChange, PlaceRequests } from '../../../src/place/place.ts';
 
 /** A git command that failed with an exit status: the place's refusal, in git's words. */
 class Refused extends Error {}
 
 /** Git's stdout as it printed it, with paths unquoted; a failure with an exit status is `Refused`, and any other is thrown as it is. */
-function* read(repo: string, args: readonly string[]): Asking<string> {
+function* read(repo: string, args: readonly string[]) {
   try {
     return yield* printed({ cmd: 'git', cwd: repo, args: ['-c', 'core.quotePath=false', '--literal-pathspecs', ...args] });
   } catch (err) {
@@ -26,7 +26,7 @@ function* read(repo: string, args: readonly string[]): Asking<string> {
 }
 
 /** Git's stdout, trimmed, or undefined when git exits with a status: a question whose no is an answer. Git that cannot start is thrown. */
-function* asked(repo: string, args: readonly string[]): Asking<string | undefined> {
+function* asked(repo: string, args: readonly string[]) {
   try {
     return (yield* read(repo, args)).trim();
   } catch (err) {
@@ -36,14 +36,13 @@ function* asked(repo: string, args: readonly string[]): Asking<string | undefine
 }
 
 /** The commit `rev` names in `repo`, or undefined where git has none. */
-const commitOf = (repo: string, rev: string): Asking<string | undefined> =>
-  asked(repo, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`]);
+const commitOf = (repo: string, rev: string) => asked(repo, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`]);
 
 /** What git's object store holds at `rev:path`: `blob`, `tree`, another kind, or undefined for nothing. */
-const kindAt = (repo: string, rev: string, file: string): Asking<string | undefined> => asked(repo, ['cat-file', '-t', `${rev}:${file}`]);
+const kindAt = (repo: string, rev: string, file: string) => asked(repo, ['cat-file', '-t', `${rev}:${file}`]);
 
 /** `--numstat -z` read into counts and paths, in git's order: a rename's record is its counts, then an empty path, then both ends. */
-function numstat(out: string): Omit<ChangedFile, 'status'>[] {
+function numstat(out: string) {
   const tokens = out.split('\0');
   const counted: Omit<ChangedFile, 'status'>[] = [];
   const count = (n: string | undefined) => (n === '-' ? null : Number(n));
@@ -80,7 +79,7 @@ const CHANGE_OF: Readonly<Record<string, FileChange>> = {
  * `--name-status -z` read into each file's change, in git's order: a rename or copy names both ends. A letter the place has no word for
  * is `Refused`, never passed on as git spelled it.
  */
-function nameStatus(out: string): { status: FileChange; path: string }[] {
+function nameStatus(out: string) {
   const tokens = out.split('\0');
   const named: { status: FileChange; path: string }[] = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -102,7 +101,7 @@ function nameStatus(out: string): { status: FileChange; path: string }[] {
 }
 
 /** The files `range` changed, renames found: each with its status and counts, or `Refused` when git's two readings disagree. */
-function* filesOf(repo: string, range: string): Asking<ChangedFile[]> {
+function* filesOf(repo: string, range: string) {
   const diff = ['diff', '--no-color', '--no-ext-diff', '--find-renames', '-z'];
   const counts = numstat(yield* read(repo, [...diff, '--numstat', range, '--']));
   const statuses = nameStatus(yield* read(repo, [...diff, '--name-status', range, '--']));
@@ -116,7 +115,7 @@ function* filesOf(repo: string, range: string): Asking<ChangedFile[]> {
 }
 
 /** The whole diff of each path of `diffOf` that `files` changed, by that path; a rename's diff names both ends, as one. */
-function* diffsOf(repo: string, range: string, files: readonly ChangedFile[], diffOf: readonly string[]): Asking<Record<string, string>> {
+function* diffsOf(repo: string, range: string, files: readonly ChangedFile[], diffOf: readonly string[]) {
   const diffs: Record<string, string> = {};
   for (const wanted of diffOf) {
     const file = files.find((f) => f.path === wanted || f.from === wanted);
@@ -128,7 +127,7 @@ function* diffsOf(repo: string, range: string, files: readonly ChangedFile[], di
 }
 
 /** Whether each path of `paths` is a file, a directory or absent at `rev`. */
-function* presentAt(repo: string, rev: string, paths: readonly string[]): Asking<Record<string, 'file' | 'directory' | 'absent'>> {
+function* presentAt(repo: string, rev: string, paths: readonly string[]) {
   const present: Record<string, 'file' | 'directory' | 'absent'> = {};
   for (const p of paths) {
     const kind = yield* kindAt(repo, rev, p);
@@ -138,7 +137,7 @@ function* presentAt(repo: string, rev: string, paths: readonly string[]): Asking
 }
 
 /** The text of each path of `paths` at `rev`, or null where it has no file. */
-function* textsAt(repo: string, rev: string, paths: readonly string[]): Asking<Record<string, string | null>> {
+function* textsAt(repo: string, rev: string, paths: readonly string[]) {
   const texts: Record<string, string | null> = {};
   for (const p of paths)
     texts[p] = (yield* kindAt(repo, rev, p)) === 'blob' ? yield* read(repo, ['cat-file', 'blob', `${rev}:${p}`]) : null;
@@ -146,7 +145,7 @@ function* textsAt(repo: string, rev: string, paths: readonly string[]): Asking<R
 }
 
 /** What the branches git has changed against the base, each part of `Changes` read in turn. */
-function* changes({ repo, baseRef, onto, branches, diffOf, present, atBase }: PlaceRequests['report']): Asking<Reply<'report'>> {
+function* changes({ repo, baseRef, onto, branches, diffOf, present, atBase }: PlaceRequests['report']) {
   if (!(yield* commitOf(repo, baseRef))) return refused(`git cannot read the base ${baseRef} in ${repo}`);
   const tips: Record<string, string> = {};
   for (const branch of branches) {
@@ -164,7 +163,7 @@ function* changes({ repo, baseRef, onto, branches, diffOf, present, atBase }: Pl
 }
 
 /** The verb's body. */
-export function* report(request: PlaceRequests['report']): Asking<Reply<'report'>> {
+export function* report(request: PlaceRequests['report']) {
   if (!isDirectory(request.repo)) return refused(`${request.repo} is not a directory, so nothing a branch in it changed can be read`);
   try {
     return yield* changes(request);

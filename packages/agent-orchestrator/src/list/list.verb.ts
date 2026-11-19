@@ -145,7 +145,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const read = { ...held, standings };
   const assessed = assess(read);
   const decided = decision(read, how.landed ?? landedOf(run, git), assessed);
-  const assessOf = (on: Run): Assessment => assess({ ...read, run: on });
+  const assessOf = (on: Run) => assess({ ...read, run: on }) satisfies Assessment;
   const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
   const scripted = base.signedOff;
   const listed = listing({
@@ -268,7 +268,7 @@ type Read = { run: Run; read: ListReading | Unjudged; steps: readonly StepSpec[]
  * ending that lands on its check (`landsOnCheck`) while a merge is staged in the repository's own checkout, or its place could not say,
  * as `holdingReads` read it (`mergeStaged`) — and each other (`held`).
  */
-const heldOf = ({ run, read, steps, staged: merging }: Read): Pick<Paused, 'staged' | 'held'> => {
+const heldOf = ({ run, read, steps, staged: merging }: Read) => {
   const checks = 'assessed' in read ? (read.assessed.waitingOnPause?.checks ?? []) : [];
   const landings = steps.filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
   const staged: PauseStaged[] =
@@ -278,7 +278,7 @@ const heldOf = ({ run, read, steps, staged: merging }: Read): Pick<Paused, 'stag
 };
 
 /** The checks the pause holds among `reads` (`heldOf`): each landing with its merge staged, and each other. */
-const heldAmong = (reads: readonly Read[]): Pick<Paused, 'staged' | 'held'> => {
+const heldAmong = (reads: readonly Read[]) => {
   const each = reads.map(heldOf);
   return { staged: each.flatMap((h) => h.staged), held: each.flatMap((h) => h.held) };
 };
@@ -324,7 +324,7 @@ export const pausedRead = Effect.fn('pausedRead')(function* () {
 });
 
 /** Whether `run` has a step with a `check:` whose session was filed and whose check was not: one the pause can hold. */
-const checkDue = (run: Run, steps: readonly StepSpec[]): boolean =>
+const checkDue = (run: Run, steps: readonly StepSpec[]) =>
   steps.some((s) => s.check !== undefined && run.steps[s.name]?.taskId && !run.steps[s.name]?.check);
 
 /**

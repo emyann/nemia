@@ -10,7 +10,7 @@ import type { AddressKindOf, BindExposure, Exposure, Parsed } from '../../contra
 export type { Exposure, Parsed };
 
 /** IPv4's four octets of a dotted text, or `undefined` for any text that is not one. */
-const v4Of = (text: string): readonly [number, number, number, number] | undefined => {
+const v4Of = (text: string) => {
   const parts = text.split('.');
   if (parts.length !== 4 || !parts.every((p) => /^\d{1,3}$/.test(p))) return undefined;
   const [a, b, c, d] = parts.map(Number);
@@ -20,7 +20,7 @@ const v4Of = (text: string): readonly [number, number, number, number] | undefin
 };
 
 /** The groups of one side of an IPv6 text's `::`, an embedded IPv4 tail read as two groups, or `undefined` for a malformed side. */
-const groupsOf = (side: string, last: boolean): number[] | undefined => {
+const groupsOf = (side: string, last: boolean) => {
   if (side === '') return [];
   const out: number[] = [];
   const parts = side.split(':');
@@ -36,39 +36,43 @@ const groupsOf = (side: string, last: boolean): number[] | undefined => {
 };
 
 /** IPv6's eight groups of a text (`[…]` and a `%zone` taken off), or `undefined` for any text that is not one. */
-const v6Of = (text: string): readonly [number, number, number, number, number, number, number, number] | undefined => {
+const v6Of = (text: string) => {
   const bare = text.replace(/^\[(.*)\]$/, '$1').replace(/%.*$/, '');
   const halves = bare.split('::');
-  if (halves.length > 2) return undefined;
+  if (halves.length > 2) return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
   const [head = '', tail] = halves;
   const before = groupsOf(head, tail === undefined);
   const after = tail === undefined ? [] : groupsOf(tail, true);
-  if (before === undefined || after === undefined) return undefined;
+  if (before === undefined || after === undefined)
+    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
   const missing = 8 - before.length - after.length;
-  if (tail === undefined ? missing !== 0 : missing < 1) return undefined;
+  if (tail === undefined ? missing !== 0 : missing < 1)
+    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
   const all = [...before, ...Array<number>(Math.max(missing, 0)).fill(0), ...after];
   const [g0, g1, g2, g3, g4, g5, g6, g7] = all;
-  if (g0 === undefined || g1 === undefined || g2 === undefined || g3 === undefined) return undefined;
-  if (g4 === undefined || g5 === undefined || g6 === undefined || g7 === undefined) return undefined;
-  return [g0, g1, g2, g3, g4, g5, g6, g7];
+  if (g0 === undefined || g1 === undefined || g2 === undefined || g3 === undefined)
+    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
+  if (g4 === undefined || g5 === undefined || g6 === undefined || g7 === undefined)
+    return undefined satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
+  return [g0, g1, g2, g3, g4, g5, g6, g7] satisfies readonly [number, number, number, number, number, number, number, number] | undefined;
 };
 
 /**
  * An address's text parsed, or `undefined` for a text that is no IPv4 or IPv6 address (a host's name, `localhost`).
  * @param text The address's text, spaces around it ignored.
  */
-export const addressParsed = (text: string): Parsed | undefined => {
+export const addressParsed = (text: string) => {
   const octets = v4Of(text.trim());
-  if (octets !== undefined) return { v: 4, octets };
+  if (octets !== undefined) return { v: 4, octets } satisfies Parsed | undefined;
   const groups = v6Of(text.trim());
-  return groups === undefined ? undefined : { v: 6, groups };
+  return (groups === undefined ? undefined : { v: 6, groups }) satisfies Parsed | undefined;
 };
 
 /** Whether every number of `xs` is 0. */
-const zeros = (xs: readonly number[]): boolean => xs.every((x) => x === 0);
+const zeros = (xs: readonly number[]) => xs.every((x) => x === 0);
 
 /** The kind of an IPv4 address by its range. */
-const v4Kind = ([x, y, z, w]: readonly [number, number, number, number]): AddressKind => {
+const v4Kind = ([x, y, z, w]: readonly [number, number, number, number]) => {
   if (x === 127) return 'loopback';
   if (zeros([x, y, z, w])) return 'wildcard';
   if (x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168)) return 'private';
@@ -77,7 +81,7 @@ const v4Kind = ([x, y, z, w]: readonly [number, number, number, number]): Addres
 };
 
 /** The kind of an IPv6 address by its range; an IPv4-mapped one reads as public, the safe side. */
-const v6Kind = (g: readonly [number, number, number, number, number, number, number, number]): AddressKind => {
+const v6Kind = (g: readonly [number, number, number, number, number, number, number, number]) => {
   const head = zeros(g.slice(0, 7));
   if (head && g[7] === 1) return 'loopback';
   if (head && g[7] === 0) return 'wildcard';
@@ -104,7 +108,7 @@ export const bindExposure: BindExposure = (kind, acknowledged) =>
  * name may resolve anywhere.
  * @param text The bind's text: an address, or a host's name.
  */
-export const kindOfBind = (text: string): AddressKind => {
+export const kindOfBind = (text: string) => {
   if (text.trim() === 'localhost') return 'loopback';
   const parsed = addressParsed(text);
   return parsed === undefined ? 'public' : addressKind(parsed);
@@ -128,9 +132,7 @@ export type InterfaceAddress = { readonly address: string; readonly family: stri
  * A machine's addresses with their kinds, from its interfaces as `os.networkInterfaces` gives them, loopback first. Pure.
  * @param interfaces The machine's interfaces by name, each with its addresses, or undefined for one with none.
  */
-export const machineAddresses = (
-  interfaces: Readonly<Record<string, readonly InterfaceAddress[] | undefined>>,
-): readonly MachineAddress[] =>
+export const machineAddresses = (interfaces: Readonly<Record<string, readonly InterfaceAddress[] | undefined>>) =>
   Object.entries(interfaces)
     .flatMap(([name, infos]) =>
       (infos ?? []).map((info) => ({

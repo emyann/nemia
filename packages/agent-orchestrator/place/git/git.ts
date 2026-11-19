@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import { Malformed } from './asked.ts';
 import { stopChild, stopGroup, stoppedWords, threwWords, unreadNow } from '../../src/place/place.store.ts';
-import type { PlaceAnswers, PlaceOutcome, PlaceVerb } from '../../src/place/place.ts';
+import type { PlaceAnswers, PlaceVerb } from '../../src/place/place.ts';
 
 /**
  * One command a verb wants run: the program, where, its arguments, what it reads on stdin, and the variables laid over the place's own
@@ -44,7 +44,7 @@ export type Refusal = { readonly refused: string };
 export type Reply<V extends PlaceVerb> = PlaceAnswers[V] | Refusal;
 
 /** A refusal in the place's words. */
-export const refused = (words: string): Refusal => ({ refused: words });
+export const refused = (words: string) => ({ refused: words });
 
 /** The most a command may print. */
 const MAX_PRINTED = 256 * 1024 * 1024;
@@ -63,7 +63,7 @@ export class Failed extends Error {
 }
 
 /** The last lines a failed command wrote on stderr, or its exit status. */
-export function failedWords(err: unknown, lines = 4): string {
+export function failedWords(err: unknown, lines = 4) {
   const { stderr, status } = err as { stderr?: unknown; status?: number | null };
   const said = (typeof stderr === 'string' ? stderr : '')
     .split('\n')
@@ -73,7 +73,7 @@ export function failedWords(err: unknown, lines = 4): string {
 }
 
 /** `command` run, and what it printed as it printed it; it throws `Failed` when it does not exit 0. */
-export function* printed(command: Command): Asking<string> {
+export function* printed(command: Command) {
   const ran = yield command;
   if (ran.error || ran.status !== 0) throw new Failed(command, ran);
   return ran.stdout;
@@ -82,12 +82,12 @@ export function* printed(command: Command): Asking<string> {
 /**
  * Git run in `cwd` with `args`, `input` on its stdin when given, its stdout trimmed; it throws `Failed` with git's words when git fails.
  */
-export function* git(cwd: string, args: readonly string[], input?: string): Asking<string> {
+export function* git(cwd: string, args: readonly string[], input?: string) {
   return (yield* printed({ cmd: 'git', cwd, args, input })).trim();
 }
 
 /** Git's stdout, trimmed, or undefined when git fails: a question whose failure is an answer. */
-export function* gitSays(cwd: string, args: readonly string[]): Asking<string | undefined> {
+export function* gitSays(cwd: string, args: readonly string[]) {
   try {
     return yield* git(cwd, args);
   } catch {
@@ -103,13 +103,13 @@ export function* gitSays(cwd: string, args: readonly string[]): Asking<string | 
  * The run's own line is the leaf `run` under the prefix, and not the prefix's folder alone: git keeps refs as files, so a ref named for
  * the run cannot sit beside the refs under it that a fork cuts. The leaf keeps both shapes under one ref prefix, which `inventory` lists.
  */
-export const runBranch = (run: string, leaf: string): string => `${runBranches(run)}${leaf}`;
+export const runBranch = (run: string, leaf: string) => `${runBranches(run)}${leaf}`;
 
 /** The prefix every branch of `run` opens with, the run's id between two slashes after the product's short name. */
-export const runBranches = (run: string): string => `wf/${run}/`;
+export const runBranches = (run: string) => `wf/${run}/`;
 
 /** Whether `dir` is a directory, so that git is never run where it cannot start. */
-export const isDirectory = (dir: string): boolean => fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ?? false;
+export const isDirectory = (dir: string) => fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ?? false;
 
 /** `.worktreeinclude`, read: what to copy, what is provisioned instead, and what is refused and why. */
 export type WorktreeInclude = {
@@ -128,7 +128,7 @@ export type WorktreeInclude = {
  * makes, since a copy costs minutes per step. Whether git ignores a path is a fact of the checkout, not the text, so `make` asks git at the
  * cut.
  */
-export function worktreeInclude(text: string): WorktreeInclude {
+export function worktreeInclude(text: string) {
   const out: WorktreeInclude = { copy: [], provisioned: [], refused: [] };
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
@@ -143,7 +143,7 @@ export function worktreeInclude(text: string): WorktreeInclude {
 }
 
 /** Why the `.worktreeinclude` line `line`, normalized to `rel`, is refused: on a drive, outside the repository, it, or git's own. */
-function whyRefused(line: string, rel: string): string | null {
+function whyRefused(line: string, rel: string) {
   if (/^[A-Za-z]:[\\/]/.test(line)) return 'is absolute';
   if (rel === '..' || rel.startsWith('../')) return 'is outside the repository';
   if (rel === '.' || rel === '') return 'is the repository itself';
@@ -152,13 +152,13 @@ function whyRefused(line: string, rel: string): string | null {
 }
 
 /** Each refused line as a person reads it: `"../x" is outside the repository`. */
-export const refusalLines = (lines: WorktreeInclude['refused']): string[] => lines.map((r) => `"${r.line}" ${r.why}`);
+export const refusalLines = (lines: WorktreeInclude['refused']) => lines.map((r) => `"${r.line}" ${r.why}`);
 
 /**
  * `.worktreeinclude` at the root of `repo`, parsed; null when the repository has none, a link that leads nowhere included; and, when it
  * is there and no file, the words that say so. A link to a file is read as the file. Throws when the file cannot be read.
  */
-export function readInclude(repo: string): WorktreeInclude | null | string {
+export function readInclude(repo: string) {
   const file = path.join(repo, '.worktreeinclude');
   const st = fs.statSync(file, { throwIfNoEntry: false });
   if (!st) return null;
@@ -178,13 +178,13 @@ export type Asked = {
 };
 
 /** The environment `command` runs in: the place's own, its own variables laid over it. */
-const envOf = (command: Command, asked: Asked): NodeJS.ProcessEnv => (command.env ? { ...asked.env, ...command.env } : asked.env);
+const envOf = (command: Command, asked: Asked) => (command.env ? { ...asked.env, ...command.env } : asked.env);
 
 /** A body moved one step: what it yields or returns next, or what it threw. */
 type Moved<V extends PlaceVerb> = { readonly step: IteratorResult<Command, Reply<V>> } | { readonly threw: unknown };
 
 /** `body` resumed with how its last command ended, or started with none. */
-function moved<V extends PlaceVerb>(body: Asking<Reply<V>>, ran?: Ran): Moved<V> {
+function moved<V extends PlaceVerb>(body: Asking<Reply<V>>, ran?: Ran) {
   try {
     return { step: ran === undefined ? body.next() : body.next(ran) };
   } catch (threw) {
@@ -193,18 +193,13 @@ function moved<V extends PlaceVerb>(body: Asking<Reply<V>>, ran?: Ran): Moved<V>
 }
 
 /** What an unread verb says of what its body threw: a request it could not read in that refusal's own words, anything else by name. */
-const thrownWords = (verb: PlaceVerb, threw: unknown): string => (threw instanceof Malformed ? threw.message : threwWords(verb, threw));
+const thrownWords = (verb: PlaceVerb, threw: unknown) => (threw instanceof Malformed ? threw.message : threwWords(verb, threw));
 
 /** What a body returned, as the verb's outcome. */
-const outcomeOf = <V extends PlaceVerb>(reply: Reply<V>): PlaceOutcome<V> =>
-  'refused' in reply ? { refused: reply.refused } : { answer: reply };
+const outcomeOf = <V extends PlaceVerb>(reply: Reply<V>) => ('refused' in reply ? { refused: reply.refused } : { answer: reply });
 
 /** How a command run with `spawnSync` ended, and whether it was stopped at the deadline, and had to be killed. */
-function ranNow(
-  command: Command,
-  leftMs: number,
-  asked: Asked,
-): { readonly ran: Ran; readonly timedOut: boolean; readonly killed: boolean } {
+function ranNow(command: Command, leftMs: number, asked: Asked) {
   asked.started();
   const options: SpawnSyncOptionsWithStringEncoding & { readonly detached: boolean } = {
     cwd: command.cwd,
@@ -229,7 +224,7 @@ function ranNow(
  * stopped; when the body cannot read its request, in that refusal's words; and when it throws, in one sentence naming the verb. Never
  * throws.
  */
-export function answeredNow<V extends PlaceVerb>(verb: V, body: Asking<Reply<V>>, asked: Asked): PlaceOutcome<V> {
+export function answeredNow<V extends PlaceVerb>(verb: V, body: Asking<Reply<V>>, asked: Asked) {
   const until = performance.now() + asked.deadlineMs;
   let at = moved<V>(body);
   for (;;) {
@@ -245,7 +240,7 @@ export function answeredNow<V extends PlaceVerb>(verb: V, body: Asking<Reply<V>>
 type Heard = { stderr: Buffer[]; killed: boolean };
 
 /** `command` started in a group of its own, handed its input, what it prints kept. */
-function startedChild(command: Command, asked: Asked, out: Buffer[], heard: Heard): ChildProcessWithoutNullStreams {
+function startedChild(command: Command, asked: Asked, out: Buffer[], heard: Heard) {
   asked.started();
   const child = spawn(command.cmd, command.args, { cwd: command.cwd, env: envOf(command, asked), detached: true, stdio: 'pipe' });
   heard.stderr = [];
@@ -257,7 +252,7 @@ function startedChild(command: Command, asked: Asked, out: Buffer[], heard: Hear
 }
 
 /** Waits for `child` to end, on its `close` or its `error`. */
-const ended = (child: ChildProcessWithoutNullStreams): Effect.Effect<Pick<Ran, 'status' | 'signal' | 'error'>> =>
+const ended = (child: ChildProcessWithoutNullStreams) =>
   Effect.callback((resume) => {
     const closed = (status: number | null, signal: NodeJS.Signals | null) => resume(Effect.succeed({ status, signal }));
     const failed = (error: Error) => resume(Effect.succeed({ status: null, signal: null, error }));
@@ -267,10 +262,10 @@ const ended = (child: ChildProcessWithoutNullStreams): Effect.Effect<Pick<Ran, '
       child.off('close', closed);
       child.off('error', failed);
     });
-  });
+  }) satisfies Effect.Effect<Pick<Ran, 'status' | 'signal' | 'error'>>;
 
 /** `command` run off the event loop: taken in a scope, and stopped with what it started when the scope closes before it ended. */
-const ranLater = (command: Command, asked: Asked, heard: Heard): Effect.Effect<Ran> =>
+const ranLater = (command: Command, asked: Asked, heard: Heard) =>
   Effect.suspend(() => {
     const out: Buffer[] = [];
     return Effect.acquireRelease(
@@ -289,7 +284,7 @@ const ranLater = (command: Command, asked: Asked, heard: Heard): Effect.Effect<R
  * says it: a command running at the deadline, or when the ask is interrupted, is stopped with what it started before the ask ends. Never
  * fails.
  */
-export const answered = <V extends PlaceVerb>(verb: V, make: () => Asking<Reply<V>>, asked: Asked): Effect.Effect<PlaceOutcome<V>> =>
+export const answered = <V extends PlaceVerb>(verb: V, make: () => Asking<Reply<V>>, asked: Asked) =>
   Effect.suspend(() => {
     const heard: Heard = { stderr: [], killed: false };
     const body = make();

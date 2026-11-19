@@ -20,7 +20,7 @@ import {
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeOf, routeWritten, routingOf } from '../route/index.ts';
-import { checkFailurePolicyOf, checkFailurePolicyWritten, type CheckFailurePolicy } from '../check/index.ts';
+import { checkFailurePolicyOf, checkFailurePolicyWritten } from '../check/index.ts';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
@@ -73,7 +73,7 @@ import { mergedOutput } from '../keys/index.ts';
 import { addedSkillsRefusal, agentDeniesOf, deniesWith, fenceRefusal, offerRefusal, ownDenies, refuseUnwritable } from './fence.ts';
 
 /** A factory's `rules` as a step on `harness` is told them, trimmed: none for blank rules, and none on a remote agent. */
-const rulesTold = (rules: string | undefined, harness: string | undefined): string | undefined =>
+const rulesTold = (rules: string | undefined, harness: string | undefined) =>
   isRemoteHarness(harness?.trim()) ? undefined : rules?.trim() || undefined;
 
 /**
@@ -128,7 +128,7 @@ export function parseWorkflow(
   skills?: SkillsFound,
   hired?: Hire,
   rules?: string,
-): StepSpec {
+) {
   const { block, body: own } = splitFrontmatter(name, text);
   let {
     meta: { agent: written, ...meta },
@@ -150,7 +150,7 @@ export function parseWorkflow(
       );
     if (meta.mcp !== undefined) refuse(agentlessServers(name, meta.mcp));
     refuseUnwritable(step, undefined);
-    return step;
+    return step satisfies StepSpec as StepSpec;
   }
   const agent = agentOf(name, attached, agents, hired);
   refuseFenceBlock(name, fenced, meta.harness, agent.keys.harness);
@@ -197,7 +197,7 @@ export function parseWorkflow(
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
       mcp: sessionServers(agent, step),
     },
-  };
+  } satisfies StepSpec as StepSpec;
 }
 
 /**
@@ -205,7 +205,7 @@ export function parseWorkflow(
  * `disallowedTools:` line and its agent denies anything, its own rules then each of the agent's they do not cover (`deniesWith`), and
  * the agent's apart, which the step's provenance keeps (`StepAgent.agentDenies`). Any other step as it was read, with none apart.
  */
-function withAgentDenies(step: StepSpec, own: Partial<Record<StepKey, string>>, agent: Agent): { step: StepSpec; agentDenies?: string[] } {
+function withAgentDenies(step: StepSpec, own: Partial<Record<StepKey, string>>, agent: Agent) {
   const agentDenies = own.disallowedTools === undefined ? [] : agentDeniesOf(agent);
   if (!agentDenies.length) return { step };
   return { step: { ...step, disallowedTools: deniesWith(step.disallowedTools ?? [], agentDenies) }, agentDenies };
@@ -215,7 +215,7 @@ function withAgentDenies(step: StepSpec, own: Partial<Record<StepKey, string>>, 
  * Refuses step `name` whose session would hold two skills of one bare name (`sameBareIn`) among `skills`, its agent `agent`'s then those
  * its own line adds: the refusal names the step, both skills and whose line each is on.
  */
-function oneBareName(name: string, agent: Agent, skills: readonly string[]): void {
+function oneBareName(name: string, agent: Agent, skills: readonly string[]) {
   const same = sameBareIn(skills);
   if (!same) return;
   const [first, second] = same.map(
@@ -228,11 +228,11 @@ function oneBareName(name: string, agent: Agent, skills: readonly string[]): voi
 }
 
 /** The refusal of an `mcp:` line, written as `line`, on step `name`, which has no agent whose servers it would add to. */
-const agentlessServers = (name: string, line: string): string =>
+const agentlessServers = (name: string, line: string) =>
   `${name}: \`mcp: ${line}\` adds MCP servers to the step's agent's, and this step has none. Name one — \`agent: <name>\` — whose servers these add to, or delete the line.`;
 
 /** The MCP servers a session of `step` loads: those its agent `agent` names, then those the step's own `mcp:` line adds, each once. */
-const sessionServers = (agent: Agent, step: StepSpec): string[] => [...new Set([...(agent.mcp ?? []), ...(step.mcp ?? [])])];
+const sessionServers = (agent: Agent, step: StepSpec) => [...new Set([...(agent.mcp ?? []), ...(step.mcp ?? [])])];
 
 /**
  * Refuses step `name`, resolved as `step` from its own lines `own` and its agent `agent`: a fence key that would widen the agent's
@@ -248,7 +248,7 @@ function agentStepRefusal(
   own: Partial<Record<StepKey, string>>,
   step: StepSpec,
   skills: SkillsFound | undefined,
-): void {
+) {
   const unoffered = offerRefusal(name, agent, own);
   if (unoffered !== undefined) refuse(unoffered);
   const loosened = fenceRefusal(name, agent, own, step);
@@ -276,7 +276,7 @@ function agentStepRefusal(
  * @param skill The skill's name.
  * @param skills The skills found in each place.
  */
-export function skillAt(step: string, agent: string, skill: string, skills: SkillsFound): string {
+export function skillAt(step: string, agent: string, skill: string, skills: SkillsFound) {
   return foundSkill(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\``, "the agent's", skill, skills);
 }
 
@@ -284,7 +284,7 @@ export function skillAt(step: string, agent: string, skill: string, skills: Skil
  * The folder of the skill `skill`, or why not, after `named`, which says who gives it: none of the places has it — and the fix takes it off
  * `whose` `skills:` line — or two of one repository do.
  */
-function foundSkill(named: string, whose: string, skill: string, skills: SkillsFound): string {
+function foundSkill(named: string, whose: string, skill: string, skills: SkillsFound) {
   const found = skills.at.get(skill);
   if (found instanceof WorkflowError) refuse(`${named}, which cannot be used — ${found.message}`);
   if (found !== undefined) return found;
@@ -294,10 +294,10 @@ function foundSkill(named: string, whose: string, skill: string, skills: SkillsF
 }
 
 /** The fence a step's lines write, under either name: Claude Code's permission mode or Codex's sandbox. */
-const fenceOf = (keys: Partial<Record<string, string>>): string | undefined => keys.sandbox ?? keys.permissionMode;
+const fenceOf = (keys: Partial<Record<string, string>>) => keys.sandbox ?? keys.permissionMode;
 
 /** An agent's keys with neither fence, for a step that writes its own. */
-function withoutFence<T extends Partial<Record<string, string>>>(keys: T): T {
+function withoutFence<T extends Partial<Record<string, string>>>(keys: T) {
   const { permissionMode: _mode, sandbox: _sandbox, ...rest } = keys;
   return rest as T;
 }
@@ -309,7 +309,7 @@ function withoutFence<T extends Partial<Record<string, string>>>(keys: T): T {
 export type Hire = { agent: string; factory: string; step: string };
 
 /** The agent a step is resolved with: its file's `agent:`, else the one a factory hires into it. Refused: both, naming each. */
-function attachedAgent(step: string, written: string | undefined, hired: Hire | undefined): string | undefined {
+function attachedAgent(step: string, written: string | undefined, hired: Hire | undefined) {
   if (written !== undefined && hired !== undefined)
     refuse(
       `${step}: \`agent: ${written}\` fills this step in every factory, and the factory ${hired.factory} hires ${hired.agent} into it too. Take the hire back — nemia factory fire ${hired.factory} --step ${hired.step} — or delete the step's \`agent:\` line. Nothing was started.`,
@@ -321,7 +321,7 @@ function attachedAgent(step: string, written: string | undefined, hired: Hire | 
  * The agent `agent:` names — or, for a step whose file names none, the one its factory hires (`hired`) — or why not: one there is not,
  * listing those there are, or one whose file is refused, in its words.
  */
-function agentOf(step: string, name: string, agents: Agents | undefined, hired?: Hire): Agent {
+function agentOf(step: string, name: string, agents: Agents | undefined, hired?: Hire) {
   const found = agents?.get(name);
   const named = hired ? `the factory ${hired.factory} hires \`${name}\` into it, and its` : `\`agent: ${name}\` names an agent whose`;
   if (found instanceof WorkflowError) refuse(`${step}: ${named} file is refused — ${found.message}`);
@@ -329,7 +329,7 @@ function agentOf(step: string, name: string, agents: Agents | undefined, hired?:
 }
 
 /** Why `name` is not an agent of `step`, among the agents `there` are: named by its `agent:` line, or by the factory that `hired` it. */
-function notAnAgent(step: string, name: string, there: readonly string[], hired: Hire | undefined): string {
+function notAnAgent(step: string, name: string, there: readonly string[], hired: Hire | undefined) {
   const missing = hired ? `the factory ${hired.factory} hires \`${name}\` into it, which` : `\`agent: ${name}\``;
   const instead = hired ? `hire one — nemia factory hire ${hired.factory} <agent> --step ${hired.step}` : undefined;
   return (
@@ -359,7 +359,7 @@ export function stepFrom(
   read: ((file: string) => string | undefined) | undefined,
   spelled: Spelled = {},
   merged?: StepOutput,
-): StepSpec {
+) {
   const after = (meta.after ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -415,14 +415,14 @@ export function stepFrom(
     loop: loopOf(name, meta.loop, output),
     rounds: roundsOf(name, meta.loop, meta.rounds),
     ...routingOf(name, meta),
-  };
+  } satisfies StepSpec;
 }
 
 /**
  * Refused: a Claude Code step that runs in `auto` — named, or the mode it is filed with when it names none — on a model that drops it
  * (`autoDropped`). The refusal names the modes that keep what the step is for.
  */
-function autoRefusal(step: string, harness: string | undefined, model: string | undefined, permissionMode: string | undefined): void {
+function autoRefusal(step: string, harness: string | undefined, model: string | undefined, permissionMode: string | undefined) {
   const dropped = autoDropped(harness, model, permissionMode);
   if (!dropped) return;
   refuse(
@@ -441,11 +441,7 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
  * @param model The model the session runs on; undefined for the harness's default.
  * @param permissionMode The mode the step names; undefined for none.
  */
-export function autoDropped(
-  harness: string | undefined,
-  model: string | undefined,
-  permissionMode: string | undefined,
-): string | undefined {
+export function autoDropped(harness: string | undefined, model: string | undefined, permissionMode: string | undefined) {
   const reach = fenceReach(harness ?? DEFAULT_HARNESS, model);
   const mode = permissionMode ?? reach?.given;
   if (!reach || mode === undefined || !reach.dropped.includes(mode)) return undefined;
@@ -511,7 +507,7 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * would be read as the frontmatter, and after an empty one, as its block.
  * @param step The step to write.
  */
-export function renderStep(step: StepDraft): string {
+export function renderStep(step: StepDraft) {
   const unknown = Object.keys(step).find(
     (key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null,
   );
@@ -521,18 +517,21 @@ export function renderStep(step: StepDraft): string {
   if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
   if ((step.workspace as string | undefined) === 'main') refuse(baseWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
-  const pairs = STEP_KEYS.flatMap((key): FrontmatterPair[] => {
+  const pairs = STEP_KEYS.flatMap((key) => {
     if (key === 'route') {
       const route = routeDrafted(step.name, step.route);
-      return route === undefined ? [] : [['route', routeWritten(route)]];
+      return (route === undefined ? [] : [['route', routeWritten(route)]]) satisfies FrontmatterPair[] as FrontmatterPair[];
     }
     if (key === 'checkFailurePolicy') {
       const policy = policyDrafted(step.name, step.checkFailurePolicy);
-      return policy === undefined ? [] : [['checkFailurePolicy', checkFailurePolicyWritten(policy)]];
+      return (policy === undefined
+        ? []
+        : [['checkFailurePolicy', checkFailurePolicyWritten(policy)]]) satisfies FrontmatterPair[] as FrontmatterPair[];
     }
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));
-    if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
-    return value === undefined ? [] : [[key, value]];
+    if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key])
+      return [] satisfies FrontmatterPair[] as FrontmatterPair[];
+    return (value === undefined ? [] : [[key, value]]) satisfies FrontmatterPair[] as FrontmatterPair[];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();
   if (pairs.length)
@@ -541,14 +540,14 @@ export function renderStep(step: StepDraft): string {
 }
 
 /** The value of `key` the step's own file holds: its own denies alone for `disallowedTools`, its agent's left to it (`ownDenies`). */
-const ownValue = (step: StepDraft, key: StepKey): unknown =>
+const ownValue = (step: StepDraft, key: StepKey) =>
   key === 'disallowedTools' && step.disallowedTools != null ? ownDenies(step) : step[key];
 
 /**
  * One key's value as its line writes it, or `undefined` for a key the step does not set. `output:` is written as the file it names, the
  * schema being the folder's; one naming no file is written with no value, which the parser refuses.
  */
-function writtenValue(step: string, key: StepKey, value: unknown): string | undefined {
+function writtenValue(step: string, key: StepKey, value: unknown) {
   if (value === undefined || value === null) return undefined;
   let text: string;
   if (Array.isArray(value)) {
@@ -583,7 +582,7 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
  * `loop:` as written, refused unless the step can say whether to go round again: one step, and `again` declared
  * boolean in its `output:`. That the step it names comes before this one is the workflow's to say (`validate`).
  */
-function loopOf(step: string, loop: string | undefined, output: StepOutput | undefined): string | undefined {
+function loopOf(step: string, loop: string | undefined, output: StepOutput | undefined) {
   if (loop === undefined) return undefined;
   if (loop.includes(',')) {
     refuse(
@@ -605,7 +604,7 @@ function loopOf(step: string, loop: string | undefined, output: StepOutput | und
 }
 
 /** `rounds:`, which counts the rounds of a loop: refused on a step with no `loop:`, and `DEFAULT_ROUNDS` on one that does not say. */
-function roundsOf(step: string, loop: string | undefined, rounds: string | undefined): number | undefined {
+function roundsOf(step: string, loop: string | undefined, rounds: string | undefined) {
   if (rounds !== undefined && loop === undefined) {
     refuse(
       `${step}: \`rounds: ${rounds}\` counts the rounds of a loop, and this step has no \`loop:\`. Add \`loop: <step>\`, naming the earlier step to run again, or delete the line. To try one step again after its check refuses it, that is \`retries:\`.`,
@@ -617,13 +616,13 @@ function roundsOf(step: string, loop: string | undefined, rounds: string | undef
 /**
  * The refusal of a key no step has, by name: with a reason of its own where it has one (`REFUSED`), and otherwise with the keys a step has.
  */
-const unknownKey = (step: string, key: string): string =>
+const unknownKey = (step: string, key: string) =>
   Object.hasOwn(REFUSED, key)
     ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`
     : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`;
 
 /** A step's `checkFailurePolicy:`, read only beside a `check:`: with none, no exit code is there for it to read. */
-function checkPolicyOf(step: string, text: string | undefined, check: string | undefined): CheckFailurePolicy | undefined {
+function checkPolicyOf(step: string, text: string | undefined, check: string | undefined) {
   if (text !== undefined && check === undefined)
     refuse(
       `${step}: \`checkFailurePolicy:\` reads the exit code of the step's \`check:\`, and this step has none. Add \`check: <command>\`, or delete the line.`,
@@ -635,17 +634,18 @@ function checkPolicyOf(step: string, text: string | undefined, check: string | u
  * A draft's `route:`, read as a file's line would be: the parsed eval, the map a step's frontmatter reads as, or its line as a Workflow's
  * spec carries it — `judge`, the JSON text `readKeys` keeps of its map, or the map in YAML flow. Undefined for none.
  */
-function routeDrafted(step: string, drafted: unknown): RouteEval | undefined {
-  if (drafted == null) return undefined;
-  if (typeof drafted === 'object' && 'kind' in drafted) return drafted as RouteEval;
-  if (typeof drafted !== 'string') return routeOf(step, JSON.stringify(drafted));
+function routeDrafted(step: string, drafted: unknown) {
+  if (drafted == null) return undefined satisfies RouteEval | undefined as RouteEval | undefined;
+  if (typeof drafted === 'object' && 'kind' in drafted)
+    return drafted as RouteEval satisfies RouteEval | undefined as RouteEval | undefined;
+  if (typeof drafted !== 'string') return routeOf(step, JSON.stringify(drafted)) satisfies RouteEval | undefined as RouteEval | undefined;
   let read: unknown;
   try {
     read = readFrontmatter(step, `route: ${drafted}`).entries[0]?.value;
   } catch {
     read = drafted;
   }
-  return routeOf(step, typeof read === 'string' ? read : JSON.stringify(read));
+  return routeOf(step, typeof read === 'string' ? read : JSON.stringify(read)) satisfies RouteEval | undefined as RouteEval | undefined;
 }
 
 /**
@@ -653,7 +653,7 @@ function routeDrafted(step: string, drafted: unknown): RouteEval | undefined {
  * (a Workflow proposal's keys, each exit code a number), or its line as the api's builder sends it (YAML flow, `checkFailurePolicyLine`).
  * Undefined for none.
  */
-function policyDrafted(step: string, drafted: unknown): CheckFailurePolicy | undefined {
+function policyDrafted(step: string, drafted: unknown) {
   if (drafted == null) return undefined;
   if (typeof drafted !== 'string') return checkFailurePolicyOf(step, JSON.stringify(drafted));
   let read: unknown;

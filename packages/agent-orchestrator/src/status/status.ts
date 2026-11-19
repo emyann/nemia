@@ -26,7 +26,6 @@ import {
   SETTLED,
   TRIED_FROM,
   tryOf,
-  type Acceptance,
   type Approval,
   type CloseoutAsked,
   type Run,
@@ -42,7 +41,7 @@ import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contr
  * @param step The step, its name and its `gate:`.
  * @param run The run, the gates it was started with among it.
  */
-export const hasGate = (step: Pick<StepSpec, 'name' | 'gate'>, run: Pick<Run, 'gates'>): boolean =>
+export const hasGate = (step: Pick<StepSpec, 'name' | 'gate'>, run: Pick<Run, 'gates'>) =>
   step.gate === true || Boolean(run.gates?.includes(step.name));
 
 /**
@@ -50,8 +49,7 @@ export const hasGate = (step: Pick<StepSpec, 'name' | 'gate'>, run: Pick<Run, 'g
  * @param steps The run's steps, in the order they run.
  * @param run The run, the gates it was started with among it.
  */
-export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): string[] =>
-  steps.filter((s) => hasGate(s, run)).map((s) => s.name);
+export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>) => steps.filter((s) => hasGate(s, run)).map((s) => s.name);
 
 /**
  * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it; an
@@ -59,8 +57,7 @@ export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): st
  * @param run The run's record.
  * @param step The step's name.
  */
-export const approvalOf = (run: Run, step: string): Approval | undefined =>
-  run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
+export const approvalOf = (run: Run, step: string) => run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
 
 /**
  * Whether each step an approval's `work` names is still on the try it was on when the approval was given (as `tryOf` counts it); an
@@ -70,7 +67,7 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
  * @param run The run's step records.
  * @param a The approval, whose `work` names each step and its try.
  */
-export const workStands = (run: Pick<Run, 'steps'>, a: Approval): boolean => {
+export const workStands = (run: Pick<Run, 'steps'>, a: Approval) => {
   const records = Object.entries(run.steps);
   return Object.entries(a.work ?? {}).every(([step, n]) => {
     const record = records.find(([name]) => name === step)?.[1];
@@ -84,7 +81,7 @@ export const workStands = (run: Pick<Run, 'steps'>, a: Approval): boolean => {
  * @param step The step.
  * @param run The run's record.
  */
-export const approvedWork = (step: StepSpec, run: Run): Record<string, number> | undefined =>
+export const approvedWork = (step: StepSpec, run: Run) =>
   approvedFirst(step, run) ? Object.fromEntries(step.after.map((a) => [a, tryOf(run, a)])) : undefined;
 
 /**
@@ -93,7 +90,7 @@ export const approvedWork = (step: StepSpec, run: Run): Record<string, number> |
  * @param step The step.
  * @param run The run's record.
  */
-export const unfiledApproval = (step: StepSpec, run: Run): Approval | undefined =>
+export const unfiledApproval = (step: StepSpec, run: Run) =>
   !run.cancelledAt && approvedFirst(step, run) && !run.steps[step.name]?.taskId ? approvalOf(run, step.name) : undefined;
 
 /**
@@ -104,7 +101,7 @@ export const unfiledApproval = (step: StepSpec, run: Run): Approval | undefined 
  * @param step The step.
  * @param run The run's record.
  */
-export const approvedUnfiled = (step: StepSpec, run: Run): boolean => unfiledApproval(step, run)?.work !== undefined;
+export const approvedUnfiled = (step: StepSpec, run: Run) => unfiledApproval(step, run)?.work !== undefined;
 
 /**
  * What an ending approved and not filed whose approval names no work (`unfiledApproval`, not `approvedUnfiled`) says of a send-back of its
@@ -113,7 +110,7 @@ export const approvedUnfiled = (step: StepSpec, run: Run): boolean => unfiledApp
  * @param step The step.
  * @param run The run's record.
  */
-export const takeBackWords = (step: StepSpec, run: Run): string => {
+export const takeBackWords = (step: StepSpec, run: Run) => {
   const given = unfiledApproval(step, run);
   return given && given.work === undefined ? takeBackOf(step, run, given) : '';
 };
@@ -124,7 +121,7 @@ export const takeBackWords = (step: StepSpec, run: Run): string => {
  * @param run The run's record.
  * @param given The step's approval, which names no work.
  */
-export const takeBackOf = (step: StepSpec, run: Run, given: Approval): string => {
+export const takeBackOf = (step: StepSpec, run: Run, given: Approval) => {
   const back = sendBackTo(step, run)
     .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
     .join(' or ');
@@ -141,7 +138,7 @@ export const takeBackOf = (step: StepSpec, run: Run, given: Approval): string =>
  * @param step The step.
  * @param run The run's record.
  */
-export const unfiledBack = (step: StepSpec, run: Run): string[] =>
+export const unfiledBack = (step: StepSpec, run: Run) =>
   run.hold || run.pruned || !approvedUnfiled(step, run) ? [] : sendBackTo(step, run);
 
 /**
@@ -150,15 +147,14 @@ export const unfiledBack = (step: StepSpec, run: Run): string[] =>
  * person's word to it is a try of its own. Never a check.
  * @param step The step, its harness among it, `DEFAULT_HARNESS` where it names none.
  */
-export const holdsOpenOn = (step: Pick<StepSpec, 'harness'>): boolean => declarationOf(step.harness)?.can.includes('keepsOpen') === true;
+export const holdsOpenOn = (step: Pick<StepSpec, 'harness'>) => declarationOf(step.harness)?.can.includes('keepsOpen') === true;
 
 /**
  * The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask.
  * Pure.
  * @param run The run's record.
  */
-export const spentApprovals = (run: Run): Approval[] =>
-  (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step) || !workStands(run, a));
+export const spentApprovals = (run: Run) => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step) || !workStands(run, a));
 
 /**
  * What a person accepted of a loop on the try its looping step is on (`nemia approve`). One for an earlier try was spent by the try after
@@ -166,15 +162,14 @@ export const spentApprovals = (run: Run): Approval[] =>
  * @param run The run's record.
  * @param step The looping step's name.
  */
-export const acceptanceOf = (run: Run, step: string): Acceptance | undefined =>
-  run.acceptances?.find((a) => a.step === step && a.try === tryOf(run, step));
+export const acceptanceOf = (run: Run, step: string) => run.acceptances?.find((a) => a.step === step && a.try === tryOf(run, step));
 
 /**
  * The acceptances a later try of their looping step has spent: each names a try the step is past. The tick consumes these, as it does a
  * spent ask. Pure.
  * @param run The run's record.
  */
-export const spentAcceptances = (run: Run): Acceptance[] => (run.acceptances ?? []).filter((a) => a.try < tryOf(run, a.step));
+export const spentAcceptances = (run: Run) => (run.acceptances ?? []).filter((a) => a.try < tryOf(run, a.step));
 
 /**
  * Whether a looping step's closeout asks for another round of its loop — `again: true` — with nobody having accepted the work as it stands.
@@ -187,7 +182,7 @@ export const spentAcceptances = (run: Run): Acceptance[] => (run.acceptances ?? 
  * @param run The run's record.
  * @param closeoutOf The closeout a step signed off, by the step's name, or undefined where it gave none.
  */
-export const askedAgain = (step: Pick<StepSpec, 'name' | 'loop'>, run: Run, closeoutOf: (step: string) => Closeout | undefined): boolean =>
+export const askedAgain = (step: Pick<StepSpec, 'name' | 'loop'>, run: Run, closeoutOf: (step: string) => Closeout | undefined) =>
   Boolean(step.loop) && closeoutOf(step.name)?.output?.again === true && !acceptanceOf(run, step.name);
 
 /**
@@ -196,7 +191,7 @@ export const askedAgain = (step: Pick<StepSpec, 'name' | 'loop'>, run: Run, clos
  * @param run The run's record.
  * @param step The step's name.
  */
-export const gateWords = (run: Run, step: string): string => {
+export const gateWords = (run: Run, step: string) => {
   const given = approvalOf(run, step);
   return given ? `is approved (try ${given.try}, at ${given.at}), and nothing after it is filed yet` : 'is awaiting approval';
 };
@@ -207,7 +202,7 @@ export const gateWords = (run: Run, step: string): string => {
  * holds it: the round is its loop's, and the gate is on what comes after. A later try of an ending approved before it is filed
  * (`approvedFirst`) is that act again, with nothing to hand on, so no gate holds it, though its approval names a try it is past. Pure.
  */
-function atGate(step: StepSpec, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined): boolean {
+function atGate(step: StepSpec, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined) {
   if (!satisfiesAfter(own) || !hasGate(step, run)) return false;
   if (approvedFirst(step, run) && run.steps[step.name]?.tries?.length) return false;
   if (askedAgain(step, run, closeoutOf)) return false;
@@ -230,7 +225,7 @@ export { endsOnBase };
  * @param step The step, its name, `gate:` and `workspace:`.
  * @param run The run, the gates it was started with among it.
  */
-export const approvedFirst = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace'>, run: Pick<Run, 'gates'>): boolean =>
+export const approvedFirst = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace'>, run: Pick<Run, 'gates'>) =>
   endsOnBase(step) && hasGate(step, run);
 
 /**
@@ -239,8 +234,11 @@ export const approvedFirst = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace'
  * @param steps The run's steps, in the order they run.
  * @param run The run, the gates it was started with among it.
  */
-export const gatesAt = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): Array<{ step: string; at: GateAt }> =>
-  steps.filter((s) => hasGate(s, run)).map((s) => ({ step: s.name, at: approvedFirst(s, run) ? 'before' : 'after' }));
+export const gatesAt = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>) =>
+  steps.filter((s) => hasGate(s, run)).map((s) => ({ step: s.name, at: approvedFirst(s, run) ? 'before' : 'after' })) satisfies Array<{
+    step: string;
+    at: GateAt;
+  }>;
 
 /**
  * Whether the run waits at that step's gate now, with nothing of the step filed: it is approved first (`approvedFirst`), it has not been
@@ -266,7 +264,7 @@ export function waitsAtGate(
   steps: readonly StepSpec[],
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
-): boolean {
+) {
   if (run.cancelledAt || !approvedFirst(step, run) || run.steps[step.name]?.taskId || approvalOf(run, step.name)) return false;
   return notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).length === 0;
 }
@@ -301,6 +299,7 @@ export function notHandedOn(
   steps: readonly StepSpec[],
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 ): string[] {
   return step.after.filter((name) => {
     const dep = steps.find((s) => s.name === name);
@@ -329,7 +328,7 @@ export function notHandedOn(
  * @param retry The tries due on this pass.
  * @param round The rounds due on this pass.
  */
-export function unheld(steps: readonly StepSpec[], run: Run, retry: readonly Retry[], round: readonly Round[]): Set<string> {
+export function unheld(steps: readonly StepSpec[], run: Run, retry: readonly Retry[], round: readonly Round[]) {
   const filing = new Set([...retry.map((r) => r.step), ...roundSpans(steps, round)]);
   const held = steps.filter((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId && s.after.some((a) => filing.has(a)));
   return new Set([...held.map((s) => s.name), ...[...retry, ...round].flatMap((r) => r.back ?? [])]);
@@ -359,7 +358,7 @@ export function endingStopped(
   askedCloseout: (taskId: string) => CloseoutAsked,
   steps: readonly StepSpec[],
   spendOf: SpendOf,
-): boolean {
+) {
   const taskId = run.steps[step.name]?.taskId;
   if (!endsOnBase(step) || !taskId || !SETTLED.has(phaseOf(taskId))) return false;
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
@@ -372,10 +371,10 @@ export function endingStopped(
  * past, and is spent (`spentApprovals`). Pure.
  * @param record The ending's step record.
  */
-export function sentBack(record: StepRecord): StepRecord {
+export function sentBack(record: StepRecord) {
   const { check, tries = [], taskId, handedOff: _, landed: __, filesRead: ___, ...rest } = record;
   const moved: NonNullable<StepRecord['tries']> = taskId === null ? [] : [{ taskId, ...(check ? { check } : {}), cause: 'back' }];
-  return { ...rest, taskId: null, tries: [...tries, ...moved] };
+  return { ...rest, taskId: null, tries: [...tries, ...moved] } satisfies StepRecord as StepRecord;
 }
 
 /**
@@ -384,7 +383,7 @@ export function sentBack(record: StepRecord): StepRecord {
  * @param step The step.
  * @param run The run's record.
  */
-export const sendBackTo = (step: StepSpec, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
+export const sendBackTo = (step: StepSpec, run: Run) => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
 
 /**
  * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
@@ -401,7 +400,7 @@ export const sendBackTo = (step: StepSpec, run: Run): string[] => (run.steps[ste
  * @param step The step, its `workspace:` and its `check:`.
  * @param _run The run the step belongs to, which it no longer reads.
  */
-export const landsOnCheck = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>): boolean =>
+export const landsOnCheck = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>) =>
   endsOnBase(step) && step.check !== undefined;
 
 /**
@@ -411,7 +410,7 @@ export const landsOnCheck = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace' 
  * @param name The step's name.
  * @param checkout The other run's step in the checkout, or undefined where none is.
  */
-export const waitsOnCheckout = (steps: readonly StepSpec[], name: string, checkout: CheckoutHold | undefined): boolean =>
+export const waitsOnCheckout = (steps: readonly StepSpec[], name: string, checkout: CheckoutHold | undefined) =>
   Boolean(checkout) && steps.some((s) => s.name === name && endsOnBase(s));
 
 /**
@@ -431,7 +430,7 @@ export type BranchStanding =
  * @param run The run, its base branch among it.
  * @param s The branch's standing.
  */
-export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string =>
+export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding) =>
   s.where === 'on'
     ? `${s.branch} is on ${run.branch}`
     : s.where === 'ahead'
@@ -448,8 +447,7 @@ export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string 
  * branch whose standing is `unread`: a result not read is never called taken.
  * @param standings Each result branch's standing, as read; none where git was not asked.
  */
-export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
-  standings.length > 0 && standings.every((b) => b.where === 'on');
+export const resultOnBase = (standings: readonly BranchStanding[]) => standings.length > 0 && standings.every((b) => b.where === 'on');
 
 /**
  * Where one step stands — see `StepStatus`. Pure, and the one place the words are decided.
@@ -523,7 +521,7 @@ export const stepStatus = (
   steps: readonly StepSpec[] = [],
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): StepStatus => standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
+) => standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
 
 /**
  * Where a step stands (`stepStatus`), and where it would stand but for being over its budget or waiting at its gate (`own`): a try's ways
@@ -566,9 +564,9 @@ export function triedFrom(
   askedCloseout: (taskId: string) => CloseoutAsked,
   steps: readonly StepSpec[],
   spendOf: SpendOf,
-): StepStatus {
+) {
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
-  return satisfiesAfter(own) && hasGate(step, run) ? 'awaiting approval' : own;
+  return (satisfiesAfter(own) && hasGate(step, run) ? 'awaiting approval' : own) satisfies StepStatus as StepStatus;
 }
 
 /**
@@ -587,7 +585,7 @@ function held(
   steps: readonly StepSpec[],
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
-): boolean {
+) {
   const record = run.steps[step.name];
   const taskId = record?.taskId;
   if (!taskId) return false;
@@ -608,7 +606,7 @@ function roundWanted(
   askedCloseout: (taskId: string) => CloseoutAsked,
   steps: readonly StepSpec[],
   spendOf: SpendOf,
-): boolean {
+) {
   return (
     satisfiesAfter(ownStatus(looping, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)) && askedAgain(looping, run, closeoutOf)
   );
@@ -618,7 +616,7 @@ function roundWanted(
  * Whether `said` signs off `blocked` and the run accepts it: a blocked closeout whose questions do not read is refused
  * (`closeoutRefusals`).
  */
-const blockedAccepted = (step: StepSpec, said: Closeout | undefined, steps: readonly StepSpec[]): boolean =>
+const blockedAccepted = (step: StepSpec, said: Closeout | undefined, steps: readonly StepSpec[]) =>
   said?.outcome === 'blocked' && !closeoutRefusals(step, said, steps).length;
 
 /**
@@ -651,7 +649,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const said = closeoutOf(step.name);
   if (standsBlocked(step, st, said, steps)) return 'blocked';
 
-  const signed = (s: StepStatus): StepStatus =>
+  const signed = (s: StepStatus) =>
     s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
   const phase = phaseOf(st.taskId);
   if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded)
@@ -668,11 +666,11 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
 };
 
 /** Whether a step stands `blocked`: its closeout accepted as blocked, and its check not run again on that very task (`rechecked`). */
-const standsBlocked = (step: StepSpec, st: StepRecord, said: Closeout | undefined, steps: readonly StepSpec[]): boolean =>
+const standsBlocked = (step: StepSpec, st: StepRecord, said: Closeout | undefined, steps: readonly StepSpec[]) =>
   blockedAccepted(step, said, steps) && !(step.check && rechecked(st));
 
 /** Whether the try just behind a step's current one is a recheck of that very task: its current task's check was run again. */
-const rechecked = (st: StepRecord): boolean => {
+const rechecked = (st: StepRecord) => {
   const last = st.tries?.at(-1);
   return last !== undefined && last.taskId === st.taskId && last.cause === 'recheck';
 };
@@ -682,7 +680,7 @@ const rechecked = (st: StepRecord): boolean => {
  * looping step's with no yes or no for `again`, one that named a file the run did not have when it signed off, as the tick read it
  * (`lackedOf`), or one the run refuses (`closeoutRefusals`: a `needs` on a `done` v1 closeout, a question field that does not read).
  */
-const unaccepted = (step: StepSpec, run: Run, steps: readonly StepSpec[], said: Closeout): boolean =>
+const unaccepted = (step: StepSpec, run: Run, steps: readonly StepSpec[], said: Closeout) =>
   declaredOutput(step, said, owedFields(step, run, steps, said)).missing.length > 0 ||
   (Boolean(step.loop) && typeof said.output?.again !== 'boolean') ||
   lackedOf(run.steps[step.name]).length > 0 ||
@@ -715,7 +713,7 @@ const NOTHING_SPENT: Spend = { usd: 0, measured: 0, unmeasured: 0 };
  * open, as a deadline leaves one — and one that never started (`unstartable`) ran no session. Undefined for no view.
  * @param view The engine's view of the task, or undefined where there is none.
  */
-export function taskSpend(view: TaskClock | undefined): TaskSpend | undefined {
+export function taskSpend(view: TaskClock | undefined) {
   if (!view) return undefined;
   const over = view.state.attempts.filter((a) => a.reason !== 'unstartable' && (a.endedAt != null || view.state.settled != null));
   const costs = over.map((a) => a.usage?.costUsd);
@@ -731,14 +729,13 @@ export function taskSpend(view: TaskClock | undefined): TaskSpend | undefined {
 }
 
 /** Two live figures as one: their dollars together, and the later of their times. */
-const addLive = (a: Spend['live'], b: Spend['live']): Spend['live'] =>
-  a && b ? { usd: a.usd + b.usd, at: a.at > b.at ? a.at : b.at } : (a ?? b);
+const addLive = (a: Spend['live'], b: Spend['live']) => (a && b ? { usd: a.usd + b.usd, at: a.at > b.at ? a.at : b.at } : (a ?? b));
 
 /**
  * Several spends as one.
  * @param spends The spends, each undefined where nothing is known of it.
  */
-export const addSpend = (spends: ReadonlyArray<Spend | undefined>): Spend =>
+export const addSpend = (spends: ReadonlyArray<Spend | undefined>) =>
   spends.reduce<Spend>((sum, s) => {
     if (!s) return sum;
     const live = addLive(sum.live, s.live);
@@ -754,7 +751,7 @@ export const addSpend = (spends: ReadonlyArray<Spend | undefined>): Spend =>
  * The tasks a step's sessions ran as, every try's, each once: the try after a recheck has its session's task again (`EarlierTry`).
  * @param record The step's record, or undefined where the run has none of it.
  */
-export const sessionTasks = (record: StepRecord | undefined): string[] => [
+export const sessionTasks = (record: StepRecord | undefined) => [
   ...new Set([...(record?.tries ?? []).map((t) => t.taskId), ...(record?.taskId ? [record.taskId] : [])]),
 ];
 
@@ -764,15 +761,14 @@ export const sessionTasks = (record: StepRecord | undefined): string[] => [
  * @param name The step's name.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export const stepSpend = (run: Run, name: string, spendOf: SpendOf): Spend => addSpend(sessionTasks(run.steps[name]).map(spendOf));
+export const stepSpend = (run: Run, name: string, spendOf: SpendOf) => addSpend(sessionTasks(run.steps[name]).map(spendOf));
 
 /**
  * What a run has cost: every step's tries. Its checks run on the run's own shell harness, which prices nothing. Pure.
  * @param run The run's record.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export const runSpend = (run: Run, spendOf: SpendOf): Spend =>
-  addSpend(Object.keys(run.steps).map((name) => stepSpend(run, name, spendOf)));
+export const runSpend = (run: Run, spendOf: SpendOf) => addSpend(Object.keys(run.steps).map((name) => stepSpend(run, name, spendOf)));
 
 /**
  * A step whose tries have together cost the cap in force on it or more — nothing left to spend, since any session spends something: what
@@ -782,7 +778,7 @@ export const runSpend = (run: Run, spendOf: SpendOf): Spend =>
  * @param run The run's record.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export function overBudget(step: StepSpec, run: Run, spendOf: SpendOf): { spent: Spend; cap: number } | undefined {
+export function overBudget(step: StepSpec, run: Run, spendOf: SpendOf) {
   const cap = budgetOf(step, run);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);
@@ -796,30 +792,25 @@ export function overBudget(step: StepSpec, run: Run, spendOf: SpendOf): { spent:
  * @param run The run's record.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export const loopOver = (
-  steps: readonly StepSpec[],
-  looping: StepSpec,
-  run: Run,
-  spendOf: SpendOf,
-): Array<{ name: string; spent: Spend; cap: number }> =>
+export const loopOver = (steps: readonly StepSpec[], looping: StepSpec, run: Run, spendOf: SpendOf) =>
   loopSpan(steps, looping).flatMap((name) => {
     const step = steps.find((s) => s.name === name);
     const over = step && overBudget(step, run, spendOf);
     return over ? [{ name, ...over }] : [];
-  });
+  }) satisfies Array<{ name: string; spent: Spend; cap: number }> as Array<{ name: string; spent: Spend; cap: number }>;
 
 /**
  * What sessions cost, for a person: `$4.20` — and `≥$4.20` when a session that ended has no cost on it, so a part never reads as the whole;
  * with what the sessions at work have spent so far added in, `$32.32 so far`.
  * @param s What the sessions cost, how many ended with no cost on them, and what those at work have spent so far.
  */
-export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${dollars(s.usd + (s.live?.usd ?? 0))}${s.live ? ' so far' : ''}`;
+export const spentWord = (s: Spend) => `${s.unmeasured ? '≥' : ''}${dollars(s.usd + (s.live?.usd ?? 0))}${s.live ? ' so far' : ''}`;
 
 /**
  * Whether anything of a spend is known: a session measured, or one at work that said what it has spent so far.
  * @param s The spend.
  */
-export const spendKnown = (s: Spend): boolean => s.measured > 0 || s.live !== undefined;
+export const spendKnown = (s: Spend) => s.measured > 0 || s.live !== undefined;
 
 /**
  * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, so the harness holds the tries
@@ -833,7 +824,7 @@ export const spendKnown = (s: Spend): boolean => s.measured > 0 || s.live !== un
  * @param cap The cap in force on the step, in dollars, or undefined where it has none.
  * @param spent What its tries have cost; nothing where not given.
  */
-export function budgetUsdFor(cap: number | undefined, spent: Spend = NOTHING_SPENT): number | undefined {
+export function budgetUsdFor(cap: number | undefined, spent: Spend = NOTHING_SPENT) {
   if (cap === undefined) return undefined;
   return Math.max(Math.ceil((cap - spent.usd) * 1e6 - 1e-6) / 1e6, 1e-6);
 }
@@ -860,7 +851,7 @@ export const LANDING_MOMENTUM = MOMENTUM + 1;
  * check are never a run's first filing, and carry `MOMENTUM` whatever step they are of.
  * @param step The step, what it waits on among it.
  */
-export const stepMomentum = (step: Pick<StepSpec, 'after'>): number => (step.after.length ? MOMENTUM : 0);
+export const stepMomentum = (step: Pick<StepSpec, 'after'>) => (step.after.length ? MOMENTUM : 0);
 
 /**
  * The floor of a `--budget` on a step with a cap, and what a person's try of a step over its budget, or ended at it, has to carry: a
@@ -874,7 +865,7 @@ export type Raise = { above: number; spent: Spend; cap: number };
  * @param run The run's record.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export function raiseOf(step: StepSpec, run: Run, spendOf: SpendOf): Raise | undefined {
+export function raiseOf(step: StepSpec, run: Run, spendOf: SpendOf) {
   const cap = budgetOf(step, run);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);
@@ -886,14 +877,14 @@ export function raiseOf(step: StepSpec, run: Run, spendOf: SpendOf): Raise | und
  * `$3`.
  * @param r The raise a try has to carry.
  */
-export const aboveWord = (r: Raise): string => (r.above > r.spent.usd ? budgetWord(r.above) : dollars(r.above));
+export const aboveWord = (r: Raise) => (r.above > r.spent.usd ? budgetWord(r.above) : dollars(r.above));
 
 /**
  * A step over its budget, or ended at it, in words: `is over budget: its tries have cost $4.20 of its $3 budget`.
  * @param status The step's status: `budget exhausted`, or over its budget.
  * @param r The raise a try has to carry.
  */
-export const raiseWords = (status: StepStatus, r: Raise): string =>
+export const raiseWords = (status: StepStatus, r: Raise) =>
   status === 'budget exhausted'
     ? `ended at its budget: its harness stopped its session at ${budgetWord(r.cap)}, and its tries have cost ${spentWord(r.spent)}`
     : `is over budget: its tries have cost ${spentWord(r.spent)} of its ${budgetWord(r.cap)} budget`;
@@ -904,7 +895,7 @@ export const raiseWords = (status: StepStatus, r: Raise): string =>
  * @param how The ask, its `--budget` and its mode among it.
  * @param command The command a refusal names; `nemia retry <runId> <step>` where not given.
  */
-export function budgetRefusal(how: RetryHow, command = 'nemia retry <runId> <step>'): string | null {
+export function budgetRefusal(how: RetryHow, command = 'nemia retry <runId> <step>') {
   if (how.budget === undefined) return null;
   if (!(typeof how.budget === 'number' && Number.isFinite(how.budget) && how.budget > 0)) {
     return `--budget ${String(how.budget)} is not an amount. It is the most the step's tries may cost together, in dollars, above what they have cost: ${command} --budget <amount>, like 5 or 2.50.`;
@@ -958,36 +949,36 @@ export type RoundAsk = { step: string; round: number; budget?: number; at: strin
  * The rounds a looping step's loop runs on its own word: its `rounds:`, which the parser always sets.
  * @param looping The looping step.
  */
-export const capOf = (looping: StepSpec): number => looping.rounds ?? DEFAULT_ROUNDS;
+export const capOf = (looping: StepSpec) => looping.rounds ?? DEFAULT_ROUNDS;
 
 /**
  * The round a step's record is on: the first, and one more for each round that moved a try behind it. A merge (`cause: 'merge'`) is not
  * one.
  * @param record The step's record, or undefined where the run has none of it.
  */
-export const roundIn = (record: StepRecord | undefined): number => 1 + (record?.tries?.filter((t) => t.cause === 'round').length ?? 0);
+export const roundIn = (record: StepRecord | undefined) =>
+  (1 + (record?.tries?.filter((t) => t.cause === 'round').length ?? 0)) satisfies number as number;
 
 /**
  * The round a step of a run is on (`roundIn`). Every step of a loop moves on together, so the looping step's is the loop's.
  * @param run The run's record.
  * @param step The step's name.
  */
-export const roundOf = (run: Run, step: string): number => roundIn(run.steps[step]);
+export const roundOf = (run: Run, step: string) => roundIn(run.steps[step]);
 
 /**
  * The looping step whose loop `name` is in — as its target, a step between, or itself — if any.
  * @param steps The run's steps.
  * @param name The step's name.
  */
-export const loopOf = (steps: readonly StepSpec[], name: string): StepSpec | undefined =>
-  steps.find((s) => s.loop && loopSpan(steps, s).includes(name));
+export const loopOf = (steps: readonly StepSpec[], name: string) => steps.find((s) => s.loop && loopSpan(steps, s).includes(name));
 
 /**
  * A round, as `nemia ls` says it: `round 2 of 3`, or past the cap, where only a person's word takes a loop.
  * @param round The round.
  * @param cap The rounds the loop runs on its own word.
  */
-export const roundWord = (round: number, cap: number): string =>
+export const roundWord = (round: number, cap: number) =>
   round <= cap ? `round ${round} of ${cap}` : `round ${round}, past rounds: ${cap}, on your word`;
 
 /**
@@ -998,7 +989,7 @@ export const roundWord = (round: number, cap: number): string =>
  * @param run The run's record.
  * @param name The target's name.
  */
-export const owesReplies = (steps: readonly StepSpec[], run: Run, name: string): boolean =>
+export const owesReplies = (steps: readonly StepSpec[], run: Run, name: string) =>
   isLoopTarget(steps, name) && roundOf(run, name) > 1 && !merged(run.steps[name]);
 
 /**
@@ -1006,7 +997,7 @@ export const owesReplies = (steps: readonly StepSpec[], run: Run, name: string):
  * merge's, whatever tries came after it within the round.
  * @param record The step's record, or undefined where the run has none of it.
  */
-export const merged = (record: StepRecord | undefined): boolean =>
+export const merged = (record: StepRecord | undefined) =>
   [...(record?.tries ?? [])].reverse().find((t) => t.cause === 'round' || t.cause === 'merge')?.cause === 'merge';
 
 /**
@@ -1019,7 +1010,7 @@ export const merged = (record: StepRecord | undefined): boolean =>
  * @param run The run's record.
  * @param name The target's name.
  */
-export function askingTry(steps: readonly StepSpec[], run: Run, name: string): { looping: StepSpec; taskId: string } | undefined {
+export function askingTry(steps: readonly StepSpec[], run: Run, name: string) {
   const looping = steps.find((s) => s.loop === name);
   if (!looping || !owesReplies(steps, run, name)) return undefined;
   const taskId = [...(run.steps[looping.name]?.tries ?? [])].reverse().find((t) => t.cause === 'round')?.taskId;
@@ -1035,7 +1026,7 @@ export function askingTry(steps: readonly StepSpec[], run: Run, name: string): {
  * @param steps The run's steps.
  * @param said The step's closeout, or undefined where it gave none.
  */
-export const owedFields = (step: StepSpec, run: Run, steps: readonly StepSpec[], said: Closeout | undefined): string[] => [
+export const owedFields = (step: StepSpec, run: Run, steps: readonly StepSpec[], said: Closeout | undefined) => [
   ...filedOwed(step, run, said),
   ...(owesReplies(steps, run, step.name) ? [LOOP_REPLIES] : []),
   ...(isJudge(step) ? [JUDGE_ROUTE] : []),
@@ -1049,7 +1040,7 @@ export const owedFields = (step: StepSpec, run: Run, steps: readonly StepSpec[],
  * @param steps The run's steps.
  * @param rounds The rounds due now.
  */
-export const roundSpans = (steps: readonly StepSpec[], rounds: readonly Round[]): Set<string> =>
+export const roundSpans = (steps: readonly StepSpec[], rounds: readonly Round[]) =>
   new Set(
     rounds.flatMap((r) => {
       const looping = steps.find((s) => s.name === r.step);
@@ -1064,5 +1055,5 @@ export const roundSpans = (steps: readonly StepSpec[], rounds: readonly Round[])
  * @param step The step's name.
  * @param status Where the step stands.
  */
-export const tryCommand = (run: Run, step: string, status: StepStatus): string =>
+export const tryCommand = (run: Run, step: string, status: StepStatus) =>
   `nemia retry ${run.id} ${step}${status === 'over budget' ? ' --budget <amount>' : ''}`;

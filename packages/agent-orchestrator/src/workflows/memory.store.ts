@@ -34,7 +34,7 @@ export const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
 type Held = { readonly files: ReadonlyMap<string, string>; readonly readme?: string; readonly carried?: ReadonlyMap<string, string> };
 
 /** The version of what is held: a digest of every file, as `workflowVersion` digests a folder's. */
-const versionOf = (held: Held): string =>
+const versionOf = (held: Held) =>
   createHash('sha256')
     .update(
       JSON.stringify([
@@ -50,7 +50,7 @@ const versionOf = (held: Held): string =>
  * through those the program is given.
  * @param defs The Agent and Skill doors to find agents and skills through; left out, those the program is given.
  */
-export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
+export function workflowDoorMemory(defs?: WorkflowDefs) {
   const workflows = new Map<string, Held>();
   const read = (dir: string, found: Found, fills?: Fills) =>
     parseFolder(

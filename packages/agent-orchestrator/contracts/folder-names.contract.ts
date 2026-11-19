@@ -14,7 +14,7 @@ export type FolderEntry = { readonly name: string; readonly folder: boolean };
 export type FolderNamesShown = { readonly names: readonly string[]; readonly more: boolean };
 
 /** Whether `e` is one the listing would name for what was typed, `prefix`. */
-const named = (e: FolderEntry, prefix: string): boolean =>
+const named = (e: FolderEntry, prefix: string) =>
   e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.'));
 
 const folderNamesShownSpec = spec<(entries: readonly FolderEntry[], prefix: string, most: number) => FolderNamesShown>({

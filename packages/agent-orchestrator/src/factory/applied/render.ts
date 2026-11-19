@@ -20,7 +20,7 @@ import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../temp
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
-import { checkFailurePolicyOf, type CheckFailurePolicy } from '../../check/index.ts';
+import { checkFailurePolicyOf } from '../../check/index.ts';
 
 /**
  * A checked template as the store hands it in: its folder as read, the text of one of its files by its path, and the lines of a file of
@@ -59,25 +59,25 @@ const WORKFLOWS = 'workflows';
 const BLOCK_WORDS = ['model', 'effort', 'context'] as const;
 
 /** A value as a frontmatter line writes it: a list as `a, b`, anything else as its words. */
-const lineOf = (value: unknown): string => (Array.isArray(value) ? value.map(String).join(', ') : String(value));
+const lineOf = (value: unknown) => (Array.isArray(value) ? value.map(String).join(', ') : String(value));
 
 /**
  * The text a `Text` value gives, each `${{ parameters.<name> }}` in it written with its value: the words, already written as a document's
  * string is (`substitute`), or the file of the template it names (`{path}`).
  */
-function textOf(value: unknown, read: TemplateRead, params: Params): string {
+function textOf(value: unknown, read: TemplateRead, params: Params) {
   if (isMap(value) && typeof value.path === 'string') return interpolated(read.text(value.path), params);
   return String(value);
 }
 
 /** The words of `value` when present, else of `file` when the template holds it, else none; each expression written with its value. */
-function textOr(value: unknown, file: string, read: TemplateRead, params: Params): string | undefined {
+function textOr(value: unknown, file: string, read: TemplateRead, params: Params) {
   if (value !== undefined) return textOf(value, read, params);
   return read.folder.files.includes(file) ? interpolated(read.text(file), params) : undefined;
 }
 
 /** The bytes of `value`'s file (`{path}`), else of `file` when the template holds it, else none: a schema, carried as it is. */
-function carriedOr(value: unknown, file: string, read: TemplateRead): string | undefined {
+function carriedOr(value: unknown, file: string, read: TemplateRead) {
   if (isMap(value) && typeof value.path === 'string') return read.text(value.path);
   if (value !== undefined) return typeof value === 'string' ? value : JSON.stringify(value);
   return read.folder.files.includes(file) ? read.text(file) : undefined;
@@ -88,7 +88,7 @@ function carriedOr(value: unknown, file: string, read: TemplateRead): string | u
  * names (`withSharedLines`), so the factory's tree holds the full list; a word as it is. A file that is no list of strings, which the
  * lint refuses before a render, gives none.
  */
-function fenceLine(value: unknown, read: TemplateRead): string {
+function fenceLine(value: unknown, read: TemplateRead) {
   if (!Array.isArray(value)) return lineOf(value);
   const items = listItemsOf(value);
   const linesOf = Object.fromEntries(items.flatMap((item) => ('path' in item ? [[item.path, read.lines(item.path) ?? []]] : [])));
@@ -96,7 +96,7 @@ function fenceLine(value: unknown, read: TemplateRead): string {
 }
 
 /** The keys the block `block` of the harness `name` writes as today's lines name them, its `options` refused into `refusals`. */
-function blockLines(where: string, name: string, block: Spec, read: TemplateRead, refusals: string[]): Record<string, string> {
+function blockLines(where: string, name: string, block: Spec, read: TemplateRead, refusals: string[]) {
   const keys: Record<string, string> = {};
   for (const key of BLOCK_WORDS) if (block[key] !== undefined) keys[key] = lineOf(block[key]);
   if (isMap(block.fence)) for (const [key, value] of Object.entries(block.fence)) keys[key] = fenceLine(value, read);
@@ -112,7 +112,7 @@ function blockLines(where: string, name: string, block: Spec, read: TemplateRead
  * (`permissionMode`, `sandbox`, a tool list). Refused into `refusals`: `options`, which today's format has no line for, and a block of
  * another harness than the one it runs on, since today's folder holds the keys of one.
  */
-function blockKeys(where: string, blocks: Spec, harness: string, read: TemplateRead, refusals: string[]): Record<string, string> {
+function blockKeys(where: string, blocks: Spec, harness: string, read: TemplateRead, refusals: string[]) {
   let keys: Record<string, string> = {};
   for (const [name, block] of Object.entries(blocks)) {
     if (!isMap(block)) continue;
@@ -126,8 +126,7 @@ function blockKeys(where: string, blocks: Spec, harness: string, read: TemplateR
 }
 
 /** The blocks of a spec: every key but `known`, each a harness's. */
-const blocksOf = (spec: Spec, known: readonly string[]): Spec =>
-  Object.fromEntries(Object.entries(spec).filter(([key]) => !known.includes(key)));
+const blocksOf = (spec: Spec, known: readonly string[]) => Object.fromEntries(Object.entries(spec).filter(([key]) => !known.includes(key)));
 
 /** The step keys copied from the template as a line writes them. */
 const STEP_WORDS = [
@@ -152,37 +151,34 @@ const STEP_WORDS = [
 ];
 
 /** A template's `route:` (`TemplateRoute`) as the parser's `RouteEval`, which the step's file writes as YAML flow; undefined for none. */
-function routeEvalOf(route: unknown): RouteEval | undefined {
-  if (route === 'judge') return { kind: 'judge' };
-  if (!isMap(route)) return undefined;
-  if (typeof route.script === 'string') return { kind: 'script', script: route.script };
+function routeEvalOf(route: unknown) {
+  if (route === 'judge') return { kind: 'judge' } satisfies RouteEval | undefined;
+  if (!isMap(route)) return undefined satisfies RouteEval | undefined;
+  if (typeof route.script === 'string') return { kind: 'script', script: route.script } satisfies RouteEval | undefined;
   if (typeof route.from === 'string' && isMap(route.table))
-    return { kind: 'table', from: route.from, table: Object.fromEntries(Object.entries(route.table).map(([k, v]) => [k, String(v)])) };
-  return undefined;
+    return {
+      kind: 'table',
+      from: route.from,
+      table: Object.fromEntries(Object.entries(route.table).map(([k, v]) => [k, String(v)])),
+    } satisfies RouteEval | undefined;
+  return undefined satisfies RouteEval | undefined;
 }
 
 /**
  * Whether `key` is a step's `checkMemory:` that renders blank, as an empty parameter writes it: no line, so the check asks the daemon's
  * default request. A blank line in a person's step file is still refused by the parser.
  */
-const blankAsked = (key: string, value: unknown): boolean => key === 'checkMemory' && lineOf(value).trim() === '';
+const blankAsked = (key: string, value: unknown) => key === 'checkMemory' && lineOf(value).trim() === '';
 
 /** A template's `checkFailurePolicy:` as the parser reads it, refused as a step's line would be; nothing for none. */
-const policyOf = (step: string, policy: unknown): { checkFailurePolicy?: CheckFailurePolicy } =>
+const policyOf = (step: string, policy: unknown) =>
   policy === undefined ? {} : { checkFailurePolicy: checkFailurePolicyOf(step, JSON.stringify(policy)) };
 
 /**
  * The step `step` of `workflow` as its file: its wiring, a former `workspace: main` written as `base` (`baseSpelled`), its overrides on
  * the harness it runs on (`harness`), and its instruction.
  */
-function stepFile(
-  workflow: string,
-  step: Spec,
-  harness: string,
-  read: TemplateRead,
-  params: Params,
-  refusals: string[],
-): string | undefined {
+function stepFile(workflow: string, step: Spec, harness: string, read: TemplateRead, params: Params, refusals: string[]) {
   const name = String(step.name);
   const where = `${WORKFLOWS}/${workflow}/workflow.yaml, step ${name}`;
   const keys: Record<string, string> = {};
@@ -212,7 +208,7 @@ function stepFile(
 }
 
 /** The harness the agent `name` runs on, as its document says, or the default. */
-function agentHarness(specs: ReadonlyMap<string, Spec>, name: string | undefined): string {
+function agentHarness(specs: ReadonlyMap<string, Spec>, name: string | undefined) {
   const harness = name === undefined ? undefined : specs.get(name)?.harness;
   return typeof harness === 'string' ? harness : DEFAULT_HARNESS;
 }
@@ -228,7 +224,7 @@ function renderWorkflow(
   specs: ReadonlyMap<string, Spec>,
   hires: Wiring['hires'],
   out: Rendered,
-): void {
+) {
   const folder = `${WORKFLOWS}/${name}`;
   const spec = (read.folder.documents.get(`${folder}/workflow.yaml`) as { spec?: { steps?: Spec[] } } | null)?.spec;
   for (const step of spec?.steps ?? []) {
@@ -247,7 +243,7 @@ function renderWorkflow(
  * The files of the workflow at `folder` a render carries as they are, into `out`: every file that is no .md or .yaml, and its README
  * unless its needs are written into one (`declares`).
  */
-function carryWorkflowFiles(folder: string, read: TemplateRead, declares: boolean, out: Rendered): void {
+function carryWorkflowFiles(folder: string, read: TemplateRead, declares: boolean, out: Rendered) {
   for (const file of read.folder.files) {
     const rest = file.slice(folder.length + 1);
     if (!file.startsWith(`${folder}/`) || rest === 'workflow.yaml') continue;
@@ -261,7 +257,7 @@ function carryWorkflowFiles(folder: string, read: TemplateRead, declares: boolea
  * as its frontmatter (`needs:`), which `workflowNeeds` reads back: the template's own README below it, its own frontmatter's other keys
  * kept and its `needs` replaced, or only the frontmatter where the template has none.
  */
-function readmeWithNeeds(folder: string, needs: readonly unknown[], read: TemplateRead): string {
+function readmeWithNeeds(folder: string, needs: readonly unknown[], read: TemplateRead) {
   const own = read.folder.files.find((file) => file.startsWith(`${folder}/`) && /^readme\.md$/i.test(file.slice(folder.length + 1)));
   const text =
     own === undefined
@@ -278,7 +274,7 @@ function readmeWithNeeds(folder: string, needs: readonly unknown[], read: Templa
 }
 
 /** The agent `name` as its file, and its output schema beside it, into `out`. */
-function renderAgentOf(name: string, spec: Spec, read: TemplateRead, params: Params, out: Rendered): void {
+function renderAgentOf(name: string, spec: Spec, read: TemplateRead, params: Params, out: Rendered) {
   const where = `agents/${name}/agent.yaml`;
   const harness = typeof spec.harness === 'string' ? spec.harness : DEFAULT_HARNESS;
   const keys: Record<string, string> = blockKeys(
@@ -312,7 +308,7 @@ function renderAgentOf(name: string, spec: Spec, read: TemplateRead, params: Par
 }
 
 /** The names of the folders of `holder` (`workflows`, `agents`) whose document `leaf` the template holds, sorted. */
-const namesOf = (read: TemplateRead, holder: string, leaf: string): string[] =>
+const namesOf = (read: TemplateRead, holder: string, leaf: string) =>
   read.folder.files
     .filter((file) => file.startsWith(`${holder}/`) && file.endsWith(`/${leaf}`) && file.split('/').length === 3)
     .flatMap((file) => {
@@ -322,14 +318,14 @@ const namesOf = (read: TemplateRead, holder: string, leaf: string): string[] =>
     .sort();
 
 /** The spec of the document `file`, its `{param}` values given. */
-const specAt = (read: TemplateRead, file: string, params: Params): Spec =>
+const specAt = (read: TemplateRead, file: string, params: Params) =>
   substitute((read.folder.documents.get(file) as { spec?: Spec } | null)?.spec ?? {}, params) as Spec;
 
 /**
  * The factory's rules `rules`, where the template has any, into `RULES.md` of the tree. Refused by name, nothing to write: rules that
  * open with a frontmatter block (`factoryRulesRefusal`), since they only add words to what an agent is told.
  */
-function renderRules(rules: string | undefined, out: Rendered): void {
+function renderRules(rules: string | undefined, out: Rendered) {
   if (!rules?.trim()) return;
   const refused = factoryRulesRefusal(FACTORY_RULES_FILE, rules);
   if (refused) out.refusals.push(`${refused} Mend the template, and apply again.`);
@@ -345,7 +341,7 @@ function renderRules(rules: string | undefined, out: Rendered): void {
  * @param read The template as read, which passes its check.
  * @param params The parameters' values to render with, by name.
  */
-export function renderFactory(read: TemplateRead, params: Params): Rendered {
+export function renderFactory(read: TemplateRead, params: Params) {
   const manifest = specAt(read, 'nemia.yaml', params);
   const hires = Object.fromEntries(Object.entries(isMap(manifest.hires) ? manifest.hires : {}).map(([k, v]) => [k, String(v)]));
   const workflows = namesOf(read, WORKFLOWS, 'workflow.yaml');

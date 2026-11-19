@@ -21,10 +21,10 @@ export type Changes = 'none' | 'pass' | 'all' | ((args: unknown[]) => readonly u
 export type VerbKind = { readonly phase?: Phase; readonly changes: Changes };
 
 /** The task a verb's first argument names. */
-const first = ([id]: unknown[]): readonly unknown[] => [id];
+const first = ([id]: unknown[]) => [id];
 
 /** The tasks a verb's first argument lists. */
-const listed = ([ids]: unknown[]): readonly unknown[] => (Array.isArray(ids) ? ids : []);
+const listed = ([ids]: unknown[]) => (Array.isArray(ids) ? ids : []);
 
 /** Every verb of the engine: its phase (a journal read is `journals`, a verb that changes a task `act`) and what it changes. */
 export const ENGINE_VERBS = {
@@ -69,5 +69,4 @@ export const ENGINE_VERBS = {
  * The table's verb `key`, or undefined for a key that is no verb of the engine.
  * @param key The key to look up.
  */
-export const verbOf = (key: string): VerbKind | undefined =>
-  Object.hasOwn(ENGINE_VERBS, key) ? (ENGINE_VERBS as Record<string, VerbKind>)[key] : undefined;
+export const verbOf = (key: string) => (Object.hasOwn(ENGINE_VERBS, key) ? (ENGINE_VERBS as Record<string, VerbKind>)[key] : undefined);

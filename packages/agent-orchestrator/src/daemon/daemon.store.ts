@@ -12,16 +12,7 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import type { Settings } from '../config/config.store.ts';
 import { reservedFor } from '../service/index.ts';
-import {
-  PHASES,
-  RECENT_KEPT,
-  recentOf,
-  type AlsoKept,
-  type PassCost,
-  type PassCostRead,
-  type Phase,
-  type RecentPass,
-} from '../meter/index.ts';
+import { PHASES, RECENT_KEPT, recentOf, type AlsoKept, type PassCost, type Phase, type RecentPass } from '../meter/index.ts';
 import {
   DAEMON_FILE,
   daemonStanding as standingOf,
@@ -32,19 +23,16 @@ import {
   type DaemonRead,
   type DaemonStanding,
   type HolderKind,
-  type Identity,
   type Instant,
   type LeaseRelease,
-  type Monotonic,
 } from './daemon.ts';
 import { Conflict } from '../refusal/refusal.ts';
-import type { PauseHolder } from '../pause/pause.ts';
 import { ALL_KINDS, DISK_PARTS } from '../disk/disk.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { alive } from '../process/alive.store.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
-const jsonOr = (text: string): unknown => {
+const jsonOr = (text: string) => {
   try {
     return JSON.parse(text);
   } catch {
@@ -70,10 +58,7 @@ const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
  * @param config The settings the daemon is given, each read as its reader answers it.
  * @param totalBytes Reads the machine's memory in bytes, for the default floor; `os.totalmem` by default.
  */
-export const ceilings = (
-  config: Settings,
-  totalBytes: () => number = os.totalmem,
-): { sessions: number; runs: number; memory?: string; cgroupParent?: string; request?: string; reserved: string } => {
+export const ceilings = (config: Settings, totalBytes: () => number = os.totalmem) => {
   const memory = config.memoryLimit;
   const parent = config.cgroupParent;
   const request = config.memoryRequest;
@@ -93,7 +78,7 @@ export const ceilings = (
  * `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 nemia up` sets the cap on the daemon alone, and read from the shell, a run the daemon holds read as
  * plain `waiting`.
  */
-const tickFile = (home: string): string => path.join(home, 'tick.json');
+const tickFile = (home: string) => path.join(home, 'tick.json');
 
 /** `tick.json` as the tick writes it: the sessions a pool admits, and the runs in flight at once, a whole number (0 for no cap). */
 const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Schema.Natural }));
@@ -102,7 +87,7 @@ const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Sche
  * The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them.
  * @param home The store's directory (`WF_ROOT`).
  */
-export function lastCeilings(home: string): { sessions: number; runs: number } | undefined {
+export function lastCeilings(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(tickFile(home), 'utf8');
@@ -120,7 +105,7 @@ export function lastCeilings(home: string): { sessions: number; runs: number } |
  * @param home The store's directory (`WF_ROOT`).
  * @param c The ceilings the pass runs with: the sessions a pool admits, and the runs in flight at once (0 for no cap).
  */
-export function recordCeilings(home: string, c: { sessions: number; runs: number }): void {
+export function recordCeilings(home: string, c: { sessions: number; runs: number }) {
   const last = lastCeilings(home);
   if (last && last.sessions === c.sessions && last.runs === c.runs) return;
   try {
@@ -134,7 +119,7 @@ export function recordCeilings(home: string, c: { sessions: number; runs: number
  * tick`'s, and read by `nemia up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
  * @param home The store's directory (`WF_ROOT`).
  */
-export const statsFile = (home: string): string => path.join(home, 'tick-stats.json');
+export const statsFile = (home: string) => path.join(home, 'tick-stats.json');
 
 const PhaseCostSchema = Schema.StructWithRest(Schema.Struct({ ms: Count, calls: Count, bytes: Count, reads: Count, spawned: Count }), Rest);
 const HarnessCostSchema = Schema.StructWithRest(
@@ -172,7 +157,7 @@ const isPassCost = Schema.is(
  * A pass's cost as it reads off disk, or undefined when it does not read as one: a file from another version, or half of one.
  * @param text The file's text.
  */
-export const parsePassCost = (text: string): PassCostRead | undefined => {
+export const parsePassCost = (text: string) => {
   const c = jsonOr(text);
   return isPassCost(c) ? c : undefined;
 };
@@ -181,7 +166,7 @@ export const parsePassCost = (text: string): PassCostRead | undefined => {
  * The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one.
  * @param home The store's directory (`WF_ROOT`).
  */
-export function lastPassCost(home: string): PassCostRead | undefined {
+export function lastPassCost(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(statsFile(home), 'utf8');
@@ -198,7 +183,7 @@ export function lastPassCost(home: string): PassCostRead | undefined {
  * @param home The store's directory (`WF_ROOT`).
  * @param cost The pass's cost, phase by phase.
  */
-export function recordPassCost(home: string, cost: PassCost): number {
+export function recordPassCost(home: string, cost: PassCost) {
   const t0 = performance.now();
   try {
     fs.mkdirSync(home, { recursive: true });
@@ -211,7 +196,7 @@ export function recordPassCost(home: string, cost: PassCost): number {
  * `$WF_ROOT/daemon.json`: the store taken by one daemon, the api or a `nemia up`, written by it alone (`daemon.ts`).
  * @param home The store's directory (`WF_ROOT`).
  */
-export const daemonFile = (home: string): string => path.join(home, DAEMON_FILE);
+export const daemonFile = (home: string) => path.join(home, DAEMON_FILE);
 
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
 
@@ -257,25 +242,30 @@ const DaemonFileSchema = Schema.Struct({
  * The file as read, in today's words: a `by` absent or of the earlier spelling is a `nemia up`'s, `up`; the cards under `holder` are
  * held as `serves`, and the `holder` key is dropped, so the next write carries only `serves`.
  */
-const upgraded = ({ by, holder, serves, ...file }: typeof DaemonFileSchema.Type): DaemonFile => {
+const upgraded = ({ by, holder, serves, ...file }: typeof DaemonFileSchema.Type) => {
   const cards = serves ?? holder;
-  return { ...file, by: by === 'api' ? 'api' : 'up', passedAt: file.passedAt ?? null, ...(cards ? { serves: cards } : {}) };
+  return {
+    ...file,
+    by: by === 'api' ? 'api' : 'up',
+    passedAt: file.passedAt ?? null,
+    ...(cards ? { serves: cards } : {}),
+  } satisfies DaemonFile;
 };
 
 /**
  * The file as a daemon writes it, or undefined when the text does not read as one (`DaemonFileSchema`).
  * @param text The file's text.
  */
-export function parseDaemonFile(text: string): DaemonFile | undefined {
+export function parseDaemonFile(text: string) {
   const decoded = Schema.decodeUnknownResult(DaemonFileSchema)(jsonOr(text));
-  return Result.isFailure(decoded) ? undefined : upgraded(decoded.success);
+  return (Result.isFailure(decoded) ? undefined : upgraded(decoded.success)) satisfies DaemonFile | undefined;
 }
 
 /**
  * The file's text, or undefined when there is none. Any other failure to read it is thrown: a store that cannot be read cannot be judged
  * free.
  */
-function readDaemonText(home: string): string | undefined {
+function readDaemonText(home: string) {
   try {
     return fs.readFileSync(daemonFile(home), 'utf8');
   } catch (err) {
@@ -285,9 +275,9 @@ function readDaemonText(home: string): string | undefined {
 }
 
 /** The file read: its text and what it holds, or undefined when there is none. */
-function readDaemon(home: string): DaemonRead | undefined {
+function readDaemon(home: string) {
   const text = readDaemonText(home);
-  return text === undefined ? undefined : { text, file: parseDaemonFile(text) };
+  return (text === undefined ? undefined : { text, file: parseDaemonFile(text) }) satisfies DaemonRead | undefined;
 }
 
 /**
@@ -295,7 +285,7 @@ function readDaemon(home: string): DaemonRead | undefined {
  * before it may hold spaces and parentheses. Undefined where there is no `/proc`, or the process is gone.
  * @param pid The process's id.
  */
-export function procStartOf(pid: number): number | undefined {
+export function procStartOf(pid: number) {
   try {
     const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
     const start = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]);
@@ -310,7 +300,7 @@ export function procStartOf(pid: number): number | undefined {
  * and whether it is the process that wrote the file.
  * @param file The file's pid, and when its process started where the file says.
  */
-export function identify(file: Pick<DaemonFile, 'pid' | 'procStart'>): Identity {
+export function identify(file: Pick<DaemonFile, 'pid' | 'procStart'>) {
   if (!alive(file.pid)) return 'gone';
   const start = file.procStart === undefined ? undefined : procStartOf(file.pid);
   if (start === undefined) return alive(file.pid) ? 'unknown' : 'gone';
@@ -318,7 +308,7 @@ export function identify(file: Pick<DaemonFile, 'pid' | 'procStart'>): Identity 
 }
 
 /** This process as a file names it for `identify`: its pid, and when it started where the machine says. */
-export function thisProcess(): PauseHolder {
+export function thisProcess() {
   const procStart = procStartOf(process.pid);
   return { pid: process.pid, ...(procStart === undefined ? {} : { procStart }) };
 }
@@ -329,7 +319,7 @@ const BOOT_ID_FILE = '/proc/sys/kernel/random/boot_id';
 let boot: string | null | undefined;
 
 /** The running boot's id, read once; `null` where the machine does not say, and no monotonic reading is taken. */
-const bootId = (): string | null => {
+const bootId = () => {
   if (boot === undefined) {
     try {
       boot = fs.readFileSync(BOOT_ID_FILE, 'utf8').trim() || null;
@@ -341,13 +331,13 @@ const bootId = (): string | null => {
 };
 
 /** The monotonic clock now, in whole milliseconds, under the boot's id; undefined where the boot id cannot be read. */
-export const monoNow = (): Monotonic | undefined => {
+export const monoNow = () => {
   const id = bootId();
   return id === null ? undefined : { boot: id, ms: Number(process.hrtime.bigint() / 1_000_000n) };
 };
 
 /** Now, on both clocks: the wall clock's `Date.now()`, and the monotonic reading where there is one. */
-export const instantNow = (): Instant => {
+export const instantNow = () => {
   const mono = monoNow();
   return { at: Date.now(), ...(mono ? { mono } : {}) };
 };
@@ -359,7 +349,7 @@ const MONO_OF = { passedAt: 'passedMono', beatAt: 'beatMono' } as const;
  * `file` with its wall stamp `stamp` set to `now`, and the monotonic reading beside it: written with it, or, where `now` has none, left out
  * rather than an earlier one kept beside a later stamp.
  */
-function stamped(file: DaemonFile, stamp: keyof typeof MONO_OF, now: Instant): DaemonFile {
+function stamped(file: DaemonFile, stamp: keyof typeof MONO_OF, now: Instant) {
   const next = { ...file };
   next[stamp] = new Date(now.at).toISOString();
   if (now.mono) next[MONO_OF[stamp]] = now.mono;
@@ -372,11 +362,11 @@ function stamped(file: DaemonFile, stamp: keyof typeof MONO_OF, now: Instant): D
  * @param home The store's directory (`WF_ROOT`).
  * @param now The instant to judge at, on both clocks; now by default.
  */
-export const daemonStanding = (home: string, now: Instant = instantNow()): DaemonStanding =>
-  standingOf(readDaemon(home), { now, identify });
+export const daemonStanding = (home: string, now: Instant = instantNow()) =>
+  standingOf(readDaemon(home), { now, identify }) satisfies DaemonStanding;
 
 /** The file written whole, through a hidden file renamed over it, so a reader never reads half of it. */
-function writeDaemon(home: string, file: DaemonFile): void {
+function writeDaemon(home: string, file: DaemonFile) {
   writeWhole(daemonFile(home), daemonText(file));
 }
 
@@ -384,7 +374,7 @@ function writeDaemon(home: string, file: DaemonFile): void {
 export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
 
 /** The lease this process writes as a daemon of kind `by`, started at `now`, with the release it runs where it is given. */
-function leaseOf(every: number, cwd: string, by: HolderKind, now: Instant, release: LeaseRelease | undefined): DaemonFile {
+function leaseOf(every: number, cwd: string, by: HolderKind, now: Instant, release: LeaseRelease | undefined) {
   const procStart = procStartOf(process.pid);
   return {
     pid: process.pid,
@@ -422,7 +412,7 @@ export function takeStore(
     release?: LeaseRelease;
     now?: Instant;
   },
-): TakenStore {
+) {
   fs.mkdirSync(home, { recursive: true });
   const held = leaseOf(every, cwd, by, now, release);
   for (let tries = 0; ; tries++) {
@@ -431,13 +421,13 @@ export function takeStore(
     if (holder) throw new Conflict({ message: holdRefusal(holder, by === 'api' ? 'api' : 'up', home, now.at) });
     if (replaced.kind !== 'none') {
       writeDaemon(home, held);
-      return { held, replaced };
+      return { held, replaced } satisfies TakenStore;
     }
     const hidden = path.join(home, `.${DAEMON_FILE}.${process.pid}`);
     fs.writeFileSync(hidden, daemonText(held));
     try {
       fs.linkSync(hidden, daemonFile(home));
-      return { held, replaced };
+      return { held, replaced } satisfies TakenStore;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || tries >= 2) throw err;
     } finally {
@@ -452,9 +442,9 @@ export function takeStore(
  * @param home The store's directory (`WF_ROOT`).
  * @param held The file this daemon took the store by (`takeStore`).
  */
-export function stillHeld(home: string, held: DaemonFile): DaemonFile | undefined {
+export function stillHeld(home: string, held: DaemonFile) {
   const file = readDaemon(home)?.file;
-  return file && file.pid !== held.pid ? file : undefined;
+  return (file && file.pid !== held.pid ? file : undefined) satisfies DaemonFile | undefined;
 }
 
 /**
@@ -465,7 +455,7 @@ export function stillHeld(home: string, held: DaemonFile): DaemonFile | undefine
  * @param held The file this daemon took the store by (`takeStore`).
  * @param now The instant the pass completed at, on both clocks; now by default.
  */
-export function passed(home: string, held: DaemonFile, now: Instant = instantNow()): DaemonFile {
+export function passed(home: string, held: DaemonFile, now: Instant = instantNow()) {
   const file = readDaemon(home)?.file;
   if (file && file.pid !== held.pid) return stamped(held, 'passedAt', now);
   const next = stamped(file ?? held, 'passedAt', now);
@@ -479,7 +469,7 @@ export function passed(home: string, held: DaemonFile, now: Instant = instantNow
  * @param home The store's directory (`WF_ROOT`).
  * @param url Where the api serves.
  */
-export function heldUrl(home: string, url: string): boolean {
+export function heldUrl(home: string, url: string) {
   const file = readDaemon(home)?.file;
   if (file?.pid !== process.pid || file.stoppedAt) return false;
   writeDaemon(home, { ...file, url });
@@ -496,7 +486,7 @@ export function heldUrl(home: string, url: string): boolean {
  * @param home The store's directory (`WF_ROOT`).
  * @param cards What the engine serves on its own port, an opaque card by harness name.
  */
-export function heldServes(home: string, cards: Record<string, Record<string, unknown>>): boolean {
+export function heldServes(home: string, cards: Record<string, Record<string, unknown>>) {
   const file = readDaemon(home)?.file;
   if (file?.pid !== process.pid || file.stoppedAt) return false;
   writeDaemon(home, { ...file, serves: cards });
@@ -514,7 +504,7 @@ export function heldServes(home: string, cards: Record<string, Record<string, un
  * @param home The store's directory (`WF_ROOT`).
  * @param now The instant to judge at, on both clocks; now by default.
  */
-export function servesOnStore(home: string, now: Instant = instantNow()): Record<string, Record<string, unknown>> | undefined {
+export function servesOnStore(home: string, now: Instant = instantNow()) {
   const standing = daemonStanding(home, now);
   if (standing.kind !== 'ticking' || standing.file.pid === process.pid) return undefined;
   return standing.file.serves;
@@ -528,7 +518,7 @@ export function servesOnStore(home: string, now: Instant = instantNow()): Record
  * @param held The file this daemon took the store by (`takeStore`).
  * @param now The instant of the beat, on both clocks; now by default.
  */
-export function beat(home: string, held: DaemonFile, now: Instant = instantNow()): void {
+export function beat(home: string, held: DaemonFile, now: Instant = instantNow()) {
   try {
     const file = readDaemon(home)?.file;
     if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon(home, stamped(file, 'beatAt', now));
@@ -543,7 +533,7 @@ export function beat(home: string, held: DaemonFile, now: Instant = instantNow()
  * @param held The file this daemon took the store by (`takeStore`).
  * @param at The time the store is let go at, an ISO stamp; now by default.
  */
-export function releaseStore(home: string, held: DaemonFile, at = new Date().toISOString()): void {
+export function releaseStore(home: string, held: DaemonFile, at = new Date().toISOString()) {
   try {
     const file = readDaemon(home)?.file;
     if (file?.pid === held.pid && !file.stoppedAt) writeDaemon(home, { ...file, stoppedAt: at });
@@ -557,7 +547,7 @@ export function releaseStore(home: string, held: DaemonFile, at = new Date().toI
  * @param verb The verb asking, `tick`, whose words the refusal says.
  * @param now The instant to judge at, on both clocks; now by default.
  */
-export function storeRefusal(home: string, verb: 'tick', now: Instant = instantNow()): string | undefined {
+export function storeRefusal(home: string, verb: 'tick', now: Instant = instantNow()) {
   const holder = holderAgainst(daemonStanding(home, now), process.pid);
   return holder ? holdRefusal(holder, verb, home, now.at) : undefined;
 }
@@ -568,7 +558,7 @@ export function storeRefusal(home: string, verb: 'tick', now: Instant = instantN
  * cost; nothing reads it to decide.
  * @param home The store's directory (`WF_ROOT`).
  */
-export const recentFile = (home: string): string => path.join(home, 'tick-recent.json');
+export const recentFile = (home: string) => path.join(home, 'tick-recent.json');
 
 /** A pass as `recordRecentPass` keeps it (`RecentPass`): a key it does not name is kept, as a newer `nemia` may write one. */
 const isRecentPass = Schema.is(
@@ -615,7 +605,7 @@ const isRecentPass = Schema.is(
  * The recent passes as `text` holds them, and how many of its entries do not read as one; none of either for a text that is no list.
  * @param text The file's text.
  */
-export const parseRecentPasses = (text: string): { passes: RecentPass[]; unread: number } => {
+export const parseRecentPasses = (text: string) => {
   const list = jsonOr(text);
   if (!Array.isArray(list)) return { passes: [], unread: 0 };
   const passes = list.filter((entry): entry is RecentPass => isRecentPass(entry));
@@ -623,7 +613,7 @@ export const parseRecentPasses = (text: string): { passes: RecentPass[]; unread:
 };
 
 /** The file's text, or undefined where there is none yet. */
-const recentText = (home: string): string | undefined => {
+const recentText = (home: string) => {
   try {
     return fs.readFileSync(recentFile(home), 'utf8');
   } catch {
@@ -636,12 +626,12 @@ const recentText = (home: string): string | undefined => {
  * read as a pass is left out, and the file named once on stderr with how many; the next pass writes the file without them.
  * @param home The store's directory (`WF_ROOT`).
  */
-export function recentPasses(home: string): RecentPass[] {
+export function recentPasses(home: string) {
   const text = recentText(home);
-  if (text === undefined) return [];
+  if (text === undefined) return [] satisfies RecentPass[] as RecentPass[];
   const { passes, unread } = parseRecentPasses(text);
   if (unread) process.stderr.write(`${recentFile(home)}: ${unread} of its passes did not read as one and were left out.\n`);
-  return passes;
+  return passes satisfies RecentPass[] as RecentPass[];
 }
 
 /**
@@ -653,12 +643,7 @@ export function recentPasses(home: string): RecentPass[] {
  * @param keep The most passes kept, the oldest left out past it; `RECENT_KEPT` by default.
  * @param also What the pass is kept with besides its cost: the quota read, the checks at work and the disk reading; none by default.
  */
-export function recordRecentPass(
-  home: string,
-  cost: PassCost,
-  keep = RECENT_KEPT,
-  also: AlsoKept = {},
-): { ms: number; kept: RecentPass[] } {
+export function recordRecentPass(home: string, cost: PassCost, keep = RECENT_KEPT, also: AlsoKept = {}) {
   const t0 = performance.now();
   const text = recentText(home);
   const kept = [...(text === undefined ? [] : parseRecentPasses(text).passes), recentOf(cost, also)].slice(-keep);

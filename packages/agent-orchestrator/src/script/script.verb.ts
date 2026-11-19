@@ -48,7 +48,7 @@ export type ScriptFiling = {
  * pass that files the route's first node — keeps what the run took after the producer's closeout is pruned.
  * @param f The pass's filing: the run, whose records are written, and its reads of each step's word and closeout.
  */
-export function answerTables(f: Pick<ScriptFiling, 'run' | 'reads'>): string[] {
+export function answerTables(f: Pick<ScriptFiling, 'run' | 'reads'>) {
   const { run, reads } = f;
   const wordOf = (name: string) => {
     const step = reads.steps.find((s) => s.name === name);

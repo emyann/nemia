@@ -51,13 +51,13 @@ import { Invalid, type Refusal } from '../refusal/refusal.ts';
  * The feed of the store `root`: beside `runs/`, one for the store.
  * @param root The store's root folder.
  */
-export const feedAt = (root: string): string => path.join(root, 'feed.jsonl');
+export const feedAt = (root: string) => path.join(root, 'feed.jsonl');
 
 /**
  * The workflow layer's feed (`feed.ts`) under the store `home`: written by the daemon alone, its tick and `up`'s start.
  * @param home The store's root folder.
  */
-export const feedFile = (home: string): string => feedAt(home);
+export const feedFile = (home: string) => feedAt(home);
 
 /**
  * Where the feed ends: the cursor after its last byte, and the generation of the feed it is the end of — the file's inode on the files, the
@@ -98,7 +98,7 @@ export type FeedDoorShape = DoorOf<FeedLayer, string>;
  * @param byteBefore The byte of the feed at a given offset.
  * @param where The feed a message names: its file, or the stand-in in memory.
  */
-export function cursorRefusalOf(after: number, size: number, byteBefore: (at: number) => number, where: string): string | undefined {
+export function cursorRefusalOf(after: number, size: number, byteBefore: (at: number) => number, where: string) {
   if (!Number.isSafeInteger(after) || after < 0)
     return `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after}`;
   if (after > size) {
@@ -120,7 +120,7 @@ export function cursorRefusalOf(after: number, size: number, byteBefore: (at: nu
  * @param after The cursor `buf` starts at, in bytes of the feed.
  * @param limit The most lines to take; every complete line where it is not given.
  */
-export function linesIn(buf: Buffer, after: number, limit = Infinity): FeedRead {
+export function linesIn(buf: Buffer, after: number, limit = Infinity) {
   const lines: FeedLine[] = [];
   const ends: number[] = [];
   let start = 0;
@@ -141,13 +141,13 @@ export function linesIn(buf: Buffer, after: number, limit = Infinity): FeedRead 
  * @param lines The lines to append.
  * @param last The feed's last byte, or undefined for an empty feed.
  */
-export function appendedText(lines: readonly FeedLine[], last: number | undefined): { text: string; leading: string } {
+export function appendedText(lines: readonly FeedLine[], last: number | undefined) {
   const leading = last !== undefined && last !== 0x0a ? '\n' : '';
   return { text: `${leading}${lines.map((l) => `${JSON.stringify(l)}\n`).join('')}`, leading };
 }
 
 /** A read's cursor, as `FeedCursor.OnCreate` checks it: a whole number of bytes, at least 0. */
-const cursorChecked = (after: number): Effect.Effect<void, Invalid> => {
+const cursorChecked = (after: number) => {
   const broken = brokenBy(FeedCursor.OnCreate, after);
   return broken === null
     ? Effect.void
@@ -159,7 +159,7 @@ const cursorChecked = (after: number): Effect.Effect<void, Invalid> => {
 };
 
 /** Each line of an append, decoded through the model's `FeedLine`: `Invalid` naming the first that breaks it, before any is written. */
-const linesChecked = (lines: readonly FeedLine[]): Effect.Effect<void, Invalid> => {
+const linesChecked = (lines: readonly FeedLine[]) => {
   for (const [i, line] of lines.entries()) {
     const broken = brokenBy(FeedLineModel, line);
     if (broken !== null)
@@ -176,7 +176,7 @@ const linesChecked = (lines: readonly FeedLine[]): Effect.Effect<void, Invalid> 
  * The door over `layer`: each method as `doorOf` makes it, a read's cursor checked first and each appended line before any is written.
  * @param layer The Feed door's layer the door's methods run on: the files, or the stand-in in memory.
  */
-export function feedDoorOver(layer: FeedLayer): FeedDoorShape {
+export function feedDoorOver(layer: FeedLayer) {
   const door = doorOf<FeedLayer, string>(layer);
   return {
     lines: {
@@ -190,13 +190,13 @@ export function feedDoorOver(layer: FeedLayer): FeedDoorShape {
         }),
       append: (lines) => Effect.andThen(linesChecked(lines), door.lines.append(lines)),
     },
-  };
+  } satisfies FeedDoorShape;
 }
 
-const statOf = (file: string): fs.Stats | undefined => fs.statSync(file, { throwIfNoEntry: false });
+const statOf = (file: string) => fs.statSync(file, { throwIfNoEntry: false });
 
 /** The byte at `at` in the file, read alone. */
-function byteAt(file: string, at: number): number {
+function byteAt(file: string, at: number) {
   const fd = fs.openSync(file, 'r');
   try {
     const one = Buffer.alloc(1);
@@ -208,8 +208,7 @@ function byteAt(file: string, at: number): number {
 }
 
 /** Why a cursor cannot be read from the file — or undefined when it can (`cursorRefusalOf`). */
-const cursorRefusalAt = (file: string, after: number): string | undefined =>
-  cursorRefusalOf(after, statOf(file)?.size ?? 0, (at) => byteAt(file, at), file);
+const cursorRefusalAt = (file: string, after: number) => cursorRefusalOf(after, statOf(file)?.size ?? 0, (at) => byteAt(file, at), file);
 
 /** The first bytes a read of a few lines takes from the file (`linesFrom`), doubled each time they hold too few lines. */
 const FIRST_CHUNK = 64 * 1024;
@@ -218,7 +217,7 @@ const FIRST_CHUNK = 64 * 1024;
  * The file's complete lines from `after` to `size` (`linesIn`): read whole, or, where `limit` is given, in chunks from `after` that double
  * until they hold `limit` lines or reach `size`, so a few lines cost about what they take and never the rest of the feed.
  */
-function linesFrom(file: string, after: number, size: number, limit?: number): FeedRead {
+function linesFrom(file: string, after: number, size: number, limit?: number) {
   if (after >= size) return { lines: [], ends: [], cursor: after };
   const fd = fs.openSync(file, 'r');
   try {
@@ -238,7 +237,7 @@ function linesFrom(file: string, after: number, size: number, limit?: number): F
 }
 
 /** `lines` appended to the file in one write (`appendedText`): the file's size before and after, and the newline written first, if any. */
-function appendLines(file: string, lines: readonly FeedLine[]): FeedAppended {
+function appendLines(file: string, lines: readonly FeedLine[]) {
   const before = statOf(file)?.size ?? 0;
   if (!lines.length) return { lines: [...lines], before, after: before, leading: '' };
   const { text, leading } = appendedText(lines, before > 0 ? byteAt(file, before - 1) : undefined);
@@ -251,7 +250,7 @@ function appendLines(file: string, lines: readonly FeedLine[]): FeedAppended {
  * The Feed door's files layer over the store `root`'s feed: its end by the file's size and inode.
  * @param root The store's root folder.
  */
-export function feedFiles(root: string): FeedLayer {
+export function feedFiles(root: string) {
   const file = feedAt(root);
   return {
     lines: {
@@ -263,7 +262,7 @@ export function feedFiles(root: string): FeedLayer {
       cursorRefusal: (after) => cursorRefusalAt(file, after),
       append: (lines) => appendLines(file, lines),
     },
-  };
+  } satisfies FeedLayer;
 }
 
 /**
@@ -278,7 +277,8 @@ export const FeedDoor = Context.Reference<FeedDoorShape>('agent-orchestrator/Fee
  * The Feed door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
  * @param root The store's root folder.
  */
-export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(FeedDoor)(feedDoorOver(feedFiles(root)));
+export const feedDoorFiles = (root: string) =>
+  Layer.succeed(FeedDoor)(feedDoorOver(feedFiles(root))) satisfies Layer.Layer<never> as Layer.Layer<never>;
 
 /**
  * One pass's words written on `door` where they are not what the feed said of them last: the lines written, and where their bytes went
@@ -322,7 +322,7 @@ export const feedPass = (
     missing?: FeedMissing;
     readiness?: FeedReadiness;
   } = {},
-): Effect.Effect<FeedAppended, Refusal> =>
+) =>
   Effect.gen(function* () {
     const end = yield* door.lines.end();
     if (
@@ -343,12 +343,12 @@ export const feedPass = (
   });
 
 /** The door over the files at the root `home`, for the synchronous spellings. */
-const doorAt = (home: string): FeedDoorShape => feedDoorOver(feedFiles(home));
+const doorAt = (home: string) => feedDoorOver(feedFiles(home)) satisfies FeedDoorShape as FeedDoorShape;
 
 /** `effect` run where it is called: what it succeeds with, or the refusal it failed with thrown, or the defect it died of. */
-function ran<A>(effect: Effect.Effect<A, Refusal>): A {
+function ran<A>(effect: Effect.Effect<A, Refusal>) {
   const exit = Effect.runSyncExit(effect);
-  if (Exit.isSuccess(exit)) return exit.value;
+  if (Exit.isSuccess(exit)) return exit.value satisfies A as A;
   throw Cause.squash(exit.cause);
 }
 
@@ -376,7 +376,7 @@ export const recordFeed = (
     missing?: FeedMissing;
     readiness?: FeedReadiness;
   } = {},
-): FeedAppended => within('act', () => ran(feedPass(doorAt(home), memo, now, pass)));
+) => within('act', () => ran(feedPass(doorAt(home), memo, now, pass)));
 
 /**
  * Appends a daemon's line (`startedLine`) to the feed, after a newline where its last line was left unended, as `recordFeed` appends; no
@@ -384,8 +384,7 @@ export const recordFeed = (
  * @param home The store's root folder.
  * @param line The daemon's line to append.
  */
-export const recordDaemonLine = (home: string, line: DaemonLine): FeedAppended =>
-  within('act', () => ran(doorAt(home).lines.append([line])));
+export const recordDaemonLine = (home: string, line: DaemonLine) => within('act', () => ran(doorAt(home).lines.append([line])));
 
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
@@ -395,7 +394,7 @@ export const freshFeedMemo = freshMemo;
  * @param home The store's root folder.
  * @param after The cursor to read from, in bytes: 0, the start, where it is not given.
  */
-export const readFeed = (home: string, after = 0): { lines: FeedLine[]; cursor: number } => {
+export const readFeed = (home: string, after = 0) => {
   const { lines, cursor } = ran(doorAt(home).lines.read(after));
   return { lines, cursor };
 };
@@ -405,13 +404,13 @@ export const readFeed = (home: string, after = 0): { lines: FeedLine[]; cursor: 
  * @param home The store's root folder.
  * @param after The cursor to judge, in bytes.
  */
-export const feedCursorRefusal = (home: string, after: number): string | undefined => ran(doorAt(home).lines.cursorRefusal(after));
+export const feedCursorRefusal = (home: string, after: number) => ran(doorAt(home).lines.cursorRefusal(after));
 
 /**
  * The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads.
  * @param home The store's root folder.
  */
-export const feedSize = (home: string): number => ran(doorAt(home).lines.end())?.cursor ?? 0;
+export const feedSize = (home: string) => (ran(doorAt(home).lines.end())?.cursor ?? 0) satisfies number as number;
 
 /**
  * The lines after `after`, each with the byte just after it (`ends`), and the cursor to read on from: what a live reader hands on. A
@@ -419,7 +418,7 @@ export const feedSize = (home: string): number => ran(doorAt(home).lines.end())?
  * @param home The store's root folder.
  * @param after The cursor to read from, in bytes.
  */
-export const readFeedEnds = (home: string, after: number): FeedRead => ran(doorAt(home).lines.read(after));
+export const readFeedEnds = (home: string, after: number) => ran(doorAt(home).lines.read(after)) satisfies FeedRead as FeedRead;
 
 /**
  * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched
@@ -428,7 +427,7 @@ export const readFeedEnds = (home: string, after: number): FeedRead => ran(doorA
  * @param opts Where the watch starts (`from`, 0 where not given), its timer's beat in ms (`intervalMs`), and what it hands each line,
  * error, read and cut to.
  */
-export const watchFeed = (home: string, opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(home), opts);
+export const watchFeed = (home: string, opts: Parameters<typeof watchFeedFile>[1]) => watchFeedFile(feedFile(home), opts);
 
 /** What every key a line does not name is kept as, so a line a newer `nemia` wrote keeps it through a read and a write back. */
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -531,20 +530,20 @@ const isFeedLine = Schema.is(FeedLineSchema);
  * The decoded line goes through the one door between the loose shape the JSON held and the typed line (`lineAsRead`), which fills in from
  * the word and the note every key that is missing, and passes on a line a newer `nemia` signed as its writer judged it.
  */
-function parseLine(text: string): FeedLine[] {
-  if (!text) return [];
+function parseLine(text: string) {
+  if (!text) return [] satisfies FeedLine[];
   try {
     const line: unknown = JSON.parse(text);
-    return isFeedLine(line) ? [lineAsRead(line)] : [];
+    return (isFeedLine(line) ? [lineAsRead(line)] : []) satisfies FeedLine[];
   } catch {
-    return [];
+    return [] satisfies FeedLine[];
   }
 }
 
-const refused = (message: string): Invalid => new Invalid({ message });
+const refused = (message: string) => new Invalid({ message });
 
 /** The file's lines after `after`, its cursor refused by name first (exit 2): what a watch given no `onCut` reads by. */
-function readEnds(file: string, after: number): FeedRead {
+function readEnds(file: string, after: number) {
   const refusal = cursorRefusalAt(file, after);
   if (refusal) throw refused(refusal);
   return linesFrom(file, after, statOf(file)?.size ?? 0);
@@ -560,7 +559,7 @@ function readEnds(file: string, after: number): FeedRead {
  * of one beat is seen by the later one alone, and the beat then says a cut the earlier one's size does not fit. The read of that byte
  * throws where the file has just gone, and the beat takes itself again (`cutOrRead`).
  */
-function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs.Stats | undefined): string | undefined {
+function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs.Stats | undefined) {
   if (cursor === 0) return undefined;
   const from = `reading the feed there is now from its start — a line said before may be said again`;
   if (!stat) return `the feed was deleted under this watch at cursor ${cursor} (${file}): ${from}`;
@@ -586,7 +585,7 @@ type WatchBeat =
  * read that cannot open the file is a feed that went just then, and is taken again, up to `tries`, so the stat of the next try says which
  * cut it was; a file that keeps failing for another reason throws its last failure, which the watch hands to `onError`.
  */
-function cutOrRead(file: string, cursor: number, ino: number | undefined, tries = 3): WatchBeat {
+function cutOrRead(file: string, cursor: number, ino: number | undefined, tries = 3) {
   let seen = ino;
   for (let i = 1; ; i++) {
     const stat = statOf(file);
@@ -620,7 +619,7 @@ type WatchHands = {
  * Given no `onCut`, it reads through `readEnds`, whose refusal of a cursor the feed no longer has (exit 2) is the caller's to take: the
  * api's stream ends on it, and its reader opens the feed again. Given one, no read of a watch already following ever says that refusal.
  */
-async function passOf(file: string, at: WatchAt, { onLine, onRead, onCut }: WatchHands): Promise<boolean> {
+async function passOf(file: string, at: WatchAt, { onLine, onRead, onCut }: WatchHands) {
   let got: { lines: FeedLine[]; ends: number[]; cursor: number };
   if (onCut) {
     const beat = cutOrRead(file, at.cursor, at.ino);
@@ -673,7 +672,7 @@ async function passOf(file: string, at: WatchAt, { onLine, onRead, onCut }: Watc
 function watchFeedFile(
   file: string,
   { from = 0, intervalMs = 1_000, onLine, onError, onRead, onCut }: { from?: number; intervalMs?: number } & WatchHands,
-): { stop(): void } {
+) {
   const refusal = cursorRefusalAt(file, from);
   if (refusal) throw refused(refusal);
   const at: WatchAt = { cursor: from, ino: statOf(file)?.ino, stopped: false };
@@ -681,7 +680,7 @@ function watchFeedFile(
   let draining = false;
   let again = false;
 
-  const drain = async (): Promise<void> => {
+  const drain = async () => {
     if (at.stopped) return;
     if (draining) {
       again = true;

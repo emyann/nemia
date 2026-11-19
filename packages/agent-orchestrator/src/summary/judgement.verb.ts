@@ -56,7 +56,7 @@ export type JudgedOrWhy = { judgement: Judgement } | { unjudged: string; saidBy:
 export type Judgements = { readonly runs: ReadonlyMap<string, JudgedOrWhy>; readonly views: Views; readonly unreadable: Unreadable };
 
 /** Each of `names` of `run` as a run left unjudged words it (`unjudgedWord`), off the views that did read, with its branch. */
-const unjudgedSteps = (run: Run, names: readonly string[], views: Views, unreadable: Unreadable): UnjudgedStep[] => {
+const unjudgedSteps = (run: Run, names: readonly string[], views: Views, unreadable: Unreadable) => {
   const wordOf = unjudgedWord(views, unreadable);
   return names.map((name) => ({ name, message: wordOf(run.steps[name]), branch: run.steps[name]?.branch ?? null }));
 };
@@ -126,4 +126,4 @@ const comparable = ({ run, names, steps, views, judged, asked }: Judgement) => {
  * @param kept The judgement kept in memory.
  * @param fresh The judgement made afresh.
  */
-export const sameJudgement = (kept: Judgement, fresh: Judgement): boolean => isDeepStrictEqual(comparable(kept), comparable(fresh));
+export const sameJudgement = (kept: Judgement, fresh: Judgement) => isDeepStrictEqual(comparable(kept), comparable(fresh));

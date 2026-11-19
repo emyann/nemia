@@ -49,8 +49,7 @@ export type Caller =
     };
 
 /** Whether `caller` acts in `factory`: the person anywhere, a factory's session in its own, a store-wide session in any. */
-const actsIn = (caller: Caller, factory: string): boolean =>
-  caller.kind === 'person' || caller.factory === null || caller.factory === factory;
+const actsIn = (caller: Caller, factory: string) => caller.kind === 'person' || caller.factory === null || caller.factory === factory;
 
 const mayProposeSpec = spec<(caller: Caller, factory: string) => boolean>({
   ensures: {
@@ -91,23 +90,23 @@ export type ApprovalVerdict =
   | { readonly kind: 'refused'; readonly reason: ApprovalRefusedReason };
 
 /** Whether `grant` covers `change`: its resource, its name (every name where the grant names none), and its verb. */
-const covers = (grant: Grant, change: Change): boolean =>
+const covers = (grant: Grant, change: Change) =>
   grant.resources.includes(change.resource) &&
   (grant.resourceNames.length === 0 || grant.resourceNames.includes(change.name)) &&
   grant.verbs.includes(change.verb);
 
 /** Whether every change is covered by some grant. */
-const delegated = (grants: readonly Grant[], changes: readonly Change[]): boolean =>
+const delegated = (grants: readonly Grant[], changes: readonly Change[]) =>
   changes.every((change) => grants.some((grant) => covers(grant, change)));
 
 /** Whether `rule` takes the proposal: every change covered, its proposer among those it names, and a widening said outright. */
-const ruleTakes = (rule: ProposalRule, p: ProposalFacts): boolean =>
+const ruleTakes = (rule: ProposalRule, p: ProposalFacts) =>
   p.changes.every((change) => covers(rule, change)) &&
   (rule.proposedBy.length === 0 || (p.proposedBy !== null && rule.proposedBy.includes(p.proposedBy))) &&
   (!p.widens || rule.widens);
 
 /** Whether some rule of `rules` takes the proposal. */
-const someRuleTakes = (rules: readonly ProposalRule[], p: ProposalFacts): boolean => rules.some((rule) => ruleTakes(rule, p));
+const someRuleTakes = (rules: readonly ProposalRule[], p: ProposalFacts) => rules.some((rule) => ruleTakes(rule, p));
 
 const proposalApprovalSpec = spec<(caller: Caller, proposal: ProposalFacts, standing: Standing) => ApprovalVerdict>({
   ensures: {

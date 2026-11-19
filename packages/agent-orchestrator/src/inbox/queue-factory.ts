@@ -24,7 +24,7 @@ export function queueFactoryRefusal(
   file: string,
   names: readonly string[],
   unfactoredStarts: boolean,
-): string | null {
+) {
   if (card.factory === DEFAULT_NAMESPACE) {
     return defaultStartRefusal(`\`factory: <name>\` in ${file}`, names).replace(NOT_STARTED, NOT_QUEUED);
   }

@@ -31,7 +31,7 @@ export type VolumeWorld = {
  * @param filedAt When the factory was filed, each volume's creation timestamp.
  * @param world What each volume's status is read against: the store's root, whether a path is a folder, and the runs that mount one.
  */
-export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, filedAt: string, world: VolumeWorld): Volume[] =>
+export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, filedAt: string, world: VolumeWorld) =>
   factoryVolumesNamed(listing).map((v) => {
     const spec = { path: v.path, readOnly: v.readOnly };
     const refused = volumeRefusal(listing, v, world.home, world.isDirectory);
@@ -50,7 +50,7 @@ export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, f
       spec,
       status,
     };
-  });
+  }) satisfies Volume[] as Volume[];
 
 /** The volumes of the factory `namespace`, read now; none for the default factory; `Missing` where no factory has the name. */
 const volumesNow = Effect.fn('volumesNow')(function* (e: Engine, how: SummaryHow, namespace: string, isDirectory: (at: string) => boolean) {

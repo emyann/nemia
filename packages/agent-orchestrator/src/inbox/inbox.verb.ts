@@ -144,7 +144,7 @@ const cardPlace = Effect.fn('cardPlace')(function* (
  * in yours (`<home>/workflows`), as a factory looks a name up. Refused as a `WorkflowError`: where it is the card's own `workflow:`
  * (`card`), in the card's file and line, then `workflowFolder`'s words.
  */
-function cardWorkflow(home: string, name: string, card: InboxCard | undefined, repo: string, tree?: string): WorkflowDir {
+function cardWorkflow(home: string, name: string, card: InboxCard | undefined, repo: string, tree?: string) {
   try {
     return workflowFolder(name, inboxDir(home), repo, tree);
   } catch (err) {
@@ -257,7 +257,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
  * back and an edit made since is kept, its paths not judged, as `nemia inbox queue --off` takes it off. Why it is still there, when that
  * failed.
  */
-const takeQueueOff = (name: CardName, file: string): Effect.Effect<string | undefined> =>
+const takeQueueOff = (name: CardName, file: string) =>
   Effect.gen(function* () {
     const door = yield* CardDoor;
     const now = yield* door.cards.read(name);
@@ -290,13 +290,16 @@ const cardGates = Effect.fn('cardGates')(function* (
  * The models a card's run is started with: its `model:`, and `flags` (`--model`) over it for the same step, each said where it was
  * (`modelSaid`); none where neither names one.
  */
-const cardModels = (card: InboxCard, flags: RunModels | undefined): { models?: RunModels; modelSaid?: (step: string) => string } => {
+const cardModels = (card: InboxCard, flags: RunModels | undefined) => {
   const models = { ...card.model, ...flags };
-  return Object.keys(models).length ? { models, modelSaid: (step) => modelSaid(card, flags, step) } : {};
+  return (Object.keys(models).length ? { models, modelSaid: (step) => modelSaid(card, flags, step) } : {}) satisfies {
+    models?: RunModels;
+    modelSaid?: (step: string) => string;
+  };
 };
 
 /** Where a card's run was told a step's model: the card's `model:` line, unless the start's `--model` names that step too. */
-const modelSaid = (card: InboxCard, flags: RunModels | undefined, step: string): string =>
+const modelSaid = (card: InboxCard, flags: RunModels | undefined, step: string) =>
   flags?.[step] !== undefined || card.model === undefined
     ? `--model ${step}=${flags?.[step] ?? ''}`
     : `${card.file}: \`model: ${modelsText(card.model)}\``;
@@ -304,7 +307,7 @@ const modelSaid = (card: InboxCard, flags: RunModels | undefined, step: string):
 /**
  * The runs a card's run is handed as context: its `from:`, then `opts.context`, a run both name once — refused as `contextRefusal` says.
  */
-function cardContext(card: InboxCard, opts: InboxStart, exists: (id: string) => boolean): string[] {
+function cardContext(card: InboxCard, opts: InboxStart, exists: (id: string) => boolean) {
   const refusedFrom = contextRefusal(card.from ?? [], opts.after ?? [], exists, undefined, `${card.file}: from:`);
   if (refusedFrom) throw refusedFrom;
   return [...new Set([...(card.from ?? []), ...(opts.context ?? [])])];
@@ -368,7 +371,7 @@ const dropStaleTries = (names: Iterable<string>, listing: readonly CardListing[]
  * The repository a queued card's line names (`on`), when it was tried on the daemon's (`fromDaemon`), which only a card of the default
  * factory is: none where that card is refused wherever a daemon runs, unless `WF_DEFAULT_FACTORY_STARTS=1` starts it there.
  */
-const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon: boolean, defaultStarts: boolean): { on?: string } =>
+const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon: boolean, defaultStarts: boolean) =>
   fromDaemon && (card.factory !== null || defaultStarts) ? { on } : {};
 
 /**

@@ -6,11 +6,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { failedWords, git, gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import { failedWords, git, gitSays, isDirectory, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The verb's body. */
-export function* land(request: PlaceRequests['land']): Asking<Reply<'land'>> {
+export function* land(request: PlaceRequests['land']) {
   const { repo: checkout, act } = request;
   const file = isDirectory(checkout) ? yield* gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
   if (file === undefined) return refused(`${checkout} is not a git repository, so there is no merge to ${act}`);

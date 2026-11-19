@@ -13,7 +13,7 @@ export type CostLines = Readonly<Record<string, number>>;
  * Whether `usd` is an amount a line can be: dollars above zero, and finite, as a cap is.
  * @param usd The amount, in dollars.
  */
-export const isLineAmount = (usd: number): boolean => Number.isFinite(usd) && usd > 0;
+export const isLineAmount = (usd: number) => Number.isFinite(usd) && usd > 0;
 
 /**
  * Why `factory` cannot set a cost line of `usd` for `workflow`, or undefined: a workflow's name that is not one, a workflow it does not
@@ -22,7 +22,7 @@ export const isLineAmount = (usd: number): boolean => Number.isFinite(usd) && us
  * @param workflow The workflow's folder name.
  * @param usd The line asked for, in dollars.
  */
-export function costLineRefusal(factory: Pick<Factory, 'name' | 'workflows'>, workflow: string, usd: number): string | undefined {
+export function costLineRefusal(factory: Pick<Factory, 'name' | 'workflows'>, workflow: string, usd: number) {
   const badName = workflowNameRefusal(workflow);
   if (badName !== undefined) return `${badName} Nothing was changed.`;
   if (!factory.workflows.includes(workflow))
@@ -37,7 +37,7 @@ export function costLineRefusal(factory: Pick<Factory, 'name' | 'workflows'>, wo
  * @param factory The factory, by its name and the cost lines it sets.
  * @param workflow The workflow's folder name.
  */
-export const unsetCostLineRefusal = (factory: Pick<Factory, 'name' | 'costLines'>, workflow: string): string => {
+export const unsetCostLineRefusal = (factory: Pick<Factory, 'name' | 'costLines'>, workflow: string) => {
   const set = Object.keys(factory.costLines ?? {}).sort();
   return `${factory.name} sets no cost line for ${workflow}. ${set.length ? `It sets one for: ${set.join(', ')}.` : 'It sets none.'} Nothing was changed.`;
 };
@@ -48,7 +48,7 @@ export const unsetCostLineRefusal = (factory: Pick<Factory, 'name' | 'costLines'
  * @param workflow The workflow's folder name.
  * @param usd The line, in dollars.
  */
-export const withCostLine = (lines: CostLines | undefined, workflow: string, usd: number): Record<string, number> => ({
+export const withCostLine = (lines: CostLines | undefined, workflow: string, usd: number) => ({
   ...lines,
   [workflow]: usd,
 });
@@ -58,7 +58,7 @@ export const withCostLine = (lines: CostLines | undefined, workflow: string, usd
  * @param lines The factory's cost lines, or undefined where it sets none.
  * @param workflow The workflow's folder name.
  */
-export const withoutCostLine = (lines: CostLines | undefined, workflow: string): Record<string, number> | undefined => {
+export const withoutCostLine = (lines: CostLines | undefined, workflow: string) => {
   const { [workflow]: _gone, ...rest } = lines ?? {};
   return Object.keys(rest).length ? rest : undefined;
 };

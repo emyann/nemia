@@ -15,7 +15,7 @@ const ROOT_FILES = ['nemia.yaml', 'NEMIA.md', 'RULES.md', 'nemia.lock.yaml'];
 const HOLDERS = ['workflows/', 'agents/', 'skills/', 'carried/'];
 
 /** Whether `file` has no part `..`, said without splitting it, which the verifier does not model. */
-const noParentPart = (file: string): boolean => file !== '..' && !file.startsWith('../') && !file.endsWith('/..') && !file.includes('/../');
+const noParentPart = (file: string) => file !== '..' && !file.startsWith('../') && !file.endsWith('/..') && !file.includes('/../');
 
 /**
  * The laws say what the layout holds as a whole; which files a known holder's folder takes (a workflow's notes, an agent's three files,

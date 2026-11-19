@@ -48,7 +48,11 @@ import { RunId } from '../record/record.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
-const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
+const nothing = () =>
+  ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] }) satisfies Omit<Forgot, 'id' | 'kind'> as Omit<
+    Forgot,
+    'id' | 'kind'
+  >;
 
 /** What `nemia rm` is left with once a run's record is read and what a pass filed and never wrote down is adopted onto it. */
 type Forgetting = Effect.Success<ReturnType<typeof readForgetting>>;
@@ -150,11 +154,11 @@ const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: str
  * A run's frozen steps, or, for a record with no frozen workflow whose folder does not read, why (`unfrozen`): whatever reading it throws,
  * a plain `ENOENT` included, so the run is judged without its steps.
  */
-const frozenSteps = (run: Run): Effect.Effect<{ steps?: StepSpec[]; unfrozen?: string }> =>
+const frozenSteps = (run: Run) =>
   stepsOf(run).pipe(
     Effect.map((steps) => ({ steps })),
     Effect.catch((err) => Effect.succeed({ unfrozen: err instanceof UnloadedFolder ? err.why : err.message })),
-  );
+  ) satisfies Effect.Effect<{ steps?: StepSpec[]; unfrozen?: string }> as Effect.Effect<{ steps?: StepSpec[]; unfrozen?: string }>;
 
 /**
  * Read the run `id` as `cancel` does: its record, its frozen steps (`frozenSteps`), the engine's view of its tasks, and its asks; then
@@ -175,7 +179,7 @@ const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: str
 });
 
 /** The ids of the engine's tasks `nemia rm` forgets of `run` as `readForgetting` adopts it: each task it names (`runTasks`), once. */
-const forgottenIds = (run: Run): string[] => [...new Set(runTasks(run))];
+const forgottenIds = (run: Run) => [...new Set(runTasks(run))];
 
 /**
  * What `nemia rm` would forget of the engine's tasks of each of the runs `runIds`: each read as rm reads it (`readForgetting`), its ids
@@ -202,14 +206,14 @@ export const runsForgetting = Effect.fn('runsForgetting')(function* (runIds: rea
  * Whether `nemia rm` reads where `run`'s result stands: for an ending gated before it runs that has not run, or one that lands on its
  * check, whose staged merge is read off its result tips.
  */
-const asksStanding = (run: Run, steps: readonly StepSpec[] | undefined): boolean =>
+const asksStanding = (run: Run, steps: readonly StepSpec[] | undefined) =>
   isRepositoryRun(run) && (steps ?? []).some((s) => (approvedFirst(s, run) && !run.steps[s.name]?.taskId) || landsOnCheck(s, run));
 
 /**
  * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
  * stands for an ending that has not run, and a merge the ending staged, as `git` reads them.
  */
-function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, place: Place): string | null {
+function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, place: Place) {
   const { run, steps } = f;
   const askAt = (a: AskName) => runsAtOnce(home).asks.where(id, a);
   const others = runsAtOnce(home)
@@ -234,14 +238,14 @@ function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, p
     merging(run, steps, statusMemo(headsOver(git), place)),
     `nemia rm ${run.id}`,
     checkKillOf,
-  );
+  ) satisfies string | null;
 }
 
 /**
  * Remove a repository run's worktrees through its place (`runWorktrees`, `handWorktree`), in one `remove`, which prunes git's list, and
  * answer what was removed, handed off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
  */
-function removeWorktrees(run: RepositoryRun, steps: readonly StepSpec[] | undefined, dir: string, place: RunPlaceRead): Worktrees {
+function removeWorktrees(run: RepositoryRun, steps: readonly StepSpec[] | undefined, dir: string, place: RunPlaceRead) {
   const within = resolved(dir);
   const recorded = {
     ...run,
@@ -262,7 +266,7 @@ function removeWorktrees(run: RepositoryRun, steps: readonly StepSpec[] | undefi
  * or pruned by the `remove`; one held (`heldWorktree`) is left with the place's command for it; one not clean is handed off first, and left
  * when its hand-off is refused, uncommitted, or does not answer.
  */
-function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step: string }, done: Worktrees): boolean {
+function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step: string }, done: Worktrees) {
   if (w.removable === 'gone') {
     if (!lstatOf(w.path)) done.gone.push(w.path);
     return false;
@@ -285,7 +289,7 @@ function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step:
 }
 
 /** Remove `removing` through the place's `remove`, never forced, adding to `done` what went and what git would not remove, in its words. */
-function removeListed(run: RepositoryRun, place: RunPlaceRead, removing: readonly Held[], done: Worktrees): void {
+function removeListed(run: RepositoryRun, place: RunPlaceRead, removing: readonly Held[], done: Worktrees) {
   const outcome = place.place.askNow('remove', { repo: run.repo, workspaces: removing.map((w) => w.path), branches: [] });
   if (!('answer' in outcome)) {
     for (const w of removing) done.left.push({ path: w.path, unread: { verb: 'remove', said: unansweredWords(outcome) } });
@@ -296,7 +300,7 @@ function removeListed(run: RepositoryRun, place: RunPlaceRead, removing: readonl
 }
 
 /** What is still in `within`, the run's worktrees' directory, by path: none when it is gone. */
-function strays(within: string): string[] {
+function strays(within: string) {
   try {
     return fs.readdirSync(within).map((name) => path.join(within, name));
   } catch {
@@ -309,10 +313,10 @@ function strays(within: string): string[] {
  * base branch as it read them — never one `handedOff` just committed onto, which the base has not — or forced, through the place's
  * `remove`. One git refuses to delete is kept, in git's words; all of them, when the `remove` does not answer.
  */
-function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead, handedOff: Forgot['handedOff']): BranchFate[] {
+function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead, handedOff: Forgot['handedOff']) {
   const read = place.inventory.branches;
   const handedOnto = new Set(handedOff.map((h) => h.branch));
-  const merged = (branch: string): boolean => !handedOnto.has(branch) && read.some((b) => b.branch === branch && b.merged);
+  const merged = (branch: string) => !handedOnto.has(branch) && read.some((b) => b.branch === branch && b.merged);
   const fates = branchFates(
     run,
     read.map((b) => b.branch),
@@ -320,17 +324,17 @@ function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead,
     how,
   );
   const doomed = fates.filter((b) => b.deleted).map((b) => b.branch);
-  if (!doomed.length) return fates;
+  if (!doomed.length) return fates satisfies BranchFate[];
   const outcome = place.place.askNow('remove', { repo: run.repo, workspaces: [], branches: doomed });
   const kept = new Map<string, BranchFate['why']>(
     'answer' in outcome
       ? outcome.answer.kept.map((k) => [k.branch, { git: k.said }])
       : doomed.map((branch) => [branch, { unread: unansweredWords(outcome) }]),
   );
-  return fates.map((b): BranchFate => {
+  return fates.map((b) => {
     const why = kept.get(b.branch);
-    return b.deleted && why ? { branch: b.branch, deleted: false, why } : b;
-  });
+    return (b.deleted && why ? { branch: b.branch, deleted: false, why } : b) satisfies BranchFate;
+  }) satisfies BranchFate[];
 }
 
 /**
@@ -339,7 +343,7 @@ function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead,
  * logs (`checkLogsOf`, by the steps `names`, or without them any under its id that is no other stored run's), and `worktrees/<id>` once
  * it is empty. Nothing else, and never the engine's, which `forgetTasks` asks the engine to forget.
  */
-function removeKeyed(home: string, id: string, names: readonly string[] | undefined): string[] {
+function removeKeyed(home: string, id: string, names: readonly string[] | undefined) {
   const removed = runsAtOnce(home).runs.forget(id);
   const remove = (at: string) => {
     const st = lstatOf(at);

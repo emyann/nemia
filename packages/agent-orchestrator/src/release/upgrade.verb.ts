@@ -79,18 +79,18 @@ export type Upgraded = {
 };
 
 /** The repository the tag is resolved in: `--repo`, else the running install's source, else the checkout the running code sits in. */
-const repoOf = (args: Args, running: Running): string =>
+const repoOf = (args: Args, running: Running) =>
   path.resolve(typeof args.repo === 'string' ? args.repo : running.kind === 'install' ? running.source : running.root);
 
 /** The answer of a place verb, or refused: `Missing` in the place's words where it refused, `Conflict` where it could not be read. */
-function answered<V extends PlaceVerb>(tag: string, outcome: PlaceOutcome<V>): Extract<PlaceOutcome<V>, { answer: unknown }>['answer'] {
+function answered<V extends PlaceVerb>(tag: string, outcome: PlaceOutcome<V>) {
   if ('answer' in outcome) return outcome.answer;
   if ('refused' in outcome) throw new Missing({ message: `${BY} ${tag}: ${outcome.refused}` });
   throw new Conflict({ message: `${BY} ${tag}: the git place did not answer (${outcome.unread.said}): nothing changed; run it again.` });
 }
 
 /** Runs the build's commands in its tree on its trial store; refused (`Invalid`) at the first that fails, naming it, its exit and log. */
-function checked(tag: string, building: Building, env: NodeJS.ProcessEnv): void {
+function checked(tag: string, building: Building, env: NodeJS.ProcessEnv) {
   for (const argv of BUILD_STEPS) {
     const exit = ranInto(argv, building.tree, trialEnv(env, building.trial), building.log);
     if (exit !== 0)
@@ -107,7 +107,7 @@ function checked(tag: string, building: Building, env: NodeJS.ProcessEnv): void 
  * line the carry printed and the log) where it exits non-zero: nothing is switched. `archive` says where the tree's `nemia` is: an
  * archive's `bin/nemia`, a build's npm bin.
  */
-function carried(tag: string, building: Building, archive: boolean, root: string, env: NodeJS.ProcessEnv): void {
+function carried(tag: string, building: Building, archive: boolean, root: string, env: NodeJS.ProcessEnv) {
   const nemia = archive ? path.join(building.tree, 'bin', 'nemia') : path.join(building.tree, 'node_modules', '.bin', 'nemia');
   const from = logSize(building.log);
   const exit = ranInto([nemia, 'doctor', 'carry'], building.tree, { ...env, WF_ROOT: root }, building.log);
@@ -128,7 +128,7 @@ function carried(tag: string, building: Building, archive: boolean, root: string
  * switched to it last, while the build's folder still stands, so the retention, which removes nothing while a build is under way, never
  * removes a release between the read that finds it built and the pointer naming it.
  */
-function prepared(place: Place, tag: string, repo: string, root: string, env: NodeJS.ProcessEnv): { release: ReleaseFile; built: boolean } {
+function prepared(place: Place, tag: string, repo: string, root: string, env: NodeJS.ProcessEnv) {
   const building = buildingOf(tag, new Date().toISOString().replace(/[:.]/g, '-'), root);
   try {
     const { commit } = answered(tag, place.askNow('export', { repo, tag, into: building.tree }));
@@ -218,7 +218,7 @@ function placedArchive(source: string, tag: string, platform: ReleasePlatform, b
  * Refused (`Conflict`) where `tag` names a version older than the oldest release that can read the store at `root` (`store.json`,
  * `goingBackRefused`), naming that release; a tag that is no version, or a store that records no floor, passes.
  */
-function floorRefusal(tag: string, root: string): void {
+function floorRefusal(tag: string, root: string) {
   const target = parseVersion(tag);
   const floor = readStoreFloor(root);
   if (target === null || floor === null || !goingBackRefused(target, floor)) return;
@@ -229,14 +229,14 @@ function floorRefusal(tag: string, root: string): void {
 }
 
 /** The installed `nemia`, as a person runs it once the store has a pointer: an archive's `bin/nemia`, a build's npm bin. */
-const installedNemia = (root: string, archive: boolean): string =>
+const installedNemia = (root: string, archive: boolean) =>
   archive ? path.join(releasesDir(root), CURRENT, 'bin', 'nemia') : path.join(releasesDir(root), CURRENT, 'node_modules', '.bin', 'nemia');
 
 /** How long the installed release's readiness read may take: the daemon it asks has just been restarted onto it. */
 const READINESS_READ_MS = 60_000;
 
 /** The readiness read `nemia doctor --json` printed, or why there is none. */
-function readinessOfJson(out: string): Readiness | string {
+function readinessOfJson(out: string) {
   try {
     return Schema.decodeUnknownSync(Readiness)(JSON.parse(out));
   } catch (err) {
@@ -256,7 +256,7 @@ function readinessOfJson(out: string): Readiness | string {
  * every run moves — or, where none of those is missing, one line saying so. A read that does not answer is one line naming the command
  * to type. Never a refusal, and nothing is rolled back: the upgrade itself succeeded, and the lines say what to do next.
  */
-function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS.ProcessEnv): string[] {
+function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS.ProcessEnv) {
   const ran = spawnSync(installedNemia(root, archive), ['doctor', '--json'], {
     env: { ...env, WF_ROOT: root, NEMIA_CONTEXT: 'local' },
     encoding: 'utf8',
@@ -266,7 +266,7 @@ function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS
   const read = ran.error === undefined ? readinessOfJson(ran.stdout) : ran.error.message;
   if (typeof read === 'string')
     return [`what ${tag} needs before a run could not be read (nemia doctor --json: ${read}): read it with nemia doctor`];
-  const held = (p: ReadinessPiece): boolean => p.state === 'missing' && (p.cost ?? 'run') === 'run';
+  const held = (p: ReadinessPiece) => p.state === 'missing' && (p.cost ?? 'run') === 'run';
   const unreached = read.pieces.find((p) => p.area === 'client' && held(p));
   if (unreached !== undefined)
     return [
@@ -298,7 +298,7 @@ function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS
 const CHEAP_AREAS: readonly ReadinessPiece['area'][] = ['machine', 'service'];
 
 /** A missing piece as the upgrade says it: its name, where it is, what is missing, then each fix with its command. */
-const pieceLines = (p: ReadinessPiece): string[] => [
+const pieceLines = (p: ReadinessPiece) => [
   `  ✗ ${p.name}${p.factory === undefined ? '' : ` (${[p.factory, p.workflow].filter((w) => w !== undefined).join('/')})`}: ${p.message}`,
   ...p.fixes.map((f) => `      ${f.command}  — ${f.message}`),
 ];

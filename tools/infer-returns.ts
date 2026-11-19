@@ -293,6 +293,7 @@ const plan = (configs: string[], files: string[]) => {
       if (result.text !== readFileSync(file, 'utf8')) texts.set(path.resolve(file), result.text);
     }
     for (const config of configs) {
+      console.log(`  round ${round} ${config}`);
       const { program, checker } = build(config, texts);
       const ordinals = new Map<ts.Node, Site>();
       const aliasesOf = new Map<string, Map<number, ts.TypeAliasDeclaration>>();
@@ -357,15 +358,45 @@ const plan = (configs: string[], files: string[]) => {
         declaration.initializer !== undefined
           ? ordinals.get(declaration.initializer)
           : undefined);
-      const callsIn = (value: ts.Node) => {
+      const functionIn = (value: ts.Node): ts.Node | undefined => {
+        if (ordinals.has(value)) return value;
+        let found: ts.Node | undefined;
+        const visit = (child: ts.Node) => {
+          if (found !== undefined) return;
+          if (ordinals.has(child)) found = child;
+          else ts.forEachChild(child, visit);
+        };
+        ts.forEachChild(value, visit);
+        return found;
+      };
+      const through = (declaration: ts.Declaration, depth: number, seen: Set<ts.Node>): Site[] => {
+        const direct = siteOf(declaration);
+        const fn =
+          direct !== undefined
+            ? undefined
+            : (ts.isVariableDeclaration(declaration) || ts.isPropertyAssignment(declaration) || ts.isPropertyDeclaration(declaration)) &&
+                declaration.initializer !== undefined
+              ? functionIn(declaration.initializer)
+              : undefined;
+        if (direct?.stripped) return [direct];
+        const node = direct !== undefined ? declaration : fn;
+        if (node === undefined || depth === 0 || seen.has(node)) return [];
+        seen.add(node);
+        const site = ordinals.get(node);
+        const owner = site !== undefined && ordinals.get(node) !== undefined ? node : undefined;
+        const out: Site[] = [];
+        const fnNode = (owner ?? (ordinals.has(declaration) ? declaration : undefined)) as ts.SignatureDeclaration | undefined;
+        if (fnNode === undefined) return out;
+        if (site?.stripped) return [site];
+        for (const value of returnsOf(fnNode)) out.push(...callsIn(value, depth - 1, seen));
+        return out;
+      };
+      const callsIn = (value: ts.Node, depth = 3, seen = new Set<ts.Node>()) => {
         const inner: Site[] = [];
         const visit = (child: ts.Node) => {
           if (ts.isCallExpression(child)) {
             const target = ts.isPropertyAccessExpression(child.expression) ? child.expression.name : child.expression;
-            for (const each of resolve(target)?.declarations ?? []) {
-              const hit = siteOf(each);
-              if (hit !== undefined) inner.push(hit);
-            }
+            for (const each of resolve(target)?.declarations ?? []) inner.push(...through(each, depth, seen));
           }
           if (!isFunctionWithBody(child)) ts.forEachChild(child, visit);
         };
@@ -376,9 +407,11 @@ const plan = (configs: string[], files: string[]) => {
         const found: Site[] = [];
         for (const declaration of resolve(node)?.declarations ?? []) {
           const direct = siteOf(declaration);
-          if (direct !== undefined) found.push(direct);
-          else if (ts.isVariableDeclaration(declaration) && declaration.initializer !== undefined)
+          if (direct !== undefined) found.push(direct, ...through(declaration, 3, new Set()));
+          else if (ts.isVariableDeclaration(declaration) && declaration.initializer !== undefined) {
             found.push(...callsIn(declaration.initializer));
+            found.push(...through(declaration, 3, new Set()));
+          }
         }
         return found;
       };

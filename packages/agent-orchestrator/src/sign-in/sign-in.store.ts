@@ -29,7 +29,7 @@ export const TOKEN_VARIABLE = DEFAULT_SIGN_IN.variable;
  * The token file of the store at `home`.
  * @param home The store's root.
  */
-export const claudeTokenFile = (home: string): string => path.join(home, TOKEN_NAME);
+export const claudeTokenFile = (home: string) => path.join(home, TOKEN_NAME) satisfies string as string;
 
 /** Whether the store keeps a sign-in token (`set`) or not (`unset`). */
 export type ClaudeTokenState = 'set' | 'unset';
@@ -61,7 +61,7 @@ export type ClaudeTokenStatus = {
 };
 
 /** A file mode's permission bits, as `chmod` takes them: `0600`. */
-const modeWords = (mode: number): string => `0${(mode & 0o777).toString(8).padStart(3, '0')}`;
+const modeWords = (mode: number) => `0${(mode & 0o777).toString(8).padStart(3, '0')}`;
 
 /**
  * Keeps `token` as the store's sign-in token: written to a file beside the token file with mode 0600, then renamed over it, so no
@@ -70,7 +70,7 @@ const modeWords = (mode: number): string => `0${(mode & 0o777).toString(8).padSt
  * @param home The store's root.
  * @param token The token as given, trimmed before it is kept.
  */
-export function writeClaudeToken(home: string, token: string): string {
+export function writeClaudeToken(home: string, token: string) {
   const trimmed = token.trim();
   if (trimmed === '' || /\s/.test(trimmed))
     throw new Invalid({
@@ -87,7 +87,7 @@ export function writeClaudeToken(home: string, token: string): string {
 }
 
 /** The warning of a token set at `setMs`, read at `now`: none while it is younger than `TOKEN_WARN_DAYS`. */
-const warningOf = (setMs: number, now: number): ClaudeTokenWarning | undefined => {
+const warningOf = (setMs: number, now: number) => {
   const age = now - setMs;
   return age >= TOKEN_LIFE_DAYS * DAY_MS ? 'past-year' : age >= TOKEN_WARN_DAYS * DAY_MS ? 'near-year' : undefined;
 };
@@ -98,10 +98,10 @@ const warningOf = (setMs: number, now: number): ClaudeTokenWarning | undefined =
  * @param home The store's root.
  * @param now The time read at, in ms since the epoch; the clock's where not given.
  */
-export function claudeTokenStatus(home: string, now: number = Date.now()): ClaudeTokenStatus {
+export function claudeTokenStatus(home: string, now: number = Date.now()) {
   const file = claudeTokenFile(home);
   const stat = fs.statSync(file, { throwIfNoEntry: false });
-  if (stat === undefined) return { state: 'unset', file };
+  if (stat === undefined) return { state: 'unset', file } satisfies ClaudeTokenStatus as ClaudeTokenStatus;
   const warning = warningOf(stat.mtimeMs, now);
   return {
     state: 'set',
@@ -110,14 +110,14 @@ export function claudeTokenStatus(home: string, now: number = Date.now()): Claud
     setAt: new Date(stat.mtimeMs).toISOString(),
     daysLeft: Math.floor((stat.mtimeMs + TOKEN_LIFE_DAYS * DAY_MS - now) / DAY_MS),
     ...(warning === undefined ? {} : { warning }),
-  };
+  } satisfies ClaudeTokenStatus as ClaudeTokenStatus;
 }
 
 /**
  * A kept token's age in words: the day it was set, and the days left of its year or how long it is past it.
  * @param status The kept token's status (`claudeTokenStatus`); no words where it carries no set time.
  */
-export function tokenAgeWords(status: ClaudeTokenStatus): string | undefined {
+export function tokenAgeWords(status: ClaudeTokenStatus) {
   if (status.setAt === undefined || status.daysLeft === undefined) return undefined;
   const day = status.setAt.slice(0, 10);
   const left = status.daysLeft;
@@ -134,7 +134,7 @@ export const TOKEN_RENEWAL = `${TOKEN_MAKER} on a machine with a browser, then n
  * or none kept. `nemia <TOKEN_NAME> status`, the daemon's start and the readiness read say it alike.
  * @param status The token's status (`claudeTokenStatus`).
  */
-export function tokenWarningLine(status: ClaudeTokenStatus): string | undefined {
+export function tokenWarningLine(status: ClaudeTokenStatus) {
   if (status.warning === undefined) return undefined;
   const age = tokenAgeWords(status);
   const end =
@@ -148,7 +148,7 @@ export function tokenWarningLine(status: ClaudeTokenStatus): string | undefined 
  * Removes the store's sign-in token; answers whether there was one.
  * @param home The store's root.
  */
-export function removeClaudeToken(home: string): boolean {
+export function removeClaudeToken(home: string) {
   const file = claudeTokenFile(home);
   const had = fs.existsSync(file);
   fs.rmSync(file, { force: true });
@@ -165,7 +165,7 @@ export type ClaudeTokenLoad = 'loaded' | 'given' | 'none';
  * @param env The environment to set the variable in, whose `WF_ROOT` names the store.
  * @param root The store's root; the one `env` names where not given.
  */
-export function loadClaudeToken(env: Record<string, string | undefined>, root: string = wfRoot(env)): ClaudeTokenLoad {
+export function loadClaudeToken(env: Record<string, string | undefined>, root: string = wfRoot(env)) {
   if (env[TOKEN_VARIABLE]) return 'given';
   const file = claudeTokenFile(root);
   const stat = fs.statSync(file, { throwIfNoEntry: false });

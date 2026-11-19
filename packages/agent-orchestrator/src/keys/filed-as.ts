@@ -60,7 +60,7 @@ const FLAG_AS: Readonly<Record<string, (flags: FiledFlags) => string | undefined
  */
 export const lineOf =
   (step: FiledStep, flags: FiledFlags = {}) =>
-  (field: string): string | undefined =>
+  (field: string) =>
     FLAG_AS[field]?.(flags) ?? FILED_AS[field]?.(step);
 
 /**
@@ -79,7 +79,7 @@ export function filedRefusal<C extends object>(
   name: string,
   config: C,
   lines: (field: string) => string | undefined,
-): string | undefined {
+) {
   const why = refusal(config);
   if (why === undefined) return undefined;
   const field = Object.entries(config).find(([key, value]) => value !== undefined && refusal({ [key]: value } as Partial<C>) === why)?.[0];

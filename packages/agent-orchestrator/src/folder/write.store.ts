@@ -103,7 +103,7 @@ export function writeWorkflowAt(
     whole?: boolean;
     fills?: Fills;
   },
-): WorkflowWritten {
+) {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined) => {
     if (why) throw new WorkflowError(why);
@@ -124,7 +124,7 @@ export function writeWorkflowAt(
   const { agents, skills } = found;
   refuse(codexModeRefusal(steps, agents));
   const texts = stepFilesOf(steps, agents, fills);
-  const there = (file: string): string | undefined => {
+  const there = (file: string) => {
     try {
       return fs.readFileSync(path.resolve(at, file), 'utf8');
     } catch {
@@ -133,7 +133,7 @@ export function writeWorkflowAt(
   };
   const carried = new Map(files.map((file) => [file.path, file.text] as const));
   const dropped = droppedOf(at, entries, carried, whole);
-  const read = (file: string): string | undefined => carried.get(file) ?? (dropped.includes(file) ? undefined : there(file));
+  const read = (file: string) => carried.get(file) ?? (dropped.includes(file) ? undefined : there(file));
   const parsed = parseFolder(texts, read, agents, skills, fills);
 
   fs.mkdirSync(at, { recursive: true });
@@ -162,7 +162,13 @@ export function writeWorkflowAt(
   if (readme !== undefined)
     put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   for (const file of dropped) fs.rmSync(path.join(at, file));
-  return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: [...removed, ...dropped].sort() };
+  return {
+    dir: at,
+    steps: parsed,
+    written: written.sort(),
+    kept: kept.sort(),
+    removed: [...removed, ...dropped].sort(),
+  } satisfies WorkflowWritten;
 }
 
 /**
@@ -170,9 +176,9 @@ export function writeWorkflowAt(
  * that is no markdown, is text (`textIn`) and is not `carried`. A non-text file — a picture — and a folder inside are never among them, nor
  * a file that does not read.
  */
-function droppedOf(at: string, entries: readonly fs.Dirent[], carried: ReadonlyMap<string, string>, whole: boolean): string[] {
+function droppedOf(at: string, entries: readonly fs.Dirent[], carried: ReadonlyMap<string, string>, whole: boolean) {
   if (!whole) return [];
-  const isText = (name: string): boolean => {
+  const isText = (name: string) => {
     try {
       return textIn(fs.readFileSync(path.join(at, name))) !== null;
     } catch {
@@ -187,12 +193,7 @@ function droppedOf(at: string, entries: readonly fs.Dirent[], carried: ReadonlyM
  * where one is written (`withReadme`) — that is a link among its `entries`. A write follows a link, so it would write into whatever it
  * points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went.
  */
-function linkedRefusal(
-  at: string,
-  entries: readonly fs.Dirent[],
-  withReadme: boolean,
-  files: readonly { path: string }[],
-): string | undefined {
+function linkedRefusal(at: string, entries: readonly fs.Dirent[], withReadme: boolean, files: readonly { path: string }[]) {
   const carried = entries.find((e) => e.isSymbolicLink() && files.some((file) => file.path === e.name));
   if (carried)
     return linkRefusal(
@@ -211,7 +212,7 @@ function linkedRefusal(
  * The refusal of the first draft of `steps` that sends a sandbox under the former name, as `codexModeWritten` words it, or undefined
  * where none does.
  */
-function codexModeRefusal(steps: readonly StepDraft[], agents: Agents): string | undefined {
+function codexModeRefusal(steps: readonly StepDraft[], agents: Agents) {
   for (const step of steps)
     if (step.permissionMode != null && fenceKeyOf(harnessOfDraft(step, agents)) === 'sandbox')
       return codexModeWritten(step.name, step.permissionMode);
@@ -219,7 +220,7 @@ function codexModeRefusal(steps: readonly StepDraft[], agents: Agents): string |
 }
 
 /** The harness a draft runs on: its own `harness`, else its agent's by its file, else none said. */
-function harnessOfDraft(step: StepDraft, agents: Agents): string | undefined {
+function harnessOfDraft(step: StepDraft, agents: Agents) {
   if (step.harness != null) return String(step.harness);
   const agent = typeof step.agent === 'string' ? agents.get(step.agent) : undefined;
   return agent === undefined || agent instanceof WorkflowError ? undefined : agent.keys.harness;
@@ -230,7 +231,7 @@ function harnessOfDraft(step: StepDraft, agents: Agents): string | undefined {
  * the resolved one, its agent's denies with the step's own — without the rules that agent's file denies, which the step's line adds to
  * (`deniesWith`), so a save never pins its agent's line into the step again. Any other draft as it is.
  */
-function ownLine(step: StepDraft, agents: Agents): StepDraft {
+function ownLine(step: StepDraft, agents: Agents) {
   const agent = typeof step.agent === 'string' ? agents.get(step.agent) : undefined;
   if (!step.disallowedTools || agent === undefined || agent instanceof WorkflowError) return step;
   const denies = agentDeniesOf(agent);
@@ -246,11 +247,7 @@ function ownLine(step: StepDraft, agents: Agents): StepDraft {
  * @param agents The agents a step may name, found where a run of the folder would look.
  * @param fills What a factory gives the workflow's steps, or undefined where none gives any.
  */
-export function stepFilesOf(
-  steps: readonly StepDraft[],
-  agents: Agents,
-  fills: Fills | undefined,
-): (readonly [name: string, text: string])[] {
+export function stepFilesOf(steps: readonly StepDraft[], agents: Agents, fills: Fills | undefined) {
   return steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(ownLine(step, agents)), fills)] as const);
 }
 
@@ -268,7 +265,7 @@ export type WorkflowRemoved = { dir: string; removed: string[] };
  * @param dir The workflow folder to remove.
  * @param users One sentence for each thing that still needs the workflow; none where not given.
  */
-export function removeWorkflowAt(home: string, dir: string, users: readonly string[] = []): WorkflowRemoved {
+export function removeWorkflowAt(home: string, dir: string, users: readonly string[] = []) {
   const at = path.resolve(dir);
   const yours = path.resolve(home, 'workflows');
   const folderRefused = agentsFolderRefusal(at);
@@ -302,7 +299,7 @@ export function removeWorkflowAt(home: string, dir: string, users: readonly stri
  * store's `workflows/`, or in a repository's the store knows — `<repo>/workflows/<name>`, for a `repo` of a factory or the one the caller
  * names. The folder itself, not one below it, nor the `workflows/` that holds it: those are the folders the board lists as workflows.
  */
-function workflowPlaceRefusal(home: string, at: string, repo?: string): string | undefined {
+function workflowPlaceRefusal(home: string, at: string, repo?: string) {
   const holder = path.dirname(at);
   const store = path.resolve(home, 'workflows');
   if (isWorkflowsHolderAt(home, holder, repo)) return undefined;
@@ -317,14 +314,14 @@ const listedAt = (home: string) => doorAtOnce(home, (door) => door.factories.lis
  * @param home The store's root folder.
  * @param repo A repository the caller names besides, or undefined for none.
  */
-export function knownReposAt(home: string, repo?: string): Set<string> {
+export function knownReposAt(home: string, repo?: string) {
   const known = new Set(listedAt(home).flatMap((f) => ('volumes' in f ? workedOn(f).map((r) => path.resolve(r)) : [])));
   if (repo) known.add(path.resolve(repo));
   return known;
 }
 
 /** The trees of the factories made from a template, each resolved: where such a factory runs from, laid out as a repository. */
-const factoryTrees = (home: string): Set<string> =>
+const factoryTrees = (home: string) =>
   new Set(listedAt(home).flatMap((f) => ('tree' in f && f.tree !== undefined ? [path.resolve(f.tree)] : [])));
 
 /**
@@ -334,7 +331,7 @@ const factoryTrees = (home: string): Set<string> =>
  * @param dir The folder to judge.
  * @param repo A repository the caller names besides, or undefined for none.
  */
-export function isWorkflowsHolderAt(home: string, dir: string, repo?: string): boolean {
+export function isWorkflowsHolderAt(home: string, dir: string, repo?: string) {
   const at = path.resolve(dir);
   if (at === path.resolve(home, 'workflows')) return true;
   if (path.basename(at) !== 'workflows') return false;
@@ -347,7 +344,7 @@ export function isWorkflowsHolderAt(home: string, dir: string, repo?: string): b
  * @param home The store's root folder.
  * @param workflowDir The workflow's folder.
  */
-export function placesAroundAt(home: string, workflowDir: string): Places {
+export function placesAroundAt(home: string, workflowDir: string) {
   const repo = path.dirname(path.dirname(path.resolve(workflowDir)));
   return { ...(knownReposAt(home).has(repo) || factoryTrees(home).has(repo) ? { repo } : {}), home };
 }

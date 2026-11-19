@@ -13,10 +13,10 @@ import { writeWhole } from '../../whole-file/whole-file.store.ts';
  * Where the tick keeps its tries of the factories' schedules: `$WF_ROOT/schedules`, a folder per factory.
  * @param home The store's root.
  */
-export const schedulesDir = (home: string): string => path.join(home, 'schedules');
+export const schedulesDir = (home: string) => path.join(home, 'schedules');
 
 /** The try file of the schedule of `workflow` in `factory`. */
-const tryFile = (home: string, factory: string, workflow: string): string => path.join(schedulesDir(home), factory, `${workflow}.json`);
+const tryFile = (home: string, factory: string, workflow: string) => path.join(schedulesDir(home), factory, `${workflow}.json`);
 
 /** A try as the tick writes it, every key it holds kept. */
 const ScheduleTrySchema = Schema.StructWithRest(
@@ -36,7 +36,7 @@ const ScheduleTrySchema = Schema.StructWithRest(
  * @param factory The factory's name.
  * @param workflow The name of the workflow the schedule starts.
  */
-export function readScheduleTry(home: string, factory: string, workflow: string): ScheduleTry | undefined {
+export function readScheduleTry(home: string, factory: string, workflow: string) {
   try {
     const decoded = Schema.decodeUnknownResult(ScheduleTrySchema)(JSON.parse(fs.readFileSync(tryFile(home, factory, workflow), 'utf8')));
     return Result.isSuccess(decoded) ? decoded.success : undefined;
@@ -52,7 +52,7 @@ export function readScheduleTry(home: string, factory: string, workflow: string)
  * @param workflow The name of the workflow the schedule starts.
  * @param tried The try to keep: the fire it was for, when, and the run it started or why it did not.
  */
-export function putScheduleTry(home: string, factory: string, workflow: string, tried: ScheduleTry): void {
+export function putScheduleTry(home: string, factory: string, workflow: string, tried: ScheduleTry) {
   const file = tryFile(home, factory, workflow);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeWhole(file, `${JSON.stringify(tried, null, 2)}\n`);
@@ -63,7 +63,7 @@ export function putScheduleTry(home: string, factory: string, workflow: string, 
  * @param cron The cron expression.
  * @param tz The time zone it is read in, or undefined for the machine's.
  */
-export function cronOf(cron: string, tz: string | undefined): Cron.Cron | { error: string } {
+export function cronOf(cron: string, tz: string | undefined) {
   const parsed = Cron.parse(cron, tz);
   return Result.isSuccess(parsed) ? parsed.success : { error: parsed.failure.message };
 }
@@ -75,7 +75,7 @@ export function cronOf(cron: string, tz: string | undefined): Cron.Cron | { erro
  * @param schedule The schedule: its cron and its time zone, the machine's where it names none.
  * @param now The time the fires are read around, in milliseconds since the epoch.
  */
-export function firesOf(schedule: Pick<Schedule, 'cron' | 'tz'>, now: number): { latest: number; next: number } | { error: string } {
+export function firesOf(schedule: Pick<Schedule, 'cron' | 'tz'>, now: number) {
   const cron = cronOf(schedule.cron, schedule.tz);
   if ('error' in cron) return cron;
   const second = new Date(now - (now % 1000));

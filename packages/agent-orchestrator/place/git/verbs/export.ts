@@ -6,11 +6,11 @@
  * repository does not have, and an `into` that holds anything.
  */
 import fs from 'node:fs';
-import { git, gitSays, isDirectory, printed, refused, type Asking, type Reply } from '../git.ts';
+import { git, gitSays, isDirectory, printed, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The verb's body. */
-export function* exported({ repo, tag, into }: PlaceRequests['export']): Asking<Reply<'export'>> {
+export function* exported({ repo, tag, into }: PlaceRequests['export']) {
   if (!isDirectory(repo)) return refused(`${repo} is not a directory, so no tag in it can be exported`);
   const commit = yield* gitSays(repo, ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]);
   if (commit === undefined) return refused(`${repo} has no tag ${tag}: tag the commit to release (git -C ${repo} tag ${tag} <commit>)`);

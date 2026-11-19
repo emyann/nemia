@@ -52,6 +52,7 @@ const parsed = (block: string, lineCounter?: LineCounter) =>
   parseDocument(block, { schema: 'failsafe', version: '1.2', uniqueKeys: false, prettyErrors: false, ...(lineCounter && { lineCounter }) });
 
 /** A node as its value: a scalar's string (`''` for an empty one), a list's items, a map's keys. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function valueOf(node: unknown): FrontmatterValue {
   if (node === null || node === undefined) return '';
   if (isScalar(node))
@@ -63,14 +64,14 @@ function valueOf(node: unknown): FrontmatterValue {
 }
 
 /** Whether a block's every line is a former line, a comment or blank: what the former reader read without refusing. For the rewrite. */
-const formerShaped = (block: string): boolean =>
+const formerShaped = (block: string) =>
   block.split('\n').every((raw) => {
     const line = raw.trim();
     return !line || line.startsWith('#') || FORMER_LINE.test(line);
   });
 
 /** A block as the former reader read it, each line trimmed, split at its first colon: what the rewrite keeps every value of. */
-function formerEntries(block: string): (FrontmatterEntry & { value: string })[] {
+function formerEntries(block: string) {
   return block.split('\n').flatMap((raw, i) => {
     const line = raw.trim();
     if (!line || line.startsWith('#')) return [];
@@ -87,7 +88,7 @@ const YAML_FIX =
  * Whether a parsed block is in the former line form: YAML refuses it, reads it as no map, or reads a flow collection on a step's key that
  * holds one value (`ONE_VALUE`), and its every line is a former one. What the former reader read and YAML reads otherwise.
  */
-function formerForm(doc: ReturnType<typeof parsed>, block: string): boolean {
+function formerForm(doc: ReturnType<typeof parsed>, block: string) {
   if (!formerShaped(block)) return false;
   if (doc.errors.length) return true;
   const root = doc.contents;
@@ -103,13 +104,13 @@ function formerForm(doc: ReturnType<typeof parsed>, block: string): boolean {
  * Whether a block (a file's lines between its two `---`) is in the former line form: refused at load, written as YAML by the rewrite.
  * @param block The frontmatter's lines between its two `---`.
  */
-export const inFormerForm = (block: string): boolean => formerForm(parsed(block), block);
+export const inFormerForm = (block: string) => formerForm(parsed(block), block);
 
 /**
  * What the load says of a block in the former line form: the first line YAML reads otherwise than the former reader did, or that sits
  * indented, and that line written as YAML, every value the same; or the rewrite of the whole folder, which writes every file so.
  */
-function formerRefusal(name: string, block: string): string {
+function formerRefusal(name: string, block: string) {
   const entries = formerEntries(block);
   const lines = block.split('\n');
   const first =
@@ -130,11 +131,10 @@ function formerRefusal(name: string, block: string): string {
  * @param name The file's name, as a refusal names it.
  * @param block The frontmatter's lines between its two `---`.
  */
-export function readFrontmatter(name: string, block: string): Frontmatter {
+export function readFrontmatter(name: string, block: string) {
   const counter = new LineCounter();
   const doc = parsed(block, counter);
-  const lineAt = (offset: number | undefined): number =>
-    offset === undefined ? FIRST_LINE : counter.linePos(offset).line + FIRST_LINE - 1;
+  const lineAt = (offset: number | undefined) => (offset === undefined ? FIRST_LINE : counter.linePos(offset).line + FIRST_LINE - 1);
   const marker = block.split('\n').findIndex((line) => /^(---|\.\.\.)[ \t]*$/.test(line));
   if (marker >= 0) {
     refuse(
@@ -170,7 +170,7 @@ export function readFrontmatter(name: string, block: string): Frontmatter {
  * error on a block YAML refuses, as the loader's `readFrontmatter` refuses it with the fix.
  * @param block The frontmatter's lines between its two `---`.
  */
-export function frontmatterValues(block: string): unknown {
+export function frontmatterValues(block: string) {
   const doc = parseDocument(block);
   const [error] = doc.errors;
   if (error !== undefined) throw error;
@@ -183,7 +183,7 @@ export function frontmatterValues(block: string): unknown {
  * which `renderFrontmatter`'s pairs do not.
  * @param values The keys and their values, in the order they are written.
  */
-export function frontmatterOfValues(values: Readonly<Record<string, unknown>>): string {
+export function frontmatterOfValues(values: Readonly<Record<string, unknown>>) {
   return stringify(values, { lineWidth: 0 });
 }
 
@@ -192,7 +192,7 @@ export function frontmatterOfValues(values: Readonly<Record<string, unknown>>): 
  * for a listing (`frontmatterKey`), or a file that is a card only when its block reads as one (`cardToStart`).
  * @param block The frontmatter's lines between its two `---`.
  */
-export function frontmatterOrNull(block: string): Frontmatter | null {
+export function frontmatterOrNull(block: string) {
   try {
     return readFrontmatter('', block);
   } catch {
@@ -208,7 +208,7 @@ export function frontmatterOrNull(block: string): Frontmatter | null {
  * @param entry The entry read: its key, its value and its line.
  * @param list Whether the entry's key holds a list.
  */
-export function flatValue(name: string, entry: FrontmatterEntry, list: boolean): string {
+export function flatValue(name: string, entry: FrontmatterEntry, list: boolean) {
   const { key, value, line } = entry;
   if (typeof value === 'string') return value;
   if (!Array.isArray(value)) {
@@ -229,14 +229,14 @@ export function flatValue(name: string, entry: FrontmatterEntry, list: boolean):
 }
 
 /** A scalar node for `value`, in `type`. */
-const scalarOf = (value: string, type?: Scalar.Type): Scalar => {
+const scalarOf = (value: string, type?: Scalar.Type) => {
   const node = new Scalar(value);
   if (type) node.type = type;
   return node;
 };
 
 /** A node for `value`: a scalar, a flow list of scalars, or a map. */
-function nodeOf(doc: Document, value: FrontmatterValue, type?: Scalar.Type): unknown {
+function nodeOf(doc: Document, value: FrontmatterValue, type?: Scalar.Type) {
   if (typeof value === 'string') return scalarOf(value, type);
   if (Array.isArray(value)) {
     const seq = new YAMLSeq();
@@ -248,33 +248,33 @@ function nodeOf(doc: Document, value: FrontmatterValue, type?: Scalar.Type): unk
 }
 
 /** One `key: value` written in `type`, as lines. */
-function pairText(key: string, value: FrontmatterValue, type?: Scalar.Type): string {
+function pairText(key: string, value: FrontmatterValue, type?: Scalar.Type) {
   const doc = new Document({}, { schema: 'failsafe', version: '1.2' });
   doc.set(scalarOf(key), nodeOf(doc, value, type));
   return doc.toString({ lineWidth: 0, minContentWidth: 0 });
 }
 
 /** Whether `text` reads back as `key` holding `value`, and nothing else. */
-function readsBack(text: string, key: string, value: FrontmatterValue): boolean {
+function readsBack(text: string, key: string, value: FrontmatterValue) {
   const only = onlyEntry(frontmatterOrNull(text));
   return only !== undefined && only.key === key && same(only.value, value);
 }
 
 /** The one entry of a block read as YAML, or undefined for a block that did not read, or holds more or fewer. */
-function onlyEntry(read: Frontmatter | null): FrontmatterEntry | undefined {
+function onlyEntry(read: Frontmatter | null) {
   if (read === null || read.entries.length !== 1) return undefined;
   return read.entries[0];
 }
 
 /** Whether two values are the same, item by item. */
-const same = (a: FrontmatterValue, b: FrontmatterValue): boolean => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: FrontmatterValue, b: FrontmatterValue) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * `key: value` as YAML, the lines it takes: plain where a plain value reads back the same, quoted where it would not, and a literal block
  * (`|-`) for a value with a line break, or one longer than `BLOCK_PAST` that cannot be plain. Each is read back, and written in double
  * quotes, which hold anything, where the first form would read otherwise.
  */
-function writtenPair(key: string, value: FrontmatterValue): string {
+function writtenPair(key: string, value: FrontmatterValue) {
   const first = pairText(key, value);
   if (typeof value === 'string') {
     const plain = first === `${key}: ${value}\n`;
@@ -293,8 +293,8 @@ function writtenPair(key: string, value: FrontmatterValue): string {
  * (`readFrontmatter`) gives the values it was written with. A comment line a writer keeps goes before or after it, as it is.
  * @param pairs The keys and their values, in the order they are written.
  */
-export function renderFrontmatter(pairs: readonly FrontmatterPair[]): string {
-  return pairs.map(([key, value]) => writtenPair(key, value)).join('');
+export function renderFrontmatter(pairs: readonly FrontmatterPair[]) {
+  return pairs.map(([key, value]) => writtenPair(key, value)).join('') satisfies string as string;
 }
 
 /**
@@ -306,7 +306,7 @@ export function renderFrontmatter(pairs: readonly FrontmatterPair[]): string {
  * @param key The key to set or take out.
  * @param value The value to set it to, or undefined to take it out.
  */
-export function withKey(name: string, block: string, key: string, value: FrontmatterValue | undefined): string {
+export function withKey(name: string, block: string, key: string, value: FrontmatterValue | undefined) {
   readFrontmatter(name, block);
   const doc = parsed(block);
   if (doc.contents === null || isScalar(doc.contents)) doc.contents = doc.createNode({}) as never;
@@ -326,7 +326,7 @@ export function withKey(name: string, block: string, key: string, value: Frontma
 }
 
 /** A block's comment lines alone, what is left of it once its last key is taken out. */
-const commentsOf = (block: string): string =>
+const commentsOf = (block: string) =>
   block
     .split('\n')
     .filter((line) => line.trim().startsWith('#'))
@@ -337,7 +337,7 @@ const commentsOf = (block: string): string =>
  * Whether one former line `key: value` reads, as YAML on its own, as the former reader read it. A line still in the former form on its own
  * does not, and is answered before it is read: the load refuses it by naming a line this picks (`formerRefusal`).
  */
-const lineReadsSame = (line: string, key: string, value: string): boolean => {
+const lineReadsSame = (line: string, key: string, value: string) => {
   if (formerForm(parsed(line), line)) return false;
   const only = onlyEntry(frontmatterOrNull(line));
   return only !== undefined && only.key === key && only.value === value;
@@ -348,7 +348,7 @@ const lineReadsSame = (line: string, key: string, value: string): boolean => {
  * as `writtenPair` writes it, every other line, comment and blank left byte for byte. Refused, naming the line, where YAML would not read
  * the result as the former reader read the block: a key's value, its order or its count.
  */
-function rewriteBlock(name: string, block: string, eol = '\n'): string {
+function rewriteBlock(name: string, block: string, eol = '\n') {
   const lines = block.split('\n');
   const tail = lines.pop() ?? '';
   const written = lines.map((raw) => {
@@ -388,7 +388,7 @@ const FRONTMATTER_AT = /^(﻿?---[ \t]*(\r?\n))([\s\S]*?\r?\n)?(---[ \t]*(?:\r?\
  * @param name The file's name, as a refusal names it.
  * @param text The file's whole text.
  */
-export function rewriteFormer(name: string, text: string): { text: string; changed: boolean } {
+export function rewriteFormer(name: string, text: string) {
   const m = FRONTMATTER_AT.exec(text);
   if (!m) return { text, changed: false };
   const block = m[3] ?? '';
@@ -407,7 +407,7 @@ export function rewriteFormer(name: string, text: string): { text: string; chang
  * is the author's to say. None for a block in the former form, whose rewrite keeps the tail in the value, nor one that does not read.
  * @param block The frontmatter's lines between its two `---`.
  */
-export function commentTails(block: string): number[] {
+export function commentTails(block: string) {
   const read = frontmatterOrNull(block);
   if (read === null) return [];
   const lines = block.split('\n');

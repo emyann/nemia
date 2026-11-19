@@ -24,7 +24,7 @@ export const needs = (memo: NeedsMemo) => sweepLoop(() => needsOnce(memo), NEEDS
  * loop (`needsOnce`), and the store's files say: the place's, the workflows' and the harnesses' needs, the tools folder, a factory.
  * `nemia doctor` still runs every command.
  */
-export const sweptFacts = (): ReadinessFacts => ({ ...liveFacts(), run: () => undefined });
+export const sweptFacts = () => ({ ...liveFacts(), run: () => undefined }) satisfies ReadinessFacts as ReadinessFacts;
 
 /**
  * The store's readiness read, for as long as the daemon runs: `readinessOf` over the needs' memory `memo` the sweep above fills, the

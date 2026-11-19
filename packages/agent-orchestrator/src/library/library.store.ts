@@ -20,7 +20,6 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { readServersAt, writeServersAt } from '../factory/servers/servers.store.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
 import type { LibraryKind, LibraryRef } from './library.ts';
-import type { LibraryAdded } from '../skills/read.store.ts';
 
 /** The rest a newer tick may write beside the keys this one names, kept on a write. */
 const REST = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -39,7 +38,7 @@ const CopiesSchema = Schema.StructWithRest(Schema.Struct({ copies: Schema.Record
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export function libraryAddsFile(home: string, name: string): string {
+export function libraryAddsFile(home: string, name: string) {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name, 'library.json');
@@ -49,7 +48,7 @@ export function libraryAddsFile(home: string, name: string): string {
  * The JSON of `file` decoded by `schema`, or undefined where the file is not there. Refused (`Invalid`), naming the file, its first wrong
  * field and `fix`, where it does not read.
  */
-function readJson<T>(file: string, decode: (raw: unknown) => Result.Result<T, Schema.SchemaError>, fix: string): T | undefined {
+function readJson<T>(file: string, decode: (raw: unknown) => Result.Result<T, Schema.SchemaError>, fix: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -77,7 +76,7 @@ function readJson<T>(file: string, decode: (raw: unknown) => Result.Result<T, Sc
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function readLibraryAdds(home: string, name: string): readonly LibraryRef[] | undefined {
+export function readLibraryAdds(home: string, name: string) {
   const file = libraryAddsFile(home, name);
   const read = readJson(
     file,
@@ -94,7 +93,7 @@ export function readLibraryAdds(home: string, name: string): readonly LibraryRef
  * @param name The factory's name.
  * @param adds Every add of the factory.
  */
-export function writeLibraryAdds(home: string, name: string, adds: readonly LibraryRef[]): void {
+export function writeLibraryAdds(home: string, name: string, adds: readonly LibraryRef[]) {
   const file = libraryAddsFile(home, name);
   let kept: Record<string, unknown> = {};
   try {
@@ -111,13 +110,13 @@ export function writeLibraryAdds(home: string, name: string, adds: readonly Libr
  * The store's library folder, `<home>/workflows`, which holds the person's `agents/`, `skills/`, workflows and library servers.
  * @param home The store's root.
  */
-export const libraryDir = (home: string): string => path.join(home, 'workflows');
+export const libraryDir = (home: string) => path.join(home, 'workflows');
 
 /**
  * The person's library servers, by name, `{}` where none was recorded.
  * @param home The store's root.
  */
-export const libraryServers = (home: string): FactoryServers =>
+export const libraryServers = (home: string) =>
   readServersAt(
     path.join(libraryDir(home), 'mcpservers.json'),
     'write the server again at the library (PUT /api/mcpservers/<server> with its type and url), or remove the file to start over',
@@ -128,14 +127,14 @@ export const libraryServers = (home: string): FactoryServers =>
  * @param home The store's root.
  * @param servers Every library server, by name.
  */
-export const writeLibraryServers = (home: string, servers: FactoryServers): void =>
+export const writeLibraryServers = (home: string, servers: FactoryServers) =>
   writeServersAt(path.join(libraryDir(home), 'mcpservers.json'), servers);
 
 /**
  * The digest of each builtin the person copied, at the copy, by `<kind>/<name>`; `{}` where none was recorded.
  * @param home The store's root.
  */
-export const builtinCopies = (home: string): Readonly<Record<string, string>> =>
+export const builtinCopies = (home: string) =>
   readJson(
     path.join(libraryDir(home), 'copies.json'),
     Schema.decodeUnknownResult(CopiesSchema),
@@ -148,7 +147,7 @@ export const builtinCopies = (home: string): Readonly<Record<string, string>> =>
  * @param key The copy, `<kind>/<name>`.
  * @param digest The builtin's digest at the copy.
  */
-export function recordBuiltinCopy(home: string, key: string, digest: string): void {
+export function recordBuiltinCopy(home: string, key: string, digest: string) {
   const file = path.join(libraryDir(home), 'copies.json');
   const copies = { ...builtinCopies(home), [key]: digest };
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -162,7 +161,7 @@ export function recordBuiltinCopy(home: string, key: string, digest: string): vo
  * @param home The store's root.
  * @param name The factory's name, `default` among them; undefined for a read in no factory.
  */
-export function addedOf(home: string, name: string | undefined): LibraryAdded | undefined {
+export function addedOf(home: string, name: string | undefined) {
   if (name === undefined) return undefined;
   let recorded: readonly LibraryRef[] | undefined;
   try {

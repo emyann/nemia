@@ -2,7 +2,6 @@
  * The facts a rule is judged on (`Facts`), from what admission reads of a run at the call (`Seen`): pure, so each condition is proven on
  * a fixture state, and carrying nothing between calls. The reads are `nemia admit`'s (`admit.verb.ts`).
  */
-import type { Facts } from './auto.ts';
 import type { Outcome } from 'objects';
 
 /**
@@ -36,7 +35,7 @@ export type Seen = {
  * the step asks no question and needs nothing of the person, and no other step waits on them. Pure.
  * @param seen What admission read of the run at the call, for the step it answers.
  */
-export const factsOf = (seen: Seen): Facts => ({
+export const factsOf = (seen: Seen) => ({
   recommends: seen.closeout?.outcome === 'done' && seen.questions.every((q) => q.recommended !== null && q.recommended.length > 0),
   checked: seen.verdict === 0,
   accepted: seen.loops.every((l) => !l.again && !l.personAccepted),

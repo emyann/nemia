@@ -21,7 +21,7 @@ export const WIRING_FILE = 'factory.json';
 const HIRES = 'hires.';
 
 /** The agent whose file `file`, directly in the agents' folder, is: `<agent>.md` or `<agent>.schema.json`; none for another. */
-const agentOfFile = (file: string): string | null => {
+const agentOfFile = (file: string) => {
   const name = file.endsWith('.schema.json')
     ? file.slice(0, -'.schema.json'.length)
     : file.endsWith('.md')
@@ -31,7 +31,7 @@ const agentOfFile = (file: string): string | null => {
 };
 
 /** The hire a key of the wiring names, `<workflow>.<step>` for `hires.<workflow>/<step>`; none for another key. */
-const hireOfKey = (key: string | null): string | null => {
+const hireOfKey = (key: string | null) => {
   if (key === null || !key.startsWith(HIRES)) return null;
   const step = key.slice(HIRES.length);
   const cut = step.indexOf('/');
@@ -58,23 +58,24 @@ export const resolvedBy: ResolvedBy = (segments, key, text, factory) => {
  * The owner of a file at the tree's root, `top`, its key `key`: the rules and the instruction by the Factory, a hire of the wiring by its
  * Hire.
  */
-const rootOwner = (top: string, key: string | null, factory: string): ResolutionOwner | null => {
-  if (top === 'RULES.md' || top === 'NEMIA.md') return { kind: 'Factory', name: factory };
+const rootOwner = (top: string, key: string | null, factory: string) => {
+  if (top === 'RULES.md' || top === 'NEMIA.md') return { kind: 'Factory', name: factory } satisfies ResolutionOwner | null;
   const hire = top === WIRING_FILE ? hireOfKey(key) : null;
-  return hire === null ? null : { kind: 'Hire', name: hire };
+  return (hire === null ? null : { kind: 'Hire', name: hire }) satisfies ResolutionOwner | null;
 };
 
 /** The owner of a file under the tree's `workflows/`, by its path's segments: a Workflow, an Agent, a Skill, or none. */
-const workflowsOwner = (segments: readonly string[]): ResolutionOwner | null => {
+const workflowsOwner = (segments: readonly string[]) => {
   const [top, folder, file] = segments;
-  if (top !== 'workflows' || folder === undefined) return null;
-  if (folder === 'skills') return segments.length >= 4 && file !== undefined ? { kind: 'Skill', name: file } : null;
-  if (segments.length !== 3 || file === undefined) return null;
+  if (top !== 'workflows' || folder === undefined) return null satisfies ResolutionOwner | null;
+  if (folder === 'skills')
+    return (segments.length >= 4 && file !== undefined ? { kind: 'Skill', name: file } : null) satisfies ResolutionOwner | null;
+  if (segments.length !== 3 || file === undefined) return null satisfies ResolutionOwner | null;
   if (folder === 'agents') {
     const agent = agentOfFile(file);
-    return agent === null ? null : { kind: 'Agent', name: agent };
+    return (agent === null ? null : { kind: 'Agent', name: agent }) satisfies ResolutionOwner | null;
   }
-  return HELD_FOLDERS.includes(folder) ? null : { kind: 'Workflow', name: folder };
+  return (HELD_FOLDERS.includes(folder) ? null : { kind: 'Workflow', name: folder }) satisfies ResolutionOwner | null;
 };
 
 /**
@@ -96,30 +97,30 @@ const KINDS: readonly ResolutionKind[] = ['Workflow', 'Agent', 'Skill', 'Hire', 
  * An owner as one string, `<Kind>/<name>`: the key `resolutions.json` names its proposal by, and the pass's maps key it by.
  * @param owner The owner: its kind and its name.
  */
-export const ownerKey = (owner: ResolutionOwner): string => `${owner.kind}/${owner.name}`;
+export const ownerKey = (owner: ResolutionOwner) => `${owner.kind}/${owner.name}`;
 
 /**
  * The owner a key names: `<Kind>/<name>`; a bare name, as `resolutions.json` named a workflow's before any other kind had one, a
  * Workflow.
  * @param key The key, `<Kind>/<name>` or a bare workflow's name.
  */
-export const ownerOfKey = (key: string): ResolutionOwner => {
+export const ownerOfKey = (key: string) => {
   const cut = key.indexOf('/');
   const kind = KINDS.find((k) => k === key.slice(0, cut));
-  return cut > 0 && kind !== undefined ? { kind, name: key.slice(cut + 1) } : { kind: 'Workflow', name: key };
+  return (cut > 0 && kind !== undefined ? { kind, name: key.slice(cut + 1) } : { kind: 'Workflow', name: key }) satisfies ResolutionOwner;
 };
 
 /**
  * The segments of the path a conflict's address names: its `#<key>` or `:<a>-<b>` cut off, split at each `/`.
  * @param at The conflict's address.
  */
-export const segmentsOf = (at: string): string[] => at.replace(/(#.*|:\d+-\d+)$/, '').split('/');
+export const segmentsOf = (at: string) => at.replace(/(#.*|:\d+-\d+)$/, '').split('/');
 
 /**
  * The key a conflict's address names after its `#`, null where it names none.
  * @param at The conflict's address.
  */
-export const keyOf = (at: string): string | null => {
+export const keyOf = (at: string) => {
   const cut = at.indexOf('#');
   return cut < 0 ? null : at.slice(cut + 1);
 };
@@ -128,20 +129,20 @@ export const keyOf = (at: string): string | null => {
  * Whether every side of a file that is there holds text (`textIn`).
  * @param sides Each side's file, undefined where that side has none.
  */
-export const allText = (...sides: readonly (TreeFile | undefined)[]): boolean =>
+export const allText = (...sides: readonly (TreeFile | undefined)[]) =>
   sides.every((side) => side === undefined || textIn(side.bytes) !== null);
 
 /**
  * The key of the owner of a whole file of the tree, at the path `at`, where one owns it whole; the wiring, which a Hire owns by a key,
  * none.
  */
-const fileOwnerKey = (at: string, factory: string): string | null => {
+const fileOwnerKey = (at: string, factory: string) => {
   const owner = resolvedBy(at.split('/'), null, true, factory);
   return owner === null ? null : ownerKey(owner);
 };
 
 /** The wiring's text read as JSON, or none where it does not read as an object. */
-const wiringOf = (file: TreeFile | undefined): Record<string, unknown> | null => {
+const wiringOf = (file: TreeFile | undefined) => {
   const text = file === undefined ? null : textIn(file.bytes);
   if (text === null) return null;
   try {
@@ -153,7 +154,7 @@ const wiringOf = (file: TreeFile | undefined): Record<string, unknown> | null =>
 };
 
 /** A record under `key` of `value`, or none. */
-const recordAt = (value: Record<string, unknown> | null, key: string): Record<string, unknown> | undefined => {
+const recordAt = (value: Record<string, unknown> | null, key: string) => {
   const at = value?.[key];
   return typeof at === 'object' && at !== null && !Array.isArray(at) ? (at as Record<string, unknown>) : undefined;
 };
@@ -162,7 +163,7 @@ const recordAt = (value: Record<string, unknown> | null, key: string): Record<st
  * The render's wiring `theirs` with each taken hire's value given the tree's `ours` holds, `hires.<workflow>/<step>`: removed where the
  * tree has none. The render's file as it was where no hire is taken, or either side does not read as JSON.
  */
-function hiresTaken(theirs: TreeFile, ours: TreeFile | undefined, hires: readonly string[]): TreeFile {
+function hiresTaken(theirs: TreeFile, ours: TreeFile | undefined, hires: readonly string[]) {
   const render = wiringOf(theirs);
   const tree = wiringOf(ours);
   if (hires.length === 0 || render === null || (ours !== undefined && tree === null)) return theirs;
@@ -189,14 +190,9 @@ function hiresTaken(theirs: TreeFile, ours: TreeFile | undefined, hires: readonl
  * @param owners The keys of the owners whose resolution applied (`ownerKey`).
  * @param factory The factory's name, the Factory owner's.
  */
-export function takenFromTree(
-  theirs: readonly TreeFile[],
-  ours: readonly TreeFile[],
-  owners: Iterable<string>,
-  factory: string,
-): TreeFile[] {
+export function takenFromTree(theirs: readonly TreeFile[], ours: readonly TreeFile[], owners: Iterable<string>, factory: string) {
   const taken = new Set(owners);
-  const isTaken = (at: string): boolean => {
+  const isTaken = (at: string) => {
     const key = fileOwnerKey(at, factory);
     return key !== null && taken.has(key);
   };
@@ -222,11 +218,7 @@ export function takenFromTree(
  * @param factory The factory's name, the Factory owner's.
  * @param trees The files of each tree the merge was made of: the base, ours and theirs.
  */
-export function conflictOwners(
-  conflicts: readonly Conflict[],
-  factory: string,
-  ...trees: readonly (readonly TreeFile[])[]
-): ReadonlyMap<string, string> {
+export function conflictOwners(conflicts: readonly Conflict[], factory: string, ...trees: readonly (readonly TreeFile[])[]) {
   const indexed = trees.map((files) => new Map(files.map((file) => [file.path, file])));
   const owners = new Map<string, string>();
   for (const { at } of conflicts) {
@@ -256,7 +248,7 @@ export function resolvedAgain(
   proposal: string,
   proposals: Readonly<Record<string, string>>,
   choices: Readonly<Record<string, Choice>>,
-): ResolvedAgain | undefined {
+) {
   const recorded = Object.entries(proposals).find(([, name]) => name === proposal);
   if (recorded === undefined) return undefined;
   const owner = ownerOfKey(recorded[0]);

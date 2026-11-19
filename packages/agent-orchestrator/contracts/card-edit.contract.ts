@@ -30,10 +30,10 @@ export type CardEditAsk = {
 export type CardEditRefusal = 'started' | 'factory' | 'labels';
 
 /** Whether the text names a factory other than the one the card lives in. */
-const movesFactory = (ask: CardEditAsk): boolean => ask.factoryRead !== undefined && ask.factoryRead !== ask.namespace;
+const movesFactory = (ask: CardEditAsk) => ask.factoryRead !== undefined && ask.factoryRead !== ask.namespace;
 
 /** Whether the text says labels other than the card's. */
-const relabels = (ask: CardEditAsk): boolean => ask.labelsRead !== undefined && ask.labelsRead !== ask.labelsNow;
+const relabels = (ask: CardEditAsk) => ask.labelsRead !== undefined && ask.labelsRead !== ask.labelsNow;
 
 const cardEditRefusalSpec = spec<(ask: CardEditAsk) => CardEditRefusal | null>({
   ensures: {

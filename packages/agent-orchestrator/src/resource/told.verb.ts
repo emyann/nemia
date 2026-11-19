@@ -65,13 +65,7 @@ export type StepFiled = {
  * rewrite it. For a step not yet filed, what it would be told now (`briefNow`), from `workflows` — the
  * workflow the run froze, as the tick composes it, with its place's words. For a filed task the engine has no record of, nobody can say.
  */
-function briefOf(
-  run: Run,
-  name: string,
-  workflows: readonly StepSpec[] | null,
-  views: Views,
-  placeService: PlaceService['Service'],
-): string | null {
+function briefOf(run: Run, name: string, workflows: readonly StepSpec[] | null, views: Views, placeService: PlaceService['Service']) {
   const taskId = run.steps[name]?.taskId;
   if (taskId) return views.get(taskId)?.state.brief || null;
   const step = workflows?.find((s) => s.name === name);
@@ -92,13 +86,13 @@ export type TaskPart =
  * `task`, step `name`'s, split into its parts (`handedParts`) at the headings the run writes, a `<step>` of one named by a step the run
  * froze — or, on a record that froze none, of `workflows` — and each `## From run` section's `how` read off `run`.
  */
-function taskPartsOf(run: Run, name: string, workflows: readonly StepSpec[] | null, task: string): TaskPart[] {
+function taskPartsOf(run: Run, name: string, workflows: readonly StepSpec[] | null, task: string) {
   const steps = (run.workflow ?? workflows ?? []).map((s) => s.name);
   return handedParts(task, steps, name).map((part) => {
     if (part.kind === 'text') return part;
     if (run.after?.includes(part.run)) return { ...part, how: 'waited' };
     return run.context?.includes(part.run) ? { ...part, how: 'read' } : part;
-  });
+  }) satisfies TaskPart[];
 }
 
 /**
@@ -111,18 +105,16 @@ function taskPartsOf(run: Run, name: string, workflows: readonly StepSpec[] | nu
  * @param views The engine's views of the run's tasks, by task id.
  * @param placeService The place service, read where the brief is made again from the workflow's files.
  */
-export function toldOf(
-  run: Run,
-  name: string,
-  workflows: readonly StepSpec[] | null,
-  views: Views,
-  placeService: PlaceService['Service'],
-): { told: string | null; layers: ToldLayers | null; taskParts: TaskPart[] | null } {
+export function toldOf(run: Run, name: string, workflows: readonly StepSpec[] | null, views: Views, placeService: PlaceService['Service']) {
   const told = briefOf(run, name, workflows, views, placeService);
   const frozen = run.workflow?.find((s) => s.name === name);
   const layers = frozen ? toldLayers(frozen, told) : null;
   const task = layers?.task ?? told;
-  return { told, layers, taskParts: task === null ? null : taskPartsOf(run, name, workflows, task) };
+  return { told, layers, taskParts: task === null ? null : taskPartsOf(run, name, workflows, task) } satisfies {
+    told: string | null;
+    layers: ToldLayers | null;
+    taskParts: TaskPart[] | null;
+  } as { told: string | null; layers: ToldLayers | null; taskParts: TaskPart[] | null };
 }
 
 /**
@@ -132,7 +124,7 @@ export function toldOf(
  * @param views The engine's views of the run's tasks, by task id.
  * @param home The store's folder, where a remote agent's record is read.
  */
-export function filedOf(record: StepRecord | undefined, views: Views, home: string): StepFiled | null {
+export function filedOf(record: StepRecord | undefined, views: Views, home: string) {
   const view = record?.taskId ? views.get(record.taskId) : undefined;
   if (!view || phaseOfView(view) === 'unknown') return null;
   const { deadlineSeconds } = view.state;
@@ -155,7 +147,7 @@ export function filedOf(record: StepRecord | undefined, views: Views, home: stri
  * The model a person's `nemia retry --model` asked a step's current try for: on the try its task replaced, where `nextTry` keeps the
  * model with the mode — found past any recheck, which replaced only a check, and kept the task.
  */
-function askedModelOf(record: StepRecord | undefined): string | null {
+function askedModelOf(record: StepRecord | undefined) {
   const tries = record?.tries ?? [];
   return [...tries].reverse().find((t) => t.cause !== 'recheck')?.model ?? null;
 }
@@ -167,7 +159,7 @@ function askedModelOf(record: StepRecord | undefined): string | null {
  * refused, or that is refused as it stands, gives no address — the run's page is still drawn, and `nemia up` says what is wrong with the
  * file.
  */
-function remoteOf(harness: string | undefined, home: string): StepFiled['remote'] {
+function remoteOf(harness: string | undefined, home: string) {
   const name = remoteNameOf(harness);
   if (name === undefined) return null;
   let agent: Record<string, unknown> | undefined;

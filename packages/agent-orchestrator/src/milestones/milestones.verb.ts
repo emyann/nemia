@@ -25,7 +25,7 @@ const harnessReady = Effect.fnUntraced(function* (home: string) {
   const kept = yield* NeedsMemory;
   const memo = kept ?? needsMemo(home);
   if (kept === undefined || (memo.version === 0 && memo.readings.size === 0)) yield* needsOnce(memo);
-  const met = (name: string): boolean => {
+  const met = (name: string) => {
     const need = memo.harnessNeeds.find((n) => n.name === name);
     return need !== undefined && memo.readings.get(checkKey(harnessCheckOf(need))) === 'met';
   };
@@ -48,8 +48,7 @@ export const milestonesNow = Effect.fn('milestonesNow')(function* () {
       .map((v) => ({ factory: f.name, at: path.resolve(v.path) })),
   );
   const untrusted = writable.length === 0 ? [] : yield* untrustedPlaces(filed);
-  const trusted = (w: { factory: string; at: string }): boolean =>
-    !untrusted.some((u) => u.factory === w.factory && path.resolve(u.place) === w.at);
+  const trusted = (w: { factory: string; at: string }) => !untrusted.some((u) => u.factory === w.factory && path.resolve(u.place) === w.at);
   const volume = writable.some(trusted);
   const waiting = writable.find((w) => !trusted(w));
   const runs = yield* (yield* RunDoor).runs.list();

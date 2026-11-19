@@ -36,7 +36,7 @@ const idChecked = checked(RunId.OnCreate, (id: string) => `a new run under ${JSO
  * The door over `layer`: each method as `doorOf` makes it, a new run's and a run written back's checked before the layer writes.
  * @param layer The run store the door is over: the files, or the memory.
  */
-export function runDoorOver(layer: RunsLayer): RunDoorShape {
+export function runDoorOver(layer: RunsLayer) {
   const door = doorOf<RunsLayer, RunId>(layer);
   return {
     ...door,
@@ -54,14 +54,14 @@ export function runDoorOver(layer: RunsLayer): RunDoorShape {
           return yield* door.runs.rewrite(run);
         }),
     },
-  };
+  } satisfies RunDoorShape;
 }
 
 /**
  * A record already at the id of a new run, as a refusal: the files say so by `EEXIST`, the memory by its own.
  * @param id The id of the new run.
  */
-export const runTaken = (id: string): Conflict =>
+export const runTaken = (id: string) =>
   new Conflict({ message: `run ${id} already exists: start it under a new id, or forget the one there with nemia rm ${id}` });
 
 /**
@@ -69,16 +69,16 @@ export const runTaken = (id: string): Conflict =>
  * @param card The card the new run is started from.
  * @param run The id of the run already started from it.
  */
-export const cardStartedTwice = (card: string, run: string): Conflict =>
+export const cardStartedTwice = (card: string, run: string) =>
   new Conflict({
     message: `card ${card} was started already as run ${run}: read it with nemia show ${run}, or forget it with nemia rm ${run} and start the card again`,
-  });
+  }) satisfies Conflict as Conflict;
 
 /**
  * The run store's files at the store's root `home`, a new run's record refused as `runTaken` when one is there: what the files layer is
  * over.
  */
-const filesRuns = (home: string): RunsLayer => {
+const filesRuns = (home: string) => {
   const files = filesStoreAt(home);
   return {
     ...files,
@@ -99,7 +99,7 @@ const filesRuns = (home: string): RunsLayer => {
         }
       },
     },
-  };
+  } satisfies RunsLayer;
 };
 
 /**
@@ -115,7 +115,7 @@ export const RunDoor = Context.Reference<RunDoorShape>('agent-orchestrator/RunDo
  * The Run door over the store's files at `home`, as a layer: what the default gives at the root a program is given, for one that names it.
  * @param home The store's root folder.
  */
-export const runDoorFiles = (home: string): Layer.Layer<never> => Layer.succeed(RunDoor)(runDoorOver(filesRuns(home)));
+export const runDoorFiles = (home: string) => Layer.succeed(RunDoor)(runDoorOver(filesRuns(home)));
 
 /**
  * The Run door over the store's files at `home`, each method run at once (`atOnce`): what a plain synchronous function reads and writes
@@ -123,4 +123,4 @@ export const runDoorFiles = (home: string): Layer.Layer<never> => Layer.succeed(
  * itself: a run written here is checked as the door checks it.
  * @param home The store's root folder.
  */
-export const runsAtOnce = (home: string): RunsLayer => atOnce<RunsLayer, RunId>(runDoorOver(filesRuns(home)));
+export const runsAtOnce = (home: string) => atOnce<RunsLayer, RunId>(runDoorOver(filesRuns(home))) satisfies RunsLayer as RunsLayer;

@@ -38,8 +38,7 @@ export type Drift = KindName & { pinned: number; now: number; step?: string };
  * The digest the ledger and a closeout schema's hash are taken by: a sha256 of `parts` as JSON, cut to 16 hex characters.
  * @param parts What the digest is taken of.
  */
-export const digestOf = (parts: readonly unknown[]): string =>
-  createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
+export const digestOf = (parts: readonly unknown[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
 
 /**
  * The revision `hash` stands at in `entries`: the entry already given for that content, whatever its place in the ledger, else the next
@@ -48,11 +47,11 @@ export const digestOf = (parts: readonly unknown[]): string =>
  * @param hash The digest of the content.
  * @param at When a new entry is given, written on it.
  */
-export const revisionNow = (entries: readonly Revision[], hash: string, at: string): Revision =>
+export const revisionNow = (entries: readonly Revision[], hash: string, at: string) =>
   entries.find((e) => e.hash === hash) ?? { n: Math.max(0, ...entries.map((e) => e.n)) + 1, hash, at };
 
 /** The pin of `pins` for `of`, or undefined where it holds none. */
-const pinFor = (pins: readonly Pin[], of: KindName): Pin | undefined => pins.find((t) => t.kind === of.kind && t.name === of.name);
+const pinFor = (pins: readonly Pin[], of: KindName) => pins.find((t) => t.kind === of.kind && t.name === of.name);
 
 /**
  * The kinds `pinned` differs from `now` on, in `pinned`'s order: one `Drift` per kind and name whose content `now` holds other bytes of, by
@@ -62,7 +61,7 @@ const pinFor = (pins: readonly Pin[], of: KindName): Pin | undefined => pins.fin
  * @param pinned What the run resolved, or undefined on a record that pinned nothing.
  * @param now What the files hold now.
  */
-export const kindsDrift = (pinned: readonly Pin[] | undefined, now: readonly Pin[]): Drift[] =>
+export const kindsDrift = (pinned: readonly Pin[] | undefined, now: readonly Pin[]) =>
   (pinned ?? []).flatMap((pin) => {
     const at = pinFor(now, pin);
     return at && at.hash !== pin.hash ? [{ kind: pin.kind, name: pin.name, pinned: pin.n, now: at.n }] : [];
@@ -83,7 +82,7 @@ export const stepsDrift = (
   steps: readonly (readonly [string, readonly Pin[] | undefined])[],
   pinned: readonly Pin[] | undefined,
   now: readonly Pin[],
-): Drift[] =>
+) =>
   steps.flatMap(([step, pins]) =>
     (pins ?? []).flatMap((pin) => {
       const at = pinFor(now, pin);
@@ -100,5 +99,5 @@ export const stepsDrift = (
  * off what the api serves (`driftNow`): changing this line changes the CLI and the feed's note, never the board.
  * @param d The drift.
  */
-export const driftWords = (d: Drift): string =>
+export const driftWords = (d: Drift) =>
   `${d.kind} ${d.name}: ${d.step ? `${d.step} ran on rev ${d.pinned}` : `rev ${d.pinned}`}, now ${d.now}`;

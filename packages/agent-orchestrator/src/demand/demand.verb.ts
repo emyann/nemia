@@ -37,18 +37,19 @@ export type DemandHost = ServiceHost & {
  * The machine as it is, the lease read every `DEMAND_POLL_MS` for at most `DEMAND_WAIT_MS`.
  * @param root The store's directory (`WF_ROOT`).
  */
-export const liveDemandHost = (root: string): DemandHost => ({
-  ...liveHost(root),
-  pollMs: DEMAND_POLL_MS,
-  waitMs: DEMAND_WAIT_MS,
-  spawn: spawnDetached,
-  env: process.env,
-});
+export const liveDemandHost = (root: string) =>
+  ({
+    ...liveHost(root),
+    pollMs: DEMAND_POLL_MS,
+    waitMs: DEMAND_WAIT_MS,
+    spawn: spawnDetached,
+    env: process.env,
+  }) satisfies DemandHost as DemandHost;
 
 /** The login service of the store `host` serves: the unit or agent whose `WF_ROOT` is the store, as named and started; or null. */
-function storeService(host: DemandHost): (ServiceNamed & { start: () => void }) | null {
+function storeService(host: DemandHost) {
   const system = systemOf(host.machine());
-  if ('refusal' in system) return null;
+  if ('refusal' in system) return null satisfies (ServiceNamed & { start: () => void }) | null;
   const { root } = host.roots();
   const read = system.system === 'systemd' ? unitRead : plistRead;
   const folder = path.dirname(unitPathOf(system.system, DEFAULT_NAME, host.dirs()));
@@ -57,9 +58,11 @@ function storeService(host: DemandHost): (ServiceNamed & { start: () => void }) 
     const found = serviceForUpgrade({ name }, host);
     if (found === null) continue;
     const unit = unitName(system.system, name);
-    return { system: system.system, name, unit, home: host.dirs().home, uid: host.user().uid, start: found.start };
+    return { system: system.system, name, unit, home: host.dirs().home, uid: host.user().uid, start: found.start } satisfies
+      | (ServiceNamed & { start: () => void })
+      | null;
   }
-  return null;
+  return null satisfies (ServiceNamed & { start: () => void }) | null;
 }
 
 /** The lease once it ticks, or the start's end, read every `pollMs`; undefined once `waitMs` has passed with neither. */
@@ -70,11 +73,11 @@ const settled = (host: DemandHost, ended: () => SpawnEnded | undefined) =>
   ).pipe(Effect.timeoutOrElse({ duration: host.waitMs, orElse: () => Effect.succeed(undefined) }));
 
 /** Why a start failed, in its own words. */
-const failed = (err: unknown): Unstarted => ({ kind: 'failed', message: (err as Error).message ?? String(err) });
+const failed = (err: unknown) => ({ kind: 'failed', message: (err as Error).message ?? String(err) }) satisfies Unstarted;
 
 /** What came of a start that did not tick: its end, or the whole wait. */
-const unstarted = (end: { ended: SpawnEnded | undefined } | undefined, host: DemandHost): Unstarted =>
-  end?.ended === undefined ? { kind: 'silent', waitedMs: host.waitMs } : { kind: 'ended', ...end.ended };
+const unstarted = (end: { ended: SpawnEnded | undefined } | undefined, host: DemandHost) =>
+  (end?.ended === undefined ? { kind: 'silent', waitedMs: host.waitMs } : { kind: 'ended', ...end.ended }) satisfies Unstarted;
 
 /** Starts the store's login service and waits for it to hold the lease; its line. */
 const startService = Effect.fn('startService')(function* (service: ServiceNamed & { start: () => void }, host: DemandHost) {
@@ -96,16 +99,14 @@ const tickingLine = (lease: Standing, pid: number, entry: string, root: string, 
   lease.file.pid === pid ? startedLine({ pid, entry, root, log }) : otherTookLine({ pid, holder: lease.file.pid, root, log });
 
 /** The daemon the service would run, spawned with the service's environment into `log`: what it runs, its pid and its end; or why not. */
-function spawned(
-  host: DemandHost,
-  root: string,
-  log: string,
-): { entry: string; pid: number | undefined; ended: Promise<SpawnEnded> } | Unstarted {
+function spawned(host: DemandHost, root: string, log: string) {
   try {
     const { entry, cwd } = host.daemon();
-    return { entry, ...host.spawn({ node: host.node, entry, cwd, env: daemonEnv(host.env, root, host.path), log }) };
+    return { entry, ...host.spawn({ node: host.node, entry, cwd, env: daemonEnv(host.env, root, host.path), log }) } satisfies
+      | { entry: string; pid: number | undefined; ended: Promise<SpawnEnded> }
+      | Unstarted;
   } catch (err) {
-    return failed(err);
+    return failed(err) satisfies { entry: string; pid: number | undefined; ended: Promise<SpawnEnded> } | Unstarted;
   }
 }
 

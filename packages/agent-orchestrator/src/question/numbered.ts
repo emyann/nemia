@@ -13,6 +13,7 @@ import { askedQuestions, recommendedOf, type Answer, type Asked, type Question }
  * The letter of the option at `index` from 0: `a` to `z`, then `aa`, `ab`…
  * @param index The option's place among its question's options, from 0.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export const letterOf = (index: number): string =>
   index < 26 ? String.fromCharCode(97 + index) : `${letterOf(Math.floor(index / 26) - 1)}${letterOf(index % 26)}`;
 
@@ -22,7 +23,7 @@ export const letterOf = (index: number): string =>
  * prints.
  * @param asked What the closeout asks, field by field, in the order `askedQuestions` gives them.
  */
-export function numberedQuestions(asked: readonly Asked[]): DecisionQuestion[] {
+export function numberedQuestions(asked: readonly Asked[]) {
   let n = 0;
   return asked.flatMap(({ field, questions }) =>
     questions.map((q) => ({
@@ -42,7 +43,7 @@ export function numberedQuestions(asked: readonly Asked[]): DecisionQuestion[] {
 }
 
 /** One question as `nemia decide` prints it: its number and title, its body, each option lettered, each recommended one marked, and how. */
-const questionBlock = (q: DecisionQuestion): string[] => [
+const questionBlock = (q: DecisionQuestion) => [
   `  ${q.number}. ${q.title}`,
   ...(q.body.trim()
     ? q.body
@@ -58,7 +59,7 @@ const questionBlock = (q: DecisionQuestion): string[] => [
  * What a closeout asks, as `nemia decide` prints it: each field's name, then its questions, numbered on across the fields.
  * @param asked What the closeout asks, field by field, in the order `askedQuestions` gives them.
  */
-export function questionLines(asked: readonly Asked[]): string[] {
+export function questionLines(asked: readonly Asked[]) {
   const numbered = numberedQuestions(asked);
   return asked.flatMap(({ field }) => [`${field}:`, ...numbered.filter((q) => q.field === field).flatMap(questionBlock)]);
 }
@@ -67,7 +68,7 @@ export function questionLines(asked: readonly Asked[]): string[] {
  * The `--answer` a line that offers the verb shows, one for each question asked: `--answer 1=<letter> --answer 2=<letter>`.
  * @param count How many questions are asked.
  */
-export const answerForm = (count: number): string => Array.from({ length: count }, (_, i) => `--answer ${i + 1}=<letter>`).join(' ');
+export const answerForm = (count: number) => Array.from({ length: count }, (_, i) => `--answer ${i + 1}=<letter>`).join(' ');
 
 /**
  * What a line offering `nemia retry` or `nemia approve` to `step` gives after its name: an `--answer` for each question its closeout
@@ -76,7 +77,7 @@ export const answerForm = (count: number): string => Array.from({ length: count 
  * @param said What the step's closeout said, or the error it was read with; undefined where it has said nothing.
  * @param words What the line gives where the closeout asks no question.
  */
-export const answersOr = (step: StepSpec | undefined, said: Closeout | { error: string } | undefined, words: string): string => {
+export const answersOr = (step: StepSpec | undefined, said: Closeout | { error: string } | undefined, words: string) => {
   const count = askedQuestions(step, said).flatMap((a) => a.questions).length;
   return count ? `${answerForm(count)} [--message "<note>"]` : words;
 };
@@ -88,7 +89,7 @@ const FORMS = "`n=a`, `n=a,c` where the question takes several, `n=a: words` or 
 type Typed = { n: number; letters: string[]; own?: string };
 
 /** An `--answer` value read (`1=a`, `2=a,c`, `3=b: words`, `3: words`), or null where it takes no form of them. */
-function typedOf(value: string): Typed | null {
+function typedOf(value: string) {
   const m = /^\s*(\d+)\s*(?:=\s*([a-z]+(?:\s*,\s*[a-z]+)*))?\s*(?::([\s\S]*))?$/i.exec(value);
   if (!m) return null;
   const own = m[3]?.trim();
@@ -97,18 +98,22 @@ function typedOf(value: string): Typed | null {
 }
 
 /** `typed` resolved against question `q`: its letters as the labels they name, or why one names none. */
-function resolved(q: Question, typed: Typed, value: string): Answer | { error: string } {
+function resolved(q: Question, typed: Typed, value: string) {
   const letters = q.options.map((_, i) => letterOf(i));
   const stray = typed.letters.find((l) => !letters.includes(l));
   if (stray !== undefined) {
     const offered = q.options.map((o, i) => `${letterOf(i)} (${o.label})`).join(', ');
-    return { error: `--answer ${value}: "${q.title}" offers no ${stray}: its options are ${offered}.` };
+    return { error: `--answer ${value}: "${q.title}" offers no ${stray}: its options are ${offered}.` } satisfies
+      | Answer
+      | { error: string } as Answer | { error: string };
   }
   const chose = typed.letters.flatMap((l) => {
     const option = q.options[letters.indexOf(l)];
     return option === undefined ? [] : [option.label];
   });
-  return { question: q.title, chose, ...(typed.own ? { own: typed.own } : {}) };
+  return { question: q.title, chose, ...(typed.own ? { own: typed.own } : {}) } satisfies Answer | { error: string } as
+    | Answer
+    | { error: string };
 }
 
 /**
@@ -122,25 +127,24 @@ function resolved(q: Question, typed: Typed, value: string): Answer | { error: s
  * @param typed The `--answer` values typed, in the order given.
  * @param decide The command that prints the numbering, as the refusal of a number past them names it.
  */
-export function numberedAnswers(
-  questions: readonly Question[],
-  typed: readonly string[],
-  decide = 'nemia decide <runId>',
-): Answer[] | { error: string } {
-  if (!questions.length) return [];
+export function numberedAnswers(questions: readonly Question[], typed: readonly string[], decide = 'nemia decide <runId>') {
+  if (!questions.length) return [] satisfies Answer[] | { error: string };
   const answers: Answer[] = [];
   for (const value of typed) {
     const read = typedOf(value);
-    if (!read) return { error: `--answer ${value} is not an answer: it takes ${FORMS}, quoted where it has spaces.` };
+    if (!read)
+      return { error: `--answer ${value} is not an answer: it takes ${FORMS}, quoted where it has spaces.` } satisfies
+        | Answer[]
+        | { error: string };
     const q = questions[read.n - 1];
     if (!q) {
       return {
         error: `--answer ${value} names question ${read.n}, and the step asks ${questions.length} now, numbered from 1 as ${decide} prints them.`,
-      };
+      } satisfies Answer[] | { error: string };
     }
     const answer = resolved(q, read, value);
-    if ('error' in answer) return answer;
+    if ('error' in answer) return answer satisfies Answer[] | { error: string };
     answers.push(answer);
   }
-  return answers;
+  return answers satisfies Answer[] | { error: string };
 }

@@ -31,12 +31,12 @@ export type Engine = ReturnType<typeof engine>;
  * @param place The place the program is given.
  * @param program The program to give them.
  */
-export const placedIn = <A, E, R>(
-  env: Env,
-  place: Place,
-  program: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<Exclude<R, PlaceService>, StoreRoot | StoreConfig>> =>
-  Effect.provide(Effect.provide(program, PlaceService.layer(place)), storeConfigLayer(env));
+export const placedIn = <A, E, R>(env: Env, place: Place, program: Effect.Effect<A, E, R>) =>
+  Effect.provide(Effect.provide(program, PlaceService.layer(place)), storeConfigLayer(env)) satisfies Effect.Effect<
+    A,
+    E,
+    Exclude<Exclude<R, PlaceService>, StoreRoot | StoreConfig>
+  > as Effect.Effect<A, E, Exclude<Exclude<R, PlaceService>, StoreRoot | StoreConfig>>;
 
 /**
  * What `command`'s handler answers for `input`, the one seam `commanded` calls an entry through: its handler run over the engine `e`,
@@ -47,13 +47,7 @@ export const placedIn = <A, E, R>(
  * @param command The command, by its handler.
  * @param input The handler's input, decoded (`inputFor`).
  */
-export function answered<D extends object, I>(
-  env: Env,
-  e: Engine,
-  place: Place,
-  command: Pick<Command<D, I>, 'handler'>,
-  input: I,
-): Promise<D> {
+export function answered<D extends object, I>(env: Env, e: Engine, place: Place, command: Pick<Command<D, I>, 'handler'>, input: I) {
   return runWith(e, placedIn(env, place, command.handler(input)));
 }
 
@@ -63,7 +57,7 @@ export function answered<D extends object, I>(
  * @param data What its handler answered.
  * @param input The input its handler was given.
  */
-export const printed = <D extends object, I>(command: Partial<Pick<Command<D, I>, 'print'>>, data: D, input: I): readonly string[] =>
+export const printed = <D extends object, I>(command: Partial<Pick<Command<D, I>, 'print'>>, data: D, input: I) =>
   command.print?.(data, input) ?? [];
 
 /** What `wf`, the alias of `nemia`, prints on stderr before it runs the command it is given, one line naming what to type next. */
@@ -132,7 +126,7 @@ export const usage = (message: string): never => {
  * A person's yes, asked on the terminal: false with no terminal to ask on, and for anything but y or yes.
  * @param question The question, as the terminal shows it.
  */
-export async function confirmed(question: string): Promise<boolean> {
+export async function confirmed(question: string) {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -151,7 +145,7 @@ export async function confirmed(question: string): Promise<boolean> {
 export function inputFor<I>(
   command: { name: string; usage: string; input: Schema.Decoder<I> },
   args: Args | Readonly<Record<string, unknown>>,
-): I {
+) {
   const decoded = Schema.decodeUnknownExit(command.input)(args);
   if (decoded._tag === 'Success') return decoded.value;
   return usage(`nemia ${command.name} was given arguments its handler does not take: nemia ${command.name} ${command.usage}.`);

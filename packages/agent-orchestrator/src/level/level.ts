@@ -23,7 +23,7 @@ export type { Level };
  * @param level The level asked of.
  * @param floor The level it is held against.
  */
-export const atLeast = (level: Level, floor: Level): boolean => LEVELS.indexOf(level) >= LEVELS.indexOf(floor);
+export const atLeast = (level: Level, floor: Level) => LEVELS.indexOf(level) >= LEVELS.indexOf(floor);
 
 /** A raise of a factory's level for a stretch: the level it is raised to, until the moment `until` (ISO), and its default after. */
 export type Raise = { level: Level; until: string };
@@ -45,7 +45,7 @@ export type FactoryLevel = { factory: string; level: Level; default: Level; own:
  * @param file The factory's level file, undefined where none was written.
  * @param at The time asked of, in ms since the epoch.
  */
-export const raiseAt = (file: FactoryLevelFile | undefined, at: number): Raise | null =>
+export const raiseAt = (file: FactoryLevelFile | undefined, at: number) =>
   file?.raise !== undefined && Date.parse(file.raise.until) > at ? file.raise : null;
 
 /**
@@ -55,8 +55,7 @@ export const raiseAt = (file: FactoryLevelFile | undefined, at: number): Raise |
  * @param store The store's level.
  * @param at The time asked of, in ms since the epoch.
  */
-export const levelOf = (file: FactoryLevelFile | undefined, store: Level, at: number): Level =>
-  raiseAt(file, at)?.level ?? file?.level ?? store;
+export const levelOf = (file: FactoryLevelFile | undefined, store: Level, at: number) => raiseAt(file, at)?.level ?? file?.level ?? store;
 
 /**
  * The factory `factory`'s level read at `at`, its file `file` and the store's level `store`. Pure.
@@ -65,7 +64,7 @@ export const levelOf = (file: FactoryLevelFile | undefined, store: Level, at: nu
  * @param store The store's level.
  * @param at The time asked of, in ms since the epoch.
  */
-export const factoryLevelOf = (factory: string, file: FactoryLevelFile | undefined, store: Level, at: number): FactoryLevel => ({
+export const factoryLevelOf = (factory: string, file: FactoryLevelFile | undefined, store: Level, at: number) => ({
   factory,
   level: levelOf(file, store, at),
   default: file?.level ?? store,
@@ -82,7 +81,7 @@ export const FACTORY_LEVEL_FORM = `nemia level [${LEVELS.join('|')}] [--factory 
  * @param level The level the raise asks for.
  * @param byDefault The factory's default level.
  */
-export const raiseRefusal = (factory: string, level: Level, byDefault: Level): string | undefined =>
+export const raiseRefusal = (factory: string, level: Level, byDefault: Level) =>
   atLeast(byDefault, level)
     ? `${factory} is at ${byDefault} by default, so a raise to ${level} raises nothing: raise it above its default, or set its default with nemia level ${level} --factory ${factory}.`
     : undefined;
@@ -101,7 +100,7 @@ const LONGEST = 7 * DAY;
  * read as one. Pure.
  * @param text The stretch as typed, `--for`'s value.
  */
-export function durationOf(text: string): number | undefined {
+export function durationOf(text: string) {
   const [, digits, unit] = /^(\d+)([mhd])$/.exec(text.trim()) ?? [];
   const per = unit === undefined ? undefined : UNITS[unit];
   if (digits === undefined || per === undefined) return undefined;
@@ -113,7 +112,7 @@ export function durationOf(text: string): number | undefined {
  * Why `text` is no stretch a raise is given for, or undefined where it is one. Pure.
  * @param text The stretch as typed, `--for`'s value.
  */
-export const durationRefusal = (text: string): string | undefined =>
+export const durationRefusal = (text: string) =>
   durationOf(text) === undefined
     ? `--for takes the stretch a raise lasts, digits and m, h or d, up to 7d, like 90m, 2h or 1d, and ${JSON.stringify(text)} is not one: ${FACTORY_LEVEL_FORM}.`
     : undefined;
@@ -130,12 +129,7 @@ export type FactoryAsk = { factory: string; level?: Level; forMs?: number; end?:
  * @param store The store's level.
  * @param at The time of the write, which the file's `since` and a raise's end are counted from.
  */
-export function factoryAsked(
-  ask: FactoryAsk,
-  current: FactoryLevelFile | undefined,
-  store: Level,
-  at: Date,
-): { file: FactoryLevelFile } | { conflict: string } | { invalid: string } {
+export function factoryAsked(ask: FactoryAsk, current: FactoryLevelFile | undefined, store: Level, at: Date) {
   const since = at.toISOString();
   const raise = raiseAt(current, at.getTime());
   const own = current?.level === undefined ? {} : { level: current.level };
@@ -169,8 +163,8 @@ export function levelsAfter(
   changed: { factory: string; file: FactoryLevelFile } | undefined,
   at: number,
   byDefault: string,
-): FactoryLevel[] {
-  const fileOf = (r: FactoryLevel): FactoryLevelFile | undefined => {
+) {
+  const fileOf = (r: FactoryLevel) => {
     if (r.factory === byDefault) return undefined;
     if (r.factory === changed?.factory) return changed.file;
     return { since: '', ...(r.own === null ? {} : { level: r.own }), ...(r.raise === null ? {} : { raise: r.raise }) };
@@ -183,7 +177,7 @@ export function levelsAfter(
  * @param row The factory's level.
  * @param byDefault The default factory's name, whose level is the store's.
  */
-export function factoryLevelWords(row: FactoryLevel, byDefault: string): string {
+export function factoryLevelWords(row: FactoryLevel, byDefault: string) {
   const whose = row.factory === byDefault ? "the store's level, for runs in no factory" : row.own === null ? "the store's" : 'its own';
   if (row.raise !== null) return `${row.factory}: ${row.level} until ${row.raise.until}, then ${row.default} (${whose})`;
   return `${row.factory}: ${row.level} (${whose})`;

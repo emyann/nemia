@@ -47,7 +47,7 @@ import { loopSpan } from '../workflow/index.ts';
 import type { EarlierTry, TryCause } from '../retry/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
-import type { Decision, Offer } from '../decide/decide.ts';
+import type { Decision } from '../decide/decide.ts';
 import { mergeDue, mergeDueNote, mergeNote, mergeSpent, mergeWaits } from '../merge/merge.ts';
 import type { LandingSaid, Verdict } from '../check/index.ts';
 
@@ -83,7 +83,7 @@ export function roundsDue(
   asks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): Round[] {
+) {
   const due: Round[] = [];
   for (const step of steps) {
     if (!step.loop) continue;
@@ -116,7 +116,7 @@ function askedRound(
   closeoutOf: (step: string) => Closeout | undefined,
   asks: readonly RoundAsk[],
   spendOf: SpendOf,
-): Round | undefined {
+) {
   const over = loopOver(steps, step, run, spendOf);
   const above = Math.max(0, ...over.map((o) => o.spent.usd));
   const held = at.status === 'over budget' && satisfiesAfter(at.own) && askedAgain(step, run, closeoutOf);
@@ -124,14 +124,14 @@ function askedRound(
     at.status === 'exhausted' || held
       ? asks.find((a) => a.step === step.name && a.round === at.round && (!over.length || (a.budget !== undefined && a.budget > above)))
       : undefined;
-  if (!ask || !step.loop) return undefined;
+  if (!ask || !step.loop) return undefined satisfies Round | undefined;
   return {
     step: step.name,
     target: step.loop,
     round: at.round,
     by: 'ask',
     ...(over.length ? { budget: ask.budget, raise: over.map((o) => o.name) } : {}),
-  };
+  } satisfies Round | undefined;
 }
 
 /**
@@ -151,7 +151,7 @@ function askedRound(
  * @param r The round filed: its looping step, its target, on whose word, and a budget a person raised with it.
  * @param taskId The id of the task just filed for the round's target, which takes the target's place.
  */
-export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskId: string): Run['steps'] {
+export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskId: string) {
   const looping = steps.find((s) => s.name === r.step);
   const filed = filedOn(
     { run, reads: { steps } },
@@ -178,7 +178,7 @@ export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskI
  * @param r The round filed.
  * @param looping The round's looping step, whose `rounds:` the line names.
  */
-export const roundFiledNote = (r: Round, looping: StepSpec): string =>
+export const roundFiledNote = (r: Round, looping: StepSpec) =>
   r.merge
     ? mergeNote(r)
     : `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `nemia retry --round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`;
@@ -203,7 +203,7 @@ export const roundBriefed = (r: Round, looping: StepSpec, landing?: LandingSaid)
  * @param run The run whose loops' rounds the asks are read against.
  * @param asks The round asks on the run that the tick has not consumed.
  */
-export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] =>
+export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]) =>
   asks.filter((a) => (a.merge ? mergeSpent(run, a) : a.round <= roundOf(run, a.step)));
 
 /**
@@ -212,7 +212,7 @@ export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] 
  * @param id The run's id, named in the refusal's command.
  * @param budget The amount given with `--budget`, in dollars, or undefined where none was given.
  */
-export const roundBudgetRefusal = (id: string, budget?: number): string | null =>
+export const roundBudgetRefusal = (id: string, budget?: number) =>
   budget !== undefined && !(Number.isFinite(budget) && budget > 0)
     ? `--budget ${String(budget)} is not an amount. It is the most a step of the loop may cost together, in dollars, above what it has cost: nemia retry ${id} [<step>] --round --budget <amount>, like 5 or 2.50.`
     : null;
@@ -222,7 +222,7 @@ export const roundBudgetRefusal = (id: string, budget?: number): string | null =
  * the next tick files anyway, or a merge it would drop (`mergeWaits`). `over` is what each step of the loop over its budget has cost
  * (`loopOver`). Undefined when none is.
  */
-function roundWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], over: ReturnType<typeof loopOver>): string | undefined {
+function roundWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], over: ReturnType<typeof loopOver>) {
   const now = roundOf(run, looping.name);
   const above = Math.max(0, ...over.map((o) => o.spent.usd));
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
@@ -280,7 +280,7 @@ export function roundAsk(
   spendOf: SpendOf = () => undefined,
   budget?: number,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): { step: string; round: number; budget?: number } | { refusal: string } {
+) {
   const no = (refusal: string) => ({ refusal });
   const notAmount = roundBudgetRefusal(run.id, budget);
   if (notAmount) return no(notAmount);
@@ -397,7 +397,7 @@ export function roundAsk(
 }
 
 /** The steps of `looping`'s loop (`loopSpan`), in the workflow's order. */
-const spanSteps = (steps: readonly StepSpec[], looping: StepSpec): StepSpec[] => {
+const spanSteps = (steps: readonly StepSpec[], looping: StepSpec) => {
   const names = loopSpan(steps, looping);
   return steps.filter((s) => names.includes(s.name));
 };
@@ -406,8 +406,7 @@ const spanSteps = (steps: readonly StepSpec[], looping: StepSpec): StepSpec[] =>
  * The step whose loop a person means: the one they `named`, or where they name none the run's one loop, of its `loops`; undefined
  * where they name none and the run has no loop, or several.
  */
-const loopingOf = (named: StepSpec | undefined, loops: readonly StepSpec[]): StepSpec | undefined =>
-  named ?? (loops.length === 1 ? loops[0] : undefined);
+const loopingOf = (named: StepSpec | undefined, loops: readonly StepSpec[]) => named ?? (loops.length === 1 ? loops[0] : undefined);
 
 /**
  * Why the words given with an acceptance cannot ride on it — or null. Pure, and asked before anything about the run: words that are missing
@@ -415,7 +414,7 @@ const loopingOf = (named: StepSpec | undefined, loops: readonly StepSpec[]): Ste
  * @param message The words given with `--message`, or undefined where none were.
  * @param command The command the refusal tells a person to type again, its `--message` added.
  */
-export const acceptWordsRefusal = (message: string | undefined, command: string): string | null =>
+export const acceptWordsRefusal = (message: string | undefined, command: string) =>
   message === undefined
     ? `--message says why the work is good enough with its findings open, and is what the steps after the loop are handed — the shipper, and whoever reads the merge, have nothing else. Say it: ${command} --message "<why>".`
     : !message.trim()
@@ -426,7 +425,7 @@ export const acceptWordsRefusal = (message: string | undefined, command: string)
  * Why an acceptance of `looping`'s work waits on an ask already there: a round about to be filed, or a merge that sends the work back
  * (`mergeWaits`). Undefined when neither is.
  */
-function acceptWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[]): string | undefined {
+function acceptWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[]) {
   const now = roundOf(run, looping.name);
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
   if (pending) {
@@ -454,7 +453,7 @@ function spanRefusal(
   run: Run,
   now: number,
   at: (s: StepSpec) => { status: StepStatus; own: StepStatus },
-): string | undefined {
+) {
   const stopping = span.find((s) => at(s).own !== 'exhausted' && stopsFollowers(at(s).own));
   if (stopping) {
     const { status } = at(stopping);
@@ -482,7 +481,7 @@ function gateNotLoop(
   askedCloseout: (taskId: string) => CloseoutAsked,
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
-): string | undefined {
+) {
   if (!honoursAsks(run)) return undefined;
   const words = runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf);
   if (steps.some((s) => s.loop && words.get(s.name) === 'exhausted')) return undefined;
@@ -530,7 +529,7 @@ export function acceptAsk(
   asks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): { step: string; try: number } | { refusal: string } {
+) {
   const no = (refusal: string) => ({ refusal });
   const gate = name === undefined ? gateNotLoop(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf) : undefined;
   if (gate) return no(gate);
@@ -604,20 +603,20 @@ export function acceptAsk(
  * @param run The run the loop is in: the round it was on.
  * @param a The person's acceptance: when they said enough.
  */
-export const acceptedNote = (step: StepSpec, run: Run, a: Acceptance): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open`;
+export const acceptedNote = (step: StepSpec, run: Run, a: Acceptance) =>
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open` satisfies string as string;
 
 /**
  * A round due now, as `nemia ls` and `nemia decide` say it.
  * @param steps The workflow the run is judged by: the looping step's `rounds:`.
  * @param r The round due.
  */
-export function roundDueNote(steps: readonly StepSpec[], r: Round): string {
+export function roundDueNote(steps: readonly StepSpec[], r: Round) {
   const looping = steps.find((s) => s.name === r.step);
-  if (r.by === 'merge') return mergeDueNote(r);
-  return r.by === 'ask'
+  if (r.by === 'merge') return mergeDueNote(r) satisfies string as string;
+  return (r.by === 'ask'
     ? `round ${r.round} asked (nemia retry --round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}) — the next tick files ${r.target}`
-    : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`;
+    : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`) satisfies string as string;
 }
 
 /**
@@ -628,8 +627,8 @@ export function roundDueNote(steps: readonly StepSpec[], r: Round): string {
  * @param run The run the loop is in: its round, and whether it is pruned or held.
  * @param raise Whether a step of the loop is over its budget, so the command offered carries `--budget`.
  */
-export const exhaustedNote = (step: StepSpec, run: Run, raise = false): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round${raise ? ' --budget <amount>' : ''}`}`;
+export const exhaustedNote = (step: StepSpec, run: Run, raise = false) =>
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round${raise ? ' --budget <amount>' : ''}`}` satisfies string as string;
 
 /**
  * A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the
@@ -637,10 +636,10 @@ export const exhaustedNote = (step: StepSpec, run: Run, raise = false): string =
  * @param step The looping step whose round waits on a budget.
  * @param run The run the loop is in: its round, and whether it is pruned or held.
  */
-export const heldNote = (step: StepSpec, run: Run): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round --budget <amount>`}`;
+export const heldNote = (step: StepSpec, run: Run) =>
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round --budget <amount>`}` satisfies string as string;
 
-const noMoreRounds = (pruned: Pruned): string => `no round more, since the run was ${prunedWords(pruned)}`;
+const noMoreRounds = (pruned: Pruned) => `no round more, since the run was ${prunedWords(pruned)}`;
 
 /**
  * Where a verb would be offered on a held run, what is said instead, with what the person who put the hold said of it: `held until a-1x2y
@@ -649,14 +648,14 @@ const noMoreRounds = (pruned: Pruned): string => `no round more, since the run w
  * @param hold The hold on the run: the runs it waits on, why, and by whom.
  * @param what What would be offered, said in its place: `once more`, `its approval`.
  */
-export const heldLater = (hold: Hold, what: string): string =>
+export const heldLater = (hold: Hold, what: string) =>
   `${holdWord(
     hold.until.map((run) => ({ run })),
     hold,
   )}; ${what} is asked once the hold lifts`;
 
 /** The steps of a loop over their budget, in words: `implement has cost $4.20 of its $3 budget`. */
-const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number }>): string =>
+const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number }>) =>
   over.map((o) => `${o.name} has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ');
 
 /**
@@ -672,7 +671,7 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  * @param d What the run waits on (`Decision`): only an awaiting one names loops out of rounds or held on a budget.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget. Left out, nothing has cost.
  */
-export function roundOffers(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
+export function roundOffers(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf = () => undefined) {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
   return steps
     .filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name)))
@@ -685,7 +684,7 @@ export function roundOffers(steps: readonly StepSpec[], run: Run, d: Decision, s
       const once = over.length ? `, its cap raised above ${dollars(Math.max(...over.map((o) => o.spent.usd)))}` : '';
       const why = exhausted ? `\`rounds: ${capOf(looping)}\` are spent${raise}` : overWords(over);
       const round = `nemia retry ${run.id} ${name} --round${over.length ? ' --budget <amount>' : ''}`;
-      const offer = (command: string, before: string): Offer => ({ step: name, command, said: `${name}: ${before}:  ${command}` });
+      const offer = (command: string, before: string) => ({ step: name, command, said: `${name}: ${before}:  ${command}` });
       const again = offer(
         round,
         `it asked for round ${roundOf(run, name) + 1}, and ${why}. Its findings are below. Once more${once} — ${looping.loop} continued, then a new ${name}`,
@@ -709,4 +708,4 @@ export function roundOffers(steps: readonly StepSpec[], run: Run, d: Decision, s
  * What `nemia decide` offers for each loop out of rounds, as its lines: each offer's sentence (`roundOffers`). Pure.
  * @param args What `roundOffers` takes: the workflow, the run, what it waits on and what each task cost.
  */
-export const roundLines = (...args: Parameters<typeof roundOffers>): string[] => roundOffers(...args).map((o) => o.said);
+export const roundLines = (...args: Parameters<typeof roundOffers>) => roundOffers(...args).map((o) => o.said);

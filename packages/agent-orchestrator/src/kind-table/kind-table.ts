@@ -23,16 +23,17 @@ import {
 } from 'objects';
 
 /** A text column: its name, what it says and its priority (0 shown by default, 1 when asked wide). */
-const column = (name: string, description: string, priority: 0 | 1): TableColumnDefinition => ({
-  name,
-  type: 'string',
-  format: name === 'Name' ? 'name' : '',
-  description,
-  priority,
-});
+const column = (name: string, description: string, priority: 0 | 1) =>
+  ({
+    name,
+    type: 'string',
+    format: name === 'Name' ? 'name' : '',
+    description,
+    priority,
+  }) satisfies TableColumnDefinition;
 
 /** `text` up to its first line's end; `''` for none. */
-const firstLine = (text: string | null | undefined): string => {
+const firstLine = (text: string | null | undefined) => {
   if (!text) return '';
   const at = text.indexOf('\n');
   return at === -1 ? text : text.slice(0, at);
@@ -46,7 +47,7 @@ const tableOf = <Item extends { readonly metadata: ObjectMeta }>(
   page: { readonly metadata: { readonly continue?: string }; readonly items: readonly Item[] },
   columns: readonly TableColumnDefinition[],
   cells: (item: Item) => readonly string[],
-): Table => ({
+) => ({
   kind: 'Table',
   apiVersion: 'meta.k8s.io/v1',
   metadata: page.metadata.continue === undefined ? {} : { continue: page.metadata.continue },
@@ -55,7 +56,7 @@ const tableOf = <Item extends { readonly metadata: ObjectMeta }>(
 });
 
 /** What a definition's note says: why it does not read, and the origin that shadows it, `; `-joined; `''` for neither. */
-const definitionNote = (error: string | null, shadowedBy: string | undefined): string =>
+const definitionNote = (error: string | null, shadowedBy: string | undefined) =>
   [...(error ? [`does not read: ${firstLine(error)}`] : []), ...(shadowedBy ? [`shadowed by ${shadowedBy}`] : [])].join('; ');
 
 /** The columns of an agent's row, in the order its cells are. */
@@ -73,21 +74,21 @@ export const AGENT_COLUMNS: readonly TableColumnDefinition[] = [
 ];
 
 /** What an agent's card says it can do: its entries' ids, or why it says nothing. */
-const canDo = ({ status }: Agent): string =>
+const canDo = ({ status }: Agent) =>
   status.cardError ? `says nothing it can do — ${firstLine(status.cardError)}` : (status.card ?? []).map((entry) => entry.id).join(', ');
 
 /** Where an agent was copied from, and whether its source moved since: `''` for one never copied. */
-const copiedCell = ({ status: { copied } }: Agent): string => {
+const copiedCell = ({ status: { copied } }: Agent) => {
   if (copied === null) return '';
   const since = copied.now === 'changed' ? '; the source has changed since' : copied.now === 'gone' ? '; the source is gone' : '';
   return `from ${copied.source} at ${copied.version}${since}`;
 };
 
 /** A harness prompt as a cell: none, and `keep`, which sets none, are `''`. */
-const harnessPromptCell = (prompt: string | null | undefined): string => (prompt === 'keep' ? '' : firstLine(prompt));
+const harnessPromptCell = (prompt: string | null | undefined) => (prompt === 'keep' ? '' : firstLine(prompt));
 
 /** The cells of `agent`'s row, in `AGENT_COLUMNS`' order. */
-const agentCells = (agent: Agent): readonly string[] => [
+const agentCells = (agent: Agent) => [
   agent.metadata.name,
   agent.status.origin,
   firstLine(agent.spec.description),
@@ -104,7 +105,7 @@ const agentCells = (agent: Agent): readonly string[] => [
  * `list` as a table: `AGENT_COLUMNS`, and a row per agent of the page.
  * @param list The page of agents, as the list answers it.
  */
-export const agentTable = (list: AgentList): Table => tableOf(list, AGENT_COLUMNS, agentCells);
+export const agentTable = (list: AgentList) => tableOf(list, AGENT_COLUMNS, agentCells) satisfies Table as Table;
 
 /** The columns of a skill's row, in the order its cells are. */
 export const SKILL_COLUMNS: readonly TableColumnDefinition[] = [
@@ -119,7 +120,7 @@ export const SKILL_COLUMNS: readonly TableColumnDefinition[] = [
 ];
 
 /** The cells of `skill`'s row, in `SKILL_COLUMNS`' order. */
-const skillCells = (skill: Skill): readonly string[] => [
+const skillCells = (skill: Skill) => [
   skill.metadata.name,
   skill.status.origin,
   firstLine(skill.spec.description ?? skill.status.entry?.description),
@@ -134,7 +135,7 @@ const skillCells = (skill: Skill): readonly string[] => [
  * `list` as a table: `SKILL_COLUMNS`, and a row per skill of the page.
  * @param list The page of skills, as the list answers it.
  */
-export const skillTable = (list: SkillList): Table => tableOf(list, SKILL_COLUMNS, skillCells);
+export const skillTable = (list: SkillList) => tableOf(list, SKILL_COLUMNS, skillCells) satisfies Table as Table;
 
 /** The columns of a factory's row, in the order its cells are. */
 export const FACTORY_COLUMNS: readonly TableColumnDefinition[] = [
@@ -156,7 +157,7 @@ const DEFAULT_FACTORY_NOTE = 'every run and card that names no factory — read,
  * A factory's note: why its file does not read; else each place a harness does not trust, and each condition that is not as it should
  * be (`Applied` false, any other true), as `nemia factory ls` words them; the default factory's, what it is.
  */
-const factoryNote = ({ metadata, status }: Factory): string => {
+const factoryNote = ({ metadata, status }: Factory) => {
   if (status.error) return firstLine(status.error);
   if (metadata.name === DEFAULT_NAMESPACE) return DEFAULT_FACTORY_NOTE;
   const amiss = status.conditions.filter((c) => (c.type === 'Applied') === (c.status === 'False'));
@@ -169,20 +170,20 @@ const factoryNote = ({ metadata, status }: Factory): string => {
 };
 
 /** A record's entries sorted by key, each as `say` words it, comma-separated. */
-const sortedEntries = <V>(record: Readonly<Record<string, V>> | undefined, say: (key: string, value: V) => string): string =>
+const sortedEntries = <V>(record: Readonly<Record<string, V>> | undefined, say: (key: string, value: V) => string) =>
   Object.entries(record ?? {})
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => say(key, value))
     .join(', ');
 
 /** The template a factory was made from, and the version applied or that none is yet; `''` for none. */
-const templateCell = ({ spec: { template }, status }: Factory): string =>
+const templateCell = ({ spec: { template }, status }: Factory) =>
   template === undefined
     ? ''
     : `${template.source} ${template.version}, ${status.applied === undefined ? 'not rendered yet' : `applied at ${status.applied}`}`;
 
 /** The cells of `factory`'s row, in `FACTORY_COLUMNS`' order. */
-const factoryCells = (factory: Factory): readonly string[] => [
+const factoryCells = (factory: Factory) => [
   factory.metadata.name,
   factory.spec.volumes
     .filter((v) => !v.readOnly)
@@ -201,7 +202,7 @@ const factoryCells = (factory: Factory): readonly string[] => [
  * `list` as a table: `FACTORY_COLUMNS`, and a row per factory of the page.
  * @param list The page of factories, as the list answers it.
  */
-export const factoryTable = (list: FactoryList): Table => tableOf(list, FACTORY_COLUMNS, factoryCells);
+export const factoryTable = (list: FactoryList) => tableOf(list, FACTORY_COLUMNS, factoryCells) satisfies Table as Table;
 
 /** The columns of an MCP server's row, in the order its cells are. */
 export const MCP_SERVER_COLUMNS: readonly TableColumnDefinition[] = [
@@ -215,7 +216,7 @@ export const MCP_SERVER_COLUMNS: readonly TableColumnDefinition[] = [
 ];
 
 /** The cells of `server`'s row, in `MCP_SERVER_COLUMNS`' order. */
-const mcpServerCells = (server: McpServer): readonly string[] => [
+const mcpServerCells = (server: McpServer) => [
   server.metadata.name,
   server.spec.type,
   server.spec.url,
@@ -231,4 +232,4 @@ const mcpServerCells = (server: McpServer): readonly string[] => [
  * `list` as a table: `MCP_SERVER_COLUMNS`, and a row per server of the page.
  * @param list The page of MCP servers, as the list answers it.
  */
-export const mcpServerTable = (list: McpServerList): Table => tableOf(list, MCP_SERVER_COLUMNS, mcpServerCells);
+export const mcpServerTable = (list: McpServerList) => tableOf(list, MCP_SERVER_COLUMNS, mcpServerCells) satisfies Table as Table;

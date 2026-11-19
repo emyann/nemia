@@ -8,11 +8,10 @@
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { tried } from '../runtime-client.ts';
-import type { Refusal } from '../refusal/refusal.ts';
 import { FactoryDoor, type FactoryDoorShape } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { readLevel } from '../nemia/level.store.ts';
-import { factoryLevelOf, type FactoryLevel, type FactoryLevelFile, type Level } from './level.ts';
+import { factoryLevelOf, type FactoryLevel } from './level.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { runNamespace } from '../run-list/index.ts';
@@ -24,7 +23,7 @@ const saidAlready = new Set<string>();
  * The factory `name`'s file, read through the door, none for the default factory, whose level is the store's; one that does not read is
  * said once on stderr and read as `manual`, so the factory is left alone.
  */
-const fileOrManual = (door: FactoryDoorShape, name: string): Effect.Effect<FactoryLevelFile | undefined> =>
+const fileOrManual = (door: FactoryDoorShape, name: string) =>
   door.level.read(FactoryName.read(name)).pipe(
     Effect.catch((err) =>
       Effect.sync(() => {
@@ -37,10 +36,10 @@ const fileOrManual = (door: FactoryDoorShape, name: string): Effect.Effect<Facto
   );
 
 /** The store's own level: what `nemia level <level>` set, `manual` where it never was. */
-const storeLevel = (home: string): Level => readLevel(home)?.level ?? 'manual';
+const storeLevel = (home: string) => readLevel(home)?.level ?? 'manual';
 
 /** The levels of the factories `names` at `at` (ms), each its own file over the store's level, read through the door. */
-const rowsOf = (door: FactoryDoorShape, names: readonly string[], at: number): Effect.Effect<FactoryLevel[], Refusal, StoreRoot> =>
+const rowsOf = (door: FactoryDoorShape, names: readonly string[], at: number) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     const store = yield* tried(() => storeLevel(home));
@@ -53,7 +52,7 @@ const rowsOf = (door: FactoryDoorShape, names: readonly string[], at: number): E
  * Every factory's level at `at`, the default factory first, then each factory of the store that reads, by name.
  * @param at The time asked of, in ms since the epoch; now where not given.
  */
-export const levelsNow = (at: number = Date.now()): Effect.Effect<FactoryLevel[], Refusal, StoreRoot> =>
+export const levelsNow = (at: number = Date.now()) =>
   Effect.gen(function* () {
     const door = yield* FactoryDoor;
     const unread = new Set((yield* door.factories.listed()).flatMap((l) => ('error' in l ? [l.name] : [])));
@@ -69,7 +68,7 @@ export const levelsNow = (at: number = Date.now()): Effect.Effect<FactoryLevel[]
  * @param name The factory's name, undefined for the default factory.
  * @param at The time asked of, in ms since the epoch; now where not given.
  */
-export const levelOfFactory = (name: string | undefined, at: number = Date.now()): Effect.Effect<Level, Refusal, StoreRoot> =>
+export const levelOfFactory = (name: string | undefined, at: number = Date.now()) =>
   Effect.gen(function* () {
     const [row] = yield* rowsOf(yield* FactoryDoor, [runNamespace(name)], at);
     return row?.level ?? storeLevel(yield* StoreRoot);
@@ -79,7 +78,7 @@ export const levelOfFactory = (name: string | undefined, at: number = Date.now()
  * The factory the run `runId` was started in, frozen on its record: the default factory where it names none. Refused: no such run.
  * @param runId The run's id.
  */
-export const runFactory = (runId: string): Effect.Effect<string, Refusal> =>
+export const runFactory = (runId: string) =>
   Effect.map(
     Effect.flatMap(RunDoor, (door) => door.runs.read(RunId.read(runId))),
     (run) => runNamespace(run.factory),

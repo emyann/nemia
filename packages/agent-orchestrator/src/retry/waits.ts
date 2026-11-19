@@ -43,7 +43,7 @@ export const WAITS_ON_PERSON: Record<StepReason, boolean> = {
  * try past its cap (`raise`).
  * @param standing What `retryable` answers of the step.
  */
-export function waitsOnPerson(standing: ReturnType<typeof retryable>): string | undefined {
+export function waitsOnPerson(standing: ReturnType<typeof retryable>) {
   if (WAITS_ON_PERSON[standing.reason]) return standing.via === 'session' ? 'its session waits on you' : `it is ${standing.status}`;
   if (standing.sendsBack) return 'a try of it sends the work back from a gate';
   if (standing.raise) return 'a try of it runs past its cap';

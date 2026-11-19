@@ -23,14 +23,15 @@ import type { SkillOther } from './skills.ts';
 export type { SkillPage } from './skill-door.store.ts';
 
 /** A text flag under `key`, as the api hands it. */
-const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
+const keyed = (key: string) => ({ flag: `--${key}`, kind: 'text', key }) satisfies Flag;
 
 /** The spec of an entry served on the api alone: its positionals, and its text flags by key. */
-const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): Spec => ({
-  positionals,
-  flags: keys.map(keyed),
-  unknown: (arg) => `the board's skills take no ${arg}.`,
-});
+const apiSpec = (positionals: readonly Positional[], keys: readonly string[]) =>
+  ({
+    positionals,
+    flags: keys.map(keyed),
+    unknown: (arg) => `the board's skills take no ${arg}.`,
+  }) satisfies Spec;
 
 /** What `skills`' handler takes: the skill folders to read. */
 export const SkillsInput = Schema.Struct({ skills: Schema.optionalKey(Schema.Array(Schema.String)) });

@@ -18,7 +18,7 @@ export const TOOLS_EXAMPLE = '`tools: Read, Grep, Glob, Bash`';
  * @param tools The `tools:` line's value, undefined where the step has none.
  * @param harness The step's `harness:`, undefined for the default harness.
  */
-export function toolsOf(step: string, tools: string | undefined, harness: string | undefined): string[] | undefined {
+export function toolsOf(step: string, tools: string | undefined, harness: string | undefined) {
   if (tools === undefined) return undefined;
   const named = `${step}: \`tools: ${tools}\``;
   const written = `A step's tools are the harness's names for them, bare and comma-separated: ${TOOLS_EXAMPLE}.`;
@@ -101,12 +101,7 @@ const RULE_LIST = {
  * @param written The line's value, undefined where the step has none.
  * @param spelled The key as the file spelled it, its former name included; absent where it is the key.
  */
-export function rulesOf(
-  step: string,
-  key: 'disallowedTools' | 'allowedTools',
-  written: string | undefined,
-  spelled?: string,
-): string[] | undefined {
+export function rulesOf(step: string, key: 'disallowedTools' | 'allowedTools', written: string | undefined, spelled?: string) {
   if (written === undefined) return undefined;
   const w = RULE_LIST[key];
   const named = `${step}: \`${spelled ?? key}: ${written}\`${spelled !== undefined && spelled !== key ? ` (\`${spelled}:\` is \`${key}:\`'s former name)` : ''}`;
@@ -161,7 +156,7 @@ const FILE_TOOLS = ['Write', 'NotebookEdit'] as const;
  * inert deny is worse, since the step is fenced by nothing while its file reads as fenced. The fix is the same rule on `Edit`, which
  * covers the file-editing tools whichever list it is in.
  */
-const fileRuleRefusal = (named: string, rule: string, key: 'disallowedTools' | 'allowedTools'): string =>
+const fileRuleRefusal = (named: string, rule: string, key: 'disallowedTools' | 'allowedTools') =>
   `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and ${
     key === 'allowedTools'
       ? 'denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it'
@@ -182,13 +177,13 @@ const PATH_TOOLS = ['Read', ...EDITING_TOOLS];
 export type DeniedAt = { cwd?: string; runId?: string };
 
 /** A call or a rule, `Tool` or `Tool(what)`, split. Pure. */
-const callOf = (written: string): { tool: string; what?: string } => {
+const callOf = (written: string) => {
   const [, tool, what] = /^([^()]+)\((.*)\)$/s.exec(written) ?? [];
   return tool !== undefined && what !== undefined ? { tool, what } : { tool: written };
 };
 
 /** A directory as a prefix: no trailing slash. */
-const dirOf = (cwd: string): string => cwd.replace(/\/+$/, '');
+const dirOf = (cwd: string) => cwd.replace(/\/+$/, '');
 
 /**
  * The rule that would allow a denied call, in `allowedTools:`'s words, from the call as the runtime words it (`denialText`: `Bash(pytest)`,
@@ -210,7 +205,7 @@ const dirOf = (cwd: string): string => cwd.replace(/\/+$/, '');
  * @param denied The denied call, as the runtime words it.
  * @param at The session's directory and its run's id, which a path is written from; none where neither is known.
  */
-export function allowRuleOf(denied: string, at: DeniedAt = {}): string {
+export function allowRuleOf(denied: string, at: DeniedAt = {}) {
   const { tool, what } = callOf(denied);
   if (what === undefined) return denied;
   if (tool === 'Bash') return `Bash(${what}:*)`;
@@ -218,7 +213,7 @@ export function allowRuleOf(denied: string, at: DeniedAt = {}): string {
   return `${EDITING_TOOLS.includes(tool) ? 'Edit' : tool}(${pathRuleOf(what, at)})`;
 }
 
-function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
+function pathRuleOf(path: string, { cwd, runId }: DeniedAt) {
   if (!path.startsWith('/') || path.startsWith('//')) return path;
   if (cwd && path.startsWith(`${dirOf(cwd)}/`)) return path.slice(dirOf(cwd).length + 1);
   return `/${
@@ -243,7 +238,7 @@ function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
  * @param disallowedTools The step's deny rules.
  * @param at The session's directory and its run's id, which a path is matched from; none where neither is known.
  */
-export function disallowedBy(denied: string, disallowedTools: readonly string[], at: DeniedAt = {}): string | undefined {
+export function disallowedBy(denied: string, disallowedTools: readonly string[], at: DeniedAt = {}) {
   const call = callOf(denied);
   return disallowedTools.find((written) => {
     const rule = callOf(written);
@@ -263,7 +258,7 @@ export function disallowedBy(denied: string, disallowedTools: readonly string[],
  * Whether a path is one a rule's path pattern names, or under one: `**` any depth, `*` and `?` within a part. A relative pattern with no
  * `/` in it names a file at any depth below the directory, as a gitignore line does. Pure.
  */
-function pathUnder(pattern: string, path: string, cwd: string | undefined): boolean {
+function pathUnder(pattern: string, path: string, cwd: string | undefined) {
   const target = path.startsWith('/') ? path.replace(/^\/\//, '/') : cwd ? `${dirOf(cwd)}/${path.replace(/^\.\//, '')}` : undefined;
   if (target === undefined || pattern.startsWith('~')) return false;
   const relative = !pattern.startsWith('//');

@@ -76,7 +76,7 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
     folders.set(card.name, folder);
   }
   if (onRepo) openPlace(place, opts.repo, true);
-  const folderOf = (card: Card): string => folders.get(card.name) ?? workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree);
+  const folderOf = (card: Card) => folders.get(card.name) ?? workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree);
   const startOne = opts.start ?? startRun;
   const started: Planned[] = [];
   for (const [i, card] of cards.entries()) {

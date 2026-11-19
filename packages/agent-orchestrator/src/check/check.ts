@@ -23,7 +23,7 @@
  *
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
-import { isRepositoryRun, type Run, type StepRecord, type StepStatus, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -136,7 +136,7 @@ export const checkEnvOf = (
   run: Run,
   step: Pick<StepSpec, 'name' | 'workspace'>,
   t: { workspace: string; files: string; closeout: string | undefined; workflowFiles?: string; carriedFiles?: string },
-): CheckEnv => ({
+) => ({
   WF_RUN: run.id,
   WF_STEP: step.name,
   ...(isRepositoryRun(run) && !endsOnBase(step) ? { WF_BASE_REF: run.baseRef } : {}),
@@ -193,7 +193,7 @@ export type CheckFirst = 'install' | 'unprovisioned';
  * @param command The shell line the run froze for the check.
  * @param first What runs before the command: an install, or no command at all (`unprovisioned`); left out, the command alone.
  */
-export const checkArgv = (command: string, first?: CheckFirst): string[] => [
+export const checkArgv = (command: string, first?: CheckFirst) => [
   'sh',
   '-c',
   [
@@ -215,7 +215,7 @@ export type Verdict = number | 'unfinished';
  * otherwise `unfinished` — killed, stopped, never started, or not ended yet — which is no verdict on the work, never a guessed number.
  * @param attempt The check's last attempt, its exit code and why it ended, or undefined where it has none.
  */
-export const attemptVerdict = (attempt: { exitCode?: number | null; reason?: string | null } | undefined): Verdict =>
+export const attemptVerdict = (attempt: { exitCode?: number | null; reason?: string | null } | undefined) =>
   typeof attempt?.exitCode === 'number' && attempt.reason !== 'deadline' && attempt.reason !== 'operator' ? attempt.exitCode : 'unfinished';
 
 /**
@@ -223,16 +223,16 @@ export const attemptVerdict = (attempt: { exitCode?: number | null; reason?: str
  * @param text The output.
  * @param n How many lines: `CHECK_TAIL_LINES` where none is given.
  */
-export function lastLines(text: string, n = CHECK_TAIL_LINES): string {
+export function lastLines(text: string, n = CHECK_TAIL_LINES) {
   const lines = text.replace(/\s+$/, '').split('\n');
-  return lines.slice(-n).join('\n');
+  return lines.slice(-n).join('\n') satisfies string as string;
 }
 
 /**
  * How a verdict reads on a screen: `exit 1`, or `unfinished`.
  * @param v The verdict.
  */
-export const verdictWord = (v: Verdict): string => (v === 'unfinished' ? 'unfinished' : `exit ${v}`);
+export const verdictWord = (v: Verdict) => (v === 'unfinished' ? 'unfinished' : `exit ${v}`);
 
 /**
  * What a check's verdict can be at a door: `passed`, `failed`, `unfinished` (no verdict on the work), `running`, or `unknown`. `objects`'
@@ -256,11 +256,11 @@ export type CheckVerdict = { result: CheckResult; exit: number | null };
  * @param phase The phase the check's task stands in.
  * @param verdict Its last attempt's verdict (`attemptVerdict`).
  */
-export function checkVerdictOf(phase: TaskPhase, verdict: Verdict): CheckVerdict {
-  if (phase === 'unknown') return { result: 'unknown', exit: null };
-  if (phase === 'succeeded') return { result: 'passed', exit: 0 };
-  if (phase !== 'failed' && phase !== 'stopped') return { result: 'running', exit: null };
-  return verdict === 'unfinished' ? { result: 'unfinished', exit: null } : { result: 'failed', exit: verdict };
+export function checkVerdictOf(phase: TaskPhase, verdict: Verdict) {
+  if (phase === 'unknown') return { result: 'unknown', exit: null } satisfies CheckVerdict;
+  if (phase === 'succeeded') return { result: 'passed', exit: 0 } satisfies CheckVerdict;
+  if (phase !== 'failed' && phase !== 'stopped') return { result: 'running', exit: null } satisfies CheckVerdict;
+  return (verdict === 'unfinished' ? { result: 'unfinished', exit: null } : { result: 'failed', exit: verdict }) satisfies CheckVerdict;
 }
 
 /**
@@ -271,7 +271,7 @@ export function checkVerdictOf(phase: TaskPhase, verdict: Verdict): CheckVerdict
  * does not weaken the fence — the fence is about who AUTHORS the command, and that stays the run.
  * @param command The check's shell line, as the run froze it.
  */
-export const checkContract = (command: string): string =>
+export const checkContract = (command: string) =>
   [
     '',
     '## Before you sign off',
@@ -296,7 +296,7 @@ export const checkContract = (command: string): string =>
  * @param command The check's shell line, as the run froze it.
  * @param words How the place stages a merge and what the session is denied, or undefined where the place says none.
  */
-export const landingContract = (command: string, words?: LandingWords): string =>
+export const landingContract = (command: string, words?: LandingWords) =>
   [
     '',
     '## The run checks and lands your merge',
@@ -333,7 +333,7 @@ export type CheckRefusal = { command: string; verdict: Verdict; stdout: string; 
  * is the fence: a step that fails a check again is the step most tempted to make the check easier.
  * @param r What the check said: its command, its verdict, the last lines of each stream, and the kill where one ended it.
  */
-export function refusalSection(r: CheckRefusal): string {
+export function refusalSection(r: CheckRefusal) {
   const json = JSON.stringify({ command: r.command, exit: r.verdict, stdout: r.stdout, stderr: r.stderr }, null, 2);
   const fence = '`'.repeat(Math.max(3, ...(json.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
   return [
@@ -376,7 +376,7 @@ export const REPORTED_LINES = 100;
  * how many more there were.
  * @param log The check's stdout.
  */
-export function reportedLines(log: string): { lines: string[]; cut: number } {
+export function reportedLines(log: string) {
   const all = log
     .split('\n')
     .map((line) => line.replace(/\r$/, ''))
@@ -401,7 +401,7 @@ const SUBJECT_FAILED = /^\s*(?:\[[^\]\s]+\] )?[\w.-]+: (?:worker \d+ )?FAILED �
  * it was first said. Past `FAILING_LINES`, the first that many, and `cut`, how many more there were. A check of another shape names none.
  * @param log The check's output.
  */
-export function failingLines(log: string): { lines: string[]; cut: number } {
+export function failingLines(log: string) {
   const all = new Map<string, string>();
   for (const raw of log.split('\n')) {
     const line = raw.replace(/\r$/, '');
@@ -433,7 +433,7 @@ export type LandingSaid = { step: string; check: string; command: string } & (
  * and its task.
  * @param said What the ending's check said, or why it cannot be read.
  */
-export function landingSaidSection(said: LandingSaid): string {
+export function landingSaidSection(said: LandingSaid) {
   const head = ['', `## What ${said.step}'s check said on the merged tree`, ''];
   if ('unreadable' in said)
     return [...head, `What it said cannot be given here — ${said.unreadable}. Its task is ${codeSpan(said.check)}.`].join('\n');
@@ -461,7 +461,7 @@ export function landingSaidSection(said: LandingSaid): string {
 }
 
 /** A value as JSON, fenced longer than any run of backticks inside it. */
-function jsonFenced(value: object): string[] {
+function jsonFenced(value: object) {
   const json = JSON.stringify(value, null, 2);
   const fence = '`'.repeat(Math.max(3, ...(json.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
   return [`${fence}json`, json, fence];
@@ -494,7 +494,7 @@ export type CheckHanded =
  * suite's output is text nobody vetted. A check that did not finish, or whose log cannot be read, says so: never nothing.
  * @param said What the step's check said, or why it cannot be read.
  */
-export function checkHandedSection(said: CheckHanded): string {
+export function checkHandedSection(said: CheckHanded) {
   const head = ['', `## What ${said.step}'s check said`, ''];
   if ('unreadable' in said)
     return [
@@ -531,7 +531,7 @@ export function checkHandedSection(said: CheckHanded): string {
 }
 
 /** Inline code that survives backticks in the text: a fence longer than any run of them inside. */
-function codeSpan(text: string): string {
+function codeSpan(text: string) {
   const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((m) => m[0].length));
   const fence = '`'.repeat(longest + 1);
   const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
@@ -547,11 +547,7 @@ function codeSpan(text: string): string {
  * @param record The step's record: its check and what landed.
  * @param phaseOf The phase of a task the engine holds, by its id.
  */
-export const onItsCheck = (
-  step: StepSpec,
-  record: StepRecord,
-  phaseOf: (taskId: string) => TaskPhase,
-): Extract<StepStatus, 'verified' | 'failed (check)' | 'failed' | 'checking'> => {
+export const onItsCheck = (step: StepSpec, record: StepRecord, phaseOf: (taskId: string) => TaskPhase) => {
   const check = record.check ? phaseOf(record.check.taskId) : undefined;
   if (endsOnBase(step)) {
     if (!record.landed) return 'checking';

@@ -7,13 +7,13 @@
  * are `brief`, so a section reads alike in every brief that has it, whatever comes before it.
  * @param brief The brief.
  */
-export const briefParts = (brief: string): string[] => brief.split(/(?<=\n)(?=## )/);
+export const briefParts = (brief: string) => brief.split(/(?<=\n)(?=## )/);
 
 /**
  * `spec` with its brief cut into parts (`briefParts`) beside it: the runtime keeps each part once, and the brief is filed whole.
  * @param spec A task's spec, holding its brief.
  */
-export const inParts = <S extends { brief: string }>(spec: S): S & { briefParts: string[] } => ({
+export const inParts = <S extends { brief: string }>(spec: S) => ({
   ...spec,
   briefParts: briefParts(spec.brief),
 });

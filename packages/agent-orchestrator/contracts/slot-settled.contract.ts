@@ -17,7 +17,7 @@ export type SlotKept = {
 };
 
 /** The words of a run that ended: it succeeded, a step of it broke, or a person called it off. */
-const ended = (status: RunStatusWord): boolean => status === 'succeeded' || status === 'failed' || status === 'cancelled';
+const ended = (status: RunStatusWord) => status === 'succeeded' || status === 'failed' || status === 'cancelled';
 
 const slotSettledSpec = spec<(kept: SlotKept | undefined) => boolean>({
   ensures: {

@@ -9,7 +9,6 @@ import type { FactoryListing } from '../factory/factory.ts';
 import { HARNESSES } from '../harness/harness.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
 import { unansweredWords } from '../place/place.ts';
-import type { Untrusted } from './trust.ts';
 
 /** How many places are asked of at once. */
 const AT_ONCE = 4;
@@ -19,15 +18,15 @@ const AT_ONCE = 4;
  * @param place The place asked for the repository's root.
  * @param dir The folder whose repository is asked.
  */
-export const rootOf = (place: Place, dir: string): Effect.Effect<{ readonly root: string | undefined } | { readonly unasked: string }> =>
+export const rootOf = (place: Place, dir: string) =>
   Effect.map(place.ask('root', { dir }), (outcome) =>
     'answer' in outcome ? { root: outcome.answer.root ?? undefined } : { unasked: unansweredWords(outcome) },
   );
 
 /** The harnesses' trusts of `dir` that are not given now, one a harness's folder. */
-function lacking(factory: string, dir: string, root: string | undefined): Untrusted[] {
+function lacking(factory: string, dir: string, root: string | undefined) {
   const seen = new Set<string>();
-  return HARNESSES.flatMap((harness): Untrusted[] => {
+  return HARNESSES.flatMap((harness) => {
     const trust = folderTrust(harness, dir, undefined, root);
     if (!trust || trust.trusted || seen.has(`${trust.harness}\n${trust.folder}`)) return [];
     seen.add(`${trust.harness}\n${trust.folder}`);

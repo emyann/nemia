@@ -29,7 +29,7 @@ export type Instant = { at: number; mono?: Monotonic };
  * @param from The earlier moment.
  * @param to The later moment.
  */
-export const elapsedMs = (from: Instant, to: Instant): number =>
+export const elapsedMs = (from: Instant, to: Instant) =>
   from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
 
 /** Which daemon holds the store: the api's process, or a `nemia up`. */
@@ -97,13 +97,13 @@ export type Identity = 'same' | 'other' | 'unknown' | 'gone';
  * A holder's kind as a line says it: `api`, or `nemia up`.
  * @param kind The holder's kind.
  */
-export const holderName = (kind: HolderKind): string => (kind === 'up' ? 'nemia up' : kind);
+export const holderName = (kind: HolderKind) => (kind === 'up' ? 'nemia up' : kind);
 
 /**
  * A holder named for a person: `the api of pid 12 at http://127.0.0.1:8787`, `the api of pid 12`, or `the nemia up of pid 12`.
  * @param file The holder's lease: its kind, its pid and the url it serves at, if any.
  */
-export const holderWords = (file: Pick<DaemonFile, 'by' | 'pid' | 'url'>): string =>
+export const holderWords = (file: Pick<DaemonFile, 'by' | 'pid' | 'url'>) =>
   file.by === 'api' ? `the api of pid ${file.pid}${file.url ? ` at ${file.url}` : ''}` : `the nemia up of pid ${file.pid}`;
 
 /**
@@ -131,7 +131,7 @@ export const STALE_FLOOR_MS = 15 * 60_000;
  * How long a holder of interval `every` may be silent before it reads as stalled: ten of its intervals, never under fifteen minutes.
  * @param every The holder's pass interval, in milliseconds.
  */
-export const staleAfterMs = (every: number): number => Math.max(STALE_PASSES * every, STALE_FLOOR_MS);
+export const staleAfterMs = (every: number) => Math.max(STALE_PASSES * every, STALE_FLOOR_MS);
 
 /**
  * The longest interval a timer keeps: Node fires a longer one after 1 ms, so `nemia up 1e10` would pass without pause and never go stale.
@@ -147,16 +147,18 @@ export const DEFAULT_EVERY_MS = 4_000;
  * ticks.
  * @param arg The interval as typed, in milliseconds, or undefined where none was given.
  */
-export function everyOf(arg: string | undefined): { every: number } | { refusal: string } {
-  if (arg === undefined) return { every: DEFAULT_EVERY_MS };
+export function everyOf(arg: string | undefined) {
+  if (arg === undefined)
+    return { every: DEFAULT_EVERY_MS } satisfies { every: number } | { refusal: string } as { every: number } | { refusal: string };
   const every = Number(arg);
-  if (arg.trim() !== '' && Number.isInteger(every) && every >= 1 && every <= MAX_EVERY_MS) return { every };
+  if (arg.trim() !== '' && Number.isInteger(every) && every >= 1 && every <= MAX_EVERY_MS)
+    return { every } satisfies { every: number } | { refusal: string } as { every: number } | { refusal: string };
   return {
     refusal:
       `nemia up takes its pass interval in whole milliseconds, from 1 to ${MAX_EVERY_MS}, and ${JSON.stringify(arg)} is not one: ` +
       `nemia up [ms], ${DEFAULT_EVERY_MS} when none is given. The interval is written into ${DAEMON_FILE}, and a holder whose interval does not ` +
       `read there holds nothing: a second nemia up would take the store from it while it ticks.`,
-  };
+  } satisfies { every: number } | { refusal: string } as { every: number } | { refusal: string };
 }
 
 /**
@@ -183,7 +185,7 @@ export type Standing = {
 export type DaemonStanding = { kind: 'none' } | { kind: 'unreadable'; text: string } | Standing;
 
 /** The file's stamps of life, each its wall time with the monotonic reading written beside it: its start, its last pass and its beat. */
-const stampsOf = (file: DaemonFile): Instant[] =>
+const stampsOf = (file: DaemonFile) =>
   [
     { at: file.startedAt, mono: file.startedMono },
     { at: file.passedAt, mono: file.passedMono },
@@ -199,10 +201,10 @@ const stampsOf = (file: DaemonFile): Instant[] =>
 export function daemonStanding(
   read: DaemonRead | undefined,
   { now, identify }: { now: Instant; identify: (file: DaemonFile) => Identity },
-): DaemonStanding {
-  if (read === undefined) return { kind: 'none' };
+) {
+  if (read === undefined) return { kind: 'none' } satisfies DaemonStanding;
   const { text, file } = read;
-  if (!file) return { kind: 'unreadable', text };
+  if (!file) return { kind: 'unreadable', text } satisfies DaemonStanding;
   const stamps = stampsOf(file);
   const last = Math.max(...stamps.map((s) => s.at));
   const quiet = Math.min(...stamps.map((s) => elapsedMs(s, now)));
@@ -214,7 +216,7 @@ export function daemonStanding(
       : quiet > staleAfterMs(file.every)
         ? 'stalled'
         : 'ticking';
-  return { kind, file, last, quiet, identity };
+  return { kind, file, last, quiet, identity } satisfies DaemonStanding;
 }
 
 /**
@@ -222,7 +224,7 @@ export function daemonStanding(
  * @param standing Where the store stands (`daemonStanding`).
  * @param self The pid of the process asking.
  */
-export const holderAgainst = (standing: DaemonStanding, self: number): Standing | undefined =>
+export const holderAgainst = (standing: DaemonStanding, self: number) =>
   standing.kind === 'ticking' && standing.file.pid !== self ? standing : undefined;
 
 /**
@@ -232,7 +234,7 @@ export const holderAgainst = (standing: DaemonStanding, self: number): Standing 
  * @param file The holder's lease.
  * @param now The time to measure ages at, in epoch milliseconds.
  */
-export function lastPassWords(file: DaemonFile, now: number): string {
+export function lastPassWords(file: DaemonFile, now: number) {
   const ago = (t: string) => `${durationWord(now - Date.parse(t))} ago (${t})`;
   const passed = file.passedAt ? `last pass ${ago(file.passedAt)}` : `no pass completed yet, started ${ago(file.startedAt)}`;
   const since = Date.parse(file.passedAt ?? file.startedAt);
@@ -246,7 +248,7 @@ export function lastPassWords(file: DaemonFile, now: number): string {
  * when the pid could not be confirmed as the process that wrote the file, how to check it first, since a pid is reused once its process
  * ends.
  */
-const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>): string =>
+const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>) =>
   identity === 'same'
     ? `kill ${file.pid} — that pid is the node process that ticks, not an npm wrapper around it, which can be killed and leave it ticking`
     : `its pid, once checked: ${file.pid} could not be confirmed here as the process that wrote ${DAEMON_FILE} (${file.procStart === undefined ? 'the file names no process start' : `no /proc/${file.pid}/stat to compare its start with`}), ` +
@@ -261,7 +263,7 @@ const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>): str
  * @param store The store's directory, as the line names it.
  * @param now The time to measure ages at, in epoch milliseconds.
  */
-export function holdRefusal(standing: Standing, verb: 'up' | 'api' | 'tick', store: string, now: number): string {
+export function holdRefusal(standing: Standing, verb: 'up' | 'api' | 'tick', store: string, now: number) {
   const holder = standing.file;
   const who = `${holderWords(holder)}, started ${holder.startedAt} in ${holder.cwd}, every ${holder.every}ms — ${lastPassWords(holder, now)}`;
   const stale = durationWord(staleAfterMs(holder.every));
@@ -278,7 +280,7 @@ export function holdRefusal(standing: Standing, verb: 'up' | 'api' | 'tick', sto
 }
 
 /** Why a holder is gone: its process ended, or its pid is another process's now — never a pid to kill. */
-const goneWords = ({ identity }: Standing): string =>
+const goneWords = ({ identity }: Standing) =>
   identity === 'other'
     ? `whose process is gone — that pid is another process's now, started after the nemia up that wrote ${DAEMON_FILE}`
     : 'whose process is gone';
@@ -289,7 +291,7 @@ const goneWords = ({ identity }: Standing): string =>
  * @param store The store's directory, as the line names it.
  * @param now The time to measure ages at, in epoch milliseconds.
  */
-export function takeoverLine(replaced: DaemonStanding, store: string, now: number): string | undefined {
+export function takeoverLine(replaced: DaemonStanding, store: string, now: number) {
   if (replaced.kind === 'unreadable') return `took ${store} over from a ${DAEMON_FILE} that did not read as a holder`;
   if (replaced.kind === 'gone')
     return `took ${store} over from pid ${replaced.file.pid}, ${goneWords(replaced)} — its ${lastPassWords(replaced.file, now)}`;
@@ -309,17 +311,17 @@ export function takeoverLine(replaced: DaemonStanding, store: string, now: numbe
  * @param store The store's directory, as the line names it.
  * @param self The kind of the daemon that stops; `up` by default.
  */
-export const takenFromLine = (by: DaemonFile | undefined, store: string, self: HolderKind = 'up'): string =>
+export const takenFromLine = (by: DaemonFile | undefined, store: string, self: HolderKind = 'up') =>
   by
     ? `${holderName(self)}: ${store} was taken over by ${holderWords(by)}, started ${by.startedAt} in ${by.cwd} — this one stops rather than be a second writer.`
     : `${holderName(self)}: ${store} no longer names this ${holderName(self)} as its holder — this one stops rather than be a second writer.`;
 
 /** Said after a holder ticking whose pid could not be confirmed: that it was not, so a person does not take the pid for certain. */
-const unconfirmed = ({ file, identity }: Standing): string =>
+const unconfirmed = ({ file, identity }: Standing) =>
   identity === 'same' ? '' : ` (pid ${file.pid} not confirmed here as the process that wrote ${DAEMON_FILE})`;
 
 /** Where an api holder serves, said after its pid: ` at http://127.0.0.1:8787`, or nothing. */
-const at = (file: DaemonFile): string => (file.url ? ` at ${file.url}` : '');
+const at = (file: DaemonFile) => (file.url ? ` at ${file.url}` : '');
 
 /**
  * `nemia ls`'s last line: whether a daemon is ticking the store, which — the api, with its url, or a `nemia up` — and when its last pass
@@ -327,7 +329,7 @@ const at = (file: DaemonFile): string => (file.url ? ` at ${file.url}` : '');
  * @param standing Where the store stands (`daemonStanding`).
  * @param now The time to measure ages at, in epoch milliseconds.
  */
-export function daemonLine(standing: DaemonStanding, now: number): string {
+export function daemonLine(standing: DaemonStanding, now: number) {
   switch (standing.kind) {
     case 'none':
       return `daemon: none has held this store — nothing ticks it; ${START_WORDS}`;
@@ -353,7 +355,7 @@ export function daemonLine(standing: DaemonStanding, now: number): string {
  * The file's text, as `nemia up` writes it.
  * @param file The lease to write.
  */
-export const daemonText = (file: DaemonFile): string => `${JSON.stringify(file, null, 2)}\n`;
+export const daemonText = (file: DaemonFile) => `${JSON.stringify(file, null, 2)}\n`;
 
 /** Whether a daemon ticks the store, read off its lease at `at`, with its line (`daemonLine`): what `nemia watch` says when it changes. */
 export type Liveness = { state: 'up' | 'down'; at: string; text: string };
@@ -363,16 +365,17 @@ export type Liveness = { state: 'up' | 'down'; at: string; text: string };
  * @param standing Where the store stands (`daemonStanding`).
  * @param now The time to measure ages at, in epoch milliseconds.
  */
-export const livenessLine = (standing: DaemonStanding, now: number): Liveness => ({
-  state: standing.kind === 'ticking' ? 'up' : 'down',
-  at: new Date(now).toISOString(),
-  text: daemonLine(standing, now),
-});
+export const livenessLine = (standing: DaemonStanding, now: number) =>
+  ({
+    state: standing.kind === 'ticking' ? 'up' : 'down',
+    at: new Date(now).toISOString(),
+    text: daemonLine(standing, now),
+  }) satisfies Liveness;
 
 /**
  * A liveness line as `nemia watch` prints it: `12:00:00  daemon down  · <its daemon line>`, or one JSON object, which no cursor has.
  * @param l The liveness to print.
  * @param json Whether to print it as one JSON object; false by default.
  */
-export const livenessWords = (l: Liveness, json = false): string =>
+export const livenessWords = (l: Liveness, json = false) =>
   json ? JSON.stringify({ liveness: l.state, at: l.at, note: l.text }) : `${l.at.slice(11, 19)}  daemon ${l.state}  · ${l.text}`;

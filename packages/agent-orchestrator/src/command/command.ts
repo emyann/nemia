@@ -58,7 +58,7 @@ export const RENAMED_VALUES: ReadonlyMap<string, ReadonlyMap<string, Readonly<Re
  * @param command The command's name.
  * @param body The request's body, of any shape.
  */
-export function renamedValues(command: string, body: unknown): { body: unknown; hint?: string } {
+export function renamedValues(command: string, body: unknown) {
   const keys = RENAMED_VALUES.get(command);
   if (keys === undefined || typeof body !== 'object' || body === null || Array.isArray(body)) return { body };
   const renamed = [...keys].flatMap(([key, values]) => {
@@ -88,9 +88,9 @@ export type CommandSpec = CommandWords;
  * @param spec The command's spec: its positionals and its flags.
  * @param argv The command line after the command's name.
  */
-export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined {
+export function parseArgv(spec: Spec, argv: readonly string[]) {
   try {
-    return parseArgvOf(spec, argv);
+    return parseArgvOf(spec, argv) satisfies Args | undefined as Args | undefined;
   } catch (err) {
     throw asInvalid(err);
   }
@@ -103,7 +103,7 @@ export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined
  * @param form The command's form, which ends the refusal.
  * @param flag The flag's spelling, as the refusal names it: `--budget` where none is given.
  */
-export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget'): number {
+export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget') {
   try {
     return amountOfObjects(text, takes, form, flag);
   } catch (err) {
@@ -112,14 +112,14 @@ export function amountOf(text: string | undefined, takes: string, form: string, 
 }
 
 /** `objects`' refusal of what was typed, as the package's own (`Invalid`); anything else as it is. */
-const asInvalid = (err: unknown): unknown => (err instanceof CommandRefused ? new Invalid({ message: err.message }) : err);
+const asInvalid = (err: unknown) => (err instanceof CommandRefused ? new Invalid({ message: err.message }) : err);
 
 /**
  * The dollars under `key`, or undefined where none were given.
  * @param args The command line's arguments, as parsed.
  * @param key The key the dollars are under.
  */
-export const amountIn = (args: Args, key: string): number | undefined => {
+export const amountIn = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'number' ? value : undefined;
 };
@@ -152,7 +152,7 @@ type Entry = Pick<CommandSpec, 'name' | 'only' | 'ticks' | 'served'> & {
  * run; one served on the CLI alone with neither a handler nor a runner of the CLI (`runners`); and one that ticks and writes nothing,
  * whose next pass would have nothing to do.
  */
-function runBreaks(c: Entry, runners: readonly string[]): string[] {
+function runBreaks(c: Entry, runners: readonly string[]) {
   const breaks: string[] = [];
   if (c.ticks === true && c.writes !== true)
     breaks.push(
@@ -170,7 +170,7 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
  * Where an entry's words for its sides break the rules: a why left empty, of the side that serves it alone or of a flag the CLI alone
  * takes.
  */
-function sideBreaks(c: Entry): string[] {
+function sideBreaks(c: Entry) {
   const breaks: string[] = [];
   if (c.only !== undefined && !c.only.why.trim()) breaks.push(`${c.name} is served on the ${c.only.side} alone and says no why: say why`);
   for (const f of c.spec?.flags ?? [])
@@ -192,15 +192,14 @@ export type LinkedTool = {
  * factory_ls), every other by its `as`; a later link with no `as` gives no tool, which `commandBreaks` refuses.
  * @param entry The entry: its name and its links.
  */
-export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>): LinkedTool[] =>
+export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>) =>
   (entry.served ?? []).flatMap((link, i) => {
     const tool = i === 0 ? entry.name.replaceAll(' ', '_') : link.as;
     return tool === undefined ? [] : [{ endpoint: link.endpoint, tool, entry: entry.name, query: link.query ?? {} }];
   });
 
 /** Whether `name` is a command the client holds (`COMMAND_WORDS`) that answers once, no stream (`STREAM_COMMANDS`). */
-const heldOnce = (name: string): boolean =>
-  COMMAND_WORDS.some((w) => w.name === name) && !(STREAM_COMMANDS as readonly string[]).includes(name);
+const heldOnce = (name: string) => COMMAND_WORDS.some((w) => w.name === name) && !(STREAM_COMMANDS as readonly string[]).includes(name);
 
 /**
  * Where an entry's links break the rules: an entry the command line does not serve alone that links no endpoint, which the api would
@@ -208,7 +207,7 @@ const heldOnce = (name: string): boolean =>
  * since the MCP port has a tool for every store verb the command line has, made of its links (`toolsOf`); and a link after the first
  * that names no tool (`as`), which only the first takes from the verb.
  */
-function linkBreaks(c: Entry): string[] {
+function linkBreaks(c: Entry) {
   const breaks: string[] = [];
   if (c.served === undefined && c.only?.side !== 'cli')
     breaks.push(
@@ -227,7 +226,7 @@ function linkBreaks(c: Entry): string[] {
 }
 
 /** Whether `name` is a verb about this machine (`objects`' `MACHINE_VERBS`, by its first word), which this CLI runs. */
-const ofTheMachine = (name: string): boolean => (MACHINE_VERBS as readonly string[]).includes(name.split(' ')[0] ?? '');
+const ofTheMachine = (name: string) => (MACHINE_VERBS as readonly string[]).includes(name.split(' ')[0] ?? '');
 
 /**
  * Where an entry the command line serves is a store verb this CLI still holds: one whose words are not the client's (`COMMAND_WORDS`),
@@ -235,7 +234,7 @@ const ofTheMachine = (name: string): boolean => (MACHINE_VERBS as readonly strin
  * store verb is parsed, worded and printed by the client and reaches the store through the api; an entry served on the api alone is none
  * of the command line's.
  */
-function heldBreaks(c: Entry, kept: readonly string[]): string[] {
+function heldBreaks(c: Entry, kept: readonly string[]) {
   if (c.only?.side === 'api' || ofTheMachine(c.name) || kept.includes(c.name) || COMMAND_WORDS.some((w) => w.name === c.name)) return [];
   return [
     `${c.name} is a store verb this CLI still serves: move its words into objects' COMMAND_WORDS and its runner into apps/cli, which asks the api, or serve it on the api alone`,
@@ -243,7 +242,7 @@ function heldBreaks(c: Entry, kept: readonly string[]): string[] {
 }
 
 /** Each tool name that two links give (`toolsOf`), of `entries`: a sentence naming the tool, the entries that give it, and the fix. */
-function toolBreaks(entries: readonly Pick<CommandSpec, 'name' | 'served'>[]): string[] {
+function toolBreaks(entries: readonly Pick<CommandSpec, 'name' | 'served'>[]) {
   const first = new Map<string, string>();
   const breaks: string[] = [];
   for (const { tool, entry } of entries.flatMap(toolsOf)) {
@@ -272,7 +271,7 @@ export function commandBreaks(
   runners: readonly string[] = [],
   linked: readonly Pick<CommandSpec, 'name' | 'served'>[] = [],
   kept?: readonly string[],
-): string[] {
+) {
   const breaks: string[] = [];
   const seen = new Set<string>();
   for (const c of table) {

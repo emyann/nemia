@@ -29,7 +29,7 @@ export const TURN_SCHEMA = {
  * having said something; else failed, saying why.
  * @param s The turn's task as the engine answers it.
  */
-export const turnCheckOf: TurnCheckOf = (s: TurnSeen): TurnVerdict => {
+export const turnCheckOf: TurnCheckOf = (s: TurnSeen) => {
   if (!s.settled) return { state: 'running' };
   if (s.end === 'deadline') return { state: 'failed', failure: 'deadline' };
   if (s.end === 'operator') return { state: 'failed', failure: 'stopped' };

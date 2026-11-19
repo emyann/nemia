@@ -173,7 +173,7 @@ export { projectAllows } from 'agent-runtime';
  * rethrows.
  * @param err What a read of the journal rejected with, of any kind.
  */
-export const unreadableJournal = (err: unknown): string | undefined => {
+export const unreadableJournal = (err: unknown) => {
   if (!(err instanceof Error)) return undefined;
   const { _tag, taskId } = err as Error & { _tag?: unknown; taskId?: unknown };
   return _tag === 'JournalError' && typeof taskId === 'string' && taskId !== '*' ? err.message : undefined;
@@ -209,7 +209,7 @@ export const HARNESSES: Readonly<Record<string, HarnessConfig>> & {
  * The harnesses the daemon asks for their quota (`up`): each of the engine's that declares it reports one (`quota`), every one a
  * subscription of its own.
  */
-export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((name) => declarationOf(name)?.can.includes('quota') === true);
+export const quotaHarnesses = () => Object.keys(HARNESSES).filter((name) => declarationOf(name)?.can.includes('quota') === true);
 
 /**
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,
@@ -242,7 +242,7 @@ export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((nam
  * @param env The environment the store's settings and the telemetry's are read from: `WF_ROOT`, the `WF_MEMORY_*` variables,
  * `WF_MAX_CONCURRENT`, `WF_CGROUP_PARENT`, `NEMIA_TOOL_DETAILS` and the export intervals (`EXPORT_INTERVALS`), as the sentences above say.
  */
-export const engine = (env: Env): Engine => {
+export const engine = (env: Env) => {
   const root = wfRoot(env);
   const config = settingsOf(env);
   const read = readRemote(root);
@@ -263,11 +263,11 @@ export const engine = (env: Env): Engine => {
       ...storeLimits(config),
       ...(telemetry ? { telemetry } : {}),
     }),
-  );
+  ) satisfies Engine as Engine;
 };
 
 /** Where the runtime keeps its own store, under this store's `WF_ROOT`: the one root every process on this store shares. */
-const engineRoot = (root: string): string => path.join(root, 'engine');
+const engineRoot = (root: string) => path.join(root, 'engine');
 
 /**
  * The engines holding the sessions this one only reads, as the runtime takes them: one entry per harness a holder can hold
@@ -281,11 +281,10 @@ const engineRoot = (root: string): string => path.join(root, 'engine');
  * The names are the runtime's rule and not a literal of ours: filtering `HARNESSES` here would teach this file an eighth harness
  * word, where the count only shrinks (`test/words.test.ts`).
  */
-const holderOption = (root: string): Record<string, () => { card: Record<string, unknown> } | undefined> =>
-  Object.fromEntries(heldHarnessesOf(HARNESSES).map((name) => [name, () => cardOnStore(root, name)]));
+const holderOption = (root: string) => Object.fromEntries(heldHarnessesOf(HARNESSES).map((name) => [name, () => cardOnStore(root, name)]));
 
 /** The card the holder of this store serves for `harness`, as the runtime configures an agent with it, or `undefined`. */
-const cardOnStore = (root: string, harness: string): { card: Record<string, unknown> } | undefined => {
+const cardOnStore = (root: string, harness: string) => {
   const card = servesOnStore(root)?.[harness];
   return card === undefined ? undefined : { card };
 };
@@ -297,7 +296,7 @@ const cardOnStore = (root: string, harness: string): { card: Record<string, unkn
  * `EngineRefused`; any other failure to build it is thrown as it is.
  * @param layer The layer that gives the runtime's `Engine` service: the store's runtime, or a test's stand-in.
  */
-export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine => {
+export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>) => {
   const built = Effect.runSyncExit(
     Layer.build(layer).pipe(
       Effect.map((context) => Context.get(context, RuntimeEngine)),
@@ -306,7 +305,7 @@ export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine => {
   );
   if (Exit.isFailure(built)) throw refusalWords('engine')(Cause.squash(built.cause));
   const e = built.value;
-  return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
+  return { ...e, file: (spec) => e.file({ ...spec, queued: true }) } satisfies Engine;
 };
 
 /**
@@ -314,11 +313,11 @@ export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine => {
  * the one engine it is given.
  */
 export class EngineService extends Context.Service<EngineService, Engine>()('agent-orchestrator/Engine') {
-  static readonly layer = (e: Engine): Layer.Layer<EngineService> => Layer.succeed(EngineService)(e);
+  static readonly layer = (e: Engine) => Layer.succeed(EngineService)(e) satisfies Layer.Layer<EngineService> as Layer.Layer<EngineService>;
 }
 
 /** What a read threw or rejected with, in a controller's program: a refusal (`isRefusal`) as its failure, anything else as a defect. */
-const orRefusal = (err: unknown): Effect.Effect<never, Refusal> => (isRefusal(err) ? Effect.fail(err) : Effect.die(err));
+const orRefusal = (err: unknown) => (isRefusal(err) ? Effect.fail(err) : Effect.die(err));
 
 /**
  * A synchronous read of the store or of git, in a controller's program: what `read` returns, or the refusal it threw as the program's
@@ -332,8 +331,8 @@ export const tried: <A>(read: () => A) => Effect.Effect<A, Refusal> = fromThrow;
  * @param verb The engine's verb, which leads a refusal's words.
  * @param effect What the verb returns, run in the program.
  */
-export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>): Effect.Effect<A> =>
-  effect.pipe(Effect.mapError(refusalWords(verb)), Effect.orDie);
+export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>) =>
+  effect.pipe(Effect.mapError(refusalWords(verb)), Effect.orDie) satisfies Effect.Effect<A> as Effect.Effect<A>;
 
 /**
  * `program` over the engine `e`, run to a Promise: what the CLI, the api and the tests run a controller with. Rejects with the refusal
@@ -343,8 +342,10 @@ export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>): Effect.E
  * @param e The engine the program runs over.
  * @param program The controller's program, which asks the engine.
  */
-export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>): Promise<A> =>
-  Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e)), Effect.provideService(References.MinimumLogLevel, 'Warn')));
+export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>) =>
+  Effect.runPromise(
+    program.pipe(Effect.provide(EngineService.layer(e)), Effect.provideService(References.MinimumLogLevel, 'Warn')),
+  ) satisfies Promise<A> as Promise<A>;
 
 /**
  * `program` over the engine `e` in place of the one in its context: what a pass hands a read the engine it reads through
@@ -353,7 +354,7 @@ export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineServ
  */
 export const over =
   (e: Engine) =>
-  <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, EngineService>> =>
+  <A, E, R>(program: Effect.Effect<A, E, R>) =>
     Effect.provideService(program, EngineService, e);
 
 /**
@@ -361,8 +362,7 @@ export const over =
  * failure (`orRefusal`); anything else it rejected with, the program dies of.
  * @param read The read, a function that returns its Promise.
  */
-export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
-  Effect.tryPromise({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
+export const awaited = <A>(read: () => Promise<A>) => Effect.tryPromise({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
 
 /**
  * What the store's engine admits under, as `engine()` hands it to the runtime: its ceiling (`ceilingOf`), `unschedulable`, asked by the
@@ -374,11 +374,7 @@ export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
  * @param config The store's settings: its ceiling and its memory floor.
  * @param totalBytes The machine's memory, read for the default floor alone: `os.totalmem`, a test's planted total.
  */
-export const storeAdmission = (
-  root: string,
-  config: Settings,
-  totalBytes: () => number = os.totalmem,
-): { maxConcurrent?: number; unschedulable: () => boolean; reserved?: { memory: string } } => ({
+export const storeAdmission = (root: string, config: Settings, totalBytes: () => number = os.totalmem) => ({
   unschedulable: () => pauseStands(root),
   ...ceilingOf(config),
   ...floorOf(config, totalBytes),
@@ -389,7 +385,7 @@ export const storeAdmission = (
  * the machine, 1 GiB at least (`reservedFor`), in Mi; none when the variable is refused (`memoryReserved`), as `ceilingOf` gives no
  * ceiling, so the engine admits by its ceiling alone.
  */
-const floorOf = (config: Settings, totalBytes: () => number): { reserved?: { memory: string } } => {
+const floorOf = (config: Settings, totalBytes: () => number) => {
   try {
     return { reserved: { memory: config.memoryReserved ?? `${reservedFor(Math.floor(totalBytes() / 2 ** 20))}Mi` } };
   } catch (err) {
@@ -399,7 +395,7 @@ const floorOf = (config: Settings, totalBytes: () => number): { reserved?: { mem
 };
 
 /** The engine's ceiling, `WF_MAX_CONCURRENT`'s sessions per pool, or none when the variable is refused (`maxConcurrent`). */
-const ceilingOf = (config: Settings): { maxConcurrent?: number } => {
+const ceilingOf = (config: Settings) => {
   try {
     return { maxConcurrent: config.maxConcurrent };
   } catch (err) {
@@ -415,9 +411,7 @@ const ceilingOf = (config: Settings): { maxConcurrent?: number } => {
  * refused, as `ceilingOf` gives no ceiling.
  * @param config The store's settings: its memory limit, its memory request and its cgroup slice.
  */
-export const storeLimits = (
-  config: Settings,
-): { defaultLimits?: { memory: string }; defaultRequests?: { memory: string }; cgroupParent?: string } => {
+export const storeLimits = (config: Settings) => {
   try {
     const memory = config.memoryLimit;
     const request = config.memoryRequest;
@@ -449,7 +443,7 @@ export type RemoteRead = { agents: ReadonlyMap<string, RemoteAgent>; refused: Re
  * The store's `a2a-agents.json` under `root`, judged and read afresh (`RemoteRead`): it throws nothing.
  * @param root The store's root folder, whose `a2a-agents.json` is read.
  */
-export function readRemote(root: string): RemoteRead {
+export function readRemote(root: string) {
   const file = remoteAgentsFile(root);
   let entries: ReturnType<typeof readRemoteAgents>;
   try {
@@ -471,7 +465,7 @@ export function readRemote(root: string): RemoteRead {
  * Every refusal a read of the file came to: the file's own, or each entry's.
  * @param read The file's read (`readRemote`).
  */
-export const refusalsOf = (read: RemoteRead): string[] => (read.unread ? [read.unread] : [...read.refused.values()]);
+export const refusalsOf = (read: RemoteRead) => (read.unread ? [read.unread] : [...read.refused.values()]);
 
 /**
  * The remote A2A agents the store's `a2a-agents.json` declares and the runtime takes, by name (`readRemote`): what the api offers a step
@@ -479,7 +473,7 @@ export const refusalsOf = (read: RemoteRead): string[] => (read.unread ? [read.u
  * its words.
  * @param root The store's root folder, whose `a2a-agents.json` is read.
  */
-export function remoteAgents(root: string): ReadonlyMap<string, RemoteAgent> {
+export function remoteAgents(root: string) {
   const read = readRemote(root);
   if (read.unread) throw new Invalid({ message: read.unread });
   return read.agents;
@@ -499,13 +493,12 @@ export function remoteAgents(root: string): ReadonlyMap<string, RemoteAgent> {
  * holds it. A later slice that lets a card come from elsewhere makes this branch read the url.
  * @param root The store's root folder: its lease, and the engine root where the holder's token is.
  */
-export const credentialsAt =
-  (root: string): Credentials =>
-  (scheme, _agentUrl, harness) => {
+export const credentialsAt = (root: string) =>
+  ((scheme, _agentUrl, harness) => {
     if (scheme === BEARER && servesOnStore(root)?.[harness] !== undefined) return holderTokenOf(engineRoot(root));
     const name = remoteNameOf(harness);
     return name === undefined ? undefined : process.env[envNameOf(name, scheme)] || undefined;
-  };
+  }) satisfies Credentials;
 
 /**
  * What a spawn refused for a secret not given says to do: set the variable, where the run's processes read it.
@@ -523,8 +516,7 @@ export const missingCredential: MissingCredential = (scheme, _agentUrl, harness)
  * the runtime's `drain`, through the engine the program is given. A call in flight runs on.
  * @param holder The pid of the daemon whose attached sessions are held, or null to let them go.
  */
-export const drained = (holder: number | null): Effect.Effect<void, never, EngineService> =>
-  Effect.flatMap(EngineService, (e) => asked('drain', e.drain(holder)));
+export const drained = (holder: number | null) => Effect.flatMap(EngineService, (e) => asked('drain', e.drain(holder)));
 
 /**
  * Holds every session, job or attached, at its tool call's end under the store's pause, and cuts a call still in flight once `graceMs`
@@ -532,5 +524,5 @@ export const drained = (holder: number | null): Effect.Effect<void, never, Engin
  * through the engine the program is given: a put with the grace that stands keeps its start, and another grace starts it again.
  * @param given The grace a call in flight is given, in ms, or null to lift the drain.
  */
-export const sessionsDrained = (given: { graceMs: number } | null): Effect.Effect<void, never, EngineService> =>
+export const sessionsDrained = (given: { graceMs: number } | null) =>
   Effect.flatMap(EngineService, (e) => asked('drainSessions', e.drainSessions(given)));

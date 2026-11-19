@@ -7,7 +7,7 @@
  * reset: one with commits of its own, a merge in progress, changes not committed or no branch is left as it is, and said, with what to
  * do. Refuses a `repo` that is no directory, or no git repository.
  */
-import { failedWords, git, gitSays, isDirectory, printed, refused, type Asking, type Reply } from '../git.ts';
+import { failedWords, git, gitSays, isDirectory, printed, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** Git asks no one at a terminal for a credential: one the machine does not hold fails the fetch at once. */
@@ -17,7 +17,7 @@ const NO_PROMPT = { GIT_TERMINAL_PROMPT: '0' };
 type Upstream = { readonly remote: string; readonly ref: string; readonly name: string };
 
 /** The upstream of `branch` in `repo`, undefined where it follows none. */
-function* upstreamOf(repo: string, branch: string): Asking<Upstream | undefined> {
+function* upstreamOf(repo: string, branch: string) {
   const remote = yield* gitSays(repo, ['config', '--get', `branch.${branch}.remote`]);
   const ref = yield* gitSays(repo, ['config', '--get', `branch.${branch}.merge`]);
   const name = yield* gitSays(repo, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
@@ -26,7 +26,7 @@ function* upstreamOf(repo: string, branch: string): Asking<Upstream | undefined>
 }
 
 /** What fetching `upstream`'s branch into `repo` failed with, in git's words and what to do; undefined once it is fetched. */
-function* unfetched(repo: string, upstream: Upstream): Asking<string | undefined> {
+function* unfetched(repo: string, upstream: Upstream) {
   if (upstream.remote === '.') return undefined;
   try {
     yield* printed({
@@ -42,7 +42,7 @@ function* unfetched(repo: string, upstream: Upstream): Asking<string | undefined
 }
 
 /** Why `repo`, on `branch` and behind its upstream, is not to be fast-forwarded, with what to do; undefined when it is. */
-function* heldBack(repo: string, branch: string, upstream: string, own: number): Asking<string | undefined> {
+function* heldBack(repo: string, branch: string, upstream: string, own: number) {
   if (own > 0)
     return `and holds ${own} commit(s) of its own, so it is not fast-forwarded: push them, or move them to a branch of their own and put ${branch} back on ${upstream}`;
   if ((yield* gitSays(repo, ['rev-parse', '--quiet', '--verify', 'MERGE_HEAD'])) !== undefined)
@@ -53,7 +53,7 @@ function* heldBack(repo: string, branch: string, upstream: string, own: number):
 }
 
 /** The verb's body. */
-export function* follow({ repo }: PlaceRequests['follow']): Asking<Reply<'follow'>> {
+export function* follow({ repo }: PlaceRequests['follow']) {
   if (!isDirectory(repo)) return refused(`${repo} is not a directory, so there is no checkout to follow its remote`);
   if ((yield* gitSays(repo, ['rev-parse', '--git-dir'])) === undefined)
     return refused(`${repo} is not a git repository, so there is no checkout to follow its remote: name the factory's repository`);

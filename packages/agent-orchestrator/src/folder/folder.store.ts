@@ -67,7 +67,7 @@ import { entriesOf } from '../skills/read.store.ts';
  * @param found The agents and skills already found, which the steps are resolved against.
  * @param fills What a factory gives the steps: the agent each is hired and its rules; undefined where no factory gives any.
  */
-export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): StepSpec[] {
+export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills) {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
   const agents = agentsFolderRefusal(dir);
   if (agents) throw new WorkflowError(agents);
@@ -75,7 +75,7 @@ export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): Ste
   const files = stepFiles(entries);
   if (!files.length) throw new WorkflowError(`${dir} has no .md steps in it${noStepsBecause(dir, entries)}`);
 
-  const read = (file: string): string | undefined => {
+  const read = (file: string) => {
     try {
       return fs.readFileSync(path.resolve(dir, file), 'utf8');
     } catch {
@@ -88,7 +88,7 @@ export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): Ste
     found.agents,
     found.skills,
     fills,
-  );
+  ) satisfies StepSpec[];
 }
 
 /**
@@ -103,10 +103,10 @@ export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): Ste
  * the former line form is not named here: the load refuses it, at its line (`readFrontmatter`).
  * @param dir The workflow's folder.
  */
-export function formerKeyLines(dir: string): string[] {
+export function formerKeyLines(dir: string) {
   const steps = stepTexts(dir);
   const agents = [...new Set(steps.flatMap(({ agent }) => agent ?? []))].sort();
-  const codexMode = (at: string, text: string, harness: string | undefined): string[] => {
+  const codexMode = (at: string, text: string, harness: string | undefined) => {
     const word = formerModeOf(text, harness);
     return word === undefined ? [] : [codexModeLine(at, word)];
   };
@@ -142,7 +142,7 @@ export function formerKeyLines(dir: string): string[] {
  * `nemia start` quotes a refusal of it as the file says it. None for a folder that is not there.
  * @param dir The workflow's folder.
  */
-export function formerModesWritten(dir: string): Record<string, string> {
+export function formerModesWritten(dir: string) {
   return Object.fromEntries(
     stepTexts(dir).flatMap(({ file, text, agent, harness }) => {
       const fenced = frontmatterKey(text, 'permissionMode') !== undefined || frontmatterKey(text, 'sandbox') !== undefined;
@@ -154,7 +154,7 @@ export function formerModesWritten(dir: string): Record<string, string> {
 }
 
 /** A file's text, or nothing for one that cannot be read: the load has said why. */
-const textAt = (at: string): string => {
+const textAt = (at: string) => {
   try {
     return fs.readFileSync(at, 'utf8');
   } catch {
@@ -163,17 +163,17 @@ const textAt = (at: string): string => {
 };
 
 /** Where the agent `agent` a step of the workflow in `dir` names is written. */
-const agentAt = (dir: string, agent: string): string => path.join(agentsDir(dir), `${agent}.md`);
+const agentAt = (dir: string, agent: string) => path.join(agentsDir(dir), `${agent}.md`);
 
 /** The word a file on `harness` names its sandbox under as `permissionMode:`, the former name of `sandbox:` there; else undefined. */
-const formerModeOf = (text: string, harness: string | undefined): string | undefined =>
+const formerModeOf = (text: string, harness: string | undefined) =>
   fenceKeyOf(harness) === 'sandbox' ? frontmatterKey(text, 'permissionMode', true) : undefined;
 
 /**
  * Each step file of the workflow in `dir` with its text, the agent it names and the harness it runs on: its own `harness:`, else its
  * agent's. None for a folder that is not there.
  */
-function stepTexts(dir: string): { file: string; text: string; agent?: string; harness?: string }[] {
+function stepTexts(dir: string) {
   return stepFiles(entriesOf(dir)).map((file) => {
     const text = textAt(path.join(dir, file));
     const agent = frontmatterKey(text, 'agent');
@@ -187,7 +187,7 @@ function stepTexts(dir: string): { file: string; text: string; agent?: string; h
  * Why a folder has no steps, when the folder can say: a README, which is not one, or folders of steps beside each
  * other — `<repo>/workflows/`, which holds a repository's workflows, rather than one of them.
  */
-function noStepsBecause(dir: string, entries: readonly string[]): string {
+function noStepsBecause(dir: string, entries: readonly string[]) {
   const readme = entries.find(isReadme);
   if (readme) return ` — ${readme} describes the workflow, and is not a step. Write the first step beside it: implement.md, say.`;
   const workflows = workflowsIn(dir, entries);
@@ -202,7 +202,7 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
  * @param dir The folder of workflows.
  * @param entries The names in `dir` where the caller listed them already; listed here where not given.
  */
-export function workflowsIn(dir: string, entries?: readonly string[]): string[] {
+export function workflowsIn(dir: string, entries?: readonly string[]) {
   return (entries ?? entriesOf(dir))
     .filter(
       (name) => ![AGENTS_FOLDER, SKILLS_FOLDER, CARRIED_FOLDER].includes(name) && stepFiles(entriesOf(path.join(dir, name))).length > 0,
@@ -210,14 +210,14 @@ export function workflowsIn(dir: string, entries?: readonly string[]): string[] 
     .sort();
 }
 
-const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
+const isFolder = (at: string) => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
  * The folder `dir` as the Workflow door's id (`WorkflowDir`), or refused as a `WorkflowError` in `workflowDirRefusal`'s words: where a
  * folder is resolved, the one place besides a stored record a `WorkflowDir` comes from.
  * @param dir The workflow folder's path.
  */
-export function workflowDirAt(dir: string): WorkflowDir {
+export function workflowDirAt(dir: string) {
   const refused = workflowDirRefusal(dir);
   if (refused !== null) throw new WorkflowError(refused);
   return WorkflowDir.read(dir);
@@ -236,16 +236,17 @@ export function workflowDirAt(dir: string): WorkflowDir {
  * @param repo The repository whose `workflows/` a bare name is looked up in.
  * @param tree The tree of a factory made from a template, looked in before the repository; undefined where there is none.
  */
-export function workflowFolder(given: string, from: string, repo: string, tree?: string): WorkflowDir {
+export function workflowFolder(given: string, from: string, repo: string, tree?: string) {
   const at = path.resolve(from, given);
-  if (isFolder(at)) return workflowDirAt(at);
+  if (isFolder(at)) return workflowDirAt(at) satisfies WorkflowDir as WorkflowDir;
   const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
   const agentsRefused = bare && given === AGENTS_FOLDER ? agentsFolderRefusal(path.join(repo, 'workflows', given)) : undefined;
   if (agentsRefused !== undefined) throw new WorkflowError(agentsRefused);
   if (bare && tree !== undefined && isFolder(path.join(tree, 'workflows', given)))
-    return workflowDirAt(path.resolve(tree, 'workflows', given));
+    return workflowDirAt(path.resolve(tree, 'workflows', given)) satisfies WorkflowDir as WorkflowDir;
   const workflows = path.join(repo, 'workflows');
-  if (bare && isFolder(path.join(workflows, given))) return workflowDirAt(path.resolve(workflows, given));
+  if (bare && isFolder(path.join(workflows, given)))
+    return workflowDirAt(path.resolve(workflows, given)) satisfies WorkflowDir as WorkflowDir;
   const theirs = workflowsIn(workflows);
   throw new WorkflowError(
     `no workflow folder at ${at}${bare ? `, nor a workflow named ${given} in ${workflows}` : ''}. ` +
@@ -262,7 +263,7 @@ export function workflowFolder(given: string, from: string, repo: string, tree?:
  * @param workflowsDir The folder of workflows to look through.
  * @param name The agent's name.
  */
-export function agentUsers(workflowsDir: string, name: string): string[] {
+export function agentUsers(workflowsDir: string, name: string) {
   const users: string[] = [];
   for (const workflow of workflowsIn(workflowsDir)) {
     const dir = path.join(workflowsDir, workflow);
@@ -286,7 +287,7 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
  * that cannot be read describes nothing, and the steps beside it are `loadWorkflows`' (`workflows/workflows.store.ts`) to judge.
  * @param dir The workflow's folder.
  */
-export function workflowDescription(dir: string): string | null {
+export function workflowDescription(dir: string) {
   const text = workflowReadme(dir);
   return text === null ? null : readmeDescription(text);
 }
@@ -300,13 +301,13 @@ export function workflowDescription(dir: string): string | null {
  * (`workflows/workflows.store.ts`) to judge.
  * @param dir The workflow's folder.
  */
-export function workflowReadme(dir: string): string | null {
+export function workflowReadme(dir: string) {
   const text = readmeText(dir);
   return text === null ? null : text.replace(/\r\n/g, '\n').replace(FRONTMATTER, '');
 }
 
 /** The text of the first README of the folder `dir` by name, any case, frontmatter and all, without a leading byte order mark; or null. */
-function readmeText(dir: string): string | null {
+function readmeText(dir: string) {
   try {
     const readme = fs.readdirSync(dir).filter(isReadme).sort()[0];
     if (!readme) return null;
@@ -324,7 +325,7 @@ const NeedsDeclared = Schema.Struct({ needs: Schema.optionalKey(Schema.Array(Nee
  * do not read (`why`, the decoder's words), none then. Pure.
  * @param text The README's text, frontmatter and all.
  */
-export function needsDeclaredIn(text: string): { readonly needs: readonly Need[]; readonly why?: string } {
+export function needsDeclaredIn(text: string) {
   const block = FRONTMATTER.exec(text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'))?.[1];
   if (block === undefined) return { needs: [] };
   try {
@@ -341,7 +342,7 @@ export function needsDeclaredIn(text: string): { readonly needs: readonly Need[]
  * frontmatter names no needs. Never throws: a run whose needs cannot be read waits on none of them, and the readiness read says why.
  * @param dir The workflow's folder.
  */
-export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[]; readonly error?: string } {
+export function workflowNeedsRead(dir: string) {
   const text = readmeText(dir);
   if (text === null) return { needs: [] };
   const { needs, why } = needsDeclaredIn(text);
@@ -356,7 +357,7 @@ export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[
  * The machine needs the workflow of the folder `dir` declares in its README's frontmatter (`workflowNeedsRead`), none where none read.
  * @param dir The workflow's folder.
  */
-export const workflowNeeds = (dir: string): readonly Need[] => workflowNeedsRead(dir).needs;
+export const workflowNeeds = (dir: string) => workflowNeedsRead(dir).needs;
 
 /**
  * The README a writer of the workflow of the folder `dir` hands `writeWorkflow` as `readme` (`write.store.ts`): `body` as given where it
@@ -365,7 +366,7 @@ export const workflowNeeds = (dir: string): readonly Need[] => workflowNeedsRead
  * @param dir The workflow's folder, whose README on disk gives the frontmatter a bare instruction is written under.
  * @param body The README to write, whole or its instruction alone, or undefined to keep the README's own.
  */
-export function workflowReadmeWith(dir: string, body: string | undefined): string | undefined {
+export function workflowReadmeWith(dir: string, body: string | undefined) {
   return readmeComposed(readmeText(dir) ?? '', body);
 }
 
@@ -375,7 +376,7 @@ export function workflowReadmeWith(dir: string, body: string | undefined): strin
  * @param dir The workflow's folder.
  * @param spec The Workflow's spec, of which its `readme` is read.
  */
-export const workflowSpecReadme = (dir: string, spec: { readonly readme?: string | null }): string | undefined =>
+export const workflowSpecReadme = (dir: string, spec: { readonly readme?: string | null }) =>
   workflowReadmeWith(dir, spec.readme ?? undefined);
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;

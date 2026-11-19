@@ -18,12 +18,13 @@ import type { PlaceRequests } from '../../src/place/place.ts';
  * with why. A repository not cloned, or a checkout on another branch, follows none (`no-upstream`); an origin the place no longer holds
  * cannot be read (`unfetched`).
  */
-export function follow(held: Held, { repo: dir }: PlaceRequests['follow']): Reply<'follow'> {
-  if (!isDirectory(dir)) return refused(`${dir} is not a directory, so there is no checkout to follow its remote`);
+export function follow(held: Held, { repo: dir }: PlaceRequests['follow']) {
+  if (!isDirectory(dir))
+    return refused(`${dir} is not a directory, so there is no checkout to follow its remote`) satisfies Reply<'follow'>;
   const at = checkoutAt(held, dir);
-  if (!at) return refused(noRepository(dir));
+  if (!at) return refused(noRepository(dir)) satisfies Reply<'follow'>;
   const { repo, checkout } = at;
-  if (repo.follows?.branch !== checkout.branch) return { state: 'no-upstream' };
+  if (repo.follows?.branch !== checkout.branch) return { state: 'no-upstream' } satisfies Reply<'follow'>;
   const upstream = `origin/${checkout.branch}`;
   const origin = held.repositories.get(repo.follows.origin);
   const tip = origin?.branches.get(checkout.branch);
@@ -32,19 +33,20 @@ export function follow(held: Held, { repo: dir }: PlaceRequests['follow']): Repl
       state: 'unfetched',
       upstream,
       message: `${repo.follows.origin} is no repository this test place holds with ${checkout.branch}`,
-    };
+    } satisfies Reply<'follow'>;
   for (const [id, commit] of origin.commits) if (!repo.commits.has(id)) repo.commits.set(id, commit);
   const head = headOf(repo, checkout);
-  if (within(repo, tip, head)) return { state: tip === head ? 'up-to-date' : 'ahead', upstream };
+  if (within(repo, tip, head)) return { state: tip === head ? 'up-to-date' : 'ahead', upstream } satisfies Reply<'follow'>;
   const left = (why: string) => ({ state: 'left' as const, upstream, message: `${dir} is behind ${upstream} ${why}` });
-  if (!within(repo, head, tip)) return left('and holds commits of its own: push them, or move them to a branch of their own');
-  if (dirty(repo, checkout)) return left('with changes not committed: commit them or take them back');
+  if (!within(repo, head, tip))
+    return left('and holds commits of its own: push them, or move them to a branch of their own') satisfies Reply<'follow'>;
+  if (dirty(repo, checkout)) return left('with changes not committed: commit them or take them back') satisfies Reply<'follow'>;
   mergedIn(held, at, tip, true, '');
-  return { state: 'fast-forwarded', upstream, from: head, to: tip };
+  return { state: 'fast-forwarded', upstream, from: head, to: tip } satisfies Reply<'follow'>;
 }
 
 /** A workspace cut at `at` on the new branch `name` from `from`, its files written there; why not, where it cannot be. */
-function cut(repo: Repository, at: string, name: string, from: string): string | undefined {
+function cut(repo: Repository, at: string, name: string, from: string) {
   const base = commitAt(repo, from);
   if (!base) return `${from} names no commit of ${repo.root}`;
   if (repo.branches.has(name)) return `a branch named ${name} is there already`;
@@ -60,7 +62,7 @@ function cut(repo: Repository, at: string, name: string, from: string): string |
  * directory is one, with each branch of `also` merged into it: one the repository lacks, or asked while a conflict stands, is a note,
  * dropped where a conflict is left.
  */
-export function make(held: Held, { repo: dir, at, run, leaf, from, also }: PlaceRequests['make']): Reply<'make'> {
+export function make(held: Held, { repo: dir, at, run, leaf, from, also }: PlaceRequests['make']) {
   const name = runBranch(run, leaf);
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so no workspace can be cut from it`);
   const repo = repositoryAt(held, dir);
@@ -84,7 +86,7 @@ export function make(held: Held, { repo: dir, at, run, leaf, from, also }: Place
 }
 
 /** `handoff`: what a step left uncommitted in its workspace, committed on its branch; null where it left nothing. */
-export function handoff(held: Held, { workspace, step, why }: PlaceRequests['handoff']): Reply<'handoff'> {
+export function handoff(held: Held, { workspace, step, why }: PlaceRequests['handoff']) {
   if (!isDirectory(workspace)) return refused(`${workspace} is not a directory, so nothing of ${step} is there to hand off`);
   const found = checkoutAt(held, workspace);
   if (!found) return refused(`nothing of ${step} can be handed off: ${noRepository(workspace)}`);
@@ -96,23 +98,25 @@ export function handoff(held: Held, { workspace, step, why }: PlaceRequests['han
  * `land`: the merge staged in a checkout committed under the message given, or taken back. The commit holds the merge as it was staged
  * and resolved, never a file the checkout was left since.
  */
-export function land(held: Held, request: PlaceRequests['land']): Reply<'land'> {
+export function land(held: Held, request: PlaceRequests['land']) {
   const { repo: dir, act } = request;
   const found = checkoutAt(held, dir);
-  if (!found) return refused(`there is no merge to ${act}: ${noRepository(dir)}`);
+  if (!found) return refused(`there is no merge to ${act}: ${noRepository(dir)}`) satisfies Reply<'land'>;
   const { staged } = found.checkout;
-  if (!staged) return refused(`no merge is in progress in ${dir}, so there is none to ${act}`);
+  if (!staged) return refused(`no merge is in progress in ${dir}, so there is none to ${act}`) satisfies Reply<'land'>;
   if (request.act === 'abort') {
     takenBack(found);
-    return { aborted: true };
+    return { aborted: true } satisfies Reply<'land'>;
   }
-  if (staged.conflicts.length) return refused(`${staged.conflicts.join(', ')} still in conflict in ${dir}: resolve each, then land again`);
-  if (!request.message.trim()) return refused(`the merge in ${dir} is given an empty message, and is not committed under none`);
-  return { commit: committed(held, found, request.message.trim(), staged.tree) };
+  if (staged.conflicts.length)
+    return refused(`${staged.conflicts.join(', ')} still in conflict in ${dir}: resolve each, then land again`) satisfies Reply<'land'>;
+  if (!request.message.trim())
+    return refused(`the merge in ${dir} is given an empty message, and is not committed under none`) satisfies Reply<'land'>;
+  return { commit: committed(held, found, request.message.trim(), staged.tree) } satisfies Reply<'land'>;
 }
 
 /** Why the workspace `dir` of `repo` is not removed, or undefined once it is, with its directory. */
-function workspaceLeft(repo: Repository, dir: string): string | undefined {
+function workspaceLeft(repo: Repository, dir: string) {
   const checkout = repo.checkouts.get(real(dir));
   if (!checkout || checkout.dir === repo.root) return `${dir} is no workspace cut from ${repo.root}`;
   if (fs.existsSync(checkout.dir) && dirty(repo, checkout)) return `${dir} holds work no commit has: commit it or take it away first`;
@@ -122,7 +126,7 @@ function workspaceLeft(repo: Repository, dir: string): string | undefined {
 }
 
 /** Why the branch `name` of `repo` is not deleted, or undefined once it is. */
-function branchKept(repo: Repository, name: string): string | undefined {
+function branchKept(repo: Repository, name: string) {
   if (!repo.branches.has(name)) return `${repo.root} has no branch ${name}`;
   const held = [...repo.checkouts.values()].find((c) => c.branch === name);
   if (held) return `${name} is the branch ${held.dir} is on`;
@@ -131,7 +135,7 @@ function branchKept(repo: Repository, name: string): string | undefined {
 }
 
 /** `remove`: each workspace that holds nothing uncommitted taken away, those whose directory is gone forgotten, each branch deleted. */
-export function remove(held: Held, { repo: dir, workspaces, branches }: PlaceRequests['remove']): Reply<'remove'> {
+export function remove(held: Held, { repo: dir, workspaces, branches }: PlaceRequests['remove']) {
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so there is no repository to remove anything from`);
   const repo = repositoryAt(held, dir);
   const answer: { removed: string[]; left: { path: string; said: string }[]; deleted: string[]; kept: { branch: string; said: string }[] } =
@@ -151,7 +155,7 @@ export function remove(held: Held, { repo: dir, workspaces, branches }: PlaceReq
 }
 
 /** `export`: a tag's files written into an empty folder, which is given the place's own folder for `seal` to take away. */
-export function exported(held: Held, { repo: dir, tag, into }: PlaceRequests['export']): Reply<'export'> {
+export function exported(held: Held, { repo: dir, tag, into }: PlaceRequests['export']) {
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so no tag in it can be exported`);
   const repo = repositoryAt(held, dir);
   const id = repo?.tags.get(tag);
@@ -165,7 +169,7 @@ export function exported(held: Held, { repo: dir, tag, into }: PlaceRequests['ex
 }
 
 /** `seal`: the place's own folder taken from a tree `export` wrote; refused for a checkout, which is no export's. */
-export function seal(held: Held, { tree }: PlaceRequests['seal']): Reply<'seal'> {
+export function seal(held: Held, { tree }: PlaceRequests['seal']) {
   if (!isDirectory(tree)) return refused(`${tree} is not a directory, so there is no exported tree to seal`);
   if (checkoutAt(held, tree)) return refused(`${tree} is a checkout that holds a commit, not a tree an export wrote: it is left as it is`);
   const own = path.join(tree, OWN);
@@ -175,7 +179,7 @@ export function seal(held: Held, { tree }: PlaceRequests['seal']): Reply<'seal'>
 }
 
 /** The folder a URL the test place can read names: a path, or a `file://` URL of one; undefined for any other, which it cannot reach. */
-function folderOf(url: string): string | undefined {
+function folderOf(url: string) {
   if (path.isAbsolute(url)) return url;
   try {
     return url.startsWith('file://') ? fileURLToPath(url) : undefined;
@@ -194,7 +198,7 @@ function folderOf(url: string): string | undefined {
  * checkout of a repository already. Refused for a relative `dir` and for a file. The folder's files are left as they are, as git leaves
  * them untracked.
  */
-export function initialized(held: Held, { dir }: PlaceRequests['init']): Reply<'init'> {
+export function initialized(held: Held, { dir }: PlaceRequests['init']) {
   if (!path.isAbsolute(dir)) return refused(`${dir} is not an absolute path: name the folder to make a repository from the root`);
   if (fs.existsSync(dir) && !isDirectory(dir)) return refused(`${dir} is a file, not a folder: name a folder to make a repository`);
   fs.mkdirSync(dir, { recursive: true });
@@ -207,7 +211,7 @@ export function initialized(held: Held, { dir }: PlaceRequests['init']): Reply<'
   return { repo: dir, made: true };
 }
 
-export function cloned(held: Held, { url, into }: PlaceRequests['clone']): Reply<'clone'> {
+export function cloned(held: Held, { url, into }: PlaceRequests['clone']) {
   if (!path.isAbsolute(into)) return refused(`${into} is not an absolute path: name the folder to clone into from the root`);
   if (isDirectory(into) && repositoryAt(held, into)) return { repo: into, made: false };
   if (fs.existsSync(into) && !(isDirectory(into) && fs.readdirSync(into).length === 0))

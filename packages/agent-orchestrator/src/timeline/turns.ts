@@ -31,7 +31,7 @@ export type TurnSpan = { asked: boolean; heldFrom: string | null; spawnedAt: str
  * @param tries A step's tries, in the order they were filed.
  * @param i The index in `tries` of the try asked about.
  */
-export function turnOf(tries: readonly TurnTry[], i: number): number | null {
+export function turnOf(tries: readonly TurnTry[], i: number) {
   const behind = tries.slice(0, i).filter((t) => t.taskId === tries[i]?.taskId);
   const answered = behind.at(-1)?.cause;
   if (answered === undefined || answered === 'recheck') return null;
@@ -39,7 +39,7 @@ export function turnOf(tries: readonly TurnTry[], i: number): number | null {
 }
 
 /** Whether an attempt signed off blocked: its closeout, as `parseCloseout` reads it, says so. An attempt that signed none did not. */
-const signedBlocked = (a: TurnAttempt | undefined): boolean => {
+const signedBlocked = (a: TurnAttempt | undefined) => {
   if (a?.closeout === undefined || a.closeout === null) return false;
   const said = parseCloseout(a.closeout);
   return !('error' in said) && said.outcome === 'blocked';
@@ -53,7 +53,7 @@ const signedBlocked = (a: TurnAttempt | undefined): boolean => {
  * @param turn The turn asked about, from 0.
  * @param over Whether the task is settled, or signed and waiting on a person.
  */
-export function turnSpanOf(attempts: readonly TurnAttempt[], turn: number, over: boolean): TurnSpan {
+export function turnSpanOf(attempts: readonly TurnAttempt[], turn: number, over: boolean) {
   const own = attempts.filter((a) => (a.turn ?? 0) === turn);
   const before = own.length ? attempts.filter((a) => (a.turn ?? 0) < turn).at(-1) : undefined;
   const last = attempts.every((a) => (a.turn ?? 0) <= turn);
@@ -71,7 +71,7 @@ export function turnSpanOf(attempts: readonly TurnAttempt[], turn: number, over:
  * a gate, whose wait was at that gate), and one whose two times are not both known.
  * @param t The try, with the span of its turn where it is one.
  */
-export function answerWaitOf(t: { turn?: TurnSpan }): number | null {
+export function answerWaitOf(t: { turn?: TurnSpan }) {
   const turn = t.turn;
   if (!turn?.asked || !turn.heldFrom || !turn.spawnedAt) return null;
   return Math.max(0, Date.parse(turn.spawnedAt) - Date.parse(turn.heldFrom));

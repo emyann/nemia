@@ -96,20 +96,21 @@ export const ANSWER_HELP = [
  * The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data.
  * @param verb The verb the flag is given to, which its words name.
  */
-export const answerFlag = (verb: 'retry' | 'approve'): Flag => ({
-  flag: '--answer',
-  kind: 'text',
-  key: 'answer',
-  many: true,
-  takes: `--answer takes a question's number and the letter of its option, as nemia decide <runId> prints them: nemia ${verb} <runId> <step> --answer 1=a`,
-  only: { side: 'cli', why: 'the api takes the answers as data, by question title and option label (`answers`)' },
-});
+export const answerFlag = (verb: 'retry' | 'approve') =>
+  ({
+    flag: '--answer',
+    kind: 'text',
+    key: 'answer',
+    many: true,
+    takes: `--answer takes a question's number and the letter of its option, as nemia decide <runId> prints them: nemia ${verb} <runId> <step> --answer 1=a`,
+    only: { side: 'cli', why: 'the api takes the answers as data, by question title and option label (`answers`)' },
+  }) satisfies Flag;
 
 /**
  * The `--answer` values typed, in the order given: none where none were.
  * @param args The command line's parsed arguments.
  */
-export const typedOf = (args: Args): readonly string[] => {
+export const typedOf = (args: Args) => {
   const value = args.answer;
   return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
 };
@@ -119,7 +120,7 @@ export const typedOf = (args: Args): readonly string[] => {
  * @param args The command line's parsed arguments.
  * @param command The command as typed, which the refusal's fixes repeat.
  */
-export const recheckAnswerRefusal = (args: Args, command: string): string | null =>
+export const recheckAnswerRefusal = (args: Args, command: string) =>
   args.mode === 'recheck' && typedOf(args).length
     ? `--answer carries your answers into the try's brief, and --recheck files no session to read them — it runs the check again, and nothing else. Recheck without answers (${command} --recheck), or give them to a session: ${command} --answer <n>=<letter>.`
     : null;

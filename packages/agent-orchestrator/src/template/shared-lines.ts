@@ -21,12 +21,14 @@ export const withSharedLines: WithSharedLines = (items, linesOf) =>
   onceEach(items.flatMap((item) => ('path' in item ? linesFor(linesOf, item.path) : [item.line])));
 
 /** The lines `linesOf` holds for `file` among its own entries, none for a name it holds only through Object (`constructor`, say). */
-const linesFor = (linesOf: Readonly<Record<string, readonly string[]>>, file: string): readonly string[] =>
+const linesFor = (linesOf: Readonly<Record<string, readonly string[]>>, file: string) =>
   Object.entries(linesOf).find(([name]) => name === file)?.[1] ?? [];
 
 /**
  * The items of a list field as `withSharedLines` takes them: a string as its own `{ line }`, a `{ path }` as it is; anything else none.
  * @param value The list field's value.
  */
-export const listItemsOf = (value: readonly unknown[]): ListItem[] =>
-  value.flatMap((item): ListItem[] => (typeof item === 'string' ? [{ line: item }] : isPathItem(item) ? [{ path: item.path }] : []));
+export const listItemsOf = (value: readonly unknown[]) =>
+  value.flatMap((item) =>
+    typeof item === 'string' ? [{ line: item }] : isPathItem(item) ? [{ path: item.path }] : [],
+  ) satisfies ListItem[] as ListItem[];

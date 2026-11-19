@@ -21,13 +21,13 @@ export type Edited = { readonly labels: Labels } | { readonly refused: string };
 type Read = Readonly<Record<string, string | undefined>>;
 
 /** The value `map` gives `key`, if any. */
-const at = (map: Read, key: string): string | undefined => map[key];
+const at = (map: Read, key: string) => map[key];
 
 /** Whether `map` carries `key` itself. */
-const carries = (map: Labels, key: string): boolean => Object.hasOwn(map, key);
+const carries = (map: Labels, key: string) => Object.hasOwn(map, key);
 
 /** Whether an edit would change a value `current` already holds: a `key=value` whose key carries another value. */
-const changesAValue = (current: Labels, edits: readonly LabelChange[]): boolean =>
+const changesAValue = (current: Labels, edits: readonly LabelChange[]) =>
   edits.some((e) => e.op === 'set' && carries(current, e.key) && at(current, e.key) !== e.value);
 
 const labelEditsSpec = spec<(current: Labels, edits: readonly LabelChange[], overwrite: boolean) => Edited>({

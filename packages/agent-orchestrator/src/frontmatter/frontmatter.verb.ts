@@ -46,7 +46,7 @@ export type Rewritten = {
  * `factory/applied/applied.store.ts` lays them out (`treeDir`, `appliedDir`). Only those there.
  * @param home The store's home folder.
  */
-export function storeFolders(home: string): string[] {
+export function storeFolders(home: string) {
   const factories = path.join(home, 'factories');
   const named = fs.existsSync(factories)
     ? fs
@@ -66,6 +66,7 @@ export function storeFolders(home: string): string[] {
  * Every `*.md` file under `dir`, in order, `.git`, `node_modules` and links passed over.
  * @param dir The folder to walk.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function markdownIn(dir: string): string[] {
   return fs
     .readdirSync(dir, { withFileTypes: true })
@@ -78,12 +79,12 @@ export function markdownIn(dir: string): string[] {
 }
 
 /** `text` written whole over `file` (`writeWhole`) at the file's own mode, so a read-only file is never writable in between. */
-function replaceFile(file: string, text: string): void {
+function replaceFile(file: string, text: string) {
   writeWhole(file, text, { mode: fs.statSync(file).mode & 0o777 });
 }
 
 /** The lines of `text`'s frontmatter, already YAML, that YAML ends at ` #`, as `file:line`; none for a frontmatter that does not read. */
-function tailsOf(file: string, text: string): string[] {
+function tailsOf(file: string, text: string) {
   try {
     const { block } = splitFrontmatter(file, text);
     return block === null ? [] : commentTails(block).map((line) => `${file}:${line}`);
@@ -94,7 +95,7 @@ function tailsOf(file: string, text: string): string[] {
 }
 
 /** The folders `args` names, resolved, each refused (`Missing`) where it is no folder; the store's own where it names none. */
-function foldersOf(args: Args, home: string): string[] {
+function foldersOf(args: Args, home: string) {
   const given = Array.isArray(args.folders) ? (args.folders as readonly string[]) : [];
   if (!given.length) return storeFolders(home);
   return given.map((folder) => {
@@ -111,8 +112,7 @@ function foldersOf(args: Args, home: string): string[] {
  * Whether `file` may be a step or an agent, whose top-level fence keys move into its harness's block: no skill, no README, nothing under a
  * `skills/` folder, whose frontmatter is the harness's own.
  */
-const fenced = (file: string): boolean =>
-  !['SKILL.md', 'README.md'].includes(path.basename(file)) && !file.split(path.sep).includes(SKILLS_FOLDER);
+const fenced = (file: string) => !['SKILL.md', 'README.md'].includes(path.basename(file)) && !file.split(path.sep).includes(SKILLS_FOLDER);
 
 /**
  * The harness `file` runs on, for the block its fence moves into: its own `harness:` line, else the agent its `agent:` line names, read
@@ -120,7 +120,7 @@ const fenced = (file: string): boolean =>
  * default. Undefined where nothing here says: a step with no `agent:` line, which a factory may hire onto any agent, or one whose agent
  * lives in another place.
  */
-function harnessOfFile(file: string, text: string): string | undefined {
+function harnessOfFile(file: string, text: string) {
   const own = frontmatterKey(text, 'harness');
   if (own !== undefined) return own;
   if (path.basename(path.dirname(file)) === AGENTS_FOLDER) return DEFAULT_HARNESS;
@@ -135,7 +135,7 @@ function harnessOfFile(file: string, text: string): string | undefined {
  * @param folders The folders whose markdown files are read.
  * @param check Whether only to find the files to rewrite, writing none.
  */
-export function rewriteFolders(folders: readonly string[], check: boolean): Rewritten {
+export function rewriteFolders(folders: readonly string[], check: boolean) {
   const files = [...new Set(folders.flatMap(markdownIn))];
   const rewritten: string[] = [];
   const refused: { file: string; why: string }[] = [];
@@ -168,7 +168,7 @@ export function rewriteFolders(folders: readonly string[], check: boolean): Rewr
  * What `nemia frontmatter rewrite` says of a walk: each file rewritten or due, each refused, each tail, each fence key kept, and none of
  * them where none.
  */
-export function rewrittenLines({ check, rewritten, refused, tails, kept = [] }: Rewritten): string[] {
+export function rewrittenLines({ check, rewritten, refused, tails, kept = [] }: Rewritten) {
   const lines = [
     ...rewritten.map((file) => `${check ? 'due' : 'rewritten'}: ${file}`),
     ...refused.map(({ why }) => `refused: ${why}`),
@@ -186,7 +186,7 @@ export function rewrittenLines({ check, rewritten, refused, tails, kept = [] }: 
 }
 
 /** The walk's end as the CLI's exit: a refused file as its refusal (2), a rewrite due under `--check` as 1, else what it found. */
-const ended = (found: Rewritten): Effect.Effect<Rewritten, WorkflowError> => {
+const ended = (found: Rewritten) => {
   if (found.refused.length) return Effect.fail(new WorkflowError(rewrittenLines(found).join('\n')));
   if (found.check && found.rewritten.length) return Effect.die(Object.assign(new Error(rewrittenLines(found).join('\n')), { exitCode: 1 }));
   return Effect.succeed(found);

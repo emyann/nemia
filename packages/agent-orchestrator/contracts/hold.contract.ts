@@ -37,13 +37,13 @@ export type HoldPut = {
 export type HoldStop = 'cancelled' | 'pruned' | 'landed' | 'succeeded' | 'held' | 'folder';
 
 /** Nothing of the run is left to file: it is called off, pruned, or finished. */
-const over = (p: HoldPut): boolean => p.cancelled || p.pruned || p.finished !== null;
+const over = (p: HoldPut) => p.cancelled || p.pruned || p.finished !== null;
 
 /** Nothing of the run stops a hold before a folder run's wait is asked: not over, and not held already. */
-const open = (p: HoldPut): boolean => !over(p) && !p.held;
+const open = (p: HoldPut) => !over(p) && !p.held;
 
 /** The hold waits on runs to land on a branch: it names at least one. */
-const waitsOnRuns = (p: HoldPut): boolean => p.until.length > 0;
+const waitsOnRuns = (p: HoldPut) => p.until.length > 0;
 
 const holdStopSpec = spec<(p: HoldPut) => HoldStop | null>({
   ensures: {
@@ -84,7 +84,7 @@ export type HoldStopOf = Implementation<typeof holdStopSpec>;
  * A run a hold names that never lands without a person: the store has no such run, it was cancelled, or a result branch it recorded is
  * gone (`neverLands`, wait/wait.ts).
  */
-const neverLands = (w: Wait): boolean => w.missing === true || w.cancelledAt !== undefined || (w.gone !== undefined && w.gone.length > 0);
+const neverLands = (w: Wait) => w.missing === true || w.cancelledAt !== undefined || (w.gone !== undefined && w.gone.length > 0);
 
 const holdNeedsYouSpec = spec<(holds: readonly Wait[]) => boolean>({
   /** A cancellation is a moment written by `nemia cancel`, never empty (`waitOf` reads the record's `cancelledAt` as it is). */

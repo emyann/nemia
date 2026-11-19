@@ -5,7 +5,7 @@
  * was running as the loop came back: the most recent one still open, which the process's tracer, wrapped, keeps (`openSpans`).
  */
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { Effect, Metric, type Scope, Tracer } from 'effect';
+import { Effect, Metric, Tracer } from 'effect';
 
 /**
  * The event loop's delay, in ms, as Node measures it: the time a timer of the loop's fired past its due. Named in OpenTelemetry's family
@@ -36,7 +36,7 @@ const RESOLUTION_MS = 10;
  * @param percentiles Each percentile of the measure, from 0 to 100, and the delay at it in ns.
  * @param count The samples the measure took.
  */
-export const delaysOf = (percentiles: ReadonlyMap<number, number>, count: number): number[] => {
+export const delaysOf = (percentiles: ReadonlyMap<number, number>, count: number) => {
   const steps = [...percentiles].sort(([a], [b]) => a - b);
   const out: number[] = [];
   let taken = 0;
@@ -51,7 +51,7 @@ export const delaysOf = (percentiles: ReadonlyMap<number, number>, count: number
 export type NamedSpan = { name: string; chain: string[] };
 
 /** The span's name and its parents' names, innermost first. */
-const namedOf = (span: Tracer.Span): NamedSpan => {
+const namedOf = (span: Tracer.Span) => {
   const chain: string[] = [];
   let at: Tracer.AnySpan | undefined = span;
   while (at !== undefined && chain.length < 12) {
@@ -67,7 +67,7 @@ const namedOf = (span: Tracer.Span): NamedSpan => {
  * @param inner The tracer the process gave, which still makes and exports every span.
  * @param open The spans open, kept in the order started.
  */
-export const openSpans = (inner: Tracer.Tracer, open: Set<Tracer.Span>): Tracer.Tracer =>
+export const openSpans = (inner: Tracer.Tracer, open: Set<Tracer.Span>) =>
   Tracer.make({
     span(options) {
       const span = inner.span(options);
@@ -83,7 +83,7 @@ export const openSpans = (inner: Tracer.Tracer, open: Set<Tracer.Span>): Tracer.
   });
 
 /** The span started most recently that is still open, or undefined where none is. */
-const runningOf = (open: ReadonlySet<Tracer.Span>): NamedSpan | undefined => {
+const runningOf = (open: ReadonlySet<Tracer.Span>) => {
   let last: Tracer.Span | undefined;
   for (const span of open) last = span;
   return last && namedOf(last);
@@ -126,10 +126,7 @@ const watched = (watch: LoopWatch, open: ReadonlySet<Tracer.Span>) =>
  * @param program What runs with the loop watched: the daemon.
  * @param watch When a stall is logged and how often the histogram is filled; the daemon's (`DAEMON_WATCH`) unless given.
  */
-export const eventLoopWatched = <A, E, R>(
-  program: Effect.Effect<A, E, R>,
-  watch: LoopWatch = DAEMON_WATCH,
-): Effect.Effect<A, E, R | Scope.Scope> =>
+export const eventLoopWatched = <A, E, R>(program: Effect.Effect<A, E, R>, watch: LoopWatch = DAEMON_WATCH) =>
   Effect.gen(function* () {
     const open = new Set<Tracer.Span>();
     const tracer = openSpans(yield* Effect.tracer, open);

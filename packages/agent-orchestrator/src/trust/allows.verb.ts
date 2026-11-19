@@ -26,7 +26,7 @@ export const NO_ALLOWS: Allows = { rules: [], untrusted: () => undefined };
  * @param repo The repository's folder; undefined for a run that works on none.
  * @param factory The factory the run is started in; undefined for none.
  */
-export function repoAllows(repo: string | undefined, factory?: string): Allows {
+export function repoAllows(repo: string | undefined, factory?: string) {
   if (repo === undefined) return NO_ALLOWS;
   return {
     rules: projectAllows(DEFAULT_HARNESS, repo) ?? [],

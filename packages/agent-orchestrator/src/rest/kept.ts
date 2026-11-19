@@ -19,7 +19,7 @@ import type { Run } from '../record/record.ts';
 export type RecordMemo<P> = { runs: Map<string, { stamp: string; of: P }> };
 
 /** A memo that holds nothing: what a serving process starts with, one per read. */
-export const recordMemo = <P>(): RecordMemo<P> => ({ runs: new Map() });
+export const recordMemo = <P>() => ({ runs: new Map() });
 
 /**
  * What a read reads the memo through: the store stamped before any record is read, the reader of one run by id
@@ -43,9 +43,9 @@ export type RecordsRead = {
  * @param read The store's stamps, the reader of a run by id, and whether to verify.
  * @param project What a run is projected to.
  */
-export function keptRecords<P>(memo: RecordMemo<P> | undefined, read: RecordsRead, project: (run: Run) => P): P[] {
+export function keptRecords<P>(memo: RecordMemo<P> | undefined, read: RecordsRead, project: (run: Run) => P) {
   const ids = [...read.stamps.keys()].sort((a, b) => a.localeCompare(b));
-  const projected = (id: string): P | undefined => {
+  const projected = (id: string) => {
     const run = read.find(id);
     return run === undefined ? undefined : project(run);
   };
@@ -77,7 +77,7 @@ export function keptRecords<P>(memo: RecordMemo<P> | undefined, read: RecordsRea
 }
 
 /** Refuses a projection kept for `id` that a fresh read does not give again (`WF_VERIFY_REST`), naming the run. */
-function verified<P>(id: string, kept: P, fresh: P | undefined): void {
+function verified<P>(id: string, kept: P, fresh: P | undefined) {
   if (isDeepStrictEqual(kept, fresh)) return;
   throw new Error(
     `The memo of run records answered ${id} differently from a fresh read (WF_VERIFY_REST): something its projection reads is not in the run's stamp.`,

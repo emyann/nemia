@@ -29,7 +29,7 @@ export type Place = {
  * @param runs The store's `runs/` folder.
  * @param id The run's id.
  */
-export const workRoot = (runs: string, id: string): string => path.join(runs, id, 'work');
+export const workRoot = (runs: string, id: string) => path.join(runs, id, 'work');
 
 /**
  * Where `nemia start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which record.store.ts's `inputsDir`
@@ -38,7 +38,7 @@ export const workRoot = (runs: string, id: string): string => path.join(runs, id
  * @param runs The store's `runs/` folder.
  * @param id The run's id.
  */
-export const inputsRoot = (runs: string, id: string): string => path.join(runs, id, 'inputs');
+export const inputsRoot = (runs: string, id: string) => path.join(runs, id, 'inputs');
 
 /**
  * Where a run keeps its own copies of its workflow folder: `runs/<id>/workflow`, and with `hex` the one copy under that digest
@@ -48,7 +48,7 @@ export const inputsRoot = (runs: string, id: string): string => path.join(runs, 
  * @param id The run's id.
  * @param hex The digest of the one copy; absent for the folder of every copy.
  */
-export const workflowFilesRoot = (runs: string, id: string, hex?: string): string =>
+export const workflowFilesRoot = (runs: string, id: string, hex?: string) =>
   hex === undefined ? path.join(runs, id, 'workflow') : path.join(runs, id, 'workflow', hex);
 
 /**
@@ -59,7 +59,7 @@ export const workflowFilesRoot = (runs: string, id: string, hex?: string): strin
  * @param id The run's id.
  * @param hex The digest of the one copy; absent for the folder of every copy.
  */
-export const carriedFilesRoot = (runs: string, id: string, hex?: string): string =>
+export const carriedFilesRoot = (runs: string, id: string, hex?: string) =>
   hex === undefined ? path.join(runs, id, 'carried') : path.join(runs, id, 'carried', hex);
 
 /**
@@ -71,7 +71,7 @@ export const carriedFilesRoot = (runs: string, id: string, hex?: string): string
  * `to` is emptied first, never merged over: a step is filed again after a person sends work back to it (`sentBack`), and its copy then
  * holds no file the parent has since deleted or renamed.
  */
-function copyGiven(from: string, to: string): void {
+function copyGiven(from: string, to: string) {
   fs.rmSync(to, { recursive: true, force: true });
   if (!fs.existsSync(from)) return;
   const skip = path.join(from, GIVEN);
@@ -89,7 +89,7 @@ function copyGiven(from: string, to: string): void {
  * Refuses, with exit 2 and nothing removed, a `<workspace>/given` that is a link or not a directory: `copyGiven` empties and writes that
  * path on each filing, and would otherwise remove and write wherever the link points, outside the folder. Passes when it is absent.
  */
-function ownGiven(workspace: string): void {
+function ownGiven(workspace: string) {
   const at = path.join(workspace, GIVEN);
   const found = fs.lstatSync(at, { throwIfNoEntry: false });
   if (!found || (found.isDirectory() && !found.isSymbolicLink())) return;
@@ -111,27 +111,28 @@ function ownGiven(workspace: string): void {
  * `dontAsk`, where a path outside its directory is denied without a prompt. With nothing to copy, the folder is left as it was.
  * @param runs The store's `runs/` folder, under which each run's folders are made.
  */
-export const folderPlace = (runs: string): Place => ({
-  make(run, plan, step) {
-    if (plan.kind === 'inherit') {
-      const from = run.steps[plan.from]?.workspace;
-      if (!from) throw new Error(`${step}: ${plan.from} has no folder yet`);
-      return { workspace: from, notes: [] };
-    }
-    const workspace = path.join(workRoot(runs, run.id), step);
-    fs.mkdirSync(workspace, { recursive: true });
-    const given = givenPlan(run, plan);
-    const notes: string[] = [];
-    if (given.inputs || given.from.length > 0) ownGiven(workspace);
-    if (given.inputs) {
-      copyGiven(inputsRoot(runs, run.id), path.join(workspace, given.inputs));
-      notes.push(`${given.inputs}: the files nemia start --input gave the run and the cards --card handed it, copied in`);
-    }
-    for (const g of given.from) {
-      copyGiven(g.source, path.join(workspace, g.dir));
-      notes.push(`${g.dir}: ${g.step}'s folder, copied in`);
-    }
-    return { workspace, notes };
-  },
-  handOff() {},
-});
+export const folderPlace = (runs: string) =>
+  ({
+    make(run, plan, step) {
+      if (plan.kind === 'inherit') {
+        const from = run.steps[plan.from]?.workspace;
+        if (!from) throw new Error(`${step}: ${plan.from} has no folder yet`);
+        return { workspace: from, notes: [] };
+      }
+      const workspace = path.join(workRoot(runs, run.id), step);
+      fs.mkdirSync(workspace, { recursive: true });
+      const given = givenPlan(run, plan);
+      const notes: string[] = [];
+      if (given.inputs || given.from.length > 0) ownGiven(workspace);
+      if (given.inputs) {
+        copyGiven(inputsRoot(runs, run.id), path.join(workspace, given.inputs));
+        notes.push(`${given.inputs}: the files nemia start --input gave the run and the cards --card handed it, copied in`);
+      }
+      for (const g of given.from) {
+        copyGiven(g.source, path.join(workspace, g.dir));
+        notes.push(`${g.dir}: ${g.step}'s folder, copied in`);
+      }
+      return { workspace, notes };
+    },
+    handOff() {},
+  }) satisfies Place as Place;

@@ -6,7 +6,7 @@
  * Beneath the controllers, beside `branches.store.ts`: it asks the place it is handed and reads nothing else, and `runner.ts`
  * re-exports `changesOf`.
  */
-import type { Changes, ChangedFile, PlaceRequests } from '../place/place.ts';
+import type { ChangedFile, PlaceRequests } from '../place/place.ts';
 import type { Place } from '../place/place.store.ts';
 import type { RepositoryRun } from '../record/record.ts';
 import { CHECK_AFFECTING, notKnown, radius, sensitivePaths, workspacesIn, type Radius } from './branches.ts';
@@ -26,11 +26,7 @@ export type BranchChanges = {
 };
 
 /** What `place` answers `report` for `run`, or what it said instead: its refusal, or why it was not heard. */
-function reportOf(
-  place: Place,
-  run: RepositoryRun,
-  ask: Partial<PlaceRequests['report']> & Pick<PlaceRequests['report'], 'branches'>,
-): Changes | { readonly unknown: string } {
+function reportOf(place: Place, run: RepositoryRun, ask: Partial<PlaceRequests['report']> & Pick<PlaceRequests['report'], 'branches'>) {
   const request = { repo: run.repo, baseRef: run.baseRef, onto: run.branch, diffOf: [], present: [], atBase: [], ...ask };
   const outcome = place.askNow('report', request);
   if ('answer' in outcome) return outcome.answer;
@@ -38,11 +34,11 @@ function reportOf(
 }
 
 /** The top-level markdown files of `files` a branch added. */
-const notesIn = (files: readonly ChangedFile[]): string[] =>
+const notesIn = (files: readonly ChangedFile[]) =>
   files.filter((f) => f.status === 'added' && f.path.endsWith('.md') && !f.path.includes('/')).map((f) => f.path);
 
 /** The text of a file a diff adds whole: its added lines, after the hunk's head. */
-const addedText = (diff: string): string =>
+const addedText = (diff: string) =>
   diff
     .split('\n')
     .slice(diff.split('\n').findIndex((l) => l.startsWith('@@')) + 1)
@@ -60,12 +56,7 @@ const addedText = (diff: string): string =>
  * @param branches The branches read.
  * @param globs The files whose diffs are read; the check-affecting ones (`CHECK_AFFECTING`) where absent.
  */
-export function changesOf(
-  place: Place,
-  run: RepositoryRun,
-  branches: readonly string[],
-  globs: readonly string[] = CHECK_AFFECTING,
-): BranchChanges[] {
+export function changesOf(place: Place, run: RepositoryRun, branches: readonly string[], globs: readonly string[] = CHECK_AFFECTING) {
   const asked = [...new Set(branches)];
   if (!asked.length) return [];
   const first = reportOf(place, run, { branches: asked, atBase: ['package.json'] });
@@ -81,7 +72,7 @@ export function changesOf(
   const second = diffOf.length ? reportOf(place, run, { branches: readable, diffOf }) : undefined;
   return read.map(({ branch, files, radius: r }) => {
     if (!files) return { branch, radius: r, inFull: r as { error: string }, notes: r as { error: string } };
-    const diffOfPath = (p: string): string | { error: string } => {
+    const diffOfPath = (p: string) => {
       if (!second) return { error: notKnown(`the place was asked no diff of ${p} on ${branch}`) };
       if ('unknown' in second) return { error: notKnown(second.unknown) };
       return second.diffs[branch]?.[p] ?? { error: notKnown(`the place gave no diff of ${p} on ${branch}`) };
@@ -92,14 +83,14 @@ export function changesOf(
 }
 
 /** The diffs, end to end, or the first that is not known; undefined for none. */
-function joined(diffs: readonly (string | { error: string })[]): string | { error: string } | undefined {
+function joined(diffs: readonly (string | { error: string })[]) {
   if (!diffs.length) return undefined;
   const texts = diffs.filter((d) => typeof d === 'string');
   return diffs.find((d) => typeof d !== 'string') ?? texts.join('');
 }
 
 /** Each note's text out of its diff, or the first that is not known. */
-function notesFrom(files: readonly string[], diffOf: (p: string) => string | { error: string }): Note[] | { error: string } {
+function notesFrom(files: readonly string[], diffOf: (p: string) => string | { error: string }) {
   const notes: Note[] = [];
   for (const file of files) {
     const diff = diffOf(file);
@@ -117,12 +108,7 @@ function notesFrom(files: readonly string[], diffOf: (p: string) => string | { e
  * @param branch The branch whose tip is read.
  * @param paths The paths looked for, each from the repository's root.
  */
-export function presentOn(
-  place: Place,
-  run: RepositoryRun,
-  branch: string,
-  paths: readonly string[],
-): Readonly<Record<string, 'file' | 'directory' | 'absent'>> | { readonly unknown: string } {
+export function presentOn(place: Place, run: RepositoryRun, branch: string, paths: readonly string[]) {
   const read = reportOf(place, run, { branches: [branch], present: paths });
   return 'unknown' in read ? read : (read.present[branch] ?? {});
 }

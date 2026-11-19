@@ -8,14 +8,14 @@ import fs from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { Effect } from 'effect';
 import { HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
-import type { HarnessCheck, HarnessTurn, Need, NeedState, ReadinessFix, TurnStart } from 'objects';
+import type { HarnessCheck, HarnessTurn, Need, ReadinessFix, TurnStart } from 'objects';
 import { asked, EngineService, type TaskView } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { MOMENTUM } from '../status/status.ts';
 import { signInNeedOf } from '../needs/index.ts';
 import { checkKey, harnessCheckOf, needsMemo, NeedsMemory, needsOnce } from '../needs/needs.verb.ts';
-import { TURN_BUDGET_USD, TURN_DEADLINE_SECONDS, TURN_PROMPT, TURN_SCHEMA, turnCheckOf, type TurnSeen } from './harness-turn.ts';
+import { TURN_BUDGET_USD, TURN_DEADLINE_SECONDS, TURN_PROMPT, TURN_SCHEMA, turnCheckOf } from './harness-turn.ts';
 import { latestTurnRecord, readTurnRecord, turnsDir, writeTurnRecord, type TurnRecord } from './harness-turn.store.ts';
 
 /** How much of the end of a turn's stderr and stdout a failed check reads its harness's words from. */
@@ -28,21 +28,21 @@ const WORDS_MOST = 300;
  * The harnesses a check turn runs through: each that runs a brief as an agent session and declares the model a check turn runs on
  * (`turnModel`), which it declares only where it ends a session at a spend cap.
  */
-export const turnHarnesses = (): string[] =>
+export const turnHarnesses = () =>
   Object.entries(HARNESS_DECLARATIONS).flatMap(([name, d]) => (d.needs?.turnModel !== undefined && d.runsBrief ? [name] : []));
 
 /** A fix a person types: its words and its command. */
-const typed = (message: string, command: string): ReadinessFix => ({ message, command, startable: false, kind: 'typed' });
+const typed = (message: string, command: string) => ({ message, command, startable: false, kind: 'typed' }) satisfies ReadinessFix;
 
 /**
  * The fixes of a failed turn of `harness`: its sign-in's, each typed, since a refusal in the harness's own words is most often a lapsed
  * sign-in.
  */
-const turnFixes = (harness: string, needs: readonly Need[]): ReadinessFix[] =>
-  (needs.find((n) => n.name === signInNeedOf(harness))?.fixes ?? []).map((f) => typed(f.message, f.command));
+const turnFixes = (harness: string, needs: readonly Need[]) =>
+  (needs.find((n) => n.name === signInNeedOf(harness))?.fixes ?? []).map((f) => typed(f.message, f.command)) satisfies ReadinessFix[];
 
 /** The statement `closeout` carries as its answer: the `answer` it was asked for, or the text it gave. */
-const answerOf = (closeout: unknown): string | undefined => {
+const answerOf = (closeout: unknown) => {
   if (typeof closeout === 'string') return closeout;
   if (typeof closeout === 'object' && closeout !== null && 'answer' in closeout && typeof closeout.answer === 'string')
     return closeout.answer;
@@ -50,7 +50,7 @@ const answerOf = (closeout: unknown): string | undefined => {
 };
 
 /** What `view` says of the turn, as `turnCheckOf` reads it. */
-const seenOf = (view: TaskView): TurnSeen => {
+const seenOf = (view: TaskView) => {
   const last = view.state.attempts.at(-1);
   const answer = answerOf(last?.closeout);
   return {
@@ -62,7 +62,7 @@ const seenOf = (view: TaskView): TurnSeen => {
 };
 
 /** The last line `text` says, cut to `WORDS_MOST`, or undefined where it says none. */
-const lastLine = (text: string): string | undefined => {
+const lastLine = (text: string) => {
   const line = text
     .split('\n')
     .map((l) => l.trim())
@@ -81,7 +81,7 @@ const FAILURE_WORDS = {
 } as const;
 
 /** `n` dollars, as a sentence says a turn's cost. */
-const costWords = (n: number): string => `$${n < 0.01 ? n.toFixed(4) : n.toFixed(2)}`;
+const costWords = (n: number) => `$${n < 0.01 ? n.toFixed(4) : n.toFixed(2)}` satisfies string as string;
 
 /**
  * The turn `record` as it stands: its check over its task's view, the cost its last attempt counted, and, where it failed, why in the
@@ -102,7 +102,7 @@ const turnRead = Effect.fnUntraced(function* (record: TurnRecord) {
     at: record.startedAt,
     ...(costUsd === undefined ? {} : { costUsd }),
   };
-  const check = yield* Effect.gen(function* (): Effect.fn.Return<HarnessCheck, never, EngineService | StoreRoot> {
+  const check = yield* Effect.gen(function* () {
     if (verdict.state === 'running')
       return {
         ...base,
@@ -141,7 +141,7 @@ const readingsOf = Effect.fnUntraced(function* (home: string) {
   const kept = yield* NeedsMemory;
   const memo = kept ?? needsMemo(home);
   if (kept === undefined || (memo.version === 0 && memo.readings.size === 0)) yield* needsOnce(memo);
-  return (name: string): NeedState | undefined => {
+  return (name: string) => {
     const need = memo.harnessNeeds.find((n) => n.name === name);
     return need === undefined ? undefined : memo.readings.get(checkKey(harnessCheckOf(need)));
   };

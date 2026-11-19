@@ -18,12 +18,12 @@ export const MEMORY_ROOT = '/memory';
 type Held = { kind: 'folder' | 'archive'; name: string; files: TreeFile[]; digest: string };
 
 /** A copy of `files`, so what a test holds is never what the stand-in keeps. */
-const copied = (files: readonly TreeFile[]): TreeFile[] => files.map((f) => ({ ...f, bytes: Uint8Array.from(f.bytes) }));
+const copied = (files: readonly TreeFile[]) => files.map((f) => ({ ...f, bytes: Uint8Array.from(f.bytes) }));
 
 /** A fresh Template door over a map: no template held. */
-export function templateDoorMemory(): Layer.Layer<never> {
+export function templateDoorMemory() {
   const held = new Map<string, Held>();
-  const under = (at: string): boolean => [...held.keys()].some((place) => place.startsWith(`${at}${path.sep}`));
+  const under = (at: string) => [...held.keys()].some((place) => place.startsWith(`${at}${path.sep}`));
   const layer: TemplateLayer = {
     templates: {
       read: (source) => {

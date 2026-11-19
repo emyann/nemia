@@ -25,7 +25,6 @@ import {
   workspaceModules,
   workspacePlan,
   worktreeDeps,
-  type DepEntry,
   type DepsListing,
   type Installed,
   type Provisioned,
@@ -43,7 +42,7 @@ import type { Followed, PlaceRequests } from '../place/place.ts';
  * to resolve, so a filing that reads it goes on without it rather than stopping the pass.
  * @param run The run whose repository is resolved.
  */
-export const realRepoOf = (run: Run): string | undefined => {
+export const realRepoOf = (run: Run) => {
   if (!isRepositoryRun(run)) return undefined;
   try {
     return fs.realpathSync(run.repo);
@@ -68,8 +67,8 @@ const execFileAsync = promisify(execFile);
  * @param mainRoot The main checkout's root folder.
  * @param worktree The worktree's root folder.
  */
-export function lockfileParts(mainRoot: string, worktree: string): string | null {
-  const read = (file: string): string | null => {
+export function lockfileParts(mainRoot: string, worktree: string) {
+  const read = (file: string) => {
     try {
       return fs.readFileSync(file, 'utf8');
     } catch {
@@ -95,7 +94,7 @@ export function lockfileParts(mainRoot: string, worktree: string): string | null
  * Null for a checkout with no lockfile, and for one with no `node_modules`: nobody installed a tree there to bring up to date.
  * @param repo The repository's checkout folder.
  */
-export function checkoutParts(repo: string): string | null {
+export function checkoutParts(repo: string) {
   if (!fs.statSync(path.join(repo, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) return null;
   let text: string;
   try {
@@ -125,7 +124,7 @@ export type CheckoutKept =
  * @param home The store's root folder.
  * @param repo The repository's checkout folder.
  */
-export async function keepCheckoutInstalled(home: string, repo: string): Promise<CheckoutKept> {
+export async function keepCheckoutInstalled(home: string, repo: string) {
   const tree = fs.statSync(path.join(repo, 'node_modules'), { throwIfNoEntry: false })?.isDirectory() ?? false;
   const due = checkoutInstall({
     cloned: isCloneFolder(home, repo),
@@ -133,14 +132,18 @@ export async function keepCheckoutInstalled(home: string, repo: string): Promise
     tree,
     parting: tree ? checkoutParts(repo) : null,
   });
-  if (!due.due) return { kept: 'untouched' };
+  if (!due.due) return { kept: 'untouched' } satisfies CheckoutKept;
   try {
     countSpawn();
     await execFileAsync('npm', [...INSTALL_ARGS], { cwd: repo, timeout: NPM_CI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
-    return { kept: 'installed', because: due.because };
+    return { kept: 'installed', because: due.because } satisfies CheckoutKept;
   } catch (err) {
     const { stderr, message } = err as { stderr?: string; message?: string };
-    return { kept: 'failed', because: due.because, error: lastLines(stderr?.trim() ? stderr : (message ?? String(err)), 10) };
+    return {
+      kept: 'failed',
+      because: due.because,
+      error: lastLines(stderr?.trim() ? stderr : (message ?? String(err)), 10),
+    } satisfies CheckoutKept;
   }
 }
 
@@ -149,7 +152,7 @@ export async function keepCheckoutInstalled(home: string, repo: string): Promise
  * @param repo The repository's checkout folder, said in the note.
  * @param kept What came of the checkout's install (`keepCheckoutInstalled`).
  */
-export function keptNotes(repo: string, kept: CheckoutKept): string[] {
+export function keptNotes(repo: string, kept: CheckoutKept) {
   const why = (because: string) =>
     because === 'node_modules' ? 'it had no node_modules' : `its package-lock.json asks for ${because}, which its node_modules lacks`;
   if (kept.kept === 'installed') return [`node_modules: ${repo} installed with npm install --no-save — ${why(kept.because)}`];
@@ -161,7 +164,7 @@ export function keptNotes(repo: string, kept: CheckoutKept): string[] {
 }
 
 /** A lockfile's text, parsed; null where it does not parse, which `lockfileParting` reads as parting at `package-lock.json`. */
-function parsedLock(text: string): unknown {
+function parsedLock(text: string) {
   try {
     return JSON.parse(text);
   } catch {
@@ -177,7 +180,7 @@ function parsedLock(text: string): unknown {
  * a link, is read as the package it leads to — a tree provisioned `linked` (main's packages linked where they could not be hardlinked) is
  * judged by what its links give, not taken to part at its first one.
  */
-function installedAt(root: string, lock: unknown, through = false): Record<string, Installed | null> {
+function installedAt(root: string, lock: unknown, through = false) {
   const installed: Record<string, Installed | null> = {};
   const packages = lockfilePackages(lock) ?? {};
   const real = through ? realOr(root) : root;
@@ -205,7 +208,7 @@ function installedAt(root: string, lock: unknown, through = false): Record<strin
 }
 
 /** The real path of `p`, or `p` where it is not there to resolve. */
-function realOr(p: string): string {
+function realOr(p: string) {
   try {
     return fs.realpathSync(p);
   } catch {
@@ -214,7 +217,7 @@ function realOr(p: string): string {
 }
 
 /** Whether the link at `at` leads, resolved, to a path outside `realRoot`; a link that leads nowhere does not. */
-function leadsOut(realRoot: string, at: string): boolean {
+function leadsOut(realRoot: string, at: string) {
   try {
     return !fs.realpathSync(at).startsWith(realRoot + path.sep);
   } catch {
@@ -223,9 +226,9 @@ function leadsOut(realRoot: string, at: string): boolean {
 }
 
 /** Main's `node_modules`, listed for `depsPlan`: names and link targets, nothing below a package. */
-function listDeps(modules: string): DepsListing | null {
+function listDeps(modules: string) {
   if (!fs.statSync(modules, { throwIfNoEntry: false })?.isDirectory()) return null;
-  const entriesOf = (dir: string): DepEntry[] => {
+  const entriesOf = (dir: string) => {
     try {
       return fs
         .readdirSync(dir, { withFileTypes: true })
@@ -246,7 +249,7 @@ function listDeps(modules: string): DepsListing | null {
  * and keyed by the folder. A folder is left out where the worktree's is not a directory of its own — absent, or reached through a link,
  * which would have the plan write where it leads — where the worktree's `node_modules` there is a link, and where main has none.
  */
-function nestedListings(mainRoot: string, worktree: string): Record<string, DepsListing> {
+function nestedListings(mainRoot: string, worktree: string) {
   let text: string;
   try {
     text = fs.readFileSync(path.join(worktree, 'package-lock.json'), 'utf8');
@@ -265,7 +268,7 @@ function nestedListings(mainRoot: string, worktree: string): Record<string, Deps
 }
 
 /** Whether `p` is a directory whose real path is `real`: there, and reached through no link. */
-function isOwnDirectory(p: string, real: string): boolean {
+function isOwnDirectory(p: string, real: string) {
   try {
     return fs.realpathSync(p) === real && fs.statSync(p).isDirectory();
   } catch {
@@ -283,7 +286,7 @@ const HARDLINK_REFUSED = new Set(['EXDEV', 'EPERM', 'ENOTSUP']);
  * Main's entry at `from`, made again at `to`: each directory made, each file hardlinked, each link copied as written and never followed —
  * so no loop, and nothing outside `from` is read. What it made, counted; a socket or a pipe is nobody's dependency, and left out.
  */
-function hardlinkTree(from: string, to: string): number {
+function hardlinkTree(from: string, to: string) {
   const st = fs.lstatSync(from);
   if (st.isSymbolicLink()) {
     fs.symlinkSync(fs.readlinkSync(from), to);
@@ -325,10 +328,10 @@ function hardlinkTree(from: string, to: string): number {
  * @param mainRoot The main checkout's root folder, whose packages are linked.
  * @param worktree The worktree's root folder, whose `node_modules` is made.
  */
-export async function provisionDeps(mainRoot: string, worktree: string): Promise<Provisioned> {
+export async function provisionDeps(mainRoot: string, worktree: string) {
   const modules = path.join(worktree, 'node_modules');
-  if (lstatOf(modules)?.isSymbolicLink()) return { tree: 'shared' };
-  if (lstatOf(path.join(modules, '.package-lock.json'))) return { tree: 'own', installed: false };
+  if (lstatOf(modules)?.isSymbolicLink()) return { tree: 'shared' } satisfies Provisioned;
+  if (lstatOf(path.join(modules, '.package-lock.json'))) return { tree: 'own', installed: false } satisfies Provisioned;
 
   if (lockfileParts(mainRoot, worktree)) {
     try {
@@ -338,15 +341,15 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
         timeout: NPM_CI_TIMEOUT_MS,
         maxBuffer: 64 * 1024 * 1024,
       });
-      return { tree: 'own', installed: true };
+      return { tree: 'own', installed: true } satisfies Provisioned;
     } catch (err) {
       const { stderr, message } = err as { stderr?: string; message?: string };
-      return { tree: 'failed', error: lastLines(stderr?.trim() ? stderr : (message ?? String(err)), 10) };
+      return { tree: 'failed', error: lastLines(stderr?.trim() ? stderr : (message ?? String(err)), 10) } satisfies Provisioned;
     }
   }
 
   const listing = listDeps(path.join(mainRoot, 'node_modules'));
-  if (!listing) return { tree: 'absent' };
+  if (!listing) return { tree: 'absent' } satisfies Provisioned;
   let made = 0;
   let why: string | undefined;
   try {
@@ -377,13 +380,13 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
       made++;
     }
   } catch (err) {
-    return { tree: 'failed', error: (err as Error).message };
+    return { tree: 'failed', error: (err as Error).message } satisfies Provisioned;
   }
-  return why ? { tree: 'linked', made, why } : { tree: 'hardlinked', made };
+  return (why ? { tree: 'linked', made, why } : { tree: 'hardlinked', made }) satisfies Provisioned;
 }
 
 /** The notes a step's `node_modules` gives the run's log: installed with `npm ci`, not provisioned, or linked, not hardlinked. */
-function depsNotes(deps: Provisioned): string[] {
+function depsNotes(deps: Provisioned) {
   if (deps.tree === 'own' && deps.installed)
     return ['node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed'];
   if (deps.tree === 'failed') return [`node_modules: not provisioned — ${deps.error.split('\n').at(-1)}`];
@@ -401,7 +404,7 @@ function depsNotes(deps: Provisioned): string[] {
  * own: there is no tree of its own to part.
  * @param worktree The worktree's root folder.
  */
-export function worktreeParts(worktree: string): string | null {
+export function worktreeParts(worktree: string) {
   if (!fs.lstatSync(path.join(worktree, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) return null;
   let text: string;
   try {
@@ -418,7 +421,7 @@ export function worktreeParts(worktree: string): string | null {
  * lockfile installs into (`workspaceModules`) — where the folder is the worktree's own directory and its `node_modules` no link. Removing
  * unlinks: a file hardlinked from the checkout keeps its content there, and a link is never followed.
  */
-function clearDeps(worktree: string): void {
+function clearDeps(worktree: string) {
   const root = fs.realpathSync(worktree);
   let lock: unknown = null;
   try {
@@ -460,7 +463,7 @@ export type Reinstalled = {
  * @param repo The repository's checkout folder.
  * @param worktree The worktree's root folder.
  */
-export async function keepWorktreeInstalled(home: string, runId: string, repo: string, worktree: string): Promise<Reinstalled | undefined> {
+export async function keepWorktreeInstalled(home: string, runId: string, repo: string, worktree: string) {
   const modules = lstatOf(path.join(worktree, 'node_modules'));
   const tree = !modules ? 'none' : modules.isSymbolicLink() ? 'shared' : 'own';
   const due = worktreeDeps({
@@ -469,22 +472,24 @@ export async function keepWorktreeInstalled(home: string, runId: string, repo: s
     tree,
     parting: tree === 'own' ? worktreeParts(worktree) : null,
   });
-  if (due.act === 'keep') return undefined;
+  if (due.act === 'keep') return undefined satisfies Reinstalled | undefined;
   if (due.act === 'reprovision') {
     try {
       clearDeps(worktree);
     } catch (err) {
-      return { ...due, kept: { kept: 'untouched' }, deps: { tree: 'failed', error: (err as Error).message } };
+      return { ...due, kept: { kept: 'untouched' }, deps: { tree: 'failed', error: (err as Error).message } } satisfies
+        | Reinstalled
+        | undefined;
     }
   }
   const kept = await keepCheckoutInstalled(home, repo);
   const provisioned = await provisionDeps(repo, worktree);
   const deps: Provisioned = kept.kept === 'failed' && provisioned.tree === 'absent' ? { tree: 'failed', error: kept.error } : provisioned;
-  return { ...due, kept, deps };
+  return { ...due, kept, deps } satisfies Reinstalled | undefined;
 }
 
 /** Whether `worktree` lies, by real path, under the store's `worktrees/<runId>/`, and is neither `repo` nor inside it. */
-function isRunWorktree(home: string, runId: string, repo: string, worktree: string): boolean {
+function isRunWorktree(home: string, runId: string, repo: string, worktree: string) {
   try {
     const real = fs.realpathSync(worktree);
     const repoReal = realOr(repo);
@@ -501,7 +506,7 @@ function isRunWorktree(home: string, runId: string, repo: string, worktree: stri
  * @param repo The repository's checkout folder, said in the notes.
  * @param r What came of the worktree's `node_modules` (`keepWorktreeInstalled`).
  */
-export function reinstalledNotes(repo: string, r: Reinstalled): string[] {
+export function reinstalledNotes(repo: string, r: Reinstalled) {
   return [
     ...(r.act === 'reprovision'
       ? [`node_modules: provisioned again — its package-lock.json asks for ${r.because}, which its node_modules lacked`]
@@ -531,14 +536,14 @@ export type CutOutcome = { readonly cut: Cut } | { readonly uncut: string };
  * @param name The step's name, each note said under it.
  * @param made What came of the cut: its notes, or why it was not cut.
  */
-export const cutNotes = (name: string, made: CutOutcome): string[] =>
+export const cutNotes = (name: string, made: CutOutcome) =>
   ('cut' in made ? made.cut.notes : [made.uncut]).map((note) => `${name}: ${note}`);
 
 /** Why a step's workspace was not made. */
-const uncut = (words: string): CutOutcome => ({ uncut: `not cut — ${words}` });
+const uncut = (words: string) => ({ uncut: `not cut — ${words}` });
 
 /** Whether `made` is `at` itself, by real path; false where either is not there to resolve. */
-function madeAt(made: string, at: string): boolean {
+function madeAt(made: string, at: string) {
   try {
     return fs.realpathSync(made) === fs.realpathSync(at);
   } catch {
@@ -567,7 +572,7 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
  * @param repo The repository's checkout folder, said in the note.
  * @param followed What `follow` answered of the checkout.
  */
-export function followedNotes(repo: string, followed: Followed): string[] {
+export function followedNotes(repo: string, followed: Followed) {
   if (followed.state === 'fast-forwarded')
     return [
       `base: ${repo} fast-forwarded from ${followed.from.slice(0, 12)} to ${followed.to.slice(0, 12)}, where ${followed.upstream} is`,
@@ -628,7 +633,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
 ) {
   const { steps, step } = ranShape(run, frozen, routed);
   const plan = workspacePlan(steps, step);
-  const cut = (made: Cut): CutOutcome => ({ cut: made });
+  const cut = (made: Cut) => ({ cut: made });
   if (!isRepositoryRun(run)) return cut(folderPlace(runsDir(home)).make(run, plan, step.name));
   const of = (name: string) => {
     const s = run.steps[name];
@@ -683,17 +688,18 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
  * @param steps The run's workflow.
  * @param step The step whose workspace is cut.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function ranShape(run: Pick<Run, 'steps'>, steps: readonly StepSpec[], step: StepSpec): { steps: StepSpec[]; step: StepSpec } {
   const byName = new Map(steps.map((s) => [s.name, s]));
-  const through = (name: string, seen: ReadonlySet<string> = new Set()): string[] => {
+  const through = (name: string, seen: ReadonlySet<string> = new Set()) => {
     const s = byName.get(name);
     if (s?.routes === undefined || seen.has(name)) return [name];
     const [first] = [...s.after].sort();
     return first === undefined ? [] : through(first, new Set([...seen, name]));
   };
-  const parents = (s: StepSpec): string[] => [...new Set(s.after.flatMap((a) => through(a)))];
+  const parents = (s: StepSpec) => [...new Set(s.after.flatMap((a) => through(a)))];
   const shaped = steps.filter((s) => s.routes === undefined).map((s) => ({ ...s, after: parents(s) }));
-  const filed = (name: string): boolean => Boolean(run.steps[name]?.taskId || run.steps[name]?.workspace);
+  const filed = (name: string) => Boolean(run.steps[name]?.taskId || run.steps[name]?.workspace);
   const ran = { ...step, after: parents(step).filter(filed) };
   return { steps: shaped.map((s) => (s.name === step.name ? ran : s)), step: ran };
 }

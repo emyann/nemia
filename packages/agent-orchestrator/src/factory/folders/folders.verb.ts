@@ -40,6 +40,7 @@ export type RepositoryMadeRead = { readonly path: string; readonly made: boolean
  * link that leads nowhere followed to where it would lead, so every link on the path is judged where it leads. A path the disk
  * cannot follow (a loop of links, a file on the way) is answered as it is written, and the write refuses it.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const realOr = (at: string): string => {
   const whole = path.resolve(at);
   try {
@@ -53,7 +54,7 @@ const realOr = (at: string): string => {
 };
 
 /** Whether `at` is a folder, a link followed. */
-const isFolder = (at: string): boolean => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() ?? false;
+const isFolder = (at: string) => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() ?? false;
 
 /** The roots and the stores, each resolved through its links, as the listing judges by them. */
 const bounds = Effect.fnUntraced(function* () {

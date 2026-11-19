@@ -30,7 +30,7 @@ export { holdsOpen } from './holds-open/holds-open.ts';
  * @param message The words given with `--message`, or undefined where none were given.
  * @param command The command the refusal offers again with words; `nemia approve <runId> <step>` when not given.
  */
-export const approvalWordsRefusal = (message: string | undefined, command = 'nemia approve <runId> <step>'): string | null =>
+export const approvalWordsRefusal = (message: string | undefined, command = 'nemia approve <runId> <step>') =>
   message !== undefined && !message.trim()
     ? `--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. Say what you approve, or on what terms — ${command} --message "<words>" — or leave --message out.`
     : null;
@@ -39,7 +39,7 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'nem
  * A second approval of the try a step is on: while it may still be sent back, the send-back (`sendsBack`, or `unfiledRefusal` for an
  * ending approved and not filed); else that it has handed on.
  */
-function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, given: Approval, sendsBack: true | undefined): string {
+function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, given: Approval, sendsBack: true | undefined) {
   const { name } = step;
   const approved = `try ${tryOf(run, name)} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
   if (sendsBack)
@@ -52,7 +52,7 @@ function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, g
  * The words of an approved step that has handed on: `approved`, what it said of the approval, then what waits on it — filed, or nothing
  * — then `so`, what that leaves a person, and where the run stands. Pure.
  */
-function handedOnWords(steps: readonly StepSpec[], name: string, run: Run, approved: string, so: string): string {
+function handedOnWords(steps: readonly StepSpec[], name: string, run: Run, approved: string, so: string) {
   const after = steps.some((s) => s.after.includes(name));
   return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, ${so}. See where the run stands: nemia ls ${run.id}.`;
 }
@@ -63,7 +63,7 @@ function handedOnWords(steps: readonly StepSpec[], name: string, run: Run, appro
  * first. An approval an older nemia wrote names no work, and no send-back spends it: taken back first (`takeBackOf`), the work may be
  * sent back.
  */
-function unfiledRefusal(step: StepSpec, run: Run, approved: string, given: Approval): string {
+function unfiledRefusal(step: StepSpec, run: Run, approved: string, given: Approval) {
   const back = sendBackTo(step, run).map((s) => `nemia retry ${run.id} ${s} --message "<objection>"`);
   const after =
     given.work === undefined
@@ -187,7 +187,7 @@ export const approvalRefusal: ApprovalRefusal = (
  * run reads at its gate, where it stands (`stood`) — its session is what waits for the word. A step the words do not name reads `pending`.
  * Pure.
  */
-function gateWord(filed: boolean, word: StepStatus | undefined, stood: () => StepStatus): StepStatus {
+function gateWord(filed: boolean, word: StepStatus | undefined, stood: () => StepStatus) {
   const said = word ?? 'pending';
   return filed && said === 'awaiting approval' ? stood() : said;
 }
@@ -197,7 +197,7 @@ function gateWord(filed: boolean, word: StepStatus | undefined, stood: () => Ste
  * to do instead. A table condition never filed (`filed` false) says it in a condition's words: its producer not signed off, its table
  * answering no route, off the route taken. Pure.
  */
-function notAtItsGate(step: StepSpec, run: Run, filed: boolean, status: StepStatus): string {
+function notAtItsGate(step: StepSpec, run: Run, filed: boolean, status: StepStatus) {
   const { name } = step;
   if (step.route?.kind === 'table' && !filed) {
     const producer = firstPiece(step.route.from, '.');
@@ -240,12 +240,7 @@ export type ApproveForm = 'gate' | 'loop';
  * @param name The step named, or undefined where none is.
  * @param atGate Whether that step waits at its gate now, asked only where it decides.
  */
-export function approveFormOf(
-  steps: readonly StepSpec[],
-  run: Pick<Run, 'gates'>,
-  name: string | undefined,
-  atGate: () => boolean,
-): ApproveForm {
+export function approveFormOf(steps: readonly StepSpec[], run: Pick<Run, 'gates'>, name: string | undefined, atGate: () => boolean) {
   if (name === undefined) return 'loop';
   const step = steps.find((s) => s.name === name);
   if (step === undefined || !step.loop) return 'gate';
@@ -270,7 +265,7 @@ export const takeBackStop: TakeBackStopOf = ({ known, approved, filed }) =>
  * @param run The run the step is of.
  * @param name The step whose approval is taken back.
  */
-export function takeBackJudged(steps: readonly StepSpec[], run: Run, name: string): { approval: Approval } | { refused: string } {
+export function takeBackJudged(steps: readonly StepSpec[], run: Run, name: string) {
   const step = steps.find((s) => s.name === name);
   const record = run.steps[name];
   const given = approvalOf(run, name);
@@ -279,12 +274,18 @@ export function takeBackJudged(steps: readonly StepSpec[], run: Run, name: strin
     approved: given !== undefined,
     filed: Boolean(record?.taskId || record?.check),
   });
-  if (stop === 'unknown') return { refused: `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.` };
+  if (stop === 'unknown')
+    return { refused: `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.` } satisfies
+      | { approval: Approval }
+      | { refused: string } as { approval: Approval } | { refused: string };
   if (stop === 'unapproved' || !given)
     return {
       refused: `try ${tryOf(run, name)} of ${name} is not approved, so there is nothing to take back. To approve it once it waits at its gate: nemia approve ${run.id} ${name}. See where it stands: nemia ls ${run.id}.`,
-    };
-  if (stop === null) return { approval: given };
+    } satisfies { approval: Approval } | { refused: string } as { approval: Approval } | { refused: string };
+  if (stop === null)
+    return { approval: given } satisfies { approval: Approval } | { refused: string } as { approval: Approval } | { refused: string };
   const approved = `try ${given.try} of ${name} was approved at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
-  return { refused: handedOnWords(steps, name, run, approved, 'and its approval cannot be taken back') };
+  return { refused: handedOnWords(steps, name, run, approved, 'and its approval cannot be taken back') } satisfies
+    | { approval: Approval }
+    | { refused: string } as { approval: Approval } | { refused: string };
 }

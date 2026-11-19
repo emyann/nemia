@@ -22,7 +22,7 @@ export function contextRefusal(
   exists: (runId: string) => boolean,
   self?: string,
   flag = '--from',
-): Missing | Invalid | null {
+) {
   const seen = new Set<string>();
   for (const id of context) {
     const notId = idRefusal(id, 'read', flag);

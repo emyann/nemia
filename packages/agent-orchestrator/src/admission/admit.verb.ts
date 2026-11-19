@@ -14,7 +14,7 @@ import type { Ran } from '../command/entry.verb.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
-import { RULE_ANSWERS, factsOf, listInForce, type PolicyRule, type Facts } from '../auto/index.ts';
+import { RULE_ANSWERS, factsOf, listInForce, type Facts } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
 import { admissionOf, answerOf, namedIn, typedIn, type PolicyReads, type Scope, type Typed } from './admission.ts';
 import { seenOf } from './seen.verb.ts';
@@ -79,7 +79,7 @@ export const waitRead = Effect.fnUntraced(function* (runId: string, stepName: st
 });
 
 /** The call `given` names, or undefined where it is no JSON of a tool and its input. */
-function callOf(given: string): AdmissionCall | undefined {
+function callOf(given: string) {
   try {
     const call = JSON.parse(given) as Partial<AdmissionCall> | null;
     return typeof call?.tool === 'string' && typeof call.input === 'object' && call.input !== null ? (call as AdmissionCall) : undefined;
@@ -112,7 +112,7 @@ const scopeRead = Effect.fnUntraced(function* (line: string, table: Parameters<t
 });
 
 /** The rules in force for `agent` in the store `home`: none where the person's list does not read, so nothing is let through by it. */
-function rulesOf(home: string, agent: string): readonly PolicyRule[] {
+function rulesOf(home: string, agent: string) {
   try {
     return listInForce(readConfirmed(home, agent)?.rules);
   } catch {

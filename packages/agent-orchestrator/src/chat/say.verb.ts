@@ -53,8 +53,7 @@ import {
 export type Delivered = { marked: string[]; said: string[]; left: string[] };
 
 /** The key a said is claimed by: its attempt and its time. */
-const keyOf = (s: { attempt: number; at: string } | { attempt: number; said: string }): string =>
-  `${s.attempt} ${'at' in s ? s.at : s.said}`;
+const keyOf = (s: { attempt: number; at: string } | { attempt: number; said: string }) => `${s.attempt} ${'at' in s ? s.at : s.said}`;
 
 /** The first said of `said` with `text`, at or after `since`, that no key of `claimed` names. */
 const unclaimed = (said: readonly SourceSaid[], text: string, since: string, claimed: ReadonlySet<string>) =>
@@ -93,7 +92,7 @@ export const sayOutbox = Effect.fn('sayOutbox')(function* (taskId: string, dir: 
  * Whether the chat kept in `dir` has an entry no mark names yet: what the keeper owes it.
  * @param dir The folder the chat is kept in.
  */
-export const outboxOwed = (dir: string): boolean => {
+export const outboxOwed = (dir: string) => {
   const marked = new Set(readDelivered(dir).map((m) => m.id));
   return readOutbox(dir).some((entry) => !marked.has(entry.id));
 };
@@ -146,7 +145,7 @@ export const recordAsks = Effect.fn('recordAsks')(function* (taskId: string, dir
  * their answer — but a call of hers asking its words afresh is marked all the same: the answer on record is owed to that call, and
  * `answersDue` reads its taking of it under that call's own id. Reads the chat's files each time, and carries nothing between beats.
  */
-const closesFor = (dir: string, live: NonNullable<TaskView['asks']>): AskClose[] => {
+const closesFor = (dir: string, live: NonNullable<TaskView['asks']>) => {
   const answered = new Set(readAnswers(dir).map((answer) => answer.id));
   const closed = readAsksClosed(dir);
   const [cut, calls] = [cutOf(closed), callsOf(closed)];
@@ -172,7 +171,7 @@ const closesFor = (dir: string, live: NonNullable<TaskView['asks']>): AskClose[]
  * all, and nothing is marked then: an absence read off a harness that does not report asks is no absence, and reading it as one
  * would close a question the person is still owed.
  */
-const markCuts = (dir: string, live: TaskView['asks']): void => {
+const markCuts = (dir: string, live: TaskView['asks']) => {
   if (live === undefined) return;
   for (const mark of closesFor(dir, live)) appendAskClosed(dir, mark);
 };
@@ -250,13 +249,13 @@ const carry = (e: Engine, taskId: string, owes: AnswerOwed, ask: Ask, answer: As
  * @param dir The folder the chat is kept in.
  * @param live The asks the session holds open now, or undefined where its harness cannot say.
  */
-export const closesOwed = (dir: string, live: TaskView['asks']): boolean => live !== undefined && closesFor(dir, live).length > 0;
+export const closesOwed = (dir: string, live: TaskView['asks']) => live !== undefined && closesFor(dir, live).length > 0;
 
 /**
  * Whether the chat kept in `dir` holds an answer no mark names yet: what the keeper owes her.
  * @param dir The folder the chat is kept in.
  */
-export const answersOwed = (dir: string): boolean => {
+export const answersOwed = (dir: string) => {
   const done = new Set(readAnswersDone(dir).map((mark) => mark.id));
   return readAnswers(dir).some((answer) => !done.has(answer.id));
 };

@@ -64,7 +64,7 @@ import { FACTORY_COST_LINES } from './cost-line/cost-line.verb.ts';
  */
 
 /** The text under `key`: what the spec read there. */
-const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
+const textOf = (args: Args, key: string) => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
  * The listing every factory shares: those of the store, as the door lists them, their schedules as `schedulesListed` does, and

@@ -145,10 +145,7 @@ export const Round = Schema.Struct({
 export type Round = typeof Round.Type;
 
 /** Each step's tasks in try order, from 1: the tries behind it, then its current one when filed. */
-const tasksInOrder = (step: Step): Array<string> => [
-  ...(step.tries ?? []).map((t) => t.taskId),
-  ...(step.taskId === null ? [] : [step.taskId]),
-];
+const tasksInOrder = (step: Step) => [...(step.tries ?? []).map((t) => t.taskId), ...(step.taskId === null ? [] : [step.taskId])];
 
 /**
  * A try's task is `stepTaskId(run, step, n)` for its own number n (record.ts:401), as every filing names it (`tick/file.verb.ts:196`,

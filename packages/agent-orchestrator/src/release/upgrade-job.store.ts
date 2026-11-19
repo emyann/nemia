@@ -24,21 +24,21 @@ export type UpgradeRecord = typeof UpgradeRecord.Type;
  * The folder of the upgrades' records of the store at `home`.
  * @param home The store's folder.
  */
-export const upgradesDir = (home: string): string => path.join(home, 'upgrades');
+export const upgradesDir = (home: string) => path.join(home, 'upgrades');
 
 /**
  * The record of the upgrade `id` of the store at `home`.
  * @param home The store's folder.
  * @param id The upgrade's id.
  */
-export const upgradeFile = (home: string, id: string): string => path.join(upgradesDir(home), `${id}.json`);
+export const upgradeFile = (home: string, id: string) => path.join(upgradesDir(home), `${id}.json`);
 
 /**
  * Writes `record` whole, by a temporary file and a rename, so no reader meets half of one.
  * @param home The store's folder.
  * @param record The upgrade's record, its id naming the file.
  */
-export function writeUpgradeRecord(home: string, record: UpgradeRecord): void {
+export function writeUpgradeRecord(home: string, record: UpgradeRecord) {
   fs.mkdirSync(upgradesDir(home), { recursive: true });
   const hidden = path.join(upgradesDir(home), `.${record.id}-${process.pid}`);
   fs.writeFileSync(hidden, `${JSON.stringify(record, null, 2)}\n`);
@@ -50,7 +50,7 @@ export function writeUpgradeRecord(home: string, record: UpgradeRecord): void {
  * @param home The store's folder.
  * @param id The upgrade's id; one that could leave the folder, or a dot name, reads as none.
  */
-export function readUpgradeRecord(home: string, id: string): UpgradeRecord | undefined {
+export function readUpgradeRecord(home: string, id: string) {
   if (id === '' || id.includes('/') || id.includes('\\') || id.startsWith('.')) return undefined;
   try {
     return Schema.decodeUnknownSync(UpgradeRecord)(JSON.parse(fs.readFileSync(upgradeFile(home, id), 'utf8')));
@@ -64,7 +64,7 @@ export function readUpgradeRecord(home: string, id: string): UpgradeRecord | und
  * none was started, or none reads.
  * @param home The store's folder.
  */
-export function lastUpgradeRecord(home: string): UpgradeRecord | undefined {
+export function lastUpgradeRecord(home: string) {
   let names: string[];
   try {
     names = fs.readdirSync(upgradesDir(home));

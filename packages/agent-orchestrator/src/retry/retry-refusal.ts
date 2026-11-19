@@ -136,7 +136,7 @@ export function retryRefusal(
   spendOf: SpendOf = () => undefined,
   checkKillOf: CheckKillOf = () => undefined,
   tipOf: TipOf = () => undefined,
-): string | null {
+) {
   const asked: Asked = {
     steps,
     run,
@@ -171,7 +171,7 @@ export function retryRefusal(
  * The step asked for — or why the ask is refused before its standing is read: words or a budget that cannot ride on it, a step the run
  * does not have, a flag a remote step cannot take, a model an `auto` step would drop, and a run cancelled, pruned or held.
  */
-function askedStep(asked: Asked): string | StepSpec {
+function askedStep(asked: Asked) {
   const { steps, run, name, how, command } = asked;
   const wrong = messageRefusal(how, command) ?? budgetRefusal(how, command);
   if (wrong) return wrong;
@@ -199,7 +199,7 @@ function askedStep(asked: Asked): string | StepSpec {
 }
 
 /** The ask with the step's standing read, once the step is known to exist. */
-function judged(asked: Asked, step: StepSpec): Judged {
+function judged(asked: Asked, step: StepSpec) {
   const { steps, run, name, phaseOf, closeoutOf, askedCloseout, asks, spendOf } = asked;
   const next = tryOf(run, name) + 1;
   const floor = raiseOf(step, run, spendOf);
@@ -218,14 +218,14 @@ function judged(asked: Asked, step: StepSpec): Judged {
 }
 
 /** How an ending that stopped on the base branch is said: its name, its own status, and that it did not do what it was approved for. */
-function stoppedWords(c: Judged, ending: StepSpec): string {
+function stoppedWords(c: Judged, ending: StepSpec) {
   const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf } = c;
 
   return `${ending.name} stopped on the base branch (${ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for`;
 }
 
 /** The ask `nemia pause --now` wrote for this try: void, which the next pass sets aside; or still due, tried on the resume. */
-function pauseAskRefusal(c: Judged): string | undefined {
+function pauseAskRefusal(c: Judged) {
   const { run, name, command, next, pending } = c;
   if (pending?.interrupted === undefined) return undefined;
   const ran = pending.mode === 'recheck' ? 'check' : 'session';
@@ -239,7 +239,7 @@ function pauseAskRefusal(c: Judged): string | undefined {
  * An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a try to land again that takes the same
  * try.
  */
-function pendingRefusal(c: Judged): string | undefined {
+function pendingRefusal(c: Judged) {
   const paused = pauseAskRefusal(c);
   if (paused !== undefined) return paused;
   const { run, name, command, asks, next, pending, sendsBack, back, stoppedAt } = c;
@@ -267,7 +267,7 @@ function pendingRefusal(c: Judged): string | undefined {
 }
 
 /** An ask already waiting that no tick honours for its budget: one missing past the cap, or one the step cannot take. */
-function uncarriedRefusal(c: Judged, pending: RetryAsk): string {
+function uncarriedRefusal(c: Judged, pending: RetryAsk) {
   const { name, command, next, status, raise, floor } = c;
   const asked = `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at})`;
   const again = `Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again`;
@@ -281,12 +281,12 @@ function uncarriedRefusal(c: Judged, pending: RetryAsk): string {
 }
 
 /** Why a step with no way to be tried has none: an ending stopped on the base branch, an ending at its gate, or its status. */
-function nothingToTry(c: Judged): string {
+function nothingToTry(c: Judged) {
   return stoppedEndingRefusal(c) ?? endingGateRefusal(c) ?? unspentRefusal(c) ?? statusRefusal(c);
 }
 
 /** A step whose work an ending stopped on the base branch acted on: sent back through the folder's loop, or landed again. */
-function stoppedEndingRefusal(c: Judged): string | undefined {
+function stoppedEndingRefusal(c: Judged) {
   const { steps, run, name, status, stoppedAt, again } = c;
   if (!stoppedAt || !satisfiesAfter(status)) return undefined;
   const through = stoppedAt.after.filter((a) => steps.find((s) => s.name === a)?.loop);
@@ -303,7 +303,7 @@ function stoppedEndingRefusal(c: Judged): string | undefined {
 }
 
 /** An ending at its gate with nothing of it filed: no try to replace, so its approval, or a send-back of the work it would act on. */
-function endingGateRefusal(c: Judged): string | undefined {
+function endingGateRefusal(c: Judged) {
   const { step, run, name, status } = c;
   if (status !== 'awaiting approval' || run.steps[name]?.taskId) return undefined;
   const back = sendBackTo(step, run)
@@ -319,7 +319,7 @@ function endingGateRefusal(c: Judged): string | undefined {
  * A send-back of work an ending approved and not filed waits on, where that approval names no work (`takeBackWords`): nothing would spend
  * it, so it is taken back first.
  */
-function unspentRefusal(c: Judged): string | undefined {
+function unspentRefusal(c: Judged) {
   const { steps, run, name, status } = c;
   if (!satisfiesAfter(status)) return undefined;
   const ending = steps.find((s) => s.after.includes(name) && sendBackTo(s, run).includes(name) && takeBackWords(s, run));
@@ -327,7 +327,7 @@ function unspentRefusal(c: Judged): string | undefined {
 }
 
 /** What a step's status says of a try, when it has none: not filed, running, checking, done, or a loop's round to go. */
-function statusRefusal(c: Judged): string {
+function statusRefusal(c: Judged) {
   const { steps, step, run, name, status } = c;
   const why: Partial<Record<StepStatus, string>> = {
     pending: `${name} has not been filed yet, so there is no try to replace. Wait for it: nemia ls ${run.id}.`,
@@ -346,7 +346,7 @@ function statusRefusal(c: Judged): string {
  * `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted; and on a step ended at its
  * budget with no check to run, or whose staged merge the run took back, its session retry with `--budget` named instead.
  */
-function modeRefusal(c: Judged): string | undefined {
+function modeRefusal(c: Judged) {
   const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
   if (landsOnCheck(step, run) && status === 'failed (check)') {
@@ -374,7 +374,7 @@ function modeRefusal(c: Judged): string | undefined {
  * `--recheck` of a step that signed off blocked, refused where its failed check may not run again (`blockedRecheck`): each why says what to
  * do instead, and names only a command taken on the same state — a wait, or the session's answer.
  */
-function blockedRecheckRefusal(c: Judged): string {
+function blockedRecheckRefusal(c: Judged) {
   const { run, name, command, phaseOf, tipOf, closeoutOf } = c;
   const said = blockedRecheck(blockedRecheckRead(run.steps[name], true, phaseOf, tipOf));
   const answer = `${command} ${answersOr(c.step, closeoutOf(name), '--message "<answer>"')}`;
@@ -398,7 +398,7 @@ function blockedRecheckRefusal(c: Judged): string {
 }
 
 /** `--recheck` of a step ended at its budget that has no check to run, or whose staged merge the run took back: its session, raised. */
-function budgetStopRefusal({ step, command, raise }: Judged): string {
+function budgetStopRefusal({ step, command, raise }: Judged) {
   const why = step.check
     ? `its session was ended at its budget, and the run took back the merge it staged in the repository's checkout: there is nothing staged for its check to judge`
     : `its session was ended at its budget, and it declares no check: there is nothing to run`;
@@ -408,7 +408,7 @@ function budgetStopRefusal({ step, command, raise }: Judged): string {
 }
 
 /** A send-back with no words: from an ending stopped on the base branch, from an ending's gate, or from the step's own. */
-function wordlessRefusal(c: Judged): string | undefined {
+function wordlessRefusal(c: Judged) {
   const { steps, run, name, how, command, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, sendsBack, back } = c;
   if (!sendsBack || how.message !== undefined) return undefined;
   const say = `Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
@@ -433,12 +433,12 @@ function wordlessRefusal(c: Judged): string | undefined {
 }
 
 /** A `--budget` missing from a try of a step over its budget, or one given that the step cannot take. */
-function budgetAskRefusal(c: Judged): string | undefined {
+function budgetAskRefusal(c: Judged) {
   return raiseMissing(c) ?? budgetMisgiven(c);
 }
 
 /** A session of a step over its budget, or ended at it, asked for without a `--budget`: the recheck first, where it is offered. */
-function raiseMissing(c: Judged): string | undefined {
+function raiseMissing(c: Judged) {
   const { name, how, command, modes, status, raise } = c;
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
@@ -457,7 +457,7 @@ function raiseMissing(c: Judged): string | undefined {
  * A `--budget` a step cannot take: on a step with no `budget:`, which has no cap to raise; or not above its floor (`raiseOf`) — what its
  * tries have cost, or the cap in force, whichever is more — since a `--budget` only ever raises the cap.
  */
-function budgetMisgiven(c: Judged): string | undefined {
+function budgetMisgiven(c: Judged) {
   const { name, how, command, status, raise, floor } = c;
   if (how.budget === undefined) return undefined;
   if (!floor) {
@@ -477,7 +477,7 @@ function budgetMisgiven(c: Judged): string | undefined {
 }
 
 /** A step the run is about to try again itself: an ask to sign off, or a try `retries:` still covers. */
-function runTriesItself(c: Judged): string | undefined {
+function runTriesItself(c: Judged) {
   const { steps, step, run, name, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, checkKillOf, next } = c;
   const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf, checkKillOf, c.tipOf).find(
     (r) => r.step === name,

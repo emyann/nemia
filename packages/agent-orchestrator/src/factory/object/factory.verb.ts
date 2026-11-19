@@ -19,7 +19,6 @@ import {
   API_VERSION,
   DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
-  type FactoryCommands,
   type FactoryList,
   type FactoryStatus,
   type ObjectMeta,
@@ -32,16 +31,15 @@ import type { FactoryListing } from '../factory.ts';
 import type { InstructionRead } from '../instruction.store.ts';
 import type { RulesRead } from '../rules/rules.store.ts';
 import { doorAt, doorAtOnce } from '../door/factories.store.ts';
-import { FactoryName, isDefaultFactory, type DefaultFactory } from '../factory.model.ts';
+import { FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { untrustedPlaces } from '../../trust/untrusted.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
-import type { Level } from '../../level/level.ts';
 import { factoryVolumesNamed } from '../volume/volume.ts';
 import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /** Two texts in the order `<` compares them. */
-const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /** What a factory's object is made of: the store's factories, and the places not trusted of those whose status is built. */
 export type FactoryListed = {
@@ -59,7 +57,7 @@ export type FiledFactory = {
 export type Filed = { readonly factory: FiledFactory; readonly listing: FactoryListing | undefined };
 
 /** The places of `name` among `untrusted`, as the object says them, `never` left out where any trust can be kept. */
-const untrustedOf = (untrusted: readonly Untrusted[], name: string): FactoryStatus['untrusted'] =>
+const untrustedOf = (untrusted: readonly Untrusted[], name: string) =>
   untrusted
     .filter((u) => u.factory === name)
     .map(({ place, harness, withheld, never }) => ({ place, harness, withheld, ...(never === null ? {} : { never }) }));
@@ -76,14 +74,14 @@ const harnessSettingsOf = (settings: Readonly<Record<string, unknown>> | undefin
 type FactoryParts = { readonly rules: RulesRead; readonly instruction: InstructionRead };
 
 /** A read that found nothing: no words, and nothing that does not read. */
-const isBlank = (read: { words: string | null; error: string | null }): boolean => read.words === null && read.error === null;
+const isBlank = (read: { words: string | null; error: string | null }) => read.words === null && read.error === null;
 
 /**
  * The rules and the instruction of the factory of `listing`, read at the store `home`, as its version digests them: none where it keeps
  * neither, so a factory with no sub-resource keeps the version of its spec and status alone. Where the instruction's place cannot be said,
  * its error is read.
  */
-const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: string): FactoryParts | undefined => {
+const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: string) => {
   const name = FactoryName.read(listing.name);
   const { words, error } = doorAtOnce(home, (door) => door.rules.read(name));
   const rules = { words, error };
@@ -101,24 +99,20 @@ const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: stri
  * A factory's object, of its spec and status and when it was filed: its `resourceVersion` the digest of its spec and its `parts`' where
  * given, never of its status (see the file's head).
  */
-const objectOf = (
-  meta: Omit<ObjectMeta, 'resourceVersion'>,
-  spec: FactoryObject['spec'],
-  status: FactoryStatus,
-  parts?: FactoryParts,
-): FactoryObject => ({
-  apiVersion: API_VERSION,
-  kind: 'Factory',
-  metadata: { ...meta, resourceVersion: versionOf(spec, null, parts) },
-  spec,
-  status,
-});
+const objectOf = (meta: Omit<ObjectMeta, 'resourceVersion'>, spec: FactoryObject['spec'], status: FactoryStatus, parts?: FactoryParts) =>
+  ({
+    apiVersion: API_VERSION,
+    kind: 'Factory',
+    metadata: { ...meta, resourceVersion: versionOf(spec, null, parts) },
+    spec,
+    status,
+  }) satisfies FactoryObject;
 
 /**
  * The factory `name`'s own default level, from its level file: none where it follows the store's, an error where the file does not
  * read.
  */
-const ownLevel = (home: string, name: string): { level: Level } | { error: string } | {} => {
+const ownLevel = (home: string, name: string) => {
   try {
     const own = doorAtOnce(home, (door) => door.level.read(FactoryName.read(name)))?.level;
     return own === undefined ? {} : { level: own };
@@ -135,9 +129,10 @@ const ownLevel = (home: string, name: string): { level: Level } | { error: strin
  * @param listed The store's listing whole, whose places a harness does not trust are read.
  * @param home The store's root.
  */
-export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: string): FactoryObject => {
+export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: string) => {
   const { metadata, spec } = filedOf(listing, home);
-  if ('error' in listing) return objectOf(metadata, spec, { conditions: [], untrusted: [], error: `${listing.file} ${listing.error}` });
+  if ('error' in listing)
+    return objectOf(metadata, spec, { conditions: [], untrusted: [], error: `${listing.file} ${listing.error}` }) satisfies FactoryObject;
   const written = readStatus(home, listing.name);
   const level = ownLevel(home, listing.name);
   const status: FactoryStatus = {
@@ -150,7 +145,7 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
     untrusted: untrustedOf(listed.untrusted, listing.name),
     ...('error' in level ? { error: level.error } : {}),
   };
-  return objectOf(metadata, spec, status, partsOf(listing, home));
+  return objectOf(metadata, spec, status, partsOf(listing, home)) satisfies FactoryObject;
 };
 
 /**
@@ -159,7 +154,7 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
  * @param listing The factory's file as the store listed it, or why it does not read.
  * @param home The store's root.
  */
-export const filedOf = (listing: FactoryListing, home: string): FiledFactory => {
+export const filedOf = (listing: FactoryListing, home: string) => {
   const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
   if ('error' in listing) return { metadata: meta, spec: { workflows: [], hires: {}, volumes: [] } };
   const level = ownLevel(home, listing.name);
@@ -191,24 +186,29 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
  * workflow (no `workflows`), hiring no one, keeping no file.
  * @param home The store's root, whose time of birth is the default factory's.
  */
-export const defaultFactoryObject = (home: string): FactoryObject =>
-  objectOf({ name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) }, { hires: {}, volumes: [] }, { conditions: [], untrusted: [] });
+export const defaultFactoryObject = (home: string) =>
+  objectOf(
+    { name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) },
+    { hires: {}, volumes: [] },
+    { conditions: [], untrusted: [] },
+  ) satisfies FactoryObject;
 
 /**
  * Every factory's object: the default, then each of `listed`, read at `home`.
  * @param listed The store's listing of its factories' files.
  * @param home The store's root.
  */
-export const factoryObjectsOf = (listed: FactoryListed, home: string): FactoryObject[] => [
-  defaultFactoryObject(home),
-  ...listed.factories.map((l) => factoryObjectOf(l, listed, home)),
-];
+export const factoryObjectsOf = (listed: FactoryListed, home: string) =>
+  [
+    defaultFactoryObject(home),
+    ...listed.factories.map((l) => factoryObjectOf(l, listed, home)),
+  ] satisfies FactoryObject[] as FactoryObject[];
 
 /**
  * The refusal of a factory no object has the name of: it names the list.
  * @param name The name asked for.
  */
-export const noFactory = (name: string): Missing =>
+export const noFactory = (name: string) =>
   new Missing({
     message: `no factory ${name}: list them with nemia factory (GET /api/factories), or file one with nemia factory add ${name} --volume <path|url>:rw`,
   });
@@ -231,7 +231,7 @@ export const factoriesListed = Effect.fn('factoriesListed')(function* (
  * The record the Factory door reads under `name` at the store `home` where no listing of the store's has it: the default factory's, or
  * `Missing` (`noFactory`) for a name no factory has.
  */
-const unlisted = (home: string, name: string): Effect.Effect<DefaultFactory, Missing> =>
+const unlisted = (home: string, name: string) =>
   doorAt(home, (door) => door.factories.read(FactoryName.read(name))).pipe(
     Effect.mapError(() => noFactory(name)),
     Effect.flatMap((record) => (isDefaultFactory(record) ? Effect.succeed(record) : Effect.fail(noFactory(name)))),
@@ -283,7 +283,7 @@ const named = (name: string) => {
  * @param factory The factory as its parts read it.
  * @param schedules The workflows the factory schedules, each by its folder name.
  */
-export const factoryCommands = (factory: FiledFactory, schedules: readonly string[]): FactoryCommands => {
+export const factoryCommands = (factory: FiledFactory, schedules: readonly string[]) => {
   const name = factory.metadata.name;
   return {
     attach: commandLine(named('factory attach'), { factory: name }),

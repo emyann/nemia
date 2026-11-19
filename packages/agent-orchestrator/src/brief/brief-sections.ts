@@ -97,7 +97,7 @@ export type TaskHeading = keyof typeof TASK_HEADINGS;
  * @param heading The heading, as `TASK_HEADINGS` writes it.
  * @param fills What fills each `<…>` of it, in order.
  */
-export function headingOf(heading: TaskHeading, ...fills: readonly (string | number)[]): string {
+export function headingOf(heading: TaskHeading, ...fills: readonly (string | number)[]) {
   let at = 0;
   return `## ${heading.replace(/<[a-z]+>/g, (hole) => String(fills[at++] ?? hole))}`;
 }
@@ -120,7 +120,7 @@ export function retriedInRound(
   steps: readonly StepSpec[],
   retry: RetryBriefing,
   closeoutOf: (step: string) => Closeout | undefined,
-): string {
+) {
   const looping = steps.find((s) => s.loop === step.name);
   if (retry.resumed || !looping || !owesReplies(steps, run, step.name)) return '';
   const round = roundOf(run, step.name);
@@ -178,7 +178,7 @@ export type EndingStopped = { step: string; status: StepStatus; summary?: string
  * data, then what this step is asked to do with them — say whether the work must change to hold on the base branch as it is now, and hand
  * the change to the work's next round with `again: true`, where merging the base branch into the run's branch is the work's to do.
  */
-function endingSection(step: StepSpec, e: EndingStopped): string[] {
+function endingSection(step: StepSpec, e: EndingStopped) {
   const said = [
     ...(e.summary ? ['', 'Its summary:', '', ...fenced(e.summary, 'text')] : []),
     ...(e.needs ? ['', 'What it needs:', '', ...fenced(e.needs, 'text')] : []),
@@ -216,7 +216,7 @@ export const SIGNOFF = [
  * What a try is told when its last closeout named files the run did not have (`RetryBriefing.lacks`): that the closeout was not accepted
  * and what that held back, each file with why, and the two ways to answer — write the file, or take its name off.
  */
-const lacksSaid = (lacks: readonly string[]): string =>
+const lacksSaid = (lacks: readonly string[]) =>
   [
     'The closeout of the last try named, in `artifacts`, files the run does not have. The run did not accept it: its check was not run,',
     'and nothing that waits on this step started.',
@@ -228,7 +228,7 @@ const lacksSaid = (lacks: readonly string[]): string =>
   ].join('\n');
 
 /** What the run refused of a closeout (`closeoutRefusals`), and to sign off again once mended. */
-const refusedSaid = (refused: readonly string[]): string =>
+const refusedSaid = (refused: readonly string[]) =>
   [
     'The run did not accept the closeout of the last try: nothing that waits on this step started.',
     '',
@@ -238,11 +238,10 @@ const refusedSaid = (refused: readonly string[]): string =>
   ].join('\n');
 
 /** Why a closeout was not accepted, where the run knows: the files it lacked (`lacksSaid`), else what its envelope was refused. */
-const notAccepted = (r: RetryBriefing): string | undefined =>
-  r.lacks?.length ? lacksSaid(r.lacks) : r.refused?.length ? refusedSaid(r.refused) : undefined;
+const notAccepted = (r: RetryBriefing) => (r.lacks?.length ? lacksSaid(r.lacks) : r.refused?.length ? refusedSaid(r.refused) : undefined);
 
 /** What the run's own sign-off ask tells the session it continues: why its closeout was not accepted (`notAccepted`), else `SIGNOFF`. */
-const signoffSaid = (r: RetryBriefing): string => notAccepted(r) ?? SIGNOFF;
+const signoffSaid = (r: RetryBriefing) => notAccepted(r) ?? SIGNOFF;
 
 /** Who filed a try the store's pause stopped (`by: 'pause'`): the run, once resumed, and no person. */
 const PAUSED_WHO =
@@ -258,7 +257,7 @@ const NEW_SESSION_IN_FOLDER =
   'You have not been given its reasoning, on purpose: read what it left, not an account of it.';
 
 /** Who filed a try, as its brief says it: the run — by `retries:`, a sign-off ask or the pause — or a person, by their `nemia retry`. */
-const whoOf = (step: StepSpec, r: RetryBriefing): string => {
+const whoOf = (step: StepSpec, r: RetryBriefing) => {
   if (r.by === 'retries') return `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`;
   if (r.by === 'signoff') return 'The run filed this try itself, once in a round, before it waits on a person.';
   if (r.by === 'pause') return PAUSED_WHO;
@@ -290,7 +289,7 @@ const WHY_ENDED: Partial<Record<StepStatus, string>> = {
  * what its envelope was refused (`refusedSaid`), where that is why it reads `unsigned`, else the sentence of how its last try ended
  * (`WHY_ENDED`).
  */
-const whyEnded = (r: RetryBriefing): string =>
+const whyEnded = (r: RetryBriefing) =>
   (r.status === 'unsigned' ? notAccepted(r) : undefined) ?? WHY_ENDED[r.status] ?? `The last try ended \`${r.status}\`.`;
 
 /**
@@ -324,7 +323,7 @@ const CHECK_AGAIN =
  * @param r The try, and what became of the one before it.
  * @param inFolder Whether the step is of a folder run, told of its folder rather than a branch; false where absent.
  */
-export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false): string {
+export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false) {
   const pastBudget =
     r.pastCap && r.status !== 'budget exhausted'
       ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
@@ -372,7 +371,7 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false)
  * (agent-runtime's open issue 16). Nothing when nothing was said; and a new session is given none, as it is given none of the last one's
  * conversation.
  */
-function saidSection(said: readonly Said[] | undefined): string[] {
+function saidSection(said: readonly Said[] | undefined) {
   if (!said?.length) return [];
   const one = said.length === 1;
   const byAgent = said.some((s) => saidBy(s.text).from.kind === 'agent');
@@ -398,7 +397,7 @@ function saidSection(said: readonly Said[] | undefined): string[] {
  * nothing was said.
  * @param said What was said to the step before it was filed, in order; undefined where nothing was.
  */
-export function saidBeforeSection(said: readonly SaidBefore[] | undefined): string[] {
+export function saidBeforeSection(said: readonly SaidBefore[] | undefined) {
   if (!said?.length) return [];
   const one = said.length === 1;
   const byAgent = said.some((s) => saidBy(s.text).from.kind === 'agent');
@@ -456,7 +455,7 @@ export function roundSection(
   steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   inFolder = false,
-): string {
+) {
   const looping = steps.find((s) => s.name === r.loop);
   const between = looping ? loopSpan(steps, looping).filter((n) => n !== step.name && n !== r.loop) : [];
   const who =
@@ -517,12 +516,7 @@ export function roundSection(
  * @param steps The run's steps.
  * @param closeoutOf How a step signed off, by its name; undefined where it has not.
  */
-export function loopSection(
-  step: StepSpec,
-  run: Run,
-  steps: readonly StepSpec[],
-  closeoutOf: (step: string) => Closeout | undefined,
-): string {
+export function loopSection(step: StepSpec, run: Run, steps: readonly StepSpec[], closeoutOf: (step: string) => Closeout | undefined) {
   const target = step.loop;
   if (target === undefined) return '';
   const round = roundOf(run, step.name);
@@ -569,7 +563,7 @@ export function loopSection(
  * `## Replies from <target>`: a loop's target's `replies`, as data — through `declaredOutput`, so round 1's empty list, which every
  * closeout of a loop's target carries, is never handed on as an answer — and where the rest of its closeout is (`HANDED_CLOSEOUT`).
  */
-function repliesSection(step: StepSpec, closeoutOf: (step: string) => Closeout | undefined): string {
+function repliesSection(step: StepSpec, closeoutOf: (step: string) => Closeout | undefined) {
   const target = step.name;
   const { given } = declaredOutput(step, closeoutOf(target), [LOOP_REPLIES]);
   const head = ['', headingOf('Replies from <step>', target), ''];
@@ -608,7 +602,7 @@ export function fromSection(
   steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   read: { because: string; omit: readonly string[] } = { because: `this step reads it (\`input: ${from}\`)`, omit: [] },
-): string {
+) {
   const producer = steps.find((s) => s.name === from);
   const fields = producer ? outputFields(producer).filter((f) => !read.omit.includes(f)) : [];
   const names = fields.map((f) => `\`${f}\``).join(', ');
@@ -636,7 +630,7 @@ export function fromSection(
  * @param run The run, the gates it was started with among it.
  * @param steps The run's steps.
  */
-export function gatesAfterSection(step: StepSpec, run: Pick<Run, 'gates'>, steps: readonly StepSpec[]): string {
+export function gatesAfterSection(step: StepSpec, run: Pick<Run, 'gates'>, steps: readonly StepSpec[]) {
   const after = downstreamOf(steps, step.name);
   const gated = steps.filter((s) => after.has(s.name) && hasGate(s, run)).map((s) => `\`${s.name}\``);
   if (!gated.length) return '';
@@ -662,7 +656,7 @@ export function gatesAfterSection(step: StepSpec, run: Pick<Run, 'gates'>, steps
  * @param run The run.
  * @param steps The run's steps.
  */
-export function approvedSection(step: StepSpec, run: Run, steps: readonly StepSpec[]): string {
+export function approvedSection(step: StepSpec, run: Run, steps: readonly StepSpec[]) {
   const before = upstreamOf(steps, step.name);
   const approved = steps
     .filter((s) => hasGate(s, run) && (before.has(s.name) || (s.name === step.name && approvedFirst(s, run))))
@@ -701,7 +695,7 @@ export function approvedSection(step: StepSpec, run: Run, steps: readonly StepSp
  * Whether the try a person's answer asked for was filed as they asked it: the try before it was replaced by that mode, on that model, as
  * `answerOf` reads the current try's. An answer to a try never filed, or filed another way, was given to nobody.
  */
-const answerGiven = (run: Run, a: RetryAsk): boolean => {
+const answerGiven = (run: Run, a: RetryAsk) => {
   const replaced = run.steps[a.step]?.tries?.[a.try - 2];
   return replaced !== undefined && replaced.cause === a.mode && replaced.model === a.model;
 };
@@ -720,7 +714,7 @@ const answerGiven = (run: Run, a: RetryAsk): boolean => {
  * @param steps The run's steps.
  * @param answers Every answer a person gave with `nemia retry --message` on the run, waiting or consumed.
  */
-export function answeredSection(step: StepSpec, run: Run, steps: readonly StepSpec[], answers: readonly RetryAsk[]): string {
+export function answeredSection(step: StepSpec, run: Run, steps: readonly StepSpec[], answers: readonly RetryAsk[]) {
   const before = upstreamOf(steps, step.name);
   const given = answers
     .filter((a): a is RetryAsk & { message: string } => a.message !== undefined && before.has(a.step) && answerGiven(run, a))
@@ -751,12 +745,7 @@ export function answeredSection(step: StepSpec, run: Run, steps: readonly StepSp
  * @param steps The run's steps.
  * @param closeoutOf How a step signed off, by its name; undefined where it has not.
  */
-export function acceptedSection(
-  step: StepSpec,
-  run: Run,
-  steps: readonly StepSpec[],
-  closeoutOf: (step: string) => Closeout | undefined,
-): string {
+export function acceptedSection(step: StepSpec, run: Run, steps: readonly StepSpec[], closeoutOf: (step: string) => Closeout | undefined) {
   const before = upstreamOf(steps, step.name);
   const accepted = steps
     .filter((s) => s.loop && before.has(s.name))
@@ -788,7 +777,7 @@ export function acceptedSection(
  * The approval a person types at `step`'s gate: an `--answer` for each question its closeout asks, and `[--budget <step>=<amount>]...`
  * where it proposes budgets for the steps after it.
  */
-function approveCommand(run: Run, step: StepSpec, said: Closeout | undefined): string {
+function approveCommand(run: Run, step: StepSpec, said: Closeout | undefined) {
   const budgets = proposedBudgets(step, said).length ? ' [--budget <step>=<amount>]...' : '';
   return `nemia approve ${run.id} ${step.name} ${answersOr(step, said, '[--message "<words>"]')}${budgets}`;
 }
@@ -826,7 +815,7 @@ export function gateLines(
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
   checkKillOf: CheckKillOf = () => undefined,
-): Record<string, string> {
+) {
   const lines: Record<string, string> = {};
   const waitingAgain = unheld(
     steps,
@@ -862,7 +851,7 @@ export function gateLines(
  * What `nemia decide` prints under a step a person approved: when, the words they gave, and — for an ending approved and not filed — the
  * send-back of the work it would act on, which spends the approval (`unfiledBack`). Pure.
  */
-function approvedLine(step: StepSpec, run: Run, given: Approval): string {
+function approvedLine(step: StepSpec, run: Run, given: Approval) {
   const back = unfiledBack(step, run)
     .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
     .join(' or ');
@@ -877,7 +866,7 @@ function approvedLine(step: StepSpec, run: Run, given: Approval): string {
  * @param steps The run's steps.
  * @param run The run.
  */
-export function acceptedLines(steps: readonly StepSpec[], run: Run): Record<string, string> {
+export function acceptedLines(steps: readonly StepSpec[], run: Run) {
   const lines: Record<string, string> = {};
   for (const step of steps) {
     const given = step.loop ? acceptanceOf(run, step.name) : undefined;

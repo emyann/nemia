@@ -24,17 +24,16 @@ export type StepBudget = { step: string; usd: number };
 export type CapInput = { raised: number | undefined; approved: readonly number[]; workflow: number | undefined };
 
 /** An amount a cap can be: dollars above zero, and finite. */
-const anAmount = (usd: number): boolean => usd > 0 && Number.isFinite(usd);
+const anAmount = (usd: number) => usd > 0 && Number.isFinite(usd);
 
 /** Whether `budgets` name `step`. */
-const names = (budgets: readonly StepBudget[], step: string): boolean => budgets.some((b) => b.step === step);
+const names = (budgets: readonly StepBudget[], step: string) => budgets.some((b) => b.step === step);
 
 /** Whether no step is named twice in `budgets`. */
-const onceEach = (budgets: readonly StepBudget[]): boolean =>
-  budgets.every((b, i) => budgets.every((c, j) => i === j || c.step !== b.step));
+const onceEach = (budgets: readonly StepBudget[]) => budgets.every((b, i) => budgets.every((c, j) => i === j || c.step !== b.step));
 
 /** Whether every budget names one of `later`, once, with an amount: the budgets a gate can set. */
-const settable = (budgets: readonly StepBudget[], later: readonly string[]): boolean =>
+const settable = (budgets: readonly StepBudget[], later: readonly string[]) =>
   budgets.every((b) => later.includes(b.step) && anAmount(b.usd)) && onceEach(budgets);
 
 const proposalRefusalSpec = spec<(budgets: readonly StepBudget[], later: readonly string[]) => string | null>({
@@ -157,7 +156,7 @@ const capInForceSpec = spec<(i: CapInput) => number | undefined>({
 export type CapInForce = Implementation<typeof capInForceSpec>;
 
 /** Whether `cap` is above a budget `ceilings` give its step. */
-const above = (cap: StepBudget, ceilings: readonly StepBudget[]): boolean => ceilings.some((c) => c.step === cap.step && cap.usd > c.usd);
+const above = (cap: StepBudget, ceilings: readonly StepBudget[]) => ceilings.some((c) => c.step === cap.step && cap.usd > c.usd);
 
 const aboveTheWorkflowSpec = spec<(caps: readonly StepBudget[], ceilings: readonly StepBudget[]) => string[]>({
   ensures: {

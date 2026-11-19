@@ -33,14 +33,10 @@ export type DemandPlan = { kind: 'ticking' } | { kind: 'off' } | { kind: 'servic
  * @param serviced Asks whether a login service of the store is installed.
  * @param env The caller's environment, whose `NEMIA_DAEMON_START` is read.
  */
-export function demandPlan(
-  standing: DaemonStanding,
-  serviced: () => boolean,
-  env: Readonly<Record<string, string | undefined>>,
-): DemandPlan {
-  if (standing.kind === 'ticking') return { kind: 'ticking' };
-  if (env[DEMAND_OFF] === 'off') return { kind: 'off' };
-  return serviced() ? { kind: 'service' } : { kind: 'spawn' };
+export function demandPlan(standing: DaemonStanding, serviced: () => boolean, env: Readonly<Record<string, string | undefined>>) {
+  if (standing.kind === 'ticking') return { kind: 'ticking' } satisfies DemandPlan;
+  if (env[DEMAND_OFF] === 'off') return { kind: 'off' } satisfies DemandPlan;
+  return (serviced() ? { kind: 'service' } : { kind: 'spawn' }) satisfies DemandPlan;
 }
 
 /**
@@ -50,7 +46,7 @@ export function demandPlan(
  * @param root The store's directory, given as `WF_ROOT`.
  * @param searchPath The search path, given as `PATH`.
  */
-export function daemonEnv(env: Readonly<Record<string, string | undefined>>, root: string, searchPath: string): Record<string, string> {
+export function daemonEnv(env: Readonly<Record<string, string | undefined>>, root: string, searchPath: string) {
   const own: Record<(typeof OWN_KEYS)[number], string> = { WF_ROOT: root, PATH: searchPath };
   const login = LOGIN_KEYS.flatMap((key) => (env[key] === undefined ? [] : [[key, env[key]] as const]));
   return { ...Object.fromEntries(login), ...own };
@@ -65,7 +61,7 @@ const ENV_WORDS =
  * Said once a daemon this command spawned holds the store: its pid, what it runs, where it logs, how to stop or keep it.
  * @param s The daemon spawned: its pid, the entry it runs, the store it holds and the file it logs to.
  */
-export const startedLine = (s: { pid: number; entry: string; root: string; log: string }): string =>
+export const startedLine = (s: { pid: number; entry: string; root: string; log: string }) =>
   `nemia: no daemon ticked ${s.root}, so this command started one: pid ${s.pid}, running ${s.entry}, logging to ${s.log}; ` +
   `stop it with kill ${s.pid}, or keep it as the login service with nemia service install --take-over ${s.pid} — ${ENV_WORDS}.`;
 
@@ -76,25 +72,25 @@ export type ServiceNamed = { system: ServiceSystem; name: string; unit: string; 
  * Where the service's system keeps what it prints: systemd's journal, or the file launchd writes.
  * @param s The login service.
  */
-export const serviceLog = (s: ServiceNamed): string =>
+export const serviceLog = (s: ServiceNamed) =>
   s.system === 'systemd' ? `journalctl --user -u ${s.unit}` : `${s.home}/Library/Logs/${s.name}.log`;
 
 /** Where the service logs, and how it is stopped. */
-const serviceWords = (s: ServiceNamed): string =>
+const serviceWords = (s: ServiceNamed) =>
   `logging to ${serviceLog(s)}; stop it with ${s.system === 'systemd' ? `systemctl --user stop ${s.unit}` : `launchctl bootout gui/${s.uid}/${s.name}`}`;
 
 /**
  * Said once the login service this command started holds the store.
  * @param s The login service, the store it holds and the pid it runs as.
  */
-export const serviceStartedLine = (s: ServiceNamed & { root: string; pid: number }): string =>
+export const serviceStartedLine = (s: ServiceNamed & { root: string; pid: number }) =>
   `nemia: no daemon ticked ${s.root}, so this command started its login service ${s.unit}: pid ${s.pid}, ${serviceWords(s)}.`;
 
 /**
  * Said where nothing ticks the store and this caller does not start a daemon (`NEMIA_DAEMON_START=off`).
  * @param root The store's directory.
  */
-export const offLine = (root: string): string =>
+export const offLine = (root: string) =>
   `nemia: nothing ticks ${root}, and ${DEMAND_OFF}=off here, so this command starts no daemon: what it files waits for one — ${START_WORDS}.`;
 
 /**
@@ -107,7 +103,7 @@ export type Unstarted =
   | { kind: 'silent'; waitedMs: number };
 
 /** Why a daemon started did not take the store, in words. */
-const unstartedWords = (why: Unstarted): string => {
+const unstartedWords = (why: Unstarted) => {
   if (why.kind === 'failed') return `it could not be started (${why.message})`;
   if (why.kind === 'silent') return `it has not taken the store after ${Math.round(why.waitedMs / 1000)}s`;
   return `it ended (${why.signal === null ? `exit ${why.code}` : `killed by ${why.signal}`}) before it took the store`;
@@ -117,7 +113,7 @@ const unstartedWords = (why: Unstarted): string => {
  * Said where the daemon started does not take the store: why, where to read it, and that the command went on.
  * @param s What was started, the store, the file it logs to and why it did not take the store.
  */
-export const unstartedLine = (s: { what: string; root: string; log: string; why: Unstarted }): string =>
+export const unstartedLine = (s: { what: string; root: string; log: string; why: Unstarted }) =>
   `nemia: no daemon ticked ${s.root}, so this command started ${s.what}, but ${unstartedWords(s.why)}: read ${s.log}. ` +
   `The command went on, and what it files waits for a daemon — ${START_WORDS}.`;
 
@@ -125,5 +121,5 @@ export const unstartedLine = (s: { what: string; root: string; log: string; why:
  * Said where another daemon took the store while this one started: the one spawned stops on the lease's refusal.
  * @param s The pid spawned, the pid of the daemon that took the store, the store and the file the one spawned logs to.
  */
-export const otherTookLine = (s: { pid: number; holder: number; root: string; log: string }): string =>
+export const otherTookLine = (s: { pid: number; holder: number; root: string; log: string }) =>
   `nemia: another daemon, pid ${s.holder}, took ${s.root} while this command started pid ${s.pid}, which stops on the lease's refusal (${s.log}): pid ${s.holder} ticks it.`;

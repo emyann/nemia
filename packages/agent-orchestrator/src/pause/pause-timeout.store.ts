@@ -16,7 +16,7 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
  * The store's timeout file.
  * @param home The store's root.
  */
-export const timeoutFile = (home: string): string => path.join(home, 'pause-timeout.json');
+export const timeoutFile = (home: string) => path.join(home, 'pause-timeout.json');
 
 const isTimeoutFile = Schema.is(Schema.Struct({ timeout: Schema.String, at: Schema.optional(Schema.String) }));
 
@@ -28,7 +28,7 @@ export type TimeoutAt = { ms: number; set: boolean; at?: string };
  * timeout, is refused `Invalid`, naming the file and the verb that writes it again.
  * @param home The store's root.
  */
-export function timeoutAt(home: string): TimeoutAt {
+export function timeoutAt(home: string) {
   const file = timeoutFile(home);
   let text: string;
   try {
@@ -56,7 +56,7 @@ export function timeoutAt(home: string): TimeoutAt {
  * @param text The timeout as a person typed it, a duration such as `10m`.
  * @param now When it is set, the file's stamp; the present where none is given.
  */
-export function putTimeout(home: string, text: string, now: Date = new Date()): TimeoutAt {
+export function putTimeout(home: string, text: string, now: Date = new Date()) {
   const ms = timeoutOf(text);
   if (ms === undefined) throw new Invalid({ message: `${timeoutRefusal(text)}: type nemia pause-timeout <d>, as nemia pause-timeout 10m` });
   const file = timeoutFile(home);

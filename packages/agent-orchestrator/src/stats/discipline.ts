@@ -37,7 +37,7 @@ export type SkillsClock = { state: { attempts: ReadonlyArray<{ ended: unknown; s
  * @param view The task's view, its attempts among it, or undefined where there is none.
  * @param given The skills the step's `skills:` gave its session, as written.
  */
-export function skillsLoadedOf(view: SkillsClock | undefined, given: readonly string[]): string[] | null {
+export function skillsLoadedOf(view: SkillsClock | undefined, given: readonly string[]) {
   const ends = (view?.state.attempts ?? []).filter((a) => a.ended !== null && a.ended !== undefined);
   if (!ends.length || !ends.every((a) => a.skills !== undefined)) return null;
   const written = new Map(given.map((name) => [bareSkillOf(name), name]));
@@ -53,7 +53,7 @@ export type FilesClock = { state: { attempts: ReadonlyArray<{ ended: unknown; fi
  * files.
  * @param view The task's view, its attempts among it, or undefined where there is none.
  */
-export function filesTouchedOf(view: FilesClock | undefined): string[] | null {
+export function filesTouchedOf(view: FilesClock | undefined) {
   const ends = (view?.state.attempts ?? []).filter((a) => a.ended !== null && a.ended !== undefined);
   if (!ends.length || !ends.every((a) => a.files !== undefined)) return null;
   return [...new Set(ends.flatMap((a) => [...(a.files ?? [])]))];
@@ -69,7 +69,7 @@ export type DueFact = { skill: string; touched: boolean };
  * @param files The files the try touched, or null where they were not measured.
  * @param applies The globs each skill's `applies:` declares, by skill.
  */
-export function skillsDueOf(files: readonly string[] | null, applies: ReadonlyMap<string, readonly string[]>): DueFact[] | null {
+export function skillsDueOf(files: readonly string[] | null, applies: ReadonlyMap<string, readonly string[]>) {
   if (files === null) return null;
   return [...applies]
     .filter(([, globs]) => globs.length)
@@ -88,7 +88,7 @@ export type RuleRow = { skill: string; rule: string; says: string; kept: number;
  * @param denied The calls the try was denied, or null where they were not measured.
  * @param declared The rules each skill declares, by skill.
  */
-export function rulesOfTry(denied: readonly string[] | null, declared: ReadonlyMap<string, readonly SkillRule[]>): RuleFact[] | null {
+export function rulesOfTry(denied: readonly string[] | null, declared: ReadonlyMap<string, readonly SkillRule[]>) {
   if (denied === null) return null;
   return [...declared].flatMap(([skill, rules]) =>
     rules.map((r) => {
@@ -98,13 +98,13 @@ export function rulesOfTry(denied: readonly string[] | null, declared: ReadonlyM
   );
 }
 
-const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+const byName = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * Each skill's rule over `tries` (`RuleRow`): most broken first, then by skill and rule. None where no try measured a rule.
  * @param tries The tries, each with the rules it kept or broke, null where none was measured.
  */
-export function ruleRowsOf(tries: ReadonlyArray<{ rules: readonly RuleFact[] | null }>): RuleRow[] {
+export function ruleRowsOf(tries: ReadonlyArray<{ rules: readonly RuleFact[] | null }>) {
   const rows = new Map<string, RuleRow>();
   for (const fact of tries.flatMap((t) => t.rules ?? [])) {
     const key = JSON.stringify([fact.skill, fact.rule]);
@@ -126,13 +126,13 @@ export type SkillRow = { skill: string; count: number; tries: number; touched: n
  * of its own, with no load; one declared and neither touched nor loaded has none.
  * @param tries The tries, each with the skills it loaded and the skills it was due to load, each null where not measured.
  */
-export function skillRowsOf(tries: ReadonlyArray<{ skills: readonly string[] | null; due: readonly DueFact[] | null }>): SkillRow[] {
+export function skillRowsOf(tries: ReadonlyArray<{ skills: readonly string[] | null; due: readonly DueFact[] | null }>) {
   const names = new Set([
     ...tries.flatMap((t) => t.skills ?? []),
     ...tries.flatMap((t) => (t.due ?? []).filter((d) => d.touched).map((d) => d.skill)),
   ]);
   return [...names]
-    .map((skill): SkillRow => {
+    .map((skill) => {
       const loaded = (t: (typeof tries)[number]) => Boolean(t.skills?.includes(skill));
       const declared = tries.filter((t) => t.due?.some((d) => d.skill === skill));
       const touched = declared.filter((t) => t.due?.some((d) => d.skill === skill && d.touched));

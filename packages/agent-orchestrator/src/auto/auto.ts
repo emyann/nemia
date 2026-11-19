@@ -76,14 +76,14 @@ export const isProposalRule = (rule: PolicyRule): rule is ProposalPolicyRule => 
  * The rules of `list` that answer at a gate. Pure.
  * @param list The person's list.
  */
-export const gateRules = (list: readonly PolicyRule[]): GateRule[] => list.filter((rule): rule is GateRule => !isProposalRule(rule));
+export const gateRules = (list: readonly PolicyRule[]) => list.filter((rule): rule is GateRule => !isProposalRule(rule));
 
 /**
  * The rules of `list` that approve the proposals of `factory`. Pure.
  * @param list The person's list.
  * @param factory The factory's name.
  */
-export const proposalRulesIn = (list: readonly PolicyRule[], factory: string): ProposalPolicyRule[] =>
+export const proposalRulesIn = (list: readonly PolicyRule[], factory: string) =>
   list.filter((rule): rule is ProposalPolicyRule => isProposalRule(rule) && rule.factory === factory);
 
 /** A run's facts at a call, for one step: each condition, whether it holds, and what the run has spent (`spend`, in dollars). */
@@ -115,11 +115,10 @@ export const DEFAULT_POLICY: GateRule = { id: DEFAULT_ID, answer: 'approve', whe
  * The list in force: the builtin rule while the person has confirmed none, else their confirmed list, which replaces it. Pure.
  * @param confirmed The person's confirmed list; undefined where they confirmed none.
  */
-export const listInForce = (confirmed: readonly PolicyRule[] | undefined): PolicyRule[] =>
-  confirmed === undefined ? [DEFAULT_POLICY] : [...confirmed];
+export const listInForce = (confirmed: readonly PolicyRule[] | undefined) => (confirmed === undefined ? [DEFAULT_POLICY] : [...confirmed]);
 
 /** Whether `rule` allows `answer` at `step` in `facts`: its answer, a step it covers, each condition it needs, and under its line. */
-const allows = (rule: PolicyRule, answer: string, step: string, facts: Facts): boolean =>
+const allows = (rule: PolicyRule, answer: string, step: string, facts: Facts) =>
   !isProposalRule(rule) &&
   rule.answer === answer &&
   (rule.steps === undefined || rule.steps.includes(step)) &&
@@ -131,11 +130,8 @@ const allows = (rule: PolicyRule, answer: string, step: string, facts: Facts): b
  * @param list The list in force.
  * @param facts The facts of the run at the call, for the step.
  */
-export const allowedBy = (
-  list: readonly PolicyRule[],
-  { answer, step }: { answer: string; step: string },
-  facts: Facts,
-): PolicyRule | undefined => list.find((rule) => allows(rule, answer, step, facts));
+export const allowedBy = (list: readonly PolicyRule[], { answer, step }: { answer: string; step: string }, facts: Facts) =>
+  list.find((rule) => allows(rule, answer, step, facts));
 
 /** Each condition as a rule says it, in the words of a person who knows nothing of how Nemia reads it. */
 export const CONDITION_WORDS: Record<Condition, string> = {
@@ -153,8 +149,7 @@ const ANSWER_WORDS: Record<RuleAnswer, (steps: string) => string> = {
 };
 
 /** Words joined as a sentence lists them: `a`, `a and b`, `a, b and c`. */
-const listed = (words: readonly string[]): string =>
-  words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`);
 
 /**
  * A rule in the person's words, made from its fields alone, so what they read is what admission holds: the steps by their names, as what
@@ -163,7 +158,7 @@ const listed = (words: readonly string[]): string =>
  * `Approve design and land on their own, whatever their state.` Pure.
  * @param rule The rule.
  */
-export function ruleWords(rule: PolicyRule): string {
+export function ruleWords(rule: PolicyRule) {
   if (isProposalRule(rule)) return proposalRuleWords(rule);
   const several = rule.steps !== undefined && rule.steps.length > 1;
   const steps = rule.steps === undefined ? 'any step' : listed(rule.steps);
@@ -176,7 +171,7 @@ export function ruleWords(rule: PolicyRule): string {
  * A proposal rule in the person's words, from its fields alone: `Approve proposals in acme that update workflows build or review, made by
  * implementer, that never widen access.` Pure.
  */
-function proposalRuleWords(rule: ProposalPolicyRule): string {
+function proposalRuleWords(rule: ProposalPolicyRule) {
   const names = rule.resourceNames.length ? ` ${listed(rule.resourceNames)}` : '';
   const by = rule.proposedBy.length ? `, made by ${listed(rule.proposedBy)}` : ', made by any agent or you';
   const widening = rule.widens ? ', even where they widen access' : ', that never widen access';
@@ -184,11 +179,11 @@ function proposalRuleWords(rule: ProposalPolicyRule): string {
 }
 
 /** A value read as a list of names, or undefined where it is not one. */
-const namesOf = (value: unknown): string[] | undefined =>
+const namesOf = (value: unknown) =>
   Array.isArray(value) && value.every((v) => typeof v === 'string' && v.trim() !== '') ? value : undefined;
 
 /** Why the fields of `rule` other than its id and answer are no rule's, or undefined where they are. */
-function shapeRefusal(rule: Record<string, unknown>, at: string): string | undefined {
+function shapeRefusal(rule: Record<string, unknown>, at: string) {
   if (rule.steps !== undefined && (namesOf(rule.steps) === undefined || (rule.steps as string[]).length === 0))
     return `${at}: steps is a list of step names, or left out for every step.`;
   const when = rule.when;
@@ -207,7 +202,7 @@ function shapeRefusal(rule: Record<string, unknown>, at: string): string | undef
  * @param rule The rule as proposed, of any shape.
  * @param at How the refusal names it.
  */
-export function ruleRefusal(rule: unknown, at: string): string | undefined {
+export function ruleRefusal(rule: unknown, at: string) {
   if (typeof rule !== 'object' || rule === null || Array.isArray(rule))
     return `${at} is no rule: { "id", "answer", "steps"?, "when", "under"? }.`;
   const r = rule as Record<string, unknown>;
@@ -221,7 +216,7 @@ export function ruleRefusal(rule: unknown, at: string): string | undefined {
 }
 
 /** Why the fields of a proposal rule are no rule's, or undefined where they are. */
-function proposalShapeRefusal(r: Record<string, unknown>, at: string): string | undefined {
+function proposalShapeRefusal(r: Record<string, unknown>, at: string) {
   const form = '{ "id", "answer": "approve-proposal", "factory", "resources", "resourceNames", "verbs", "widens", "proposedBy" }';
   if (typeof r.factory !== 'string' || !r.factory.trim()) return `${at}: factory names the factory whose proposals it approves: ${form}.`;
   const resources = namesOf(r.resources);

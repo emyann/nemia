@@ -59,13 +59,13 @@ export type RunQuery = {
 type Listed = Pick<Run, 'id' | 'factory' | 'workflowDir' | 'labels'>;
 
 /** Runs in the order a list answers them and a token reads them: by name, as `<` compares. */
-const byName = (a: Listed, b: Listed): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+const byName = (a: Listed, b: Listed) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
  * The runs of `query.namespace` (every run where none is given) that its label selectors keep, sorted by name, or `Invalid` for a label
  * selector that is not one.
  */
-const keptOf = <R extends Listed>(runs: readonly R[], query: RunQuery): readonly R[] | Invalid => {
+const keptOf = <R extends Listed>(runs: readonly R[], query: RunQuery) => {
   const selectors = query.labelSelector ?? [];
   const refused = selectorsRefused(selectors, 'run');
   if (refused !== undefined) return refused;
@@ -75,7 +75,7 @@ const keptOf = <R extends Listed>(runs: readonly R[], query: RunQuery): readonly
 };
 
 /** The selector `query.fieldSelector` spells, none where it is not given, or `Invalid` naming every form it takes. */
-const fieldSelectorOf = (query: RunQuery): RunSelector | undefined | Invalid => {
+const fieldSelectorOf = (query: RunQuery) => {
   if (query.fieldSelector === undefined) return undefined;
   return (
     runStateSelector(query.fieldSelector) ??
@@ -217,13 +217,13 @@ const framedList = (
   items: RunObject[],
   unjudged: RunUnjudged[],
   frame: { counts: { waiting: number; inFlight: number; finished: number }; asOf: string },
-): RunList => {
+) => {
   const list = listOf('Run', page, items);
-  return { ...list, metadata: { ...list.metadata, ...frame }, ...(unjudged.length ? { unjudged } : {}) };
+  return { ...list, metadata: { ...list.metadata, ...frame }, ...(unjudged.length ? { unjudged } : {}) } satisfies RunList;
 };
 
 /** A run of a list asked by state left unjudged: its name, namespace and state, and why with its steps where its answer says. */
-const unjudgedOf = (one: Stated, answer: RunObjectAnswer): RunUnjudged => ({
+const unjudgedOf = (one: Stated, answer: RunObjectAnswer) => ({
   name: one.name,
   namespace: runNamespace(one.run.factory),
   error: 'unjudged' in answer ? answer.unjudged : '',
@@ -239,7 +239,7 @@ const countsOf = (stated: readonly Stated[]) => {
 };
 
 /** `run` as a list asked by state keeps it: summarized off its judgement (`summaryOf`), or stated as the list counts one left unjudged. */
-const statedOf = (run: Run, one: JudgedOrWhy, home: string): Stated => {
+const statedOf = (run: Run, one: JudgedOrWhy, home: string) => {
   const summary = 'judgement' in one ? summaryOf(one.judgement, home) : undefined;
   const state = summary ? kindOf(summary) : unjudgedStateOf(run);
   const finished = summary !== undefined && state === 'finished';
@@ -251,7 +251,7 @@ const statedOf = (run: Run, one: JudgedOrWhy, home: string): Stated => {
     outcome: finished ? outcomeOf(summary) : null,
     name: run.id,
     finishedAt: finished ? finishedAtOf(summary) : run.createdAt,
-  };
+  } satisfies Stated;
 };
 
 /**
@@ -295,7 +295,7 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
  * @param run The run read: its id, and the factory its record names.
  * @param namespace The namespace a read or an action addressed the run under.
  */
-export const runIn = (run: Pick<Run, 'id' | 'factory'>, namespace: string): Effect.Effect<void, Missing> =>
+export const runIn = (run: Pick<Run, 'id' | 'factory'>, namespace: string) =>
   runNamespace(run.factory) === namespace
     ? Effect.void
     : Effect.fail(

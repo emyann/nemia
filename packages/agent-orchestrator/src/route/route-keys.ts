@@ -14,10 +14,7 @@ const ROUTE_WORD = /^[a-z][a-z0-9-]*$/;
  * @param step The step's name, which a refusal names.
  * @param meta The step's frontmatter keys, each as the text its line holds.
  */
-export function routingOf(
-  step: string,
-  meta: Partial<Record<StepKey, string>>,
-): Pick<StepSpec, 'routes' | 'route' | 'when' | 'ends' | 'workflow'> {
+export function routingOf(step: string, meta: Partial<Record<StepKey, string>>) {
   const { routes, route, ends } = conditionKeysOf(step, meta);
   const workflow = workflowOf(step, meta.workflow, routes !== undefined);
   return {
@@ -30,7 +27,7 @@ export function routingOf(
 }
 
 /** A condition's own keys: `routes:` (two or more), `route:` beside it and never without it, and `ends:` on a condition alone. */
-function conditionKeysOf(step: string, meta: Partial<Record<StepKey, string>>): Pick<StepSpec, 'routes' | 'route' | 'ends'> {
+function conditionKeysOf(step: string, meta: Partial<Record<StepKey, string>>) {
   const routes = wordsOf(step, 'routes', meta.routes);
   const route = meta.route === undefined ? undefined : routeOf(step, meta.route);
   const ends = wordsOf(step, 'ends', meta.ends);
@@ -43,7 +40,7 @@ function conditionKeysOf(step: string, meta: Partial<Record<StepKey, string>>): 
       refuse(
         `${step}: \`ends: ${meta.ends}\` names routes on which the run ends, and this step is no condition. Move the line to the condition, beside its \`routes:\`, or delete it.`,
       );
-    return {};
+    return {} satisfies Pick<StepSpec, 'routes' | 'route' | 'ends'> as Pick<StepSpec, 'routes' | 'route' | 'ends'>;
   }
   if (routes.length < 2) {
     refuse(
@@ -55,11 +52,14 @@ function conditionKeysOf(step: string, meta: Partial<Record<StepKey, string>>): 
       `${step}: \`routes:\` makes this step a condition, and it says no \`route:\` — how its route is answered. Add \`route: { from: <step>.<field>, table: { <value>: <route> } }\`, \`route: { script: <path> }\` or \`route: judge\`.`,
     );
   }
-  return { routes, route, ...(ends !== undefined && { ends }) };
+  return { routes, route, ...(ends !== undefined && { ends }) } satisfies Pick<StepSpec, 'routes' | 'route' | 'ends'> as Pick<
+    StepSpec,
+    'routes' | 'route' | 'ends'
+  >;
 }
 
 /** `workflow:`, a workflow's name, on a node that is no condition. */
-function workflowOf(step: string, written: string | undefined, condition: boolean): string | undefined {
+function workflowOf(step: string, written: string | undefined, condition: boolean) {
   const workflow = written?.trim();
   if (workflow === undefined) return undefined;
   if (!/^[a-z0-9][a-z0-9-]*$/.test(workflow)) {
@@ -76,7 +76,7 @@ function workflowOf(step: string, written: string | undefined, condition: boolea
 }
 
 /** A list of route words, or refused naming the item that is none: duplicates are refused, a list saying one route twice says less. */
-function wordsOf(step: string, key: 'routes' | 'when' | 'ends', value: string | undefined): string[] | undefined {
+function wordsOf(step: string, key: 'routes' | 'when' | 'ends', value: string | undefined) {
   if (value === undefined) return undefined;
   const words = value
     .split(',')
@@ -101,8 +101,8 @@ const ROUTE_SHAPES = '`route: { from: <step>.<field>, table: { <value>: <route> 
  * @param step The condition's name, which a refusal names.
  * @param text The text of the `route:` line.
  */
-export function routeOf(step: string, text: string): RouteEval {
-  if (text.trim() === 'judge') return { kind: 'judge' };
+export function routeOf(step: string, text: string) {
+  if (text.trim() === 'judge') return { kind: 'judge' } satisfies RouteEval;
   let map: unknown;
   try {
     map = text.trim().startsWith('{') ? JSON.parse(text) : undefined;
@@ -117,14 +117,14 @@ export function routeOf(step: string, text: string): RouteEval {
       refuse(
         `${step}: \`route: { script: … }\` names no file. Name the script, from the workflow's folder: \`route: { script: routes/pick.ts }\`.`,
       );
-    return { kind: 'script', script: script.trim() };
+    return { kind: 'script', script: script.trim() } satisfies RouteEval;
   }
-  if (keys === 'from,table') return tableOf(step, map.from, map.table);
-  return refuse(`${step}: \`route:\` holds \`${keys || 'nothing'}\`, and a condition's eval is ${ROUTE_SHAPES}.`);
+  if (keys === 'from,table') return tableOf(step, map.from, map.table) satisfies RouteEval;
+  return refuse(`${step}: \`route:\` holds \`${keys || 'nothing'}\`, and a condition's eval is ${ROUTE_SHAPES}.`) satisfies RouteEval;
 }
 
 /** A table eval, `{ from: <step>.<field>, table: { <value>: <route> } }`, its rows each a word. */
-function tableOf(step: string, from: unknown, table: unknown): RouteEval {
+function tableOf(step: string, from: unknown, table: unknown) {
   if (typeof from !== 'string' || !/^[^.\s]+\.[^.\s]+$/.test(from.trim())) {
     refuse(
       `${step}: \`route: { from: ${JSON.stringify(from)} }\` names no field: write the producer's step and its output field, \`from: plan.surface\`.`,
@@ -139,12 +139,16 @@ function tableOf(step: string, from: unknown, table: unknown): RouteEval {
       refuse(`${step}: \`route: { table: { ${value}: … } }\` routes to no word. Name one of the condition's \`routes:\`.`);
     rows[value] = routed.trim();
   }
-  return { kind: 'table', from: from.trim(), table: rows };
+  return { kind: 'table', from: from.trim(), table: rows } satisfies RouteEval;
 }
 
 /**
  * A condition's eval as its line writes it, the map `routeOf` reads back.
  * @param route The condition's eval.
  */
-export const routeWritten = (route: RouteEval): FrontmatterValue =>
-  route.kind === 'judge' ? 'judge' : route.kind === 'script' ? { script: route.script } : { from: route.from, table: { ...route.table } };
+export const routeWritten = (route: RouteEval) =>
+  (route.kind === 'judge'
+    ? 'judge'
+    : route.kind === 'script'
+      ? { script: route.script }
+      : { from: route.from, table: { ...route.table } }) satisfies FrontmatterValue as FrontmatterValue;

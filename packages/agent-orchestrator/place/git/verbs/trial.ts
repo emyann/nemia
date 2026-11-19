@@ -5,14 +5,14 @@
  * `{ clean: false, conflicts }` with the files git names, or `{ unknown }` in git's first line, a branch it lacks or a git older than 2.38,
  * never a guess either way. Refuses a repository that is no directory.
  */
-import { Failed, gitSays, isDirectory, printed, refused, type Asking, type Reply } from '../git.ts';
+import { Failed, gitSays, isDirectory, printed, refused } from '../git.ts';
 import type { PlaceRequests, TrialMerge } from '../../../src/place/place.ts';
 
 /**
  * Whether `branch` merges onto `onto` in `repo`. Git's exit 1 with output is its answer that the merge conflicts: the tree it wrote on the
  * first line, then each conflicted file once. Any other failure is not known, in git's first line.
  */
-function* tried(repo: string, { onto, branch }: { readonly onto: string; readonly branch: string }): Asking<TrialMerge> {
+function* tried(repo: string, { onto, branch }: { readonly onto: string; readonly branch: string }) {
   try {
     yield* printed({ cmd: 'git', cwd: repo, args: ['merge-tree', '--write-tree', '--name-only', '--no-messages', onto, branch] });
     return { clean: true };
@@ -25,7 +25,7 @@ function* tried(repo: string, { onto, branch }: { readonly onto: string; readonl
 }
 
 /** The verb's body. */
-export function* trial({ repo, trials }: PlaceRequests['trial']): Asking<Reply<'trial'>> {
+export function* trial({ repo, trials }: PlaceRequests['trial']) {
   if (!isDirectory(repo)) return refused(`${repo} is not a directory, so no branch in it can be tried`);
   const at: Record<string, string | null> = {};
   for (const onto of new Set(trials.map((p) => p.onto)))

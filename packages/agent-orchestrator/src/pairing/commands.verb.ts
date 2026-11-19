@@ -20,7 +20,7 @@ import { mintPersonTokenFree } from '../token/token.store.ts';
 import { linkMarked, linkMinted, pairingApproved, pairingMarked, pairingsListed, type Marked } from './pairing.store.ts';
 
 /** A person's token minted at `nowMs` for the claim `marked`, under its name or the first free after it; the mark taken back if refused. */
-function mintedFor(home: string, marked: Marked, nowMs: number): { token: string; name: string } {
+function mintedFor(home: string, marked: Marked, nowMs: number) {
   try {
     return mintPersonTokenFree(home, marked.name, new Date(nowMs));
   } catch (err) {
@@ -39,10 +39,10 @@ function mintedFor(home: string, marked: Marked, nowMs: number): { token: string
  * @param secret The secret the client presents, which must be the pairing's own.
  * @param nowMs The time of the claim, in ms since the epoch.
  */
-export function pairingClaimed(home: string, id: string, secret: string, nowMs: number): PairingClaimed {
+export function pairingClaimed(home: string, id: string, secret: string, nowMs: number) {
   const marked = pairingMarked(home, id, secret, nowMs);
-  if ('phase' in marked) return marked;
-  return { phase: 'claimed', ...mintedFor(home, marked, nowMs) };
+  if ('phase' in marked) return marked satisfies PairingClaimed as PairingClaimed;
+  return { phase: 'claimed', ...mintedFor(home, marked, nowMs) } satisfies PairingClaimed as PairingClaimed;
 }
 
 /**
@@ -53,7 +53,7 @@ export function pairingClaimed(home: string, id: string, secret: string, nowMs: 
  * @param secret The link's secret, as the browser presents it.
  * @param nowMs The time of the claim, in ms since the epoch.
  */
-export function linkClaimed(home: string, secret: string, nowMs: number): { token: string; name: string } {
+export function linkClaimed(home: string, secret: string, nowMs: number) {
   return mintedFor(home, linkMarked(home, secret, nowMs), nowMs);
 }
 
@@ -61,7 +61,7 @@ export function linkClaimed(home: string, secret: string, nowMs: number): { toke
 const API_PORT = 8787;
 
 /** An address as a URL's host takes it: a wildcard as the loopback, an IPv6 one between brackets. */
-const hostShown = (address: string): string => {
+const hostShown = (address: string) => {
   if (address === '0.0.0.0') return '127.0.0.1';
   if (address === '::') return '[::1]';
   return address.includes(':') ? `[${address}]` : address;
@@ -78,14 +78,14 @@ const LOOPBACK_URL_HOST = /^(https?:\/\/)(?:127\.0\.0\.1|\[::1\])(?=[:/]|$)/i;
  * @param leaseUrl The url the api ticking the store serves at, off its lease, or undefined where none ticks it.
  * @param env The environment, whose `NEMIA_BIND` and `PORT` are read where no lease says the url.
  */
-export const boardBase = (leaseUrl: string | undefined, env: Env): string =>
+export const boardBase = (leaseUrl: string | undefined, env: Env) =>
   (leaseUrl ?? `http://${hostShown(env.NEMIA_BIND?.trim() || '127.0.0.1')}:${env.PORT?.trim() || API_PORT}`).replace(
     LOOPBACK_URL_HOST,
     '$1localhost',
   );
 
 /** The url the api ticking the store `home` serves at, off its lease, or undefined where none ticks it. */
-const leaseUrl = (home: string): string | undefined => {
+const leaseUrl = (home: string) => {
   const standing = daemonStanding(home);
   return standing.kind === 'ticking' && standing.file.by === 'api' ? standing.file.url : undefined;
 };

@@ -71,7 +71,7 @@ export type InformerMemo<T = Judgement, O = RunObject> = {
 };
 
 /** An informer that holds nothing: what a serving process starts with. */
-export const informerMemo = <T = Judgement, O = RunObject>(): InformerMemo<T, O> => ({ runs: new Map(), hits: 0, objectHits: 0 });
+export const informerMemo = <T = Judgement, O = RunObject>() => ({ runs: new Map(), hits: 0, objectHits: 0 });
 
 /**
  * The listed object kept for the run `id` on the very entry that holds `judgement`, the one this read was served or judged: none where
@@ -80,7 +80,7 @@ export const informerMemo = <T = Judgement, O = RunObject>(): InformerMemo<T, O>
  * @param id The run's id.
  * @param judgement The judgement the read was served or judged on.
  */
-export const keptObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T): O | undefined => {
+export const keptObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T) => {
   const entry = memo.runs.get(id);
   return entry !== undefined && entry.value === judgement ? entry.object : undefined;
 };
@@ -93,7 +93,7 @@ export const keptObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement
  * @param judgement The judgement the object was built on.
  * @param object The run's listed object.
  */
-export const keepObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T, object: O): void => {
+export const keepObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement: T, object: O) => {
   const entry = memo.runs.get(id);
   if (entry !== undefined && entry.value === judgement) entry.object = object;
 };
@@ -105,13 +105,13 @@ export const keepObject = <T, O>(memo: InformerMemo<T, O>, id: string, judgement
 export const Informer = Context.Reference<InformerMemo | undefined>('agent-orchestrator/Informer', { defaultValue: () => undefined });
 
 /** One informer for a process, made by its layer: the api gives one per app, read by the daemon's pass and every request alike. */
-export const informerLayer = (): Layer.Layer<never> => Layer.sync(Informer, () => informerMemo());
+export const informerLayer = () => Layer.sync(Informer, () => informerMemo());
 
 /**
  * A pass begins: an entry of a run still moving that an earlier pass or request kept is judged again from now on.
  * @param memo The informer.
  */
-export const passStarted = (memo: InformerMemo<unknown>): void => {
+export const passStarted = (memo: InformerMemo<unknown>) => {
   memo.pass = (memo.pass ?? 0) + 1;
 };
 
@@ -120,7 +120,7 @@ export const passStarted = (memo: InformerMemo<unknown>): void => {
  * @param memo The informer.
  * @param id The run's id.
  */
-export const dropInformed = (memo: InformerMemo<unknown>, id: string): void => {
+export const dropInformed = (memo: InformerMemo<unknown>, id: string) => {
   memo.runs.delete(id);
 };
 
@@ -164,15 +164,10 @@ export type InformerRead<T> = {
  * The branches of `run`'s steps whose try behind carries the commit its check was filed on (`CheckTask.tip`): where a blocked step may
  * have that check run again turns on each one's tip (`blockedRecheck`), so a judgement is kept on them too.
  */
-const recheckBranches = (run: Run): string[] =>
-  Object.values(run.steps).flatMap((r) => (r.branch && r.tries?.at(-1)?.check?.tip ? [r.branch] : []));
+const recheckBranches = (run: Run) => Object.values(run.steps).flatMap((r) => (r.branch && r.tries?.at(-1)?.check?.tip ? [r.branch] : []));
 
 /** The tips of `branches` and `run`'s base branch, as `heads` gives them for its repository; none for a folder run or no branch. */
-const tipsOf = (
-  run: Run,
-  branches: readonly string[],
-  heads: (repo: string) => ReadonlyMap<string, string>,
-): Record<string, string | null> =>
+const tipsOf = (run: Run, branches: readonly string[], heads: (repo: string) => ReadonlyMap<string, string>) =>
   isRepositoryRun(run) && branches.length
     ? Object.fromEntries([...new Set([...branches, run.branch])].map((b) => [b, heads(run.repo).get(b) ?? null]))
     : {};
@@ -205,7 +200,7 @@ const committed = <T, O>(e: Engine, memo: InformerMemo<T, O>, held: ReadonlyMap<
 const recordTexts = new WeakMap<Run, string>();
 
 /** `run` as JSON, written once per run object (`recordTexts`). */
-const recordText = (run: Run): string => {
+const recordText = (run: Run) => {
   const known = recordTexts.get(run);
   if (known !== undefined) return known;
   const text = JSON.stringify(run);
@@ -217,7 +212,7 @@ const recordText = (run: Run): string => {
  * Whether `entry` was judged on `run` as it is now: the run's `stamp`, the run itself, and, for a run that has filed nothing, where the
  * needs' readings stand (`needs`, `needsVersionOf`).
  */
-const judgedOn = <T, O>(entry: Entry<T, O>, run: Run, stamp: string | undefined, needs: number | undefined): boolean =>
+const judgedOn = <T, O>(entry: Entry<T, O>, run: Run, stamp: string | undefined, needs: number | undefined) =>
   entry.stamp === stamp && (entry.run === run || recordText(entry.run) === recordText(run)) && entry.needs === needs;
 
 /**

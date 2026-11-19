@@ -4,7 +4,7 @@
  */
 import { Effect } from 'effect';
 import type { StepSpec } from '../workflow.ts';
-import { isRepositoryRun, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { stepStatus, type SpendOf } from '../status/status.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -37,14 +37,10 @@ export type SendReads = {
  * @param run The run the pass read.
  * @param reads The pass's reads: the steps, the tasks' phases, the closeouts, what each cost and each check's verdict.
  */
-export const wordReader =
-  (run: Run, reads: SendReads) =>
-  (name: string): StepStatus => {
-    const step = reads.steps.find((s) => s.name === name);
-    return step
-      ? stepStatus(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf, reads.verdictOf)
-      : 'pending';
-  };
+export const wordReader = (run: Run, reads: SendReads) => (name: string) => {
+  const step = reads.steps.find((s) => s.name === name);
+  return step ? stepStatus(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf, reads.verdictOf) : 'pending';
+};
 
 /**
  * The card a workflow node files: `<run>-<node>-routed`. A person's card is named by `runId`, whose last piece is four letters or digits,
@@ -52,14 +48,14 @@ export const wordReader =
  * @param run The id of the run the node is in.
  * @param node The workflow node's name.
  */
-export const sentCardName = (run: string, node: string): string => `${run}-${node}-routed`;
+export const sentCardName = (run: string, node: string) => `${run}-${node}-routed`;
 
 /**
  * The step whose closeout a condition's route was read from: a table's producer (`route: { from: <producer>.<field> }`), else the
  * condition itself, a judge or a script whose own closeout said the route.
  * @param condition The condition whose route was read.
  */
-export const routeProducer = (condition: StepSpec): string =>
+export const routeProducer = (condition: StepSpec) =>
   condition.route?.kind === 'table' ? firstPiece(condition.route.from, '.') : condition.name;
 
 /**
@@ -68,7 +64,7 @@ export const routeProducer = (condition: StepSpec): string =>
  * @param run The run, whose brief and id title the card where the producer says none.
  * @param producer How the condition's producer signed off, or undefined where it has not.
  */
-export function sentCardTitle(run: Run, producer: Closeout | undefined): string {
+export function sentCardTitle(run: Run, producer: Closeout | undefined) {
   const said = producer?.output?.title;
   const title = typeof said === 'string' ? firstPiece(said.trim(), '\n').trim() : '';
   return title || firstPiece(run.brief, '\n').trim() || `Work routed on from run ${run.id}`;
@@ -94,7 +90,7 @@ export function sentCardText(
   at: string,
   title: string,
   labels: Labels,
-): string {
+) {
   const keys: FrontmatterPair[] = [
     ['workflow', node.workflow ?? ''],
     ...(isRepositoryRun(run) ? [['repo', run.repo] as const] : []),

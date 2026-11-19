@@ -31,6 +31,7 @@ export type RunFrozen = RunKeys & { day: string; at: string; workflowDir: string
 export type Mark = RunKeys & { day: string; kind: MarkKind; name: string; steps: string[]; agents: Array<string | null>; since: string };
 
 /** A value as JSON with every object's keys sorted, so the same value always reads the same. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const canonical = (value: unknown): unknown =>
   Array.isArray(value)
     ? value.map(canonical)
@@ -43,14 +44,14 @@ const canonical = (value: unknown): unknown =>
       : value;
 
 /** A value's digest: sha256 of its sorted JSON, cut to 16 hex characters as a skill's version is. */
-const digestOf = (value: unknown): string =>
+const digestOf = (value: unknown) =>
   createHash('sha256')
     .update(JSON.stringify(canonical(value)))
     .digest('hex')
     .slice(0, 16);
 
 /** A step's own digest: its resolved keys, but its body and its agent, with its own note (`ownNote`) and its agent's name. */
-function stepItem(step: StepSpec): FrozenItem {
+function stepItem(step: StepSpec) {
   const { body: _body, agent, ...keys } = step;
   const name = agent?.name ?? null;
   return {
@@ -59,11 +60,11 @@ function stepItem(step: StepSpec): FrozenItem {
     digest: digestOf({ ...keys, note: ownNote(step), agent: name }),
     steps: [step.name],
     agents: [name],
-  };
+  } satisfies FrozenItem;
 }
 
 /** Add `item` to `items`, or, where an item of its kind and name is there, its steps and agents to it and its digest where it has none. */
-function merged(items: FrozenItem[], item: FrozenItem): FrozenItem[] {
+function merged(items: FrozenItem[], item: FrozenItem) {
   const there = items.find((i) => i.kind === item.kind && i.name === item.name);
   if (!there) return [...items, item];
   there.digest ??= item.digest;
@@ -77,27 +78,28 @@ function merged(items: FrozenItem[], item: FrozenItem): FrozenItem[] {
  * carries its instructions, else the agent unknown, and each skill it gives, by the digest of its rendered copy in `skills` (step → skill →
  * digest): its agent's with the agent, those the step's line adds with the step alone.
  */
-function itemsOf(step: StepSpec, skills: ReadonlyMap<string, ReadonlyMap<string, string>>): FrozenItem[] {
+function itemsOf(step: StepSpec, skills: ReadonlyMap<string, ReadonlyMap<string, string>>) {
   const agent = step.agent;
-  if (!agent) return [stepItem(step)];
+  if (!agent) return [stepItem(step)] satisfies FrozenItem[];
   const layers = skillLayers(step);
   const said =
     agent.instructions === undefined
       ? null
       : { instructions: agent.instructions, skills: layers.agent.length ? layers.agent : undefined, harnessPrompt: agent.harnessPrompt };
-  const skill = (name: string, agents: string[]): FrozenItem => ({
-    kind: 'skill',
-    name,
-    digest: skills.get(step.name)?.get(name) ?? null,
-    steps: [step.name],
-    agents,
-  });
+  const skill = (name: string, agents: string[]) =>
+    ({
+      kind: 'skill',
+      name,
+      digest: skills.get(step.name)?.get(name) ?? null,
+      steps: [step.name],
+      agents,
+    }) satisfies FrozenItem;
   return [
     stepItem(step),
     { kind: 'agent', name: agent.name, digest: said && digestOf(said), steps: [step.name], agents: [agent.name] },
     ...layers.agent.map((name) => skill(name, [agent.name])),
     ...layers.added.map((name) => skill(name, [])),
-  ];
+  ] satisfies FrozenItem[];
 }
 
 /**
@@ -111,20 +113,19 @@ export const frozenOf = (
   head: Omit<RunFrozen, 'items'>,
   steps: readonly StepSpec[],
   skills: ReadonlyMap<string, ReadonlyMap<string, string>>,
-): RunFrozen => ({ ...head, items: steps.flatMap((s) => itemsOf(s, skills)).reduce(merged, []) });
+) => ({ ...head, items: steps.flatMap((s) => itemsOf(s, skills)).reduce(merged, []) }) satisfies RunFrozen;
 
 /** Two strings in order, by their code units. */
-const inOrder = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
+const inOrder = (a: string, b: string) => (a === b ? 0 : a < b ? -1 : 1);
 
 /** The order of runs in a workflow folder: by the time each was created, then by id. */
-const byCreated = (a: RunFrozen, b: RunFrozen): number => inOrder(a.at, b.at) || inOrder(a.run, b.run);
+const byCreated = (a: RunFrozen, b: RunFrozen) => inOrder(a.at, b.at) || inOrder(a.run, b.run);
 
 /** The order of marks: by day, run, kind, then name. */
-const byMark = (a: Mark, b: Mark): number =>
-  inOrder(a.day, b.day) || inOrder(a.run, b.run) || inOrder(a.kind, b.kind) || inOrder(a.name, b.name);
+const byMark = (a: Mark, b: Mark) => inOrder(a.day, b.day) || inOrder(a.run, b.run) || inOrder(a.kind, b.kind) || inOrder(a.name, b.name);
 
 /** The marks of one factory's runs of a workflow folder, each item against the nearest run before that froze one of its kind and name. */
-function seriesMarks(runs: readonly RunFrozen[]): Mark[] {
+function seriesMarks(runs: readonly RunFrozen[]) {
   const last = new Map<string, { run: string; digest: string | null }>();
   const marks: Mark[] = [];
   for (const r of [...runs].sort(byCreated)) {
@@ -157,7 +158,7 @@ function seriesMarks(runs: readonly RunFrozen[]): Mark[] {
  * same item, known too.
  * @param runs What each run froze.
  */
-export function marksOf(runs: readonly RunFrozen[]): Mark[] {
+export function marksOf(runs: readonly RunFrozen[]) {
   const series = new Map<string, RunFrozen[]>();
   for (const r of runs) {
     const key = JSON.stringify([r.factory, r.workflowDir]);

@@ -20,7 +20,7 @@ export type Past = { readonly resource: string; readonly verb: ChangeVerb };
  * Whether `grants` cover what `rule` covers for `resource` and `verb`: some grant names the resource and the verb, and every name the rule
  * covers (every name where the rule names none, so a grant that names none).
  */
-const coveredFor = (grants: readonly Grant[], rule: ProposalRule, resource: string, verb: ChangeVerb): boolean =>
+const coveredFor = (grants: readonly Grant[], rule: ProposalRule, resource: string, verb: ChangeVerb) =>
   grants.some(
     (g) =>
       g.resources.includes(resource) &&
@@ -29,7 +29,7 @@ const coveredFor = (grants: readonly Grant[], rule: ProposalRule, resource: stri
   );
 
 /** Whether `rule` covers `resource` with `verb`. */
-const ruleNames = (rule: ProposalRule, resource: string, verb: ChangeVerb): boolean =>
+const ruleNames = (rule: ProposalRule, resource: string, verb: ChangeVerb) =>
   rule.resources.includes(resource) && rule.verbs.includes(verb);
 
 const proposalRuleReachSpec = spec<(rule: ProposalRule, grants: readonly Grant[]) => readonly Past[]>({

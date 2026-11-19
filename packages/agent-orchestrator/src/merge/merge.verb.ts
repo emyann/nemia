@@ -19,8 +19,8 @@ import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRea
 import type { Verdict } from '../check/index.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { StepSpec } from '../step/step.ts';
-import { mergeAsk, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';
-import type { Decision, Offer } from '../decide/decide.ts';
+import { mergeAsk, mergeOffer, type MergeAsk } from './merge.ts';
+import type { Decision } from '../decide/decide.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
@@ -38,7 +38,7 @@ function mergeReads(
   asked: (taskId: string) => CloseoutAsked,
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
-): MergeReads {
+) {
   return {
     standingOf: (step: StepSpec) => standing(step, run, phaseOf, closeoutOf, asked, steps, spendOf, verdictOf),
     stopped: (step: StepSpec) => endingStopped(step, run, phaseOf, closeoutOf, asked, steps, spendOf),
@@ -51,14 +51,12 @@ function mergeReads(
  * A trial merge of a branch onto the run's base branch, by the place's trial merge (`trialMerges`), which touches no checkout, and the
  * commit the base branch was at as the place tried it.
  */
-const trialOf =
-  (run: Run, place: Place) =>
-  (branch: string): Tried => {
-    if (!isRepositoryRun(run)) return { trial: { error: 'no repository' }, base: null };
-    const { at, trials } = trialMerges(run.repo, [{ onto: run.branch, branch }], place);
-    const [trial = { unknown: `the place answered no trial of ${branch}` }] = trials;
-    return { trial: mergeWordOf(trial), base: at[run.branch] ?? null };
-  };
+const trialOf = (run: Run, place: Place) => (branch: string) => {
+  if (!isRepositoryRun(run)) return { trial: { error: 'no repository' }, base: null };
+  const { at, trials } = trialMerges(run.repo, [{ onto: run.branch, branch }], place);
+  const [trial = { unknown: `the place answered no trial of ${branch}` }] = trials;
+  return { trial: mergeWordOf(trial), base: at[run.branch] ?? null };
+};
 
 /**
  * The merges `nemia decide` offers on a run awaiting a person (`Decision`): one for each loop whose merge the verb would take now
@@ -86,7 +84,7 @@ export function mergeOffers(
     spendOf: SpendOf,
     verdictOf: (step: string) => Verdict | undefined,
   ]
-): Offer[] {
+) {
   if (d.kind !== 'awaiting' || !isRepositoryRun(run)) return [];
   const reads = mergeReads(steps, run, ...read);
   const at = new Date().toISOString();
@@ -161,5 +159,5 @@ export const closeoutsAfterMerge = Effect.fnUntraced(function* (
   const before = step.loop && merged(run.steps[step.name]) ? run.steps[step.name]?.tries?.at(-1) : undefined;
   const said = before ? (yield* asked('view', e.view(before.taskId))).state.attempts.at(-1)?.closeout : undefined;
   const own = said === undefined ? undefined : parseCloseout(said);
-  return (name: string): Closeout | undefined => (own && name === step.name && !('error' in own) ? own : signedOff(name));
+  return (name: string) => (own && name === step.name && !('error' in own) ? own : signedOff(name)) satisfies Closeout | undefined;
 });

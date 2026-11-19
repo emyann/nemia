@@ -24,7 +24,7 @@ import { doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import type { Run } from '../record/record.ts';
 import type { StepSpec } from '../workflow.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import type { StandingRecord, TokenHolder, TokenRecord } from './token.ts';
+import type { TokenHolder, TokenRecord } from './token.ts';
 
 /**
  * What the store keeps of a token it minted: the contract's record (`TokenRecord`), and the engine's task the session runs in (`task`),
@@ -45,23 +45,23 @@ const TokenFiledSchema = Schema.Struct({
  * The folder the store keeps its token records in, under the store `home`.
  * @param home The store's root folder.
  */
-export const tokensDir = (home: string): string => path.join(home, 'tokens');
+export const tokensDir = (home: string) => path.join(home, 'tokens');
 
 /**
  * The digest a token is kept and found by: its sha-256, in hex.
  * @param token The token itself, as a session or a request presents it.
  */
-export const tokenDigest = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
+export const tokenDigest = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 
 /** The file of the token whose digest is `digest`, under the store `home`. */
-const tokenFile = (home: string, digest: string): string => path.join(tokensDir(home), `${digest}.json`);
+const tokenFile = (home: string, digest: string) => path.join(tokensDir(home), `${digest}.json`);
 
 /**
  * A new token, 32 random bytes in base64url, its record written under its digest in the folder `dir` through a hidden file renamed over
  * it, readable by its owner alone in a folder its owner alone opens. Answers the token itself, which is written nowhere. Not through
  * `writeWhole`: the hidden file is made readable by its owner alone as it is created, so the record is never open to another.
  */
-function minted(dir: string, record: object): string {
+function minted(dir: string, record: object) {
   const token = crypto.randomBytes(32).toString('base64url');
   const file = path.join(dir, `${tokenDigest(token)}.json`);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -77,7 +77,7 @@ function minted(dir: string, record: object): string {
  * @param home The store's root folder.
  * @param record What the token vouches for: the session's agent, factory, run, step, attempt and task.
  */
-export function mintToken(home: string, record: TokenFiled): string {
+export function mintToken(home: string, record: TokenFiled) {
   return minted(tokensDir(home), record);
 }
 
@@ -87,7 +87,7 @@ export function mintToken(home: string, record: TokenFiled): string {
  * @param home The store's root folder.
  * @param token The token presented.
  */
-export function readToken(home: string, token: string): TokenFiled | null {
+export function readToken(home: string, token: string) {
   let text: string;
   try {
     text = fs.readFileSync(tokenFile(home, tokenDigest(token)), 'utf8');
@@ -132,25 +132,25 @@ const PERSON_HOLDER: TokenHolder = { kind: 'person' };
  * Who holds the token `record` is of: its holder, or the person where it names none.
  * @param record The standing token's record.
  */
-export const holderOf = (record: PersonTokenFiled): TokenHolder => record.holder ?? PERSON_HOLDER;
+export const holderOf = (record: PersonTokenFiled) => record.holder ?? PERSON_HOLDER;
 
 /**
  * The standing record `record` is, as `callerOf` reads it: its name and its holder.
  * @param record The standing token's record.
  */
-export const standingOf = (record: PersonTokenFiled): StandingRecord => ({ name: record.name, holder: holderOf(record) });
+export const standingOf = (record: PersonTokenFiled) => ({ name: record.name, holder: holderOf(record) });
 
 /**
  * The folder the store keeps a person's token records in, under the store `home`.
  * @param home The store's root folder.
  */
-export const personTokensDir = (home: string): string => path.join(home, 'person-tokens');
+export const personTokensDir = (home: string) => path.join(home, 'person-tokens');
 
 /** A name a person's token takes: a letter or a digit, then letters, digits, `.`, `_` or `-`, 63 at most. */
 const PERSON_TOKEN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/;
 
 /** The record a file of a person's token holds, or null where it does not read as one, which vouches for no one. */
-function personRecordOf(text: string): PersonTokenFiled | null {
+function personRecordOf(text: string) {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -164,7 +164,7 @@ function personRecordOf(text: string): PersonTokenFiled | null {
 }
 
 /** Every record of a person's token under the store `home`, with the file it is kept in; none where the folder is not there. */
-function personFiles(home: string): Array<{ file: string; record: PersonTokenFiled }> {
+function personFiles(home: string) {
   const dir = personTokensDir(home);
   if (!fs.existsSync(dir)) return [];
   return fs
@@ -187,7 +187,7 @@ function personFiles(home: string): Array<{ file: string; record: PersonTokenFil
  * @param now When it is minted, written as its `createdAt`.
  * @param holder Who holds it: the person, or an agent and what bounds it.
  */
-export function mintPersonToken(home: string, name: string, now: Date = new Date(), holder: TokenHolder = PERSON_HOLDER): string {
+export function mintPersonToken(home: string, name: string, now: Date = new Date(), holder: TokenHolder = PERSON_HOLDER) {
   if (!PERSON_TOKEN_NAME.test(name))
     throw new Invalid({
       message: `nemia token add takes a name of letters, digits, \`.\`, \`_\` or \`-\`, starting with a letter or a digit, 63 at most, and \`${name}\` is not one: name it for where it is used, as nemia token add laptop.`,
@@ -214,7 +214,7 @@ export function mintPersonToken(home: string, name: string, now: Date = new Date
  * @param name The name to mint under, or to count on from where it is taken.
  * @param now When it is minted, written as its `createdAt`.
  */
-export function mintPersonTokenFree(home: string, name: string, now: Date = new Date()): { token: string; name: string } {
+export function mintPersonTokenFree(home: string, name: string, now: Date = new Date()) {
   const taken = new Set(personFiles(home).map((f) => f.record.name));
   for (let n = 1; ; n++) {
     const free = n === 1 ? name : `${name}-${n}`;
@@ -233,7 +233,7 @@ export function mintPersonTokenFree(home: string, name: string, now: Date = new 
  * @param home The store's root folder.
  * @param digest The token's digest (`tokenDigest`).
  */
-export function personTokenOf(home: string, digest: string): PersonTokenFiled | null {
+export function personTokenOf(home: string, digest: string) {
   let text: string;
   try {
     text = fs.readFileSync(path.join(personTokensDir(home), `${digest}.json`), 'utf8');
@@ -248,7 +248,7 @@ export function personTokenOf(home: string, digest: string): PersonTokenFiled | 
  * The person's tokens the store keeps, by name: each its name and when it was minted, never its digest.
  * @param home The store's root folder.
  */
-export function personTokens(home: string): PersonTokenFiled[] {
+export function personTokens(home: string) {
   return personFiles(home)
     .map((f) => f.record)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -260,7 +260,7 @@ export function personTokens(home: string): PersonTokenFiled[] {
  * @param home The store's root folder.
  * @param name The name the token is kept under.
  */
-export function revokePersonToken(home: string, name: string): PersonTokenFiled {
+export function revokePersonToken(home: string, name: string) {
   const found = personFiles(home).find((f) => f.record.name === name);
   if (found === undefined)
     throw new Missing({ message: `no token named ${name} is kept: nemia token ls lists the names of those that are.` });
@@ -289,15 +289,16 @@ export type TokensLayer = {
 export type TokenDoorShape = DoorOf<TokensLayer, string>;
 
 /** The token records of the store `home`. */
-const tokenFiles = (home: string): TokensLayer => ({
-  tokens: { mint: (record) => mintToken(home, record), read: (token) => readToken(home, token) },
-  persons: {
-    mint: (name, holder) => mintPersonToken(home, name, new Date(), holder),
-    read: (digest) => personTokenOf(home, digest),
-    list: () => personTokens(home),
-    revoke: (name) => revokePersonToken(home, name),
-  },
-});
+const tokenFiles = (home: string) =>
+  ({
+    tokens: { mint: (record) => mintToken(home, record), read: (token) => readToken(home, token) },
+    persons: {
+      mint: (name, holder) => mintPersonToken(home, name, new Date(), holder),
+      read: (digest) => personTokenOf(home, digest),
+      list: () => personTokens(home),
+      revoke: (name) => revokePersonToken(home, name),
+    },
+  }) satisfies TokensLayer;
 
 /**
  * The token door, as the service a program yields: a reference whose default is rooted (`rootedDoor`), the records at the store's root
@@ -311,7 +312,7 @@ export const TokenDoor = Context.Reference<TokenDoorShape>('agent-orchestrator/T
  * The token door over the records of the store `root`, as a layer: for a program that names its root by the door.
  * @param root The store's root folder, whose token records the door reads and writes.
  */
-export const tokenDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(TokenDoor)(doorOf<TokensLayer, string>(tokenFiles(root)));
+export const tokenDoorFiles = (root: string) => Layer.succeed(TokenDoor)(doorOf<TokensLayer, string>(tokenFiles(root)));
 
 /**
  * A step's session token, minted under the store `home` as its try `attempt` is filed as the engine's task `task`: its agent (the step's
@@ -329,7 +330,7 @@ export const stepToken = (
   step: Pick<StepSpec, 'name' | 'agent'>,
   task: string,
   attempt: number,
-): { sessionToken: string } => ({
+) => ({
   sessionToken: mintToken(home, {
     agent: step.agent?.name ?? step.name,
     factory: runNamespace(run.factory),
@@ -358,10 +359,10 @@ export const CREDENTIAL_NAME = 'local';
  * The credential's file under the store `home`.
  * @param home The store's root folder.
  */
-export const credentialFile = (home: string): string => path.join(home, CREDENTIAL_FILE);
+export const credentialFile = (home: string) => path.join(home, CREDENTIAL_FILE);
 
 /** The token `<home>/credential` holds, trimmed, or none: no file, or an empty one. */
-function heldCredential(home: string): string | undefined {
+function heldCredential(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(credentialFile(home), 'utf8');
@@ -380,18 +381,16 @@ function heldCredential(home: string): string | undefined {
  * @param home The store's root folder.
  * @param now When a token it mints is minted.
  */
-export function credentialKept(
-  home: string,
-  now: Date = new Date(),
-): { readonly kind: 'kept' } | { readonly kind: 'minted'; readonly name: string } {
+export function credentialKept(home: string, now: Date = new Date()) {
   const held = heldCredential(home);
   const record = held === undefined ? null : personTokenOf(home, tokenDigest(held));
-  if (record !== null && holderOf(record).kind === 'person') return { kind: 'kept' };
+  if (record !== null && holderOf(record).kind === 'person')
+    return { kind: 'kept' } satisfies { readonly kind: 'kept' } | { readonly kind: 'minted'; readonly name: string };
   const { token, name } = mintPersonTokenFree(home, CREDENTIAL_NAME, now);
   fs.mkdirSync(home, { recursive: true });
   const hidden = path.join(home, `.${CREDENTIAL_FILE}.${process.pid}.tmp`);
   fs.writeFileSync(hidden, `${token}\n`, { mode: 0o600 });
   fs.chmodSync(hidden, 0o600);
   fs.renameSync(hidden, credentialFile(home));
-  return { kind: 'minted', name };
+  return { kind: 'minted', name } satisfies { readonly kind: 'kept' } | { readonly kind: 'minted'; readonly name: string };
 }

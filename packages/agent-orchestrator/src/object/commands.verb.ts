@@ -39,12 +39,16 @@ export const SHOW: Served<Readonly<Record<string, unknown>>, typeof ShowInput.Ty
   handler: (args) =>
     Effect.flatMap(
       Effect.flatMap(StoreRoot, (home) => tried(() => runsAtOnce(home).runs.read(args.runId))),
-      (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig> =>
-        args.raw === true
+      (run) =>
+        (args.raw === true
           ? Effect.succeed(rawOf(run))
           : Effect.map(runObject(run, { memo: { said: new Map() } }), (object) =>
               'unjudged' in object ? object : Schema.encodeSync(RunObject)(object),
-            ),
+            )) satisfies Effect.Effect<
+          Readonly<Record<string, unknown>>,
+          Refusal,
+          EngineService | PlaceService | StoreRoot | StoreConfig
+        > as Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig>,
     ),
 };
 

@@ -34,11 +34,11 @@ export type MilestoneStates = {
 };
 
 /** Whether every milestone before `m` is met in `f`, in the order harness, factory, volume, landed. */
-const beforeMet = (f: MilestoneFacts, m: Milestone): boolean =>
+const beforeMet = (f: MilestoneFacts, m: Milestone) =>
   m === 'harness' ? true : m === 'factory' ? f.harness : m === 'volume' ? f.harness && f.factory : f.harness && f.factory && f.volume;
 
 /** Whether `m`'s state in `out` keeps both laws of a milestone against `f`. */
-const keeps = (f: MilestoneFacts, out: MilestoneStates, m: Milestone, law: 'done' | 'next'): boolean =>
+const keeps = (f: MilestoneFacts, out: MilestoneStates, m: Milestone, law: 'done' | 'next') =>
   law === 'done' ? (out[m] === 'done') === f[m] : (out[m] === 'next') === (!f[m] && beforeMet(f, m));
 
 const milestonesOfSpec = spec<(facts: MilestoneFacts) => MilestoneStates>({

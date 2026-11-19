@@ -40,16 +40,16 @@ export type RunMarkMove =
   | { readonly kind: 'stays' }
   | { readonly kind: 'refused'; readonly as: RunMarkRefusal };
 
-const calledOff = (mark: RunMark): boolean =>
+const calledOff = (mark: RunMark) =>
   mark === 'called-off' || mark === 'called-off-held' || mark === 'called-off-pruned' || mark === 'called-off-pruned-held';
-const pruned = (mark: RunMark): boolean =>
+const pruned = (mark: RunMark) =>
   mark === 'pruned' || mark === 'pruned-held' || mark === 'called-off-pruned' || mark === 'called-off-pruned-held';
-const held = (mark: RunMark): boolean =>
+const held = (mark: RunMark) =>
   mark === 'held' || mark === 'called-off-held' || mark === 'pruned-held' || mark === 'called-off-pruned-held';
-const refusedAs = (move: RunMarkMove, as: RunMarkRefusal): boolean => move.kind === 'refused' && move.as === as;
+const refusedAs = (move: RunMarkMove, as: RunMarkRefusal) => move.kind === 'refused' && move.as === as;
 
 /** Whether `move` goes to marks that are called off, pruned and held as said. */
-const goesTo = (move: RunMarkMove, to: { calledOff: boolean; pruned: boolean; held: boolean }): boolean =>
+const goesTo = (move: RunMarkMove, to: { calledOff: boolean; pruned: boolean; held: boolean }) =>
   move.kind === 'edge' && calledOff(move.to) === to.calledOff && pruned(move.to) === to.pruned && held(move.to) === to.held;
 
 const runMarkMoveSpec = spec<(from: RunMark, event: RunMarkEvent) => RunMarkMove>({

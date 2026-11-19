@@ -17,7 +17,7 @@ export type ProposalPhaseSelector = { readonly phase: ProposalPhase; readonly eq
 const FIELD = 'status.phase';
 
 /** Whether `word` is a proposal's phase. */
-const isPhase = (word: string): boolean =>
+const isPhase = (word: string) =>
   word === 'waiting' ||
   word === 'approved' ||
   word === 'applied' ||
@@ -27,7 +27,7 @@ const isPhase = (word: string): boolean =>
   word === 'failed';
 
 /** Whether `text` is the field, `operator`, then a phase. */
-const spelled = (text: string, operator: string): boolean =>
+const spelled = (text: string, operator: string) =>
   text.startsWith(FIELD + operator) && isPhase(text.slice(FIELD.length + operator.length));
 
 const proposalPhaseSelectorSpec = spec<(text: string) => ProposalPhaseSelector | null>({

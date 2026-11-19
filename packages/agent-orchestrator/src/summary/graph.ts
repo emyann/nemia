@@ -35,12 +35,12 @@ export const typedGraphOf: TypedGraphOf = (steps) => {
  * `inputGraphOf` without its `input` edges: the graph the list and the run page draw. Pure.
  * @param steps The workflow's steps, in its order.
  */
-export function graphOf(steps: readonly GraphStep[]): RunGraph {
+export function graphOf(steps: readonly GraphStep[]) {
   const { edges, ...rest } = inputGraphOf(steps);
-  return { ...rest, edges: edges.filter((e): e is GraphEdge => e.kind !== 'input') };
+  return { ...rest, edges: edges.filter((e): e is GraphEdge => e.kind !== 'input') } satisfies RunGraph;
 }
 
-const withShown = (steps: readonly GraphStep[], names: readonly string[]): GraphStep[] => [
+const withShown = (steps: readonly GraphStep[], names: readonly string[]) => [
   ...steps,
   ...names.filter((name) => !steps.some((s) => s.name === name)).map((name) => ({ name, after: [] })),
 ];
@@ -52,8 +52,8 @@ const withShown = (steps: readonly GraphStep[], names: readonly string[]): Graph
  * @param steps The steps the run is judged by.
  * @param names The names of the steps the run shows, in their order.
  */
-export function runGraph(steps: readonly GraphStep[], names: readonly string[]): RunGraph {
-  return graphOf(withShown(steps, names));
+export function runGraph(steps: readonly GraphStep[], names: readonly string[]) {
+  return graphOf(withShown(steps, names)) satisfies RunGraph;
 }
 
 /**
@@ -61,8 +61,8 @@ export function runGraph(steps: readonly GraphStep[], names: readonly string[]):
  * @param steps The steps the run is judged by.
  * @param names The names of the steps the run shows, in their order.
  */
-export function runInputGraph(steps: readonly GraphStep[], names: readonly string[]): ObjectGraph {
-  return inputGraphOf(withShown(steps, names));
+export function runInputGraph(steps: readonly GraphStep[], names: readonly string[]) {
+  return inputGraphOf(withShown(steps, names)) satisfies ObjectGraph;
 }
 
 /**
@@ -78,22 +78,22 @@ export const TRIAGE: readonly GraphStep[] = [
   { name: 'notes', after: ['build-web', 'build-backend'] },
 ];
 
-const stateId = (name: string): string => name.replace(/[^\w]/g, '_');
+const stateId = (name: string) => name.replace(/[^\w]/g, '_');
 
-const stateLabel = (node: GraphNode): string =>
+const stateLabel = (node: GraphNode) =>
   node.kind === 'condition'
     ? `${node.name} (condition)`
     : node.kind === 'workflow'
       ? `${node.name} (workflow ${node.workflow ?? ''})`
       : node.name;
 
-const edgeLine = (e: GraphEdge): string => {
+const edgeLine = (e: GraphEdge) => {
   const head = `  ${stateId(e.from)} --> ${stateId(e.to)}`;
   return e.kind === 'route' ? `${head}: ${e.route}` : e.kind === 'loop' ? `${head}: again (rounds ${e.rounds})` : head;
 };
 
 /** How a node ends the run: a condition on each route in its `ends:`, a workflow node once its card is filed, a leaf once it ran. */
-const endLines = (node: GraphNode, edges: readonly GraphEdge[]): string[] => {
+const endLines = (node: GraphNode, edges: readonly GraphEdge[]) => {
   const id = stateId(node.name);
   const ends = (node.ends ?? []).map((route) => `  ${id} --> [*]: ${route} (ends)`);
   if (node.kind === 'workflow') return [...ends, `  ${id} --> [*]: sent`];
@@ -106,7 +106,7 @@ const endLines = (node: GraphNode, edges: readonly GraphEdge[]): string[] => {
  * each way the run ends. Given no graph, the tests' `triage` workflow (`TRIAGE`), for `docs/model.md`'s `diagram:workflow`. Pure.
  * @param graph The workflow's graph; left out, the tests' `triage` workflow's.
  */
-export const routedDiagram = (graph: RunGraph = graphOf(TRIAGE)): string => {
+export const routedDiagram = (graph: RunGraph = graphOf(TRIAGE)) => {
   const nodes =
     graph.nodes ??
     [...new Set(graph.edges.flatMap((e) => [e.from, e.to]).concat(graph.roots))].map((name) => ({ name, kind: 'step' as const }));

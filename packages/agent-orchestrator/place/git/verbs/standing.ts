@@ -18,7 +18,7 @@
  * rest. A git older than 2.41 lists no distance at all: each branch is then asked one by one. Refuses a repository git cannot list and,
  * where a branch is asked of, a `base` git cannot read.
  */
-import { Failed, git, gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import { Failed, git, gitSays, isDirectory, refused } from '../git.ts';
 import type { BranchStood, PlaceRequests } from '../../../src/place/place.ts';
 
 /** A branch asked of: its name, the tip its run recorded, the commit its run was cut at, and what was last read of it. */
@@ -31,7 +31,7 @@ type Within = 'yes' | 'no' | 'unknown';
 type Listing = { heads: Record<string, string>; ahead: Map<string, Map<string, number>> };
 
 /** Each branch's commit, and its commits ahead of each of `bases` by base: one `for-each-ref`, or undefined where git refused it. */
-function* listing(repo: string, bases: readonly string[]): Asking<Listing | undefined> {
+function* listing(repo: string, bases: readonly string[]) {
   const format = ['%(objectname)', ...bases.map((b) => `%(ahead-behind:${b})`), '%(refname)'].join(' ');
   const listed = yield* gitSays(repo, ['for-each-ref', `--format=${format}`, 'refs/heads/']);
   if (listed === undefined) return undefined;
@@ -52,7 +52,7 @@ function* listing(repo: string, bases: readonly string[]): Asking<Listing | unde
 }
 
 /** Whether `commit` is within `base`, as `merge-base --is-ancestor` says it: its exit 1 is git's no, any other failure unknown. */
-function* within(repo: string, commit: string, base: string): Asking<Within> {
+function* within(repo: string, commit: string, base: string) {
   try {
     yield* git(repo, ['merge-base', '--is-ancestor', commit, base]);
     return 'yes';
@@ -62,20 +62,20 @@ function* within(repo: string, commit: string, base: string): Asking<Within> {
 }
 
 /** Whether the branch `name`, at `commit`, is within `to`: off the listing's distance where it holds one, else asked of git. */
-function* withinOf(repo: string, listed: Listing, name: string, commit: string, to: string): Asking<Within> {
+function* withinOf(repo: string, listed: Listing, name: string, commit: string, to: string) {
   const ahead = listed.ahead.get(to)?.get(name);
   return ahead === undefined ? yield* within(repo, commit, to) : ahead === 0 ? 'yes' : 'no';
 }
 
 /** Whether the commit judged of `one` is within its run's `baseRef`: what was known of that commit, else asked. */
-function* pastOf(repo: string, listed: Listing, one: Asked, head: string | null, commit: string): Asking<Within> {
+function* pastOf(repo: string, listed: Listing, one: Asked, head: string | null, commit: string) {
   const { branch, baseRef, known } = one;
   if (known?.tip === commit && known.pastBase !== null) return known.pastBase ? 'no' : 'yes';
   return head ? yield* withinOf(repo, listed, branch, head, baseRef) : yield* within(repo, commit, baseRef);
 }
 
 /** Where one branch asked of stands, read off `listed`, and git asked for what it does not hold. */
-function* stoodOne(repo: string, base: string, one: Asked, listed: Listing): Asking<BranchStood> {
+function* stoodOne(repo: string, base: string, one: Asked, listed: Listing) {
   const { branch, tip } = one;
   const head = Object.hasOwn(listed.heads, branch) ? (listed.heads[branch] ?? null) : null;
   const commit = head ?? tip;
@@ -99,7 +99,7 @@ function* stoodOne(repo: string, base: string, one: Asked, listed: Listing): Ask
  * without `known` — again without each `baseRef` it cannot read where it
  * refuses one, and with none on a git that lists no distance. A refusal's words where git cannot list the branches, or read `base`.
  */
-function* listed(repo: string, base: string, asked: readonly Asked[]): Asking<Listing | string> {
+function* listed(repo: string, base: string, asked: readonly Asked[]) {
   const bases = [...new Set([base, ...asked.filter((a) => !a.known).map((a) => a.baseRef)])];
   const whole = yield* listing(repo, bases);
   if (whole) return whole;
@@ -113,7 +113,7 @@ function* listed(repo: string, base: string, asked: readonly Asked[]): Asking<Li
 }
 
 /** The verb's body. */
-export function* standing({ repo, base, branches }: PlaceRequests['standing']): Asking<Reply<'standing'>> {
+export function* standing({ repo, base, branches }: PlaceRequests['standing']) {
   const read = isDirectory(repo) ? (branches.length ? yield* listed(repo, base, branches) : yield* listing(repo, [])) : undefined;
   if (read === undefined) return refused(`git cannot list the branches of ${repo}: it is no git repository, or git cannot read it`);
   if (typeof read === 'string') return refused(read);

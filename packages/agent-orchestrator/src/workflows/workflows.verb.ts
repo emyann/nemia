@@ -12,7 +12,6 @@ import path from 'node:path';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
-import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
@@ -27,7 +26,7 @@ import { isDirectory } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
-import { stillNeeded, type Fills } from '../folder/folder.ts';
+import { stillNeeded } from '../folder/folder.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import type { Places } from '../skills/read.store.ts';
 import type { WorkflowRemoved, WorkflowWritten } from '../folder/write.store.ts';
@@ -36,17 +35,18 @@ import type { WorkflowRemoved, WorkflowWritten } from '../folder/write.store.ts'
 type Where = { from?: string; name: string; repo?: string; factory?: string };
 
 /** A text flag under `key`, as the api hands it. */
-const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
+const keyed = (key: string) => ({ flag: `--${key}`, kind: 'text', key }) satisfies Flag;
 
 /** The spec of an entry served on the api alone: its positionals, and its text flags by key. */
-const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): Spec => ({
-  positionals,
-  flags: keys.map(keyed),
-  unknown: (arg) => `the board's workflows take no ${arg}.`,
-});
+const apiSpec = (positionals: readonly Positional[], keys: readonly string[]) =>
+  ({
+    positionals,
+    flags: keys.map(keyed),
+    unknown: (arg) => `the board's workflows take no ${arg}.`,
+  }) satisfies Spec;
 
 /** Where a folder's agents and skills are looked for, as a start on `repo` looks, with `home` yours. */
-const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Places => ({
+const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined) => ({
   ...(repo !== undefined && { repo }),
   ...(home !== undefined && { home }),
 });
@@ -60,7 +60,7 @@ const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Plac
  * @param name The templated factory's name.
  * @param workflow The workflow's name.
  */
-export function factoryWriteOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
+export function factoryWriteOf(home: string, name: string, workflow: string) {
   const { factory, tree } = templatedAtOnce(home, name, 'nemia workflows write');
   return { places: { repo: workedOn(factory)[0] ?? tree, home }, fills: factoryFills(home, factory, workflow).fills };
 }
@@ -73,7 +73,7 @@ export function factoryWriteOf(home: string, name: string, workflow: string): { 
  * @param name The templated factory's name.
  * @param workflow The workflow's name.
  */
-export function factoryDraftOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
+export function factoryDraftOf(home: string, name: string, workflow: string) {
   return factoryDraftIn(home, templatedAtOnce(home, name, 'nemia workflows write').factory, workflow);
 }
 
@@ -93,14 +93,14 @@ export function factoryDraftIn(
   factory: Pick<Factory, 'name' | 'hires' | 'tree' | 'volumes'>,
   workflow: string,
   repo?: string,
-): { places: Places; fills: Fills } {
+) {
   const { fills } = factoryFills(home, factory, workflow);
   if (factory.tree === undefined) return { places: repo === undefined ? { home } : { repo, home }, fills };
   return { places: { repo: repo ?? workedOn(factory)[0] ?? factory.tree, home: factory.tree }, fills };
 }
 
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
-const writeJudgedOf = (where: Where, home: string): { places: Places; fills?: Fills } =>
+const writeJudgedOf = (where: Where, home: string) =>
   where.from === 'factory' && where.factory !== undefined
     ? factoryWriteOf(home, where.factory, where.name)
     : { places: placesOf(where, home) };
@@ -111,7 +111,7 @@ const writeJudgedOf = (where: Where, home: string): { places: Places; fills?: Fi
  * (`workflowNameRefusal`), and for a folder that is no workflow's (`workflowDirAt`). Minted here, where a writer's folder is resolved,
  * rather than in `yoursOrRefused`, which resolves the holders of agents and skills too.
  */
-function yoursWorkflowDir(who: string, { from = '', name, repo = '', factory }: Where, home: string): WorkflowDir {
+function yoursWorkflowDir(who: string, { from = '', name, repo = '', factory }: Where, home: string) {
   const yours = yoursOrRefused(who, 'workflows', from, name, repo, home, {
     factory,
     treeOf: (factory) => templatedTreeOf(home, factory, who),
@@ -254,7 +254,7 @@ export const WORKFLOWS_REMOVE: Served<WorkflowRemoved, WorkflowRemoveInput> = {
 };
 
 /** Why a folder does not load, in the loader's words: what it was refused or died of. */
-const unloaded = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const unloaded = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** A folder loaded (`steps`), or why it does not load (`error`, the loader's words). */
 export type FolderLoaded = { steps: StepSpec[] } | { error: string };

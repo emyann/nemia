@@ -15,7 +15,7 @@ import { randomBytes } from 'node:crypto';
  * @param text The text it is to hold.
  * @param options Its `mode`, the file mode to set; left out, the hidden file keeps the one it was made with.
  */
-export function writeWhole(file: string, text: string, options: { readonly mode?: number } = {}): void {
+export function writeWhole(file: string, text: string, options: { readonly mode?: number } = {}) {
   const hidden = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomBytes(4).toString('hex')}`);
   try {
     fs.writeFileSync(hidden, text);

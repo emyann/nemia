@@ -144,13 +144,7 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
  * Why `acceptance` could not be written at `file` of the run `id`, read again: the refusal the look would now give (`now`), else the
  * file there that is not an acceptance, named with why (`stray`) and how to clear it, else the acceptance someone else wrote first.
  */
-function acceptedAlready(
-  file: string,
-  stray: string | null,
-  acceptance: Acceptance,
-  now: ReturnType<typeof acceptAsk>,
-  id: string,
-): string {
+function acceptedAlready(file: string, stray: string | null, acceptance: Acceptance, now: ReturnType<typeof acceptAsk>, id: string) {
   if ('refusal' in now) return now.refusal;
   return stray !== null
     ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${stray}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: nemia approve ${id} ${acceptance.step} --message "<why>".`

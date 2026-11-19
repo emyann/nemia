@@ -8,7 +8,7 @@
  * what the pass already read — the engine's views, the run's record, the person's answers — and asks the runtime nothing of its own.
  */
 import { listing } from '../list/list.ts';
-import { feedPhase, feedWords, LINE_WORDS, type FeedCloseout, type FeedDenial, type FeedWords, type Once } from './index.ts';
+import { feedPhase, feedWords, LINE_WORDS, type FeedCloseout, type FeedDenial, type Once } from './index.ts';
 import { closeoutOf, closeoutTold, saidCount, waitingOf } from '../views/views.verb.ts';
 import { engineWord, killedMemoryOf, parkedOf } from '../views/views-words.ts';
 import { denialText, type TaskView } from '../runtime-client.ts';
@@ -44,7 +44,7 @@ export function wordFeed(
   checkout: CheckoutHold | undefined,
   lifted?: string,
   behind: readonly Behind[] = [],
-): FeedWords {
+) {
   const { views, steps } = r;
   return feedWords(
     listing({
@@ -96,9 +96,9 @@ export function wordFeed(
  * It is the whole of what a person has done, not what is new: the feed's own lines say which have been written already (`oncePast`), so
  * the pass carries nothing between passes and a restarted daemon writes an act neither again nor never.
  */
-function actsOf(run: Run): Once[] {
+function actsOf(run: Run) {
   return [
-    ...(run.approvals ?? []).map((a): Once => ({
+    ...(run.approvals ?? []).map((a) => ({
       step: a.step,
       word: LINE_WORDS.Approved,
       note: `try ${a.try} · at ${a.at}`,
@@ -123,7 +123,7 @@ function actsOf(run: Run): Once[] {
  * since `kind` is a selector's own key. The note is what tells one drift from another (`oncePast`), so the line is written once per
  * drift, and a new edit writes one more, though two edits nobody resolved read as the one next number. None where nothing is behind.
  */
-function behindOf(behind: readonly Behind[]): Once[] {
+function behindOf(behind: readonly Behind[]) {
   const note = behind.map((b) => `${driftWords(b)} (${b.hash.slice(0, BEHIND_DIGEST)})`).join(' · ');
   return behind.length ? [{ word: LINE_WORDS.RevisionsBehind, note }] : [];
 }
@@ -158,7 +158,7 @@ const FAULTS: Partial<Record<AttemptEnd, string>> = {
  * Two attempts of one try lost are two occurrences, told apart by being two and counted off the feed's own lines (`oncePast`), as a call
  * denied twice in one try is. Neither waits on a person, by the table (`REASONS`): the step's own status is what wakes you.
  */
-function faultsOf(run: Run, r: RunRead): Once[] {
+function faultsOf(run: Run, r: RunRead) {
   const out: Once[] = [];
   for (const step of r.steps) {
     const view = r.views.get(run.steps[step.name]?.taskId ?? '');
@@ -181,7 +181,7 @@ function faultsOf(run: Run, r: RunRead): Once[] {
  * task's denials were said on the passes it was the current one, and the try that filed the task is part of what counts them — the try
  * the task was filed for, never the try the step has since reached, or a recheck would say every denial of that task again.
  */
-function denialsOf(run: Run, r: RunRead): FeedDenial[] {
+function denialsOf(run: Run, r: RunRead) {
   const out: FeedDenial[] = [];
   for (const step of r.steps) {
     const view = r.views.get(run.steps[step.name]?.taskId ?? '');
@@ -201,7 +201,7 @@ function denialsOf(run: Run, r: RunRead): FeedDenial[] {
  * its try), so the pass carries nothing between passes and a restarted daemon logs a closeout neither again nor never. A try's turn gives
  * one closeout, and the pass that reads it before the step moves on is the pass that files what comes next, so none is passed over.
  */
-function closeoutsOf(run: Run, r: RunRead): FeedCloseout[] {
+function closeoutsOf(run: Run, r: RunRead) {
   const out: FeedCloseout[] = [];
   for (const step of r.steps) {
     const told = closeoutTold(r.views, run, step.name);

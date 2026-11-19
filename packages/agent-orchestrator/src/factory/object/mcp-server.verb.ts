@@ -20,7 +20,7 @@ import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object
  * @param server The server as its record holds it.
  * @param masked Whether each header's value is served as the mask.
  */
-export const specOf = (server: FactoryServer, masked = true): McpServer['spec'] => ({
+export const specOf = (server: FactoryServer, masked = true) => ({
   type: server.type,
   url: server.url,
   ...(server.headers === undefined ? {} : { headers: masked ? maskedHeaders(server.headers) : { ...server.headers } }),
@@ -34,7 +34,7 @@ export const specOf = (server: FactoryServer, masked = true): McpServer['spec'] 
  * @param filedAt When the server was filed, its object's creation time.
  * @param unread Why the servers' states were not read, or null where they were.
  */
-export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string, unread: string | null): McpServer => {
+export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string, unread: string | null) => {
   const spec = specOf(s);
   const error = s.error ?? unread ?? undefined;
   const status: NonNullable<McpServer['status']> = {
@@ -48,7 +48,7 @@ export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string,
     metadata: { name: s.name, namespace, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
     spec,
     status,
-  };
+  } satisfies McpServer;
 };
 
 /**

@@ -7,7 +7,7 @@ import type { RecordMemo } from '../../rest/index.ts';
 import { listedAtOnce } from '../door/factories.store.ts';
 import type { Factory, Schedule } from '../factory.ts';
 import { firesOf, readScheduleTry } from './schedule.store.ts';
-import { scheduleDue, settledFire, type ScheduleListed, type ScheduleTry } from './schedule.ts';
+import { scheduleDue, settledFire, type ScheduleTry } from './schedule.ts';
 
 /** What a schedule reads of a run: which fire of which schedule started it, and the run itself, for its last run's line. */
 export type ScheduleRun = Pick<Run, 'id' | 'createdAt' | 'scheduled'>;
@@ -16,7 +16,7 @@ export type ScheduleRun = Pick<Run, 'id' | 'createdAt' | 'scheduled'>;
  * A run as a schedule's listing reads it (`ScheduleRun`): which fire of which schedule started it, and when the run was created.
  * @param run The run's record.
  */
-export const scheduleRun = (run: Run): ScheduleRun => ({
+export const scheduleRun = (run: Run) => ({
   id: run.id,
   createdAt: run.createdAt,
   ...(run.scheduled === undefined ? {} : { scheduled: run.scheduled }),
@@ -36,7 +36,7 @@ export type Read = {
 };
 
 /** The newest run `runs` holds that the schedule of `workflow` in `factory` started, by the fire it was started for. */
-const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string): ScheduleRun | undefined =>
+const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string) =>
   runs
     .flatMap((run) => {
       const scheduled = run.scheduled;
@@ -50,7 +50,7 @@ const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string
  * @param runs The store's runs as a schedule reads them (`ScheduleRun`), whose newest of each schedule is its last run.
  * @param now The time the fires are read around, in milliseconds since the epoch.
  */
-export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: number): Read[] {
+export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: number) {
   return listedAtOnce(home)
     .filter((f): f is Factory & { file: string } => !('error' in f))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -67,7 +67,7 @@ export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: n
             last: lastRun(runs, factory.name, workflow),
           };
         }),
-    );
+    ) satisfies Read[] as Read[];
 }
 
 /**
@@ -84,13 +84,13 @@ export const isDue = (r: Read): r is Read & { fires: { latest: number; next: num
   });
 
 /** The last run of a schedule read: its newest run in the store, else the run its kept try started, when that record is gone. */
-function lastOf(r: Read): ScheduleListed['last'] {
+function lastOf(r: Read) {
   if (r.last) return { run: r.last.id, at: r.last.createdAt };
   return r.kept?.run ? { run: r.kept.run, at: r.kept.at } : null;
 }
 
 /** Why the schedule read does not start: its cron gives no fire, or its kept try refused its latest fire; null otherwise. */
-function refusedOf(r: Read): string | null {
+function refusedOf(r: Read) {
   if ('error' in r.fires) return r.fires.error;
   return r.kept?.refused && Date.parse(r.kept.due) === r.fires.latest ? (r.kept.why ?? null) : null;
 }
@@ -102,7 +102,7 @@ function refusedOf(r: Read): string | null {
  * @param runs The store's runs as a schedule reads them (`ScheduleRun`), whose newest of each schedule is its last run.
  * @param now The time the fires are read around, in milliseconds since the epoch; absent, the clock's.
  */
-export function schedulesListed(home: string, runs: readonly ScheduleRun[], now: number = Date.now()): ScheduleListed[] {
+export function schedulesListed(home: string, runs: readonly ScheduleRun[], now: number = Date.now()) {
   return schedulesRead(home, runs, now).map((r) => ({
     factory: r.factory.name,
     workflow: r.workflow,

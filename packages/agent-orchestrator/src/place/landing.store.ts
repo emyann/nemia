@@ -8,11 +8,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import type { LandingWords } from '../check/index.ts';
 import { resultBranches } from '../branches/branches.store.ts';
 import { resultTips } from '../branches/index.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
-import type { MergeState, PlaceOutcome, PlaceSay } from './place.ts';
+import type { MergeState, PlaceOutcome } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { Place } from './place.store.ts';
@@ -37,14 +36,14 @@ export type StatusMemo = {
  * @param heads Every branch of a run's repository and its commit, or undefined where they were not read.
  * @param place The place asked.
  */
-export const statusMemo = (heads: StatusMemo['heads'], place: Place): StatusMemo => ({ reads: new Map(), heads, place });
+export const statusMemo = (heads: StatusMemo['heads'], place: Place) => ({ reads: new Map(), heads, place });
 
 /**
  * Whether a merge is staged in `run`'s checkout, as a `stat` of the file the place named at `open` (`stagedFile`) says, with no process.
  * Undefined for a run whose record names no such file, started before its place named one: `status` says it there.
  * @param run The run's record, the staged file it names read.
  */
-export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | undefined {
+export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>) {
   return run.stagedFile === undefined ? undefined : fs.existsSync(run.stagedFile);
 }
 
@@ -55,7 +54,7 @@ export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | un
  * @param steps The run's steps, its result branches and landing read off them.
  * @param memo The pass's memo of what the place said, and the place it asks.
  */
-export function checkoutStatus(run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo): CheckoutRead {
+export function checkoutStatus(run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo) {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return known;
@@ -65,15 +64,14 @@ export function checkoutStatus(run: RepositoryRun, steps: readonly StepSpec[], m
 }
 
 /** The place's `status` outcome as a reading of the checkout: its answer, or why it said nothing. */
-function readOf(outcome: PlaceOutcome<'status'>): CheckoutRead {
+function readOf(outcome: PlaceOutcome<'status'>) {
   if ('answer' in outcome) return outcome.answer;
   if ('refused' in outcome) return { unread: `the place refused to read the checkout: ${outcome.refused}` };
   return { unread: `the place's status was not heard: ${outcome.unread.said}` };
 }
 
 /** What `place` says of `checkout` against `tips`, or why it said nothing. */
-const statusRead = (place: Place, repo: string, tips: Readonly<Record<string, string>>): CheckoutRead =>
-  readOf(place.askNow('status', { repo, tips }));
+const statusRead = (place: Place, repo: string, tips: Readonly<Record<string, string>>) => readOf(place.askNow('status', { repo, tips }));
 
 /**
  * `checkoutStatus`, asked off the loop (`ask`) and kept in `memo`, so the `checkoutStatus` that follows it for the same run answers
@@ -82,7 +80,7 @@ const statusRead = (place: Place, repo: string, tips: Readonly<Record<string, st
  * @param steps The run's steps, its result branches and landing read off them.
  * @param memo The pass's memo of what the place said, and the place it asks.
  */
-export const askCheckoutStatus = (run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo): Effect.Effect<CheckoutRead> => {
+export const askCheckoutStatus = (run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo) => {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return Effect.succeed(known);
@@ -104,7 +102,7 @@ export const askCheckoutStatus = (run: RepositoryRun, steps: readonly StepSpec[]
  * @param steps The run's steps, its result branches and landing read off them.
  * @param memo The pass's memo of what the place said, and the place it asks.
  */
-export function mergeStaged(run: Run, steps: readonly StepSpec[], memo: StatusMemo): boolean {
+export function mergeStaged(run: Run, steps: readonly StepSpec[], memo: StatusMemo) {
   if (!isRepositoryRun(run)) return false;
   const landings = steps.filter((s) => landsOnCheck(s, run));
   if (!landings.length) return false;
@@ -134,7 +132,7 @@ export function landThrough(
   run: RepositoryRun,
   act: { readonly act: 'commit'; readonly message: string } | { readonly act: 'abort' },
   memo: StatusMemo,
-): LandedThrough {
+) {
   memo.reads.clear();
   const outcome = memo.place.askNow('land', { repo: run.repo, ...act });
   if ('answer' in outcome) return outcome.answer;
@@ -147,7 +145,7 @@ export function landThrough(
  * @param run The run's record.
  * @param place The run's place, whose declared denies are read.
  */
-export function landingDenies(run: Run, place: Place): readonly string[] {
+export function landingDenies(run: Run, place: Place) {
   return isRepositoryRun(run) ? place.declared.denyWhileLanding : [];
 }
 
@@ -161,13 +159,7 @@ export function landingDenies(run: Run, place: Place): readonly string[] {
  * @param place The run's place, whose declared words and denies are read.
  * @param heads Every branch of the repository and its commit, or undefined where they were not read: the recorded tips alone then.
  */
-export function landingWords(
-  run: Run,
-  steps: readonly StepSpec[],
-  step: StepSpec,
-  place: Place,
-  heads?: Readonly<Record<string, string>>,
-): LandingWords | undefined {
+export function landingWords(run: Run, steps: readonly StepSpec[], step: StepSpec, place: Place, heads?: Readonly<Record<string, string>>) {
   if (!isRepositoryRun(run) || !landsOnCheck(step, run)) return undefined;
   const { declared } = place;
   const branches = Object.keys(resultTips(run, resultBranches(run, steps), heads)).join(' ') || '<result branch>';
@@ -179,6 +171,6 @@ export function landingWords(
  * @param run The run's record.
  * @param place The run's place, whose declared commands are read.
  */
-export function placeSay(run: Run, place: Place): PlaceSay | undefined {
+export function placeSay(run: Run, place: Place) {
   return isRepositoryRun(run) ? place.declared.say : undefined;
 }

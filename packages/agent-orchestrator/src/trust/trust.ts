@@ -38,10 +38,10 @@ export type Untrusted = {
  * The command that asks the trust of a factory's places again.
  * @param factory The factory's name.
  */
-export const trustCommandOf = (factory: string): string => `nemia factory trust ${factory}`;
+export const trustCommandOf = (factory: string) => `nemia factory trust ${factory}`;
 
 /** `folder` said after `place` where the trust is kept under another folder than the place itself. */
-const keptUnder = (place: string, folder: string): string => (folder === place ? place : `${place} (kept under ${folder})`);
+const keptUnder = (place: string, folder: string) => (folder === place ? place : `${place} (kept under ${folder})`);
 
 /**
  * The lines `nemia factory add`, `apply` and `trust` print of the trust asked for `factory`'s places: for each one written, the
@@ -50,7 +50,7 @@ const keptUnder = (place: string, folder: string): string => (folder === place ?
  * @param factory The factory whose places the trust was asked for.
  * @param asked What each place's trust came to.
  */
-export const trustedLines = (factory: string, asked: readonly PlaceTrust[]): string[] =>
+export const trustedLines = (factory: string, asked: readonly PlaceTrust[]) =>
   asked.flatMap((one) => {
     if ('unasked' in one) return [`not trusted: ${one.place} was not asked of — ${one.unasked}. Ask again: ${trustCommandOf(factory)}`];
     if (one.wrote)
@@ -69,7 +69,7 @@ export const trustedLines = (factory: string, asked: readonly PlaceTrust[]): str
  * @param untrusted The places whose harness withholds its grants.
  * @param width How many spaces the lines are indented by, before their own two.
  */
-export const untrustedLines = (factory: string, untrusted: readonly Untrusted[], width: number): string[] =>
+export const untrustedLines = (factory: string, untrusted: readonly Untrusted[], width: number) =>
   untrusted
     .filter((one) => one.factory === factory)
     .map(
@@ -88,7 +88,7 @@ type TrustRead = { readonly harness: string; readonly folder: string; readonly g
  * @param trust The harness's trust of the rules' folder; undefined where the harness keeps none.
  * @param factory The factory whose verb asks the trust again; undefined for a run started in none.
  */
-export const untrustedNote = (trust: TrustRead | undefined, factory?: string): string | undefined =>
+export const untrustedNote = (trust: TrustRead | undefined, factory?: string) =>
   trust === undefined || trust.trusted
     ? undefined
     : `Check too that ${trust.harness} trusts ${trust.folder}: it does not, and until it does it withholds ${trust.grants}, ` +

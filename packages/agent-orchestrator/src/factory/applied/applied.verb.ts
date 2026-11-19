@@ -14,8 +14,7 @@ import { Cause, Clock, Duration, Effect } from 'effect';
 import { tried } from '../../runtime-client.ts';
 import type { Args } from '../../command/command.ts';
 import type { Served } from '../../command/entry.verb.ts';
-import { Invalid, type Refusal } from '../../refusal/refusal.ts';
-import type { FeedConflicts } from '../../feed/index.ts';
+import { Invalid } from '../../refusal/refusal.ts';
 import { clonesOf, FactoryDoor, factoryOrNone, refuseName, volumesGiven } from '../door/factories.store.ts';
 import { volumesTrusted, writableRooted } from '../volume/volume.verb.ts';
 import { cloned } from '../clones/clones.verb.ts';
@@ -83,8 +82,8 @@ export type RenderedAt = { name: string; version: string; params: Params; entrie
  * The `--set` words that give `params`, each `<key>=<value>`.
  * @param params The factory's parameters, by name.
  */
-export const setsOf = (params: FactoryTemplate['params']): string[] =>
-  Object.entries(params).map(([key, value]) => `${key}=${String(value)}`);
+export const setsOf = (params: FactoryTemplate['params']) =>
+  Object.entries(params).map(([key, value]) => `${key}=${String(value)}`) satisfies string[] as string[];
 
 /** What a render answers where it does not render: every problem a line, with the template's name and version where they were read. */
 export type Unrendered = { problems: string[]; version?: string; name?: string };
@@ -104,7 +103,7 @@ export const renderedAt = Effect.fn('renderedAt')(function* (source: string, set
 });
 
 /** The template opened as `read`, rendered with `sets` over `held` where it is given, or why it is not (`renderedAt`). */
-function renderOpened(read: OpenTemplate, given: readonly string[], held: Params | undefined): RenderedAt | Unrendered {
+function renderOpened(read: OpenTemplate, given: readonly string[], held: Params | undefined) {
   if (read.problems.length) return { problems: read.problems.map(problemLine), name: read.name };
   const spec = (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec;
   const declared = spec.parameters ?? {};
@@ -124,12 +123,13 @@ function renderOpened(read: OpenTemplate, given: readonly string[], held: Params
 }
 
 /** A condition, as Kubernetes words one. */
-const condition = (type: FactoryConditionType, status: boolean, reason: FactoryConditionReason, message: string): Condition => ({
-  type,
-  status: status ? 'True' : 'False',
-  reason,
-  message,
-});
+const condition = (type: FactoryConditionType, status: boolean, reason: FactoryConditionReason, message: string) =>
+  ({
+    type,
+    status: status ? 'True' : 'False',
+    reason,
+    message,
+  }) satisfies Condition;
 
 /** No upgrade is under way, so nothing waits to be merged. */
 const NO_CONFLICTS = condition('ConflictsPending', false, 'NoUpgrade', 'No upgrade is under way, so no change waits to be merged.');
@@ -138,13 +138,15 @@ const NO_CONFLICTS = condition('ConflictsPending', false, 'NoUpgrade', 'No upgra
  * `render` as an answer that cannot fail: what it rendered, or, for whatever stopped it, its words as the one problem.
  * @param render The render to run, which may fail or die.
  */
-export const renderedOrNot = <R>(
-  render: Effect.Effect<RenderedAt | Unrendered, unknown, R>,
-): Effect.Effect<RenderedAt | Unrendered, never, R> =>
-  render.pipe(Effect.catchCause((cause) => Effect.succeed({ problems: [messageOf(Cause.squash(cause))] })));
+export const renderedOrNot = <R>(render: Effect.Effect<RenderedAt | Unrendered, unknown, R>) =>
+  render.pipe(Effect.catchCause((cause) => Effect.succeed({ problems: [messageOf(Cause.squash(cause))] }))) satisfies Effect.Effect<
+    RenderedAt | Unrendered,
+    never,
+    R
+  > as Effect.Effect<RenderedAt | Unrendered, never, R>;
 
 /** The words of what was thrown or failed. */
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**
  * The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not; and the template's name,
@@ -159,15 +161,12 @@ const templateNow = Effect.fn('templateNow')(function* (factory: Factory & { tem
 });
 
 /** The render `read` as `factory`, applied at `version`, takes it: rendered, or the `Applied` condition that says why it is not. */
-function conditionOf(
-  factory: Factory & { template: FactoryTemplate },
-  version: string,
-  fix: string,
-  read: RenderedAt | Unrendered,
-): RenderedAt | Condition {
+function conditionOf(factory: Factory & { template: FactoryTemplate }, version: string, fix: string, read: RenderedAt | Unrendered) {
   if ('problems' in read) {
     const more = read.problems.length > 1 ? ` (and ${read.problems.length - 1} more: ${fix})` : '';
-    return condition('Applied', false, 'TemplateInvalid', `The template does not render: ${read.problems[0]}${more}`);
+    return condition('Applied', false, 'TemplateInvalid', `The template does not render: ${read.problems[0]}${more}`) satisfies
+      | RenderedAt
+      | Condition;
   }
   if (read.version !== version)
     return condition(
@@ -175,8 +174,8 @@ function conditionOf(
       false,
       'VersionDrift',
       `The template is at version ${read.version}, and ${factory.name} was applied at ${version}: its base and tree are left as they are. Put the template back at ${version}, or upgrade to ${read.version}: nemia factory diff ${factory.name} --to ${read.version}, then nemia factory upgrade ${factory.name} --to ${read.version}.`,
-    );
-  return read;
+    ) satisfies RenderedAt | Condition;
+  return read satisfies RenderedAt | Condition;
 }
 
 /**
@@ -184,52 +183,53 @@ function conditionOf(
  * @param a One parameter set, by name.
  * @param b The other parameter set, by name.
  */
-export const sameParams = (a: FactoryTemplate['params'], b: FactoryTemplate['params']): boolean =>
+export const sameParams = (a: FactoryTemplate['params'], b: FactoryTemplate['params']) =>
   Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([key, value]) => b[key] === value);
 
 /** The `Applied` condition of a base whose digest is `base`, against the template rendered now (`now`) and the status last written. */
-function appliedOf(factory: Factory & { template: FactoryTemplate }, base: string, now: RenderedAt, last: Status | undefined): Condition {
+function appliedOf(factory: Factory & { template: FactoryTemplate }, base: string, now: RenderedAt, last: Status | undefined) {
   if (base === digestOf(now.entries))
     return condition(
       'Applied',
       true,
       'Rendered',
       `The base holds ${factory.template.source} at ${now.version}; the tree is yours to change.`,
-    );
+    ) satisfies Condition;
   if (last !== undefined && !sameParams(last.params, factory.template.params))
     return condition(
       'Applied',
       false,
       'ParamsChanged',
       `The parameters in ${factory.name}'s file differ from those its base was rendered with, and the template's files changed under version ${now.version} too: its base and tree are left as they are. Give the template a new version for its change and upgrade with the parameters, nemia factory diff ${factory.name} --to <version> --set <key>=<value>, then the line it prints; or put the template's files back, and the next pass merges the parameters.`,
-    );
+    ) satisfies Condition;
   return condition(
     'Applied',
     false,
     'ContentChanged',
     `The template's files changed under version ${now.version}: give the template a new version for the change, or put its files back.`,
-  );
+  ) satisfies Condition;
 }
 
 /** The `Applied` condition of a base that is not the template rendered now, where no status names the version it was applied at. */
-const unknownOf = ({ name, template }: Factory & { template: FactoryTemplate }): Condition =>
+const unknownOf = ({ name, template }: Factory & { template: FactoryTemplate }) =>
   condition(
     'Applied',
     false,
     'VersionUnknown',
     `${name}'s base is not ${template.source} at ${template.version}, and no status names the version it was applied at: its base and tree are left as they are. Name that version, nemia factory upgrade ${name} --to <it> [--template <name|folder|archive>], and the next pass checks it against the base.`,
-  );
+  ) satisfies Condition;
 
 /** The conditions of a factory whose base holds the template as an upgrade merged it, the tree holding the merge. */
-const upgraded = (factory: Factory & { template: FactoryTemplate }, version: string): Condition[] => [
-  condition(
-    'Applied',
-    true,
-    'Upgraded',
-    `The base holds ${factory.template.source} at ${version}, and the tree its merge with your changes; the tree is yours to change.`,
-  ),
-  condition('ConflictsPending', false, 'Merged', `The upgrade to ${version} is merged, so no change waits to be merged.`),
-];
+const upgraded = (factory: Factory & { template: FactoryTemplate }, version: string) =>
+  [
+    condition(
+      'Applied',
+      true,
+      'Upgraded',
+      `The base holds ${factory.template.source} at ${version}, and the tree its merge with your changes; the tree is yours to change.`,
+    ),
+    condition('ConflictsPending', false, 'Merged', `The upgrade to ${version} is merged, so no change waits to be merged.`),
+  ] satisfies Condition[];
 
 /** The phase of each proposal `resolutions.json` names, by its name, as read now: `gone` where the store holds it no more. */
 export type ProposalPhases = Readonly<Record<string, ProposalPhase | 'gone'>>;
@@ -272,7 +272,7 @@ export function upgradeMerge(
   switched: boolean,
   proposals: Readonly<Record<string, string>>,
   phases: ProposalPhases,
-): UpgradeMerge {
+) {
   const mergeOf = (render: readonly TreeFile[]) => (switched ? switchTrees(ours, render) : mergeTrees(base, ours, render));
   const sides = [switched ? [] : base, ours, theirs];
   const first = mergeOf(theirs);
@@ -295,16 +295,16 @@ export function upgradeMerge(
  * @param choices The person's choices, by a conflict's address.
  * @param owners The key of the owner whose proposal resolves each conflict, by its address.
  */
-export const choicesUnowned = (
-  choices: Readonly<Record<string, Choice>>,
-  owners: ReadonlyMap<string, string>,
-): Readonly<Record<string, Choice>> => Object.fromEntries(Object.entries(choices).filter(([at]) => !owners.has(at)));
+export const choicesUnowned = (choices: Readonly<Record<string, Choice>>, owners: ReadonlyMap<string, string>) =>
+  Object.fromEntries(Object.entries(choices).filter(([at]) => !owners.has(at))) satisfies Readonly<Record<string, Choice>> as Readonly<
+    Record<string, Choice>
+  >;
 
 /**
  * The owner a key names as a person reads it: `the Agent reviewer`.
  * @param key The owner's key (`ownerKey`).
  */
-export const ownerSaid = (key: string): string => {
+export const ownerSaid = (key: string) => {
   const owner = ownerOfKey(key);
   return `the ${owner.kind} ${owner.name}`;
 };
@@ -313,7 +313,7 @@ export const ownerSaid = (key: string): string => {
  * The line that settles the conflict `conflict` of the factory `name`: where an owner's proposal resolves it, the approve line while the
  * proposal waits, or the resolve line again, saying why, once it ended unapplied; else the resolve line.
  */
-function settleLine(name: string, conflict: Conflict, read: UpgradeMerge): string {
+function settleLine(name: string, conflict: Conflict, read: UpgradeMerge) {
   const owner = read.owners.get(conflict.at);
   const resolved = owner === undefined ? undefined : read.resolved.get(owner);
   const proposal = resolved?.proposal;
@@ -343,7 +343,7 @@ function waiting(
   pending: readonly Conflict[],
   switched: Switched | undefined,
   read: UpgradeMerge,
-): Condition[] {
+) {
   const { name, template } = factory;
   const count = `${pending.length} conflict${pending.length === 1 ? '' : 's'}`;
   const what =
@@ -366,7 +366,7 @@ function waiting(
       'Conflicts',
       `${count} of the ${switched === undefined ? 'upgrade' : 'switch'} to ${template.version} wait for a choice: ${[...new Set(pending.map((c) => settleLine(name, c, read)))].join('; ')}.`,
     ),
-  ];
+  ] satisfies Condition[] as Condition[];
 }
 
 /**
@@ -381,7 +381,7 @@ const upgradeDue = (
   digest: string,
   last: Status | undefined,
   recorded: string | undefined,
-): boolean =>
+) =>
   typeof last?.version === 'string' &&
   digest !== digestOf(now.entries) &&
   (last.version !== factory.template.version ||
@@ -460,7 +460,7 @@ function upgradePass(
  * the condition of its type `last` held (`transitionedAt`), and the generation of `factory` the pass read (`observedGeneration`). Decided
  * from what the pass read alone, so two passes that observe the same keep the same time.
  */
-function stamped(status: Status, last: Status | undefined, at: string, factory: Pick<Factory, 'generation'>): Status {
+function stamped(status: Status, last: Status | undefined, at: string, factory: Pick<Factory, 'generation'>) {
   const conditions = status.conditions.map((c) => {
     const before = last?.conditions.find((was) => was.type === c.type);
     const held = before === undefined ? null : { status: before.status, lastTransitionTime: before.lastTransitionTime ?? null };
@@ -470,7 +470,7 @@ function stamped(status: Status, last: Status | undefined, at: string, factory: 
 }
 
 /** `status` written as the status of `factory`, where it changed; the status. */
-const statusWritten = (home: string, factory: Pick<Factory, 'name'>, status: Status): Status => {
+const statusWritten = (home: string, factory: Pick<Factory, 'name'>, status: Status) => {
   writeStatus(home, factory.name, status);
   return status;
 };
@@ -482,14 +482,14 @@ function observedOf(
   digest: string | null,
   version: string | null,
   last: Status | undefined,
-): Condition {
-  if ('type' in now) return now;
-  if (digest !== null && version === null) return unknownOf(factory);
-  return appliedOf(factory, digest ?? '', now, last);
+) {
+  if ('type' in now) return now satisfies Condition;
+  if (digest !== null && version === null) return unknownOf(factory) satisfies Condition;
+  return appliedOf(factory, digest ?? '', now, last) satisfies Condition;
 }
 
 /** Whether the last status says the base it holds now came by an upgrade to `version`. */
-const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
+const cameByUpgrade = (last: Status | undefined, version: string) =>
   last?.version === version && last.conditions.some((c) => c.type === 'Applied' && c.reason === 'Upgraded');
 
 /**
@@ -531,7 +531,7 @@ export const upgradeComposed = Effect.fn('upgradeComposed')(function* (name: str
   if (typeof last?.version !== 'string' || !upgradeDue(factory, now, digestOf(base), last, recorded)) return undefined;
   const phases = yield* phasesNamed(name, readResolutions(home, name)?.proposals ?? {});
   const { choices, read } = upgradeRead(home, factory, now, base, { ...last, version: last.version }, phases);
-  const unchosen = Object.fromEntries(read.merge.conflicts.map((c): [string, Choice] => [c.at, 'ours']));
+  const unchosen = Object.fromEntries(read.merge.conflicts.map((c) => [c.at, 'ours'] satisfies [string, Choice]));
   const composed = compose(read.merge, { ...unchosen, ...choices });
   return 'entries' in composed ? composed.entries : undefined;
 });
@@ -541,7 +541,7 @@ export const upgradeComposed = Effect.fn('upgradeComposed')(function* (name: str
  * pass, which hands it to the feed (`emitFeed`, `conflictLines`): whether it is `True`, and its message. A factory whose file does not
  * read, that has no status yet, or whose status says no such condition is left out: nothing read, nothing said.
  */
-export const conflictsNow = (): Effect.Effect<FeedConflicts, Refusal> =>
+export const conflictsNow = () =>
   Effect.gen(function* () {
     const listed = yield* (yield* FactoryDoor).factories.listed();
     return listed.flatMap((l) => {
@@ -590,7 +590,7 @@ const namedBase = (
   rendered: string | undefined,
   last: Status | undefined,
   named: string | undefined,
-): string | undefined =>
+) =>
   baseTemplateOf({
     rendered,
     recorded: last?.template,
@@ -610,7 +610,7 @@ function reconciledWith(
   at: string,
   recorded: string | undefined,
   phases: ProposalPhases,
-): Status {
+) {
   const last = readStatus(home, factory.name);
   if (!('type' in now)) stageFolder(appliedDir(home, factory.name), now.entries, true);
   const base = entriesIn(appliedDir(home, factory.name));
@@ -634,7 +634,7 @@ function observed(
   last: Status | undefined,
   named: string | undefined,
   at: string,
-): Status {
+) {
   const current = !('type' in now) && digest === digestOf(now.entries);
   const version = base.length ? (current ? now.version : (last?.version ?? null)) : null;
   const template = base.length ? namedBase(factory, current ? now.name : undefined, last, named) : undefined;
@@ -672,7 +672,7 @@ export const RECONCILE_EVERY: Duration.Input = '5 seconds';
  * The controller, for as long as it runs: a pass each `RECONCILE_EVERY`; a pass that fails is a warning, and the next is tried a pass
  * later.
  */
-export const reconcile = (): Effect.Effect<never, never, StoreRoot> => {
+export const reconcile = () => {
   const pass = Effect.suspend(() => reconcileOnce()).pipe(
     Effect.catchCause((cause) => Effect.logWarning(`The factories could not be reconciled this pass: ${Cause.pretty(cause)}`)),
   );
@@ -680,15 +680,15 @@ export const reconcile = (): Effect.Effect<never, never, StoreRoot> => {
 };
 
 /** The words under `key`, or none. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
-  return typeof value === 'string' ? value : undefined;
+  return (typeof value === 'string' ? value : undefined) satisfies string | undefined as string | undefined;
 };
 
 /** The words given under the flag `key` that takes many, in order. */
-const manyOf = (args: Args, key: string): string[] => {
+const manyOf = (args: Args, key: string) => {
   const value = args[key];
-  return Array.isArray(value) ? value.map(String) : [];
+  return (Array.isArray(value) ? value.map(String) : []) satisfies string[] as string[];
 };
 
 /**

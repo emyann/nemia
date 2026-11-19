@@ -34,7 +34,7 @@ export type SourceSkill = { name: string; dir: string };
 export type SkillJudged = SourceSkill & { library: DefinitionThere; source: string | null };
 
 /** The fix of an agent file the copy does not read: the line deleted from a copy of the file, and that copy copied. */
-const deleteFix = (file: string): string =>
+const deleteFix = (file: string) =>
   `To copy it all the same, copy ${file} somewhere of yours, delete that line there, and copy from that path: nemia agents copy <that path>.`;
 
 /**
@@ -42,14 +42,14 @@ const deleteFix = (file: string): string =>
  * @param file The agent's file.
  * @param as The name the copy takes (`--as`), or undefined to keep the agent's own.
  */
-export function readSource(file: string, as: string | undefined): Source {
+export function readSource(file: string, as: string | undefined) {
   const at = path.resolve(file);
   if (!fs.lstatSync(at, { throwIfNoEntry: false })?.isFile())
     throw new Missing({
       message: `${at} is not there, or is not a file: name an agent's file. nemia agents sources lists the agents the store knows, by file.`,
     });
   if (!at.endsWith('.md')) throw new Invalid({ message: `${at} is not an agent's file: an agent is a <name>.md. Name one.` });
-  const read = (f: string): string | undefined => {
+  const read = (f: string) => {
     try {
       return fs.readFileSync(path.resolve(path.dirname(at), f), 'utf8');
     } catch {
@@ -83,7 +83,7 @@ export function readSource(file: string, as: string | undefined): Source {
  * @param source The agent read (`readSource`).
  * @param home The store's root.
  */
-export function skillsOf(source: Source, home: string): SourceSkill[] {
+export function skillsOf(source: Source, home: string) {
   const names = (source.draft.skills ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -102,7 +102,7 @@ export function skillsOf(source: Source, home: string): SourceSkill[] {
 }
 
 /** Whether `file` holds `text` as it is; false for a file not there. */
-const holds = (file: string, text: string): boolean => {
+const holds = (file: string, text: string) => {
   try {
     return fs.readFileSync(file, 'utf8') === text;
   } catch {
@@ -114,7 +114,7 @@ const holds = (file: string, text: string): boolean => {
  * The library's file `file`, an agent's own, `whose` it is: whether a file is there. Refused as `Invalid`, in `writeAgent`'s words,
  * where it is a link, dangling or not: a write follows a link, out of the library.
  */
-function heldOwn(file: string, whose: string): boolean {
+function heldOwn(file: string, whose: string) {
   const there = fs.lstatSync(file, { throwIfNoEntry: false });
   if (there?.isSymbolicLink())
     throw new Invalid({
@@ -136,7 +136,7 @@ function heldOwn(file: string, whose: string): boolean {
  * @param keep The parts whose library copy is kept (`--keep`), by name or schema file.
  * @param home The store's root.
  */
-export function partsOf(source: Source, skills: readonly SkillJudged[], keep: readonly string[], home: string): Part[] {
+export function partsOf(source: Source, skills: readonly SkillJudged[], keep: readonly string[], home: string) {
   const agents = yoursOf('agents', home);
   const { name } = source.draft;
   const agentFile = path.join(agents, `${name}.md`);
@@ -181,7 +181,7 @@ export function partsOf(source: Source, skills: readonly SkillJudged[], keep: re
  * @param home The store's root.
  * @param schema The schema's file name and its text.
  */
-export function writeCopySchema(home: string, schema: { file: string; text: string }): string {
+export function writeCopySchema(home: string, schema: { file: string; text: string }) {
   const file = path.join(yoursOf('agents', home), schema.file);
   fs.writeFileSync(file, schema.text);
   return file;
@@ -191,7 +191,7 @@ export function writeCopySchema(home: string, schema: { file: string; text: stri
  * Each of `paths` a failed copy wrote, removed, a folder with all it holds.
  * @param paths The files and folders the copy wrote.
  */
-export function removeWritten(paths: readonly string[]): void {
+export function removeWritten(paths: readonly string[]) {
   for (const at of paths) fs.rmSync(at, { recursive: true, force: true });
 }
 
@@ -201,7 +201,7 @@ export function removeWritten(paths: readonly string[]): void {
  * @param name The agent's name in the library.
  * @param file The agent's file copied from.
  */
-export function writeCopyRecord(home: string, name: string, file: string): string {
+export function writeCopyRecord(home: string, name: string, file: string) {
   const at = copyRecordFile(home, name);
   const version = sourceVersion(file, home) ?? '';
   const was = readCopyRecord(home, name);

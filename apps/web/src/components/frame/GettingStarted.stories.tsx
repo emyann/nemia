@@ -44,11 +44,14 @@ export const Fresh: Story = {
   },
 };
 
-/** The harness done: the factory next, whose page a later card adds, so it links nowhere yet. */
+/** The harness done: the factory next, linked to the welcome's factory step; the harness, done, links nowhere. */
 export const HarnessDone: Story = {
   args: { milestones: milestones(['done', 'next', 'later', 'later']) },
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).queryAllByRole('link')).toHaveLength(0);
+    const list = within(canvasElement);
+    await expect(list.queryAllByRole('link', { name: 'A harness' })).toHaveLength(0);
+    await expect(list.getByRole('link', { name: 'A factory' })).toHaveAttribute('href', '/welcome/factory');
+    await expect(list.getAllByRole('link')).toHaveLength(1);
   },
 };
 

@@ -58,26 +58,34 @@ const subjectOf = (line: string): string | undefined => {
 };
 
 /**
- * A test Vitest's reporters say failed: ` FAIL  <file> > <suite> > <test>` in its summary of the failed tests (` FAIL  <file>` alone where
- * the file failed before a test of it ran), its project's name in bars or in a badge before the file where it has several (`|<project>| `,
- * `<project> (<browser>) `), and ` × <suite> > <test> <ms>ms` where the test ran. Its name, without the mark, the project, the file it was
- * in or the time it took, is what says it once (`keyOf`).
+ * A test Vitest's reporters say failed, by the two lines its default reporter prints of one. Where the test ran, ` × <test> <ms>ms`, under
+ * its suites, each on a `❯ <suite>` line of its own above it: its own name alone. In its summary of the failed tests, ` FAIL  <file> >
+ * <suite> > <test>`, the badge of its project before the file where it has several (` <project> ` padded with spaces where it colours,
+ * `|<project>|` where it does not), the file's line after it where it is asked to, ` FAIL  <file> [ <file> ]` for a file that failed
+ * before a test of it ran. `key` says each once (`keyOf`): the summary by its file, the last word before its first ` > `, without its
+ * line, and the suites and the test after it, so no badge is read; the line where it ran by its name, dropped where a summary names that
+ * test (`failures`).
  */
-const VITEST_FAILED = /^\s*(?:FAIL|×)\s+(?:\|[^|]+\|\s+|[^\s>]+ \([^)]+\)\s+)?(.+?)$/;
-
-/** The name of a test Vitest says failed (`VITEST_FAILED`): its suites and its own name, without its file or its time. */
-const vitestTest = (line: string): string | undefined => {
-  const said = VITEST_FAILED.exec(bare(line))?.[1];
-  return said
-    ?.replace(/^[^\s>]+\.\w+ > /, '')
-    .replace(/ \d+(?:\.\d+)?m?s$/, '')
-    .trim();
+const vitestTest = (line: string): { key: string; name: string; summary: boolean } | undefined => {
+  const said = /^\s*(FAIL|×)\s+(.+?)$/.exec(bare(line));
+  if (said === null) return undefined;
+  const [, mark, rest] = said;
+  if (mark === '×') {
+    const name = rest.replace(/ \d+(?:\.\d+)?m?s$/, '').trim();
+    return { key: `× — ${name}`, name, summary: false };
+  }
+  const path = rest.replace(/ \[ [^\]]+ \]$/, '').trim();
+  const at = path.indexOf(' > ');
+  if (at === -1) return { key: `FAIL — ${path.split(/\s+/).at(-1) ?? path}`, name: path, summary: true };
+  const file = (path.slice(0, at).split(/\s+/).at(-1) ?? '').replace(/:\d+$/, '');
+  const named = path.slice(at + 3);
+  return { key: `FAIL — ${file} > ${named}`, name: named.split(' > ').at(-1) ?? named, summary: true };
 };
 
 /**
  * Whether `line` fails a job: a test node's reporters name, `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
  * `✖ failing tests:` the spec reporter lists them again under, the rule of Nemia's own check, copied, since this script imports
- * nothing — a test Vitest says failed (`VITEST_FAILED`), a runner's failed subject (`SUBJECT_FAILED`), a TypeScript error
+ * nothing — a test Vitest says failed (`vitestTest`), a runner's failed subject (`SUBJECT_FAILED`), a TypeScript error
  * (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
  */
 const failing = (line: string): boolean => {
@@ -95,7 +103,7 @@ const failing = (line: string): boolean => {
 /** What says a failing line once: a test Vitest failed by its name, a runner's failure by its subject, any other by the line itself. */
 const keyOf = (line: string): string => {
   const test = vitestTest(line);
-  if (test !== undefined) return `vitest — ${test}`;
+  if (test !== undefined) return test.key;
   const subject = subjectOf(line);
   return subject === undefined ? bare(line).trim() : `FAILED — ${subject}`;
 };
@@ -138,7 +146,8 @@ const postJob = (line: string): boolean =>
  * What a failing job's log says of why it failed: each line that fails it (`failing`) once, in order, with the lines after it that tell
  * why (`detail`, or `told` of a runner's failed subject) — the occurrence that tells most, since the spec reporter prints the test bare
  * where it ran and with its error under `✖ failing tests:`, and a runner its failure where it failed, again from the worker that ran
- * it and again in a headline — bounded by `JOB_LINES`. A log with no such line gives its
+ * it and again in a headline, and Vitest a test where it ran and again in its summary, which alone is kept where both are — bounded by
+ * `JOB_LINES`. A log with no such line gives its
  * last `TAIL_LINES` before GitHub's post-job lines (`postJob`) instead.
  */
 export function failures(log: string): { lines: string[]; tests: boolean } {
@@ -154,10 +163,14 @@ export function failures(log: string): { lines: string[]; tests: boolean } {
     const key = keyOf(line);
     if ((seen.get(key)?.length ?? -1) <= after.length) seen.set(key, [line, ...after]);
   });
-  if (seen.size) return { lines: [...seen.values()].flat().slice(0, JOB_LINES), tests: true };
+  const tests = all.map(vitestTest);
+  const summarised = new Set(tests.flatMap((test) => (test?.summary ? [test.name] : [])));
+  const ran = new Set(tests.flatMap((test) => (test && !test.summary && summarised.has(test.name) ? [test.key] : [])));
+  const kept = [...seen].filter(([key]) => !ran.has(key));
+  if (kept.length) return { lines: kept.flatMap(([, lines]) => lines).slice(0, JOB_LINES), tests: true };
   const cleanup = all.findIndex((line) => /^Post job cleanup\.?$/.test(line.trim()));
-  const ran = cleanup === -1 ? all : all.slice(0, cleanup);
-  return { lines: ran.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };
+  const before = cleanup === -1 ? all : all.slice(0, cleanup);
+  return { lines: before.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };
 }
 
 /**

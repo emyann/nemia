@@ -780,10 +780,12 @@ test("a red ci hands each failed Vitest job's failing lines, and names the URL o
   const GONE_URL = CI_URL.replace('/job/5678', '/job/3456');
   const vitest = stamped([
     `cli:test:  ${ESC}[31m❯${ESC}[39m test/verbs.test.ts (2 tests | 1 failed) 9ms`,
-    `cli:test:    ${ESC}[32m✓${ESC}[39m a verb passes 1ms`,
-    `cli:test:    ${ESC}[31m×${ESC}[39m the verbs > start takes a card 3ms`,
+    `cli:test:    ${ESC}[31m❯${ESC}[39m the verbs`,
+    `cli:test:      ${ESC}[32m✓${ESC}[39m a verb passes 1ms`,
+    `cli:test: ${ESC}[31m      × start takes a card${ESC}[39m${ESC}[2m 3ms${ESC}[22m`,
+    'cli:test:        → expected 1 to be 0',
     'cli:test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯',
-    `cli:test: ${ESC}[41m FAIL ${ESC}[49m test/verbs.test.ts > the verbs > start takes a card`,
+    `cli:test: ${ESC}[41m${ESC}[1m FAIL ${ESC}[22m${ESC}[49m ${ESC}[30m${ESC}[42m node ${ESC}[49m${ESC}[39m test/verbs.test.ts > the verbs > start takes a card`,
     'cli:test: AssertionError: expected 1 to be 0',
     'cli:test:  ❯ test/verbs.test.ts:21:5',
     'cli:test: ⎯⎯⎯⎯⎯⎯⎯[1/1]⎯',
@@ -808,7 +810,7 @@ test("a red ci hands each failed Vitest job's failing lines, and names the URL o
   assert.equal(r.code, 1, `a red the work answers exits as it did:\n${r.out}`);
   assert.match(r.err, /test cli \(job 9012\), the lines that failed it:/, r.err);
   for (const told of [
-    'FAIL  test/verbs.test.ts > the verbs > start takes a card',
+    'test/verbs.test.ts > the verbs > start takes a card',
     'AssertionError: expected 1 to be 0',
     '❯ test/verbs.test.ts:21:5',
   ])

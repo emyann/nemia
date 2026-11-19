@@ -238,6 +238,14 @@
       "term": "Run size",
       "meaning": "how much of a run one drawing says: `xs` its mark in a sentence, `sm` a line, `md` a runs table's row or the floor's card, `lg` the waiting card, `xl` the opened floor card, its panel. Each size says all the one under it does and more (`says`, `apps/web/src/lib/runSays.ts`, proved by `apps/web/contracts/run-says.contract.ts`), and one part draws them all, `Run` (`apps/web/src/components/look/Run.tsx`).",
       "type": "RunSize"
+    },
+    {
+      "term": "Welcome",
+      "meaning": "the page a fresh store opens on, `/welcome`, in place of the empty floor: a store with no harness activated and no factory filed, whose person has not skipped the harness in this browser (`welcomeAsked`, `apps/web/src/lib/welcome.ts`); it activates a harness and shows its two checks (`WelcomePage`, `apps/web/src/components/welcome/WelcomePage.tsx`)."
+    },
+    {
+      "term": "Getting started",
+      "meaning": "the floor's list of a store's four milestones, each as the api reads it from the store, the next one linked to its page, shown until a run has landed or the person dismisses it in this browser (`starterShown`, `apps/web/src/lib/gettingStarted.ts`; `GettingStarted`, `apps/web/src/components/frame/GettingStarted.tsx`)."
     }
   ]
 }

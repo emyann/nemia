@@ -276,3 +276,29 @@ test('`nemia doctor`\'s last line says what the missing pieces cost, never "not 
     assert.equal(last({ ready: true, ran: true, pieces: [{ ...linger, state: 'met' }] }), 'ready');
   });
 });
+
+test("`nemia doctor` lines: a harness's two checks under its install piece, a tick each, the failed one with its fix", () => {
+  const install = {
+    name: 'claude',
+    area: 'harness',
+    state: 'met',
+    message: 'installed',
+    fixes: [],
+    harness: { name: 'claude', part: 'install' },
+    checks: [
+      { name: 'version', state: 'passed', message: 'at the pin', fixes: [] },
+      {
+        name: 'turn',
+        state: 'failed',
+        message: 'it answered nothing',
+        fixes: [{ message: 'sign in', command: 'claude auth login', startable: false, kind: 'typed' }],
+      },
+    ],
+  } as const;
+  const lines = doctorLines({ ready: true, ran: true, pieces: [install] });
+  const at = lines.findIndex((l) => l.includes('claude: installed'));
+  assert.ok(at >= 0, 'the install piece is said');
+  assert.match(lines[at + 1] ?? '', /✓ version/);
+  assert.match(lines[at + 2] ?? '', /✗ turn/);
+  assert.match(lines[at + 3] ?? '', /claude auth login/, "the failed check's fix is under it");
+});

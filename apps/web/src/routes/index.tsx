@@ -1,12 +1,16 @@
 import { useSuspenseQueries, useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { DEFAULT_NAMESPACE } from 'objects';
 import { FactoriesCanvas } from '@/components/factory/FactoriesCanvas';
+import { GettingStartedOnFloor } from '@/components/frame/GettingStarted';
 import { OverviewStrip } from '@/components/frame/OverviewStrip';
 import { ceilingsQuery } from '@/lib/api/ceilings';
 import { daemonQuery } from '@/lib/api/daemon';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { quotaQuery } from '@/lib/api/quota';
+import { milestonesQuery, readinessQuery } from '@/lib/api/readiness';
+import { readHarnessSkipped } from '@/lib/harnessSkip';
+import { welcomeAsked } from '@/lib/welcome';
 import { finishedTodayQuery, openRunsQuery } from '@/lib/api/runs';
 import { holdsRuns, openBlocks } from '@/lib/factories';
 import { dayStartOf } from '@/lib/strip';
@@ -15,6 +19,15 @@ import { dayStartOf } from '@/lib/strip';
 const answered = (factories: readonly Factory[]): string[] => [...new Set([...factories.map((f) => f.name), DEFAULT_NAMESPACE])];
 
 export const Route = createFileRoute('/')({
+  /**
+   * Sends a fresh store on to the welcome as it enters (`welcomeAsked`), decided once at that navigation; a readiness read that fails
+   * sends nowhere.
+   */
+  beforeLoad: async ({ context, cause }) => {
+    if (cause !== 'enter') return;
+    const read = await context.queryClient.ensureQueryData(readinessQuery).catch(() => undefined);
+    if (read !== undefined && welcomeAsked(read.pieces, readHarnessSkipped())) throw redirect({ to: '/welcome', replace: true });
+  },
   /**
    * Waits for the factories and the light answer of each, which the blocks count, for the strip's two reads of the factory in view (the
    * runs not finished, and those finished today), and for its caps, daemon and quota, so the strip has its height before the floor is
@@ -28,6 +41,7 @@ export const Route = createFileRoute('/')({
       client.prefetchQuery(ceilingsQuery),
       client.prefetchQuery(daemonQuery),
       client.prefetchQuery(quotaQuery),
+      client.prefetchQuery(milestonesQuery),
       client
         .ensureQueryData(factoriesQuery)
         .then((factories) => Promise.all(answered(factories).map((name) => client.ensureQueryData(openRunsQuery(name))))),
@@ -44,9 +58,9 @@ export const Route = createFileRoute('/')({
 });
 
 /**
- * The Overview: the strip of every factory, over every factory as a block each (`openBlocks`),
- * which fills the rest of the screen, each counted off its own light answer, the default one shown while its answer counts a run. Each
- * answer is read again on each event of the workflow feed.
+ * The Overview: the store's Getting started list while no run has landed (`GettingStartedOnFloor`), the strip of every factory, over
+ * every factory as a block each (`openBlocks`), which fills the rest of the screen, each counted off its own light answer, the default
+ * one shown while its answer counts a run. Each answer is read again on each event of the workflow feed.
  */
 function Factories() {
   const { data: factories } = useSuspenseQuery(factoriesQuery);
@@ -57,7 +71,8 @@ function Factories() {
   const held = fallback !== undefined && holdsRuns(fallback);
   return (
     <div className="flex min-h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))] flex-col gap-6 pt-5 @3xl/page:h-[calc(100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot))]">
-      <div className="px-3 @lg/page:px-6">
+      <div className="flex flex-col gap-4 px-3 @lg/page:px-6">
+        <GettingStartedOnFloor />
         <OverviewStrip />
       </div>
       <FactoriesCanvas blocks={openBlocks(factories, opens, held)} />

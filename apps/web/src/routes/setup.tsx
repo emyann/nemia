@@ -1,15 +1,19 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import type { Fix, FixPhase, FixStart } from 'objects';
+import type { ReadinessPiece } from 'objects';
+import { CutFrame } from '@/components/look';
 import { FollowedFix } from '@/components/setup/FollowedFix';
+import { HarnessChecks } from '@/components/setup/HarnessChecks';
 import { HarnessChoice, HarnessSkipped } from '@/components/setup/HarnessChoice';
 import { PairingApprovals, PairingsReading } from '@/components/setup/PairingApprovals';
 import { ReadinessList, ReadinessReading } from '@/components/setup/ReadinessList';
 import { approvePairing, pairingsQuery } from '@/lib/api/pairing';
-import { readinessQuery, startFix } from '@/lib/api/readiness';
-import { forgetHarnessSkip, keepHarnessSkip, readHarnessSkipped } from '@/lib/harnessSkip';
-import { harnessAsked, harnessChoices } from '@/lib/setup';
+import { quotaQuery } from '@/lib/api/quota';
+import { readinessQuery } from '@/lib/api/readiness';
+import { quotaTitle } from '@/lib/quota';
+import { harnessAsked } from '@/lib/setup';
+import { useHarnessActivation } from '@/lib/useHarnessActivation';
+import { useNow } from '@/lib/useNow';
 
 /** Settings' Setup, at /setup: what the server needs to run its factories. Its loader reads the readiness read. */
 export const Route = createFileRoute('/setup')({
@@ -27,34 +31,28 @@ export const Route = createFileRoute('/setup')({
 /**
  * The fixes started on this visit, newest first, each followed as it runs; over the read, while no harness is activated and the person has
  * not skipped it in this browser (`harnessAsked`), the question of which to activate (`HarnessChoice`), kept on this visit once one is
- * activated so its install's run and then its sign-in show there; the readiness read, each piece with its fixes, a press starting one
- * the server runs; and the pairings that wait on the person's approval.
+ * activated so its install's run, its sign-in and its two checks show there; each harness activated, its two checks (`HarnessChecks`);
+ * the readiness read, each piece with its fixes, a press starting one the server runs; and the pairings that wait on the person's
+ * approval. The activation is the one the welcome drives too (`useHarnessActivation`).
  */
 function Readiness() {
-  const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(readinessQuery);
-  const [fixes, setFixes] = useState<Fix[]>([]);
-  const [endedAs, setEndedAs] = useState<Record<string, FixPhase>>({});
-  const [activating, setActivating] = useState<string>();
-  const [skipped, setSkipped] = useState(readHarnessSkipped);
-  const start = useMutation({
-    mutationFn: ({ start }: { start: FixStart; key: string }) => startFix(start),
-    onSuccess: (fix) => setFixes((started) => [fix, ...started.filter((f) => f.id !== fix.id)]),
-  });
-  const ended = (fix: Fix) => {
-    setEndedAs((was) => ({ ...was, [fix.id]: fix.phase }));
-    void queryClient.invalidateQueries({ queryKey: readinessQuery.queryKey });
-  };
-  const onStart = (fix: FixStart, key: string) => start.mutate({ start: fix, key });
-  const starts = {
-    onStart,
-    ...(start.isPending ? { starting: start.variables.key } : {}),
-    ...(start.isError ? { refused: { key: start.variables.key, message: start.error.message } } : {}),
-  };
-  const choices = harnessChoices(data.pieces);
-  const chosen = choices.find((choice) => choice.name === activating);
-  const installRun = chosen === undefined ? undefined : fixes.find((fix) => fix.need === chosen.install.name);
-  const others = fixes.filter((fix) => fix !== installRun);
+  const quota = useQuery(quotaQuery);
+  const a = useHarnessActivation(data.pieces);
+  const now = useNow(60_000);
+  const quotaWords = quota.data === undefined ? undefined : quotaTitle(quota.data, new Date(now));
+  const checksOf = (install: ReadinessPiece, signedIn: boolean) => (
+    <HarnessChecks
+      install={a.checkedInstall(install)}
+      {...(signedIn ? { turn: a.turnOf(install.harness?.name ?? install.name) } : {})}
+      {...(quotaWords === undefined ? {} : { quota: quotaWords })}
+      {...a.starts}
+    />
+  );
+  const chosen = a.chosen;
+  const activated = a.choices.filter(
+    (choice) => choice !== chosen && choice.install.state === 'met' && choice.install.checks !== undefined,
+  );
   return (
     <section aria-labelledby="setup-readiness" className="flex flex-col gap-4">
       <h2 id="setup-readiness" className="text-title-medium font-title-medium">
@@ -62,46 +60,36 @@ function Readiness() {
       </h2>
       {chosen !== undefined ? (
         <HarnessChoice
-          choices={choices}
+          choices={a.choices}
           activation={{
             choice: chosen,
-            ...(installRun === undefined ? {} : { run: <FollowedFix key={installRun.id} fix={installRun} onEnded={ended} /> }),
-            installed: chosen.install.state === 'met' || (installRun !== undefined && endedAs[installRun.id] === 'succeeded'),
+            ...(a.installRun === undefined ? {} : { run: <FollowedFix key={a.installRun.id} fix={a.installRun} onEnded={a.ended} /> }),
+            installed: a.installed,
+            checks: checksOf(chosen.install, chosen.signIn?.state === 'met'),
           }}
-          {...starts}
+          {...a.starts}
         />
-      ) : harnessAsked(data.pieces, skipped) ? (
-        <HarnessChoice
-          choices={choices}
-          onSkip={() => {
-            keepHarnessSkip();
-            setSkipped(true);
-          }}
-          {...starts}
-          onStart={(fix, key) => {
-            const name = choices.find((choice) => choice.install.name === fix.need)?.name;
-            start.mutate({ start: fix, key }, { onSuccess: () => setActivating(name) });
-          }}
-        />
+      ) : harnessAsked(data.pieces, a.skipped) ? (
+        <HarnessChoice choices={a.choices} onSkip={a.skip} {...a.starts} onStart={a.activate} />
       ) : (
-        skipped &&
-        harnessAsked(data.pieces, false) && (
-          <HarnessSkipped
-            onAskAgain={() => {
-              forgetHarnessSkip();
-              setSkipped(false);
-            }}
-          />
-        )
+        a.skipped && harnessAsked(data.pieces, false) && <HarnessSkipped onAskAgain={a.askAgain} />
       )}
-      {others.length > 0 && (
+      {activated.map((choice) => (
+        <CutFrame key={choice.name} size={12}>
+          <section data-harness-activated={choice.name} aria-label={`${choice.name}'s checks`} className="flex flex-col gap-1 p-4">
+            <h3 className="text-title-small font-title-small">{choice.install.message}</h3>
+            {checksOf(choice.install, choice.signIn?.state === 'met')}
+          </section>
+        </CutFrame>
+      ))}
+      {a.others.length > 0 && (
         <div data-fix-runs className="flex flex-col gap-3">
-          {others.map((fix) => (
-            <FollowedFix key={fix.id} fix={fix} onEnded={ended} />
+          {a.others.map((fix) => (
+            <FollowedFix key={fix.id} fix={fix} onEnded={a.ended} />
           ))}
         </div>
       )}
-      <ReadinessList readiness={data} {...starts} />
+      <ReadinessList readiness={data} {...a.starts} />
     </section>
   );
 }

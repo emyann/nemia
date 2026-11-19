@@ -409,7 +409,7 @@ const daemon = (
     yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(retain([leaseRelease(runningRelease())])), over(e)));
     yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(releaseCheck(runningRelease()))));
     let ready: Readiness | undefined;
-    yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(readied(memo, (read) => void (ready = read)))));
+    yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(readied(memo, (read) => void (ready = read))), over(e)));
     yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;

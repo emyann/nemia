@@ -14,9 +14,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { Effect, Exit } from 'effect';
+import { Effect, Exit, Option } from 'effect';
 import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, memoryBytesOf } from 'agent-runtime/vocabulary';
-import type { Need, NeedState, Readiness, ReadinessCost, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
+import type { HarnessCheck, Need, NeedState, Readiness, ReadinessCost, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { pathLedByTools, StoreRoot, toolsBinDir, toolsDir } from '../config/root.store.ts';
 import {
   cgroupParent,
@@ -39,7 +39,8 @@ import { factoryFills } from '../factory/rules/rules.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { PlaceService } from '../place/place.store.ts';
-import { tried, trustedFolder } from '../runtime-client.ts';
+import { EngineService, tried, trustedFolder } from '../runtime-client.ts';
+import { latestTurnCheck, turnHarnesses } from '../harness-turn/harness-turn.verb.ts';
 import { nemiaDir, readUntrusted } from '../nemia/level.store.ts';
 import { archiveInstall, type Running } from '../release/index.ts';
 import { toolsNeed, toolsNemia } from '../release/nemia-link.store.ts';
@@ -512,9 +513,54 @@ const needPiece = (
  * What the version command of the harness `name` answered, in the store `home`, with the tools folder first on its PATH: the first
  * `x.y.z` it printed, none where it did not start or printed none.
  */
-const versionFound = (home: string, facts: ReadinessFacts, command: string): string | undefined => {
+const versionFound = (home: string, facts: ReadinessFacts, command: string): { found?: string; printed: string } => {
   const ran = facts.run('env', [`PATH=${pathLedByTools(home, facts.env.PATH)}`, `NEMIA_TOOLS=${toolsDir(home)}`, 'sh', '-c', command]);
-  return ran === undefined || ran.code !== 0 ? undefined : versionIn(ran.out);
+  const printed = ran?.out.trim() ?? '';
+  const found = ran === undefined || ran.code !== 0 ? undefined : versionIn(ran.out);
+  return found === undefined ? { printed } : { found, printed };
+};
+
+/** The last line `printed` says, cut to 300 characters, or none. */
+const lastSaid = (printed: string): string | undefined => {
+  const line = printed
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '')
+    .at(-1);
+  return line === undefined ? undefined : line.slice(0, 300);
+};
+
+/**
+ * The version check of a harness's install in place: passed where its program answers the pin; failed, with the install offered again
+ * (index 0), where it answers another version, stating both, or none, in what it printed.
+ */
+const versionCheck = (
+  need: Need,
+  needs: { readonly title: string; readonly pin: string },
+  read: { found?: string; printed: string },
+): HarnessCheck => {
+  const { found } = read;
+  const word = harnessVersionWord(found, needs.pin);
+  const fixes = needFixes(need, 'missing').filter((fix) => fix.index === 0);
+  if (word === 'tested' && found !== undefined)
+    return { name: 'version', state: 'passed', message: VERSION_WORDS.tested(found), fixes: [], found, pin: needs.pin };
+  if (found !== undefined)
+    return {
+      name: 'version',
+      state: 'failed',
+      message: `${needs.title} answers ${found}, and this release was tested with ${needs.pin}: install ${needs.pin} again`,
+      fixes,
+      found,
+      pin: needs.pin,
+    };
+  const said = lastSaid(read.printed);
+  return {
+    name: 'version',
+    state: 'failed',
+    message: `${needs.title}'s version could not be read by running it${said === undefined ? '' : `: ${said}`}`,
+    fixes,
+    pin: needs.pin,
+  };
 };
 
 /** What the read says of the version found against the pin, by `harnessVersionWord`. */
@@ -616,12 +662,20 @@ function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wan
     const read = memo.readings.get(checkKey(harnessCheckOf(need)));
     if (of.part === 'install') {
       if (read !== 'met') return [needPiece(need, 'harness', read, undefined, undefined, harness)];
-      const found = versionFound(home, facts, of.needs.version);
+      const ran = versionFound(home, facts, of.needs.version);
+      const found = ran.found;
       const word = harnessVersionWord(found, of.needs.pin);
       const said = word === 'unread' ? VERSION_WORDS.unread() : VERSION_WORDS[word](found ?? '', of.needs.pin);
-      return [
-        needPiece(need, 'harness', read, undefined, undefined, harness, `${of.needs.title} (${of.needs.program}) is installed: ${said}`),
-      ];
+      const installed = needPiece(
+        need,
+        'harness',
+        read,
+        undefined,
+        undefined,
+        harness,
+        `${of.needs.title} (${of.needs.program}) is installed: ${said}`,
+      );
+      return [{ ...installed, checks: [versionCheck(need, of.needs, ran)] }];
     }
     if (need.name !== signInNeedOf(DEFAULT_HARNESS)) return [needPiece(need, 'harness', read, undefined, undefined, harness)];
     const status = claudeTokenStatus(home);
@@ -772,10 +826,32 @@ function releasePiece(home: string, facts: ReadinessFacts): ReadinessPiece {
 }
 
 /**
+ * `pieces`, each harness's install piece that carries a version check, of a harness that runs check turns (`turnHarnesses`), given its
+ * turn check after it (`latestTurnCheck`): its latest
+ * turn as the engine answers it, or `unrun`. Where the program was given no engine (a doctor run in this process alone), the version
+ * check alone: no turn is read that cannot be.
+ */
+const withTurnChecks = Effect.fnUntraced(function* (home: string, pieces: readonly ReadinessPiece[]) {
+  const engine = yield* Effect.serviceOption(EngineService);
+  if (Option.isNone(engine)) return [...pieces];
+  const out: ReadinessPiece[] = [];
+  for (const p of pieces) {
+    if (p.checks === undefined || p.harness === undefined || !turnHarnesses().includes(p.harness.name)) {
+      out.push(p);
+      continue;
+    }
+    const turn = yield* latestTurnCheck(home, p.harness.name).pipe(Effect.provideService(EngineService, engine.value));
+    out.push({ ...p, checks: [...p.checks, turn] });
+  }
+  return out;
+});
+
+/**
  * Every piece of the store's server, in the read's order (`Readiness`), `ready` where none is missing, and whether a run was ever
  * started here (`ran`). The needs are read off this process's memory (`NeedsMemory`) where it keeps one that has swept, else every
  * check is run now on a memory of the read's own, the place's and the harnesses' needs among them; a check with no reading is
- * `unknown`.
+ * `unknown`. A harness's install piece in place carries its two checks (`checks`): its version against the pin, and its latest check
+ * turn where the program was given the engine (`withTurnChecks`).
  */
 export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessFacts = liveFacts()) {
   const home = yield* StoreRoot;
@@ -799,5 +875,6 @@ export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessF
     releasePiece(home, facts),
   ];
   const ran = (yield* (yield* RunDoor).runs.ids()).length > 0;
-  return { ready: pieces.every((p) => p.state !== 'missing'), pieces, ran } satisfies Readiness;
+  const checked = yield* withTurnChecks(home, pieces);
+  return { ready: checked.every((p) => p.state !== 'missing'), pieces: checked, ran } satisfies Readiness;
 });

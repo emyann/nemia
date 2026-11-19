@@ -45,6 +45,7 @@ export const ROOTS = [
   'apps/web/src/lib/tryAddress.ts',
   'apps/web/src/lib/upgrade.ts',
   'apps/web/src/lib/viewers.ts',
+  'apps/web/src/lib/welcome.ts',
   'apps/web/test/e2e/stories/touched.ts',
   'apps/web/test/baseline.ts',
   'apps/web/test/stories.ts',

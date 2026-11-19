@@ -44,6 +44,7 @@ export const tabsOf = (path: string): readonly SettingsTab[] | undefined =>
 /** The store's pages, each with the rail destination it sits under, in the order they are read: the first that holds the path wins. */
 const STORE_SEATS: readonly { lights: (path: string) => boolean; rail: RailId | 'nemia'; name: string }[] = [
   { lights: (path) => path === '/', rail: 'factories', name: 'Factories' },
+  { lights: (path) => path === '/welcome', rail: 'factories', name: 'Welcome' },
   { lights: (path) => under('/runs')(path) || under('/labels')(path), rail: 'waiting', name: 'Runs' },
   { lights: under('/inbox'), rail: 'waiting', name: 'Inbox' },
   { lights: under('/agents/skills'), rail: 'skills', name: 'Skills' },

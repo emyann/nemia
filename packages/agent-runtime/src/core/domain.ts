@@ -29,6 +29,7 @@ export type {
   Bridge,
   Denial,
   Usage,
+  SpentSoFar,
   EndReason,
   Event,
   Said,

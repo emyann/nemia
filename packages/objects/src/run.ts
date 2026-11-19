@@ -347,7 +347,9 @@ export const RunStepStatus = Schema.Struct({
   check: Schema.NullOr(StepCheck).annotate({ description: "Its current try's check; null for a step with no check: line or none filed." }),
   attempts: StepAttempts,
   used: Schema.NullOr(StepUsed).annotate({ description: 'What its tries consumed; null where nothing was measured.' }),
-  spent: Schema.NullOr(Spent).annotate({ description: "What its tries' sessions cost together; null until one was measured." }),
+  spent: Schema.NullOr(Spent).annotate({
+    description: "What its tries' sessions cost together; null until one was measured or a session at work said what it has spent.",
+  }),
   budget: Schema.NullOr(StepBudget).annotate({
     description: 'Its cap in dollars and what its tries have cost of it, and whether they are over; null for a step with no budget.',
   }),
@@ -459,10 +461,16 @@ export const RunDrift = Schema.Struct({
   ),
 });
 
-/** What one step of a run has cost, every try's session together; `cost` null until one was measured. */
+/**
+ * What one step of a run has cost, every try's session together; `cost` null until one was measured or a session at work said what it
+ * has spent.
+ */
 export const StepCost = Schema.Struct({
   step: Schema.String.annotate({ description: 'The step, by name.' }),
-  cost: Schema.NullOr(Spent).annotate({ description: "What every try's session of the step cost together; null until one was measured." }),
+  cost: Schema.NullOr(Spent).annotate({
+    description:
+      "What every try's session of the step cost together; null until one was measured or a session at work said what it has spent.",
+  }),
 }).annotate({ identifier: 'StepCost' });
 export type StepCost = typeof StepCost.Type;
 
@@ -493,7 +501,9 @@ export const RunStatus = Schema.Struct({
   moving: Schema.Boolean.annotate({
     description: 'Whether anything of the run is in flight or due: a session or check at work, or something the next pass would file.',
   }),
-  cost: Schema.NullOr(Spent).annotate({ description: 'What every try of every step has cost together; null until one was measured.' }),
+  cost: Schema.NullOr(Spent).annotate({
+    description: 'What every try of every step has cost together; null until one was measured or a session at work said what it has spent.',
+  }),
   atWork: Schema.NullOr(
     Schema.Struct({
       ms: Schema.Finite.annotate({ description: 'The milliseconds its sessions and checks have been at work.' }),

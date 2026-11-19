@@ -11,7 +11,7 @@
  * (`look/run.recipe.ts`), the grain's own media rule, the sticker's breakdown and the agent's plate (`agent/AgentParts.tsx`), and one
  * dense page.
  */
-import { outsideExactly, outsideOnce, type UnapprovedOf } from '../contracts/approved-pictures.contract.ts';
+import type { UnapprovedOf } from '../contracts/approved-pictures.contract.ts';
 import type { Scheme } from './scheme.ts';
 
 /** The approved pictures' folder, from the board's folder. */
@@ -54,22 +54,10 @@ export const pictureFile = (name: string): string => {
  * @param light The ids the light pictures are named by.
  * @param canaries The light canaries.
  */
-export const unapprovedOf: UnapprovedOf = (stories, dark, light, canaries) => {
-  outsideOnce(stories, dark);
-  outsideOnce(dark, stories);
-  outsideOnce(canaries, light);
-  outsideOnce(light, canaries);
-  outsideOnce(canaries, stories);
-  outsideExactly(stories, dark);
-  outsideExactly(dark, stories);
-  outsideExactly(canaries, light);
-  outsideExactly(light, canaries);
-  outsideExactly(canaries, stories);
-  return {
-    unpictured: stories.filter((id) => !dark.includes(id)),
-    stray: dark.filter((id) => !stories.includes(id)),
-    lightUnpictured: canaries.filter((id) => !light.includes(id)),
-    lightStray: light.filter((id) => !canaries.includes(id)),
-    notAStory: canaries.filter((id) => !stories.includes(id)),
-  };
-};
+export const unapprovedOf: UnapprovedOf = (stories, dark, light, canaries) => ({
+  unpictured: stories.filter((id) => !dark.includes(id)),
+  stray: dark.filter((id) => !stories.includes(id)),
+  lightUnpictured: canaries.filter((id) => !light.includes(id)),
+  lightStray: light.filter((id) => !canaries.includes(id)),
+  notAStory: canaries.filter((id) => !stories.includes(id)),
+});

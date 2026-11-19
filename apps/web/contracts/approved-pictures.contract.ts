@@ -7,7 +7,7 @@
  * off each story file), the ids the dark pictures are named by, the ids the light pictures are named by, and the canaries
  * (`LIGHT_CANARIES`). `test/approved.test.ts` refuses the folder while any list of the answer holds a value.
  */
-import { type Implementation, lemma, spec } from '@emyann/tsverify';
+import { type Implementation, spec } from '@emyann/tsverify';
 
 /** What the approved folder owes or holds astray, each list of story ids once each, in the order of the list it comes from. */
 export type Unapproved = {
@@ -30,23 +30,7 @@ const once = (list: readonly string[]): boolean => list.every((one, at) => !list
 const exactly = (out: readonly string[], from: readonly string[], keep: (one: string) => boolean): boolean =>
   from.every((one) => out.includes(one) === keep(one)) && out.every((one) => from.includes(one));
 
-/** The ids of a list another does not hold, kept by `filter`, are each once where the list's were: proved once, then known at each list. */
-export const outsideOnce = lemma(
-  (from: readonly string[], among: readonly string[]) => once(from.filter((id) => !among.includes(id))),
-  { requires: (from) => once(from) },
-);
-
-/** The ids of a list another does not hold, kept by `filter`, are exactly those: proved once, then known at each list. */
-export const outsideExactly = lemma((from: readonly string[], among: readonly string[]) =>
-  exactly(
-    from.filter((id) => !among.includes(id)),
-    from,
-    (id) => !among.includes(id),
-  ),
-);
-
 const unapprovedSpec = spec<(stories: readonly string[], dark: readonly string[], light: readonly string[], canaries: readonly string[]) => Unapproved>({
-  requires: ({ input: [stories, dark, light, canaries] }) => once(stories) && once(dark) && once(light) && once(canaries),
   ensures: {
     unpicturedExactly: {
       description: 'A story is owed its dark picture exactly when the folder holds none of it',
@@ -68,10 +52,25 @@ const unapprovedSpec = spec<(stories: readonly string[], dark: readonly string[]
       description: 'A canary is refused exactly when it names no story',
       condition: ({ input: [stories, , , canaries], output }) => exactly(output.notAStory, canaries, (id) => !stories.includes(id)),
     },
-    eachOnce: {
-      description: 'Each list of the answer names an id once',
-      condition: ({ output }) =>
-        once(output.unpictured) && once(output.stray) && once(output.lightUnpictured) && once(output.lightStray) && once(output.notAStory),
+    unpicturedOnce: {
+      description: 'The stories owed a picture are named once each where the stories are',
+      condition: ({ input: [stories], output }) => !once(stories) || once(output.unpictured),
+    },
+    strayOnce: {
+      description: 'The stray dark pictures are named once each where the dark pictures are',
+      condition: ({ input: [, dark], output }) => !once(dark) || once(output.stray),
+    },
+    lightUnpicturedOnce: {
+      description: 'The canaries owed a light picture are named once each where the canaries are',
+      condition: ({ input: [, , , canaries], output }) => !once(canaries) || once(output.lightUnpictured),
+    },
+    lightStrayOnce: {
+      description: 'The stray light pictures are named once each where the light pictures are',
+      condition: ({ input: [, , light], output }) => !once(light) || once(output.lightStray),
+    },
+    notAStoryOnce: {
+      description: 'The canaries naming no story are named once each where the canaries are',
+      condition: ({ input: [, , , canaries], output }) => !once(canaries) || once(output.notAStory),
     },
   },
 });

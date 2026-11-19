@@ -1105,8 +1105,11 @@ describe("a card and a brief work on the repository the factory's wiring names, 
 
 describe('a factory with no writable volume: a start refused naming the volume add, then one given a repository starts on it', () => {
   let build!: string;
+  let notes!: string;
+  let repo!: string;
   beforeAll(async () => {
     const t = teardowns();
+    [notes, repo] = [scratch('wf-volume-notes-'), aRepo()];
     ({ build } = aTeam());
     await typedFrom(ROOT, ['factory', 'add', 'empty']);
     attachWorkflowAt(ROOT, { factory: 'empty', workflow: 'build' });
@@ -1114,7 +1117,6 @@ describe('a factory with no writable volume: a start refused naming the volume a
     return t.end;
   });
   const s = story(test);
-  const [notes, repo] = [scratch('wf-volume-notes-'), aRepo()];
   const startIn = () => startTypedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'empty', '--no-worktree']);
   s.test('REFUSED: no volume at all, naming the volume add with :rw', async () => {
     await startRefused(startIn, 'Invalid', 'nemia factory volume add empty <path|url>:rw');

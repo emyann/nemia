@@ -1,6 +1,6 @@
 /** The configuration a step's task is filed with, built in one place for its first filing, a try, a round, and the asks before them. */
 import path from 'node:path';
-import { Option, Schema } from 'effect';
+import { isObject } from 'effect/Predicate';
 import { modeOf, sessionContext, type StepSpec } from '../workflow.ts';
 import { isFolderTeam, sandboxed, writesNothing, writesOutsideByRule } from '../workflow/index.ts';
 import { filedAllows, filedDenies } from '../ending/ending.ts';
@@ -235,15 +235,17 @@ function inHomeOwn<Own extends object>(
   return { own: { ...withSkills, [harness]: { ...flags, settings } }, skipped: true };
 }
 
-/** A harness's settings given inline: a JSON object, its keys kept whole. */
-const settingsIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
-
 /** A harness's settings given inline as a JSON object, read; none given reads as an empty one, and a file or no object as undefined. */
 const settingsObject = (given: unknown): Record<string, unknown> | undefined => {
   if (given === undefined) return {};
   if (typeof given !== 'string') return undefined;
-  const read = Option.getOrUndefined(settingsIn(given));
-  return Array.isArray(read) ? undefined : read;
+  let read: unknown;
+  try {
+    read = JSON.parse(given);
+  } catch {
+    return undefined;
+  }
+  return isObject(read) ? read : undefined;
 };
 
 /**

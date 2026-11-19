@@ -605,6 +605,14 @@
       }
     },
     {
+      // Kept: a pure file loads no Effect but Data and Predicate (test/boundary.test.ts): a step's inline harness settings reach it as a
+      // string of its harness arguments and leave it as one, so it parses them to unknown and narrows them with Predicate.
+      "files": ["packages/agent-orchestrator/src/filed/filed.ts"],
+      "rules": {
+        "no-restricted-properties": "off"
+      }
+    },
+    {
       // Kept: the code's own Map keys, made by JSON.stringify of a tuple and parsed back: no boundary.
       "files": [
         "packages/agent-orchestrator/src/disk/disk.ts",

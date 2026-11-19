@@ -87,6 +87,17 @@ const QueuedCommand = Schema.Struct({
 });
 
 /**
+ * The spend Claude Code tells a session with a dollar cap (`maxBudgetUsd`) before each request, written into its transcript as an
+ * attachment: `used` the attempt's own spend so far and `total` its own cap, in dollars (`docs/harness.md`, *What a session has spent*).
+ */
+const BudgetUsd = Schema.Struct({
+  type: Schema.Literal('budget_usd'),
+  used: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
+  total: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
+  remaining: Schema.Finite,
+});
+
+/**
  * The lines of a Claude Code transcript the runtime reads, by `type`, in what it reads of each; every other key is not checked. A
  * field the runtime starts reading is added here.
  * Exported only for the tests that import it.
@@ -113,7 +124,7 @@ export const LINES = {
   attachment: Schema.Struct({
     type: Schema.Literal('attachment'),
     ...Said,
-    attachment: Schema.optional(Schema.Union([QueuedCommand, otherThan(['queued_command'])])),
+    attachment: Schema.optional(Schema.Union([QueuedCommand, BudgetUsd, otherThan(['queued_command', 'budget_usd'])])),
   }),
   'cost-state': Schema.Struct({
     type: Schema.Literal('cost-state'),

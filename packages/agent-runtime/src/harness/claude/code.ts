@@ -44,7 +44,7 @@ import {
 } from '../detached/detached.ts';
 import { readJobHold, type JobHold } from './job-hold.ts';
 import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
-import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
+import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords, claudeTranscriptSpent } from './transcript.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_DECLARATION, bridgeAsked, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
 import { projectMcpConfig } from '../mcp.ts';
@@ -224,7 +224,7 @@ export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signIn
   readOutput: claudeStreamOutput,
   keepOutput: claudeStreamKept,
   start: CLAUDE_INIT_START,
-  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords },
+  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords, spent: claudeTranscriptSpent },
   streams: true,
   partials: claudePartials,
   prepare: (r, beside) => claudePrepare(r, beside, hold, executable, signInMs, harnessBin),

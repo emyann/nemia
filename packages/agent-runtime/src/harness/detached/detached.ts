@@ -20,7 +20,7 @@
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Denial, Sighting, Usage } from '../../core/index.ts';
+import type { Denial, Sighting, SpentSoFar, Usage } from '../../core/index.ts';
 import { RunnerError, type RunnerOps, type SessionKept, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { forgetFiles, keptOf } from '../forget.ts';
 import { readTranscript } from '../transcript.ts';
@@ -112,11 +112,14 @@ export type HarnessSpec = {
    * byte offset it starts at, and the file, for a refusal to name. Absent, the runner has no `transcript`, and `logs` is what it gives.
    * `records`, optional, finds the record of many sessions in one pass, each id's paths, where `file` asked once an id would
    * list the harness's folders once an id.
+   * `spent`, optional, is what the session at work has spent so far by its record `file`, as the harness wrote it there at or after
+   * `since`, the run's start in ms (`Sighting.spent`); a throw is a line of it that does not decode.
    */
   transcript?: {
     file: (nativeId: string) => string | undefined;
     events: (entry: unknown, offset: number, file: string) => TranscriptEvent[];
     records?: (nativeIds: readonly string[]) => Map<string, string[]>;
+    spent?: (file: string, since: number) => SpentSoFar | undefined;
   };
   /**
    * Why a session of this harness cannot be told anything while it runs, in its own words and saying what to
@@ -913,7 +916,26 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
     const { as, output, warning } = lookOf(spec, name, run, word, () => outputOf(name, run, word), logFile(name));
     if (as === 'unread') return { warning };
     const usage = usageOf(run, output?.read, all);
-    return { sighting: sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed'), warning };
+    const sighting = sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed');
+    const live = sighting.state === 'working' && usage?.costUsd === undefined ? spentOf(run) : undefined;
+    if (live && 'wrong' in live) return { sighting, warning: [warning, live.wrong].filter(Boolean).join('; ') };
+    return { sighting: live ? { ...sighting, spent: live.spent } : sighting, warning };
+  };
+
+  /**
+   * What a run at work has spent so far, by its harness's own record (`transcript.spent`), read afresh on every look: `{ wrong }` where
+   * a line of it does not decode, and undefined for a spec that reads none, a run with no session id yet, or a record that says none.
+   */
+  const spentOf = (run: RunFile): { spent: SpentSoFar } | { wrong: string } | undefined => {
+    const read = spec.transcript?.spent;
+    const file = read && run.nativeId ? spec.transcript?.file(run.nativeId) : undefined;
+    if (!read || file === undefined) return undefined;
+    try {
+      const spent = read(file, startOf(run));
+      return spent ? { spent } : undefined;
+    } catch (cause) {
+      return { wrong: cause instanceof Error ? cause.message : String(cause) };
+    }
   };
 
   return {

@@ -48,6 +48,12 @@ export type Sighting = {
   nativeId?: string;
   /** What the session has consumed, as far as its runner could measure. Absent when it could not. */
   usage?: Usage;
+  /**
+   * What the session at work has spent so far, as its harness last told it (`SpentSoFar`): a figure it is still adding to, never a
+   * measured cost. Absent from a harness that says none, from a session told nothing yet, and once its process has ended. **Carried,
+   * never judged**: `decide` does not read it.
+   */
+  spent?: SpentSoFar;
   /** How the harness's process exited. A fact about the process, not a verdict on the work. */
   exitCode?: number;
   /** What the process left in its task's `terminationMessagePath` when it exited, for a harness that reads one. */
@@ -238,6 +244,13 @@ export type Denial = { tool: string; what?: string };
  * that measured nothing reports no usage at all, so its attempt records `null`. A zero that means
  * "nobody counted" reads as "cost nothing", which is the one reading a record must never allow.
  */
+/**
+ * What a session at work has spent so far, as its harness said it while it ran: `usd`, the attempt's own dollars, `capUsd`, the cap
+ * its harness holds the attempt to, and `at`, when it said so, an ISO time. Read afresh from the harness's own record on every look,
+ * never added up across looks; the attempt's measured cost (`Usage.costUsd`), once it has one, replaces it.
+ */
+export type SpentSoFar = { usd: number; capUsd: number; at: string };
+
 export type Usage = {
   /**
    * Model responses, each counted once however many lines it was written as. Absent from a runner

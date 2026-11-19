@@ -12,7 +12,7 @@ import { freezeHomeFiles, homeFilesDir, homeFilesOf, startFoundAt } from './froz
 import { Invalid } from '../refusal/refusal.ts';
 
 /** A factory's tree holding `home/`, with the files given, by their paths from it. */
-const treeWith = (files: Record<string, string>): string => {
+const treeWith = (files: Record<string, string>) => {
   const tree = scratch('wf-home-tree-');
   for (const [at, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(tree, 'home', at)), { recursive: true });

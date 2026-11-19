@@ -22,7 +22,7 @@ import { runRecord } from '../src/record/record.store.ts';
 import { homeFilesDir } from '../src/frozen/frozen.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { factsOf, typed as onHandler, type StartedAnswer } from './typed.ts';
+import { factsOf, typed as onHandler } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 import { COMMAND_WORDS } from 'objects';
 import type { Place } from '../src/runner.ts';
@@ -34,8 +34,10 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RU
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? onHandler(argv, e, undefined, place, env)
+    : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** Each task the stage's engine was filed, by id, as the run handed it. */
@@ -45,7 +47,7 @@ const filedFor = (id: string, step: string) => filings().get(runRecord(ROOT, id)
 /** One pass of the run `id`, on the stage's engine. */
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 /** What `nemia start` answers: what its handler answered, and the facts the client words (`StartedAnswer`). */
-const started = async (argv: string[]): Promise<StartedAnswer> => factsOf((await stage.main(['start', ...argv])) as Started);
+const started = async (argv: string[]) => factsOf((await stage.main(['start', ...argv])) as Started);
 
 describe("a run of a factory with a home: frozen at start, its switches recorded, and every filing of a step started in the run's copy", () => {
   let repo = '';

@@ -14,14 +14,14 @@ import type { Run } from '../../record/record.ts';
 const WS = '/wt/run';
 const HOME = '/runs/r/home/abc';
 
-const stepOf = (lines = ''): StepSpec => parseWorkflow('design', `---\nplace: git\n${lines}---\nDesign.\n`);
+const stepOf = (lines = '') => parseWorkflow('design', `---\nplace: git\n${lines}---\nDesign.\n`);
 
 /** A step that writes contracts alone, in `dontAsk`, as a design step of a factory does. */
 const DESIGN = stepOf('permissionMode: dontAsk\nallowedTools: ["Edit(packages/*/contracts/*.contract.ts)", "Bash(cd ${{ workspace }})"]\n');
 /** A step whose fence writes nothing: `dontAsk` with no `Edit` rule. */
 const READER = stepOf('permissionMode: dontAsk\nallowedTools: ["Bash(cd ${{ workspace }})"]\n');
 
-const found = (over: Partial<StartFound> = {}): StartFound => ({ home: HOME, mcp: false, skills: {}, ...over });
+const found = (over: Partial<StartFound> = {}) => ({ home: HOME, mcp: false, skills: {}, ...over }) satisfies StartFound;
 
 const filed = (step: StepSpec, t: { start?: StartFound; workspace?: string; run?: Partial<Run>; own?: Record<string, unknown> } = {}) =>
   filedConfig(

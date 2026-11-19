@@ -51,9 +51,9 @@ const reach = {
 };
 
 const full = {
-  repo: '/work/nemia',
+  repo: '/work/acme',
   skills: [{ name: 'look', description: 'Look at the board.', source: '.claude/skills/look/SKILL.md' }],
-  agents: [{ name: 'grace', description: null, source: '.claude/agents/grace.md' }],
+  agents: [{ name: 'implementer', description: null, source: '.claude/agents/implementer.md' }],
   mcp: [
     {
       name: 'docs',

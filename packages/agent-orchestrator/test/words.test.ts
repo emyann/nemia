@@ -193,7 +193,7 @@ export type Baseline = Readonly<Record<string, Entry>>;
  * guard is the reader, which takes the keys only under the harness's block; here the code's fields still carry them.
  */
 const FENCE_WORDS: Baseline = {
-  'apps/api/src/capabilities/reach.ts': { count: 17, ...MOVES.fenceForm },
+  'apps/api/src/capabilities/reach.ts': { count: 13, ...MOVES.fenceForm },
   'apps/api/src/workflows/builder.ts': { count: 1, ...MOVES.fenceForm },
   'apps/api/src/workflows/workflows.ts': { count: 6, ...MOVES.fenceForm },
   'apps/web/src/components/agent/AgentForm.tsx': { count: 5, ...MOVES.fenceForm },
@@ -202,7 +202,6 @@ const FENCE_WORDS: Baseline = {
   'apps/web/src/components/step/StepNode.tsx': { count: 2, ...MOVES.fenceForm },
   'apps/web/src/lib/agents.ts': { count: 11, ...MOVES.fenceForm },
   'apps/web/src/lib/api/agents.ts': { count: 6, ...MOVES.fenceForm },
-  'apps/web/src/lib/api/capabilities.ts': { count: 7, ...MOVES.fenceForm },
   'apps/web/src/lib/asks.ts': { count: 1, ...MOVES.fenceForm },
   'apps/web/src/lib/builder.ts': { count: 12, ...MOVES.fenceForm },
   'apps/web/src/lib/words.ts': { count: 2, ...MOVES.fenceForm },
@@ -252,8 +251,8 @@ const FENCE_WORDS: Baseline = {
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
-  'apps/api/src/capabilities/capabilities.ts': { count: 15, ...MOVES.reach },
-  'apps/api/src/capabilities/reach.ts': { count: 31, ...MOVES.reach },
+  'apps/api/src/capabilities/capabilities.ts': { count: 8, ...MOVES.reach },
+  'apps/api/src/capabilities/reach.ts': { count: 26, ...MOVES.reach },
   'apps/api/src/gauges/quota.ts': { count: 33, ...MOVES.quota },
   'apps/api/src/skills/skills.ts': { count: 3, ...MOVES.checkout },
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
@@ -269,7 +268,7 @@ const HARNESS_WORDS: Baseline = {
   'apps/web/src/components/step/StepForm.tsx': { count: 2, ...MOVES.web },
   'apps/web/src/lib/agents.ts': { count: 7, ...MOVES.web },
   'apps/web/src/lib/api/agents.ts': { count: 2, ...MOVES.web },
-  'apps/web/src/lib/api/capabilities.ts': { count: 13, ...MOVES.reach },
+  'apps/web/src/lib/api/capabilities.ts': { count: 2, ...MOVES.reach },
   'apps/web/src/lib/api/quota.ts': { count: 1, ...MOVES.quota },
   'apps/web/src/lib/builder.ts': { count: 2, ...MOVES.web },
   'apps/web/src/lib/quota.ts': { count: 2, ...MOVES.quota },

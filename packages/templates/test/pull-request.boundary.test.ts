@@ -774,6 +774,56 @@ test("a red job's failing lines reach the step, without their colour codes, on a
   }
 });
 
+test("a red ci hands each failed Vitest job's failing lines, and names the URL of a job whose log cannot be read", () => {
+  const at = placed();
+  const TESTS_URL = CI_URL.replace('/job/5678', '/job/9012');
+  const GONE_URL = CI_URL.replace('/job/5678', '/job/3456');
+  const vitest = stamped([
+    `cli:test:  ${ESC}[31m❯${ESC}[39m test/verbs.test.ts (2 tests | 1 failed) 9ms`,
+    `cli:test:    ${ESC}[31m❯${ESC}[39m the verbs`,
+    `cli:test:      ${ESC}[32m✓${ESC}[39m a verb passes 1ms`,
+    `cli:test: ${ESC}[31m      × start takes a card${ESC}[39m${ESC}[2m 3ms${ESC}[22m`,
+    'cli:test:        → expected 1 to be 0',
+    'cli:test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯',
+    `cli:test: ${ESC}[41m${ESC}[1m FAIL ${ESC}[22m${ESC}[49m ${ESC}[30m${ESC}[42m node ${ESC}[49m${ESC}[39m test/verbs.test.ts > the verbs > start takes a card`,
+    'cli:test: AssertionError: expected 1 to be 0',
+    'cli:test:  ❯ test/verbs.test.ts:21:5',
+    'cli:test: ⎯⎯⎯⎯⎯⎯⎯[1/1]⎯',
+    'cli:test:  Test Files  1 failed | 8 passed (9)',
+    'Process completed with exit code 1.',
+  ]);
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    {
+      when: 'pr view',
+      out: rollup(
+        { status: 'COMPLETED', conclusion: 'FAILURE' },
+        { name: 'test cli', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: TESTS_URL },
+        { name: 'lint', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: GONE_URL },
+      ),
+    },
+    { when: 'actions/jobs/9012/logs', out: vitest },
+    { when: 'actions/jobs/3456/logs', status: 1, err: 'HTTP 410: Gone (https://api.github.com/repos/o/r/actions/jobs/3456/logs)' },
+    { when: 'actions/jobs/5678/logs', out: stamped(['Process completed with exit code 1.']) },
+  ]);
+  const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
+  assert.equal(r.code, 1, `a red the work answers exits as it did:\n${r.out}`);
+  assert.match(r.err, /test cli \(job 9012\), the lines that failed it:/, r.err);
+  for (const told of [
+    'test/verbs.test.ts > the verbs > start takes a card',
+    'AssertionError: expected 1 to be 0',
+    '❯ test/verbs.test.ts:21:5',
+  ])
+    assert.ok(r.err.includes(told), `the failing test, its error and its frame: ${told}\n${r.err}`);
+  assert.equal(r.err.split('start takes a card').length - 1, 1, `the test told once:\n${r.err}`);
+  for (const noise of ['✓', 'Test Files', '(2 tests | 1 failed)']) assert.ok(!r.err.includes(noise), `${noise} is no reason:\n${r.err}`);
+  assert.ok(!r.err.includes(ESC), `no colour code reaches the step:\n${JSON.stringify(r.err)}`);
+  const unread = r.err.split('\n').filter((line) => line.startsWith('lint (job 3456)'));
+  assert.equal(unread.length, 1, `a log that cannot be read is said in one line:\n${r.err}`);
+  assert.ok(unread[0].includes(GONE_URL), `naming the job's URL:\n${r.err}`);
+  assert.ok(r.err.includes(RETRY), r.err);
+});
+
 /** The calls of the stub `gh` that ask GitHub how a head stands to the base (`compare/<base>...<head>`). */
 const compared = (calls: readonly Called[]) => asked(calls, 'api').filter((call) => call.argv.some((arg) => arg.includes('/compare/')));
 

@@ -1,9 +1,9 @@
 /**
- * Where a step's session starts, from `nemia start` to the tick's filings — a person's story on the stage (`story.ts`). A factory whose
- * tree holds a home (`home/CLAUDE.md`), its worked-on repository switched to load its memory files: the start freezes the home under
- * `runs/<id>/home/<hex>/` and records `homeFiles` and the switches (`worked`); the first filing of implement starts its session in that
- * copy, its workspace added beside it; and a try of it starts there again. What `filedConfig` makes of a home, row by row, is
- * `src/filed/session-start/session-start.test.ts`.
+ * Where a step's session starts, from `nemia start` to the tick's filings — a person's story on the stage (`story.ts`). A factory made
+ * from a template, whose tree (`treeDir`) holds a home (`home/CLAUDE.md`) and its wiring, its worked-on repository switched to load its
+ * memory files: the start freezes the home under `runs/<id>/home/<hex>/` and records `homeFiles` and the switches (`worked`); the first
+ * filing of implement starts its session in that copy, its workspace added beside it; and a try of it starts there again. What
+ * `filedConfig` makes of a home, row by row, is `src/filed/session-start/session-start.test.ts`.
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
@@ -17,6 +17,7 @@ import { teamCopy } from './team.ts';
 import { staged, story } from './story.ts';
 import { advanceRun, retryRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { treeDir, writeTreeWiring } from '../src/factory/applied/applied.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { homeFilesDir } from '../src/frozen/frozen.store.ts';
@@ -60,14 +61,22 @@ describe("a run of a factory with a home: frozen at start, its switches recorded
     fs.writeFileSync(path.join(plain, 'implement.md'), '---\nplace: git\nagent: implementer\n---\nBuild what was asked.\n');
     repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stage.place().world.repository(repo, { 'README.md': 'x\n' });
-    const tree = scratch('wf-home-tree-');
-    fs.mkdirSync(path.join(tree, 'home'), { recursive: true });
-    fs.writeFileSync(path.join(tree, 'home', 'CLAUDE.md'), '# Where you stand\n');
     addFactoryAt(ROOT, { name: 'homed', volumes: [`${repo}:rw`] });
     attachWorkflowAt(ROOT, { factory: 'homed', workflow: 'plain', repo: path.basename(repo) });
     const file = path.join(ROOT, 'factories', 'homed.json');
-    const filed = JSON.parse(fs.readFileSync(file, 'utf8')) as { volumes: Array<Record<string, unknown>> };
-    fs.writeFileSync(file, `${JSON.stringify({ ...filed, tree, volumes: filed.volumes.map((v) => ({ ...v, claudeMd: true })) })}\n`);
+    const filed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+      volumes: Array<Record<string, unknown>>;
+      workflows?: string[];
+      hires?: Record<string, string>;
+      workflowRepos?: Record<string, string>;
+    };
+    const { workflows = [], hires = {}, workflowRepos, ...rest } = filed;
+    const tree = treeDir(ROOT, 'homed');
+    fs.mkdirSync(path.join(tree, 'home'), { recursive: true });
+    fs.writeFileSync(path.join(tree, 'home', 'CLAUDE.md'), '# Where you stand\n');
+    writeTreeWiring(ROOT, 'homed', { workflows, hires, ...(workflowRepos === undefined ? {} : { workflowRepos }) });
+    const template = { source: scratch('wf-home-template-'), version: '1.0.0', params: {} };
+    fs.writeFileSync(file, `${JSON.stringify({ ...rest, template, volumes: filed.volumes.map((v) => ({ ...v, claudeMd: true })) })}\n`);
     return t.end;
   });
   const s = story(test);

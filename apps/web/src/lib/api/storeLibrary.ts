@@ -22,11 +22,11 @@ export type LibraryItem = {
   builtinChanged: boolean;
 };
 
-/** The parts of a definition's status the library's page reads. */
+/** The parts of a definition's status the library's page reads: its description on its spec, or a Workflow's on its status. */
 type Held = {
   metadata: { name: string };
   spec?: { description?: string | null };
-  status: { origin: string; factories?: readonly string[]; builtinChanged?: boolean };
+  status: { origin: string; factories?: readonly string[]; builtinChanged?: boolean; description?: string | null };
 };
 
 /** `one` of `kind` as a library item, the builtin's origin kept and every other said the user library's. */
@@ -35,7 +35,7 @@ const itemOf =
   (one: Held): LibraryItem => ({
     kind,
     name: one.metadata.name,
-    description: one.spec?.description ?? null,
+    description: one.spec?.description ?? one.status.description ?? null,
     origin: one.status.origin === 'builtin' ? 'builtin' : 'user',
     factories: one.status.factories ?? [],
     builtinChanged: one.status.builtinChanged === true,

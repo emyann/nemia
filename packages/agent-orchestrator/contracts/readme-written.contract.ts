@@ -5,7 +5,7 @@
  * A Workflow's `spec.readme` is the folder's README as its file holds it, frontmatter and all, so a README given with a frontmatter of its
  * own is the whole file, written exactly as given: a Workflow read and proposed back writes its README unchanged. A README given with no
  * frontmatter of its own is the instruction alone, written under the frontmatter the README on disk opens with (none where it opens with
- * none), so a writer that edits the instruction alone — the board's builder, which shows `status.instruction` — keeps the needs and the
+ * none), so a writer that edits the instruction alone — the board's builder, which shows `status.readmeBody` — keeps the needs and the
  * other keys that frontmatter declares. None given leaves the README as it is: the write writes none (undefined).
  *
  * Whether the given text opens with a frontmatter, and the block the README on disk opens with, are read by the caller with the parser's

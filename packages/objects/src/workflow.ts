@@ -1,8 +1,9 @@
 /**
  * The Workflow: a folder of steps a factory resolves, served as an object in the factory's namespace (`default` for the api's repository
- * and your library). Its `spec` is what its files say as written: its description, its README and its steps, each with the keys its own
- * file writes and its own note. Its `status` is what Nemia reads of it: where it was found (`origin`), its typed graph (every node with
- * its kind, decision 12), each step resolved — its keys with its agent's, what its agent is told, the agent the factory hires into it,
+ * and your library). Its `spec` is what its files hold, the shape a proposal carries: its README whole, its steps in their files' order,
+ * each with the keys its own file writes and its own note, and its other files. Its `status` is what Nemia works out of it: where it was
+ * found (`origin`), its description, its needs and its README's instruction, its typed graph (every node with its kind, decision 12),
+ * each step resolved — its keys with its agent's, what its agent is told, the agent the factory hires into it,
  * its told layers and MCP servers — the schemas beside it, why a run of it cannot start in the factory, and the ledger's revision.
  *
  * Beside it, the bodies a write is sent (`WorkflowWrite`, `WorkflowCreate`). Plain Schemas of JSON, as every object of this package is.
@@ -303,7 +304,8 @@ const stepKeyFields = {
 } satisfies { readonly [K in StepKey]: Schema.Top };
 
 /**
- * A step's keys, each as the loader reads it, every one optional: in `spec` only those its file writes, in `status` every key resolved,
+ * A step's keys, each as the loader reads it, every one optional: in `spec` only those its own file writes, as it writes them (never its
+ * agent's, nor the agent a factory hires into it), in `status` every key resolved,
  * `null` where it is unset. `route` is its line as written (`judge`, `{ script: … }`, `{ from: …, table: … }`). A key no step has is kept
  * as it was sent, never dropped, so a write of one is refused in the package's words rather than lost unsaid.
  */
@@ -380,16 +382,23 @@ export const Need = Schema.Struct({
 export type Need = typeof Need.Type;
 
 /**
- * A workflow as its files say it: its description, the machine needs its README's frontmatter declares (`needs`), its README (null
- * for none), its steps, in its order, and the folder's other text files (`files`, sorted by name). Given on a write, `files` is their
+ * A workflow as its files hold it, the shape a proposal carries: its README whole, frontmatter and all (null for none), each step's file
+ * in file-name order, and the folder's other text files (`files`, sorted by name). Proposing back what is read changes nothing. A README
+ * given with a frontmatter of its own is written as given; one given without is the instruction alone, written under the README's own
+ * frontmatter (`readme-written`, the orchestrator's contract). Given on a write, `files` is their
  * whole set, as a Kubernetes replace is: a text file of the folder that is no markdown and is not named is removed, a file that is not
  * text is never touched; left out, the folder's other files stay.
  */
 export const WorkflowSpec = Schema.Struct({
-  description: Schema.optionalKey(Text.annotate({ description: "The workflow's description; null where it has none." })),
-  needs: Schema.optionalKey(Schema.Array(Need).annotate({ description: "The machine needs its README's frontmatter declares." })),
-  readme: Schema.optionalKey(Text.annotate({ description: "The workflow's README; null for none." })),
-  steps: Schema.Array(WorkflowStep).annotate({ description: "The workflow's steps, in its order." }),
+  readme: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "The workflow's README as its file holds it, frontmatter and all; null for none. Given without a frontmatter, it is written under the README's own.",
+    }),
+  ),
+  steps: Schema.Array(WorkflowStep).annotate({
+    description: "Each step's file, in file-name order, with the keys its own file writes.",
+  }),
   files: Schema.optionalKey(
     Schema.Array(WorkflowFile).annotate({
       description: "The folder's other text files, sorted by name; given on a write, their whole set, so a text file left out is removed.",
@@ -397,7 +406,7 @@ export const WorkflowSpec = Schema.Struct({
   ),
 }).annotate({
   description:
-    "The workflow as its files say it: its description, the machine needs its README declares, its README, its steps in order, and the folder's other text files.",
+    "The workflow as its files hold it, the shape a proposal carries: its README whole, each step's file in file-name order, and the folder's other text files.",
 });
 export type WorkflowSpec = typeof WorkflowSpec.Type;
 
@@ -446,13 +455,17 @@ export const WorkflowStepStatus = Schema.Struct({
 export type WorkflowStepStatus = typeof WorkflowStepStatus.Type;
 
 /**
- * What Nemia reads of a workflow: its origin and what shadows it, its folder (`dir`), its typed graph, each step resolved, the schema
+ * What Nemia reads of a workflow: its origin and what shadows it, its folder (`dir`), its description, the machine needs its README's
+ * frontmatter declares (`needs`), its README without its frontmatter (`readmeBody`), its typed graph, each step resolved in graph order, the schema
  * files beside its steps, whether every step works in a folder (`folderTeam`), why it does not load (`error`, null where it does) and why a
  * run of it cannot start in the factory (`unfilled`, null where it can), and its revision.
  */
 export const WorkflowStatus = Schema.Struct({
   ...definitionStatus,
   dir: Schema.String.annotate({ description: "The workflow's folder." }),
+  description: Text.annotate({ description: "The workflow's description, its README's first paragraph; null where it has none." }),
+  needs: Schema.Array(Need).annotate({ description: "The machine needs its README's frontmatter declares; none where it declares none." }),
+  readmeBody: Text.annotate({ description: "The workflow's README without its frontmatter, its instruction; null for none." }),
   graph: TypedGraph.annotate({ description: "The workflow's typed graph: every node with its kind." }),
   steps: Schema.Array(WorkflowStepStatus).annotate({ description: "Each step resolved, in the workflow's order." }),
   schemas: Strings.annotate({ description: 'The schema files beside its steps.' }),

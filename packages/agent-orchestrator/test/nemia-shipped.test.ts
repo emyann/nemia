@@ -163,6 +163,7 @@ const SECTIONS: Record<string, string[]> = {
   'skills/first-meeting/SKILL.md': ['When', 'Introduce yourself', 'The offer', 'Never unasked'],
   'agents/nemia.md': ['What you learn of the person'],
   'skills/bring-what-waits/SKILL.md': ["A factory's upgrade", "A factory's takeover"],
+  'skills/create-a-factory/SKILL.md': ['1. Ask what it is for', '2. Propose a template, where one fits', '9. Stop, and say what stands'],
 };
 
 /** The sections of `SECTIONS` that `files` miss, a file not there missing them all: a line each, `<file>: <heading>`. */
@@ -171,7 +172,7 @@ const missingSections = (files: Map<string, string>): string[] =>
     headings.filter((heading) => !(files.get(file) ?? '').includes(`\n## ${heading}\n`)).map((heading) => `${file}: ${heading}`),
   );
 
-test('her skills recruit-or-create, first-meeting and bring-what-waits, and her instruction, keep their sections', () => {
+test('her skills recruit-or-create, first-meeting, bring-what-waits and create-a-factory, and her instruction, keep their sections', () => {
   assert.deepEqual(missingSections(shipped()), []);
 });
 
@@ -186,6 +187,30 @@ test('REFUSED: a first-meeting with a section dropped and another renamed is nam
     missingSections(files).filter((line) => line.startsWith('skills/first-meeting/')),
     ['skills/first-meeting/SKILL.md: The offer', 'skills/first-meeting/SKILL.md: Never unasked'],
   );
+});
+
+/** The templates Nemia ships: each folder of the templates workspace that holds a `nemia.yaml`. */
+const TEMPLATES = fs
+  .readdirSync(path.join(REPO, 'packages', 'templates'), { withFileTypes: true })
+  .filter((e) => e.isDirectory() && fs.existsSync(path.join(REPO, 'packages', 'templates', e.name, 'nemia.yaml')))
+  .map((e) => e.name);
+
+/** Where `files`' create-a-factory names a template Nemia ships, whole and in any case: a line each, `<file>: <template>`. */
+const templatesNamed = (files: Map<string, string>): string[] =>
+  [...files]
+    .filter(([file]) => file === 'skills/create-a-factory/SKILL.md')
+    .flatMap(([file, text]) =>
+      TEMPLATES.filter((name) => new RegExp(`(?<![\\w$-])${name}(?![\\w$-])`, 'i').test(text)).map((name) => `${file}: ${name}`),
+    );
+
+test('create-a-factory names no template Nemia ships: she reads the list, so another template needs no rewrite', () => {
+  assert.ok(TEMPLATES.length > 0, 'the templates are read');
+  assert.deepEqual(templatesNamed(shipped()), []);
+});
+
+test('REFUSED: a create-a-factory that proposes a shipped template by its name is named', () => {
+  const files = new Map([['skills/create-a-factory/SKILL.md', `For software, propose \`${TEMPLATES[0]}\`.`]]);
+  assert.deepEqual(templatesNamed(files), [`skills/create-a-factory/SKILL.md: ${TEMPLATES[0]}`]);
 });
 
 /** The facts of her memory each of these files names, by its path under `nemia/`, each said in backticks. */

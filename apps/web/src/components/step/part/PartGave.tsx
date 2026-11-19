@@ -15,7 +15,7 @@ import { Fold } from './Fold';
 type Gave = Exclude<StepPartModel['gave'], 'none'>;
 
 /** A value on one line: a string as it is, anything else as its JSON. */
-const lineOf = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
+const lineOf = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 /** The first of what the step gave, on one line: its first field given, else its first file, else its first value. */
 function First({ gave }: { gave: Gave }) {

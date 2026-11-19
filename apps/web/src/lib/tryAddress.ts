@@ -6,7 +6,7 @@
 import type { TryShown } from '../../contracts/try-shown.contract.ts';
 
 /** Whether `n` is one of `tries`. */
-const has = (tries: readonly number[], n: number): boolean => tries.some((t) => t === n);
+const has = (tries: readonly number[], n: number) => tries.some((t) => t === n);
 
 /**
  * The try a step shows, of its tries' numbers: the one the address asks where the step has it, else its current, else its last; none for
@@ -32,7 +32,7 @@ const TRY = /^[1-9]\d*$/;
  * or whose try is not a whole number from 1, is dropped, and a step named twice keeps its last. None for anything but a string.
  * @param value The address's `try` value, as the router hands it.
  */
-export function triesOf(value: unknown): TryChoices {
+export function triesOf(value: unknown) {
   if (typeof value !== 'string') return {};
   const choices: Record<string, number> = {};
   for (const entry of value.split(',')) {
@@ -47,7 +47,7 @@ export function triesOf(value: unknown): TryChoices {
  * How `choices` is written in the address, which `triesOf` reads back; '' for none.
  * @param choices Each step's chosen try, by the step's name.
  */
-export const triesPrinted = (choices: TryChoices): string =>
+export const triesPrinted = (choices: TryChoices) =>
   Object.entries(choices)
     .map(([step, n]) => `${step}:${n}`)
     .join(',');
@@ -56,9 +56,9 @@ export const triesPrinted = (choices: TryChoices): string =>
  * The root route's `try`: the choices it names, written again without what was dropped; none where it names none.
  * @param search The root route's search, as the router hands it.
  */
-export function trySearch(search: Record<string, unknown>): { try?: string } {
+export function trySearch(search: Record<string, unknown>) {
   const printed = triesPrinted(triesOf(search.try));
-  return printed ? { try: printed } : {};
+  return (printed ? { try: printed } : {}) satisfies { try?: string } as { try?: string };
 }
 
 /**
@@ -68,7 +68,7 @@ export function trySearch(search: Record<string, unknown>): { try?: string } {
  * @param step The step's name.
  * @param n The try the step shows, or null to take its choice back.
  */
-export function setTry<S extends { try?: string }>(search: S, step: string, n: number | null): S {
+export function setTry<S extends { try?: string }>(search: S, step: string, n: number | null) {
   const choices = triesOf(search.try);
   const { [step]: _was, ...others } = choices;
   const printed = triesPrinted(n === null ? others : { ...choices, [step]: n });

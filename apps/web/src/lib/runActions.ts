@@ -24,7 +24,7 @@ type Actionable = Pick<
  * it can be held, and Prune where it would take anything — `Prune its files…` where its worktrees are gone. None where it offers none.
  * @param run the run the actions are on
  */
-export const runActionsOf = (run: Actionable): Array<{ key: RunAction; label: string }> =>
+export const runActionsOf = (run: Actionable) =>
   [
     ...(run.try ? (['remove'] as const) : []),
     ...(run.holding ? (['lift'] as const) : holdable(run) ? (['hold'] as const) : []),

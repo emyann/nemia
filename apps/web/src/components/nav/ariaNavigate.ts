@@ -12,7 +12,5 @@ declare module 'react-aria-components' {
  *
  * @param router the router that navigates
  */
-export const ariaNavigate =
-  (router: AnyRouter) =>
-  (href: string, options?: { resetScroll?: boolean }): void =>
-    void router.navigate({ href, ...options });
+export const ariaNavigate = (router: AnyRouter) => (href: string, options?: { resetScroll?: boolean }) =>
+  void router.navigate({ href, ...options });

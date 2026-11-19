@@ -157,7 +157,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
 }
 
 /** Whether a step gave anything yet, of the try it shows: a field given, a file or a value. */
-const gaveAny = (gave: Exclude<StepPartModel['gave'], 'none'>): boolean =>
+const gaveAny = (gave: Exclude<StepPartModel['gave'], 'none'>) =>
   gave.fields.some((f) => f.given) || gave.files.length > 0 || gave.values.length > 0;
 
 /** The line under the node's name: the first of what the step gave, once it gave something, else what it runs on (`line`). */
@@ -175,14 +175,14 @@ function RunsOnOrGave({ step, gave, line }: { step: StepNodeData['step']; gave: 
  * A step node's frame: sunk into the floor and dashed for a node its route passed by; else on a card, ringed in yours at a human gate,
  * in the running colour while its session is at work.
  */
-const nodeFrame = (state: StepState, gate: boolean): string => {
+const nodeFrame = (state: StepState, gate: boolean) => {
   if (state === 'skipped') return 'border border-dashed border-outline bg-background';
   if (gate) return 'bg-card shadow-sm border-2 border-yours';
   return state === 'working' ? 'bg-card shadow-sm border border-alive ring-4 ring-alive/25' : 'bg-card shadow-sm border border-outline';
 };
 
 /** A node's head: its place in the order, after its kind where it is a condition or a workflow node (`condition · step 02`). */
-const headOf = (node: Frozen<GraphNode> | null | undefined, index: number): string =>
+const headOf = (node: Frozen<GraphNode> | null | undefined, index: number) =>
   node ? `${node.kind} · ${stepLabel(index)}` : stepLabel(index);
 
 /**
@@ -197,7 +197,7 @@ function unfiledLine(
   taskId: string | null,
   node: Frozen<GraphNode> | null | undefined,
   spec: { agent?: string | null; harness: string | null; model: string | null } | null,
-): string {
+) {
   if (node?.kind === 'workflow' || (node?.kind === 'condition' && !spec?.agent && taskId === null)) return 'runs no session';
   return taskId === null ? 'not filed yet' : 'no session yet';
 }
@@ -212,7 +212,7 @@ function nodeLine(
 }
 
 /** A step's place in its workflow's order, as its node heads it: `step 01`. */
-const stepLabel = (index: number): string => `step ${String(index + 1).padStart(2, '0')}`;
+const stepLabel = (index: number) => `step ${String(index + 1).padStart(2, '0')}`;
 
 /**
  * Who does a step and what on, as its node says it: its agent first where it has one, then the harness and the model, or that it takes the
@@ -220,7 +220,7 @@ const stepLabel = (index: number): string => `step ${String(index + 1).padStart(
  *
  * @param spec the step's agent, harness and model, each none where the step sets none
  */
-export const runsOn = (spec: { agent?: string | null; harness: string | null; model: string | null }): string =>
+export const runsOn = (spec: { agent?: string | null; harness: string | null; model: string | null }) =>
   `${spec.agent ? `${spec.agent} · ` : ''}${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}`;
 
 /**
@@ -255,7 +255,7 @@ const HARNESS_OWN = "harness's own";
  *
  * @param spec the workflow step's spec
  */
-export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: string, title?: string]> {
+export function specLines(spec: WorkflowStepSpec) {
   const lines: Array<[string, string, string?]> = [];
   if (spec.check) lines.push(['check', spec.check]);
   lines.push(['effort', spec.effort ?? HARNESS_OWN]);
@@ -501,7 +501,7 @@ function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; sa
  * What a gate's band says after the rail's word (`waits on you`): what approving does in a line (`approve ship to run it`, `approve
  * plan's hand-off`), whose whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
  */
-const nodeNeed = (need: Need, step: StepNodeData['step']): string =>
+const nodeNeed = (need: Need, step: StepNodeData['step']) =>
   need.kind === 'approve'
     ? gateNodeLine({ step: step.name, ends: step.spec?.workspace === 'base' && step.taskId === null })
     : needText(need);

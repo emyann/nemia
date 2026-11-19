@@ -72,7 +72,7 @@ const TICKING: DaemonDot = { kind: 'ticking', tone: 'ok', word: 'ticking', title
 const STALLED: DaemonDot = { kind: 'stalled', tone: 'warn', word: 'stalled', title: 'The daemon has not ticked for 4 minutes.' };
 
 /** A window `extra` says. */
-const win = (extra: Partial<QuotaWindow>): QuotaWindow => ({
+const win = (extra: Partial<QuotaWindow>) => ({
   key: 'five_hour',
   label: '5-hour',
   usedPercentage: 42,
@@ -83,18 +83,19 @@ const win = (extra: Partial<QuotaWindow>): QuotaWindow => ({
 });
 
 /** A fresh reading of `windows`. */
-const quota = (windows: QuotaWindow[]): Quota => ({
-  state: 'fresh',
-  askedAt: '2026-10-14T16:58:00.000Z',
-  ageMs: 120_000,
-  againAt: null,
-  subscription: 'max',
-  windows,
-  last: null,
-  keepMs: 300_000,
-  markAt: 80,
-  said: null,
-});
+const quota = (windows: QuotaWindow[]) =>
+  ({
+    state: 'fresh',
+    askedAt: '2026-10-14T16:58:00.000Z',
+    ageMs: 120_000,
+    againAt: null,
+    subscription: 'max',
+    windows,
+    last: null,
+    keepMs: 300_000,
+    markAt: 80,
+    said: null,
+  }) satisfies Quota;
 
 const CALM = quota([win({}), win({ key: 'seven_day', label: 'week', usedPercentage: 31, resetsAt: '2026-10-21T11:00:00.000Z' })]);
 const PAST = quota([

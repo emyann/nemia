@@ -71,7 +71,7 @@ export type RunView = Pick<
   };
 
 /** The view's spec of a step, from the object's frozen step; null for a step the run froze none of. */
-const specOf = (s: RunSpecStep | undefined): StepSpecView | null => {
+const specOf = (s: RunSpecStep | undefined) => {
   if (!s) return null;
   const { name: _name, ...rest } = s;
   return rest;
@@ -82,7 +82,7 @@ const specOf = (s: RunSpecStep | undefined): StepSpecView | null => {
  * step is handed, and each step with the step the run froze of its name.
  * @param object The Run object as the api serves it.
  */
-export const runViewOf = (object: Run): RunView => {
+export const runViewOf = (object: Run) => {
   const { metadata, spec, status } = object;
   const { graph, steps, timeline, ...judged } = status;
   return {
@@ -118,7 +118,7 @@ export const runViewOf = (object: Run): RunView => {
  * orchestrator's `atWork` of the step alone says it; null while none runs.
  * @param step The step, by its tries' timeline.
  */
-export function sinceOf(step: Pick<RunStep, 'timeline'>): string | null {
+export function sinceOf(step: Pick<RunStep, 'timeline'>) {
   const open = step.timeline
     .flatMap((t) => [t.session, t.check])
     .flatMap((span) => (span && span.spawnedAt !== null && span.endedAt === null ? [span.spawnedAt] : []));
@@ -129,7 +129,7 @@ export function sinceOf(step: Pick<RunStep, 'timeline'>): string | null {
  * The agent a step is given, as the run froze it; null for none.
  * @param step The step, by the spec the run froze of it.
  */
-export const agentOf = (step: Pick<RunStep, 'spec'>): string | null => step.spec?.agent ?? null;
+export const agentOf = (step: Pick<RunStep, 'spec'>) => step.spec?.agent ?? null;
 
 /**
  * A run a list could not judge (`RunUnjudged`), a task it reads having a journal that does not read: its name, its factory (its

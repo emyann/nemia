@@ -22,6 +22,7 @@ export type FolderTreeNode = FileNode | FolderNode;
 /** A folder while it is built, its children in the order they first came. */
 type Building = { readonly key: string; readonly name: string; readonly children: Array<Building | FileNode> };
 
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const built = (node: Building | FileNode): FolderTreeNode => {
   if ('kind' in node) return node;
   const children = node.children.map(built);
@@ -35,7 +36,7 @@ const built = (node: Building | FileNode): FolderTreeNode => {
  * folder and a file of one name stay apart.
  * @param files the files of a step's folder, as the api lists them
  */
-export function folderTreeOf(files: readonly StepArtifact[]): readonly FolderTreeNode[] {
+export function folderTreeOf(files: readonly StepArtifact[]) {
   const root: Building = { key: '', name: '', children: [] };
   for (const file of files) {
     const key = fileKey(file);

@@ -6,7 +6,7 @@ import { useCallback, useSyncExternalStore } from 'react';
  * @param query The CSS media query.
  * @param fallback The answer where there is no browser to ask.
  */
-export function useMedia(query: string, fallback: boolean): boolean {
+export function useMedia(query: string, fallback: boolean) {
   const subscribe = useCallback(
     (changed: () => void) => {
       if (typeof matchMedia !== 'function') return () => {};

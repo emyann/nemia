@@ -10,11 +10,10 @@ import { DEFAULT_NAMESPACE } from 'objects';
  * name a filter, a tag and a card show, and the namespace a verb is sent in. `factoryIn` is the way back.
  * @param factory The factory's name as the api answers it; null or undefined for the default factory.
  */
-export const namespaceOf = (factory: string | null | undefined): string => factory ?? DEFAULT_NAMESPACE;
+export const namespaceOf = (factory: string | null | undefined) => factory ?? DEFAULT_NAMESPACE;
 
 /**
  * A factory's name in the api's form, the way back from `namespaceOf`: null for the default factory, named as none.
  * @param namespace A namespace's name; undefined, or the default one, for the default factory.
  */
-export const factoryIn = (namespace: string | undefined): string | null =>
-  namespace === undefined || namespace === DEFAULT_NAMESPACE ? null : namespace;
+export const factoryIn = (namespace: string | undefined) => (namespace === undefined || namespace === DEFAULT_NAMESPACE ? null : namespace);

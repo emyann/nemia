@@ -57,7 +57,7 @@ export function PruneQuestion({ run, onClose }: { run: PruneAsked; onClose: () =
  * @param id The run's id.
  * @param onClose Closes the surface the prune is asked in.
  */
-function closePruned(id: string, onClose: () => void): void {
+function closePruned(id: string, onClose: () => void) {
   onClose();
   sayWritten('pruned', id);
 }

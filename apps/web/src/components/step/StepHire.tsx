@@ -49,8 +49,7 @@ function Hiring({ page, where, place }: { page: WorkflowStepPage; where: 'page' 
   const { factory, hired, hiring } = page;
   const into = `${page.workflow}/${page.step}`;
   const write = useMutation({
-    mutationFn: (ask: Ask): Promise<unknown> =>
-      ask.kind === 'hire' ? hireAgent(factory ?? '', into, ask.agent) : fireAgent(factory ?? '', into),
+    mutationFn: (ask: Ask) => (ask.kind === 'hire' ? hireAgent(factory ?? '', into, ask.agent) : fireAgent(factory ?? '', into)),
     onSettled: () => invalidateHires(queryClient),
   });
   const send = (ask: Ask) => {
@@ -96,7 +95,7 @@ function Hiring({ page, where, place }: { page: WorkflowStepPage; where: 'page' 
  * Whose a workflow that is not yours is, read in the page's factory: the factory's in a named one, where its folder may be the factory's
  * own, and this repository's with none.
  */
-const whose = (page: Pick<WorkflowStepPage, 'factory'>): string => (page.factory === null ? "this repository's" : "the factory's");
+const whose = (page: Pick<WorkflowStepPage, 'factory'>) => (page.factory === null ? "this repository's" : "the factory's");
 
 /** The agents beside the step's workflow, to pick one from, and Hire; or that there is none to pick. */
 function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: boolean; onHire: (agent: string) => void }) {

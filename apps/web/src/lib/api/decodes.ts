@@ -42,5 +42,5 @@ type Refused<T> = { readonly 'decodes: the schema does not decode its type both 
 /** `schema`, typed as it is, where it decodes exactly `T`. */
 export const decodes =
   <T>() =>
-  <S extends Schema.Top>(schema: S & (Same<S['Type'], T> extends true ? unknown : Refused<T>)): S =>
+  <S extends Schema.Top>(schema: S & (Same<S['Type'], T> extends true ? unknown : Refused<T>)) =>
     schema;

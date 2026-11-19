@@ -11,7 +11,7 @@ const NONE: Size = { width: 0, height: 0 };
  * @param frame The element whose size is read.
  * @param drawn Whether the frame is on the page.
  */
-export function useFrameSize(frame: RefObject<HTMLElement | null>, drawn: boolean): Size {
+export function useFrameSize(frame: RefObject<HTMLElement | null>, drawn: boolean) {
   const [size, setSize] = useState(NONE);
   useLayoutEffect(() => {
     const el = frame.current;

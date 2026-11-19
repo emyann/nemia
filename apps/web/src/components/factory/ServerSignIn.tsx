@@ -34,7 +34,7 @@ export type SignInShown =
   | { readonly at: 'connected' };
 
 /** The host of the address a sign-in opens, as its link names it: `github.com`. */
-const hostOf = (authUrl: string): string => {
+const hostOf = (authUrl: string) => {
   try {
     return new URL(authUrl).host;
   } catch {
@@ -142,17 +142,14 @@ export function SignInView({
 }
 
 /** Where a sign-in stands, from the server's state, the last sign-in started here and the engine's word on it. */
-const shownOf = (
-  state: string | null,
-  started: { authUrl: string; until: string } | undefined,
-  held: SignInState | undefined,
-): SignInShown | null => {
+const shownOf = (state: string | null, started: { authUrl: string; until: string } | undefined, held: SignInState | undefined) => {
   if (started && (held === undefined || held.state === 'waiting'))
-    return { at: 'waiting', authUrl: started.authUrl, until: held?.until ?? started.until };
-  if (held?.state === 'expired' || held?.state === 'failed') return { at: 'ended', why: held.why ?? `The sign-in ${held.state}.` };
-  if (state === 'needs-auth') return { at: 'offer' };
-  if (state === 'connected') return { at: 'connected' };
-  return null;
+    return { at: 'waiting', authUrl: started.authUrl, until: held?.until ?? started.until } satisfies SignInShown | null;
+  if (held?.state === 'expired' || held?.state === 'failed')
+    return { at: 'ended', why: held.why ?? `The sign-in ${held.state}.` } satisfies SignInShown | null;
+  if (state === 'needs-auth') return { at: 'offer' } satisfies SignInShown | null;
+  if (state === 'connected') return { at: 'connected' } satisfies SignInShown | null;
+  return null satisfies SignInShown | null;
 };
 
 /**

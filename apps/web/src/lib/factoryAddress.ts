@@ -9,10 +9,10 @@ import { factoryIn } from './api/namespace.ts';
 import type { PagePlace } from './api/workflows.ts';
 
 /** A factory's path, its name escaped, and `rest` under it. */
-const factoryPath = (factory: string, rest: string): string => `/factories/${encodeURIComponent(factory)}${rest}`;
+const factoryPath = (factory: string, rest: string) => `/factories/${encodeURIComponent(factory)}${rest}`;
 
 /** The search a factory's definition page adds for a repository's definition, read in the factory: `?from=repo`. */
-const fromSearch = (match: RegExpExecArray): object => (match[1] === 'repo' ? { from: 'repo' } : {});
+const fromSearch = (match: RegExpExecArray) => (match[1] === 'repo' ? { from: 'repo' } : {});
 
 /** Each page of before the factory's paths whose `?factory=` names its factory, and the path under `/factories/<name>` it now has. */
 const OLD_PAGES: readonly { at: RegExp; rest: (match: RegExpExecArray) => string; adds?: (match: RegExpExecArray) => object }[] = [
@@ -37,7 +37,7 @@ const OBJECT_PAGES: readonly RegExp[] = [/^\/runs\/[^/]+$/, /^\/runs\/[^/]+\/ste
  * @param path the address's path
  * @param search the address's search, as the router parsed it
  */
-export function factoryRedirect(path: string, search: Record<string, unknown>): string | undefined {
+export function factoryRedirect(path: string, search: Record<string, unknown>) {
   const { factory, ...kept } = search;
   if (typeof factory !== 'string' || factory === '') return undefined;
   if (OBJECT_PAGES.some((page) => page.test(path))) return `${path}${defaultStringifySearch(kept)}`;
@@ -57,14 +57,14 @@ export function factoryRedirect(path: string, search: Record<string, unknown>): 
  * @param namespace the object's own namespace, as the api answers it
  * @param at the factory the address's path names, none at the store's level
  */
-export function objectHome(rest: string, namespace: string | undefined, at: string | undefined): string | undefined {
+export function objectHome(rest: string, namespace: string | undefined, at: string | undefined) {
   const home = factoryIn(namespace) ?? undefined;
-  if (home === at) return undefined;
-  return home === undefined ? rest : factoryPath(home, rest);
+  if (home === at) return undefined satisfies string | undefined as string | undefined;
+  return (home === undefined ? rest : factoryPath(home, rest)) satisfies string | undefined as string | undefined;
 }
 
 /** The search a factory's page keeps beside its path: the repository it reads, where it names one. */
-const repoSearch = (place: PagePlace): { repo?: string } => (place.repo ? { repo: place.repo } : {});
+const repoSearch = (place: PagePlace) => (place.repo ? { repo: place.repo } : {});
 
 /**
  * A link to the Workflows list read in `place`: the list of its factory, under the factory's path, on its repository where it names one;
@@ -132,7 +132,7 @@ export function definitionLink(kind: 'agent' | 'skill', from: string, name: stri
  *
  * @param search the page's search, as the router parsed it
  */
-export const definitionSearch = (search: Record<string, unknown>): { from?: 'repo'; repo?: string } => ({
+export const definitionSearch = (search: Record<string, unknown>) => ({
   ...(search.from === 'repo' && { from: 'repo' as const }),
   ...(typeof search.repo === 'string' && search.repo ? { repo: search.repo } : {}),
 });

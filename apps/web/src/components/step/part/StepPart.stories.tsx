@@ -53,7 +53,7 @@ function Sizes({ run }: { run: RunDetail }) {
  * The step's card at M drawn in `canvas`, in its state: its card's kind, its frame in the step's hue, its five facts whole, a meter
  * only where a spend and its budget are measured, its label the card's small caps as its facts' labels, and its one action.
  */
-async function cardAtM(canvas: HTMLElement, kind: string, hue: string, action: string): Promise<HTMLElement> {
+async function cardAtM(canvas: HTMLElement, kind: string, hue: string, action: string) {
   const card = canvas.querySelector<HTMLElement>('[data-step-part="M"]')!;
   const frame = card.closest('[data-cut-frame]');
   await expect(frame?.getAttribute('data-cut-frame'), "its frame's hue").toBe(hue);

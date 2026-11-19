@@ -81,7 +81,7 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
  * for one with no page that the repository has, a skill named with its folder, its name as written and that it is the repository's.
  * `place` is the factory and repository the page is read in, kept on the way to the builder.
  */
-function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
+function homesOf(page: WorkflowStepPage, place: PagePlace) {
   const agent = page.layers.agent;
   const file = `${page.dir}/${page.step}.md`;
   return {
@@ -135,7 +135,7 @@ function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
         </span>
       );
     },
-  };
+  } satisfies LayerHomes;
 }
 
 /**

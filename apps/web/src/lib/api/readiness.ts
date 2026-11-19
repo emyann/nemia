@@ -23,7 +23,7 @@ export const readinessQuery = queryOptions({
  * A fix started by the server: its id and phase, the output it printed so far, and the pattern of the code its output shows.
  * @param start The fix to start, as the readiness read names it.
  */
-export const startFix = (start: FixStart): Promise<Fix> =>
+export const startFix = (start: FixStart) =>
   call(
     (c) => c.readiness.fix({ payload: start }),
     write(Fix, 'The fix may have started: read the Setup page again before starting it again.'),
@@ -33,7 +33,7 @@ export const startFix = (start: FixStart): Promise<Fix> =>
  * Where a fix's output is followed, as server-sent events: `output`, a chunk of what it printed; `ended`, its end, its data the `Fix`.
  * @param id The fix's id, as its start answered.
  */
-export const fixOutputPath = (id: string): string => `/api/readiness/fixes/${encodeURIComponent(id)}/output`;
+export const fixOutputPath = (id: string) => `/api/readiness/fixes/${encodeURIComponent(id)}/output`;
 
 /** The data of the stream's events: `output` is text as printed, never JSON, so only `ended` is decoded. */
 type FixStreamData = { ended: Fix };
@@ -45,7 +45,7 @@ export const FIX_STREAM_SCHEMAS: { readonly [K in keyof FixStreamData]: Schema.D
  * A check turn started through a harness, or the one of it still running: its id, and its check, running.
  * @param harness The harness's name, as the readiness read names it.
  */
-export const startTurn = (harness: string): Promise<HarnessTurn> =>
+export const startTurn = (harness: string) =>
   call(
     (c) => c.readiness.turn({ payload: { harness } }),
     write(HarnessTurn, 'The check turn may have started: read the page again before starting it again.'),

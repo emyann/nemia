@@ -31,7 +31,7 @@ const APPROVAL = {
 } as const;
 
 /** A step of `RUN`, by its name and its codes, with nothing a person is asked. */
-const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number): WaitingRun['steps'][number] => ({
+const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number) => ({
   name,
   ...codes,
   raise: null,
@@ -141,7 +141,7 @@ const NARROW: CSSProperties = { width: 360 };
 const WIDE: CSSProperties = { width: 760 };
 
 /** Where the button of the card drawn in `canvas` stands against its rail, and how far its right edge is from the foot's. */
-const footOf = (canvas: HTMLElement): { beside: boolean; fromRight: number } => {
+const footOf = (canvas: HTMLElement) => {
   const foot = canvas.querySelector('[data-foot]')!;
   const [rail, button] = ['[data-run-steps]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
   return {

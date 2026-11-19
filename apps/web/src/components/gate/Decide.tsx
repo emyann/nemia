@@ -146,7 +146,7 @@ export function Offers({
   asked?: readonly AskedNote[];
   steps: readonly Pick<StepView, 'name' | 'commands'>[];
 }) {
-  const lineOf = (offer: Answer): string => steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
+  const lineOf = (offer: Answer) => steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
   return (
     <section aria-label="Answer" className="space-y-2">
       <h3 className={HEADING}>Answer — each runs its step's command, as the command line would: a try, a round, or an approval</h3>
@@ -176,7 +176,7 @@ export function AnswerRow({ runId, offer, line }: { runId: string; offer: Answer
 }
 
 /** What a step needs, as its row says it after its name, when it is not a question: a question is drawn as the markdown it is (`Asks`). */
-function offerSaid(offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }>): string {
+function offerSaid(offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }>) {
   if (offer.case === 'answer') return OFFERS.answer.said;
   if (offer.case === 'denied') return OFFERS.denied.said(offer.calls);
   const { said } = OFFERS['try-again'];

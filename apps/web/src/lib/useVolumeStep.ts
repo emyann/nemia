@@ -20,7 +20,7 @@ export type { Mode } from './volumeStep.ts';
 export type Added = { readonly path: string; readonly readOnly: boolean };
 
 /** The words of a write refused, as the api said them. */
-const refusedOf = (error: Error | null): string | undefined => (error === null ? undefined : error.message);
+const refusedOf = (error: Error | null) => (error === null ? undefined : error.message);
 
 /**
  * The writes the step makes for the factory `name`, each reading the factory again once it is answered: a volume added in `mode`, then

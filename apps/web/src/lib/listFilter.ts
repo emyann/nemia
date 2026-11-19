@@ -7,8 +7,8 @@ type FilterSearch = { q?: string };
  * The filter an address keeps, `?q=`: its text where it is a string of any length but none, else none.
  * @param search The address's search, as the router read it.
  */
-export const filterOf = (search: Record<string, unknown>): FilterSearch =>
-  typeof search.q === 'string' && search.q !== '' ? { q: search.q } : {};
+export const filterOf = (search: Record<string, unknown>) =>
+  (typeof search.q === 'string' && search.q !== '' ? { q: search.q } : {}) satisfies FilterSearch as FilterSearch;
 
 /**
  * Whether a thing listed under `name`, said by `description`, is one the filter `query` keeps: every thing for a query of only spaces,
@@ -17,7 +17,7 @@ export const filterOf = (search: Record<string, unknown>): FilterSearch =>
  * @param name The thing's name.
  * @param description Its one-line description, `null` or absent where it has none.
  */
-export function matches(query: string, name: string, description?: string | null): boolean {
+export function matches(query: string, name: string, description?: string | null) {
   const wanted = query.trim().toLocaleLowerCase();
   if (wanted === '') return true;
   return name.toLocaleLowerCase().includes(wanted) || (description ?? '').toLocaleLowerCase().includes(wanted);
@@ -30,7 +30,7 @@ export function matches(query: string, name: string, description?: string | null
  * @param query The filter the address keeps.
  * @param onQuery Writes a filter to the address.
  */
-export function useFilterText(query: string, onQuery: (query: string) => void): readonly [string, (text: string) => void] {
+export function useFilterText(query: string, onQuery: (query: string) => void) {
   const [text, setText] = useState(query);
   const [sent, setSent] = useState<readonly string[]>([]);
   const [seen, setSeen] = useState(query);
@@ -47,5 +47,5 @@ export function useFilterText(query: string, onQuery: (query: string) => void): 
     setSent((before) => [...before, next]);
     onQuery(next);
   };
-  return [text, type];
+  return [text, type] satisfies readonly [string, (text: string) => void];
 }

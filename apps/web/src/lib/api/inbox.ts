@@ -19,7 +19,6 @@ import { selectorKey } from './selector.ts';
 import { cards, files, type StartFiles } from './objects.ts';
 import { factoryIn, namespaceOf } from './namespace.ts';
 import { type KeyRow } from './library.ts';
-import type { Started } from './workflows.ts';
 
 /**
  * A card's life, as the orchestrator computes it once and the api sends it (`CARD_STATES` of `objects`): its own until it starts —
@@ -81,7 +80,7 @@ export type InboxEntry = {
  * lib/inbox.ts).
  * @param card The Card as the api serves it.
  */
-export const entryOf = (card: Card): InboxEntry => {
+export const entryOf = (card: Card) => {
   const { metadata, spec, status } = card;
   return {
     name: metadata.name,
@@ -108,19 +107,19 @@ export const entryOf = (card: Card): InboxEntry => {
  * The entries of a page of cards (`entryOf`).
  * @param list A page of Cards as the api serves it.
  */
-export const entriesOf = (list: CardList): InboxEntry[] => list.items.map(entryOf);
+export const entriesOf = (list: CardList) => list.items.map(entryOf);
 
 /** Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none. */
-const cardsListed = async (selector: string | undefined): Promise<CardList> => {
+const cardsListed = async (selector: string | undefined) => {
   const picked = selector === undefined || selector.trim() === '' ? undefined : selector.trim();
   return cards.listAll(picked);
 };
 
 /** Every card that `selector` takes, as entries. */
-const cardsSelected = async (selector: string | undefined): Promise<InboxEntry[]> => entriesOf(await cardsListed(selector));
+const cardsSelected = async (selector: string | undefined) => entriesOf(await cardsListed(selector));
 
 /** The cards of `selector` still in play, as the api says of each (`status.inPlay`). */
-const inPlaySelected = async (selector: string | undefined): Promise<InboxEntry[]> =>
+const inPlaySelected = async (selector: string | undefined) =>
   (await cardsListed(selector)).items.filter((card) => card.status.inPlay).map(entryOf);
 
 /** How long a read of the inbox in play stands fresh (`inboxQuery`): what a page's loader read is not asked again as the page mounts. */
@@ -166,7 +165,7 @@ export const inboxAllQuery = (selector: string | undefined) =>
  * clause). The label filter's check before it writes the address.
  * @param selector The label selector to check, as a person typed it.
  */
-export const checkSelector = (selector: string): Promise<unknown> => cards.listAll(selector.trim());
+export const checkSelector = (selector: string) => cards.listAll(selector.trim());
 
 /**
  * A card's page: the card as the inbox lists it (`entryOf`), its file as written, frontmatter included (`status.source`, sent on a read of
@@ -175,13 +174,13 @@ export const checkSelector = (selector: string): Promise<unknown> => cards.listA
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
 /** Labels as a printer shows them, `a=b,c=d` in key order, as the orchestrator's `labelsText` does; null for none. */
-const labelsText = (labels: Readonly<Record<string, string>>): string | null => {
+const labelsText = (labels: Readonly<Record<string, string>>) => {
   const keys = Object.keys(labels).sort();
   return keys.length === 0 ? null : keys.map((key) => `${key}=${labels[key] ?? ''}`).join(',');
 };
 
 /** A card's models as it writes them, `implement=fable, review=opus`, as the orchestrator's `modelsText` does; null for none. */
-const modelsText = (models: Readonly<Record<string, string>>): string | null =>
+const modelsText = (models: Readonly<Record<string, string>>) =>
   Object.entries(models)
     .map(([step, model]) => `${step}=${model}`)
     .join(', ') || null;
@@ -191,7 +190,7 @@ const modelsText = (models: Readonly<Record<string, string>>): string | null =>
  * `<step>=<model>`, comma-joined, its labels as
  * `a=b,c=d`, its factory (its namespace, none for `default`), or what the card writes; null for a key it does not set.
  */
-const keyValue = (card: Card, key: CardKey): string | null => {
+const keyValue = (card: Card, key: CardKey) => {
   const entry = entryOf(card);
   if (key === 'queued') return entry.queued?.at ?? null;
   if (key === 'from') return entry.from.join(', ') || null;
@@ -205,7 +204,7 @@ const keyValue = (card: Card, key: CardKey): string | null => {
  * rows a card's page draws. Null for an entry that does not read as a card: its `error` says why.
  * @param card The Card as the api serves it, its own error said in its status where it does not read.
  */
-export const cardKeysOf = (card: Card): KeyRow[] | null =>
+export const cardKeysOf = (card: Card) =>
   card.status.error === undefined ? CARD_KEYS.map((key) => ({ key, value: keyValue(card, key), meaning: CARD_KEY_MEANINGS[key] })) : null;
 
 /**
@@ -216,7 +215,7 @@ export const cardKeysOf = (card: Card): KeyRow[] | null =>
 export const cardQuery = (name: string) =>
   queryOptions({
     queryKey: ['inbox', name],
-    queryFn: async (): Promise<InboxCardPage> => {
+    queryFn: async () => {
       const card = await cards.getAll(name);
       return { ...entryOf(card), source: card.status.source ?? '', keys: cardKeysOf(card) };
     },
@@ -231,15 +230,7 @@ type CardRef = Pick<InboxEntry, 'name' | 'factory'>;
  * finds its workflow by name. Resolves with the card's name; rejects with the api's refusal in full — the package's words for an idea with
  * nothing in it or a factory the store does not have, or the api's own about the request or a workflow it has none of.
  */
-export const fileCard = async ({
-  factory,
-  body,
-  workflow,
-}: {
-  body: string;
-  workflow?: string;
-  factory?: string;
-}): Promise<{ name: string }> => {
+export const fileCard = async ({ factory, body, workflow }: { body: string; workflow?: string; factory?: string }) => {
   const filed = await cards.create(namespaceOf(factory), { body, ...(workflow === undefined ? {} : { workflow }) });
   return { name: filed.metadata.name };
 };
@@ -249,7 +240,7 @@ export const fileCard = async ({
  * package's words for a card that is not there, or for a name that is not a card's.
  * @param card The card to drop: its name and its factory.
  */
-export async function dropCard(card: CardRef): Promise<void> {
+export async function dropCard(card: CardRef) {
   await cards.delete(namespaceOf(card.factory), card.name);
 }
 
@@ -260,7 +251,7 @@ export async function dropCard(card: CardRef): Promise<void> {
  * is queued already or was started — or the api's own about the request.
  * @param card The card to queue or take off the queue: its name and its factory.
  */
-export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}): Promise<Card> =>
+export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}) =>
   off ? cards.unqueue(namespaceOf(card.factory), card.name) : cards.queue(namespaceOf(card.factory), card.name);
 
 /**
@@ -278,7 +269,7 @@ export const startCard = (
   card: CardRef,
   start: { workflow: string; brief: string; after?: readonly string[]; context?: readonly string[]; files?: StartFiles },
   factory?: string | null,
-): Promise<Started> => {
+) => {
   const namespace = namespaceOf(card.factory);
   const given = start.files;
   return (given === undefined || given.listed.length === 0 ? Promise.resolve([]) : files.uploaded(namespace, given))
@@ -308,7 +299,7 @@ export const startCard = (
  * @param card The card whose `from:` is set: its name and its factory.
  * @param runs The ids of the runs its run is handed; none takes the line off.
  */
-export async function setCardFrom(card: CardRef, runs: readonly string[]): Promise<Card> {
+export async function setCardFrom(card: CardRef, runs: readonly string[]) {
   const namespace = namespaceOf(card.factory);
   const read = await cards.get(namespace, card.name);
   const { from: _, ...kept } = read.spec;

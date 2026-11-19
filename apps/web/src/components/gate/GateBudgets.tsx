@@ -16,7 +16,7 @@ export type GivenBudget = { step: string; usd: number };
 export type Amounts = Readonly<Record<string, string>>;
 
 /** The amount a field holds, or null where it holds no number above zero. */
-const amountOf = (text: string): number | null => {
+const amountOf = (text: string) => {
   const usd = Number(text.trim());
   return text.trim() !== '' && Number.isFinite(usd) && usd > 0 ? usd : null;
 };
@@ -29,10 +29,7 @@ const amountOf = (text: string): number | null => {
  * @param budgets the budgets of the gate, none where it has none
  * @param amounts what the person typed for each later step, by its name
  */
-export const budgetsGiven = (
-  budgets: Frozen<GateBudgets> | null | undefined,
-  amounts: Amounts,
-): { given: GivenBudget[]; unread: string[] } => {
+export const budgetsGiven = (budgets: Frozen<GateBudgets> | null | undefined, amounts: Amounts) => {
   const given: GivenBudget[] = [];
   const unread: string[] = [];
   for (const row of budgets?.from === 'proposed' ? budgets.steps : []) {

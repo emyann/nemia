@@ -64,7 +64,7 @@ export const CardsQueued: Story = {
 };
 
 /** Whether two boxes on the screen share any pixel. */
-const meet = (a: DOMRect, b: DOMRect): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+const meet = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
 /**
  * Runs on the floor: one at work, opened into its panel, one waiting on a run, one for a run slot, one held and one waiting on you. Each

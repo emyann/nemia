@@ -17,7 +17,7 @@ type PickedRuns = { open: ListedRun[]; finished: FinishedRun[] };
  * @param open The runs not finished, as the open runs' read answered them: those that wait and those in flight.
  * @param pages The finished runs' pages read so far, newest first.
  */
-export function pickedOf(open: OpenRuns, pages: readonly FinishedPage[]): PickedRuns {
+export function pickedOf(open: OpenRuns, pages: readonly FinishedPage[]) {
   const opened = [...open.waiting, ...open.inFlight]
     .filter(judged)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
@@ -37,7 +37,7 @@ export function pickedOf(open: OpenRuns, pages: readonly FinishedPage[]): Picked
  * `more` while the finished runs have an older page, and `older()` asks for it; `reading` until both answer; `error` the first read's
  * refusal. The open runs are read as the picker opens, not on the list's beat; the feed and a write read both again.
  */
-export function usePickerRuns(): PickedRuns & { more: boolean; older: () => void; reading: boolean; error: Error | null } {
+export function usePickerRuns() {
   const open = useQuery({ ...openRunsQuery(), refetchInterval: false });
   const pages = useInfiniteQuery(finishedPagesQuery());
   const picked = open.data && pages.data ? pickedOf(open.data, pages.data.pages) : { open: [], finished: [] };

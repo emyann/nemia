@@ -24,9 +24,9 @@ export const AMOUNT_FORMATS: Readonly<Record<AmountKind, Intl.NumberFormatOption
  * @param kind The kind of amount the field takes, which says its format.
  * @param locale The locale the field formats in; the runtime's own where none is given, as the kit's field takes it.
  */
-export function amountTyped(text: string, kind: AmountKind, locale?: string): number | null | undefined {
+export function amountTyped(text: string, kind: AmountKind, locale?: string) {
   const parts = new Intl.NumberFormat(locale, AMOUNT_FORMATS[kind]).formatToParts(-12345.6);
-  const symbol = (type: Intl.NumberFormatPartTypes): string | undefined => parts.find((part) => part.type === type)?.value;
+  const symbol = (type: Intl.NumberFormatPartTypes) => parts.find((part) => part.type === type)?.value;
   const dropped = new Set(parts.filter((part) => ['group', 'currency', 'literal'].includes(part.type)).map((part) => part.value));
   let plain = '';
   for (const char of text.replace(/\s/g, '')) {

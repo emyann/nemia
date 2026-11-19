@@ -40,7 +40,7 @@ function WaitingRow({ row }: { row: BellRow }) {
 }
 
 /** How many runs wait on you, said in the bar's description. */
-const countWords = (count: number): string => `${count} ${count === 1 ? 'run' : 'runs'}, across every factory`;
+const countWords = (count: number) => `${count} ${count === 1 ? 'run' : 'runs'}, across every factory`;
 
 /**
  * The runs waiting on you, read as the rail's count reads them (`openRunsQuery`): a row each, or a line saying nothing waits on you; a read

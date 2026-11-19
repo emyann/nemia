@@ -19,7 +19,7 @@ const FEED_STREAM = '/api/feed/stream';
  * also what the stream will not carry — what moved between the page's first reads and the end the stream starts at; down, it is what the
  * stream may have missed.
  */
-export function useFeed(): FeedStatus {
+export function useFeed() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<FeedStatus>('connecting');
 

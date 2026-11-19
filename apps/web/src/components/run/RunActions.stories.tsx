@@ -15,7 +15,7 @@ import { LONG_PRESS_MS, RunActions } from './RunActions';
 const AS_OF = new Date('2026-11-15T18:00:00.000Z');
 
 /** `run` as the list carries one. */
-const listed = (run: RunObject): ListedRun => ({
+const listed = (run: RunObject) => ({
   ...runViewOf(run),
   wallMs: 0,
   finishedAt: run.status.finishedAt ?? null,
@@ -93,7 +93,7 @@ function Card({ run }: { run: RunView }) {
 }
 
 /** The menu open on the page, and the names of its entries. */
-async function entriesOf(): Promise<string[]> {
+async function entriesOf() {
   const menu = await waitFor(() => within(document.body).getByRole('menu', { name: 'Actions on the run' }));
   return within(menu)
     .getAllByRole('menuitem')

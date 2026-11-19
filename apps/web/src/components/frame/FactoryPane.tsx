@@ -17,7 +17,7 @@ type PlaceLine = { line: ReactNode; count?: number };
  * A place's line that leads with a count: the count drawn by the kit's `Badge` at the line's end, in yours (what waits on the person),
  * and said before `words` to a screen reader alone, the badge being hidden from it; a count of 0 draws no badge and says `none` instead.
  */
-const counted = (count: number, words: string, none: string): PlaceLine =>
+const counted = (count: number, words: string, none: string) =>
   count > 0
     ? {
         line: (
@@ -40,7 +40,7 @@ const countOf = (line: PlaceLine | undefined) =>
  * of the api by phase (`waitingProposalsQuery`) and never as the whole list, read for a factory a person made alone, the default factory
  * having none; none for any other place, or before they are read.
  */
-function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace, PlaceLine>> {
+function usePlaceLines(path: string, factory: string) {
   const runs = useQuery(frameRunsQuery(path)).data;
   const inbox = useQuery(inboxQuery).data;
   const place = useQuery(factoriesQuery).data?.find((f) => f.name === factory);
@@ -51,7 +51,7 @@ function usePlaceLines(path: string, factory: string): Partial<Record<PanePlace,
     ...(runs && { runs: counted(runs.counts.waiting, 'waiting on you', 'nothing waits on you') }),
     ...(cards !== undefined && { inbox: counted(cards, 'not started', 'every card started') }),
     ...(waiting !== undefined && { proposals: { line: waiting > 0 ? `${waiting} wait on you` : 'none waiting' } }),
-  };
+  } satisfies Partial<Record<PanePlace, PlaceLine>> as Partial<Record<PanePlace, PlaceLine>>;
 }
 
 /**

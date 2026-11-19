@@ -10,12 +10,12 @@ import { call, write } from './objects.ts';
  * Sends `token` as the bearer of `POST /api/session`, which sets it as this browser's cookie; rejects where the api refuses it.
  * @param token The token the person pasted.
  */
-export const signIn = (token: string): Promise<SessionAnswer> =>
+export const signIn = (token: string) =>
   call((c) => c.session.signIn(), {
     ...write(SessionAnswer, 'The token may be kept: reload the page before pasting it again.'),
     headers: { authorization: `Bearer ${token}` },
   });
 
 /** `DELETE /api/session`: the api clears the cookie, so this browser sends no token until one is pasted again. */
-export const signOut = (): Promise<SessionAnswer> =>
+export const signOut = () =>
   call((c) => c.session.signOut(), write(SessionAnswer, 'The token may be forgotten: reload the page to see whether it is asked for.'));

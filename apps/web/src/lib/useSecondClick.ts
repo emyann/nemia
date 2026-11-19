@@ -6,7 +6,7 @@ import { secondClick } from './canvas.ts';
  * anything under it takes it, and its double click kept from the pane. Returns what a node's first click calls with what it pressed.
  * @param open What the double click opens, called with what its first click pressed.
  */
-export function useSecondClick(open: (pressed: string) => void): (pressed: string) => void {
+export function useSecondClick(open: (pressed: string) => void) {
   const pressed = useRef<string | null>(null);
   const opens = useEffectEvent(open);
   useEffect(() => {

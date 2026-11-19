@@ -32,14 +32,14 @@ type Draft = { resources: readonly string[]; names: string; verbs: readonly Chan
 const EMPTY: Draft = { resources: [], names: '', verbs: [] };
 
 /** A grant of a delegation, as the form holds it. */
-const draftOf = (rule: DelegationRule): Draft => ({
+const draftOf = (rule: DelegationRule) => ({
   resources: [...rule.resources],
   names: rule.resourceNames.join(', '),
   verbs: [...rule.verbs],
 });
 
 /** A grant the form holds, as the api takes it; none where it picks no resource or no verb. */
-const ruleOf = (draft: Draft): DelegationRule | undefined => {
+const ruleOf = (draft: Draft) => {
   if (draft.resources.length === 0 || draft.verbs.length === 0) return undefined;
   const names = draft.names
     .split(',')
@@ -49,12 +49,11 @@ const ruleOf = (draft: Draft): DelegationRule | undefined => {
 };
 
 /** A grant in words: its verbs, its resources, and its names or every name. */
-const grantWords = (rule: DelegationRule): string =>
+const grantWords = (rule: DelegationRule) =>
   `${rule.verbs.join(', ')} ${rule.resources.join(', ')}${rule.resourceNames.length ? ` named ${rule.resourceNames.join(', ')}` : ', any name'}`;
 
 /** `list` with `value` in it where `on`, else without it. */
-const toggled = <T,>(list: readonly T[], value: T, on: boolean): T[] =>
-  on ? [...new Set([...list, value])] : list.filter((v) => v !== value);
+const toggled = <T,>(list: readonly T[], value: T, on: boolean) => (on ? [...new Set([...list, value])] : list.filter((v) => v !== value));
 
 /** The delegations of the factory `name`, listed, written and removed. */
 export function FactoryDelegations({ name }: { name: string }) {

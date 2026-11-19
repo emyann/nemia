@@ -34,13 +34,13 @@ export const LIGHT_CANARIES: readonly string[] = [
  * @param id Storybook's id of the story.
  * @param theme The theme the picture is drawn in.
  */
-export const pictureName = (id: string, theme: Scheme): string => `${theme === 'light' ? `${LIGHT}/` : ''}${id.split('--').join('/')}`;
+export const pictureName = (id: string, theme: Scheme) => `${theme === 'light' ? `${LIGHT}/` : ''}${id.split('--').join('/')}`;
 
 /**
  * The file under `APPROVED` of the picture compared under `name` (`pictureName`), a suffix Vitest adds to its last segment kept.
  * @param name The name the picture was compared under.
  */
-export const pictureFile = (name: string): string => {
+export const pictureFile = (name: string) => {
   const parts = name.split('/');
   const light = parts.length > 2 && parts[0] === LIGHT;
   return `${light ? `${LIGHT}/` : ''}${parts.slice(light ? 1 : 0).join('--')}`;

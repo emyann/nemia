@@ -12,7 +12,7 @@ import { barOf, barValue, nextBar, type Bar } from './bar.ts';
  * open it again; and `toggle`, which closes it for the thing it shows and shows anything else. None of them scrolls the page, beside which
  * the sheet stands.
  */
-export function useBar(): { open: Bar | undefined; show: (bar: Bar) => void; close: () => void; toggle: (bar: Bar) => void } {
+export function useBar() {
   const open = barOf(useSearch({ strict: false }).bar);
   const navigate = useNavigate();
   const go = useCallback(
@@ -33,5 +33,5 @@ export function useBar(): { open: Bar | undefined; show: (bar: Bar) => void; clo
       const next = nextBar(open, bar);
       go(next, next === undefined);
     },
-  };
+  } satisfies { open: Bar | undefined; show: (bar: Bar) => void; close: () => void; toggle: (bar: Bar) => void };
 }

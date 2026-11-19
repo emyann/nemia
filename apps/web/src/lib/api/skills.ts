@@ -31,10 +31,10 @@ export type SkillPlace = { from: SkillSource; dir: string | null; skills: SkillR
 type SkillAdded = { skill: SkillRow };
 
 /** The folder a skill's folder is in: its place's. */
-const parentOf = (dir: string): string => dir.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '');
+const parentOf = (dir: string) => dir.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '');
 
 /** A Skill, as the picker lists it (`SkillRow`). */
-const skillRowOf = (skill: Skill): SkillRow => ({
+const skillRowOf = (skill: Skill) => ({
   name: skill.metadata.name,
   from: skill.status.origin,
   dir: skill.status.dir,
@@ -50,8 +50,8 @@ const skillRowOf = (skill: Skill): SkillRow => ({
  * The places a namespace's skills are listed by, in the order an agent of yours finds a name: in a factory, its own tree, your library,
  * its repository's and Nemia's; in the default namespace, which works on no repository, your library and Nemia's.
  */
-const skillOrigins = (namespace: string): DefinitionOrigin[] =>
-  namespace === DEFAULT_NAMESPACE ? ['user', 'builtin'] : ['factory', 'user', 'repo', 'builtin'];
+const skillOrigins = (namespace: string) =>
+  (namespace === DEFAULT_NAMESPACE ? ['user', 'builtin'] : ['factory', 'user', 'repo', 'builtin']) satisfies DefinitionOrigin[];
 
 /**
  * Every skill of `namespace`'s places, a list each read by its origin (`?origin=`), shadowed or not, read from disk on each request; keyed
@@ -60,13 +60,13 @@ const skillOrigins = (namespace: string): DefinitionOrigin[] =>
 const skillsInQuery = (namespace: string) =>
   queryOptions({
     queryKey: namespace === DEFAULT_NAMESPACE ? ['skills'] : ['skills', namespace],
-    queryFn: (): Promise<SkillPlace[]> =>
+    queryFn: () =>
       Promise.all(
         skillOrigins(namespace).map(async (from) => {
           const skills = (await served.list(namespace, { origin: from })).map(skillRowOf);
           return { from, dir: skills[0] ? parentOf(skills[0].dir) : null, skills };
         }),
-      ),
+      ) satisfies Promise<SkillPlace[]>,
   });
 
 /** Every skill the picker lists, by place, in the default namespace. */
@@ -88,7 +88,7 @@ const refused: Refuse = (words, status) => new SkillRefusal(words, status);
  * Copy the builtin skill `name` into your library, a write of its own: an agent of yours can then be given it.
  * @param name The skill's name, its folder's.
  */
-export const copySkill = async (name: string): Promise<SkillAdded> => ({
+export const copySkill = async (name: string) => ({
   skill: skillRowOf(await served.copy(name, refused)),
 });
 
@@ -129,7 +129,7 @@ export type SkillSaved = SkillDetail;
 const DRAFT_KEYS = ['title', 'description', 'tags', 'examples', 'preload'] as const;
 
 /** A skill's draft, off its spec: null where its SKILL.md does not read as one (`spec` its body alone, `status.error` saying why). */
-const draftOf = (skill: Skill): SkillDraft | null => {
+const draftOf = (skill: Skill) => {
   const { spec } = skill;
   if (skill.status.error !== null && !DRAFT_KEYS.some((key) => Object.hasOwn(spec, key))) return null;
   return {
@@ -144,14 +144,15 @@ const draftOf = (skill: Skill): SkillDraft | null => {
 };
 
 /** A Skill, as its page reads it (`SkillDetail`). */
-const skillDetailOf = (skill: Skill): SkillDetail => ({
-  skill: skillRowOf(skill),
-  version: skill.metadata.resourceVersion,
-  draft: draftOf(skill),
-  body: skill.spec.body,
-  users: skill.status.usedBy.map((u) => ({ ...u })),
-  copyHint: skill.status.copyHint,
-});
+const skillDetailOf = (skill: Skill) =>
+  ({
+    skill: skillRowOf(skill),
+    version: skill.metadata.resourceVersion,
+    draft: draftOf(skill),
+    body: skill.spec.body,
+    users: skill.status.usedBy.map((u) => ({ ...u })),
+    copyHint: skill.status.copyHint,
+  }) satisfies SkillDetail as SkillDetail;
 
 /**
  * One skill, read from disk now, in `place`'s factory on its repository (none: the default namespace): its page's read. Under
@@ -177,7 +178,7 @@ const specOfDraft = ({ name: _, ...spec }: SkillDraft) => spec;
  * refuses.
  * @param draft The skill to write: its name, its card's lines and its instructions.
  */
-export const createSkill = async (draft: SkillDraft): Promise<SkillSaved> =>
+export const createSkill = async (draft: SkillDraft) =>
   skillDetailOf(await served.create({ metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused));
 
 /**
@@ -186,7 +187,7 @@ export const createSkill = async (draft: SkillDraft): Promise<SkillSaved> =>
  * @param version The version it was read at (`SkillDetail.version`).
  * @param draft What it now holds, whole.
  */
-export const saveSkill = async (name: string, version: string, draft: SkillDraft): Promise<SkillSaved> =>
+export const saveSkill = async (name: string, version: string, draft: SkillDraft) =>
   skillDetailOf(await served.replace(name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused));
 
 /**
@@ -195,5 +196,5 @@ export const saveSkill = async (name: string, version: string, draft: SkillDraft
  * @param version The version it was read at (`SkillDetail.version`).
  * @param preload Whether it is loaded every turn; false names it for a session to load.
  */
-export const switchPreload = async (name: string, version: string, preload: boolean): Promise<SkillSaved> =>
+export const switchPreload = async (name: string, version: string, preload: boolean) =>
   skillDetailOf(await served.replace(name, { metadata: { resourceVersion: version }, preload }, refused));

@@ -21,7 +21,7 @@ const SRC = 'apps/web/src/';
 const FOLDER = 'apps/web/test/baseline/';
 
 /** The source file an entry names: all of it before its first `#`, or all of it where it has none. */
-const sourceOf = (entry: string): string => (entry.includes('#') ? entry.slice(0, entry.indexOf('#')) : entry);
+const sourceOf = (entry: string) => (entry.includes('#') ? entry.slice(0, entry.indexOf('#')) : entry);
 
 const shardOfSpec = spec<(list: BaselineList, entry: string) => string>({
   requires: ({ input: [, entry] }) => sourceOf(entry).startsWith(SRC) && sourceOf(entry).length > SRC.length,
@@ -48,13 +48,13 @@ export type Astray = { readonly file: string; readonly entry: string };
 export type FiledApart = { readonly astray: readonly Astray[]; readonly empty: readonly string[] };
 
 /** The file `entry` belongs in on `list`, or none where it names no source file under src. */
-const homeOf = (list: BaselineList, entry: string): string | undefined =>
+const homeOf = (list: BaselineList, entry: string) =>
   sourceOf(entry).startsWith(SRC) && sourceOf(entry).length > SRC.length
     ? FOLDER + list + '/' + sourceOf(entry).slice(SRC.length) + '.txt'
     : undefined;
 
 /** Whether `files` names no file twice. */
-const onceEach = (files: readonly Filed[]): boolean => files.every((one, at) => !files.slice(0, at).some((it) => it.file === one.file));
+const onceEach = (files: readonly Filed[]) => files.every((one, at) => !files.slice(0, at).some((it) => it.file === one.file));
 
 const astraySpec = spec<(list: BaselineList, file: string, entry: string) => boolean>({
   ensures: {

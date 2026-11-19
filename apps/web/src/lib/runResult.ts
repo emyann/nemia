@@ -3,7 +3,7 @@
  * steps gave, or until they have, where the run stands and the step that says it; and the run's steps as the box reads them
  * (`resultStepsOf`), final where no step comes after them on the graph. Pure.
  */
-import type { ResultOf, ResultStep, Stands } from '../../contracts/run-result.contract.ts';
+import type { ResultOf, ResultStep } from '../../contracts/run-result.contract.ts';
 import type { RunDetail, StepView } from './runView.ts';
 import { meaningOf } from './meaning.ts';
 import { movingInto, isLive } from './canvas.ts';
@@ -29,7 +29,7 @@ export const resultOf: ResultOf = (steps) => {
  * Where a step stands for the box, by its state: done, skipped, waiting on a person, failed, at work, else to come.
  * @param state The step's state, as the run's page draws it.
  */
-export function standsOf(state: StepState): Stands {
+export function standsOf(state: StepState) {
   if (satisfiesAfter(state)) return 'done';
   if (state === 'skipped') return 'skipped';
   const meaning = meaningOf(stateDrawn[state].hue);
@@ -39,7 +39,7 @@ export function standsOf(state: StepState): Stands {
 }
 
 /** Whether the step's shown try gave anything: the summary it signed off with, a declared field, a file or a value. */
-const gaveOf = (step: StepView): boolean => {
+const gaveOf = (step: StepView) => {
   const closeout = step.closeout;
   return (
     closeout !== null &&
@@ -56,7 +56,7 @@ const gaveOf = (step: StepView): boolean => {
  * plain step — a workflow node, which files a card, or a condition, which takes a route — what it did, which no session signs off.
  * @param view The run's detail: its graph, its steps, its calling off and its hold.
  */
-export function resultStepsOf(view: RunDetail): ResultStep[] {
+export function resultStepsOf(view: RunDetail) {
   const before = new Set(view.graph.edges.filter((e) => e.kind !== 'loop').map((e) => e.from));
   const nodes = nodeKinds(view.graph);
   return view.steps.map((step) => ({
@@ -64,7 +64,7 @@ export function resultStepsOf(view: RunDetail): ResultStep[] {
     final: !before.has(step.name),
     stands: standsOf(stepState(step, view.cancelledAt !== null, view.holding != null)),
     gave: nodes.has(step.name) || gaveOf(step),
-  }));
+  })) satisfies ResultStep[];
 }
 
 /** How a run ended before its final steps gave: called off by a person, or ended on its own. */
@@ -76,7 +76,7 @@ type RunEnd = 'calledOff' | 'ended';
  * reads as still to come.
  * @param view The run's detail: its status and when it was called off, null where it was not.
  */
-export function runEndOf(view: Pick<RunDetail, 'status' | 'cancelledAt'>): RunEnd | null {
+export function runEndOf(view: Pick<RunDetail, 'status' | 'cancelledAt'>) {
   if (view.cancelledAt !== null || view.status === 'cancelled') return 'calledOff';
   return view.status === 'succeeded' || view.status === 'failed' ? 'ended' : null;
 }

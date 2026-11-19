@@ -13,7 +13,7 @@ export type HarnessPieceRead = {
 };
 
 /** Whether `p` says a harness is installed: its install piece, met. */
-const activated = (p: HarnessPieceRead): boolean => p.harness !== undefined && p.harness.part === 'install' && p.state === 'met';
+const activated = (p: HarnessPieceRead) => p.harness !== undefined && p.harness.part === 'install' && p.state === 'met';
 
 const harnessAskedSpec = spec<(pieces: readonly HarnessPieceRead[], skipped: boolean) => boolean>({
   ensures: {

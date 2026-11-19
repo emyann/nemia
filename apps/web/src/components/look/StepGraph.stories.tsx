@@ -40,7 +40,7 @@ export default meta;
 type Story = StoryObj<typeof StepGraph>;
 
 /** The centre of a step's node across the graph, in the graph's own pixels. */
-const centreOf = (canvas: HTMLElement, step: string): number => {
+const centreOf = (canvas: HTMLElement, step: string) => {
   const node = canvas.querySelector<HTMLElement>(`[data-step="${step}"]`)!;
   return node.offsetLeft + node.offsetWidth / 2;
 };

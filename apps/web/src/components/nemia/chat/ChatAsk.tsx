@@ -36,12 +36,15 @@ export const OPTION =
  *
  * @param ask the ask the tag stands over
  */
-export const askTag = (ask: Ask): { words: string; hue: 'yours' | 'money' | 'grey' } =>
-  ask.chose !== undefined
+export const askTag = (ask: Ask) =>
+  (ask.chose !== undefined
     ? { words: ask.kind === 'proposal' ? 'Proposed' : 'Answered', hue: 'grey' }
     : ask.kind === 'proposal'
       ? { words: 'Proposes', hue: 'money' }
-      : { words: ask.kind === 'permission' ? 'Asks to run' : 'Asks you', hue: 'yours' };
+      : { words: ask.kind === 'permission' ? 'Asks to run' : 'Asks you', hue: 'yours' }) satisfies {
+    words: string;
+    hue: 'yours' | 'money' | 'grey';
+  };
 
 /**
  * What the SDK handed over with a call of hers that would prompt, drawn as it came and never rebuilt from the call's input: why it is
@@ -81,7 +84,7 @@ function PermissionFactsOf({ facts }: { facts: PermissionFacts }) {
 const DENY = 'Deny';
 
 /** What the form picks before the person does: `Deny` where a permission's SDK leans to no and offers it, nothing otherwise. */
-const firstPick = (ask: Ask, question: AskQuestion | undefined): AskPick => ({
+const firstPick = (ask: Ask, question: AskQuestion | undefined) => ({
   question: question?.question ?? '',
   labels:
     ask.kind === 'permission' && ask.permission.defaultToNo && question?.options.some((option) => option.label === DENY) ? [DENY] : [],

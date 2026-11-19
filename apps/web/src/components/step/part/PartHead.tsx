@@ -148,7 +148,7 @@ function Note({ note, line = false }: { note: CardNote; line?: boolean }) {
 }
 
 /** The whole head's two facts beside the session's: its check and its gate, each where the step has one. */
-const wholeFacts = (head: Head): Array<{ key: string; value: string }> => [
+const wholeFacts = (head: Head) => [
   ...(head.facts === 'none' ? [] : head.facts),
   ...(head.check === 'none' ? [] : [{ key: 'Check', value: head.check }]),
   ...(head.gate === 'none' ? [] : [{ key: 'Gate', value: head.gate }]),

@@ -26,9 +26,7 @@ import type { StepView } from './runView';
  * of — which has none to read. `tries` are the step's, each with its own turn's attempts.
  * @param step The step: its task's id, its attempts, and its tries, each with its task's id and its attempts.
  */
-export const sessionToRead = (
-  step: Pick<StepView, 'taskId' | 'attempts'> & { tries: readonly Pick<StepTry, 'taskId' | 'attempts'>[] },
-): string | null =>
+export const sessionToRead = (step: Pick<StepView, 'taskId' | 'attempts'> & { tries: readonly Pick<StepTry, 'taskId' | 'attempts'>[] }) =>
   step.attempts.count > 0 || step.tries.some((t) => t.taskId === step.taskId && t.attempts.count > 0) ? step.taskId : null;
 
 /** The tool a Claude Code session gives its closeout with. Codex gives its closeout as its last words, which are said. */
@@ -84,7 +82,7 @@ const keyOf = (event: TranscriptEvent) => `${event.kind}:${event.id}`;
  * @param known The events already read.
  * @param incoming The events the stream sent since.
  */
-export function mergeEvents(known: readonly TranscriptEvent[], incoming: readonly TranscriptEvent[]): TranscriptEvent[] {
+export function mergeEvents(known: readonly TranscriptEvent[], incoming: readonly TranscriptEvent[]) {
   const merged = [...known];
   if (!incoming.length) return merged;
   const where = new Map(merged.map((event, i) => [keyOf(event), i]));
@@ -105,7 +103,7 @@ export function mergeEvents(known: readonly TranscriptEvent[], incoming: readonl
  * start — is still shown, as a call of an unknown tool; a `text` event that says nothing is no pause between calls.
  * @param events The transcript's events, in order.
  */
-export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
+export function foldTranscript(events: readonly TranscriptEvent[]) {
   const turns: Turn[] = [];
   const calls = new Map<string, ToolCall>();
   let stretch: FoldedTurn[] = [];
@@ -170,7 +168,7 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
  * the session has moved on, and a call with no result had none.
  * @param turns The conversation's turns, in order.
  */
-export function tailStart(turns: readonly Turn[]): number {
+export function tailStart(turns: readonly Turn[]) {
   for (let i = turns.length - 1; i >= 0; i--) {
     const { kind } = turns[i];
     if (kind === 'said' || kind === 'closeout') return i + 1;
@@ -179,7 +177,7 @@ export function tailStart(turns: readonly Turn[]): number {
 }
 
 /** When a turn happened: its own time, its call's, or its fold's first. `NaN` for a time that does not parse. */
-const timeOf = (turn: Turn): number => {
+const timeOf = (turn: Turn) => {
   switch (turn.kind) {
     case 'tool':
     case 'closeout':
@@ -199,7 +197,7 @@ type Heard = Said & { arrived: string | null };
  * writes them when it reads them between calls — or ends with them, after Claude Code's line saying another session sent them ("Another
  * Claude session sent a message:"), as an idle one starts its next turn with them. Where it stands is `heardIn`'s to judge, never its time.
  */
-const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
+const arrivalOf = (event: TranscriptEvent, said: Said) => {
   if (!(event.kind === 'system' || (event.kind === 'text' && event.role === 'system'))) return false;
   const text = (event.text ?? '').trim();
   const words = said.text.trim();
@@ -210,7 +208,7 @@ const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
  * The first of `events` that may show `said`'s words reaching the session: the one after its mark (`after`, the transcript's last event
  * before the words were handed over), the first when it has none, and none — the length of `events` — while the mark is not among them.
  */
-const firstAfter = (events: readonly TranscriptEvent[], said: Said): number => {
+const firstAfter = (events: readonly TranscriptEvent[], said: Said) => {
   if (!said.after) return 0;
   const { kind, id } = said.after;
   const mark = events.findIndex((event) => event.kind === kind && event.id === id);
@@ -227,11 +225,11 @@ const firstAfter = (events: readonly TranscriptEvent[], said: Said): number => {
  * @param events The session's transcript events, in order.
  * @param said What was said to the session, off the engine's journal of the step's task.
  */
-export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[]): { events: TranscriptEvent[]; said: Heard[] } {
+export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[]) {
   const taken = new Set<number>();
   const heard = [...said]
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-    .map((s): Heard => {
+    .map((s) => {
       const from = firstAfter(events, s);
       const i = events.findIndex((event, j) => j >= from && !taken.has(j) && arrivalOf(event, s));
       if (i === -1) return { ...s, arrived: null };
@@ -250,7 +248,7 @@ export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[
  * @param turns The conversation's turns, in order.
  * @param said What was said to the session, each with when it reached it where `heardIn` found that, null or absent where not.
  */
-export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { arrived?: string | null }>): Turn[] {
+export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { arrived?: string | null }>) {
   const placed = (s: { at: string; arrived?: string | null }) => Date.parse(s.arrived ?? s.at);
   const told: ToldTurn[] = [...said]
     .sort((a, b) => placed(a) - placed(b))
@@ -276,7 +274,7 @@ export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { ar
  * A stretch as it is drawn: what comes before its first call and after its last on its own, and between them one fold — or the call itself,
  * when there is one.
  */
-function drawn(stretch: FoldedTurn[]): Turn[] {
+function drawn(stretch: FoldedTurn[]) {
   let first = -1;
   let last = -1;
   stretch.forEach((turn, i) => {
@@ -298,7 +296,7 @@ function drawn(stretch: FoldedTurn[]): Turn[] {
   return [...stretch.slice(0, first), tools, ...stretch.slice(last + 1)];
 }
 
-const inputOf = (call: ToolCall): Record<string, unknown> =>
+const inputOf = (call: ToolCall) =>
   call.input && typeof call.input === 'object' && !Array.isArray(call.input) ? (call.input as Record<string, unknown>) : {};
 
 /**
@@ -306,7 +304,7 @@ const inputOf = (call: ToolCall): Record<string, unknown> =>
  * command Codex gives as its argv, `['/bin/bash', '-lc', 'npm test']`, is its last word.
  * @param call The tool call.
  */
-export function detailOf(call: ToolCall): string | null {
+export function detailOf(call: ToolCall) {
   const input = inputOf(call);
   const command = Array.isArray(input.command) ? input.command.at(-1) : input.command;
   const said = [command, input.file_path, input.notebook_path, input.pattern, input.url, input.query, input.description, input.path].find(
@@ -326,7 +324,7 @@ const SUMMARY_MAX = 120;
  * summary with its body's first line, often a heading, which its body draws as one beneath it.
  * @param summary The summary's line.
  */
-export const summaryShown = (summary: string): string => summary.replace(/^#{1,6}\s+/, '');
+export const summaryShown = (summary: string) => summary.replace(/^#{1,6}\s+/, '');
 
 /**
  * Whether `body` opens with `summary`: its first non-empty line, a heading's marks dropped, begins with the summary as drawn, a cut one
@@ -334,7 +332,7 @@ export const summaryShown = (summary: string): string => summary.replace(/^#{1,6
  * @param summary The closeout's summary.
  * @param body The closeout's body, or null where it has none.
  */
-export function bodyLeadsWith(summary: string, body: string | null): boolean {
+export function bodyLeadsWith(summary: string, body: string | null) {
   if (!body) return false;
   const first = summaryShown(
     body
@@ -352,7 +350,7 @@ export function bodyLeadsWith(summary: string, body: string | null): boolean {
  * last space that leaves room for an ellipsis, or hard where it has none, and ends `…`.
  * @param text The summary as given.
  */
-export function summaryLine(text: string): string {
+export function summaryLine(text: string) {
   const line =
     text
       .split('\n')
@@ -382,7 +380,7 @@ type Closeout = {
  * The closeout a call gives (`Closeout`), or null where its input is no closeout.
  * @param call The tool call that gives the closeout.
  */
-export function closeoutOf(call: ToolCall): Closeout | null {
+export function closeoutOf(call: ToolCall) {
   const input = inputOf(call);
   if (typeof input.outcome !== 'string' || typeof input.summary !== 'string') return null;
   const summary = summaryLine(input.summary);

@@ -60,7 +60,7 @@ export type LevelAsk = typeof NemiaLevelSet.Type;
  * write; rejects with the api's refusal in full, such as a raise that raises nothing.
  * @param ask The level to write: the store's, a factory's default, a raise of a factory for a stretch, or its raise ended.
  */
-export const putLevel = (ask: LevelAsk): Promise<NemiaLevel> =>
+export const putLevel = (ask: LevelAsk) =>
   call(
     (c) => c.nemia.setLevel({ payload: ask }),
     write(NemiaLevelAnswer, 'A level may be written: read the levels again before setting it again.'),

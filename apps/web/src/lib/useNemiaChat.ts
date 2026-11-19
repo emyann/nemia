@@ -30,14 +30,15 @@ import { browserSharing, sharedStream, type Sharing } from './sharedStream.ts';
 const CHAT_RETRY_MS = 3_000;
 
 /** The person's words, drawn as their own at once, under the id her chat gives the outbox entry, which the stream replaces by. */
-const personEvent = (entry: ChatSent): ChatEvent => ({
-  kind: 'message',
-  id: `p:${entry.id}`,
-  at: entry.at,
-  from: 'person',
-  text: entry.text,
-  delivered: null,
-});
+const personEvent = (entry: ChatSent) =>
+  ({
+    kind: 'message',
+    id: `p:${entry.id}`,
+    at: entry.at,
+    from: 'person',
+    text: entry.text,
+    delivered: null,
+  }) satisfies ChatEvent;
 
 /**
  * Her chat as a page holds it: what was read and followed (`state`), the message this browser kept because the api would not take it
@@ -71,7 +72,7 @@ const CHAT_SHARED = 'nemia-chat-stream';
  * @param sharing The Web Locks and channels the tabs share her stream through; undefined, where the browser has none, opens one
  * in each tab.
  */
-export function reading({ setState, tryAgain }: Reader, sharing: Sharing | undefined = browserSharing()): () => void {
+export function reading({ setState, tryAgain }: Reader, sharing: Sharing | undefined = browserSharing()) {
   const read = new AbortController();
   const shared = sharedStream(
     CHAT_SHARED,
@@ -134,7 +135,7 @@ export function reading({ setState, tryAgain }: Reader, sharing: Sharing | undef
  * on her chat as the keeper's quiet marker, which the stream brings down with the rest, and a refusal — her turn over by the time it
  * reached the api — is what her presence says a beat later.
  */
-function useHeldChat(): NemiaChat {
+function useHeldChat() {
   const [state, setState] = useState<ChatFollowed>(() => unreadChat(true));
   const [kept, setKept] = useState<ChatKept | null>(() => readKept());
   const [attempt, setAttempt] = useState(0);
@@ -223,7 +224,7 @@ export function NemiaChatProvider({ children }: { children?: ReactNode }) {
 }
 
 /** Her chat as the frame's `NemiaChatProvider` holds it; a component drawn outside one is refused. */
-export function useNemiaChat(): NemiaChat {
+export function useNemiaChat() {
   const chat = useContext(HeldChat);
   if (chat === null)
     throw new Error('useNemiaChat reads her chat from NemiaChatProvider: draw this component under it (routes/__root.tsx).');

@@ -20,7 +20,7 @@ type Mode = 'rw' | 'ro';
 type Change = { kind: 'add'; volume: string } | { kind: 'remove'; path: string };
 
 /** The api's words for a write it refused, or none. */
-const refusalOf = (error: unknown): string | null =>
+const refusalOf = (error: unknown) =>
   error === null || error === undefined ? null : error instanceof Error ? error.message : 'the api answered nothing the board reads.';
 
 /** One volume: its path, its mark, what it is, where it was cloned from, and Remove, pending while its own removal is out. */
@@ -99,8 +99,10 @@ function VolumeForm({ adding, held, onAdd }: { adding: boolean; held: boolean; o
 export function FactoryVolumes({ factory }: { factory: Pick<Factory, 'name' | 'volumes' | 'commands'> }) {
   const queryClient = useQueryClient();
   const change = useMutation({
-    mutationFn: (asked: Change): Promise<unknown> =>
-      asked.kind === 'add' ? factories.addVolume(factory.name, { volume: asked.volume }) : factories.removeVolume(factory.name, asked.path),
+    mutationFn: (asked: Change) =>
+      (asked.kind === 'add'
+        ? factories.addVolume(factory.name, { volume: asked.volume })
+        : factories.removeVolume(factory.name, asked.path)) satisfies Promise<unknown> as Promise<unknown>,
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['factories'] }),
   });
   const pending = change.isPending ? change.variables : undefined;

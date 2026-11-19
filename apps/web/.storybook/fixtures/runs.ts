@@ -5,7 +5,7 @@
  * told apart by their `fieldSelector`) — with none, refusing, or with the runs of the person's three target pictures.
  */
 import { http, HttpResponse } from 'msw';
-import type { Run, RunLines, RunList, RunSpecStep, RunStepStatus } from 'objects';
+import type { Run, RunList, RunStepStatus } from 'objects';
 
 /** The instant every list is measured to, so a story draws the same words whatever day it is drawn on. */
 const AS_OF = '2026-11-15T18:00:00.000Z';
@@ -17,7 +17,7 @@ const step = (
   reason: RunStepStatus['reason'],
   status: RunStepStatus['status'],
   message: string,
-): RunStepStatus => ({
+) => ({
   name,
   phase,
   reason,
@@ -63,7 +63,7 @@ type Shape = {
 };
 
 /** The graph build's workflow freezes on a run of `names`: a chain in their order, review looping back to implement for three rounds. */
-const chainOf = (names: readonly string[]): Run['status']['graph'] => ({
+const chainOf = (names: readonly string[]) => ({
   roots: names.slice(0, 1),
   edges: [
     ...names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' as const })),
@@ -72,7 +72,7 @@ const chainOf = (names: readonly string[]): Run['status']['graph'] => ({
 });
 
 /** A run of the `factory` factory as a list asked by state answers it. */
-const run = ({ name, brief, createdAt, steps, status }: Shape): Run => ({
+const run = ({ name, brief, createdAt, steps, status }: Shape) => ({
   apiVersion: 'nemia/v1',
   kind: 'Run',
   metadata: { name, namespace: 'factory', creationTimestamp: createdAt, labels: { workflow: 'build' } },
@@ -133,18 +133,18 @@ const run = ({ name, brief, createdAt, steps, status }: Shape): Run => ({
     clock: null,
     ...status,
   },
-});
+}) satisfies Run;
 
 /** A RunList as the api answers a list asked by state: `items`, counted and measured to `AS_OF`. */
-const listOf = (items: Run[], counts: { waiting: number; inFlight: number; finished: number }): RunList => ({
+const listOf = (items: Run[], counts: { waiting: number; inFlight: number; finished: number }) => ({
   apiVersion: 'nemia/v1',
   kind: 'RunList',
   metadata: { asOf: AS_OF, counts },
   items,
-});
+}) satisfies RunList;
 
 /** Whether `request` asks for the finished runs rather than those not finished. */
-const asksFinished = (request: Request): boolean => new URL(request.url).searchParams.get('fieldSelector') === 'status.state=finished';
+const asksFinished = (request: Request) => new URL(request.url).searchParams.get('fieldSelector') === 'status.state=finished';
 
 /** The page's two reads answered with no run at all. */
 export const noRuns = [http.get('/api/runs', () => HttpResponse.json(listOf([], { waiting: 0, inFlight: 0, finished: 0 })))];
@@ -156,7 +156,7 @@ export const REFUSED_WORDS = 'the store could not be read: run nemia doctor';
 export const refused = [http.get('/api/runs', () => HttpResponse.json({ error: REFUSED_WORDS }, { status: 503 }))];
 
 /** A step as a run freezes it: its name, the agent it is given and, on a loop, how many rounds it may run. */
-const frozen = (name: string, agent: string, rounds: number | null = null): RunSpecStep => ({
+const frozen = (name: string, agent: string, rounds: number | null = null) => ({
   name,
   after: [],
   input: [],
@@ -183,7 +183,7 @@ const AGENTS: Record<string, string> = { design: 'Designer', implement: 'Impleme
 const ROUNDS: Record<string, number> = { implement: 3, review: 2 };
 
 /** An amount spent, as the api words it: `$17.00`, or `≥$5.54` where a session was not measured. */
-const spent = (usd: number, unmeasured = 0): NonNullable<Run['status']['cost']> => ({
+const spent = (usd: number, unmeasured = 0) => ({
   usd,
   measured: 1,
   unmeasured,
@@ -191,7 +191,7 @@ const spent = (usd: number, unmeasured = 0): NonNullable<Run['status']['cost']> 
 });
 
 /** `minutes` before `AS_OF`, as the api writes an instant. */
-const before = (minutes: number): string => new Date(Date.parse(AS_OF) - minutes * 60_000).toISOString();
+const before = (minutes: number) => new Date(Date.parse(AS_OF) - minutes * 60_000).toISOString();
 
 /** The steps of each workflow of the targets, in its order. */
 const STEPS_OF = { quick: ['implement', 'review', 'land'], build: ['design', 'implement', 'review', 'land'] } as const;
@@ -226,7 +226,7 @@ type Staged = {
  * A run of the targets, of the `nemia` factory: each of its workflow's steps verified but those `now` gives, its time at work
  * `minutes`.
  */
-const staged = ({ name, brief, workflow, labels, now, minutes, usd, status }: Staged): Run => {
+const staged = ({ name, brief, workflow, labels, now, minutes, usd, status }: Staged) => {
   const base = run({
     name,
     brief,
@@ -249,26 +249,26 @@ const staged = ({ name, brief, workflow, labels, now, minutes, usd, status }: St
       workflowDir: `/code/nemia/workflows/${workflow}`,
       steps: STEPS_OF[workflow].map((step) => frozen(step, AGENTS[step] ?? 'Implementer', ROUNDS[step] ?? null)),
     },
-  };
+  } satisfies Run;
 };
 
 const stepOf = step;
 
 /** `step`'s current try: its first, in round `round`, its note saying a round past the first as the api writes it. */
-const tried = (status: RunStepStatus, round: number): RunStepStatus => ({
+const tried = (status: RunStepStatus, round: number) => ({
   ...status,
   note: round > 1 ? `round ${round} of 3` : status.note,
   current: { try: 1, round, phase: status.phase, reason: status.reason, outcome: null, verdict: status.verdict },
 });
 
 /** A step at work, its session running. */
-const working = (name: string): RunStepStatus => step(name, 'running', 'Running', 'running', 'running');
+const working = (name: string) => step(name, 'running', 'Running', 'running', 'running');
 
 /** A step still to come. */
-const toCome = (name: string): RunStepStatus => step(name, 'pending', 'Pending', 'pending', 'pending');
+const toCome = (name: string) => step(name, 'pending', 'Pending', 'pending', 'pending');
 
 /** A step waiting on `on`, said by `message`. */
-const waitingOn = (name: string, on: RunStepStatus['on'], message: string): RunStepStatus => ({
+const waitingOn = (name: string, on: RunStepStatus['on'], message: string) => ({
   ...step(name, 'pending', 'Waiting', 'pending', message),
   on,
 });
@@ -289,7 +289,7 @@ const LGLL = staged({
 });
 
 /** A land waiting on the checkout lgll's land holds, said and named (`baseHeldBy`). */
-const onLgll = (): RunStepStatus => ({
+const onLgll = () => ({
   ...waitingOn('land', 'base', `waiting on the checkout (${LGLL.metadata.name}'s land has it)`),
   baseHeldBy: { run: LGLL.metadata.name, step: 'land' },
 });
@@ -474,10 +474,10 @@ const HELD = staged({
 const FINISHED_COUNT = 123;
 
 /** A RunList of the finished runs, its next page's token given, as the api answers the first page of many. */
-const finishedOf = (counts: { waiting: number; inFlight: number; finished: number }): RunList => ({
+const finishedOf = (counts: { waiting: number; inFlight: number; finished: number }) => ({
   ...listOf(LANDED, counts),
   metadata: { asOf: AS_OF, counts, continue: 'f.older' },
-});
+}) satisfies RunList;
 
 /** The page's reads answered with `open`, the runs not finished, and the targets' finished runs. */
 const answering = (open: Run[], counts: { waiting: number; inFlight: number; finished: number }) => [
@@ -521,7 +521,7 @@ type StepRead = Pick<RunStepStatus, 'name' | 'attempts' | 'taskId' | 'spent' | '
  * A step read alone: its one attempt from `from` minutes before `AS_OF` to `to` (null while it runs; `from` null for a step not filed
  * yet), what it spent, and its last line.
  */
-const readStep = (name: string, from: number | null, to: number | null, usd: number | null, lastLine: string | null = null): StepRead => ({
+const readStep = (name: string, from: number | null, to: number | null, usd: number | null, lastLine: string | null = null) => ({
   name,
   attempts:
     from === null
@@ -541,7 +541,7 @@ const readStep = (name: string, from: number | null, to: number | null, usd: num
   spent: usd === null ? null : spent(usd),
   budget: null,
   lastLine,
-});
+}) satisfies StepRead;
 
 /** Each panel's run read alone, as staged on the targets: each step's time and cost, and the last line of the step it is on. */
 export const READS: Record<'1sw7' | '72wy' | 'vqvd', { steps: StepRead[] }> = {
@@ -592,7 +592,7 @@ export const everyState = answering(
  * The lines of the run `name` as the api builds them, its steps given none: what a part that reads a run's detail is seeded with.
  * @param name The run's name.
  */
-export const linesOf = (name: string): RunLines => ({
+export const linesOf = (name: string) => ({
   decide: `nemia decide ${name}`,
   refresh: `nemia refresh ${name}`,
   fromNote: null,

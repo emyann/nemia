@@ -16,7 +16,7 @@ export const VOLUME_WAYS: readonly VolumeWay[] = ['folder', 'address', 'new'];
  * factory that holds a trusted writable volume already; the offer to make a folder a repository, or the step held on a no; else the
  * chosen way's panel, or the three tiles for none.
  */
-export const volumeStepOf: VolumeStepOf = ({ again, held, way, notRepository, added, later }): VolumeScreen => {
+export const volumeStepOf: VolumeStepOf = ({ again, held, way, notRepository, added, later }) => {
   if (added !== undefined) return added.trusted ? 'done' : later ? 'waiting' : 'trust';
   if (held && !again) return 'done';
   if (way === 'folder' && notRepository !== undefined) return notRepository === 'offered' ? 'init' : 'declined';
@@ -30,7 +30,7 @@ export const volumeStepOf: VolumeStepOf = ({ again, held, way, notRepository, ad
 export const heldOf = (factory: {
   readonly volumes: readonly { readonly path: string; readonly readOnly: boolean }[];
   readonly untrusted: readonly { readonly place: string }[];
-}): boolean => factory.volumes.some((v) => !v.readOnly && !factory.untrusted.some((u) => u.place === v.path));
+}) => factory.volumes.some((v) => !v.readOnly && !factory.untrusted.some((u) => u.place === v.path));
 
 /** The mode a volume is added in: writable, or read-only beside the writable one a factory holds. */
 export type Mode = 'rw' | 'ro';
@@ -41,11 +41,11 @@ export type Mode = 'rw' | 'ro';
  * @param again Whether the step is opened again from Settings for a factory that holds its work.
  * @param screen The screen the step shows.
  */
-export const modeOffered = (again: boolean, screen: VolumeScreen): boolean => again && screen !== 'choose' && screen !== 'new';
+export const modeOffered = (again: boolean, screen: VolumeScreen) => again && screen !== 'choose' && screen !== 'new';
 
 /**
  * The mode a volume reached by `way` is added in: a new repository writable, whatever was chosen, else `chosen`.
  * @param way The way the volume was reached.
  * @param chosen The mode the person chose, or the step's default.
  */
-export const addedAs = (way: VolumeWay | undefined, chosen: Mode): Mode => (way === 'new' ? 'rw' : chosen);
+export const addedAs = (way: VolumeWay | undefined, chosen: Mode) => (way === 'new' ? 'rw' : chosen);

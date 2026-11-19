@@ -20,7 +20,7 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
 /** The factory a run is started in from the pane of `name`: that one when its floor starts runs, else none yet. */
-function startIn(factories: readonly Factory[] | undefined, name: string): string | null {
+function startIn(factories: readonly Factory[] | undefined, name: string) {
   const factory = factories?.find((f) => f.name === name);
   return factory && floorPlace(factory) ? factory.name : null;
 }

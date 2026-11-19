@@ -3,7 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { decoded } from './read.ts';
 import { selectorKey } from './selector.ts';
-import { Labelled, Stats } from 'objects';
+import { Stats } from 'objects';
 import { call, cards, read, runs } from './objects.ts';
 import { namespaceOf } from './namespace.ts';
 
@@ -21,7 +21,7 @@ export const CLOSED_LABEL_KEYS: readonly string[] = ['factory', 'workflow'];
  * @param edits Each edit: `key=value` sets a label, `key-` takes one off.
  * @param overwrite Whether a label the run has may take another value; false refuses it.
  */
-export const labelRun = (namespace: string, id: string, edits: readonly string[], overwrite = false): Promise<Labelled> =>
+export const labelRun = (namespace: string, id: string, edits: readonly string[], overwrite = false) =>
   runs.labels(namespace, id, { labels: edits, overwrite }, 'The labels may be set: read the run again before sending it again.');
 
 /**
@@ -30,7 +30,7 @@ export const labelRun = (namespace: string, id: string, edits: readonly string[]
  * @param edits Each edit: `key=value` sets a label, `key-` takes one off.
  * @param overwrite Whether a label the card has may take another value; false refuses it.
  */
-export const labelCard = (card: { name: string; factory: string | null }, edits: readonly string[], overwrite = false): Promise<Labelled> =>
+export const labelCard = (card: { name: string; factory: string | null }, edits: readonly string[], overwrite = false) =>
   cards.labels(namespaceOf(card.factory), card.name, { labels: edits, overwrite });
 
 /**
@@ -59,7 +59,7 @@ const LabelStatsSchema = Schema.Struct({
  * What the runs `stats` covers have spent, every try's cost summed, or null where no try's cost was measured.
  * @param stats The stats the label page read.
  */
-export const spentOf = (stats: LabelStats): number | null => {
+export const spentOf = (stats: LabelStats) => {
   const known = stats.all.steps.flatMap((step) => (step.costUsd === null ? [] : [step.costUsd]));
   return known.length === 0 ? null : known.reduce((sum, cost) => sum + cost, 0);
 };
@@ -71,7 +71,7 @@ export const spentOf = (stats: LabelStats): number | null => {
 export const labelStatsQuery = (selector: string) =>
   queryOptions({
     queryKey: ['stats', ...selectorKey(selector)],
-    queryFn: (): Promise<LabelStats> =>
+    queryFn: () =>
       call((c) => c.server.stats({ query: {} }), read(Stats, selector.trim() === '' ? undefined : { selector: selector.trim() })).then(
         (stats) => decoded('GET /api/stats', LabelStatsSchema, stats),
       ),
@@ -81,5 +81,5 @@ export const labelStatsQuery = (selector: string) =>
  * The address' label filter, `?l=<selector>`, kept where it says something.
  * @param search The address' search, as the router parsed it.
  */
-export const labelSearch = (search: Record<string, unknown>): { l?: string } =>
-  typeof search.l === 'string' && search.l.trim() !== '' ? { l: search.l } : {};
+export const labelSearch = (search: Record<string, unknown>) =>
+  (typeof search.l === 'string' && search.l.trim() !== '' ? { l: search.l } : {}) satisfies { l?: string } as { l?: string };

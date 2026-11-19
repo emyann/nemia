@@ -8,7 +8,7 @@ import { useMemo } from 'react';
  * JSON, so a Map, a Date, a function or an `undefined` in it is lost. Build a Map from the entries this keeps (`useMemo` on them).
  * @param value The plain data, rebuilt on each render.
  */
-export function useContent<T>(value: T): T {
+export function useContent<T>(value: T) {
   const content = JSON.stringify(value);
   return useMemo(() => JSON.parse(content) as T, [content]);
 }

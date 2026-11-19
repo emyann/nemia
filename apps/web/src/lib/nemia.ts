@@ -31,13 +31,13 @@ const SESSION_WORDS: Record<SessionKind, string> = {
  * @param nemia What the api answers of her: the lines that reach her session, whether it was stopped, whether she rests, why her folder
  * could not be trusted.
  */
-export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string } {
+export function sessionOf(nemia: NemiaLevel) {
   const kind = kindOf(nemia);
-  return { kind, words: SESSION_WORDS[kind] };
+  return { kind, words: SESSION_WORDS[kind] } satisfies { kind: SessionKind; words: string };
 }
 
 /** The state alone, in the order `sessionOf` judges it. */
-function kindOf(nemia: NemiaLevel): SessionKind {
+function kindOf(nemia: NemiaLevel) {
   if (nemia.stopped) return 'stopped';
   if (nemia.reach.length) return 'up';
   if (nemia.untrusted !== null) return 'untrusted';
@@ -46,7 +46,7 @@ function kindOf(nemia: NemiaLevel): SessionKind {
 }
 
 /** Whether she is kept: the store's level, or any factory's in force, above Manual. */
-export const anyAbove = ({ level, factories }: Pick<NemiaLevel, 'level' | 'factories'>): boolean =>
+export const anyAbove = ({ level, factories }: Pick<NemiaLevel, 'level' | 'factories'>) =>
   level !== 'manual' || factories.some((row) => row.level !== 'manual');
 
 /** The stretches a person raises a factory for, as the api takes them, the first offered first. */
@@ -59,7 +59,7 @@ const LEVEL_WORDS: Record<Level, string> = { manual: 'Manual', 'semi-auto': 'Sem
  * A level as the board says it.
  * @param level The level to say.
  */
-export const levelWord = (level: Level): string => LEVEL_WORDS[level];
+export const levelWord = (level: Level) => LEVEL_WORDS[level];
 
 /**
  * A factory's level in words at `now`, named the store's own when it is the default factory (`byDefault`): a raise with its end, said as
@@ -68,7 +68,7 @@ export const levelWord = (level: Level): string => LEVEL_WORDS[level];
  * @param byDefault Whether the factory is the default one, whose level is the store's.
  * @param now The instant it is now, against which the raise's end is said.
  */
-export function factoryWords(row: FactoryLevel, byDefault: boolean, now: Date): string {
+export function factoryWords(row: FactoryLevel, byDefault: boolean, now: Date) {
   const whose = byDefault ? "the store's level, for runs in no factory" : row.own === null ? "the store's" : 'its own';
   if (row.raise !== null) return `Raised until ${clockWord(new Date(row.raise.until), now)}, then ${levelWord(row.default)} (${whose}).`;
   return `${levelWord(row.default)} by default (${whose}).`;
@@ -81,21 +81,21 @@ export { LEVELS } from 'objects';
  * The level a fresh session is asked at, from `level`, hers: that level where above Manual, else Semi-auto.
  * @param level Her level now.
  */
-export const freshLevel = (level: Level): Level => (level === 'manual' ? 'semi-auto' : level);
+export const freshLevel = (level: Level) => (level === 'manual' ? 'semi-auto' : level);
 
 /**
  * The levels a factory is raised to over its default `level`, lowest first: none over Auto.
  * @param level The factory's default level.
  */
-export const raisesOver = (level: Level): readonly Level[] =>
-  level === 'manual' ? ['semi-auto', 'auto'] : level === 'semi-auto' ? ['auto'] : [];
+export const raisesOver = (level: Level) =>
+  (level === 'manual' ? ['semi-auto', 'auto'] : level === 'semi-auto' ? ['auto'] : []) satisfies readonly Level[];
 
 /**
  * What her sessions cost, as her level's own line says it (`status.ts` in the orchestrator): each counted as it ends, her open one not yet.
  * A copy that stays: `GET /api/level` answers the spend's facts (`objects`' `NemiaLevel.spend`), not the line, and the board says the
  * dollars in its own money words (`dollars`).
  */
-export const spendWords = ({ usd, measured, unmeasured }: Spend): string =>
+export const spendWords = ({ usd, measured, unmeasured }: Spend) =>
   `Spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends.`;
 
 /** How a fact she keeps is pruned: by asking her, since her session alone writes her memory. */
@@ -111,7 +111,7 @@ export const PRUNE_WORDS =
  * @param presence Where she is: down, answering, or with a message not sent.
  * @param now The instant it is now, against which the time she went down is said.
  */
-export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence, now: Date): string {
+export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence, now: Date) {
   const spent = nemia?.spend ? ` · ${dollars(nemia.spend.usd)}` : '';
   if (presence.down) {
     const since = nemia?.since === null || nemia?.since === undefined ? null : new Date(nemia.since);
@@ -132,7 +132,7 @@ export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence
  * @param asking Whether one question of hers waits on the person; false by default.
  * @param refused Whether the api answered and refused the message this browser keeps; false by default.
  */
-export function composerWords(presence: Presence, asking = false, refused = false): string {
+export function composerWords(presence: Presence, asking = false, refused = false) {
   if (presence.notSent) return refused ? 'Send again, edit or discard the message above' : 'Waiting for the daemon';
   if (presence.down) return 'Write now; she reads it when she is up';
   if (presence.resting) return 'Write to her; your message wakes her';
@@ -150,4 +150,4 @@ type ComposerButton = 'send' | 'stop';
  * all.
  * @param presence Where she is: answering, or with a message not sent.
  */
-export const composerButton = (presence: Presence): ComposerButton => (presence.answering && !presence.notSent ? 'stop' : 'send');
+export const composerButton = (presence: Presence) => (presence.answering && !presence.notSent ? 'stop' : 'send');

@@ -38,14 +38,14 @@ export type StepCardFacts = {
 type StepCardInput = HeadInput;
 
 /** A head's fact as the card reads it: null in place of `none`. */
-const orNull = <T>(fact: T | None): Exclude<T, None> | null => (fact === 'none' ? null : (fact as Exclude<T, None>));
+const orNull = <T>(fact: T | None) => (fact === 'none' ? null : (fact as Exclude<T, None>));
 
 /**
  * The card of the step `step` of `run`: what the run's row knows at once (its state, its agent), and once the run's own answer is read,
  * its tries, time, facts, spend and note.
  * @param input The run's row, the step's name, the run's own answer once read, the agents once read, and the instant now.
  */
-export function stepCardOf(input: StepCardInput): StepCardFacts {
+export function stepCardOf(input: StepCardInput) {
   const head = headOf(input);
   return {
     kind: head.kind,
@@ -59,5 +59,5 @@ export function stepCardOf(input: StepCardInput): StepCardFacts {
     spend: orNull(head.spend),
     note: orNull(head.note),
     action: head.action,
-  };
+  } satisfies StepCardFacts as StepCardFacts;
 }

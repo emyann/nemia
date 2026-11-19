@@ -18,7 +18,7 @@ const MARK: Record<HarnessCheckState, { word: string; icon: LucideIcon; classNam
 const NAMES: Record<HarnessCheck['name'], string> = { version: 'Version', turn: 'A real turn' };
 
 /** What the turn's press says: running while it is, Run again once it ran, else Run the check, with its cap. */
-const turnWord = (check: HarnessCheck, pending: boolean): string => {
+const turnWord = (check: HarnessCheck, pending: boolean) => {
   const cap = check.capUsd === undefined ? '' : ` (at most ${dollars(check.capUsd)})`;
   if (pending || check.state === 'running') return 'Running…';
   return `${check.state === 'unrun' ? 'Run the check' : 'Run again'}${cap}`;

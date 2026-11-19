@@ -14,7 +14,7 @@ type Candidate = Pick<RunView, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pruned
  * that has landed, a circle, a run on another base branch — is the package's to refuse (`holdRefusal`), in its words.
  * @param run The run as the page reads it: its calling off, its pruning, its hold, the runs it waits on and its status.
  */
-export const holdable = (run: Holdable): boolean =>
+export const holdable = (run: Holdable) =>
   run.cancelledAt === null &&
   run.pruned === null &&
   run.holding === null &&
@@ -29,7 +29,7 @@ export const holdable = (run: Holdable): boolean =>
  * @param run The run the hold is of: its id and its repository.
  * @param runs The runs listed, each a candidate to wait on.
  */
-export const holdCandidates = <R extends Candidate>(run: Pick<RunView, 'id' | 'repo'>, runs: readonly R[]): R[] =>
+export const holdCandidates = <R extends Candidate>(run: Pick<RunView, 'id' | 'repo'>, runs: readonly R[]) =>
   runs.filter(
     (r) =>
       r.id !== run.id &&

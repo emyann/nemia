@@ -18,14 +18,16 @@ let refused: LinkRefused | null = null;
 const listeners = new Set<() => void>();
 
 /** The status a refusal carries, where it carries one. */
-const statusOf = (error: unknown): number =>
-  typeof error === 'object' && error !== null && typeof Reflect.get(error, 'status') === 'number' ? Reflect.get(error, 'status') : 0;
+const statusOf = (error: unknown) =>
+  (typeof error === 'object' && error !== null && typeof Reflect.get(error, 'status') === 'number'
+    ? Reflect.get(error, 'status')
+    : 0) satisfies number as number;
 
 /**
  * Claims the first-visit link the page's address carries, if it carries one: the address loses it first (`history.replaceState`), then
  * the api sets the cookie; a refusal is kept for the sign-in to say. Resolves once the claim is answered, never rejects.
  */
-export async function claimLinkOnLoad(): Promise<void> {
+export async function claimLinkOnLoad() {
   const secret = linkSecretOf(window.location.href);
   if (secret === undefined) return;
   window.history.replaceState(window.history.state, '', withoutLink(window.location.href));
@@ -39,10 +41,10 @@ export async function claimLinkOnLoad(): Promise<void> {
 }
 
 /** `listener` told when a link is refused; the answer stops telling it. */
-const onRefused = (listener: () => void): (() => void) => {
+const onRefused = (listener: () => void) => {
   listeners.add(listener);
   return () => void listeners.delete(listener);
 };
 
 /** The link this visit was refused, as a component reads it, or null. */
-export const useLinkRefused = (): LinkRefused | null => useSyncExternalStore(onRefused, () => refused);
+export const useLinkRefused = () => useSyncExternalStore(onRefused, () => refused);

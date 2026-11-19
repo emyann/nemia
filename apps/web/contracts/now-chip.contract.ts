@@ -23,8 +23,7 @@ export type NowCase = { readonly stands: NowStands; readonly yours: boolean };
 export type ChipTone = 'alive' | 'yours' | 'failure' | 'waits' | 'rest';
 
 /** Whether a step waits on something that is not a person: a run, a run slot, a hold, or its turn. */
-const waits = (stands: NowStands): boolean =>
-  stands === 'waitsOnARun' || stands === 'waitsForASlot' || stands === 'held' || stands === 'toCome';
+const waits = (stands: NowStands) => stands === 'waitsOnARun' || stands === 'waitsForASlot' || stands === 'held' || stands === 'toCome';
 
 const chipToneSpec = spec<(now: NowCase) => ChipTone>({
   ensures: {

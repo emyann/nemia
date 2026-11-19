@@ -19,7 +19,7 @@ type NeedsStep = Pick<RunView['steps'][number], 'name' | 'needs' | 'reason' | 'v
 };
 
 /** Whether a step's harness stopped its session to ask, and no closeout signed off blocked: codes `AwaitingAnswer` via `session`. */
-const atHarness = (step: Pick<NeedsStep, 'reason' | 'via'>): boolean => step.reason === 'AwaitingAnswer' && step.via === 'session';
+const atHarness = (step: Pick<NeedsStep, 'reason' | 'via'>) => step.reason === 'AwaitingAnswer' && step.via === 'session';
 
 /**
  * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what that harness
@@ -33,8 +33,7 @@ export type Need =
   | { step: string; kind: 'approve'; said: string };
 
 /** The harness's own half of such a need, in the order a person reads it: what it waits for, then what the session said last. */
-const harnessSaid = (need: Extract<Need, { kind: 'harness' }>): string =>
-  [need.waitingFor?.words, need.lastLine].filter(Boolean).join(' · ');
+const harnessSaid = (need: Extract<Need, { kind: 'harness' }>) => [need.waitingFor?.words, need.lastLine].filter(Boolean).join(' · ');
 
 /**
  * A step's need, or null. The question of a step that signed off blocked, while it waits on you — not once a person has asked for its
@@ -45,12 +44,13 @@ const harnessSaid = (need: Extract<Need, { kind: 'harness' }>): string =>
  * @param waitingOnYou Whether the run's `waitingOnYou` names the step.
  * @param runCancelled Whether the run was called off.
  */
-export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boolean): Need | null {
-  if (runCancelled) return null;
-  if (atHarness(step)) return { step: step.name, kind: 'harness', waitingFor: step.waitingFor, lastLine: step.lastLine ?? null };
-  if (step.approve && waitingOnYou) return { step: step.name, kind: 'approve', said: step.approve };
-  if (step.needs && waitingOnYou) return { step: step.name, kind: 'asks', needs: step.needs };
-  return null;
+export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boolean) {
+  if (runCancelled) return null satisfies Need | null;
+  if (atHarness(step))
+    return { step: step.name, kind: 'harness', waitingFor: step.waitingFor, lastLine: step.lastLine ?? null } satisfies Need | null;
+  if (step.approve && waitingOnYou) return { step: step.name, kind: 'approve', said: step.approve } satisfies Need | null;
+  if (step.needs && waitingOnYou) return { step: step.name, kind: 'asks', needs: step.needs } satisfies Need | null;
+  return null satisfies Need | null;
 }
 
 /**
@@ -62,12 +62,12 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
  */
 export const needsOf = (
   run: Frozen<Pick<RunView, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null }>,
-): Need[] => {
+) => {
   const decided = run.toDecide?.kind === 'approve' ? run.toDecide.step : null;
   return run.steps.flatMap((step) => {
     const need = needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null);
     return need && !(need.kind === 'approve' && need.step === decided) ? [need] : [];
-  });
+  }) satisfies Need[];
 };
 
 /**
@@ -79,7 +79,7 @@ export const needsOf = (
  * part, `PartAsks`).
  * @param need The step's need.
  */
-export const needText = (need: Need): string => {
+export const needText = (need: Need) => {
   if (need.kind === 'asks') return `asks: ${need.needs}`;
   if (need.kind === 'approve') return need.said;
   const said = harnessSaid(need);
@@ -94,7 +94,7 @@ export const needText = (need: Need): string => {
  * and the step's part's. Every other need, and a harness that said nothing about what for, reads as it does anywhere else.
  * @param need The step's need.
  */
-export const needNodeText = (need: Need): string => (need.kind === 'harness' && need.waitingFor ? need.waitingFor.words : needText(need));
+export const needNodeText = (need: Need) => (need.kind === 'harness' && need.waitingFor ? need.waitingFor.words : needText(need));
 
 /**
  * What the harness denied a step's current try, as its node says it: how many calls, never which. The node's line is about thirty
@@ -102,14 +102,14 @@ export const needNodeText = (need: Need): string => (need.kind === 'harness' && 
  * names would be cut on the one line that has to be read whole. They are the line's `title` and the step section's `denied` row.
  * @param calls The calls the harness denied the try, one entry each.
  */
-export const deniedNodeText = (calls: readonly string[]): string => `denied ${calls.length} call${calls.length === 1 ? '' : 's'}`;
+export const deniedNodeText = (calls: readonly string[]) => `denied ${calls.length} call${calls.length === 1 ? '' : 's'}`;
 
 /**
  * A need with the step it is of, as the card says it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`,
  * and `approve plan`, whose words name their step already.
  * @param need The step's need.
  */
-export const needLine = (need: Need): string =>
+export const needLine = (need: Need) =>
   need.kind === 'approve' ? need.said : `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
 
 /**
@@ -120,19 +120,19 @@ export const needLine = (need: Need): string =>
  * @param step The step, its `approve` words read.
  * @param runCancelled Whether the run was called off.
  */
-export const gateOffered = (step: Pick<StepView, 'approve'>, runCancelled: boolean): boolean => Boolean(step.approve) && !runCancelled;
+export const gateOffered = (step: Pick<StepView, 'approve'>, runCancelled: boolean) => Boolean(step.approve) && !runCancelled;
 
 /**
  * Where a step's section is on its run's page, as a URL's hash: what the run's asks link to, where its part answers them.
  * @param step The step's name.
  */
-export const stepAnchor = (step: string): string => `step-${step}`;
+export const stepAnchor = (step: string) => `step-${step}`;
 
 /**
  * The questions a step's closeout asks as data, each of its question fields in turn, in the schema's order; none without a closeout.
  * @param closeout The step's closeout, or null or undefined where it has none.
  */
-export const askedIn = (closeout: Frozen<Pick<StepCloseout, 'questions'>> | null | undefined): Frozen<Question>[] =>
+export const askedIn = (closeout: Frozen<Pick<StepCloseout, 'questions'>> | null | undefined) =>
   closeout?.questions.flatMap((a) => a.questions) ?? [];
 
 /**
@@ -197,29 +197,34 @@ type Offerable = Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { h
  * `holding` is taken for one nobody holds.
  * @param run The run's detail: its steps, the steps waiting on you, when it was called off and who holds it.
  */
-export function offersOf(run: Offerable): Offer[] {
-  if (run.cancelledAt !== null || run.holding != null) return [];
-  return run.steps.flatMap((step): Offer[] => {
-    if (step.asked) return [];
-    if (atHarness(step)) return [{ step: step.name, case: 'continue', kind: 'retry' }];
-    if (!run.waitingOnYou.includes(step.name)) return [];
+export function offersOf(run: Offerable) {
+  if (run.cancelledAt !== null || run.holding != null) return [] satisfies Offer[];
+  return run.steps.flatMap((step) => {
+    if (step.asked) return [] satisfies Offer[] as Offer[];
+    if (atHarness(step)) return [{ step: step.name, case: 'continue', kind: 'retry' }] satisfies Offer[] as Offer[];
+    if (!run.waitingOnYou.includes(step.name)) return [] satisfies Offer[] as Offer[];
     const unfinished = step.check?.verdict?.result === 'unfinished';
     if (step.raise) {
       const questions = askedIn(step.closeout);
       return [
         { step: step.name, case: 'raise', kind: 'retry', message: step.message, needs: step.needs, unfinished, questions, ...step.raise },
-      ];
+      ] satisfies Offer[] as Offer[];
     }
     const state = stepState(step, false, false);
     if (state === 'blocked') {
-      return [{ step: step.name, case: 'answer', kind: 'retry', needs: step.needs, questions: askedIn(step.closeout) }];
+      return [
+        { step: step.name, case: 'answer', kind: 'retry', needs: step.needs, questions: askedIn(step.closeout) },
+      ] satisfies Offer[] as Offer[];
     }
-    if (state === 'failed-check') return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: true, unfinished }];
-    if (state === 'unsigned') return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: false, unfinished: false }];
-    if (state === 'denied') return [{ step: step.name, case: 'denied', kind: 'retry', calls: step.denied?.words ?? null }];
-    if (state === 'exhausted') return [{ step: step.name, case: 'enough', kind: 'approve' }];
-    return [];
-  });
+    if (state === 'failed-check')
+      return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: true, unfinished }] satisfies Offer[] as Offer[];
+    if (state === 'unsigned')
+      return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: false, unfinished: false }] satisfies Offer[] as Offer[];
+    if (state === 'denied')
+      return [{ step: step.name, case: 'denied', kind: 'retry', calls: step.denied?.words ?? null }] satisfies Offer[] as Offer[];
+    if (state === 'exhausted') return [{ step: step.name, case: 'enough', kind: 'approve' }] satisfies Offer[] as Offer[];
+    return [] satisfies Offer[] as Offer[];
+  }) satisfies Offer[];
 }
 
 /**
@@ -228,7 +233,7 @@ export function offersOf(run: Offerable): Offer[] {
  * @param run The run's detail: its steps, when it was called off and who holds it.
  * @param step The step's name.
  */
-export function askedOf(run: Offerable, step: string): { try: number; note: string | null } | null {
+export function askedOf(run: Offerable, step: string) {
   if (run.cancelledAt !== null || run.holding != null) return null;
   const asked = run.steps.find((s) => s.name === step);
   return asked?.asked ? { try: asked.asked.try, note: asked.note } : null;
@@ -239,18 +244,18 @@ export function askedOf(run: Offerable, step: string): { try: number; note: stri
  * for a step whose tries cost $4.25, $4 for one ended at a $3 cap. A person changes it; the package refuses one not above, in its words.
  * @param above The amount the budget has to pass, in dollars.
  */
-export const raiseTo = (above: number): number => Math.floor(above) + 1;
+export const raiseTo = (above: number) => Math.floor(above) + 1;
 
 /**
  * The offers answered by a row, in the run's order: every offer but Continue (`Answer`).
  * @param run The run's detail: its steps, the steps waiting on you, when it was called off and who holds it.
  */
-export const answersOf = (run: Offerable): Answer[] => offersOf(run).filter((offer): offer is Answer => offer.case !== 'continue');
+export const answersOf = (run: Offerable) => offersOf(run).filter((offer): offer is Answer => offer.case !== 'continue');
 
 /**
  * A try the api has just taken, as the board says it until the run is read again and the step's note says it in the CLI `ls`'s words: what
  * the tick does with it — for a step whose session the harness blocked (`stopFirst`, the package's), stop that session first.
  * @param asked The try the api took: its number, and whether the tick stops a blocked session first.
  */
-export const askedSaid = (asked: { try: number; stopFirst: boolean }): string =>
+export const askedSaid = (asked: { try: number; stopFirst: boolean }) =>
   `try ${asked.try} asked — ${asked.stopFirst ? 'stopping its blocked session, then the tick files it' : 'the next tick files it'}`;

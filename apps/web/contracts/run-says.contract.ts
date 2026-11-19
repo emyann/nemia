@@ -40,13 +40,13 @@ export type RunSays =
   | 'lastLine';
 
 /** Said by the mark, and so at every size. */
-const ofTheMark = (thing: RunSays): boolean => thing === 'state' || thing === 'id';
+const ofTheMark = (thing: RunSays) => thing === 'state' || thing === 'id';
 
 /** Added by the line. */
-const ofTheLine = (thing: RunSays): boolean => thing === 'step' || thing === 'title' || thing === 'clock';
+const ofTheLine = (thing: RunSays) => thing === 'step' || thing === 'title' || thing === 'clock';
 
 /** Added by the row or the card at md, whichever its layout. */
-const ofMd = (thing: RunSays): boolean =>
+const ofMd = (thing: RunSays) =>
   thing === 'where' ||
   thing === 'agent' ||
   thing === 'round' ||
@@ -57,7 +57,7 @@ const ofMd = (thing: RunSays): boolean =>
   thing === 'waitedBy';
 
 /** Added by the panel alone. */
-const ofThePanel = (thing: RunSays): boolean => thing === 'named' || thing === 'facts' || thing === 'runs' || thing === 'lastLine';
+const ofThePanel = (thing: RunSays) => thing === 'named' || thing === 'facts' || thing === 'runs' || thing === 'lastLine';
 
 const smallestSizeSpec = spec<(thing: RunSays, layout: RunLayout) => RunSize>({
   ensures: {

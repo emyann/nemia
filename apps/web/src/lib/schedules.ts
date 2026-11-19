@@ -13,7 +13,7 @@ const WEEKDAY_MS = 6 * 24 * 60 * 60_000;
  * @param now The instant it is now, against which the time is said.
  * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
-export function fireWord(at: Date, now: Date, timeZone?: string): string {
+export function fireWord(at: Date, now: Date, timeZone?: string) {
   if (Math.abs(at.getTime() - now.getTime()) < WEEKDAY_MS) return clockWord(at, now, timeZone);
   return instantWords(at, now, timeZone);
 }

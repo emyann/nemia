@@ -16,7 +16,7 @@ import { holdsRuns, openBlocks } from '@/lib/factories';
 import { dayStartOf } from '@/lib/strip';
 
 /** The factories whose light answer the blocks read: each the api lists, and the default one, whose answer says whether it is shown. */
-const answered = (factories: readonly Factory[]): string[] => [...new Set([...factories.map((f) => f.name), DEFAULT_NAMESPACE])];
+const answered = (factories: readonly Factory[]) => [...new Set([...factories.map((f) => f.name), DEFAULT_NAMESPACE])];
 
 export const Route = createFileRoute('/')({
   /**

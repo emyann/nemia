@@ -15,10 +15,10 @@ import type { StepState } from '../src/lib/status.ts';
 export type StepMark = 'done' | 'alive' | 'yours' | 'failure' | 'waits' | 'todo' | 'off' | 'rest';
 
 /** Work moves into the step: its session at work, or its check running. */
-const moving = (s: StepState): boolean => s === 'working' || s === 'checking';
+const moving = (s: StepState) => s === 'working' || s === 'checking';
 
 /** The step waits on a person: a session asking, a gate, a budget or rounds spent, a sign-off missing or refused. */
-const onAPerson = (s: StepState): boolean =>
+const onAPerson = (s: StepState) =>
   s === 'asks-in-session' ||
   s === 'blocked' ||
   s === 'awaiting-approval' ||
@@ -29,16 +29,16 @@ const onAPerson = (s: StepState): boolean =>
   s === 'denied';
 
 /** The step failed, or the board could not read it as anything but a failure. */
-const failedState = (s: StepState): boolean => s === 'failed' || s === 'failed-check' || s === 'unreadable';
+const failedState = (s: StepState) => s === 'failed' || s === 'failed-check' || s === 'unreadable';
 
 /** The step is done: verified by its check, done on its own word, or a workflow node that filed its card. */
-const doneState = (s: StepState): boolean => s === 'verified' || s === 'unverified' || s === 'sent';
+const doneState = (s: StepState) => s === 'verified' || s === 'unverified' || s === 'sent';
 
 /** The step has not started: waiting its turn or a run slot, or held by a person. */
-const notStarted = (s: StepState): boolean => s === 'waiting' || s === 'waiting-for-slot' || s === 'held';
+const notStarted = (s: StepState) => s === 'waiting' || s === 'waiting-for-slot' || s === 'held';
 
 /** The rest, at rest: paused between two calls, called off, or a state the engine does not know. */
-const atRest = (s: StepState): boolean => s === 'paused' || s === 'cancelled' || s === 'unknown';
+const atRest = (s: StepState) => s === 'paused' || s === 'cancelled' || s === 'unknown';
 
 const stepMarkSpec = spec<(state: StepState, waits: boolean) => StepMark>({
   ensures: {

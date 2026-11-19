@@ -18,7 +18,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { levelQuery } from '@/lib/api/nemia';
 import { openRunsQuery } from '@/lib/api/runs';
 import { atWork } from '@/lib/footer';
-import { frameFold, type FrameFold, paneCookie, paneOpenOf } from '@/lib/frameFold';
+import { frameFold, paneCookie, paneOpenOf } from '@/lib/frameFold';
 import { useMedia } from '@/lib/useMedia';
 import { useBar } from '@/lib/useBar';
 import { useNemiaChat } from '@/lib/useNemiaChat';
@@ -69,14 +69,14 @@ export function HerSheetProvider({ children }: { children?: ReactNode }) {
 }
 
 /** Her sheet as the frame holds it, under `HerSheetProvider`. */
-export function useHerSheet(): HerSheetState {
+export function useHerSheet() {
   const held = useContext(HerSheetContext);
   if (held === null) throw new Error('useHerSheet must be used within a HerSheetProvider: wrap the frame in it, as __root.tsx does.');
   return held;
 }
 
 /** Whether the page is her chat's own: a matched route's `staticData` says it `ownsChat`. */
-export function useOwnsChat(): boolean {
+export function useOwnsChat() {
   return useMatches({ select: (matches) => matches.some((match) => match.staticData?.ownsChat) });
 }
 
@@ -128,14 +128,14 @@ export function FramePaneProvider({ shortcut, children }: { shortcut: boolean; c
 }
 
 /** The factory pane and the drawer as the frame holds them, under `FramePaneProvider`. */
-export function useFramePane(): FramePaneState {
+export function useFramePane() {
   const held = useContext(FramePaneContext);
   if (held === null) throw new Error('useFramePane must be used within a FramePaneProvider: wrap the frame in it, as __root.tsx does.');
   return held;
 }
 
 /** How the frame stands now (`frameFold`), under `HerSheetProvider` and `FramePaneProvider`. */
-export function useFrameFold(): FrameFold {
+export function useFrameFold() {
   const sheet = useHerSheet();
   const { open: paneOpen, narrow } = useFramePane();
   const hasPane = useSeat()?.level === 'factory';

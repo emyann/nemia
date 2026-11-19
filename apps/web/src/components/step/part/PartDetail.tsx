@@ -67,7 +67,7 @@ function Ended({ at, how }: { at: string | null; how: string }) {
  * the run works on a place a harness does not trust (`cause`), that this is the likely cause, in the api's words, with the line that
  * trusts it.
  */
-const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined): ReactNode => (
+const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined) => (
   <span className="flex min-w-0 flex-col gap-1">
     <span data-denied className={`font-mono text-body-small ${ink.yours}`}>
       {calls.join(', ')}
@@ -90,7 +90,7 @@ const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined):
  * The place the run `run` works on that a harness does not trust, read off the factories' answer only where a step of it was denied a
  * call (`asked`): nothing while that is read, and nothing where every place is trusted.
  */
-function useDeniedCause(run: RunDetail, asked: boolean): UntrustedPlace | undefined {
+function useDeniedCause(run: RunDetail, asked: boolean) {
   const { data } = useQuery({ ...factoriesQuery, enabled: asked });
   return asked && data ? untrustedFor(data, { repo: run.repo }) : undefined;
 }

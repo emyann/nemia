@@ -21,7 +21,7 @@ export type ScrollSource = Pick<EventTarget, 'addEventListener' | 'removeEventLi
 type Marked = Pick<Element, 'setAttribute'>;
 
 /** What scrolled, by a scroll event's target: a document's root element for the page's own scroll, else the element. */
-function scrollerOf(target: unknown): Marked | null {
+function scrollerOf(target: unknown) {
   if (typeof target !== 'object' || target === null) return null;
   const at = 'documentElement' in target ? target.documentElement : target;
   return typeof at === 'object' && at !== null && 'setAttribute' in at && typeof at.setAttribute === 'function' ? (at as Marked) : null;
@@ -36,9 +36,9 @@ function scrollerOf(target: unknown): Marked | null {
  * @param later what runs a function after a time, a timer unless a test steps it by hand
  * @returns what undoes it: no scroll is heard after, and what was shown is at rest
  */
-export function markScrolls(source: ScrollSource, later: Later = timer): () => void {
+export function markScrolls(source: ScrollSource, later: Later = timer) {
   const shown = new Map<Marked, () => void>();
-  const heard = (event: Event): void => {
+  const heard = (event: Event) => {
     const scroller = scrollerOf(event.target);
     if (!scroller) return;
     const forget = shown.get(scroller);
@@ -64,6 +64,6 @@ export function markScrolls(source: ScrollSource, later: Later = timer): () => v
 }
 
 /** Marks what scrolls on the page for as long as the caller is mounted (`markScrolls`): the frame mounts it once. */
-export function useScrollMark(): void {
+export function useScrollMark() {
   useEffect(() => markScrolls(document), []);
 }

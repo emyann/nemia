@@ -28,21 +28,22 @@ const LOOP_ROOM = 70;
  * nothing filed, nobody called it off or holds it. So its edges are the run canvas's own (`stepEdges`), drawn as they are on a run's page
  * before anything has happened: dashed, since all of it is still to come.
  */
-const unstartedFacts = (workflow: WorkflowListing): StepGraphFacts => ({
-  cancelledAt: null,
-  holding: null,
-  graph: workflow.graph,
-  steps: workflow.steps.map(({ name }) => ({
-    name,
-    phase: 'pending',
-    reason: 'Pending',
-    on: null,
-    via: null,
-    note: null,
-    roundDue: false,
-    message: 'pending',
-  })),
-});
+const unstartedFacts = (workflow: WorkflowListing) =>
+  ({
+    cancelledAt: null,
+    holding: null,
+    graph: workflow.graph,
+    steps: workflow.steps.map(({ name }) => ({
+      name,
+      phase: 'pending',
+      reason: 'Pending',
+      on: null,
+      via: null,
+      note: null,
+      roundDue: false,
+      message: 'pending',
+    })),
+  }) satisfies StepGraphFacts;
 
 /** A workflow's graph as the canvas draws it: its nodes, its edges, and how tall its rows and the room under them are. */
 type Drawn = { nodes: SpecFlowNode[]; edges: Edge[]; height: number };
@@ -51,7 +52,7 @@ type Drawn = { nodes: SpecFlowNode[]; edges: Edge[]; height: number };
  * The graph of `workflow`'s steps, laid out as a run's page lays a run out, or why it cannot be laid out. Each node is named for a screen
  * reader, neither dragged nor selected, and given the pointer back that React Flow takes off such a node: a step is pressed.
  */
-function drawnOf(workflow: WorkflowListing): Drawn | Error {
+function drawnOf(workflow: WorkflowListing) {
   const { steps, graph } = workflow;
   let at;
   try {

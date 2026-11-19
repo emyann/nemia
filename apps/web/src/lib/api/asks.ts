@@ -38,7 +38,7 @@ const AskedTrySchema = Schema.Struct({ try: Schema.Number, file: Schema.String, 
 const AskedRoundSchema = Schema.Struct({ step: Schema.String, round: Schema.Number, file: Schema.String });
 
 /** The route an ask of `step` of the run `runId` is sent to, as an answer it does not read names it. */
-const retryRoute = (namespace: string, runId: string, step: string): string =>
+const retryRoute = (namespace: string, runId: string, step: string) =>
   `POST /api/namespaces/${encodeURIComponent(namespace)}/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`;
 
 const TRY_MAY = "The ask may be written: look at the step's note on the run's page before asking again.";
@@ -67,7 +67,7 @@ export async function askTry(
   runId: string,
   step: string,
   how: { mode: RetryMode; model?: string; message?: string; budget?: number; answers?: readonly QuestionAnswer[] },
-): Promise<AskedTry> {
+) {
   const asked = await runs.retry(namespace, runId, step, how, TRY_MAY);
   const { try: n, file, stopFirst } = decoded(retryRoute(namespace, runId, step), AskedTrySchema, asked, TRY_MAY);
   return { try: n, file, stopFirst };
@@ -86,7 +86,7 @@ export async function askTry(
  * @param step The step that closes the loop.
  * @param how The budget the loop's cap is raised to, in dollars, or none.
  */
-export async function askRound(namespace: string, runId: string, step: string, how: { budget?: number }): Promise<AskedRound> {
+export async function askRound(namespace: string, runId: string, step: string, how: { budget?: number }) {
   const asked = await runs.retry(namespace, runId, step, { mode: 'continue', round: true, ...how }, ROUND_MAY);
   const { step: looping, round, file } = decoded(retryRoute(namespace, runId, step), AskedRoundSchema, asked, ROUND_MAY);
   return { step: looping, round, file };
@@ -120,7 +120,7 @@ export const approveStep = (
   runId: string,
   step: string,
   how: { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly { step: string; usd: number }[] },
-): Promise<Approved> =>
+) =>
   runs
     .approve(namespace, runId, step, how, "The approval may be written: look at the step on the run's page before approving again.")
     .then(({ try: n, at, message, file }) => ({ try: n, at, message, file }));
@@ -137,7 +137,7 @@ export const approveStep = (
  * @param step The step whose running session is told.
  * @param text The words handed to the session.
  */
-export const sayToStep = (namespace: string, runId: string, step: string, text: string): Promise<Said> =>
+export const sayToStep = (namespace: string, runId: string, step: string, text: string) =>
   runs.say(
     namespace,
     runId,

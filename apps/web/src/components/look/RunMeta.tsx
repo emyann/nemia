@@ -9,7 +9,7 @@ import { CopyId } from './CopyId';
 import { TextLink } from './TextLink';
 
 /** The labels of `map` a person put on it, in key order: every one but the store's own `factory` and `workflow`. */
-const ownOf = (map: Readonly<LabelMap>): Array<[string, string]> =>
+const ownOf = (map: Readonly<LabelMap>) =>
   Object.entries(map)
     .filter(([key]) => !CLOSED_LABEL_KEYS.includes(key))
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

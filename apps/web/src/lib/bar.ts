@@ -33,23 +33,25 @@ export const BAR_NAMES: Record<Bar['kind'], string> = {
 };
 
 /** The step of a run `name` names, `<run>/<step>`, split at its first `/`; none without a run or a step. */
-function stepOf(name: string): Bar | undefined {
+function stepOf(name: string) {
   const slash = name.indexOf('/');
   const run = name.slice(0, slash);
   const step = name.slice(slash + 1);
-  return slash > 0 && step ? { kind: 'step', run, step } : undefined;
+  return (slash > 0 && step ? { kind: 'step', run, step } : undefined) satisfies Bar | undefined;
 }
 
 /**
  * The step of a workflow `name` names, `<from>/<workflow>/<step>`, split at its first two `/`; none for a `from` that is no origin
  * (`factory`, `repo`, `user`, `builtin`), or without a workflow or a step.
  */
-function specOf(name: string): Bar | undefined {
+function specOf(name: string) {
   const [word, workflow] = name.split('/', 2);
   const step = name.slice(`${word}/${workflow}/`.length);
   const from = DEFINITION_ORIGINS.find((origin) => origin === word);
-  if (!from) return undefined;
-  return workflow && step && name.startsWith(`${from}/${workflow}/`) ? { kind: 'spec', from, workflow, step } : undefined;
+  if (!from) return undefined satisfies Bar | undefined;
+  return (workflow && step && name.startsWith(`${from}/${workflow}/`) ? { kind: 'spec', from, workflow, step } : undefined) satisfies
+    | Bar
+    | undefined;
 }
 
 /** The address of a start in no factory yet: no factory's name is free for it, since a name is `[a-z0-9-]`, so it is the bare word. */
@@ -79,37 +81,37 @@ const PARSERS: Record<string, (name: string) => Bar | undefined> = {
  * first two, and the step keeps any `/` or `:` of its own.
  * @param value The root's search key `bar` as the address gives it, of any type.
  */
-export function barOf(value: unknown): Bar | undefined {
-  if (typeof value !== 'string') return undefined;
-  if (value === ASKING) return { kind: 'start', factory: null };
-  if (value === GAUGES) return { kind: 'gauges' };
-  if (value === WAITING) return { kind: 'waiting' };
+export function barOf(value: unknown) {
+  if (typeof value !== 'string') return undefined satisfies Bar | undefined;
+  if (value === ASKING) return { kind: 'start', factory: null } satisfies Bar | undefined;
+  if (value === GAUGES) return { kind: 'gauges' } satisfies Bar | undefined;
+  if (value === WAITING) return { kind: 'waiting' } satisfies Bar | undefined;
   const at = value.indexOf(':');
   const name = value.slice(at + 1);
   const parse = Object.hasOwn(PARSERS, value.slice(0, at)) ? PARSERS[value.slice(0, at)] : undefined;
-  return at > 0 && name && parse ? parse(name) : undefined;
+  return (at > 0 && name && parse ? parse(name) : undefined) satisfies Bar | undefined;
 }
 
 /**
  * How `bar` is written in the address, which `barOf` reads back.
  * @param bar The bar to write.
  */
-export function barValue(bar: Bar): string {
+export function barValue(bar: Bar) {
   switch (bar.kind) {
     case 'start':
-      return bar.factory === null ? ASKING : `start:${bar.factory}`;
+      return (bar.factory === null ? ASKING : `start:${bar.factory}`) satisfies string as string;
     case 'factory':
-      return `factory:${bar.factory}`;
+      return `factory:${bar.factory}` satisfies string as string;
     case 'run':
-      return `run:${bar.run}`;
+      return `run:${bar.run}` satisfies string as string;
     case 'step':
-      return `step:${bar.run}/${bar.step}`;
+      return `step:${bar.run}/${bar.step}` satisfies string as string;
     case 'spec':
-      return `spec:${bar.from}/${bar.workflow}/${bar.step}`;
+      return `spec:${bar.from}/${bar.workflow}/${bar.step}` satisfies string as string;
     case 'gauges':
-      return GAUGES;
+      return GAUGES satisfies string as string;
     case 'waiting':
-      return WAITING;
+      return WAITING satisfies string as string;
   }
 }
 
@@ -117,17 +119,18 @@ export function barValue(bar: Bar): string {
  * The root route's search: a `bar` that names a bar, and none of the keys a page's own route reads (`factory`, `step`, the filters).
  * @param search The address's search, every key of it as given.
  */
-export const barSearch = (search: Record<string, unknown>): { bar?: string } => (barOf(search.bar) ? { bar: search.bar as string } : {});
+export const barSearch = (search: Record<string, unknown>) =>
+  (barOf(search.bar) ? { bar: search.bar as string } : {}) satisfies { bar?: string } as { bar?: string };
 
 /** Whether `one` and `other` show the same thing: the same address, so the same kind for the same factory, run or step. */
-const sameBar = (one: Bar, other: Bar): boolean => barValue(one) === barValue(other);
+const sameBar = (one: Bar, other: Bar) => barValue(one) === barValue(other);
 
 /**
  * What the bar shows once `pressed` is pressed while it shows `open`: nothing, for the same thing again, else what was pressed.
  * @param open What the bar shows, or undefined while it is closed.
  * @param pressed What was pressed.
  */
-export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined => (open && sameBar(open, pressed) ? undefined : pressed);
+export const nextBar = (open: Bar | undefined, pressed: Bar) => (open && sameBar(open, pressed) ? undefined : pressed);
 
 /**
  * The page Open visits from the bar: a factory's floor, a run's page, a step's session, a workflow's step's page, or none for what is no
@@ -145,11 +148,15 @@ type BarPage =
  * @param bar The workflow's step the bar shows.
  * @param place The place the page under the bar is read in; empty by default.
  */
-export const stepPage = (bar: Extract<Bar, { kind: 'spec' }>, place: PagePlace = {}): Extract<BarPage, { search: PagePlace }> => ({
-  to: '/workflows/$from/$workflow/$step',
-  params: { from: bar.from, workflow: bar.workflow, step: bar.step },
-  search: place,
-});
+export const stepPage = (bar: Extract<Bar, { kind: 'spec' }>, place: PagePlace = {}) =>
+  ({
+    to: '/workflows/$from/$workflow/$step',
+    params: { from: bar.from, workflow: bar.workflow, step: bar.step },
+    search: place,
+  }) satisfies Extract<BarPage, { search: PagePlace }> satisfies Extract<BarPage, { search: PagePlace }> as Extract<
+    BarPage,
+    { search: PagePlace }
+  >;
 
 /**
  * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, the
@@ -158,20 +165,29 @@ export const stepPage = (bar: Extract<Bar, { kind: 'spec' }>, place: PagePlace =
  * @param bar What the bar shows.
  * @param place The place the page under the bar is read in; empty by default.
  */
-export function barOpens(bar: Bar, place: PagePlace = {}): BarPage | null {
+export function barOpens(bar: Bar, place: PagePlace = {}) {
   switch (bar.kind) {
     case 'factory':
-      return { to: '/factories/$factory', params: { factory: bar.factory } };
+      return {
+        to: '/factories/$factory',
+        params: { factory: bar.factory },
+      } satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
     case 'run':
-      return { to: '/runs/$runId', params: { runId: bar.run } };
+      return {
+        to: '/runs/$runId',
+        params: { runId: bar.run },
+      } satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
     case 'step':
-      return { to: '/runs/$runId/steps/$step', params: { runId: bar.run, step: bar.step } };
+      return {
+        to: '/runs/$runId/steps/$step',
+        params: { runId: bar.run, step: bar.step },
+      } satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
     case 'spec':
-      return stepPage(bar, place);
+      return stepPage(bar, place) satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
     case 'start':
     case 'gauges':
     case 'waiting':
-      return null;
+      return null satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
   }
 }
 
@@ -179,7 +195,7 @@ export function barOpens(bar: Bar, place: PagePlace = {}): BarPage | null {
  * Whether `open` shows what is the whole machine's, not a page's: its gauges, or the runs waiting on you across every factory.
  * @param open What the bar shows, or undefined while it is closed.
  */
-export function wholeMachine(open: Bar | undefined): boolean {
+export function wholeMachine(open: Bar | undefined) {
   switch (open?.kind) {
     case 'gauges':
     case 'waiting':
@@ -200,7 +216,7 @@ export function wholeMachine(open: Bar | undefined): boolean {
  * @param from The origin the workflow is read from.
  * @param workflow The workflow's name.
  */
-export const specStep = (open: Bar | undefined, from: string, workflow: string): string | null =>
+export const specStep = (open: Bar | undefined, from: string, workflow: string) =>
   open?.kind === 'spec' && open.from === from && open.workflow === workflow ? open.step : null;
 
 /**
@@ -208,7 +224,7 @@ export const specStep = (open: Bar | undefined, from: string, workflow: string):
  * closes; never the start of a run, whose half-typed brief a press beside it would lose, and nothing for a bar already closed.
  * @param open What the bar shows, or undefined while it is closed.
  */
-export const inspects = (open: Bar | undefined): boolean => open !== undefined && open.kind !== 'start';
+export const inspects = (open: Bar | undefined) => open !== undefined && open.kind !== 'start';
 
 /** An Escape pressed while the bar is open: whether a menu or a modal took it, whether it ends a composition, the text of its field. */
 type EscapeKey = { defaultPrevented: boolean; isComposing: boolean; fieldText: string | null };
@@ -218,7 +234,7 @@ type EscapeKey = { defaultPrevented: boolean; isComposing: boolean; fieldText: s
  * that holds text, so a half-typed brief is not lost to one key; else `close` the bar.
  * @param key The Escape pressed: whether something took it, whether it ends a composition, and its field's text, null outside a field.
  */
-export function escapeDoes(key: EscapeKey): 'ignore' | 'leave' | 'close' {
+export function escapeDoes(key: EscapeKey) {
   if (key.defaultPrevented || key.isComposing) return 'ignore';
   return key.fieldText ? 'leave' : 'close';
 }
@@ -232,4 +248,4 @@ export type FocusPlace = 'in' | 'out' | 'nothing';
  * page. A press on the page, on a canvas's empty drawing, takes the focus off on purpose and leaves it on nothing: a close that then
  * gave it back would put the keyboard on a node nobody pressed, and the next Enter would open that node's bar.
  */
-export const focusGoesBack = ({ left, now }: { left: boolean; now: FocusPlace }): boolean => !left && now !== 'out';
+export const focusGoesBack = ({ left, now }: { left: boolean; now: FocusPlace }) => !left && now !== 'out';

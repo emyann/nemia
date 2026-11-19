@@ -12,17 +12,16 @@ const MOST = Number(FILE_LIMIT);
 const MOST_WORDS = ByteSize.format(FILE_LIMIT);
 
 /** `bytes` in words, in the units the limit is said in. */
-const sizeWords = (bytes: number): string => ByteSize.format(ByteSize.bytes(bytes));
+const sizeWords = (bytes: number) => ByteSize.format(ByteSize.bytes(bytes));
 
 /**
  * Whether `file` is past what the files api keeps of one.
  * @param file The file listed.
  */
-export const pastLimit = (file: File): boolean => file.size > MOST;
+export const pastLimit = (file: File) => file.size > MOST;
 
 /** Where the file at `index` stands while the start uploads: uploaded, uploading now, or waiting its turn. */
-const markOf = (index: number, sent: number): 'sent' | 'uploading' | 'waiting' =>
-  index < sent ? 'sent' : index === sent ? 'uploading' : 'waiting';
+const markOf = (index: number, sent: number) => (index < sent ? 'sent' : index === sent ? 'uploading' : 'waiting');
 
 /**
  * The files a start hands its run, as the client hands a start its inputs: dropped on the kit's drop zone, or picked with its file trigger,

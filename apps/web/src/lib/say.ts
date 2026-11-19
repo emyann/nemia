@@ -23,32 +23,35 @@ export type Sayable = { open: true } | { open: false; why: string };
  * @param run The run: when it was called off, null where it was not.
  * @param step The step the composer sends to: its name, its task, and the codes its state is read from.
  */
-export function sayable(
-  run: Pick<RunDetail, 'cancelledAt'>,
-  step: Pick<StepView, 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via'>,
-): Sayable {
+export function sayable(run: Pick<RunDetail, 'cancelledAt'>, step: Pick<StepView, 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via'>) {
   if (run.cancelledAt !== null) {
     return {
       open: false,
       why: `The run was called off, so ${step.name}'s session is being stopped, not steered, and nothing more is filed for it.`,
-    };
+    } satisfies Sayable;
   }
   if (!step.taskId)
-    return { open: false, why: `${step.name} is not filed yet, so it has no session to say anything to. Say it here once it runs.` };
+    return {
+      open: false,
+      why: `${step.name} is not filed yet, so it has no session to say anything to. Say it here once it runs.`,
+    } satisfies Sayable;
   const state = stepState(step, false, false);
-  if (state === 'working' || state === 'asks-in-session') return { open: true };
+  if (state === 'working' || state === 'asks-in-session') return { open: true } satisfies Sayable;
   if (state === 'unknown')
-    return { open: false, why: `The engine has no record of ${step.name}'s task, so there is no session to say anything to.` };
+    return {
+      open: false,
+      why: `The engine has no record of ${step.name}'s task, so there is no session to say anything to.`,
+    } satisfies Sayable;
   if (state === 'waiting') {
     return {
       open: false,
       why: `${step.name} is filed and its session has not started, so there is nobody to say anything to yet. Say it here once it runs.`,
-    };
+    } satisfies Sayable;
   }
   return {
     open: false,
     why: `${step.name}'s session has ended, so there is nobody to say anything to. To tell the step something, answer it or try it again from the run page, and the next try is told what you write.`,
-  };
+  } satisfies Sayable;
 }
 
 /**
@@ -57,7 +60,7 @@ export function sayable(
  * @param read What was said to the step, as the api last read it.
  * @param sent What this page has said to it since.
  */
-export function mergeSaid(read: readonly Said[], sent: readonly Said[]): Said[] {
+export function mergeSaid(read: readonly Said[], sent: readonly Said[]) {
   const key = (s: Said) => `${s.attempt}:${s.at}`;
   const known = new Set(read.map(key));
   return [...read, ...sent.filter((s) => !known.has(key(s)))].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));

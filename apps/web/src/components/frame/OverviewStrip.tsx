@@ -197,7 +197,7 @@ function Agents({ strip }: { strip: Strip }) {
 }
 
 /** A window's label as a meter says it, its first letter a capital. */
-const meterLabel = (w: QuotaWindow): string => w.label.charAt(0).toUpperCase() + w.label.slice(1);
+const meterLabel = (w: QuotaWindow) => w.label.charAt(0).toUpperCase() + w.label.slice(1);
 
 /**
  * The quota of this machine: a meter in money for each window, `PAST 80%` once one is used past the mark, and when it runs out and

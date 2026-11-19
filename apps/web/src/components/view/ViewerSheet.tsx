@@ -25,11 +25,10 @@ import { Reading, ReadingLines } from '@/components/look';
 type Served = Extract<StepArtifact, { url: string }>;
 
 /** The viewer of a file: by the kind the api serves it as and its name's extension; none for one it does not serve. */
-const viewerOfFile = (file: StepArtifact): Viewer =>
-  viewerOf({ kind: 'url' in file ? file.kind : null, extension: extensionOf(fileKey(file)) });
+const viewerOfFile = (file: StepArtifact) => viewerOf({ kind: 'url' in file ? file.kind : null, extension: extensionOf(fileKey(file)) });
 
 /** The run the sheet's file is of: the page's, else the bar's. */
-function useViewedRun(): string | null {
+function useViewedRun() {
   const page = useMatches({
     select: (matches) => matches.flatMap((m) => ('runId' in m.params && typeof m.params.runId === 'string' ? [m.params.runId] : [])).at(-1),
   });
@@ -178,10 +177,10 @@ export function TextFile({ file, viewer }: { file: Served; viewer: Exclude<Viewe
 }
 
 /** The JSON a text holds, or the text itself where it holds none. */
-function parsed(text: string): unknown {
+function parsed(text: string) {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as unknown;
   } catch {
-    return text;
+    return text as unknown;
   }
 }

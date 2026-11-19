@@ -5,7 +5,7 @@
  * write's body kept in `sent` for its play to read; and the factories listed, the default one and those a person made (`factoriesHeld`).
  */
 import { delay, http, HttpResponse } from 'msw';
-import type { Factory, FactoryApplied, FactoryCreated, FactoryList, Template, TemplateList } from 'objects';
+import type { Factory, FactoryList, Template, TemplateList } from 'objects';
 
 /** sdlc, as the api serves it: a team that builds software, its workflows and agents read. */
 export const SDLC: Template = {
@@ -36,15 +36,15 @@ export const BROKEN: Template = {
 };
 
 /** The templates listed: `items` in order, on one page. */
-const listOf = (items: readonly Template[]): TemplateList => ({
+const listOf = (items: readonly Template[]) => ({
   apiVersion: 'nemia/v1',
   kind: 'TemplateList',
   metadata: {},
   items: [...items],
-});
+}) satisfies TemplateList;
 
 /** An apply of sdlc answered: the factory `name`, with no volume. */
-const applied = (name: string): FactoryApplied => ({
+const applied = (name: string) => ({
   name,
   volumes: [],
   file: `/home/me/.agent-workflows/factories/${name}.yaml`,
@@ -55,7 +55,7 @@ const applied = (name: string): FactoryApplied => ({
 });
 
 /** A filing answered: the empty factory `name`, with no volume. */
-const created = (name: string): FactoryCreated => ({
+const created = (name: string) => ({
   name,
   volumes: [],
   file: `/home/me/.agent-workflows/factories/${name}.yaml`,
@@ -96,13 +96,13 @@ export const writesRefused = answering([SDLC], true);
 export const oneBroken = answering([SDLC, BROKEN]);
 
 /** The factory `name` as the api serves it, on no volume. */
-const factoryNamed = (name: string): Factory => ({
+const factoryNamed = (name: string) => ({
   apiVersion: 'nemia/v1',
   kind: 'Factory',
   metadata: { name, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
   spec: { hires: {}, volumes: [] },
   status: { conditions: [], untrusted: [] },
-});
+}) satisfies Factory;
 
 /**
  * The factories listed: the default one first, then each of `names`.

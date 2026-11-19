@@ -16,9 +16,8 @@ import type { AskPick, AskQuestion, ChatEvent, ChatPresence } from './api/chat.t
 import { CHAT_STREAM_SCHEMAS } from './api/chat.ts';
 import { UnreadAnswer } from './api/read.ts';
 import { streamDataOf } from './api/stream.ts';
-import type { ConversationItem, ConversationLine } from './conversation.ts';
+import type { ConversationItem } from './conversation.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
-import type { Presence } from './presence.ts';
 import { proposalLinkOf } from './proposalLink.ts';
 import { broughtOf } from './stepLink.ts';
 
@@ -49,21 +48,21 @@ type AskDrawn = 'actions' | 'form' | 'many';
  * reads to say whether an ask is a proposal.
  * @param questions The ask's questions, each with its choices.
  */
-export const drawnAsk = (questions: readonly AskQuestion[]): AskDrawn =>
+export const drawnAsk = (questions: readonly AskQuestion[]) =>
   questions.length > 1 ? 'many' : (questions[0]?.options ?? []).every((option) => option.description.trim() === '') ? 'actions' : 'form';
 
 /**
  * Whether the question `question` is answered by `pick`: a label chosen, or words of their own with something in them.
  * @param pick What the person picked for the question, or undefined where they picked nothing.
  */
-export const askAnswered = (pick: AskPick | undefined): boolean =>
+export const askAnswered = (pick: AskPick | undefined) =>
   pick === undefined ? false : pick.words === undefined ? (pick.labels ?? []).length > 0 : pick.words.trim() !== '';
 
 /**
  * What the recap says of how many are left: `2 not answered` while any is, `All answered` once none is.
  * @param open How many questions are not answered.
  */
-export const askLeft = (open: number): string => (open > 0 ? `${open} not answered` : 'All answered');
+export const askLeft = (open: number) => (open > 0 ? `${open} not answered` : 'All answered');
 
 /**
  * The asks of `events` that wait on the person: what the composer's words and the panel's cue are about. One the person answered
@@ -71,7 +70,7 @@ export const askLeft = (open: number): string => (open > 0 ? `${open} not answer
  * is not holding a call open for.
  * @param events Her chat's events, oldest first.
  */
-export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
+export const asksOpen = (events: readonly ChatEvent[]) =>
   events.filter((event): event is ChatAsk => isAsk(event) && event.chose === undefined && event.cutAt === undefined);
 
 /**
@@ -81,7 +80,7 @@ export const asksOpen = (events: readonly ChatEvent[]): ChatAsk[] =>
  * asks at once — where the words would name no question — the composer is what it always is, and this is `undefined`. Pure.
  * @param events Her chat's events, oldest first.
  */
-export const askInWords = (events: readonly ChatEvent[]): ChatAsk | undefined => {
+export const askInWords = (events: readonly ChatEvent[]) => {
   const open = asksOpen(events);
   const one = open.length === 1 ? open[0] : undefined;
   return one !== undefined && drawnAsk(one.questions) === 'form' ? one : undefined;
@@ -92,7 +91,7 @@ export const askInWords = (events: readonly ChatEvent[]): ChatAsk | undefined =>
  * @param ask The ask the words answer.
  * @param text The person's words, as typed in the composer.
  */
-export const wordsAnswer = (ask: ChatAsk, text: string): AskPick[] => [{ question: ask.questions[0]?.question ?? '', words: text }];
+export const wordsAnswer = (ask: ChatAsk, text: string) => [{ question: ask.questions[0]?.question ?? '', words: text }];
 
 /** Where she is before a read answers: down, since nothing says she is up. */
 export const CHAT_DOWN: ChatPresence = { up: false, answering: false, waitsOnYou: 0, unread: 0, wakes: false };
@@ -113,7 +112,7 @@ export type ChatFollowed = Followed & {
  * What the panel holds before its first read: nothing, being read when there is one (`loading`).
  * @param loading Whether the first read is in flight.
  */
-export const unreadChat = (loading: boolean): ChatFollowed => ({
+export const unreadChat = (loading: boolean) => ({
   events: [],
   presence: CHAT_DOWN,
   cursor: null,
@@ -130,7 +129,7 @@ export const unreadChat = (loading: boolean): ChatFollowed => ({
  * @param known The events the panel knows, oldest first.
  * @param incoming The events a frame brings, in the order they came.
  */
-export function mergeChatEvents(known: readonly ChatEvent[], incoming: readonly ChatEvent[]): ChatEvent[] {
+export function mergeChatEvents(known: readonly ChatEvent[], incoming: readonly ChatEvent[]) {
   const merged = [...known];
   if (!incoming.length) return merged;
   const where = new Map(merged.map((event, i) => [event.id, i]));
@@ -157,17 +156,14 @@ type ChatChange =
  * @param s Her chat as the panel holds it.
  * @param c The change one frame of the stream brings.
  */
-export function changedChat(s: ChatFollowed, c: ChatChange): ChatFollowed {
+export function changedChat(s: ChatFollowed, c: ChatChange) {
   if (c.kind === 'events') return { ...s, events: mergeChatEvents(s.events, c.events) };
   if (c.kind === 'presence') return { ...s, presence: c.presence };
   return { ...s, cursor: c.cursor };
 }
 
 /** The arrivals one of her stream's events brings: what it decoded, or its decode's `UnreadAnswer`, and the cursor its id is, if any. */
-const brought = (event: ChatChange | UnreadAnswer, id: string): (ChatChange | UnreadAnswer)[] => [
-  event,
-  ...(id ? [{ kind: 'cursor' as const, cursor: id }] : []),
-];
+const brought = (event: ChatChange | UnreadAnswer, id: string) => [event, ...(id ? [{ kind: 'cursor' as const, cursor: id }] : [])];
 
 /**
  * What her chat's stream means, for `follow`: `presence` replaces where she is, `chat` merges one event by its id, and either moves the
@@ -212,7 +208,7 @@ const chatFollower: Follower<ChatFollowed, ChatChange> = {
  * @param update Writes a change to what the panel holds.
  * @param frames How the events that arrive together are merged once: the browser's animation frames, or a test's own.
  */
-export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed) => ChatFollowed) => void, frames: Frames): (() => void) =>
+export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed) => ChatFollowed) => void, frames: Frames) =>
   follow(stream, chatFollower, update, frames);
 
 /**
@@ -228,7 +224,7 @@ export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed
  * @param runsWaiting How many runs wait on the person, as the run list counts them.
  * @param events Her chat's events, oldest first.
  */
-export const presenceOf = (api: ChatPresence, notSent: boolean, runsWaiting: number, events: readonly ChatEvent[]): Presence => ({
+export const presenceOf = (api: ChatPresence, notSent: boolean, runsWaiting: number, events: readonly ChatEvent[]) => ({
   runsWaiting,
   asksWaiting: asksOpen(events).length,
   notSent,
@@ -248,26 +244,27 @@ export type ChatItem = { kind: 'event'; event: ChatEvent } | ChatTurn;
 type ChatTurn = { kind: 'turn'; id: string; calls: ChatCall[]; running: boolean; ms: number };
 
 /** The milliseconds from the first of `calls` to the last, 0 where either moment does not parse. */
-const spanOf = (calls: readonly ChatCall[]): number => {
+const spanOf = (calls: readonly ChatCall[]) => {
   const ms = Date.parse(calls[calls.length - 1].at) - Date.parse(calls[0].at);
   return Number.isFinite(ms) && ms > 0 ? ms : 0;
 };
 
 /** The calls gathered so far as a turn. */
-const turnOf = (calls: ChatCall[]): ChatTurn => ({
-  kind: 'turn',
-  id: calls[0].id,
-  calls,
-  running: calls.some((call) => call.state === 'running' || call.state === 'waits'),
-  ms: spanOf(calls),
-});
+const turnOf = (calls: ChatCall[]) =>
+  ({
+    kind: 'turn',
+    id: calls[0].id,
+    calls,
+    running: calls.some((call) => call.state === 'running' || call.state === 'waits'),
+    ms: spanOf(calls),
+  }) satisfies ChatTurn;
 
 /**
  * Her chat drawn as blocks, in the order it came: each run of consecutive calls folded into one turn (`turnOf`), everything else as
  * itself. A turn still running is drawn open, with its last call alive; a finished one folds into its one line (`turnWords`).
  * @param events Her chat's events, oldest first.
  */
-export function foldChat(events: readonly ChatEvent[]): ChatItem[] {
+export function foldChat(events: readonly ChatEvent[]) {
   const out: ChatItem[] = [];
   let calls: ChatCall[] = [];
   const close = () => {
@@ -291,7 +288,7 @@ export function foldChat(events: readonly ChatEvent[]): ChatItem[] {
  * hers as hers. Only an outbox entry the person wrote is drawn as the person's.
  * @param message The message, who it is from read.
  */
-export const drawnAs = (message: ChatMessage): 'marker' | 'person' | 'peer' | 'agent' =>
+export const drawnAs = (message: ChatMessage) =>
   message.from === 'keeper' ? 'marker' : message.from === 'person' ? 'person' : message.from === 'peer' ? 'peer' : 'agent';
 
 /** Whether an event is a message of hers, which is what goes unread. */
@@ -303,7 +300,7 @@ const hers = (event: ChatEvent): event is ChatMessage => event.kind === 'message
  * @param events Her chat's events, oldest first.
  * @param unread How many of her messages the api counts unread.
  */
-export function newFrom(events: readonly ChatEvent[], unread: number): string | null {
+export function newFrom(events: readonly ChatEvent[], unread: number) {
   if (unread < 1) return null;
   const mine = events.filter(hers);
   return unread > mine.length ? null : (mine[mine.length - unread]?.id ?? null);
@@ -313,7 +310,7 @@ export function newFrom(events: readonly ChatEvent[], unread: number): string | 
  * The id the read mark is posted through: her latest message, since hers alone go unread; null where she has said nothing.
  * @param events Her chat's events, oldest first.
  */
-export const readableFrom = (events: readonly ChatEvent[]): string | null => events.filter(hers).at(-1)?.id ?? null;
+export const readableFrom = (events: readonly ChatEvent[]) => events.filter(hers).at(-1)?.id ?? null;
 
 /** A link read out of her words: the words it was written on, and where it goes. */
 type ChatLink = { words: string; href: string };
@@ -325,7 +322,7 @@ const LINK = /\[([^\]\n]+)\]\(([^()\s]+)\)/g;
  * Whether an address is a page of this board, which the look's filled button leads to through the router: one leading slash and not
  * two, since a protocol-relative address (`//evil.test/x`) begins with a slash and the browser resolves it off this board.
  */
-const ours = (href: string): boolean => href.startsWith('/') && !href.startsWith('//');
+const ours = (href: string) => href.startsWith('/') && !href.startsWith('//');
 
 /**
  * Her words with each link to a page of this board taken out of the sentence and named beside it: `text` reads plain, the link's own
@@ -334,7 +331,7 @@ const ours = (href: string): boolean => href.startsWith('/') && !href.startsWith
  * wrote it, for `Markdown` to draw — a button through the router leads to a route, and those are not routes.
  * @param text Her message's words, as markdown.
  */
-export function linksOf(text: string): { text: string; links: ChatLink[] } {
+export function linksOf(text: string) {
   const links: ChatLink[] = [];
   const plain = text.replace(LINK, (whole: string, words: string, href: string) => {
     if (!ours(href)) return whole;
@@ -354,27 +351,33 @@ type ChatBroughtProposal = { kind: 'brought-proposal'; factory: string; name: st
 export type ChatOwn = ChatAsk | ChatBrought | ChatBroughtProposal;
 
 /** What a link of hers brings: a step of a run (`broughtOf`) or a proposal (`proposalLinkOf`), keyed for once each; none for another. */
-const bringOf = (href: string): { key: string; own: ChatBrought | ChatBroughtProposal } | undefined => {
+const bringOf = (href: string) => {
   const step = broughtOf(href);
-  if (step) return { key: `brought:${step.run}/${step.step}`, own: { kind: 'brought', ...step } };
+  if (step)
+    return { key: `brought:${step.run}/${step.step}`, own: { kind: 'brought', ...step } } satisfies
+      | { key: string; own: ChatBrought | ChatBroughtProposal }
+      | undefined;
   const proposal = proposalLinkOf(href);
-  if (proposal) return { key: `brought-proposal:${proposal.factory}/${proposal.name}`, own: { kind: 'brought-proposal', ...proposal } };
-  return undefined;
+  if (proposal)
+    return { key: `brought-proposal:${proposal.factory}/${proposal.name}`, own: { kind: 'brought-proposal', ...proposal } } satisfies
+      | { key: string; own: ChatBrought | ChatBroughtProposal }
+      | undefined;
+  return undefined satisfies { key: string; own: ChatBrought | ChatBroughtProposal } | undefined;
 };
 
 /** The steps and proposals the links `links` bring, each once, in the order she wrote them, each with its key. */
-const broughtIn = (links: readonly ChatLink[]): { key: string; own: ChatBrought | ChatBroughtProposal }[] => {
+const broughtIn = (links: readonly ChatLink[]) => {
   const seen = new Set<string>();
   return links.flatMap((link) => {
     const named = bringOf(link.href);
     if (!named || seen.has(named.key)) return [];
     seen.add(named.key);
     return [named];
-  });
+  }) satisfies { key: string; own: ChatBrought | ChatBroughtProposal }[];
 };
 
 /** One of her calls as a line of a turn: her events carry no input and no result, so a line of hers opens on nothing. */
-const lineOf = (call: ChatCall): ConversationLine => ({
+const lineOf = (call: ChatCall) => ({
   id: call.id,
   tool: call.tool,
   sentence: call.sentence,
@@ -386,11 +389,20 @@ const lineOf = (call: ChatCall): ConversationLine => ({
  * Her words, the person's own, another agent's, or the keeper's quiet line: hers as markdown with her links named beside it
  * (`linksOf`), and another agent's as it stands, under the name it speaks under (`by: 'peer'`).
  */
-function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
+function saidOf(message: ChatMessage) {
   const drawn = drawnAs(message);
-  if (drawn === 'marker') return { kind: 'note', id: message.id, what: 'keeper', words: message.text };
+  if (drawn === 'marker') return { kind: 'note', id: message.id, what: 'keeper', words: message.text } satisfies ConversationItem<ChatOwn>;
   if (drawn === 'person')
-    return { kind: 'said', id: message.id, who: 'You', at: message.at, text: message.text, markdown: false, yours: true, links: [] };
+    return {
+      kind: 'said',
+      id: message.id,
+      who: 'You',
+      at: message.at,
+      text: message.text,
+      markdown: false,
+      yours: true,
+      links: [],
+    } satisfies ConversationItem<ChatOwn>;
   if (drawn === 'peer')
     return {
       kind: 'said',
@@ -402,9 +414,18 @@ function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
       markdown: false,
       yours: false,
       links: [],
-    };
+    } satisfies ConversationItem<ChatOwn>;
   const { text, links } = linksOf(message.text);
-  return { kind: 'said', id: message.id, who: 'Nemia', at: message.at, text, markdown: true, yours: false, links };
+  return {
+    kind: 'said',
+    id: message.id,
+    who: 'Nemia',
+    at: message.at,
+    text,
+    markdown: true,
+    yours: false,
+    links,
+  } satisfies ConversationItem<ChatOwn>;
 }
 
 /**
@@ -416,7 +437,7 @@ function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
  * drawing for is left out. Pure: a node test proves the whole mapping without a browser.
  * @param events Her chat's events, oldest first.
  */
-export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatOwn>[] {
+export function chatItems(events: readonly ChatEvent[]) {
   const out: ConversationItem<ChatOwn>[] = [];
   for (const item of foldChat(events)) {
     if (item.kind === 'turn') {

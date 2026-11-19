@@ -19,7 +19,7 @@ export function Unread({ children }: { children: ReactNode }) {
  */
 export const saysReading =
   (label: string) =>
-  async ({ canvasElement }: { canvasElement: HTMLElement }): Promise<void> => {
+  async ({ canvasElement }: { canvasElement: HTMLElement }) => {
     const named = await waitFor(() => {
       const found = [...canvasElement.ownerDocument.body.querySelectorAll('[role="status"]')].find(
         (status) => status.textContent === label,

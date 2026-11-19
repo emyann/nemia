@@ -13,16 +13,16 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type ListedInput = { readonly name: string; readonly size: number };
 
 /** Whether `a` and `b` are one file as the list reads it: the same name and size. */
-const same = (a: ListedInput, b: ListedInput): boolean => a.name === b.name && a.size === b.size;
+const same = (a: ListedInput, b: ListedInput) => a.name === b.name && a.size === b.size;
 
 /** Whether `files` holds `file`. */
-const holds = (files: readonly ListedInput[], file: ListedInput): boolean => files.some((f) => same(f, file));
+const holds = (files: readonly ListedInput[], file: ListedInput) => files.some((f) => same(f, file));
 
 /** The largest size a file is counted to, a safe integer's. */
 const MOST_BYTES = 9_007_199_254_740_991;
 
 /** Whether `file` has a size as a browser's file has: a count of bytes, none below 0, none past a safe integer. */
-const sized = (file: ListedInput): boolean => file.size >= 0 && file.size <= MOST_BYTES;
+const sized = (file: ListedInput) => file.size >= 0 && file.size <= MOST_BYTES;
 
 const inputAddedSpec = spec<(listed: readonly ListedInput[], added: ListedInput) => readonly ListedInput[]>({
   /** The list the form holds names each file once, as this function leaves it; every file has a size, as a browser's has. */

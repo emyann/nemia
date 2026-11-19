@@ -66,7 +66,7 @@ export const chatStreamPath = '/api/nemia/chat/stream';
  *   how many events at most, the api's own count where none.
  * @param signal Aborts the read; none for a read that runs to its end.
  */
-export const readChat = (page: { before?: string; limit?: number } = {}, signal?: AbortSignal): Promise<ChatHistory> =>
+export const readChat = (page: { before?: string; limit?: number } = {}, signal?: AbortSignal) =>
   call(
     (c) =>
       c.nemia.chat({
@@ -83,7 +83,7 @@ export const readChat = (page: { before?: string; limit?: number } = {}, signal?
  * The person's words, put in her outbox: she reads them at her next turn.
  * @param text The person's words.
  */
-export const sendChat = (text: string): Promise<ChatSent> =>
+export const sendChat = (text: string) =>
   call(
     (c) => c.nemia.chatSend({ payload: { text } }),
     write(ChatSentAnswer, 'The message may be in her outbox already: read her chat again before sending it a second time.'),
@@ -94,7 +94,7 @@ export const sendChat = (text: string): Promise<ChatSent> =>
  * @param id The ask's id.
  * @param picks The person's pick for each of its questions.
  */
-export const answerChat = (id: string, picks: readonly AskPick[]): Promise<ChatAnswer> =>
+export const answerChat = (id: string, picks: readonly AskPick[]) =>
   call(
     (c) => c.nemia.chatAnswer({ payload: { id, picks } }),
     write(ChatAnswerAnswer, 'The answer may be filed already: read her chat again, which draws it, before answering a second time.'),
@@ -104,14 +104,14 @@ export const answerChat = (id: string, picks: readonly AskPick[]): Promise<ChatA
  * The person's read mark moved to `through`.
  * @param through The id of the last event the person saw.
  */
-export const markChatRead = (through: string): Promise<ChatReadMark> =>
+export const markChatRead = (through: string) =>
   call(
     (c) => c.nemia.chatRead({ payload: { through } }),
     write(ChatReadMarkAnswer, 'The mark may be moved already: read her chat again before marking it again.'),
   );
 
 /** The turn she is answering ended. */
-export const stopChat = (): Promise<ChatStop> =>
+export const stopChat = () =>
   call(
     (c) => c.nemia.chatStop(),
     write(ChatStopAnswer, 'Her turn may be ended already: read her chat again before stopping her a second time.'),

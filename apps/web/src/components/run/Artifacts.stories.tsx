@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { http, HttpResponse } from 'msw';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
-import type { StepArtifact } from '@/lib/api/tries';
 import { Artifacts } from './Artifacts';
 
 /** Where the api serves a file of the implement step's files directory: its path under it encoded whole, as the closeout's `url` says. */
@@ -12,7 +11,7 @@ const PICTURE =
   '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill-opacity="0.85"/><rect x="24" y="300" width="432" height="36" fill-opacity="0.3"/></svg>';
 
 /** A file of the step's files directory, served: at its top, or in a folder beneath it, by its path. */
-const served = (rel: string, kind: 'image' | 'text' | 'other', size: number): StepArtifact => ({
+const served = (rel: string, kind: 'image' | 'text' | 'other', size: number) => ({
   path: `/wf/runs/r-k2rq/artifacts/implement/${rel}`,
   relativePath: rel,
   name: rel,

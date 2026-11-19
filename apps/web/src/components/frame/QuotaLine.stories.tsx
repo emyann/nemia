@@ -13,10 +13,10 @@ export default meta;
 /** The room of a board at 1440 pixels with the rail open. */
 const WIDE: CSSProperties = { width: 1136 };
 
-const ago = (minutes: number): string => new Date(Date.now() - minutes * 60_000).toISOString();
-const later = (hours: number): string => new Date(Date.now() + hours * 3_600_000).toISOString();
+const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+const later = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
 
-const win = (extra: Partial<QuotaWindow>): QuotaWindow => ({
+const win = (extra: Partial<QuotaWindow>) => ({
   key: 'seven_day',
   label: 'week',
   usedPercentage: 40,

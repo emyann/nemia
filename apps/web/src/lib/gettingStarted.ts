@@ -27,15 +27,15 @@ export const MILESTONE_NAMES: Readonly<Record<Milestone, string>> = {
 const STARTER_KEY = 'nemia:getting-started-dismissed';
 
 /** Whether the list was dismissed in this browser: kept as `1`, anything else read as not. */
-export const readStarterDismissed = (): boolean => readStored(STARTER_KEY, (raw) => (raw === '1' ? true : undefined), false);
+export const readStarterDismissed = () => readStored(STARTER_KEY, (raw) => (raw === '1' ? true : undefined), false);
 
 /** Keeps the dismissal, so the list is not shown again in this browser. */
-export const keepStarterDismissed = (): void => store(STARTER_KEY, '1');
+export const keepStarterDismissed = () => store(STARTER_KEY, '1');
 
 /**
  * Whether the list is shown: not dismissed in this browser, and no run has landed yet.
  * @param milestones The store's milestones, as the api read them.
  * @param dismissed Whether the person dismissed the list in this browser.
  */
-export const starterShown = (milestones: readonly MilestoneRead[], dismissed: boolean): boolean =>
+export const starterShown = (milestones: readonly MilestoneRead[], dismissed: boolean) =>
   !dismissed && milestones.some((m) => m.name === 'landed' && m.state !== 'done');

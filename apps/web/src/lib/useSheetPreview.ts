@@ -8,7 +8,7 @@ const SHEET_QUERY = '(hover: none), (max-width: 599px)';
  * Whether a step's preview opens as a sheet now, read again when the window or the pointer changes; false where there is no browser to
  * ask.
  */
-export const useSheetPreview = (): boolean => useMedia(SHEET_QUERY, false);
+export const useSheetPreview = () => useMedia(SHEET_QUERY, false);
 
 /** The room a step's card takes across: its frame's 416 pixels, the 12 its box keeps on each side, and the window's 12 at its edge. */
 export const CARD_REACH = 452;
@@ -22,7 +22,7 @@ export type PreviewSide = 'end top' | 'bottom start';
  * @param rail Where the rail stands across the window: its left and right edges, in pixels.
  * @param width The window's width, in pixels.
  */
-export const previewSide = (rail: { left: number; right: number }, width: number): PreviewSide =>
+export const previewSide = (rail: { left: number; right: number }, width: number) =>
   rail.left >= CARD_REACH || width - rail.right >= CARD_REACH ? 'end top' : 'bottom start';
 
 /** The bar whose card is open, by its id, or null when none is. */
@@ -35,20 +35,20 @@ const openListeners = new Set<() => void>();
  * @param id The bar's id.
  * @param open Whether its card opened, rather than closed.
  */
-export function cardOpened(id: string, open: boolean): void {
+export function cardOpened(id: string, open: boolean) {
   const next = open ? id : openBar === id ? null : openBar;
   if (next === openBar) return;
   openBar = next;
   for (const listener of openListeners) listener();
 }
 
-function subscribeOpen(changed: () => void): () => void {
+function subscribeOpen(changed: () => void) {
   openListeners.add(changed);
   return () => openListeners.delete(changed);
 }
 
 /** Whether a step's card is open now. */
-export const aCardOpen = (): boolean => openBar !== null;
+export const aCardOpen = () => openBar !== null;
 
 /** `aCardOpen`, read again when a card opens or closes; while one is, the card of another bar opens at once. */
-export const useACardOpen = (): boolean => useSyncExternalStore(subscribeOpen, aCardOpen, () => false);
+export const useACardOpen = () => useSyncExternalStore(subscribeOpen, aCardOpen, () => false);

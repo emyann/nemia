@@ -3,7 +3,7 @@ import { filled, paint } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 
 /** Bars of the plate's own ink, `widths` in pixels, an inked bar and a gap in turn, repeated along the barcode. */
-function bars(widths: readonly number[]): CSSProperties {
+function bars(widths: readonly number[]) {
   let at = 0;
   const stops = widths.map((width, i) => {
     const from = at;

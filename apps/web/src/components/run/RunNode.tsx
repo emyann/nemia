@@ -237,12 +237,12 @@ type Look = { ringed?: 'focus' | 'yours'; marks: { 'data-ghost-run'?: true; 'dat
  * while a person has its result to decide (`toDecideOf`), the one finished card that waits for a person. A ghost, a run that waits on
  * runs and nothing else (`waitsOnRuns`), is marked: its part's tone draws it outlined, waiting.
  */
-function lookOf(run: RunView, inspected: boolean): Look {
+function lookOf(run: RunView, inspected: boolean) {
   const ghost = waitsOnRuns(run);
   const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
-  if (inspected) return { ringed: 'focus', marks };
-  if (toDecideOf(run)) return { ringed: 'yours', marks: {} };
-  return { marks };
+  if (inspected) return { ringed: 'focus', marks } satisfies Look;
+  if (toDecideOf(run)) return { ringed: 'yours', marks: {} } satisfies Look;
+  return { marks } satisfies Look;
 }
 
 /** What a run waiting on you touched, in a line: `touched 2 packages · +979 −12`, from its decision, read once for its state. */

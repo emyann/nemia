@@ -100,14 +100,15 @@ export function RunCanvas(props: Props) {
 /** A node as the canvas keeps it: where it is and how big React Flow measured it. What it shows is read from the run on every render. */
 type PlacedStep = Node<Record<string, never>, 'step'>;
 /** The node of the step `name` at `position`: its edges leave it on its right and arrive on its left, so the graph reads left to right. */
-const nodeAt = (name: string, position: Point): PlacedStep => ({
-  id: name,
-  type: 'step',
-  position,
-  sourcePosition: Position.Right,
-  targetPosition: Position.Left,
-  data: {},
-});
+const nodeAt = (name: string, position: Point) =>
+  ({
+    id: name,
+    type: 'step',
+    position,
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
+    data: {},
+  }) satisfies PlacedStep;
 
 /** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; what is selected is the bar's. */
 const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange | NodeDimensionChange =>
@@ -187,9 +188,11 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
 
   const nodes = useMemo(() => {
     const indexOf = new Map(run.steps.map((s, i) => [s.name, i]));
-    return placed.flatMap((node): StepFlowNode[] => {
+    return placed.flatMap((node) => {
       const index = indexOf.get(node.id);
-      return index === undefined ? [] : [{ ...node, data: stepData(run, index), selected: node.id === selected }];
+      return (
+        index === undefined ? [] : [{ ...node, data: stepData(run, index), selected: node.id === selected }]
+      ) satisfies StepFlowNode[];
     });
   }, [placed, run, selected]);
 

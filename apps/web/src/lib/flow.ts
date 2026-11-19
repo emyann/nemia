@@ -49,7 +49,7 @@ export const flowSteps = (run: {
   steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue'>>;
   cancelledAt: string | null;
   holding?: RunView['holding'];
-}): EdgeStep[] =>
+}) =>
   run.steps.map((step) => ({
     name: step.name,
     state: stepState(step, run.cancelledAt !== null, run.holding != null),
@@ -62,7 +62,7 @@ export const flowSteps = (run: {
  * an api older than the board listed with no graph: the list is read tolerantly (`onYouOf`), so each card says what to do rather than the
  * floor refusing every run.
  */
-function columnsOf(names: readonly string[], graph: Frozen<RunGraph>): { columns: string[][]; error: string | null } {
+function columnsOf(names: readonly string[], graph: Frozen<RunGraph>) {
   if (!Array.isArray((graph as Partial<Frozen<RunGraph>> | undefined)?.edges))
     return { columns: names.map((name) => [name]), error: UNGRAPHED };
   try {
@@ -76,11 +76,11 @@ function columnsOf(names: readonly string[], graph: Frozen<RunGraph>): { columns
 export const UNGRAPHED = "Listed without its steps' graph by an api older than this board: restart the api, then reload the page.";
 
 /** Where the run is now: at work, or waiting on a person. Nothing is, on a run somebody called off. */
-const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
+const isLiveStep = (state: StepState, cancelled: boolean) =>
   !cancelled && (movingInto(state) || state === 'asks-in-session' || waitsAtGate(state, false));
 
 /** The column the rail is centred on: the first with a step live, else the first with a step not done, else the last. */
-function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean): number {
+function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean) {
   const live = columns.findIndex((column) => column.some((name) => isLiveStep(stateOf(name), cancelled)));
   if (live >= 0) return live;
   const todo = columns.findIndex((column) => column.some((name) => !settledState(stateOf(name))));
@@ -95,7 +95,7 @@ function liveColumn(columns: readonly string[][], stateOf: (name: string) => Ste
  * @param live The index of the column the rail is centred on.
  * @param slots How many slots the rail has, fold points counted: `GRAPH_SLOTS` by default.
  */
-export function windowOf(n: number, live: number, slots = GRAPH_SLOTS): { start: number; end: number } {
+export function windowOf(n: number, live: number, slots = GRAPH_SLOTS) {
   if (n <= slots) return { start: 0, end: n - 1 };
   const used = (s: number, e: number) => (s > 0 ? 1 : 0) + (e - s + 1) + (e < n - 1 ? 1 : 0);
   let start = Math.max(0, Math.min(live, n - 1) - 1);
@@ -150,12 +150,12 @@ export type StepGraphLayout = {
 const GRAPH = { pad: 14, line: 8, top: 2, lane: 13, height: 24, under: 15, nest: 4, gate: 12 };
 
 /** A point's half-width by its state: a step at work or waiting on a person a size larger, a failure between, a route passed by smaller. */
-function radiusOf(state: StepState | null): number {
+function radiusOf(state: StepState | null) {
   const mark = state === null ? 'todo' : stepMark(state, false);
   return mark === 'alive' || mark === 'yours' ? 6.6 : mark === 'failure' ? 5.6 : mark === 'off' ? 4 : 5;
 }
 
-const r1 = (n: number): number => Math.round(n * 10) / 10;
+const r1 = (n: number) => (Math.round(n * 10) / 10) satisfies number as number;
 
 /**
  * A run's steps as its workflow's graph drawn small, `width` wide: the columns around where the run is (`windowOf`, `GRAPH_SLOTS`),
@@ -178,7 +178,7 @@ export function graphOf(
   cancelled: boolean,
   width = 188,
   fold = GRAPH_SLOTS,
-): StepGraphLayout {
+) {
   const { columns, error } = columnsOf(names, graph);
   const stateAt = stateReader(steps);
   const { start, end } = windowOf(columns.length, liveColumn(columns, stateAt, cancelled), Math.max(fold, 1));
@@ -192,7 +192,7 @@ export function graphOf(
   const middle = lanes === 1 ? GRAPH.line : GRAPH.top + ((lanes - 1) * GRAPH.lane) / 2;
   const gap = slots.length > 1 ? (width - 2 * GRAPH.pad) / (slots.length - 1) : 0;
   const points = slots.flatMap((slot, s) =>
-    slot.map((box, lane): GraphPoint => ({
+    slot.map((box, lane) => ({
       ...box,
       x: r1(GRAPH.pad + s * gap),
       y: r1(middle + (lane - (slot.length - 1) / 2) * GRAPH.lane),
@@ -203,7 +203,7 @@ export function graphOf(
   const at = new Map(points.map((point) => [point.id, point]));
   const lowest = Math.max(GRAPH.line, ...points.map((point) => point.y));
   let loops = 0;
-  const lines = [...joinedOf(slots, graph, steps, error)].map(([id, { from, to, loop, states, skip, untaken, label }]): GraphLine => {
+  const lines = [...joinedOf(slots, graph, steps, error)].map(([id, { from, to, loop, states, skip, untaken, label }]) => {
     const [a, b] = [at.get(from.id)!, at.get(to.id)!];
     const state = stateOf(states);
     const line = { id, from: from.id, to: to.id, loop, state, untaken: !loop && untaken, taken: loop && label !== null };
@@ -214,11 +214,15 @@ export function graphOf(
         ...line,
         path: `M${r1(a.x)},${r1(a.y + a.r + 2.2)} V${r1(bottom)} H${r1(b.x)} V${r1(tip + 0.4)}`,
         head: `M${r1(b.x - 3)},${r1(tip + 3.4)} L${r1(b.x)},${r1(tip)} L${r1(b.x + 3)},${r1(tip + 3.4)}`,
-      };
+      } satisfies GraphLine;
     }
     if (skip) {
       const top = Math.min(a.y, b.y) - GRAPH.line - 1;
-      return { ...line, path: `M${r1(a.x)},${r1(a.y - a.r - 2)} V${r1(top)} H${r1(b.x)} V${r1(b.y - b.r - 2)}`, head: null };
+      return {
+        ...line,
+        path: `M${r1(a.x)},${r1(a.y - a.r - 2)} V${r1(top)} H${r1(b.x)} V${r1(b.y - b.r - 2)}`,
+        head: null,
+      } satisfies GraphLine;
     }
     const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const [ux, uy] = [(b.x - a.x) / length, (b.y - a.y) / length];
@@ -226,7 +230,7 @@ export function graphOf(
       ...line,
       path: `M${r1(a.x + ux * (a.r + 3))},${r1(a.y + uy * (a.r + 3))} L${r1(b.x - ux * (b.r + 3))},${r1(b.y - uy * (b.r + 3))}`,
       head: null,
-    };
+    } satisfies GraphLine;
   });
   const drawn = new Map(points.filter((point) => point.kind === 'step').map((point) => [point.names[0], point]));
   const ticks = gates.flatMap(({ step, at }) => {
@@ -235,44 +239,37 @@ export function graphOf(
   });
   const rows = lanes <= 2 ? GRAPH.height : GRAPH.height + (lanes - 2) * GRAPH.lane;
   const under = loops > 0 ? lowest + GRAPH.under + GRAPH.nest * (loops - 1) + 1 : 0;
-  return { points, lines, gates: ticks, width, height: Math.max(rows, under), error };
+  return { points, lines, gates: ticks, width, height: Math.max(rows, under), error } satisfies StepGraphLayout as StepGraphLayout;
 }
 
 const stateReader = (steps: readonly EdgeStep[]) => {
   const of = new Map(steps.map((s) => [s.name, s.state]));
-  return (name: string): StepState => of.get(name) ?? 'unknown';
+  return (name: string) => of.get(name) ?? 'unknown';
 };
 
-const boxer =
-  (stateOf: (name: string) => StepState, cancelled: boolean) =>
-  (kind: Box['kind'], names: string[]): Box => {
-    const done = names.every((name) => settledState(stateOf(name)));
-    return {
-      id: `${kind}:${names[0]}`,
-      kind,
-      names,
-      label:
-        kind === 'step'
-          ? names[0]
-          : kind === 'more'
-            ? `+${names.length}`
-            : `${names.length} ${done ? 'done' : names.length === 1 ? 'step' : 'steps'}`,
-      state: kind === 'step' ? stateOf(names[0]) : null,
-      live: names.some((name) => isLiveStep(stateOf(name), cancelled)),
-      done,
-    };
+const boxer = (stateOf: (name: string) => StepState, cancelled: boolean) => (kind: Box['kind'], names: string[]) => {
+  const done = names.every((name) => settledState(stateOf(name)));
+  return {
+    id: `${kind}:${names[0]}`,
+    kind,
+    names,
+    label:
+      kind === 'step'
+        ? names[0]
+        : kind === 'more'
+          ? `+${names.length}`
+          : `${names.length} ${done ? 'done' : names.length === 1 ? 'step' : 'steps'}`,
+    state: kind === 'step' ? stateOf(names[0]) : null,
+    live: names.some((name) => isLiveStep(stateOf(name), cancelled)),
+    done,
   };
+};
 
 /**
  * A column of the rail: its steps, or past `RAIL_LANES` the first of them and a pill counting the rest — the live ones first, so the
  * step the run is at is never the one counted, each in the layering's order.
  */
-function capped(
-  column: readonly string[],
-  boxOf: ReturnType<typeof boxer>,
-  stateOf: (name: string) => StepState,
-  cancelled: boolean,
-): Box[] {
+function capped(column: readonly string[], boxOf: ReturnType<typeof boxer>, stateOf: (name: string) => StepState, cancelled: boolean) {
   if (column.length <= RAIL_LANES) return column.map((name) => boxOf('step', [name]));
   const rank = (name: string) => (isLiveStep(stateOf(name), cancelled) ? 0 : 1);
   const shown = new Set([...column].sort((a, b) => rank(a) - rank(b) || column.indexOf(a) - column.indexOf(b)).slice(0, RAIL_LANES - 1));
@@ -296,7 +293,7 @@ type Joined = Map<
  * two steps' own boxes, since back into a fold it would say nothing a person could follow; `skip` where it passes over a column; `untaken`
  * where every route it stands for is off the route its condition took.
  */
-function joinedOf(slots: readonly Box[][], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], error: string | null): Joined {
+function joinedOf(slots: readonly Box[][], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], error: string | null) {
   const boxOf = new Map(slots.flatMap((slot, s) => slot.flatMap((box) => box.names.map((name) => [name, { box, slot: s }] as const))));
   const joined: Joined = new Map();
   if (error !== null) return joined;
@@ -323,5 +320,5 @@ function joinedOf(slots: readonly Box[][], graph: Frozen<RunGraph>, steps: reado
 }
 
 /** Running if any edge an arrow stands for is, done if every one is, and to come otherwise. */
-const stateOf = (states: readonly EdgeState[]): EdgeState =>
-  states.includes('running') ? 'running' : states.every((s) => s === 'done') ? 'done' : 'to-come';
+const stateOf = (states: readonly EdgeState[]) =>
+  (states.includes('running') ? 'running' : states.every((s) => s === 'done') ? 'done' : 'to-come') satisfies EdgeState as EdgeState;

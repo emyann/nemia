@@ -86,7 +86,7 @@ function Told({ told, marks }: { told: Extract<Own, { what: 'told' }>; marks: st
  * The part's Said slot of the step `step`, in what holds both the part and the talk (`data-step-scope`), scrolled to its top: that scroll
  * alone is moved, as `scrollIntoView` would move the window too and carry the page's header out of view.
  */
-function toSaid(from: Element, step: string): void {
+function toSaid(from: Element, step: string) {
   const scope = from.closest<HTMLElement>(`[data-step-scope]`);
   const said = (scope ?? document).querySelector(`[data-part-said="${CSS.escape(step)}"]`);
   if (!said) return;

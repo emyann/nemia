@@ -9,7 +9,7 @@ import type { PluginOption } from 'vite';
  * Whether `plugin`, or any plugin of a list it is, is the router's: one that reads the routes and writes their tree.
  * @param plugin A plugin of a Vite config, or a list of them.
  */
-export const ofTheRouter = (plugin: PluginOption): boolean => {
+export const ofTheRouter = (plugin: PluginOption) => {
   if (Array.isArray(plugin)) return plugin.some(ofTheRouter);
   return typeof plugin === 'object' && plugin !== null && 'name' in plugin && /tanstack|router/i.test(plugin.name);
 };
@@ -18,5 +18,4 @@ export const ofTheRouter = (plugin: PluginOption): boolean => {
  * `plugins` without the router's.
  * @param plugins The plugins of a Vite config.
  */
-export const withoutTheRouter = (plugins: readonly PluginOption[] | undefined): PluginOption[] =>
-  (plugins ?? []).filter((plugin) => !ofTheRouter(plugin));
+export const withoutTheRouter = (plugins: readonly PluginOption[] | undefined) => (plugins ?? []).filter((plugin) => !ofTheRouter(plugin));

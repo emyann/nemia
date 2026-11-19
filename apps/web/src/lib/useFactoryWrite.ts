@@ -21,7 +21,7 @@ type FactoryWrite = {
  * @param write Files the factory by its name, rejecting with the api's refusal.
  * @param onMade Told the factory's name once the api answered the write.
  */
-export function useFactoryWrite(write: (name: string) => Promise<unknown>, onMade: (name: string) => void): FactoryWrite {
+export function useFactoryWrite(write: (name: string) => Promise<unknown>, onMade: (name: string) => void) {
   const [name, setName] = useState('');
   const [pending, setPending] = useState(false);
   const [refused, setRefused] = useState<string | undefined>(undefined);

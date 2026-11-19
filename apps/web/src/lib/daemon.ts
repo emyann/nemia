@@ -12,7 +12,7 @@ import { agoWords } from './runWords.ts';
 type DaemonWords = { before: string; command: string; after: string };
 
 /** How long ago the daemon did something, as every page says an age (`agoWords`): `20 minutes ago`, `just now`. */
-const heard = (at: string | null, now: Date): string => (at ? agoWords(new Date(at), now) : 'at a time its file does not say');
+const heard = (at: string | null, now: Date) => (at ? agoWords(new Date(at), now) : 'at a time its file does not say');
 
 /**
  * Why nothing ticks the store and how to start what does, or null when a daemon ticks it — nothing to say then. The holder is named by
@@ -22,7 +22,7 @@ const heard = (at: string | null, now: Date): string => (at ? agoWords(new Date(
  * @param d What the api judged of `daemon.json`.
  * @param now The time an age is told from, the browser's own on the page.
  */
-export function daemonWords(d: Daemon, now: Date): DaemonWords | null {
+export function daemonWords(d: Daemon, now: Date) {
   if (d.ticking) return null;
   const who = `the ${d.by} of pid ${d.pid}`;
   let why: string;
@@ -57,4 +57,4 @@ export function daemonWords(d: Daemon, now: Date): DaemonWords | null {
  * The line as one sentence.
  * @param w The line in its three parts.
  */
-export const daemonSentence = (w: DaemonWords): string => `${w.before}${w.command}${w.after}`;
+export const daemonSentence = (w: DaemonWords) => `${w.before}${w.command}${w.after}`;

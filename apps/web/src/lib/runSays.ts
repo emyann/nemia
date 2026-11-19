@@ -62,7 +62,7 @@ const FIRST: Record<RunSays, RunSize> = {
  * @param thing What is said.
  * @param layout The run's shape at md: a row of a list or a card.
  */
-export const smallestSize: SmallestSizeOf = (thing: RunSays, layout: RunLayout): RunSize =>
+export const smallestSize: SmallestSizeOf = (thing: RunSays, layout: RunLayout) =>
   thing === 'labels' && layout === 'row' ? 'md' : FIRST[thing];
 
 /**
@@ -70,7 +70,7 @@ export const smallestSize: SmallestSizeOf = (thing: RunSays, layout: RunLayout):
  * @param size How much it says.
  * @param layout Its shape at md, a row or a card.
  */
-export function says(size: RunSize, layout: RunLayout): ReadonlySet<RunSays> {
+export function says(size: RunSize, layout: RunLayout) {
   const at = SIZES.indexOf(size);
   return new Set(THINGS.filter((thing) => SIZES.indexOf(smallestSize(thing, layout)) <= at));
 }

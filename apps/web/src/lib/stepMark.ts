@@ -53,7 +53,7 @@ export const stepMark: StepMarkOf = (state, waits) =>
  * @param at The index of the step asked about.
  * @param held Whether a person holds the run.
  */
-export function waitsNow(drawn: ReadonlyArray<{ state: StepState; on: WaitOn | null }>, at: number, held: boolean): boolean {
+export function waitsNow(drawn: ReadonlyArray<{ state: StepState; on: WaitOn | null }>, at: number, held: boolean) {
   const { state, on } = drawn[at];
   if (state !== 'waiting') return NOT_STARTED.has(state);
   return on !== null || (held && drawn.findIndex((step) => NOT_STARTED.has(step.state)) === at);
@@ -64,7 +64,7 @@ export function waitsNow(drawn: ReadonlyArray<{ state: StepState; on: WaitOn | n
  * graph's node never disagree; `done` for a run whose every step is done.
  * @param run The run: its steps with their codes, spec and try, its calling off, its hold and its waits.
  */
-export function nowMark(run: Parameters<typeof nowOf>[0]): StepMark {
+export function nowMark(run: Parameters<typeof nowOf>[0]) {
   const now = nowOf(run);
   if (!now) return 'done';
   const held = run.holding != null;

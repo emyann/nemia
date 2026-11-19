@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { FileText, Folder, FolderOpen } from 'lucide-react';
 import type { StepArtifact } from '../../lib/api/tries.ts';
@@ -34,13 +34,13 @@ function Lead({ file }: { file: StepArtifact }) {
 }
 
 /** What a row of the tree says it is, for the page and its tests: a served file's kind, `pruned`, or `path` where nothing is served. */
-const artifactOf = (file: StepArtifact): string => ('pruned' in file ? 'pruned' : 'url' in file ? file.kind : 'path');
+const artifactOf = (file: StepArtifact) => ('pruned' in file ? 'pruned' : 'url' in file ? file.kind : 'path');
 
 /**
  * The rows of `nodes`: a folder that folds, its name and how many files are under it, then what it holds; a file, its name, its picture
  * where it is one, and its size. A served file with no step to open it in is a link to the file, in a new tab.
  */
-function rows(nodes: readonly FolderTreeNode[], step: string | null, open: ReadonlySet<Key>): ReactNode[] {
+function rows(nodes: readonly FolderTreeNode[], step: string | null, open: ReadonlySet<Key>) {
   return nodes.map((node) => {
     if (node.kind === 'folder')
       return (

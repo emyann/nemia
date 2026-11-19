@@ -5,7 +5,7 @@ import { atRest } from '../../../.storybook/play';
 import { budgetsGiven, GateBudgetRows, type Amounts, type GateBudgets } from './GateBudgets';
 
 /** The budgets `implement` proposes for the steps after it, or, approved, the caps its approval set. */
-const budgetsOf = (from: GateBudgets['from'], past = false): GateBudgets => ({
+const budgetsOf = (from: GateBudgets['from'], past = false) => ({
   from,
   steps: [
     { step: 'review', usd: 60, said: '$60.00', why: 'Five parts, as the two wide runs took.', workflow: 40, above: true },

@@ -15,7 +15,7 @@ export type Hue = 'yours' | 'alive' | 'money' | 'failure' | 'grey' | 'sage';
  * The meaning a hue says: `grey` and `sage` are both `rest`.
  * @param hue The colour asked about.
  */
-export const meaningOf = (hue: Hue): Meaning => (hue === 'grey' || hue === 'sage' ? 'rest' : hue);
+export const meaningOf = (hue: Hue) => (hue === 'grey' || hue === 'sage' ? 'rest' : hue);
 
 /** The loud form: the hue as the ground, its own ink on it. */
 export const filled: Record<Hue, string> = {

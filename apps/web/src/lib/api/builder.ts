@@ -17,7 +17,7 @@ export type { KeyField } from 'objects';
 export type KeyForm = Omit<KeyFormAnswer, 'agents'> & { agents: Record<string, Partial<WorkflowStepSpec>> };
 
 /** `form` with each agent's keys read as a step's. */
-const keyFormOf = (form: KeyFormAnswer): KeyForm => ({
+const keyFormOf = (form: KeyFormAnswer) => ({
   ...form,
   agents: Object.fromEntries(
     Object.entries(form.agents).map(([name, keys]) => [name, decoded('GET /api/workflows/keys', StepSpecPartSchema, keys)]),

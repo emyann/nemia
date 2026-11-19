@@ -15,7 +15,7 @@ import { forgetStored, readStored, store } from './stored.ts';
  * A session is going, so its attempt's time is still counting.
  * @param state The step's state.
  */
-export const isLive = (state: StepState): boolean => state === 'working' || state === 'asks-in-session';
+export const isLive = (state: StepState) => state === 'working' || state === 'asks-in-session';
 
 /**
  * `#<attempts> · <time>` for a step's latest attempt, or null before its first.
@@ -27,7 +27,7 @@ export const isLive = (state: StepState): boolean => state === 'working' || stat
  * @param live Whether a session of it is going (`isLive`).
  * @param now The time the counting time is told to, in ms since the epoch.
  */
-export function attemptLine(attempts: StepAttempts, live: boolean, now: number): string | null {
+export function attemptLine(attempts: StepAttempts, live: boolean, now: number) {
   const { count, latest } = attempts;
   if (!latest) return null;
   const started = Date.parse(latest.startedAt);
@@ -48,14 +48,14 @@ export type EdgeState = 'to-come' | 'running' | 'done';
  * refused check or a step not filed: nothing is moving there.
  * @param state The step's state.
  */
-export const movingInto = (state: StepState): boolean => state === 'working' || state === 'checking';
+export const movingInto = (state: StepState) => state === 'working' || state === 'checking';
 
 /**
  * An edge into `target`: done once the work at both ends is, running while work moves into the target, and to come otherwise.
  * @param sourceDone Whether the work at the edge's source is done.
  * @param target The state of the step the edge goes into.
  */
-export const edgeState = (sourceDone: boolean, target: StepState): EdgeState =>
+export const edgeState = (sourceDone: boolean, target: StepState) =>
   sourceDone && satisfiesAfter(target) ? 'done' : movingInto(target) ? 'running' : 'to-come';
 
 /**
@@ -89,13 +89,13 @@ export type PacketStep = { name: string; input: readonly string[]; fields: numbe
  * A packet's label: the name of the step that gave it.
  * @param giver The name of the step that gave the packet.
  */
-export const packetLabel = (giver: string): string => giver;
+export const packetLabel = (giver: string) => giver;
 
 /**
  * Every packet of a run: one for each step its taker's `input` names among the run's steps, in the takers' order, then the input's.
  * @param steps The run's steps, each with the steps it is handed and what its shown try gave.
  */
-export function packetsOf(steps: readonly PacketStep[]): Packet[] {
+export function packetsOf(steps: readonly PacketStep[]) {
   const of = new Map(steps.map((s) => [s.name, s]));
   return steps.flatMap((taker) =>
     taker.input.flatMap((name) => {
@@ -123,7 +123,7 @@ export function edgesOf(
   steps: readonly EdgeStep[],
   taken: ReadonlyMap<string, string> = new Map(),
   packets: readonly Packet[] = [],
-): CanvasEdge[] {
+) {
   const of = new Map(steps.map((s) => [s.name, s]));
   const drawn = new Map<string, CanvasEdge>();
   for (const edge of graph.edges) {
@@ -145,18 +145,18 @@ export function edgesOf(
 }
 
 /** Whether a route edge is off the route: its condition took another route, or its target was skipped. */
-const untaken = (edge: Frozen<GraphEdge>, target: StepState, taken: ReadonlyMap<string, string>): boolean =>
+const untaken = (edge: Frozen<GraphEdge>, target: StepState, taken: ReadonlyMap<string, string>) =>
   edge.kind === 'route' && (target === 'skipped' || (taken.get(edge.from) ?? edge.route) !== edge.route);
 
 /** A second route between the same two steps, on the edge drawn for the first: both routes on its label, taken where either is. */
-const joinRoute = (edge: CanvasEdge, route: string, off: boolean): CanvasEdge => ({
+const joinRoute = (edge: CanvasEdge, route: string, off: boolean) => ({
   ...edge,
   label: edge.label ? `${edge.label} · ${route}` : route,
   untaken: edge.untaken && off,
 });
 
 /** One edge of the graph as the canvas draws it, between `source` and `target` (`edgesOf`). */
-function edgeOf(id: string, edge: Frozen<GraphEdge>, source: EdgeStep, target: EdgeStep, taken: ReadonlyMap<string, string>): CanvasEdge {
+function edgeOf(id: string, edge: Frozen<GraphEdge>, source: EdgeStep, target: EdgeStep, taken: ReadonlyMap<string, string>) {
   if (edge.kind === 'loop')
     return {
       id,
@@ -166,7 +166,7 @@ function edgeOf(id: string, edge: Frozen<GraphEdge>, source: EdgeStep, target: E
       state: source.roundDue ? 'running' : 'to-come',
       label: loopLabel([source.note, target.note], edge.rounds),
       untaken: false,
-    };
+    } satisfies CanvasEdge;
   return {
     id,
     source: edge.from,
@@ -175,7 +175,7 @@ function edgeOf(id: string, edge: Frozen<GraphEdge>, source: EdgeStep, target: E
     state: edgeState(satisfiesAfter(source.state), target.state),
     label: edge.kind === 'route' ? edge.route : null,
     untaken: untaken(edge, target.state, taken),
-  };
+  } satisfies CanvasEdge;
 }
 
 /**
@@ -191,7 +191,7 @@ const ROUND = /^round (\d+)(?: of (\d+))?/;
  * @param notes The notes, the looping step's first and then its target's, null for a step with none.
  * @param rounds The loop's cap of rounds, from the graph.
  */
-export function loopLabel(notes: ReadonlyArray<string | null>, rounds: number): string | null {
+export function loopLabel(notes: ReadonlyArray<string | null>, rounds: number) {
   for (const note of notes) {
     const m = note ? ROUND.exec(note) : null;
     if (m && Number(m[1]) > 1) return `round ${m[1]} of ${m[2] ?? rounds}`;
@@ -209,7 +209,7 @@ export const LOOP_TARGET = 'loop-in';
  * @param state What the edge says.
  * @param loop Whether the edge is a loop's.
  */
-export function edgeStroke(state: EdgeState, loop: boolean): string {
+export function edgeStroke(state: EdgeState, loop: boolean) {
   if (state === 'running') return 'var(--edge-running)';
   if (loop) return 'var(--edge-loop)';
   return state === 'done' ? 'var(--edge-done)' : 'var(--edge-to-come)';
@@ -221,7 +221,7 @@ export function edgeStroke(state: EdgeState, loop: boolean): string {
  * @param state What the edge says.
  * @param loop Whether the edge is a loop's.
  */
-export const edgeLine = (state: EdgeState, loop: boolean): { strokeWidth: number; strokeDasharray?: string } => ({
+export const edgeLine = (state: EdgeState, loop: boolean) => ({
   strokeWidth: state === 'running' ? 2 : 1.5,
   ...(loop || state === 'to-come' ? { strokeDasharray: '5 4' } : {}),
 });
@@ -240,7 +240,7 @@ export const LOOP_DEPTH = 44;
  * @param target Where it comes into its target, in the canvas's coordinates.
  * @param depth How far below the lower end the path dips, in the canvas's units; `LOOP_DEPTH` by default.
  */
-export function loopPath(source: Point, target: Point, depth = LOOP_DEPTH): { path: string; labelX: number; labelY: number } {
+export function loopPath(source: Point, target: Point, depth = LOOP_DEPTH) {
   const bottom = Math.max(source.y, target.y) + depth;
   const control = (bottom - (source.y + target.y) / 8) / 0.75;
   return {
@@ -260,7 +260,7 @@ export const LEAST_ZOOM = 0.5;
  * @param pressed The step the first click showed, or null where it showed none.
  * @param detail The browser's count of the clicks.
  */
-export const secondClick = (pressed: string | null, detail: number): string | null => (detail === 2 ? pressed : null);
+export const secondClick = (pressed: string | null, detail: number) => (detail === 2 ? pressed : null);
 
 /**
  * Where each step goes: where a person left it, if they moved it, else where the layering puts it.
@@ -268,11 +268,7 @@ export const secondClick = (pressed: string | null, detail: number): string | nu
  * @param computed Where the layering puts each step, by name.
  * @param saved Where a person left each step they moved, by name, or null where none is saved.
  */
-export function place(
-  names: readonly string[],
-  computed: ReadonlyMap<string, Point>,
-  saved: ReadonlyMap<string, Point> | null,
-): Map<string, Point> {
+export function place(names: readonly string[], computed: ReadonlyMap<string, Point>, saved: ReadonlyMap<string, Point> | null) {
   return new Map(names.map((name) => [name, saved?.get(name) ?? computed.get(name) ?? { x: 0, y: 0 }]));
 }
 
@@ -280,7 +276,7 @@ export function place(
  * A layout as it was saved, or null for anything that is not an object of finite points.
  * @param raw What storage holds under the layout's key, or null where it holds nothing.
  */
-export function parseLayout(raw: string | null): Map<string, Point> | null {
+export function parseLayout(raw: string | null) {
   if (raw === null) return null;
   let value: unknown;
   try {
@@ -322,49 +318,49 @@ const FACTORY_OPEN_KEY = 'nemia:factory-open';
  * Where a person left a run's steps, as this browser saved it; null where it saved none, or storage is refused.
  * @param runId The run's id.
  */
-export const readLayout = (runId: string): Map<string, Point> | null => readStored(layoutKey(runId), parseLayout, null);
+export const readLayout = (runId: string) => readStored(layoutKey(runId), parseLayout, null);
 /**
  * Saves where a person left a run's steps, in this browser: where storage is refused or full, nothing is saved.
  * @param runId The run's id.
  * @param at Where each step was left, by name.
  */
-export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void =>
+export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>) =>
   store(layoutKey(runId), JSON.stringify(Object.fromEntries(at)));
 /**
  * Forgets where a person left a run's steps, so the layering places them again.
  * @param runId The run's id.
  */
-export const forgetLayout = (runId: string): void => forgetStored(layoutKey(runId));
+export const forgetLayout = (runId: string) => forgetStored(layoutKey(runId));
 
-export const readFactoryLayout = (): Map<string, Point> | null => readStored(FACTORY_KEY, parseLayout, null);
+export const readFactoryLayout = () => readStored(FACTORY_KEY, parseLayout, null);
 /** The arrangement saved while a cell was narrower, as it was saved: for `widenLayout`. */
-export const readNarrowFactoryLayout = (): Map<string, Point> | null => readStored(NARROW_FACTORY_KEY, parseLayout, null);
+export const readNarrowFactoryLayout = () => readStored(NARROW_FACTORY_KEY, parseLayout, null);
 /**
  * Saves the Factory's arrangement under the `v2` key, and forgets the one saved while a cell was narrower.
  * @param at Where each run's card was left, by run id.
  */
-export const saveFactoryLayout = (at: ReadonlyMap<string, Point>): void => {
+export const saveFactoryLayout = (at: ReadonlyMap<string, Point>) => {
   store(FACTORY_KEY, JSON.stringify(Object.fromEntries(at)));
   forgetStored(NARROW_FACTORY_KEY);
 };
-export const forgetFactoryLayout = (): void => {
+export const forgetFactoryLayout = () => {
   forgetStored(FACTORY_KEY);
   forgetStored(NARROW_FACTORY_KEY);
 };
 
-export const readFactoryOpen = (): string[] => readStored(FACTORY_OPEN_KEY, parseOpen, []);
+export const readFactoryOpen = () => readStored(FACTORY_OPEN_KEY, parseOpen, []);
 /**
  * Saves the Factory's open runs, in this browser.
  * @param ids The ids of the runs whose cards are open, in the order opened.
  */
-export const saveFactoryOpen = (ids: readonly string[]): void => store(FACTORY_OPEN_KEY, JSON.stringify(ids));
-export const forgetFactoryOpen = (): void => forgetStored(FACTORY_OPEN_KEY);
+export const saveFactoryOpen = (ids: readonly string[]) => store(FACTORY_OPEN_KEY, JSON.stringify(ids));
+export const forgetFactoryOpen = () => forgetStored(FACTORY_OPEN_KEY);
 
 /**
  * The open runs as they were saved: run ids, each once, in order; none for anything that is not a list of ids.
  * @param raw What storage holds under the open runs' key, or null where it holds nothing.
  */
-export function parseOpen(raw: string | null): string[] {
+export function parseOpen(raw: string | null) {
   if (raw === null) return [];
   let value: unknown;
   try {

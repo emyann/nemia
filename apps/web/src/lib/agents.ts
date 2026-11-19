@@ -1,4 +1,4 @@
-import type { AgentDraft, AgentListing, AgentRoleKey } from './api/agents.ts';
+import type { AgentListing, AgentRoleKey } from './api/agents.ts';
 import type { KeyForm } from './api/builder.ts';
 import { remoteRefuses } from './builder.ts';
 
@@ -59,7 +59,7 @@ export type AgentForm = {
  * A form for a new agent, or for the agent `listing` as it reads.
  * @param listing The agent as the api lists it, or null for a new agent.
  */
-export function formOf(listing: AgentListing | null): AgentForm {
+export function formOf(listing: AgentListing | null) {
   const keys = Object.fromEntries(ROLE_KEYS.map((key) => [key, listing?.keys[key] ?? ''])) as Record<AgentRoleKey, string>;
   return {
     name: listing?.name ?? '',
@@ -79,7 +79,7 @@ export function formOf(listing: AgentListing | null): AgentForm {
  * The schema file a new result schema is written to when the form names none: beside the agent, after it.
  * @param name The agent's name as typed; an empty one gives `agent`.
  */
-export const schemaFileFor = (name: string): string => `${name.trim() || 'agent'}.schema.json`;
+export const schemaFileFor = (name: string) => `${name.trim() || 'agent'}.schema.json`;
 
 /** The words `harnessPrompt:` takes, as the package's `HARNESS_PROMPTS` has them; `''` on the form is none, which is `keep`. */
 export const HARNESS_PROMPTS = ['keep', 'no-coding', 'replace'] as const;
@@ -90,7 +90,7 @@ export const HARNESS_PROMPTS = ['keep', 'no-coding', 'replace'] as const;
  * judged here that the package judges on save.
  * @param form The agent's form as it is being edited.
  */
-export function draftOf(form: AgentForm): AgentDraft {
+export function draftOf(form: AgentForm) {
   const keys = Object.fromEntries(ROLE_KEYS.map((key) => [key, form.keys[key].trim() || null])) as Record<AgentRoleKey, string | null>;
   const text = form.schemaText.trim();
   if (text && !keys.output) keys.output = schemaFileFor(form.name);
@@ -113,7 +113,7 @@ export function draftOf(form: AgentForm): AgentDraft {
  * @param form The agent's form as it is being edited.
  * @param listing The agent as read, or null for a new agent.
  */
-export function edited(form: AgentForm, listing: AgentListing | null): boolean {
+export function edited(form: AgentForm, listing: AgentListing | null) {
   return JSON.stringify(draftOf(form)) !== JSON.stringify(draftOf(formOf(listing)));
 }
 
@@ -124,7 +124,7 @@ export function edited(form: AgentForm, listing: AgentListing | null): boolean {
  * @param key The role key asked about.
  * @param harness The harness the agent names, as typed; empty for the default one.
  */
-export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness: string): readonly string[] | null {
+export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness: string) {
   const field = form?.keys.find((k) => k.key === key);
   if (!field) return null;
   const on = harness.trim() || form!.defaultHarness;
@@ -141,7 +141,7 @@ export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness:
  * @param key The role key asked about.
  * @param harness The harness the agent names, as typed; empty for the default one.
  */
-export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: string): boolean {
+export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: string) {
   const field = form?.keys.find((k) => k.key === key);
   const on = harness.trim() || (form?.defaultHarness ?? '');
   if (form && remoteRefuses(form, key, on)) return false;
@@ -155,14 +155,13 @@ export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: st
  * @param form The step form's keys as the api gives them, or undefined while they load.
  * @param key The role key asked about.
  */
-export const meaningOf = (form: KeyForm | undefined, key: AgentRoleKey): string | null =>
-  form?.keys.find((k) => k.key === key)?.meaning ?? null;
+export const meaningOf = (form: KeyForm | undefined, key: AgentRoleKey) => form?.keys.find((k) => k.key === key)?.meaning ?? null;
 
 /**
  * The skills line as the names it gives, in its order: split on commas, each trimmed, an empty one dropped.
  * @param line A comma-separated line as typed: the skills line, or a tools line read the same way.
  */
-export const skillList = (line: string): string[] =>
+export const skillList = (line: string) =>
   line
     .split(',')
     .map((name) => name.trim())
@@ -172,29 +171,28 @@ export const skillList = (line: string): string[] =>
  * Names as the skills line writes them: `review-a-change, write-a-note`.
  * @param names The names, in the order they are written.
  */
-export const skillLine = (names: readonly string[]): string => names.join(', ');
+export const skillLine = (names: readonly string[]) => names.join(', ');
 
 /**
  * The skills line with `name` given last, once: a name it gives already leaves it as it was.
  * @param line The skills line as typed.
  * @param name The skill's name to give.
  */
-export const withSkill = (line: string, name: string): string =>
-  skillList(line).includes(name) ? line : skillLine([...skillList(line), name]);
+export const withSkill = (line: string, name: string) => (skillList(line).includes(name) ? line : skillLine([...skillList(line), name]));
 
 /**
  * The skills line without `name`.
  * @param line The skills line as typed.
  * @param name The skill's name to take off.
  */
-export const withoutSkill = (line: string, name: string): string => skillLine(skillList(line).filter((given) => given !== name));
+export const withoutSkill = (line: string, name: string) => skillLine(skillList(line).filter((given) => given !== name));
 
 /**
  * Why the skills given reach nothing, as the package refuses it on save — `tools:` set without `Skill`, or `Skill` denied — or null. A tool
  * is read as the package reads it, one entry of the comma-separated list, exactly `Skill`.
  * @param form The form's skills line and its keys, its tools and its deny rules read.
  */
-export function skillToolGap(form: Pick<AgentForm, 'skills' | 'keys'>): 'tools' | 'disallowedTools' | null {
+export function skillToolGap(form: Pick<AgentForm, 'skills' | 'keys'>) {
   if (!skillList(form.skills).length) return null;
   const tools = skillList(form.keys.tools);
   if (form.keys.tools.trim() && !tools.includes('Skill')) return 'tools';
@@ -206,13 +204,13 @@ export function skillToolGap(form: Pick<AgentForm, 'skills' | 'keys'>): 'tools' 
  * `tools:` with `Skill` added last.
  * @param tools The `tools:` line as typed.
  */
-export const toolsWithSkill = (tools: string): string => skillLine([...skillList(tools), 'Skill']);
+export const toolsWithSkill = (tools: string) => skillLine([...skillList(tools), 'Skill']);
 
 /**
  * `disallowedTools:` with `Skill` taken off.
  * @param denied The deny line as typed.
  */
-export const deniedWithoutSkill = (denied: string): string => skillLine(skillList(denied).filter((tool) => tool !== 'Skill'));
+export const deniedWithoutSkill = (denied: string) => skillLine(skillList(denied).filter((tool) => tool !== 'Skill'));
 
 /**
  * What each `harnessPrompt:` word does, as the form offers it: a plain choice, what it costs or drops, and whether it is kept behind For
@@ -249,7 +247,7 @@ export const HARNESS_PROMPT_CHOICES: ReadonlyArray<{
  * The word a form's harness prompt is drawn as: unset is `keep`, which is what a session runs with.
  * @param value The form's harness prompt as typed; empty for unset.
  */
-export const harnessPromptShown = (value: string): string => value.trim() || 'keep';
+export const harnessPromptShown = (value: string) => value.trim() || 'keep';
 
 /**
  * The form's harness prompt once `picked` is chosen, from `was`, what the file said as read. `keep` is written only where it was: an agent
@@ -258,7 +256,7 @@ export const harnessPromptShown = (value: string): string => value.trim() || 'ke
  * @param picked The word chosen, one of `HARNESS_PROMPTS`.
  * @param was What the agent's file said of its harness prompt as read; empty for nothing.
  */
-export function pickHarnessPrompt(picked: string, was: string): string {
+export function pickHarnessPrompt(picked: string, was: string) {
   if (picked !== 'keep') return picked;
   return was.trim() === 'keep' ? was : '';
 }
@@ -273,7 +271,7 @@ export type KeptForm = { key: string; version: string };
  * @param version The agent's version as it reads now.
  * @param kept The form the page kept across a copy of a skill, or null when it keeps none.
  */
-export const formKeyOf = (version: string, kept: KeptForm | null): string => (kept && kept.version === version ? kept.key : version);
+export const formKeyOf = (version: string, kept: KeptForm | null) => (kept && kept.version === version ? kept.key : version);
 
 /**
  * What the page keeps once its copy of a skill is written: the form under `key`, at the version the agent reads at now (`now`) — but only
@@ -287,7 +285,7 @@ export function keptAfterCopy(
   was: Pick<AgentListing, 'source' | 'schema'>,
   now: Pick<AgentListing, 'source' | 'schema' | 'version'>,
   key: string,
-): KeptForm | null {
+) {
   if (now.source !== was.source || JSON.stringify(now.schema ?? null) !== JSON.stringify(was.schema ?? null)) return null;
   return { key, version: now.version };
 }
@@ -299,7 +297,7 @@ export function keptAfterCopy(
  * @param kept The form a copy kept, or null when the page keeps none.
  * @param now The agent's version as read back, or undefined before that read lands.
  */
-export const keptAfterSave = (kept: KeptForm | null, now: string | undefined): KeptForm | null =>
+export const keptAfterSave = (kept: KeptForm | null, now: string | undefined) =>
   kept && now !== undefined && now !== kept.version ? null : kept;
 
 /**
@@ -315,7 +313,7 @@ export async function settleSave({
   rename?: () => Promise<unknown>;
   invalidate: () => Promise<unknown>;
   release: () => void;
-}): Promise<void> {
+}) {
   if (rename) await rename();
   await invalidate();
   release();
@@ -332,13 +330,12 @@ export const TRY_TERMS = 'dontAsk, allowed Edit(**) in its folder and never more
  * @param runs The runs listed, a try's carrying the agent it tries.
  * @param agent The agent's name.
  */
-export function latestTryOf<T extends { try: { agent: string } | null; createdAt: string }>(
-  runs: readonly T[],
-  agent: string,
-): T | undefined {
+export function latestTryOf<T extends { try: { agent: string } | null; createdAt: string }>(runs: readonly T[], agent: string) {
   return runs
     .filter((run) => run.try?.agent === agent)
-    .reduce<T | undefined>((latest, run) => (!latest || run.createdAt > latest.createdAt ? run : latest), undefined);
+    .reduce<T | undefined>((latest, run) => (!latest || run.createdAt > latest.createdAt ? run : latest), undefined) satisfies
+    | T
+    | undefined as T | undefined;
 }
 
 /**
@@ -346,8 +343,8 @@ export function latestTryOf<T extends { try: { agent: string } | null; createdAt
  * @param brief The brief as typed.
  * @param latest The agent's latest try, whether it still moves and its id, or undefined when it has none.
  */
-export function tryHeld(brief: string, latest: { moving: boolean; id: string } | undefined): string | null {
-  if (latest?.moving) return `A try is still running (${latest.id}): one at a time.`;
-  if (!brief.trim()) return 'Write a brief to try it on.';
-  return null;
+export function tryHeld(brief: string, latest: { moving: boolean; id: string } | undefined) {
+  if (latest?.moving) return `A try is still running (${latest.id}): one at a time.` satisfies string | null as string | null;
+  if (!brief.trim()) return 'Write a brief to try it on.' satisfies string | null as string | null;
+  return null satisfies string | null as string | null;
 }

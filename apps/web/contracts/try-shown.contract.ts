@@ -7,7 +7,7 @@
 import { type Implementation, spec } from '@emyann/tsverify';
 
 /** Whether `n` is one of the step's tries (`===`, as the board compares numbers). */
-const has = (tries: readonly number[], n: number): boolean => tries.some((t) => t === n);
+const has = (tries: readonly number[], n: number) => tries.some((t) => t === n);
 
 const tryShownSpec = spec<(tries: readonly number[], current: number | null, asked: number | null) => number | null>({
   /** A try's number is a whole number, as the api counts tries: never NaN, which no try equals. */

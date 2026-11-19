@@ -31,7 +31,7 @@ import type { Frozen } from './frozen.ts';
  * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  * @param run The run: its status, whether it moves, and what it waits on and who holds it, where the listing says them.
  */
-export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>): boolean =>
+export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>) =>
   run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
 
 /**
@@ -39,7 +39,7 @@ export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>)
  * in flight (`inFlight`) is among them, a run at its gate that still moves with the waiting.
  * @param open The light answer's rows: those that wait on a person, and those in flight.
  */
-export const openRows = <T>(open: { waiting: readonly T[]; inFlight: readonly T[] }): T[] => [...open.waiting, ...open.inFlight];
+export const openRows = <T>(open: { waiting: readonly T[]; inFlight: readonly T[] }) => [...open.waiting, ...open.inFlight];
 
 /** What `inFlight` and `waitsOnYou` read beside their own fields, each read as absent where a listing lacks it. */
 type Held = { waiting?: RunView['waiting']; holding?: RunView['holding']; cancelledAt?: string | null };
@@ -50,7 +50,7 @@ type Held = { waiting?: RunView['waiting']; holding?: RunView['holding']; cancel
  * refusal would take the whole floor down for a word.
  * @param run The run, by the api's `toDecide`; absent or null where there is nothing to decide.
  */
-export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }): Frozen<RunToDecide> | null => run.toDecide ?? null;
+export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }) => run.toDecide ?? null;
 
 /**
  * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
@@ -59,8 +59,9 @@ export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }): Froz
  * nobody, whatever its steps last said.
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
-export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>): boolean =>
-  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
+export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) =>
+  (!run.cancelledAt &&
+    (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou))) satisfies boolean as boolean;
 
 /**
  * Whether a run waits on runs, and on nothing else: started `--after` runs not landed, each of which may still land, with nothing of it
@@ -68,7 +69,7 @@ export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelled
  * the queue lane draws a card not started, until it starts. Not a cancelled run, which waits on nobody.
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
-export const waitsOnRuns = (run: Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
+export const waitsOnRuns = (run: Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held) =>
   !run.cancelledAt && Boolean(run.waiting) && !waitsOnYou(run);
 
 /**
@@ -82,7 +83,7 @@ export const waitsOnRuns = (run: Pick<RunView, 'waitingOnYou' | 'cancelledAt'> &
  */
 export const onYouOf = (
   run: Frozen<Pick<RunView, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null }>,
-): readonly string[] => {
+) => {
   const said = run.waitingOnYouWords ?? run.waitingOnYou;
   const decide = toDecideOf(run);
   return decide?.kind === 'approve' ? said.filter((one) => one !== `approve ${decide.step}`) : said;
@@ -93,7 +94,7 @@ export const onYouOf = (
  * a run that never lands is one, though it has filed nothing and is not in flight; in flight; or finished.
  * @param run The run as the api lists it.
  */
-export const standingOf = (run: Pick<RunView, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): string =>
+export const standingOf = (run: Pick<RunView, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>) =>
   run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
 type Clocked = Frozen<
@@ -104,7 +105,7 @@ type Clocked = Frozen<
  * How long a run waited before it started — created to its first filing — or null while nothing of it is filed.
  * @param run The run: when it was created, and when it started (null while nothing of it is filed).
  */
-export const waitedMs = (run: Pick<RunView, 'createdAt' | 'startedAt'>): number | null =>
+export const waitedMs = (run: Pick<RunView, 'createdAt' | 'startedAt'>) =>
   run.startedAt === null ? null : Math.max(0, Date.parse(run.startedAt) - Date.parse(run.createdAt));
 
 /**
@@ -114,27 +115,26 @@ export const waitedMs = (run: Pick<RunView, 'createdAt' | 'startedAt'>): number 
  * @param run The run's times: created, started, called off, and its time at work where the api gives it.
  * @param finished Whether the floor reads the run as finished, not in flight.
  */
-export const clockCounts = (run: Clocked, finished: boolean): boolean => {
+export const clockCounts = (run: Clocked, finished: boolean) => {
   if (run.startedAt === null) return run.cancelledAt === null;
   return run.atWork ? run.atWork.since !== null : !finished;
 };
 
 /** A run's time at work at `now`: what ran and ended (`AtWork.ms`), and the time since what still runs started. */
-const atWorkMs = (atWork: AtWork, now: number): number =>
-  atWork.ms + (atWork.since === null ? 0 : Math.max(0, now - Date.parse(atWork.since)));
+const atWorkMs = (atWork: AtWork, now: number) => atWork.ms + (atWork.since === null ? 0 : Math.max(0, now - Date.parse(atWork.since)));
 
 /**
  * Whether a run is over, for its clock: nothing of it runs (`AtWork.since`), and it is called off, or `finished` and waiting on nobody
  * (`waitsOnYou`) — a run at a gate has only stopped until a person answers.
  */
-const isOver = (run: Clocked & { atWork: AtWork }, finished: boolean): boolean =>
+const isOver = (run: Clocked & { atWork: AtWork }, finished: boolean) =>
   run.atWork.since === null && (run.cancelledAt !== null || (finished && !waitsOnYou({ ...run, waitingOnYou: run.waitingOnYou ?? [] })));
 
 /** An ISO instant whole, as a clock's title says it in the browser's time zone (`instantWhole`). */
-const whole = (iso: string): string => instantWhole(new Date(iso));
+const whole = (iso: string) => instantWhole(new Date(iso));
 
 /** The sentence a clock's title ends on for a run that waited a second or more before its first filing (`waitedMs`); else nothing. */
-const waitedSentence = (run: Pick<RunView, 'createdAt' | 'startedAt'>): string => {
+const waitedSentence = (run: Pick<RunView, 'createdAt' | 'startedAt'>) => {
   const waited = waitedMs(run) ?? 0;
   return waited >= 1000
     ? ` Created ${whole(run.createdAt)}, and waited ${durationWords(waited, 'second')} before its first step was filed.`
@@ -142,7 +142,7 @@ const waitedSentence = (run: Pick<RunView, 'createdAt' | 'startedAt'>): string =
 };
 
 /** The clock's title past the start: the time at work, the start, the end or that it still goes, the wall time, and the wait before. */
-function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: number, over: boolean): string {
+function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: number, over: boolean) {
   const started = Date.parse(run.startedAt);
   const { endedAt } = run.atWork;
   const end = !over
@@ -157,7 +157,7 @@ function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: 
 type ClockPlace = 'card' | 'row';
 
 /** What a run's clock says in a table's column, where there is room for one short fact: the time at work, to the minute. */
-const rowWords = (run: Clocked, now: number): string => {
+const rowWords = (run: Clocked, now: number) => {
   if (run.startedAt === null) return 'not started';
   return run.atWork ? durationWords(atWorkMs(run.atWork, now), 'minute') : 'not judged';
 };
@@ -182,13 +182,8 @@ const rowWords = (run: Clocked, now: number): string => {
  * @param finished Whether the floor reads the run as finished, not in flight.
  * @param place Where the words are drawn: on a card, the default, or in a row of a table.
  */
-export function runClock(
-  run: Clocked,
-  now: number,
-  finished: boolean,
-  place: ClockPlace = 'card',
-): { words: string; at: string; title: string } {
-  const said = (words: string): string => (place === 'row' ? rowWords(run, now) : words);
+export function runClock(run: Clocked, now: number, finished: boolean, place: ClockPlace = 'card') {
+  const said = (words: string) => (place === 'row' ? rowWords(run, now) : words);
   if (run.startedAt === null) {
     const created = `Created ${whole(run.createdAt)}.`;
     const since = durationWords(now - Date.parse(run.createdAt), 'second');
@@ -243,7 +238,7 @@ type FloorRun = Pick<RunView, 'id' | 'createdAt' | 'status' | 'moving' | 'waitin
  * @param runs The runs the floor may draw, each judged.
  * @param showFinished Whether "Show finished" is on: every run is then on the floor.
  */
-export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
+export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean) {
   const waitedOn = new Set(runs.filter(inFlight).flatMap(liveWaits));
   return byAge(runs).filter((run) => showFinished || inFlight(run) || toDecideOf(run) !== null || waitsOnYou(run) || waitedOn.has(run.id));
 }
@@ -256,7 +251,7 @@ export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: 
  * and Show finished is on.
  * @param rows The light answer's rows, in their order; a row the list could not judge among them.
  */
-export function parentsWanted(rows: readonly ((FloorRun & Pick<RunView, 'context'>) | UnjudgedRun)[]): string[] {
+export function parentsWanted(rows: readonly ((FloorRun & Pick<RunView, 'context'>) | UnjudgedRun)[]) {
   const listed = new Set(rows.map((row) => row.id));
   const judgedRows = rows.filter((row): row is FloorRun & Pick<RunView, 'context'> => judged(row));
   const waits = judgedRows.filter(inFlight).flatMap(liveWaits);
@@ -278,7 +273,7 @@ export function floorRowsOf<T extends { id: string }>(
   parents: readonly T[],
   undecided: readonly T[],
   finished: readonly T[],
-): T[] {
+) {
   const seen = new Set<string>();
   return [...openRows(open), ...parents, ...undecided, ...finished].filter((row) => !seen.has(row.id) && Boolean(seen.add(row.id)));
 }
@@ -291,7 +286,7 @@ type Waits = Pick<RunView, 'id' | 'waiting'> & { holding?: RunView['holding'] };
  * a person holds it until that has not landed (`holding`). None once the run has started and nobody holds it: a wait it was started with
  * is over, and a run it reads as context is never one.
  */
-const liveWaits = (run: Waits): string[] => [
+const liveWaits = (run: Waits) => [
   ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.landed).map((h) => h.run)]),
 ];
 
@@ -309,22 +304,26 @@ type RunEdge = { id: string; source: string; target: string; state: Extract<Edge
  * Reduced transitively: an edge u→w is dropped when another path u→…→w joins the two among the edges drawn, since the chain says it.
  * @param runs The runs on the floor, each with what its roots wait on and a person's hold on it.
  */
-export function runEdges(runs: readonly Waits[]): RunEdge[] {
+export function runEdges(runs: readonly Waits[]) {
   const floor = new Set(runs.map((run) => run.id));
   const edges = runs.flatMap((child) => {
     const onTheFloor = (parent: string) => floor.has(parent) && parent !== child.id;
     const waited = [...new Set((child.waiting?.runs ?? []).map((w) => w.run))].filter(onTheFloor);
     const held = liveWaits(child).filter((parent) => onTheFloor(parent) && !waited.includes(parent));
     return [
-      ...waited.map((parent): RunEdge => ({ id: `after:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' })),
-      ...held.map((parent): RunEdge => ({ id: `hold:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' })),
+      ...waited.map(
+        (parent) => ({ id: `after:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' }) satisfies RunEdge,
+      ),
+      ...held.map(
+        (parent) => ({ id: `hold:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' }) satisfies RunEdge,
+      ),
     ];
   });
-  return edges.filter((edge) => !reachesAround(edges, edge));
+  return edges.filter((edge) => !reachesAround(edges, edge)) satisfies RunEdge[];
 }
 
 /** Whether `edge`'s target is reached from its source by a path of two edges or more among `edges`. */
-function reachesAround(edges: readonly RunEdge[], edge: RunEdge): boolean {
+function reachesAround(edges: readonly RunEdge[], edge: RunEdge) {
   const seen = new Set<string>();
   const next = edges.filter((e) => e.source === edge.source && e.target !== edge.target).map((e) => e.target);
   while (next.length) {
@@ -346,7 +345,7 @@ type ContextEdge = { id: string; source: string; target: string };
  * @param runs The runs on the floor, each with the runs it reads as context.
  * @param focus The id of the focused card's run, or null where no card is focused.
  */
-export function contextEdges(runs: ReadonlyArray<Pick<RunView, 'id' | 'context'>>, focus: string | null): ContextEdge[] {
+export function contextEdges(runs: ReadonlyArray<Pick<RunView, 'id' | 'context'>>, focus: string | null) {
   const card = runs.find((run) => run.id === focus);
   if (!card) return [];
   const floor = new Set(runs.map((run) => run.id));
@@ -359,7 +358,7 @@ export function contextEdges(runs: ReadonlyArray<Pick<RunView, 'id' | 'context'>
  * A card's title: the brief's first line with words on it, without a heading's hashes; else the run id.
  * @param run The run, by its id and its brief.
  */
-export const titleOf = (run: Pick<RunView, 'id' | 'brief'>): string =>
+export const titleOf = (run: Pick<RunView, 'id' | 'brief'>) =>
   run.brief
     .split('\n')
     .map((line) => line.replace(/^\s*#+\s*/, '').trim())
@@ -371,7 +370,7 @@ export const titleOf = (run: Pick<RunView, 'id' | 'brief'>): string =>
  * @param run The card's run, by the runs it reads as context.
  * @param runs The runs the board holds, whose titles name those it reads.
  */
-export const readsLines = (run: Frozen<Pick<RunView, 'context'>>, runs: ReadonlyArray<Pick<RunView, 'id' | 'brief'>>): string[] => {
+export const readsLines = (run: Frozen<Pick<RunView, 'context'>>, runs: ReadonlyArray<Pick<RunView, 'id' | 'brief'>>) => {
   const byId = new Map(runs.map((source) => [source.id, source]));
   return run.context.map((id) => {
     const source = byId.get(id);
@@ -383,17 +382,17 @@ export const readsLines = (run: Frozen<Pick<RunView, 'context'>>, runs: Readonly
  * The repo by its folder's name, which is what a person calls it; the full path is for machines.
  * @param repo The repository's path.
  */
-export const repoName = (repo: string): string =>
-  repo
+export const repoName = (repo: string) =>
+  (repo
     .split(/[\\/]+/)
     .filter(Boolean)
-    .at(-1) ?? repo;
+    .at(-1) ?? repo) satisfies string as string;
 
 /**
  * Oldest first, so a run that starts takes the next free cell and moves no card already down.
  * @param runs The runs, by their ids and when each was created; ties go by id.
  */
-export const byAge = <T extends Pick<RunView, 'id' | 'createdAt'>>(runs: readonly T[]): T[] =>
+export const byAge = <T extends Pick<RunView, 'id' | 'createdAt'>>(runs: readonly T[]) =>
   [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
 /** A cell on the Factory's grid: room for one card and the gap beside and below it. Cards are drawn to fit. */
@@ -438,7 +437,7 @@ export const ONE_CELL: Span = { columns: 1, rows: 1 };
  * wider. From the count of its steps alone, so the card and the cells it claims (`openSpan`) agree.
  * @param steps How many steps the run has.
  */
-export const panelWidth = (steps: number): number => Math.max(RUN_PANEL.width, steps * STEP_ROOM + PANEL_FRAME);
+export const panelWidth = (steps: number) => Math.max(RUN_PANEL.width, steps * STEP_ROOM + PANEL_FRAME);
 
 /**
  * The cells an open run takes: its panel's (`RUN_PANEL`, `panelWidth`), as many to the right as its width reaches and as many rows down as
@@ -446,7 +445,7 @@ export const panelWidth = (steps: number): number => Math.max(RUN_PANEL.width, s
  * card. Never less than the card's own cell.
  * @param steps How many steps the run has.
  */
-export function openSpan(steps: number): Span {
+export function openSpan(steps: number) {
   const width = panelWidth(steps);
   return {
     columns: Math.max(1, Math.ceil((width + GAP) / CELL_WIDTH)),
@@ -459,7 +458,7 @@ export function openSpan(steps: number): Span {
  * @param open The ids of the open runs, the one opened last at the end.
  * @param id The id of the run clicked.
  */
-export const toggleOpen = (open: readonly string[], id: string): string[] =>
+export const toggleOpen = (open: readonly string[], id: string) =>
   open.includes(id) ? open.filter((other) => other !== id) : [...open, id];
 
 /**
@@ -471,7 +470,7 @@ export const toggleOpen = (open: readonly string[], id: string): string[] =>
  * @param drawn The ids of the cards drawn open on the last pass.
  * @param spans The cards drawn open now, each with the cells it takes.
  */
-export function unfoldingNow(drawn: ReadonlySet<string>, spans: ReadonlyMap<string, Span>): { unfolding: Set<string>; drawn: Set<string> } {
+export function unfoldingNow(drawn: ReadonlySet<string>, spans: ReadonlyMap<string, Span>) {
   return { unfolding: new Set([...spans.keys()].filter((id) => !drawn.has(id))), drawn: new Set(spans.keys()) };
 }
 
@@ -527,7 +526,7 @@ export function placeRuns(
   spans: ReadonlyMap<string, Span> = new Map(),
   after: ReadonlyMap<string, readonly string[]> = new Map(),
   unfolding: ReadonlySet<string> = new Set(spans.keys()),
-): Map<string, Point> {
+) {
   const floor = new Set(ids);
   const order = [...[...spans.keys()].filter((id) => floor.has(id)), ...ids.filter((id) => !spans.has(id))];
   const spanOfId = (id: string) => spans.get(id) ?? ONE_CELL;
@@ -569,7 +568,7 @@ export function placeRuns(
     const left = saved?.get(id);
     if (!at.has(id) && left && free(left, spanOfId(id), taken)) put(id, left);
   }
-  const groupOf = (id: string): string[] => {
+  const groupOf = (id: string) => {
     if (spans.has(id)) return [id];
     const found = new Set([id]);
     for (const one of found) {
@@ -583,13 +582,13 @@ export function placeRuns(
     }
     return group;
   };
-  const shapeOf = (members: readonly string[]): Map<string, Point> => {
+  const shapeOf = (members: readonly string[]) => {
     const columns = layers(members.map((name) => ({ name, after: parents.get(name)!.filter((p) => members.includes(p)) })));
     const cells = columns.flatMap((column, c) => column.map((name, i) => [name, { x: c, y: i - (column.length - 1) / 2 }] as const));
     const top = Math.min(...cells.map(([, p]) => p.y));
     return new Map(cells.map(([name, p]) => [name, { x: p.x, y: p.y - top }]));
   };
-  const placeTogether = (members: readonly string[], strict: boolean): boolean => {
+  const placeTogether = (members: readonly string[], strict: boolean) => {
     const shape = shapeOf(members);
     const cell = (name: string) => shape.get(name)!;
     const first = Math.max(
@@ -656,7 +655,7 @@ export function placeRuns(
  *
  * Across it still rounds: cards are narrower than their cell by the gap between them, so two columns' cards never touch.
  */
-function cellsOf({ x, y }: Point, span: Span): string[] {
+function cellsOf({ x, y }: Point, span: Span) {
   const column = Math.round(x / CELL_WIDTH);
   const top = Math.floor(y / CELL_HEIGHT);
   const bottom = Math.ceil(y / CELL_HEIGHT + span.rows) - 1;
@@ -677,7 +676,7 @@ export const NARROW_CELL_WIDTH = 320;
  * Down is unchanged: a cell is as tall in both.
  * @param saved The arrangement saved on the narrow grid, each card's point by its run's id, or null where none is saved.
  */
-export function widenLayout(saved: ReadonlyMap<string, Point> | null): Map<string, Point> | null {
+export function widenLayout(saved: ReadonlyMap<string, Point> | null) {
   if (!saved) return null;
   return new Map([...saved].map(([id, { x, y }]) => [id, { x: (x * CELL_WIDTH) / NARROW_CELL_WIDTH, y }]));
 }
@@ -689,10 +688,6 @@ export function widenLayout(saved: ReadonlyMap<string, Point> | null): Map<strin
  * @param now Where each card on the floor stands now.
  * @param known The ids of the runs the store lists.
  */
-export function keepLayout(
-  saved: ReadonlyMap<string, Point> | null,
-  now: ReadonlyMap<string, Point>,
-  known: ReadonlySet<string>,
-): Map<string, Point> {
+export function keepLayout(saved: ReadonlyMap<string, Point> | null, now: ReadonlyMap<string, Point>, known: ReadonlySet<string>) {
   return new Map([...(saved ?? []), ...now].filter(([id]) => known.has(id)));
 }

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
  * pace shows no time older than that pace.
  * @param everyMs How often the time is read again, in milliseconds.
  */
-export function useNow(everyMs: number): number {
+export function useNow(everyMs: number) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- the clock is read again at once when `everyMs` changes

@@ -5,7 +5,7 @@ import { namespaceOf } from '@/lib/factories';
 import { ink } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { previewBar } from '../step/StepPreview';
-import { RunActions, type FoundRun } from './RunActions';
+import { RunActions } from './RunActions';
 import { CopyId, CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Run, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
@@ -52,7 +52,7 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
  * @param runs the rows' runs
  * @param target what the menu was asked for on
  */
-const rowRunOf = (runs: readonly (ListedRun | UnjudgedRun)[], target: Element): FoundRun | null => {
+const rowRunOf = (runs: readonly (ListedRun | UnjudgedRun)[], target: Element) => {
   const row = target.closest('[role="row"][data-run]');
   const run = row && runs.find((r) => r.id === row.getAttribute('data-run'));
   return row && run && judged(run) ? { run, at: row } : null;

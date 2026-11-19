@@ -14,7 +14,7 @@ import { listPlace } from './factories.ts';
  * @param queryClient The board's query client, loaded.
  * @param address The place the page's address names: a factory, or none.
  */
-export async function loadWorkflowsIn(queryClient: QueryClient, address: PagePlace): Promise<void> {
+export async function loadWorkflowsIn(queryClient: QueryClient, address: PagePlace) {
   if (listPlace(address, []).kind === 'every') {
     await Promise.all([queryClient.ensureQueryData(workflowsQuery), queryClient.prefetchQuery(factoriesQuery)]);
     return;
@@ -28,7 +28,7 @@ export async function loadWorkflowsIn(queryClient: QueryClient, address: PagePla
  * its key, and each factory's, which lists the folder where it attaches it. Resolves once they are marked.
  * @param queryClient The board's query client, whose lists are marked to read again.
  */
-export const rereadWorkflows = (queryClient: QueryClient): Promise<unknown> =>
+export const rereadWorkflows = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true }),
     queryClient.invalidateQueries({ queryKey: ['factory-workflows'] }),

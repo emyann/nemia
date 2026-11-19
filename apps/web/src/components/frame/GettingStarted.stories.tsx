@@ -5,7 +5,7 @@ import { atRest } from '../../../.storybook/play';
 import { GettingStarted } from './GettingStarted';
 
 /** The four milestones of a store, each in `states`' state. */
-const milestones = (states: readonly MilestoneRead['state'][]): MilestoneRead[] =>
+const milestones = (states: readonly MilestoneRead['state'][]) =>
   (['harness', 'factory', 'volume', 'landed'] as const).map((name, i) => ({
     name,
     state: states[i] ?? 'later',

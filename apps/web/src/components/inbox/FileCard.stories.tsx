@@ -51,7 +51,7 @@ const FILED: Card = {
 };
 
 /** The idea typed and File pressed in the story drawn in `canvasElement`: the snackbar that names the card filed. */
-async function filedIn(canvasElement: HTMLElement): Promise<HTMLElement> {
+async function filedIn(canvasElement: HTMLElement) {
   const box = within(canvasElement);
   await userEvent.type(await box.findByRole('textbox', { name: 'An idea' }), 'Write the release notes');
   await userEvent.click(box.getByRole('button', { name: 'File' }));

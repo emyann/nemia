@@ -24,7 +24,7 @@ export default meta;
 type Story = StoryObj<typeof NemiaSettings>;
 
 /** The section over `level`. */
-const at = (level: NemiaLevel): Story => ({
+const at = (level: NemiaLevel) => ({
   render: () => (
     <QueryClientProvider
       client={seeded([

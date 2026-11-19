@@ -34,7 +34,7 @@ export const policyQuery = (agent: string) =>
  * @param id The rule's id.
  * @param words The rule's words, as the person read them.
  */
-export const confirmRule = (agent: string, id: string, words: string): Promise<PolicyList> =>
+export const confirmRule = (agent: string, id: string, words: string) =>
   call(
     (c) => c.nemia.confirmRule({ params: { name: agent, id }, payload: { words } }),
     write(PolicyListAnswer, 'The rule may be in force, or read otherwise: read the rules again before confirming it again.'),
@@ -45,7 +45,7 @@ export const confirmRule = (agent: string, id: string, words: string): Promise<P
  * @param agent The agent's name.
  * @param id The rule's id.
  */
-export const dropRule = (agent: string, id: string): Promise<PolicyList> =>
+export const dropRule = (agent: string, id: string) =>
   call(
     (c) => c.nemia.dropRule({ params: { name: agent, id } }),
     write(PolicyListAnswer, 'The rule may be out of force: read the rules again before dropping it again.'),

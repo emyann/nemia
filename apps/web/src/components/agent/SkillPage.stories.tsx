@@ -18,15 +18,16 @@ export default meta;
 type Story = StoryObj<typeof SkillPage>;
 
 /** The page over `detail`. */
-const over = (detail: SkillDetail): Story => ({
-  render: (args) => (
-    <QueryClientProvider client={seeded([[skillQuery(args.from, args.name).queryKey, detail]])}>
-      <Suspense>
-        <SkillPage {...args} />
-      </Suspense>
-    </QueryClientProvider>
-  ),
-});
+const over = (detail: SkillDetail) =>
+  ({
+    render: (args) => (
+      <QueryClientProvider client={seeded([[skillQuery(args.from, args.name).queryKey, detail]])}>
+        <Suspense>
+          <SkillPage {...args} />
+        </Suspense>
+      </QueryClientProvider>
+    ),
+  }) satisfies Story;
 
 /** Yours, named: the switch off and free to press. */
 export const Named: Story = {

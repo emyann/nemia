@@ -317,7 +317,7 @@ function KeyInput({
 }
 
 /** A value a step's agent gives it, as its field shows it in place of none: `opus — implementer's`, or that the agent sets none either. */
-function givenText(key: keyof WorkflowStepSpec, value: WorkflowStepSpec[keyof WorkflowStepSpec], agent: string | null): string {
+function givenText(key: keyof WorkflowStepSpec, value: WorkflowStepSpec[keyof WorkflowStepSpec], agent: string | null) {
   if (value === null || (Array.isArray(value) && !value.length)) return `not set — nor by ${agent}`;
   const text = Array.isArray(value)
     ? value.join(', ')

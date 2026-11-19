@@ -52,16 +52,16 @@ export type FrameFold = {
 };
 
 /** Her chat is wanted in the sheet: her face opened it, the page is not her chat's own, and no bar's thing has taken the sheet. */
-const herShown = (at: FrameAt): boolean => at.sheetOpen && !at.ownsChat && !at.barOpen;
+const herShown = (at: FrameAt) => at.sheetOpen && !at.ownsChat && !at.barOpen;
 
 /** The sheet is wanted: the address names a bar's thing, or her chat is wanted in it. */
-const sheetWanted = (at: FrameAt): boolean => at.barOpen || herShown(at);
+const sheetWanted = (at: FrameAt) => at.barOpen || herShown(at);
 
 /** The factory pane is drawn beside the page as the person keeps it: the page sits in one, the screen is not narrow, and it is open. */
-const paneKept = (at: FrameAt): boolean => at.hasPane && at.width !== 'narrow' && at.paneOpen;
+const paneKept = (at: FrameAt) => at.hasPane && at.width !== 'narrow' && at.paneOpen;
 
 /** The docked sheet takes the factory pane's room: under 1600, wider than narrow, while the sheet is wanted. */
-const sheetTakesThePane = (at: FrameAt): boolean => at.width === 'medium' && sheetWanted(at);
+const sheetTakesThePane = (at: FrameAt) => at.width === 'medium' && sheetWanted(at);
 
 const frameFoldSpec = spec<(at: FrameAt) => FrameFold>({
   ensures: {

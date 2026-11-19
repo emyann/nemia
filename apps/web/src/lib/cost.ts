@@ -13,7 +13,7 @@ type Priced = Pick<StepView, 'spent' | 'budget'>;
  * cap.
  * @param step The step, its cost so far and its cap read.
  */
-export function costText(step: Priced): string | null {
+export function costText(step: Priced) {
   if (step.budget) return step.budget.of ?? `budget ${step.budget.said}`;
   return step.spent?.said ?? null;
 }
@@ -23,7 +23,7 @@ export function costText(step: Priced): string | null {
  * for.
  * @param step The step, its cap read.
  */
-export const pastBudget = (step: Pick<Priced, 'budget'>): boolean => step.budget?.over === true;
+export const pastBudget = (step: Pick<Priced, 'budget'>) => step.budget?.over === true;
 
 /**
  * What a cost adds up, on hover: how many ended sessions the harness priced — and for a cost that reads `≥`, how many had no cost on them,
@@ -31,7 +31,7 @@ export const pastBudget = (step: Pick<Priced, 'budget'>): boolean => step.budget
  * @param spent The cost, with how many sessions were measured and how many had no cost.
  * @param of What the cost is of, as the sentence names it: `the run's tries`.
  */
-export function spentTitle(spent: Spent, of: string): string {
+export function spentTitle(spent: Spent, of: string) {
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const missing = spent.unmeasured
     ? `; ${plural(spent.unmeasured, 'ended session')} had no cost on ${spent.unmeasured === 1 ? 'it' : 'them'}, so it cost at least this`

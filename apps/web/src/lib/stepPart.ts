@@ -11,7 +11,7 @@ import type { AgentListing } from './api/agents.ts';
 import type { StepArtifact, StepValue } from './api/tries.ts';
 import { agentOf, type RunView, type StepSpecView } from './api/judged.ts';
 import type { RunDetail, StepView } from './runView.ts';
-import { packetsOf, type Packet, type PacketStep } from './canvas.ts';
+import { packetsOf, type Packet } from './canvas.ts';
 import { fieldReadOf, widgetOf, type FieldWidget } from './fieldWidget.ts';
 import { meaningOf } from './meaning.ts';
 import { durationWords } from './duration.ts';
@@ -125,22 +125,22 @@ const KIND_OF: Record<Exclude<StepPhase, 'pending' | 'stopped'>, StepKind> = {
  * @param state The step's state as the board draws it (`stepState`).
  * @param ran Whether a session of the step ran: a try of it has a task.
  */
-export function kindOf(phase: StepPhase, state: StepState, ran: boolean): StepKind {
+export function kindOf(phase: StepPhase, state: StepState, ran: boolean) {
   if (phase === 'pending' || phase === 'stopped' || state === 'held') return ran ? 'done' : 'come';
   return KIND_OF[phase];
 }
 
 /** The frame's hue for a state, its drawing's own: `alive` at work, `yours` where it waits on a person, and none for every other. */
-function hueOf(state: StepState): HeadHue {
+function hueOf(state: StepState) {
   const meaning = meaningOf(stateDrawn[state].hue);
   return meaning === 'alive' || meaning === 'yours' ? meaning : 'none';
 }
 
 /** Whether a state waits on a person: its drawing's meaning is `yours`. */
-const waitsOnYou = (state: StepState): boolean => meaningOf(stateDrawn[state].hue) === 'yours';
+const waitsOnYou = (state: StepState) => meaningOf(stateDrawn[state].hue) === 'yours';
 
 /** How many rounds the step's loop may run: its own `rounds:`, or that of the step whose loop runs it again; null outside a loop. */
-function roundsOf(step: StepView, steps: readonly StepView[]): number | null {
+function roundsOf(step: StepView, steps: readonly StepView[]) {
   return step.spec?.rounds ?? steps.find((other) => other.spec?.loop === step.name)?.spec?.rounds ?? null;
 }
 
@@ -148,7 +148,7 @@ function roundsOf(step: StepView, steps: readonly StepView[]): number | null {
  * The step's tries and rounds, never its place among the run's steps (the rail says it): `try 1 · round 1 of 3`, `2 tries` for a step
  * done after more than one, `up to 3 rounds` for a step to come in a loop, and `not started` for one outside it.
  */
-function placeOf(step: StepView, steps: readonly StepView[], kind: StepKind): string {
+function placeOf(step: StepView, steps: readonly StepView[], kind: StepKind) {
   const rounds = roundsOf(step, steps);
   const current = step.tries.at(-1);
   if (!current) return rounds === null ? 'not started' : `up to ${rounds} rounds`;
@@ -157,7 +157,7 @@ function placeOf(step: StepView, steps: readonly StepView[], kind: StepKind): st
 }
 
 /** When the step's last session started and ended and how long it ran, from its timeline, else from its latest attempt. */
-function sessionOf(step: StepView): { start: string | null; end: string | null; ranMs: number | null } {
+function sessionOf(step: StepView) {
   const session = [...step.timeline].reverse().find((entry) => entry.session !== null)?.session ?? null;
   const latest = step.attempts.latest;
   return {
@@ -168,46 +168,51 @@ function sessionOf(step: StepView): { start: string | null; end: string | null; 
 }
 
 /** A time box whose instant is not known: its label and a dash. */
-const untimed = (label: string, ink: CardTime['ink']): CardTime => ({ label, value: '—', note: '', ink });
+const untimed = (label: string, ink: CardTime['ink']) => ({ label, value: '—', note: '', ink });
 
 /** How long its last session ran, said under an ended step's instant. */
-const ranNote = (step: StepView, ranMs: number | null): string =>
+const ranNote = (step: StepView, ranMs: number | null) =>
   ranMs === null ? '' : `${step.tries.length > 1 ? 'its last try ran' : 'ran'} ${durationWords(ranMs, 'minute')}`;
 
 /**
  * The time box of each kind: at work for how long and since when, waiting since its session ended, done or failed at its end and how long
  * it ran, and to come after the steps it waits for.
  */
-function timeOf(step: StepView, kind: StepKind, now: Date): CardTime {
+function timeOf(step: StepView, kind: StepKind, now: Date) {
   const { start, end, ranMs } = sessionOf(step);
-  const since = (from: string, label: string, ink: CardTime['ink']): CardTime => ({
+  const since = (from: string, label: string, ink: CardTime['ink']) => ({
     label,
     value: durationWords(now.getTime() - Date.parse(from), 'minute'),
     note: `since ${whenWords(new Date(from), now)}`,
     ink,
   });
-  const at = (label: string, ink: CardTime['ink']): CardTime =>
+  const at = (label: string, ink: CardTime['ink']) =>
     end === null ? untimed(label, ink) : { label, value: whenWords(new Date(end), now), note: ranNote(step, ranMs), ink };
-  if (kind === 'work') return start === null ? untimed('At work', 'alive') : since(start, 'At work', 'alive');
+  if (kind === 'work') return (start === null ? untimed('At work', 'alive') : since(start, 'At work', 'alive')) satisfies CardTime;
   if (kind === 'gate') {
     const from = end ?? start;
-    return from === null ? untimed('Waiting', 'yours') : since(from, 'Waiting', 'yours');
+    return (from === null ? untimed('Waiting', 'yours') : since(from, 'Waiting', 'yours')) satisfies CardTime;
   }
-  if (kind === 'failed') return at('Failed', 'failure');
-  if (kind === 'done') return at('Done', 'plain');
+  if (kind === 'failed') return at('Failed', 'failure') satisfies CardTime;
+  if (kind === 'done') return at('Done', 'plain') satisfies CardTime;
   const after = step.spec?.after ?? [];
-  return { label: 'Starts', value: after.length > 0 ? `after ${after.join(', ')}` : 'when filed', note: '', ink: 'muted' };
+  return {
+    label: 'Starts',
+    value: after.length > 0 ? `after ${after.join(', ')}` : 'when filed',
+    note: '',
+    ink: 'muted',
+  } satisfies CardTime;
 }
 
 /** A context window in tokens as the head says it: `400k tokens`, or the model's whole window where the step sets none. */
-const contextSaid = (tokens: number | null): string =>
+const contextSaid = (tokens: number | null) =>
   tokens === null ? 'whole window' : tokens >= 1000 ? `${Math.round(tokens / 1000)}k tokens` : `${tokens} tokens`;
 
 /** The first of `values` that is set, else `default`. */
-const firstSet = (...values: Array<string | null | undefined>): string => values.find((value) => value != null) ?? 'default';
+const firstSet = (...values: Array<string | null | undefined>) => values.find((value) => value != null) ?? 'default';
 
 /** The session's five facts, whole: its harness, model, effort, context and permission, from what its try was filed with first. */
-function factsOf(step: StepView): Array<{ key: string; value: string }> {
+function factsOf(step: StepView) {
   const { spec, filed } = step;
   return [
     { key: 'Harness', value: firstSet(spec?.harness) },
@@ -223,23 +228,37 @@ function factsOf(step: StepView): Array<{ key: string; value: string }> {
  * one, or not measured yet where its harness said nothing; to come, its budget; else the kit's meter of its spend against its budget, or
  * its spend alone where it has none, or not measured where nothing was.
  */
-function spendOf(step: StepView, kind: StepKind): CardSpend {
+function spendOf(step: StepView, kind: StepKind) {
   const { spent, budget } = step;
   const of = budget ? `of ${budget.said}` : '';
   if (kind === 'work' && spent?.live && budget) {
-    return { kind: 'meter', label: 'Spent', value: spent.usd + spent.live.usd, max: budget.usd, said: `${spent.said} of ${budget.said}` };
+    return {
+      kind: 'meter',
+      label: 'Spent',
+      value: spent.usd + spent.live.usd,
+      max: budget.usd,
+      said: `${spent.said} of ${budget.said}`,
+    } satisfies CardSpend;
   }
-  if (kind === 'work') return { kind: 'words', label: 'Spent', said: spent?.live ? spent.said : 'not measured yet', note: of };
-  if (kind === 'come') return { kind: 'words', label: 'Budget', said: budget?.said ?? 'none set', note: '' };
-  if (spent && budget) return { kind: 'meter', label: 'Spent', value: spent.usd, max: budget.usd, said: `${spent.said} of ${budget.said}` };
-  return { kind: 'words', label: 'Spent', said: spent?.said ?? 'not measured', note: of };
+  if (kind === 'work')
+    return { kind: 'words', label: 'Spent', said: spent?.live ? spent.said : 'not measured yet', note: of } satisfies CardSpend;
+  if (kind === 'come') return { kind: 'words', label: 'Budget', said: budget?.said ?? 'none set', note: '' } satisfies CardSpend;
+  if (spent && budget)
+    return {
+      kind: 'meter',
+      label: 'Spent',
+      value: spent.usd,
+      max: budget.usd,
+      said: `${spent.said} of ${budget.said}`,
+    } satisfies CardSpend;
+  return { kind: 'words', label: 'Spent', said: spent?.said ?? 'not measured', note: of } satisfies CardSpend;
 }
 
 /** The check's refusal, or null where its check did not refuse. */
-const refusalOf = (step: StepView): string | null => (step.check?.refused ? `It failed its check (${step.check.refused.exit}).` : null);
+const refusalOf = (step: StepView) => (step.check?.refused ? `It failed its check (${step.check.refused.exit}).` : null);
 
 /** What the step's check says: its verdict's word, the exit of one that failed, `not run yet` before its verdict; none without a check. */
-function checkOf(step: StepView): string {
+function checkOf(step: StepView) {
   const verdict = step.check?.verdict;
   if (!step.check) return 'none';
   if (!verdict) return 'not run yet';
@@ -247,7 +266,7 @@ function checkOf(step: StepView): string {
 }
 
 /** What the gate asks, or what a person said when they approved it; null for a step with no gate. */
-function gateWords(step: StepView, now: Date): string | null {
+function gateWords(step: StepView, now: Date) {
   if (step.gate?.awaiting) return step.needs ?? 'It waits for your approval.';
   const approval = step.gate?.approval;
   return approval ? `Approved at ${whenWords(new Date(approval.at), now)}.` : null;
@@ -257,17 +276,17 @@ function gateWords(step: StepView, now: Date): string | null {
  * The head's one note, the first that says something: the agent's last line, the calls its harness denied, its check's refusal, then
  * its gate's words; null when none does.
  */
-function noteOf(step: StepView, now: Date): CardNote | null {
-  if (step.lastLine) return { text: step.lastLine, icon: 'info' };
-  if (step.denied) return { text: step.denied.words, icon: 'shield' };
+function noteOf(step: StepView, now: Date) {
+  if (step.lastLine) return { text: step.lastLine, icon: 'info' } satisfies CardNote | null;
+  if (step.denied) return { text: step.denied.words, icon: 'shield' } satisfies CardNote | null;
   const refused = refusalOf(step);
-  if (refused) return { text: refused, icon: 'fail' };
+  if (refused) return { text: refused, icon: 'fail' } satisfies CardNote | null;
   const gate = gateWords(step, now);
-  return gate ? { text: gate, icon: 'info' } : null;
+  return (gate ? { text: gate, icon: 'info' } : null) satisfies CardNote | null;
 }
 
 /** The agent of a step, as the run froze it (`agentOf`), with its role from the agents' listing; none for a step that names none. */
-function whoOf(name: string | null, agents: HeadInput['agents']): Who | None {
+function whoOf(name: string | null, agents: HeadInput['agents']) {
   if (!name) return 'none';
   const role = agents?.find((agent) => agent.name === name)?.role ?? '';
   return { name, initial: name.charAt(0).toUpperCase(), role };
@@ -292,23 +311,24 @@ const UNREAD: OwnFacts = {
 };
 
 /** The head's facts of `own`, a step of the run's own answer whose steps are `steps`, of kind `kind`. */
-const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now: Date): OwnFacts => ({
-  time: timeOf(own, kind, now),
-  spend: spendOf(own, kind),
-  round: placeOf(own, steps, kind),
-  check: checkOf(own),
-  gate: gateWords(own, now) ?? 'none',
-  facts: factsOf(own),
-  note: noteOf(own, now) ?? 'none',
-  tries: own.tries.map((t) => t.try),
-  shown: own.shown,
-});
+const ownFacts = (own: StepView, steps: readonly StepView[], kind: StepKind, now: Date) =>
+  ({
+    time: timeOf(own, kind, now),
+    spend: spendOf(own, kind),
+    round: placeOf(own, steps, kind),
+    check: checkOf(own),
+    gate: gateWords(own, now) ?? 'none',
+    facts: factsOf(own),
+    note: noteOf(own, now) ?? 'none',
+    tries: own.tries.map((t) => t.try),
+    shown: own.shown,
+  }) satisfies OwnFacts;
 
 /**
  * The head of the step `step` of `run`: what the run's row knows at once (its state, its agent, its model), and once the run's own answer
  * is read, its tries, time, facts, spend, check, gate and note — each `none` until then, or where it does not apply.
  */
-export function headOf({ run, step, detail, agents, now }: HeadInput): PartHead {
+export function headOf({ run, step, detail, agents, now }: HeadInput) {
   const row = run.steps.find((s) => s.name === step);
   const codes = row ?? UNLISTED;
   const state = stepState(codes, run.cancelledAt !== null, run.holding != null);
@@ -326,7 +346,7 @@ export function headOf({ run, step, detail, agents, now }: HeadInput): PartHead 
     model: own?.filed?.model ?? own?.spec?.model ?? row?.spec?.model ?? 'none',
     ...(own && detail ? ownFacts(own, detail.steps, kind, now) : UNREAD),
     action: { words: state === 'awaiting-approval' ? 'Read and approve' : 'Open the step', runId: run.id, step },
-  };
+  } satisfies PartHead;
 }
 
 /**
@@ -349,7 +369,7 @@ type PartAsks = {
  * @param state The step's state as the board draws it (`stepState`).
  * @param waitedOn Whether the run says it waits on a person for this step.
  */
-export function asksOf(step: StepView, state: StepState, waitedOn: boolean): PartAsks | None {
+export function asksOf(step: StepView, state: StepState, waitedOn: boolean) {
   const yours = waitsOnYou(state) || waitedOn;
   const asks: PartAsks = {
     gate: yours && step.gate?.awaiting ? step.gate : null,
@@ -379,21 +399,21 @@ type GotLine =
   | { from: 'agent'; agent: string | null; text: string | null; skills: readonly string[] };
 
 /** The text parts of a task that came from `source` (the run's take every part the read did not cut), and the step that gave each. */
-const textsFrom = (step: StepView, source: TaskSource): Array<{ text: string; step: string | null }> =>
+const textsFrom = (step: StepView, source: TaskSource) =>
   (step.taskParts ?? []).flatMap((part) =>
     part.kind === 'text' && (part.source ?? 'run') === source ? [{ text: part.text, step: part.step ?? null }] : [],
   );
 
 /** The names of `items`' steps, each once, in their order: null for an item with none. */
-const stepsOf = (items: ReadonlyArray<{ step: string | null }>): Array<string | null> => [...new Set(items.map((i) => i.step))];
+const stepsOf = (items: ReadonlyArray<{ step: string | null }>) => [...new Set(items.map((i) => i.step))];
 
 /**
  * What the step got, a line per source in `GOT_ORDER`: you; each step that handed it a part, or whose declared output it is handed (its
  * packet), in the order its task names them, then its input's; each check; each run it was handed; the run's own sections; and its agent.
  */
-function gotOf(step: StepView, packets: readonly Packet[]): GotLine[] {
+function gotOf(step: StepView, packets: readonly Packet[]) {
   const into = packets.filter((p) => p.to === step.name);
-  const packetOf = (giver: string): Packet | null => into.find((p) => p.from === giver) ?? null;
+  const packetOf = (giver: string) => into.find((p) => p.from === giver) ?? null;
   const you = textsFrom(step, 'person');
   const handed = textsFrom(step, 'step');
   const givers = [...new Set([...stepsOf(handed).flatMap((s) => (s === null ? [] : [s])), ...into.map((p) => p.from)])];
@@ -445,11 +465,17 @@ type PartSaid =
   | { kind: 'unreadable'; error: string };
 
 /** What the step said, of the try shown; none before it signed off. */
-function saidOf(step: StepView): PartSaid | None {
+function saidOf(step: StepView) {
   const { closeout, unreadable } = step;
   if (closeout)
-    return { kind: 'closeout', outcome: closeout.outcome, summary: closeout.summary, account: closeout.body, needs: closeout.needs };
-  return unreadable ? { kind: 'unreadable', error: unreadable.error } : 'none';
+    return {
+      kind: 'closeout',
+      outcome: closeout.outcome,
+      summary: closeout.summary,
+      account: closeout.body,
+      needs: closeout.needs,
+    } satisfies PartSaid | None;
+  return (unreadable ? { kind: 'unreadable', error: unreadable.error } : 'none') satisfies PartSaid | None;
 }
 
 /** A declared field of the step's output: its name, the widget that draws it, and its value; a dash (`given` false) before it is given. */
@@ -471,7 +497,7 @@ type PartGave = {
  * The step's declared fields: as the closeout's schema reads them, in its order; before a closeout, as the run froze them, each a dash. A
  * field the api read questions from is of the questions shape where nothing else says its shape: a run frozen before shapes were kept.
  */
-function fieldsOf(step: StepView, spec: StepSpecView | null): GaveField[] {
+function fieldsOf(step: StepView, spec: StepSpecView | null) {
   const closeout = step.closeout;
   const declared = spec?.fields ?? [];
   if (!closeout) return declared.map((f) => ({ name: f.name, widget: widgetOf(fieldReadOf(null, f.shape)), given: false, value: null }));
@@ -492,10 +518,10 @@ function fieldsOf(step: StepView, spec: StepSpecView | null): GaveField[] {
  * else, for a file outside every folder of its step, the path its closeout gave, which is shown and never matched.
  * @param file The file, as the api serves it.
  */
-export const fileKey = (file: StepArtifact): string => file.relativePath ?? ('name' in file ? file.name : file.path);
+export const fileKey = (file: StepArtifact) => (file.relativePath ?? ('name' in file ? file.name : file.path)) satisfies string as string;
 
 /** Whether a file a step's folders list is one its closeout named: the same path from the step's folder. */
-const namedAs = (named: StepArtifact, listed: StepArtifact): boolean =>
+const namedAs = (named: StepArtifact, listed: StepArtifact) =>
   named.relativePath !== undefined && named.relativePath === listed.relativePath;
 
 /**
@@ -503,7 +529,7 @@ const namedAs = (named: StepArtifact, listed: StepArtifact): boolean =>
  * its folder hold that it did not name, each once across the two.
  * @param step The step, as the run's view has it.
  */
-export function stepFilesOf(step: StepView): { named: StepArtifact[]; unnamed: StepArtifact[] } {
+export function stepFilesOf(step: StepView) {
   const listed = [...(step.artifactsFolder?.files ?? []), ...step.files];
   const closeout = step.closeout?.artifacts ?? [];
   const named = [...new Map(closeout.map((n) => [fileKey(n), n])).values()].map(
@@ -520,20 +546,22 @@ export function stepFilesOf(step: StepView): { named: StepArtifact[]; unnamed: S
  * nothing.
  * @param step The step, as the run's view has it.
  */
-export function viewedFilesOf(step: StepView): StepArtifact[] {
+export function viewedFilesOf(step: StepView) {
   const { named, unnamed } = stepFilesOf(step);
-  return [...named, ...unnamed].filter((file) => file.relativePath !== undefined || 'name' in file);
+  return [...named, ...unnamed].filter(
+    (file) => file.relativePath !== undefined || 'name' in file,
+  ) satisfies StepArtifact[] as StepArtifact[];
 }
 
 /** How many files the step's artifacts folder and its folder hold that its closeout did not name, each counted once. */
-const unnamedOf = (step: StepView): number => stepFilesOf(step).unnamed.length;
+const unnamedOf = (step: StepView) => stepFilesOf(step).unnamed.length;
 
 /**
  * What the step gave, of the try shown; none where it declares nothing and gave nothing — its loop's replies to findings counting as
  * something given, which `PartGave` draws from the closeout beside its fields. A field whose questions the part asks of a person
  * (`answered`) is drawn there, as the form that answers it, and not again here.
  */
-function gaveOf(step: StepView, packets: readonly Packet[], answered: ReadonlySet<string>): PartGave | None {
+function gaveOf(step: StepView, packets: readonly Packet[], answered: ReadonlySet<string>) {
   const gave: PartGave = {
     packet: packets.find((p) => p.from === step.name)?.label ?? null,
     fields: fieldsOf(step, step.spec).filter((field) => !answered.has(field.name)),
@@ -561,7 +589,7 @@ type PartDetail = {
   debug: { try: number | null };
 };
 
-const detailOf = (step: StepView): PartDetail => ({
+const detailOf = (step: StepView) => ({
   shown: step.shown,
   tries: step.tries.map((t) => t.try),
   body: step.body,
@@ -584,7 +612,7 @@ export type StepPartModel = {
 };
 
 /** A step as its packets count it: its input, and what its shown try gave (its output's fields and its files). */
-const packetStepOf = (step: StepView): PacketStep => ({
+const packetStepOf = (step: StepView) => ({
   name: step.name,
   input: step.spec?.input ?? [],
   fields: Object.keys(step.closeout?.output ?? {}).length,
@@ -595,7 +623,7 @@ const packetStepOf = (step: StepView): PacketStep => ({
  * Every packet of the run's view, each counted from its giver's shown try (`packetsOf`).
  * @param view The run's view, its steps.
  */
-export const packetsOfView = (view: Pick<RunDetail, 'steps'>): Packet[] => packetsOf(view.steps.map(packetStepOf));
+export const packetsOfView = (view: Pick<RunDetail, 'steps'>) => packetsOf(view.steps.map(packetStepOf));
 
 /**
  * The part of the step `step` of the run's view `view`, of the try each step shows (`StepView.shown`, the address's choice): its head
@@ -605,15 +633,10 @@ export const packetsOfView = (view: Pick<RunDetail, 'steps'>): Packet[] => packe
  * @param now The instant now, which the step's time and gate are said against.
  * @param agents The agents, each by name and role, once read; undefined before.
  */
-export function stepPartOf(
-  view: RunDetail,
-  step: string,
-  now: Date,
-  agents?: ReadonlyArray<Pick<AgentListing, 'name' | 'role'>>,
-): StepPartModel {
+export function stepPartOf(view: RunDetail, step: string, now: Date, agents?: ReadonlyArray<Pick<AgentListing, 'name' | 'role'>>) {
   const head = headOf({ run: view, step, detail: view, agents, now });
   const own = view.steps.find((s) => s.name === step);
-  if (!own) return { head, asks: 'none', got: 'none', said: 'none', gave: 'none', detail: 'none' };
+  if (!own) return { head, asks: 'none', got: 'none', said: 'none', gave: 'none', detail: 'none' } satisfies StepPartModel;
   const packets = packetsOfView(view);
   const got = gotOf(own, packets);
   const asks = asksOf(own, head.state, view.waitingOnYou.includes(step));
@@ -625,7 +648,7 @@ export function stepPartOf(
     said: saidOf(own),
     gave: gaveOf(own, packets, answered),
     detail: detailOf(own),
-  };
+  } satisfies StepPartModel;
 }
 
 /**
@@ -633,5 +656,5 @@ export function stepPartOf(
  * @param part The step's part.
  * @param size The size the part is drawn at.
  */
-export const slotsOf = (part: StepPartModel, size: PartSize): Array<{ slot: PartSlot; value: StepPartModel[PartSlot] }> =>
+export const slotsOf = (part: StepPartModel, size: PartSize) =>
   PART_SLOTS.filter((slot) => SLOTS_AT[size].has(slot)).map((slot) => ({ slot, value: part[slot] }));

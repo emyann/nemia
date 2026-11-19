@@ -16,7 +16,7 @@ const BASE = 'http://board.invalid';
  * router's own `defaultParseSearch` as `search`, and its hash, where it has one. Pure.
  * @param href The board's address, as a message writes it.
  */
-export function routeOfHref(href: string): RouteOfHref {
+export function routeOfHref(href: string) {
   const url = new URL(href, BASE);
   const hash = url.hash.slice(1);
   return { to: url.pathname, search: defaultParseSearch(url.search), ...(hash ? { hash } : {}) };

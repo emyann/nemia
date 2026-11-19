@@ -21,7 +21,7 @@ export function streamDataOf<D, K extends keyof D & string>(
   schemas: { readonly [E in keyof D]: Schema.Decoder<D[E]> },
   event: K,
   data: string,
-): D[K] | UnreadAnswer {
+) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(data);

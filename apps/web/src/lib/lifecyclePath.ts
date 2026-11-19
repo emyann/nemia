@@ -20,7 +20,7 @@ export const PATH_POLL_MS = 2_000;
  * @param final The machine's final states, empty where they are not known.
  * @param current Whether the path is of the step's current try.
  */
-export function pathPoll(read: StepPath | undefined, final: readonly string[], current: boolean): number | false {
+export function pathPoll(read: StepPath | undefined, final: readonly string[], current: boolean) {
   if (!current || !read || read.taskId === null || final.length === 0) return false;
   const last = read.path.at(-1);
   return last && final.includes(last.state) ? false : PATH_POLL_MS;
@@ -33,12 +33,12 @@ export function pathPoll(read: StepPath | undefined, final: readonly string[], c
  * what a person said to it, move none of it.
  * @param step The step's status in the run object: its task, its attempts and its current try.
  */
-export const stepStamp = <S extends Pick<RunStepStatus, 'taskId' | 'attempts' | 'current'>>(step: S): string => {
+export const stepStamp = <S extends Pick<RunStepStatus, 'taskId' | 'attempts' | 'current'>>(step: S) => {
   const c = step.current;
   const now = c
     ? [c.try, c.round, c.phase, c.reason, c.outcome ?? '-', c.verdict ? `${c.verdict.result}:${c.verdict.exit ?? '-'}` : '-'].join('.')
     : '-';
-  return `${step.taskId ?? '-'}|${step.attempts.count}|${now}`;
+  return `${step.taskId ?? '-'}|${step.attempts.count}|${now}` satisfies string as string;
 };
 
 /**
@@ -46,7 +46,7 @@ export const stepStamp = <S extends Pick<RunStepStatus, 'taskId' | 'attempts' | 
  * @param path The task's path, each entry a state its journal said.
  * @param at The index of the entry on the timeline; past the end, the last.
  */
-export const litAt = (path: readonly LifecycleTransition[], at: number): string | undefined => path[Math.min(at, path.length - 1)]?.state;
+export const litAt = (path: readonly LifecycleTransition[], at: number) => path[Math.min(at, path.length - 1)]?.state;
 
 /**
  * The routes of the graph the path took up to step `at`, as the drawing names them (`from->to`): each move from one state to another
@@ -56,7 +56,7 @@ export const litAt = (path: readonly LifecycleTransition[], at: number): string 
  * @param at The index of the entry on the timeline the routes are taken up to.
  * @param graph The machine's graph: its edges and the verbs a person takes.
  */
-export function takenRoutes(path: readonly LifecycleTransition[], at: number, graph: Pick<MachineGraph, 'edges' | 'verbs'>): string[] {
+export function takenRoutes(path: readonly LifecycleTransition[], at: number, graph: Pick<MachineGraph, 'edges' | 'verbs'>) {
   const routes = new Set([
     ...graph.edges.filter((e) => e.from !== e.to).map((e) => `${e.from}->${e.to}`),
     ...graph.verbs.flatMap((v) => v.from.map((from) => `${from}->${v.to}`)),
@@ -76,7 +76,7 @@ export function takenRoutes(path: readonly LifecycleTransition[], at: number, gr
  * @param i The index of the entry asked about.
  * @param verbs The verbs a person takes on the machine.
  */
-export function byPerson(path: readonly LifecycleTransition[], i: number, verbs: readonly MachineVerb[]): string | undefined {
+export function byPerson(path: readonly LifecycleTransition[], i: number, verbs: readonly MachineVerb[]) {
   const [before, step] = [path[i - 1], path[i]];
   if (!before || !step || before.state === step.state) return undefined;
   return verbs.find((v) => v.entry === step.event && v.to === step.state && v.from.includes(before.state))?.verb;
@@ -92,7 +92,7 @@ type Box = { readonly top: number; readonly height: number };
  * @param box The box to show, on the page.
  * @param scrollTop How far the view is scrolled down now, in pixels.
  */
-export function centredScroll(view: Box, box: Box, scrollTop: number): number | null | undefined {
+export function centredScroll(view: Box, box: Box, scrollTop: number) {
   if (box.height === 0) return undefined;
   if (box.top >= view.top && box.top + box.height <= view.top + view.height) return null;
   return Math.max(0, scrollTop + box.top + box.height / 2 - (view.top + view.height / 2));

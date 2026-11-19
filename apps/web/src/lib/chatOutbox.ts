@@ -23,7 +23,7 @@ export type ChatKept = { text: string; at: string; refused?: string };
  * What `raw` names: a kept message, or null for storage that holds none, or words that are not one.
  * @param raw What storage holds under the key, or null where it holds nothing.
  */
-export function parseKept(raw: string | null): ChatKept | null {
+export function parseKept(raw: string | null) {
   if (raw === null) return null;
   let value: unknown;
   try {
@@ -38,7 +38,7 @@ export function parseKept(raw: string | null): ChatKept | null {
 }
 
 /** The message this browser keeps, null where it keeps none or storage is refused. */
-export function readKept(): ChatKept | null {
+export function readKept() {
   return readStored(CHAT_OUTBOX_KEY, parseKept, null);
 }
 
@@ -49,7 +49,7 @@ export function readKept(): ChatKept | null {
  * @param at When the person wrote them.
  * @param refused The api's words where it refused the message; undefined where the board lost the daemon.
  */
-export function keepUnsent(text: string, at: string, refused?: string): void {
+export function keepUnsent(text: string, at: string, refused?: string) {
   store(CHAT_OUTBOX_KEY, JSON.stringify(refused === undefined ? { text, at } : { text, at, refused }));
 }
 
@@ -57,7 +57,7 @@ export function keepUnsent(text: string, at: string, refused?: string): void {
  * The kept message's words changed to `text`, its moment and what the api last said of it kept: nothing where none is kept.
  * @param text The message's new words.
  */
-export function editKept(text: string): void {
+export function editKept(text: string) {
   const kept = readKept();
   if (kept !== null) keepUnsent(text, kept.at, kept.refused);
 }
@@ -66,7 +66,7 @@ export function editKept(text: string): void {
  * What the api said where `failure` is its refusal, an answer with a 4xx status: its own words. Null where nothing answered (the fetch
  * failed) or the api failed (a 5xx): the board lost the daemon.
  */
-function refusalOf(failure: unknown): string | null {
+function refusalOf(failure: unknown) {
   return failure instanceof WriteRefusal && failure.status >= 400 && failure.status < 500 ? failure.message : null;
 }
 
@@ -76,7 +76,7 @@ function refusalOf(failure: unknown): string | null {
  * @param at When the person wrote them.
  * @param failure What the send failed with: a refusal of the api's, or any other error.
  */
-export function keptAfter(text: string, at: string, failure: unknown): ChatKept {
+export function keptAfter(text: string, at: string, failure: unknown) {
   const refused = refusalOf(failure);
   return refused === null ? { text, at } : { text, at, refused };
 }
@@ -88,7 +88,7 @@ export function keptAfter(text: string, at: string, failure: unknown): ChatKept 
  * @param ms How long to wait before each try, in ms.
  * @param refused Called with the refusal that stops the tries.
  */
-export function retryKept(send: () => Promise<unknown>, ms: number, refused: (failure: unknown) => void): () => void {
+export function retryKept(send: () => Promise<unknown>, ms: number, refused: (failure: unknown) => void) {
   let timer: ReturnType<typeof setTimeout>;
   let stopped = false;
   const attempt = () => {
@@ -106,7 +106,7 @@ export function retryKept(send: () => Promise<unknown>, ms: number, refused: (fa
 }
 
 /** Forgets the kept message: where storage is refused, nothing was kept to forget. */
-export function forgetKept(): void {
+export function forgetKept() {
   forgetStored(CHAT_OUTBOX_KEY);
 }
 
@@ -118,7 +118,7 @@ let sending: Promise<unknown> | null = null;
  * each try the kept message, and it must reach her once. Resolves and rejects as `send` does, and the next call runs it again.
  * @param send Sends the message once.
  */
-export function sendingOnce<T>(send: () => Promise<T>): Promise<T> {
+export function sendingOnce<T>(send: () => Promise<T>) {
   if (sending !== null) return sending as Promise<T>;
   const flight = send();
   sending = flight;

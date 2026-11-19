@@ -25,7 +25,7 @@ type AtWork = { runs: number; sessions: number };
  * not stop counts. A run the list could not judge has no step to count.
  * @param open The light answer of every factory: its counts, and its waiting and in-flight rows.
  */
-export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>): AtWork {
+export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>) {
   let sessions = 0;
   for (const run of openRows(open)) {
     if (!judged(run) || run.cancelledAt) continue;
@@ -38,13 +38,13 @@ export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>):
 }
 
 /** `count` and its noun, singular for one. */
-const counted = (count: number, one: string): string => `${count} ${one}${count === 1 ? '' : 's'}`;
+const counted = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
 
 /**
  * What is at work, in short (`2 runs · 3 sessions`) and as a sentence.
  * @param work The runs in flight and the sessions working or checking (`atWork`).
  */
-export const atWorkWords = (work: AtWork): { text: string; title: string } => ({
+export const atWorkWords = (work: AtWork) => ({
   text: `${counted(work.runs, 'run')} · ${counted(work.sessions, 'session')}`,
   title: `${counted(work.runs, 'run')} in flight, and ${counted(work.sessions, 'session')} working or checking, across every factory.`,
 });
@@ -55,7 +55,7 @@ export const atWorkWords = (work: AtWork): { text: string; title: string } => ({
  * naming the folder it runs from.
  * @param version The api's version: the release's, and the code serving it where the api says it.
  */
-export function versionWords(version: Version): { text: string; title: string } {
+export function versionWords(version: Version) {
   const named = `Nemia ${version.version}`;
   const release = version.release;
   if (release === undefined) return { text: `v${version.version}`, title: named };
@@ -99,7 +99,7 @@ const DAEMON_WORDS: Record<Daemon['kind'], string> = {
  * @param dot The daemon's dot (`daemonDot`).
  * @param paused Whether every factory is paused.
  */
-export function tickWord(dot: DaemonDot, paused: boolean): string {
+export function tickWord(dot: DaemonDot, paused: boolean) {
   if (paused) return 'paused';
   if (dot.kind === 'error' || dot.kind === 'reading' || dot.kind === 'ticking') return dot.word;
   return 'not ticking';
@@ -114,28 +114,39 @@ export function tickWord(dot: DaemonDot, paused: boolean): string {
  * @param error Why the read failed, or null where it did not.
  * @param now The instant the sentence is said at, which the daemon's times are read against.
  */
-export function daemonDot(daemon: Daemon | undefined, error: Error | null, now: Date): DaemonDot {
+export function daemonDot(daemon: Daemon | undefined, error: Error | null, now: Date) {
   if (error) {
-    return { kind: 'error', tone: 'down', word: 'unread', title: `Whether a daemon ticks this store could not be read: ${error.message}` };
+    return {
+      kind: 'error',
+      tone: 'down',
+      word: 'unread',
+      title: `Whether a daemon ticks this store could not be read: ${error.message}`,
+    } satisfies DaemonDot;
   }
-  if (!daemon) return { kind: 'reading', tone: 'reading', word: 'reading', title: 'Reading whether a daemon ticks this store.' };
+  if (!daemon)
+    return { kind: 'reading', tone: 'reading', word: 'reading', title: 'Reading whether a daemon ticks this store.' } satisfies DaemonDot;
   const words = daemonWords(daemon, now);
   if (daemon.ticking && daemon.unobserved.length > 0) {
-    return { kind: daemon.kind, tone: 'warn', word: 'ticking, harness unread', title: [daemon.line, ...daemon.unobserved].join('\n') };
+    return {
+      kind: daemon.kind,
+      tone: 'warn',
+      word: 'ticking, harness unread',
+      title: [daemon.line, ...daemon.unobserved].join('\n'),
+    } satisfies DaemonDot;
   }
   return {
     kind: daemon.kind,
     tone: TONES[daemon.kind],
     word: DAEMON_WORDS[daemon.kind],
     title: words ? daemonSentence(words) : daemon.line,
-  };
+  } satisfies DaemonDot;
 }
 
 /**
  * Whether the board follows the workflow feed, as a word and a sentence.
  * @param feed Where the feed stands: connecting, open, or down.
  */
-export function feedWords(feed: FeedStatus): { word: string; title: string } {
+export function feedWords(feed: FeedStatus) {
   switch (feed) {
     case 'open':
       return { word: 'live', title: 'The board follows the workflow feed: what moves is read again at once.' };
@@ -147,7 +158,7 @@ export function feedWords(feed: FeedStatus): { word: string; title: string } {
 }
 
 /** Windows in short: `5-hour 82% · week 40%`. */
-const windowsText = (windows: readonly WindowWords[]): string => windows.map((w) => `${w.label} ${w.used}`).join(' · ');
+const windowsText = (windows: readonly WindowWords[]) => windows.map((w) => `${w.label} ${w.used}`).join(' · ');
 
 /**
  * The quota in short: each window's label and percentage — `marked` when one is used past the mark and not reset since — and the hover's
@@ -157,11 +168,7 @@ const windowsText = (windows: readonly WindowWords[]): string => windows.map((w)
  * @param error Why the read failed, or null where it did not.
  * @param now The instant the windows and the last reading are read against.
  */
-export function quotaShort(
-  quota: Quota | undefined,
-  error: Error | null,
-  now: Date,
-): { text: string; marked: boolean; stale: boolean; title: string } {
+export function quotaShort(quota: Quota | undefined, error: Error | null, now: Date) {
   if (error) return { text: 'unread', marked: false, stale: false, title: `The quota could not be read: ${error.message}` };
   if (!quota) return { text: 'reading', marked: false, stale: false, title: 'Reading the quota.' };
   const title = quotaTitle(quota, now);
@@ -189,7 +196,7 @@ export function quotaShort(
  * a page is the screen less the three, `100svh-var(--frame-top)-var(--frame-lines)-var(--frame-foot)`.
  * @param source A source file's text.
  */
-export const staleFrameHeights = (source: string): string[] =>
+export const staleFrameHeights = (source: string) =>
   [...source.matchAll(/h-\[calc\(100svh-\s*(3rem|var\(--frame-top\)[^\]]*)\)\]/g)]
     .filter((m) => m[1] === '3rem' || !m[1]?.includes('var(--frame-foot)'))
     .map((m) => m[0]);
@@ -200,7 +207,7 @@ export const staleFrameHeights = (source: string): string[] =>
  * the newest.
  * @param version The api's version, with the latest release it read where it read one.
  */
-export function newerReleaseWords(version: Version): string | null {
+export function newerReleaseWords(version: Version) {
   const latest = version.latest;
   return latest?.newer ? `nemia ${latest.version} is out: upgrade it in Settings` : null;
 }

@@ -18,10 +18,10 @@ export type WelcomePieceRead = {
 };
 
 /** Whether `p` says a harness is activated: its install piece, met. */
-const activated = (p: WelcomePieceRead): boolean => p.harness !== undefined && p.harness.part === 'install' && p.state === 'met';
+const activated = (p: WelcomePieceRead) => p.harness !== undefined && p.harness.part === 'install' && p.state === 'met';
 
 /** Whether `p` says a factory besides the default is filed: the read's factory piece, met. */
-const filed = (p: WelcomePieceRead): boolean => p.area === 'factory' && p.state === 'met';
+const filed = (p: WelcomePieceRead) => p.area === 'factory' && p.state === 'met';
 
 const welcomeAskedSpec = spec<(pieces: readonly WelcomePieceRead[], skipped: boolean) => boolean>({
   ensures: {

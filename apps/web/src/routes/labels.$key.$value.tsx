@@ -24,7 +24,7 @@ const BUCKETS: ReadonlyArray<{ bucket: Bucket; hue: Hue }> = [
 ];
 
 /** The bucket of `run`: a person's first, then its phase; `running` for a run the list could not judge, as the tick counts it. */
-const bucketOf = (run: RunRow): Bucket => {
+const bucketOf = (run: RunRow) => {
   if (!judged(run)) return 'running';
   if (run.waitingOnYou.length > 0) return 'needs a person';
   switch (run.phase) {

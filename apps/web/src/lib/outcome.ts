@@ -8,8 +8,7 @@ import { isObject } from 'effect/Predicate';
  * A field's `description` in its schema, when it has one: what a yes or a no means.
  * @param schema The field's schema, of any shape.
  */
-export const descriptionOf = (schema: unknown): string | null =>
-  isObject(schema) && typeof schema.description === 'string' ? schema.description : null;
+export const descriptionOf = (schema: unknown) => (isObject(schema) && typeof schema.description === 'string' ? schema.description : null);
 
 /**
  * Who said how a try ended, and what: the agent, in its statement, or in one that could not be read; the machine, in the reason its
@@ -49,25 +48,26 @@ const CUT_WORDS: Readonly<Partial<Record<AttemptEnd, string>>> = {
  * @param t The try: its closeout, its unreadable statement and its attempts.
  * @param none What is said of a try nobody said the end of.
  */
-export function outcomeOf(t: Frozen<Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>>, none: string): Outcome {
+export function outcomeOf(t: Frozen<Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>>, none: string) {
   const latest = t.attempts.latest;
-  if (t.closeout) return { by: 'agent', outcome: t.closeout.outcome, cut: (latest?.reason && CUT_WORDS[latest.reason]) || null };
+  if (t.closeout)
+    return { by: 'agent', outcome: t.closeout.outcome, cut: (latest?.reason && CUT_WORDS[latest.reason]) || null } satisfies Outcome;
   if (t.unreadable)
     return {
       by: 'unreadable',
       words: `It gave a closing statement that could not be read (${t.unreadable.error}). Here it is as it came.`,
-    };
-  if (!latest?.ended || !latest.reason) return { by: 'nobody', words: none };
+    } satisfies Outcome;
+  if (!latest?.ended || !latest.reason) return { by: 'nobody', words: none } satisfies Outcome;
   const words = MACHINE_WORDS[latest.reason];
-  if (words) return { by: 'machine', reason: latest.reason, words };
+  if (words) return { by: 'machine', reason: latest.reason, words } satisfies Outcome;
   if (latest.reason === 'harness' && (latest.ended === 'failed' || latest.ended === 'stopped')) {
     return {
       by: 'machine',
       reason: latest.ended,
       words: `Its harness ended the session ${latest.ended}, and it said nothing of how it went.`,
-    };
+    } satisfies Outcome;
   }
-  return { by: 'nobody', words: none };
+  return { by: 'nobody', words: none } satisfies Outcome;
 }
 
 /**
@@ -75,5 +75,5 @@ export function outcomeOf(t: Frozen<Pick<StepTry, 'closeout' | 'unreadable' | 'a
  * `no closeout`.
  * @param o The try's outcome, as `outcomeOf` gives it.
  */
-export const outcomeWord = (o: Outcome): string =>
+export const outcomeWord = (o: Outcome) =>
   o.by === 'agent' ? o.outcome : o.by === 'machine' ? o.reason : o.by === 'unreadable' ? 'unreadable' : 'no closeout';

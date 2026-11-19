@@ -20,13 +20,14 @@ const FORM: KeyForm = {
 };
 
 /** A step of no agent, its amounts given as `budget` and `retries`. */
-const stepOf = (budget: number | null, retries: number | null): DraftStep => ({
-  name: 'implement',
-  spec: { ...UNSET, budget, retries },
-  body: 'Build the change.',
-  own: null,
-  schema: null,
-});
+const stepOf = (budget: number | null, retries: number | null) =>
+  ({
+    name: 'implement',
+    spec: { ...UNSET, budget, retries },
+    body: 'Build the change.',
+    own: null,
+    schema: null,
+  }) satisfies DraftStep as DraftStep;
 
 /** The amounts a step's form follows, as the builder's draft holds them. */
 type Args = { budget: number | null; retries: number | null };

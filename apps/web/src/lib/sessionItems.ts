@@ -22,14 +22,14 @@ export type SessionOwn =
 export const [THOUGHT_TOOL, HARNESS_TOOL] = ['Thinking', 'Harness'];
 
 /** What a call asked, as the line draws it: its input as JSON, indented, so a long one reads as more than one line. */
-const askedIn = (call: ToolCall): string | undefined => (call.input === undefined ? undefined : JSON.stringify(call.input, null, 2));
+const askedIn = (call: ToolCall) => (call.input === undefined ? undefined : JSON.stringify(call.input, null, 2));
 
 /**
  * One call as a line of a turn: the tool's glyph and name, the one thing it was about beside it (`detailOf`), and what it asked and what
  * came back, which the line opens to. Failed where its result says so, done where it has one, and otherwise running while the session may
  * still answer it (`running`) — at rest once it cannot.
  */
-const callLine = (call: ToolCall, running: boolean): ConversationLine => {
+const callLine = (call: ToolCall, running: boolean) => {
   const fact = detailOf(call);
   const asked = askedIn(call);
   return {
@@ -40,51 +40,54 @@ const callLine = (call: ToolCall, running: boolean): ConversationLine => {
     state: call.result ? (call.result.isError ? 'error' : 'done') : running ? 'running' : 'pending',
     ...(asked === undefined ? {} : { input: asked }),
     ...(call.result === null ? {} : { result: call.result.text }),
-  };
+  } satisfies ConversationLine;
 };
 
 /** A thought as a line of a turn: what it says is behind the line, as a call's result is, and a thought with no text kept says so. */
-const thoughtLine = (turn: ThinkingTurn): ConversationLine => ({
-  id: turn.key,
-  tool: THOUGHT_TOOL,
-  sentence: turn.text === null ? 'Thought, with no text kept' : 'Thought',
-  state: 'done',
-  ...(turn.text === null ? {} : { result: turn.text }),
-});
+const thoughtLine = (turn: ThinkingTurn) =>
+  ({
+    id: turn.key,
+    tool: THOUGHT_TOOL,
+    sentence: turn.text === null ? 'Thought, with no text kept' : 'Thought',
+    state: 'done',
+    ...(turn.text === null ? {} : { result: turn.text }),
+  }) satisfies ConversationLine;
 
 /** A line the harness wrote between two calls, as a line of the turn it rides in: its words behind the line. */
-const harnessLine = (turn: SystemTurn): ConversationLine => ({
-  id: turn.key,
-  tool: HARNESS_TOOL,
-  sentence: 'A line from the harness',
-  state: 'done',
-  result: turn.text,
-});
+const harnessLine = (turn: SystemTurn) =>
+  ({
+    id: turn.key,
+    tool: HARNESS_TOOL,
+    sentence: 'A line from the harness',
+    state: 'done',
+    result: turn.text,
+  }) satisfies ConversationLine;
 
 /** When a line of a fold happened: its call's time, or its own. */
-const foldedAt = (turn: FoldedTurn): number => Date.parse(turn.kind === 'tool' ? turn.call.at : turn.at);
+const foldedAt = (turn: FoldedTurn) => Date.parse(turn.kind === 'tool' ? turn.call.at : turn.at);
 
 /** How long a fold took, first line to last: 0 where either moment does not parse, as a fold of one line is. */
-const spanOf = (turns: readonly FoldedTurn[]): number => {
+const spanOf = (turns: readonly FoldedTurn[]) => {
   const ms = foldedAt(turns[turns.length - 1]) - foldedAt(turns[0]);
   return Number.isFinite(ms) && ms > 0 ? ms : 0;
 };
 
 /** A fold's lines, in the order they came: its calls, the thoughts among them, and the harness's lines. */
-const linesOf = (turns: readonly FoldedTurn[], running: boolean): ConversationLine[] =>
+const linesOf = (turns: readonly FoldedTurn[], running: boolean) =>
   turns.map((turn) =>
     turn.kind === 'tool' ? callLine(turn.call, running) : turn.kind === 'thinking' ? thoughtLine(turn) : harnessLine(turn),
-  );
+  ) satisfies ConversationLine[];
 
 /** A turn of work on the family's shape: open while one of its calls may still be answered, folded into one line once none may. */
-const workOf = (key: string, turns: readonly FoldedTurn[], running: boolean): ConversationItem<SessionOwn> => ({
-  kind: 'work',
-  id: key,
-  lines: linesOf(turns, running),
-  running: running && turns.some((turn) => turn.kind === 'tool' && turn.call.result === null),
-  ms: spanOf(turns),
-  counts: 'step',
-});
+const workOf = (key: string, turns: readonly FoldedTurn[], running: boolean) =>
+  ({
+    kind: 'work',
+    id: key,
+    lines: linesOf(turns, running),
+    running: running && turns.some((turn) => turn.kind === 'tool' && turn.call.result === null),
+    ms: spanOf(turns),
+    counts: 'step',
+  }) satisfies ConversationItem<SessionOwn>;
 
 /**
  * A step's session on the one shape the family draws (`lib/conversation.ts`), its adapter onto it, `who` naming whoever says its words:
@@ -99,9 +102,9 @@ const workOf = (key: string, turns: readonly FoldedTurn[], running: boolean): Co
  * @param who The name drawn on the session's own words.
  * @param live Whether the session may still add to it.
  */
-export function sessionItems(turns: readonly Turn[], who: string, live: boolean): ConversationItem<SessionOwn>[] {
+export function sessionItems(turns: readonly Turn[], who: string, live: boolean) {
   const tail = tailStart(turns);
-  const own = (key: string, what: SessionOwn): ConversationItem<SessionOwn> => ({ kind: 'own', id: key, own: what });
+  const own = (key: string, what: SessionOwn) => ({ kind: 'own', id: key, own: what }) satisfies ConversationItem<SessionOwn>;
   return turns.map((turn, i) => {
     const running = live && i >= tail;
     switch (turn.kind) {
@@ -120,5 +123,5 @@ export function sessionItems(turns: readonly Turn[], who: string, live: boolean)
       default:
         return workOf(turn.key, [turn], running);
     }
-  });
+  }) satisfies ConversationItem<SessionOwn>[];
 }

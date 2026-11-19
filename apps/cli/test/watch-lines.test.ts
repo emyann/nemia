@@ -5,10 +5,11 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
+import type { FeedStreamLine } from 'objects';
 import { watchedLine } from '../src/watch/lines.ts';
 
 const at = '2026-11-11T10:02:13.000Z';
-const LINES: ReadonlyArray<readonly [object, string]> = [
+const LINES: ReadonlyArray<readonly [FeedStreamLine, string]> = [
   [{ at, run: 'r-1', word: 'running' }, '10:02:13  r-1  —  running'],
   [
     { at, run: 'r-1', step: 'plan', word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' },
@@ -29,10 +30,9 @@ const LINES: ReadonlyArray<readonly [object, string]> = [
 ];
 
 test("the client prints each line of the feed in its words, a factory's headed by its name", () => {
-  for (const [line, words] of LINES) assert.equal(watchedLine(JSON.stringify(line), 0, {}), words, JSON.stringify(line));
+  for (const [line, words] of LINES) assert.equal(watchedLine(line, 0, {}), words, JSON.stringify(line));
 });
 
 test('under --json a line is printed whole, with the cursor just after it', () => {
-  for (const [line] of LINES)
-    assert.deepEqual(JSON.parse(watchedLine(JSON.stringify(line), 412, { json: true })), { ...line, cursor: 412 });
+  for (const [line] of LINES) assert.deepEqual(JSON.parse(watchedLine(line, 412, { json: true })), { ...line, cursor: 412 });
 });

@@ -13,8 +13,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Cause, Effect, Exit, Fiber, Schedule } from 'effect';
-import type { Args } from 'objects';
+import { Cause, Effect, Exit, Fiber, Option, Schedule, Schema } from 'effect';
+import { type Args, FEED_STREAM_EVENTS, FeedStreamEvent } from 'objects';
 import { sessionHeaders, urlOf } from '../client.ts';
 import { served } from '../daemon.ts';
 import { asked as objectsAsked } from '../objects.ts';
@@ -27,7 +27,7 @@ import { bookmarkLine, livenessOf, livenessWords, pausedWords, watchedLine, type
 export const RECONNECT_EVERY = '1 second';
 
 /** What `nemia watch` was asked: `--once`, `--json`, the selectors, the cursor file, the cursor typed. */
-type Asked = { once: boolean; how: Watched; selectors: string[]; cursorFile?: string; cursor?: number };
+export type Asked = { once: boolean; how: Watched; selectors: string[]; cursorFile?: string; cursor?: number };
 
 /**
  * What the parsed words ask (`objects`' `WATCH_WORDS`, its cursor checked by their `check`): refused, exit 2, where a cursor file is named
@@ -153,35 +153,58 @@ async function opened(base: string, asked: Asked, from: number, signal?: AbortSi
 }
 
 /** Where the watch is: the cursor it has read to, and whether the hints were said, which are said once whatever the reconnects. */
-type At = { cursor: number; hinted: boolean };
+export type At = { cursor: number; hinted: boolean };
+
+/** Decodes an event of the stream by `objects`' `FeedStreamEvent`, none where it does not. */
+const decodeSent = Schema.decodeUnknownOption(FeedStreamEvent);
 
 /**
- * One event of the stream, printed as the in-process watch prints it and its cursor kept: the `opened` event the stream opens with,
- * skipped; a line, its id the cursor; a bookmark, which a
- * `--once` read leaves to its end; a hint, said once on stderr; a failed read said on stderr. Answers `cut`
- * for a feed cut under the cursor.
+ * One event of the stream as `objects`' `FeedStreamEvent` decodes it: none for an event of a name the feed does not send, and the name
+ * with no event for one whose data does not decode.
  */
-function onSent(s: Sent, asked: Asked, at: At): 'cut' | undefined {
-  if (s.event === 'opened') return undefined;
-  if (s.event === 'hint') {
-    if (!at.hinted) console.error(`nemia watch: ${(JSON.parse(s.data) as { message: string }).message}`);
+function decodedOf(s: Sent): Option.Option<FeedStreamEvent> | 'undecoded' {
+  if (!FEED_STREAM_EVENTS.some((name) => name === s.event)) return Option.none();
+  const decoded = decodeSent({ event: s.event, data: s.data, ...(s.id !== undefined ? { id: s.id } : {}) });
+  return Option.isSome(decoded) ? decoded : 'undecoded';
+}
+
+/**
+ * One event of the stream, decoded (`decodedOf`), printed as the in-process watch prints it and its cursor kept: the `opened` event the
+ * stream opens with, skipped; a line, its id the cursor; a bookmark, which a `--once` read leaves to its end; a hint, said once on stderr;
+ * a failed read said on stderr. An event of a name the feed does not send is skipped; one whose data does not decode is said on stderr,
+ * by its name, and the watch goes on. Answers `cut` for a feed cut under the cursor.
+ *
+ * @param s the event as the stream sent it: its name, its data and its id
+ * @param asked what `nemia watch` was asked: `--once`, how it prints, and the cursor file it keeps
+ * @param at where the watch is: the cursor it has read to, which a line and a bookmark move, and whether the hints were said
+ */
+export function onSent(s: Sent, asked: Asked, at: At): 'cut' | undefined {
+  const decoded = decodedOf(s);
+  if (decoded === 'undecoded') {
+    console.error(`nemia watch: a \`${s.event}\` event's data could not be read, and is left out; the watch goes on.`);
+    return undefined;
+  }
+  if (Option.isNone(decoded)) return undefined;
+  const e = decoded.value;
+  if (e.event === 'opened') return undefined;
+  if (e.event === 'hint') {
+    if (!at.hinted) console.error(`nemia watch: ${e.data.message}`);
     return undefined;
   }
   at.hinted = true;
-  if (s.event === 'bookmark') {
-    at.cursor = Number(s.id ?? at.cursor);
+  if (e.event === 'bookmark') {
+    at.cursor = Number(e.id);
     if (asked.once) return undefined;
     const printed = bookmarkLine(at.cursor, asked.how);
     if (printed !== undefined) console.log(printed);
     kept(asked.cursorFile, at.cursor);
-  } else if (s.event === 'unreadable') {
-    const { error, retrying } = JSON.parse(s.data) as { error: string; retrying: boolean };
-    console.error(`nemia watch: ${error}`);
-    if (!retrying) return 'cut';
-  } else if (s.event !== 'readable' && s.id !== undefined) {
-    at.cursor = Number(s.id);
+  } else if (e.event === 'unreadable') {
+    console.error(`nemia watch: ${e.data.error}`);
+    if (!e.data.retrying) return 'cut';
+  } else if (e.event !== 'readable') {
+    at.cursor = Number(e.id);
     kept(asked.cursorFile, at.cursor);
-    console.log(watchedLine(s.data, at.cursor, asked.how));
+    console.log(watchedLine(e.data, at.cursor, asked.how));
   }
   return undefined;
 }

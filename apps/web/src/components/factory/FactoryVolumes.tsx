@@ -6,7 +6,7 @@
  * path or a git URL and its mode, sent as the CLI's volume add sends it, the api's refusal shown in its words under the form. Each write
  * reads the factories again.
  */
-import { Fragment, useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, CardContent, Divider, EmptyState, Switch, Tag, TextField, Title } from '@/components/ui/ds';
 import { CutPress, Pending, RadioTile, RadioTileGroup } from '@/components/look';
@@ -49,8 +49,9 @@ const refusalOf = (error: unknown): string | null =>
   error === null || error === undefined ? null : error instanceof Error ? error.message : 'the api answered nothing the board reads.';
 
 /**
- * One volume: its path, its mark, what it is, where it was cloned from, its two switches, each showing the value asked while its own
- * write is out (`asked`), and Remove, pending while its own removal is out. A volume with no stored name has its switches held.
+ * One volume: its path, its mark, what it is, where it was cloned from, its two switches, each named by its label and the volume's
+ * path as Remove is, and showing the value asked while its own write is out (`asked`), and Remove, pending while its own removal is out.
+ * A volume with no stored name has its switches held.
  */
 function VolumeRow({
   volume: v,
@@ -67,10 +68,11 @@ function VolumeRow({
   onRemove: () => void;
   onSwitch: (key: SwitchKey, on: boolean) => void;
 }) {
+  const id = useId();
   return (
     <div data-factory-volume={v.path} className="flex flex-col gap-2">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="min-w-0 font-mono text-body-medium [overflow-wrap:anywhere]">{v.path}</span>
+        <span id={`${id}-path`} className="min-w-0 font-mono text-body-medium [overflow-wrap:anywhere]">{v.path}</span>
         <Tag variant={v.readOnly ? 'tonal' : 'outlined'} className="font-mono" data-volume-mark={v.readOnly ? 'ro' : 'rw'}>
           {v.readOnly ? ':ro' : ':rw'}
         </Tag>
@@ -98,11 +100,12 @@ function VolumeRow({
             labelPosition="start"
             supportingText={sw.means}
             data-volume-switch={sw.key}
+            aria-labelledby={`${id}-${sw.key} ${id}-path`}
             isSelected={asked?.key === sw.key ? asked.on : v[sw.key]}
             isDisabled={held || v.name === null}
             onChange={(on) => onSwitch(sw.key, on)}
           >
-            {sw.label}
+            <span id={`${id}-${sw.key}`}>{sw.label}</span>
           </Switch>
         ))}
       </div>

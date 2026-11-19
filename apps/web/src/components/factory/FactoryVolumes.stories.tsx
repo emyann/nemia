@@ -41,7 +41,7 @@ const labelOf = (canvasElement: HTMLElement, path: string, key: 'claudeMd' | 'sk
 
 /**
  * A read-only folder and a writable one, which is worked on; each with its Remove and its two switches, memory files off and skills on, as
- * a volume that sets neither is.
+ * a volume that sets neither is, each switch named by its label and its volume's path.
  */
 export const Two: Story = {
   args: { factory: { ...factoryView(FACTORY), volumes } },
@@ -52,6 +52,12 @@ export const Two: Story = {
     for (const path of ['/srv/notes', '/srv/scratch']) {
       await expect(switchOf(canvasElement, path, 'claudeMd')).not.toBeChecked();
       await expect(switchOf(canvasElement, path, 'skills')).toBeChecked();
+      await expect(within(canvasElement).getByRole('switch', { name: `Load its memory files ${path}` })).toBe(
+        switchOf(canvasElement, path, 'claudeMd'),
+      );
+      await expect(within(canvasElement).getByRole('switch', { name: `Offer its skills ${path}` })).toBe(
+        switchOf(canvasElement, path, 'skills'),
+      );
     }
     await expect(canvasElement.querySelector('[data-volume-switch="claudeMd"]')).toHaveTextContent('memory files it holds load');
     await expect(canvasElement.querySelector('[data-volume-switch="skills"]')).toHaveTextContent('skills it holds are offered');

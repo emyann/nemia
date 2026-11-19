@@ -2,10 +2,10 @@
  * The factory step's reads and writes as the api answers them, for its stories (`Pages/Welcome factory` and its parts): the templates
  * Nemia builds in typed by `objects`' own `Template` and `TemplateList`, an apply answered by its `FactoryApplied` and a filing by its
  * `FactoryCreated`, so a key the api renames fails the typecheck here; and the MSW handlers a story names in `parameters.msw`, each
- * write's body kept in `sent` for its play to read.
+ * write's body kept in `sent` for its play to read; and the factories listed, the default one and those a person made (`factoriesHeld`).
  */
 import { delay, http, HttpResponse } from 'msw';
-import type { FactoryApplied, FactoryCreated, Template, TemplateList } from 'objects';
+import type { Factory, FactoryApplied, FactoryCreated, FactoryList, Template, TemplateList } from 'objects';
 
 /** sdlc, as the api serves it: a team that builds software, its workflows and agents read. */
 export const SDLC: Template = {
@@ -94,3 +94,27 @@ export const writesRefused = answering([SDLC], true);
 
 /** sdlc and a template Nemia cannot read. */
 export const oneBroken = answering([SDLC, BROKEN]);
+
+/** The factory `name` as the api serves it, on no volume. */
+const factoryNamed = (name: string): Factory => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Factory',
+  metadata: { name, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
+  spec: { hires: {}, volumes: [] },
+  status: { conditions: [], untrusted: [] },
+});
+
+/**
+ * The factories listed: the default one first, then each of `names`.
+ * @param names The factories a person made.
+ */
+export const factoriesHeld = (names: readonly string[]) => [
+  http.get('/api/factories', () =>
+    HttpResponse.json({
+      apiVersion: 'nemia/v1',
+      kind: 'FactoryList',
+      metadata: {},
+      items: ['default', ...names].map(factoryNamed),
+    } satisfies FactoryList),
+  ),
+];

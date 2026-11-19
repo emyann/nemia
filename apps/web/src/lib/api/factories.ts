@@ -191,6 +191,16 @@ export const applyTemplate = (name: string, template: string): Promise<FactoryAp
   factories.apply(name, { template: { name: template } });
 
 /**
+ * The names of the factories a person made, the default factory left out, in the order the api lists them: what the welcome's factory
+ * step names once the store holds one. Under `['factories']`, so a write that reads the factories again reads it too.
+ */
+export const factoryNamesQuery = queryOptions({
+  queryKey: ['factories', 'names'],
+  queryFn: async (): Promise<string[]> =>
+    (await factories.listAll()).items.map((f) => f.metadata.name).filter((name) => name !== DEFAULT_NAMESPACE),
+});
+
+/**
  * The rules of the factory `name`, read from its file on each request.
  * @param name The factory's name.
  */

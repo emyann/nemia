@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { Milestone } from 'objects';
 import { CutButton, PageName } from '@/components/look';
 import { Button } from '@/components/ui/ds';
 import { useHerSheet } from '@/components/frame/HerSheet';
+import { factoryNamesQuery } from '@/lib/api/factories';
 import { milestonesQuery } from '@/lib/api/readiness';
 import { templatesQuery } from '@/lib/api/templates';
 import { factoryStepOf, type FactoryMade, type FactoryWay } from '@/lib/factoryStep';
@@ -53,16 +54,14 @@ export function FactoryStep() {
       <header className="flex flex-col gap-1">
         <PageName>Your first factory</PageName>
         <p className="text-body-medium text-on-surface-variant">
-          A factory is where your workflows run, with the agents it hires. It may start with no volume: you give it one next.
+          A factory is where your workflows run, with the agents it hires. It may start with no volume.
         </p>
       </header>
       {done ? (
-        <section data-factory-made aria-label="The factory made" className="flex flex-col gap-2">
-          <p className="m-0 text-body-large text-on-surface">
-            {made === undefined ? 'The store holds a factory.' : `${made.name} is made.`}
-          </p>
-          <p className="m-0 text-body-medium text-on-surface-variant">It has no volume yet: a volume is the folder its runs work in.</p>
-        </section>
+        <FactoryMadeWords
+          made={made?.name}
+          volumeDone={milestones.data.milestones.some((m) => m.name === 'volume' && m.state === 'done')}
+        />
       ) : (
         <>
           <FactoryWays value={way} onChange={setWay} />
@@ -100,5 +99,31 @@ export function FactoryStep() {
         )}
       </footer>
     </article>
+  );
+}
+
+/**
+ * What the made screen says: the factory this page made, else the factories the store holds, read as the screen comes (the default
+ * factory left out), so one Nemia filed in her chat or one filed at a terminal is named; and, while the store's volume milestone is not
+ * done, that it has no volume yet.
+ */
+function FactoryMadeWords({ made, volumeDone }: { made: string | undefined; volumeDone: boolean }) {
+  const names = useQuery({ ...factoryNamesQuery, enabled: made === undefined });
+  const held = names.data ?? [];
+  return (
+    <section data-factory-made aria-label="The factory made" className="flex flex-col gap-2">
+      <p data-factory-named className="m-0 text-body-large text-on-surface">
+        {made !== undefined
+          ? `${made} is made.`
+          : held.length === 0
+            ? 'The store holds a factory.'
+            : `${held.length === 1 ? 'Your factory' : 'Your factories'}: ${held.join(', ')}.`}
+      </p>
+      {!volumeDone && (
+        <p data-factory-no-volume className="m-0 text-body-medium text-on-surface-variant">
+          It has no volume yet: a volume is the folder its runs work in.
+        </p>
+      )}
+    </section>
   );
 }

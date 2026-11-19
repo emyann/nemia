@@ -43,28 +43,28 @@ export type Routed = { readonly name: string; readonly local: boolean; readonly 
 
 /** Whether `name` is one of `READ_VERBS`: a read the client asks the api for, whose help is still the old path's. */
 const reads: readonly string[] = READ_VERBS;
-const movedRead = (name: string): boolean => reads.includes(name);
+const movedRead = (name: string) => reads.includes(name);
 
 /** Whether `name` is one of `MOVED_COMMANDS`: a command whose words the client holds, help included. */
 const commands: readonly string[] = MOVED_COMMANDS;
-const theClients = (name: string): boolean => commands.includes(name);
+const theClients = (name: string) => commands.includes(name);
 
 /** Whether `name` is one of `CLIENT_VERBS`. */
 const clients: readonly string[] = CLIENT_VERBS;
-const own = (name: string): boolean => clients.includes(name);
+const own = (name: string) => clients.includes(name);
 
 /** Whether `name` is one of `MACHINE_VERBS`. */
 const machines: readonly string[] = MACHINE_VERBS;
-const ofTheMachine = (name: string): boolean => machines.includes(name);
+const ofTheMachine = (name: string) => machines.includes(name);
 
 /** Whether `name` is answered by this client: one of its own verbs, or a command whose words it holds. */
-const answeredHere = (name: string): boolean => own(name) || theClients(name);
+const answeredHere = (name: string) => own(name) || theClients(name);
 
 /**
  * Whether `command`, typed while the context names a remote daemon and asking no help, is a word the client does not answer and that is
  * no verb of this machine: the old path would read this machine's store with it, and no path reaches the remote daemon's.
  */
-const stranded = (command: Routed): boolean =>
+const stranded = (command: Routed) =>
   command.remote && !command.help && !movedRead(command.name) && !answeredHere(command.name) && !ofTheMachine(command.name);
 
 const routeSpec = spec<(command: Routed) => Route>({

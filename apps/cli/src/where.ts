@@ -20,7 +20,7 @@ export const CREDENTIAL_FILE = 'credential';
  * The store's folder: `WF_ROOT`, else `~/.agent-workflows`, as the orchestrator reads it.
  * @param env The environment read for `WF_ROOT`.
  */
-export const storeRoot = (env: NodeJS.ProcessEnv = process.env): string =>
+export const storeRoot = (env: NodeJS.ProcessEnv = process.env) =>
   env.WF_ROOT !== undefined && env.WF_ROOT !== '' ? env.WF_ROOT : path.join(os.homedir(), '.agent-workflows');
 
 /**
@@ -28,7 +28,7 @@ export const storeRoot = (env: NodeJS.ProcessEnv = process.env): string =>
  * in use is not this machine's, whose store is then never read.
  * @param env The environment read for the context in use and `WF_ROOT`.
  */
-export function servedAt(env: NodeJS.ProcessEnv = process.env): string | undefined {
+export function servedAt(env: NodeJS.ProcessEnv = process.env) {
   if (chosenOf(env).kind !== 'local') return undefined;
   let text: string;
   try {
@@ -50,7 +50,7 @@ export function servedAt(env: NodeJS.ProcessEnv = process.env): string | undefin
  * may not read, or a context in use that is not this machine's, whose store is then never read.
  * @param env The environment read for the context in use and `WF_ROOT`.
  */
-export function storeCredential(env: NodeJS.ProcessEnv = process.env): string | undefined {
+export function storeCredential(env: NodeJS.ProcessEnv = process.env) {
   if (chosenOf(env).kind !== 'local') return undefined;
   try {
     const token = fs.readFileSync(path.join(storeRoot(env), CREDENTIAL_FILE), 'utf8').trim();

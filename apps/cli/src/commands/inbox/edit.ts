@@ -15,7 +15,7 @@ const { name: COMMAND } = INBOX_EDIT_WORDS;
  * @param card The card as the api answers it after the write.
  * @param before The card as it was read before the write.
  */
-export const editedLines = (card: Card, before: Card): string[] => {
+export const editedLines = (card: Card, before: Card) => {
   const { name } = card.metadata;
   const title = headline(card.spec.body ?? '');
   const unchanged = card.metadata.resourceVersion === before.metadata.resourceVersion;
@@ -29,7 +29,7 @@ export const editedLines = (card: Card, before: Card): string[] => {
  * `nemia inbox edit`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function inboxEdit(args: Args): Promise<number> {
+export async function inboxEdit(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const source = textOrFile(textArg(args, 'source') ?? '', COMMAND, `nemia inbox edit ${name} ./card.md`);
   const before = await asked(COMMAND, (c) => c.cards.getAll({ params: { name } }));

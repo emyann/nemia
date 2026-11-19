@@ -16,7 +16,7 @@ import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 const InPlay = Schema.Struct({ status: Schema.Struct({ inPlay: Schema.Boolean }) });
 
 /** Whether a row's object is a card the api counts in play. */
-const inPlay = (row: Table['rows'][number]): boolean => {
+const inPlay = (row: Table['rows'][number]) => {
   const read = Schema.decodeUnknownOption(InPlay)(row.object);
   return read._tag === 'Some' && read.value.status.inPlay;
 };
@@ -29,7 +29,7 @@ const inPlay = (row: Table['rows'][number]): boolean => {
  * @param selector The label selectors typed with `-l`, none where none was.
  * @param ended How many cards were left out for their run having ended.
  */
-export const inboxSaid = (listed: number, selector: readonly string[], ended: number): string =>
+export const inboxSaid = (listed: number, selector: readonly string[], ended: number) =>
   listed
     ? `\nstart one: nemia start <name> [--workflows <w>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`
     : ended
@@ -42,7 +42,7 @@ export const inboxSaid = (listed: number, selector: readonly string[], ended: nu
  * Prints the cards `args` asks for, as the server prints their table, and how to start, queue or drop one; answers 0.
  * @param args The command's words as parsed against `INBOX_READ_WORDS`.
  */
-export async function inbox(args: Args): Promise<number> {
+export async function inbox(args: Args) {
   const all = switchArg(args, 'all');
   const read = tableAsked(args);
   const selector = [...read.selector];

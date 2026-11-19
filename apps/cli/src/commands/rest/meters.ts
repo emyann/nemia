@@ -8,17 +8,17 @@ import { asked } from '../../objects.ts';
 import { said, switchArg, textArg } from '../requests.ts';
 
 /** A time in milliseconds as a pass's line says it: whole from 100, one decimal from 10, two below. */
-const msWord = (ms: number): string => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.toFixed(1) : ms.toFixed(2));
+const msWord = (ms: number) => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.toFixed(1) : ms.toFixed(2));
 
 /** `n` of a thing, its plural past one. */
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** A bucket's bound as a person reads it: `≤ 100 ms`, and `> 5000 ms` for the last. */
-const bucketWord = (b: PassesRead['histogram'][number], bounds: readonly number[]): string =>
+const bucketWord = (b: PassesRead['histogram'][number], bounds: readonly number[]) =>
   b.le === null ? `> ${bounds.at(-1)} ms` : `≤ ${b.le} ms`;
 
 /** `nemia passes`' lines: the summary, the histogram a row a bucket from the first to the last with passes, and the parts. */
-export const passesLines = ({ recent, histogram, parts, summary, bounds }: PassesRead): string[] => {
+export const passesLines = ({ recent, histogram, parts, summary, bounds }: PassesRead) => {
   const [oldest] = recent;
   if (!summary || !oldest) return ['no pass is kept yet: nemia up, or the api, ticks the store and keeps its last passes'];
   const first = histogram.findIndex((b) => b.count > 0);
@@ -42,10 +42,10 @@ export const passesLines = ({ recent, histogram, parts, summary, bounds }: Passe
 const SERIES_LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part', 'kind'] as const;
 
 /** A value as a series' line says it: whole from 100, else two decimals. */
-const round = (v: number): string => (Math.abs(v) >= 100 ? `${Math.round(v)}` : v.toFixed(2));
+const round = (v: number) => (Math.abs(v) >= 100 ? `${Math.round(v)}` : v.toFixed(2));
 
 /** A label set as a person reads it: `phase=place`, nothing for none; a key no line carries is left out. */
-const labelWords = (l: Readonly<Record<string, string>>): string =>
+const labelWords = (l: Readonly<Record<string, string>>) =>
   SERIES_LABEL_KEYS.filter((k) => l[k] !== undefined)
     .map((k) => `${k}=${l[k]}`)
     .join(' ');
@@ -54,7 +54,7 @@ const labelWords = (l: Readonly<Record<string, string>>): string =>
  * `nemia series`' lines: the range, then a line a series and label set, its points' count, and its latest and highest.
  * @param read The series the api answers: the range, the span of a point, and each series's points.
  */
-export const seriesLines = (read: SeriesRead): string[] =>
+export const seriesLines = (read: SeriesRead) =>
   read.series.length
     ? [
         `${read.range}, a point a ${read.span}, from ${read.from} to ${read.to}:`,
@@ -68,13 +68,13 @@ export const seriesLines = (read: SeriesRead): string[] =>
     : [`nothing is kept for ${read.range} yet: nemia up, or the api, ticks the store and keeps its series a minute at a time`];
 
 /** The answer as `--json` prints it: the whole of it, indented. */
-const jsonLines = (answer: unknown): string[] => [JSON.stringify(answer, null, 2)];
+const jsonLines = (answer: unknown) => [JSON.stringify(answer, null, 2)];
 
 /**
  * `nemia passes`' runner: the recent passes, the last `--last` of them where given.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function passes(args: Args): Promise<number> {
+export async function passes(args: Args) {
   const last = textArg(args, 'last');
   const read = await asked(PASSES_WORDS.name, (c) => c.server.passes({ query: last === undefined ? {} : { last } }));
   said(switchArg(args, 'json') ? jsonLines(read) : passesLines(read));
@@ -85,7 +85,7 @@ export async function passes(args: Args): Promise<number> {
  * `nemia series`' runner: the system's series over `--range`, 24h where none is given.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function series(args: Args): Promise<number> {
+export async function series(args: Args) {
   const range = textArg(args, 'range');
   const read = await asked(SERIES_WORDS.name, (c) => c.server.series({ query: range === undefined ? {} : { range } }));
   said(switchArg(args, 'json') ? jsonLines(read) : seriesLines(read));

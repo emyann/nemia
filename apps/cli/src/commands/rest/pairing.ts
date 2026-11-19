@@ -12,7 +12,7 @@ import { asked } from '../../objects.ts';
 import { said, textArg } from '../requests.ts';
 
 /** `nemia pairings ls`' runner: a line a pairing, newest first, or that none is kept. */
-export async function pairingsLs(): Promise<number> {
+export async function pairingsLs() {
   const { pairings } = await asked(PAIRINGS_LS_WORDS.name, (c) => c.pairings.list());
   said(
     pairings.length
@@ -26,7 +26,7 @@ export async function pairingsLs(): Promise<number> {
  * `nemia pairings approve <code>`'s runner: the pairing approved, and how its token is named and revoked.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function pairingsApprove(args: Args): Promise<number> {
+export async function pairingsApprove(args: Args) {
   const code = textArg(args, 'code') ?? '';
   const p = await asked(PAIRINGS_APPROVE_WORDS.name, (c) => c.pairings.approve({ payload: { code } }));
   said([
@@ -40,7 +40,7 @@ export async function pairingsApprove(args: Args): Promise<number> {
  * `nemia board link`'s runner: the link, under `--base` where given, else where the api says the board is, and how long it holds.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function boardLink(args: Args): Promise<number> {
+export async function boardLink(args: Args) {
   const base = textArg(args, 'base');
   const { url, expiresAt } = await asked(BOARD_LINK_WORDS.name, (c) => c.links.mint({ payload: base === undefined ? {} : { base } }));
   said([url, `open it once, until ${expiresAt}: it signs that browser in, and no other`]);
@@ -54,7 +54,7 @@ export async function boardLink(args: Args): Promise<number> {
  * printed, how long it holds, and why it was not opened.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function boardOpen(args: Args): Promise<number> {
+export async function boardOpen(args: Args) {
   const chosen = chosenOf();
   const base = textArg(args, 'base') ?? (chosen.kind === 'remote' ? chosen.server : undefined);
   const { url, expiresAt } = await asked(OPEN_WORDS.name, (c) => c.links.mint({ payload: base === undefined ? {} : { base } }));

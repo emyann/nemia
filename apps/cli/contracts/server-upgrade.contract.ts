@@ -41,16 +41,16 @@ export type UpgradeTarget =
   | { readonly kind: 'refused'; readonly reason: UpgradeTargetRefusal };
 
 /** Whether `output` asks for exactly `tag`. */
-const asks = (output: UpgradeTarget, tag: string): boolean => output.kind === 'tag' && output.tag === tag;
+const asks = (output: UpgradeTarget, tag: string) => output.kind === 'tag' && output.tag === tag;
 
 /** Whether `output` is refused for `reason`. */
-const refusedFor = (output: UpgradeTarget, reason: UpgradeTargetRefusal): boolean => output.kind === 'refused' && output.reason === reason;
+const refusedFor = (output: UpgradeTarget, reason: UpgradeTargetRefusal) => output.kind === 'refused' && output.reason === reason;
 
 /** Nothing was typed but the verb: the newest release the server read is the one asked for. */
-const bare = (asked: ServerUpgradeAsked): boolean => asked.tag === null && !asked.back;
+const bare = (asked: ServerUpgradeAsked) => asked.tag === null && !asked.back;
 
 /** `--back` alone was typed. */
-const backAlone = (asked: ServerUpgradeAsked): boolean => asked.tag === null && asked.back;
+const backAlone = (asked: ServerUpgradeAsked) => asked.tag === null && asked.back;
 
 const upgradeTargetSpec = spec<(asked: ServerUpgradeAsked, read: ServerUpgradeRead) => UpgradeTarget>({
   ensures: {

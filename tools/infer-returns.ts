@@ -573,6 +573,7 @@ const pin = (site: string, type: string, upcast: boolean) => {
       };
       ts.forEachChild((node as ts.FunctionLikeDeclaration).body!, visit);
     }
+    const pinned = isAsync(node) ? (/^Promise<([\s\S]*)>$/.exec(type)?.[1] ?? type) : type;
     for (const value of values) {
       const start = value.getStart(source);
       const bare =
@@ -586,7 +587,7 @@ const pin = (site: string, type: string, upcast: boolean) => {
       edits.push({
         start: value.getEnd(),
         end: value.getEnd(),
-        text: `${bare ? '' : ')'} satisfies ${type}${upcast ? ` as ${type}` : ''}`,
+        text: `${bare ? '' : ')'} satisfies ${pinned}${upcast ? ` as ${pinned}` : ''}`,
       });
     }
   }

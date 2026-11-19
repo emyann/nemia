@@ -41,7 +41,7 @@ Read the objects of a resource the api serves, or one by its name. The resources
 const OUTPUTS: readonly Output[] = ['json', 'yaml', 'name'];
 
 /** The word after an option, refused where none follows. */
-const valueOf = (args: readonly string[], at: number, option: string): string => {
+const valueOf = (args: readonly string[], at: number, option: string) => {
   const value = args[at + 1];
   if (value === undefined || value.startsWith('-'))
     throw new Refused(`nemia get: ${option} takes a value after it; see \`nemia get --help\``);
@@ -49,14 +49,14 @@ const valueOf = (args: readonly string[], at: number, option: string): string =>
 };
 
 /** The output `-o` names, refused where it names none `get` prints. */
-const outputOf = (format: string): Output => {
+const outputOf = (format: string) => {
   const output = OUTPUTS.find((o) => o === format);
   if (output === undefined) throw new Refused(`nemia get: -o takes json, yaml or name; see \`nemia get --help\``);
   return output;
 };
 
 /** The options of `args` read into `out`, and the words that are no option's. */
-function optionsOf(args: readonly string[], out: GetAsked): string[] {
+function optionsOf(args: readonly string[], out: GetAsked) {
   const words: string[] = [];
   for (let at = 0; at < args.length; at++) {
     const arg = args[at] ?? '';
@@ -74,7 +74,7 @@ function optionsOf(args: readonly string[], out: GetAsked): string[] {
 }
 
 /** What `args` ask of `get`. */
-function parsed(args: readonly string[]): GetAsked {
+function parsed(args: readonly string[]) {
   const out: GetAsked = { word: '', name: undefined, namespace: undefined, all: false, selector: [], output: 'table' };
   const [first, second, ...more] = optionsOf(args, out);
   if (first === undefined) throw new Refused('nemia get: name a resource, `nemia get <resource>`; the resources are in `nemia explain`');
@@ -91,7 +91,7 @@ function parsed(args: readonly string[]): GetAsked {
  * @param at The moment, an ISO date; one that does not parse is `<unknown>`.
  * @param now The moment the age is counted to, in ms since the epoch: now where it is left out.
  */
-export const ageOf = (at: string, now: number = Date.now()): string => {
+export const ageOf = (at: string, now: number = Date.now()) => {
   const ms = now - Date.parse(at);
   if (!Number.isFinite(ms)) return '<unknown>';
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -102,7 +102,7 @@ export const ageOf = (at: string, now: number = Date.now()): string => {
 };
 
 /** An object's state as its status says it: its `phase`, else its `state`. */
-const stateOf = (object: Served): string => {
+const stateOf = (object: Served) => {
   const status = object.status;
   if (typeof status !== 'object' || status === null) return '<none>';
   const said = 'phase' in status ? status.phase : 'state' in status ? status.state : undefined;
@@ -115,7 +115,7 @@ const stateOf = (object: Served): string => {
  * @param all Whether the list is across every namespace, which puts NAMESPACE first.
  * @param now The moment each AGE is counted to, in ms since the epoch: now where it is left out.
  */
-export function tableOf(objects: readonly Served[], all: boolean, now: number = Date.now()): string[] {
+export function tableOf(objects: readonly Served[], all: boolean, now: number = Date.now()) {
   const rows = [
     [...(all ? ['NAMESPACE'] : []), 'NAME', 'STATE', 'AGE'],
     ...objects.map((o) => [
@@ -135,11 +135,11 @@ export function tableOf(objects: readonly Served[], all: boolean, now: number = 
 }
 
 /** What `get` prints of `answer`, a page or one object, in `output`. */
-const printed = (answer: unknown, output: 'json' | 'yaml'): string =>
+const printed = (answer: unknown, output: 'json' | 'yaml') =>
   output === 'json' ? `${JSON.stringify(answer, null, 2)}\n` : stringify(answer);
 
 /** One object of `resource` by its name, printed as `typed` asks. */
-async function getOne(resource: APIResource, typed: GetAsked, name: string): Promise<number> {
+async function getOne(resource: APIResource, typed: GetAsked, name: string) {
   const calls = KIND_CALLS[resource.kind];
   const call =
     !resource.namespaced || (typed.namespace === undefined && calls.get.all !== undefined)
@@ -155,14 +155,14 @@ async function getOne(resource: APIResource, typed: GetAsked, name: string): Pro
 }
 
 /** Why a list is empty, as stderr says it: the resource, where it was listed, and the selectors. */
-const noneFound = (resource: APIResource, typed: GetAsked): string => {
+const noneFound = (resource: APIResource, typed: GetAsked) => {
   const where = !resource.namespaced ? '' : typed.all ? ' in any namespace' : ` in namespace ${typed.namespace ?? DEFAULT_NAMESPACE}`;
   const matching = typed.selector.length ? ` matching -l ${typed.selector.join(' -l ')}` : '';
   return `No ${resource.name} found${where}${matching}.`;
 };
 
 /** The objects of `resource`, in a namespace or across all, printed as `typed` asks. */
-async function getList(resource: APIResource, typed: GetAsked): Promise<number> {
+async function getList(resource: APIResource, typed: GetAsked) {
   const calls = KIND_CALLS[resource.kind];
   const call =
     !resource.namespaced || typed.all
@@ -185,7 +185,7 @@ async function getList(resource: APIResource, typed: GetAsked): Promise<number> 
  * or throws its refusal.
  * @param args The words typed after `get`: the resource, a name, and the options `--help` lists.
  */
-export async function get(args: readonly string[]): Promise<number> {
+export async function get(args: readonly string[]) {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(GET_HELP);
     return 0;

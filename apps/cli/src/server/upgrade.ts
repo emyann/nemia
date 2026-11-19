@@ -15,7 +15,7 @@
  */
 import { Effect, Schema } from 'effect';
 import { Answered, Upgrade, type UpgradesRead, type VersionAnswer } from 'objects';
-import type { ServerUpgradeAsked, ServerUpgradeRead, UpgradeTargetRefusal } from '../../contracts/server-upgrade.contract.ts';
+import type { UpgradeTargetRefusal } from '../../contracts/server-upgrade.contract.ts';
 import { sessionHeaders, urlOf } from '../client.ts';
 import { probed, served } from '../daemon.ts';
 import { askedAcross } from '../objects.ts';
@@ -57,10 +57,10 @@ const STDIO: Speak = { out: (text) => process.stdout.write(text), err: (text) =>
 export type ServerUpgradeSeams = { readonly client: string | null; readonly speak: Speak; readonly backWithinMs: number };
 
 /** A `nemia server` typed otherwise than its usage: refused, exit 2, naming it. */
-const misused = (said: string): Refused => new Refused(`nemia server: ${said}. Type one of:\n${USAGE.join('\n')}`);
+const misused = (said: string) => new Refused(`nemia server: ${said}. Type one of:\n${USAGE.join('\n')}`);
 
 /** The words after `upgrade`, read; refused where they are not a tag or `--back`. */
-function askedOf(args: readonly string[]): ServerUpgradeAsked {
+function askedOf(args: readonly string[]) {
   const flags = args.filter((word) => word.startsWith('-'));
   const unknown = flags.find((word) => word !== '--back');
   if (unknown !== undefined) throw misused(`\`upgrade\` takes no ${unknown}`);
@@ -82,13 +82,13 @@ const TARGET_REFUSED: Readonly<Record<UpgradeTargetRefusal, string>> = {
 };
 
 /** A server older than the remote upgrade, which serves no `/api/upgrades`: refused, naming the upgrade on its own machine. */
-const predates = (base: string): Refused =>
+const predates = (base: string) =>
   new Refused(
     `nemia server upgrade: the server at ${base} is older than the upgrade through its api (it serves no /api/upgrades). Upgrade it once on its own machine, \`nemia upgrade <tag>\`, then type \`nemia server upgrade\` from here`,
   );
 
 /** The server's releases as `upgradeTarget` reads them; `unserved` where it serves no `/api/upgrades`. */
-async function readOf(env: NodeJS.ProcessEnv): Promise<ServerUpgradeRead | 'unserved'> {
+async function readOf(env: NodeJS.ProcessEnv) {
   const [version, upgrades] = await Promise.all([
     askedAcross(ASKED_AS, (client) => client.server.version(), env),
     askedAcross(
@@ -107,7 +107,7 @@ async function readOf(env: NodeJS.ProcessEnv): Promise<ServerUpgradeRead | 'unse
 }
 
 /** `version` and `upgrades` as `upgradeTarget` reads them. */
-const readFrom = (version: VersionAnswer, upgrades: UpgradesRead): ServerUpgradeRead => ({
+const readFrom = (version: VersionAnswer, upgrades: UpgradesRead) => ({
   latest: version.latest === undefined ? null : { newer: version.latest.newer, tag: version.latest.tag ?? null },
   previous: upgrades.previous === null ? null : { tag: upgrades.previous.tag, refused: upgrades.previous.refused !== undefined },
 });
@@ -121,34 +121,24 @@ type Opened = Upgrade | 'dropped' | 'unopened';
  * The output of upgrade `id` at `base`, read once, each chunk printed past the `printed` characters already said (a reopened stream
  * sends from the first byte); answers how it ended and how many characters it has now said.
  */
-async function streamed(
-  base: string,
-  id: string,
-  printed: number,
-  env: NodeJS.ProcessEnv,
-  speak: Speak,
-): Promise<{ readonly opened: Opened; readonly printed: number }> {
+async function streamed(base: string, id: string, printed: number, env: NodeJS.ProcessEnv, speak: Speak) {
   let response: Response;
   try {
     response = await fetch(urlOf(base, `/api/upgrades/${encodeURIComponent(id)}/output`), {
       headers: { accept: 'text/event-stream', ...sessionHeaders(env) },
     });
   } catch {
-    return { opened: 'unopened', printed };
+    return { opened: 'unopened', printed } satisfies { readonly opened: Opened; readonly printed: number };
   }
   if (!response.ok || response.body === null) {
     await response.body?.cancel();
-    return { opened: 'unopened', printed };
+    return { opened: 'unopened', printed } satisfies { readonly opened: Opened; readonly printed: number };
   }
   return readTo(response.body.getReader(), printed, speak);
 }
 
 /** A stream's events read to its end, each `output` chunk printed past the `printed` characters already said. */
-async function readTo(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  printed: number,
-  speak: Speak,
-): Promise<{ readonly opened: Opened; readonly printed: number }> {
+async function readTo(reader: ReadableStreamDefaultReader<Uint8Array>, printed: number, speak: Speak) {
   const decoder = new TextDecoder();
   let text = '';
   let at = 0;
@@ -156,11 +146,19 @@ async function readTo(
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) return { opened: 'dropped', printed: said };
+      if (done)
+        return { opened: 'dropped', printed: said } satisfies { readonly opened: Opened; readonly printed: number } as {
+          readonly opened: Opened;
+          readonly printed: number;
+        };
       const { sent, rest } = blocksOf(text + decoder.decode(value, { stream: true }));
       text = rest;
       for (const s of sent) {
-        if (s.event === 'ended') return { opened: decodeUpgrade(JSON.parse(s.data)), printed: said };
+        if (s.event === 'ended')
+          return { opened: decodeUpgrade(JSON.parse(s.data)), printed: said } satisfies {
+            readonly opened: Opened;
+            readonly printed: number;
+          } as { readonly opened: Opened; readonly printed: number };
         if (s.event !== 'output') continue;
         if (said - at < s.data.length) speak.out(s.data.slice(Math.max(0, said - at)));
         at += s.data.length;
@@ -168,14 +166,17 @@ async function readTo(
       }
     }
   } catch {
-    return { opened: 'dropped', printed: said };
+    return { opened: 'dropped', printed: said } satisfies { readonly opened: Opened; readonly printed: number } as {
+      readonly opened: Opened;
+      readonly printed: number;
+    };
   } finally {
     await reader.cancel().catch(() => undefined);
   }
 }
 
 /** Whether the daemon at `base` answers its health, polled every `POLL_MS` until `deadline`. */
-async function answersBy(base: string, deadline: number, env: NodeJS.ProcessEnv): Promise<boolean> {
+async function answersBy(base: string, deadline: number, env: NodeJS.ProcessEnv) {
   for (;;) {
     if ((await probed(base, env)).probe === 'answers') return true;
     if (Date.now() >= deadline) return false;
@@ -184,7 +185,7 @@ async function answersBy(base: string, deadline: number, env: NodeJS.ProcessEnv)
 }
 
 /** Upgrade `id` as the server says it now; undefined where it cannot be read. */
-const upgradeNow = (id: string, env: NodeJS.ProcessEnv): Promise<Upgrade | undefined> =>
+const upgradeNow = (id: string, env: NodeJS.ProcessEnv) =>
   askedAcross(ASKED_AS, (client) => client.upgrades.upgradeOf({ params: { id } }), env).catch(() => undefined);
 
 /**
@@ -192,7 +193,7 @@ const upgradeNow = (id: string, env: NodeJS.ProcessEnv): Promise<Upgrade | undef
  * again each time it closes without its end, once the daemon answers again; the `Upgrade` it ended with, or the last read of it where
  * the server did not end it within `backWithinMs` of the stream first closing, the restart, which is when that bound starts.
  */
-async function followed(base: string, started: Upgrade, env: NodeJS.ProcessEnv, seams: ServerUpgradeSeams): Promise<Upgrade> {
+async function followed(base: string, started: Upgrade, env: NodeJS.ProcessEnv, seams: ServerUpgradeSeams) {
   let deadline: number | undefined;
   let printed = 0;
   let last = started;
@@ -212,7 +213,7 @@ async function followed(base: string, started: Upgrade, env: NodeJS.ProcessEnv, 
 }
 
 /** What the verb says once `ended` ended at `base`, this nemia being of `client`; answers the exit code. */
-async function said(base: string, ended: Upgrade, env: NodeJS.ProcessEnv, seams: ServerUpgradeSeams): Promise<number> {
+async function said(base: string, ended: Upgrade, env: NodeJS.ProcessEnv, seams: ServerUpgradeSeams) {
   const { speak } = seams;
   const now = ended.phase === 'succeeded' ? (await probed(base, env)).release : null;
   const end = upgradeEnd(ended.phase, seams.client, now);
@@ -234,7 +235,7 @@ async function said(base: string, ended: Upgrade, env: NodeJS.ProcessEnv, seams:
 }
 
 /** `nemia server upgrade …`, on the words after `upgrade`: answers its exit code, or throws its refusal. */
-async function upgrade(args: readonly string[], env: NodeJS.ProcessEnv, seams: ServerUpgradeSeams): Promise<number> {
+async function upgrade(args: readonly string[], env: NodeJS.ProcessEnv, seams: ServerUpgradeSeams) {
   const asked = askedOf(args);
   const base = await served(ASKED_AS, env, null);
   const read = await readOf(env);
@@ -260,7 +261,7 @@ export async function server(
   args: readonly string[],
   env: NodeJS.ProcessEnv = process.env,
   seams: ServerUpgradeSeams = { client: clientRelease(), speak: STDIO, backWithinMs: BACK_WITHIN_MS },
-): Promise<number> {
+) {
   if (args.includes('-h') || args.includes('--help')) {
     seams.speak.out(`${USAGE.join('\n')}\n`);
     return 0;
@@ -275,5 +276,5 @@ export async function server(
  * @param name The remote context's name.
  * @param at The url of the context's server.
  */
-export const serverHint = (name: string, at: string): string =>
+export const serverHint = (name: string, at: string) =>
   `nemia upgrade is this machine's install. The server of the context ${name}, at ${at}, is upgraded from here with \`nemia server upgrade [<tag>]\`\n`;

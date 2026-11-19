@@ -12,7 +12,7 @@ import { namespaceOfCard, namespaceOfRun, said, switchArg, textArg } from '../re
  * absent — then the labels as they stand.
  * @param edits Each edit as typed: `key=value` to set, `key-` to remove.
  */
-export function labelledLines({ kind, name, labels, was }: Labelled, edits: readonly string[]): string[] {
+export function labelledLines({ kind, name, labels, was }: Labelled, edits: readonly string[]) {
   const what = kind === 'Run' ? `run ${name}` : `card ${name}`;
   const lines = edits.map((edit) => {
     const at = edit.indexOf('=');
@@ -35,7 +35,7 @@ const editOf = (args: Args) => ({ labels: [...labelEdits(args)], ...(switchArg(a
  * `nemia label run`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function labelRun(args: Args): Promise<number> {
+export async function labelRun(args: Args) {
   const command = LABEL_RUN_WORDS.name;
   const name = textArg(args, 'runId') ?? '';
   const namespace = await namespaceOfRun(command, name);
@@ -48,7 +48,7 @@ export async function labelRun(args: Args): Promise<number> {
  * `nemia label inbox`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function labelInbox(args: Args): Promise<number> {
+export async function labelInbox(args: Args) {
   const command = LABEL_INBOX_WORDS.name;
   const name = textArg(args, 'name') ?? '';
   const namespace = await namespaceOfCard(command, name);

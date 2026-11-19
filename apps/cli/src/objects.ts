@@ -33,7 +33,7 @@ const isRefusal = (err: unknown): err is { readonly error: string } =>
   typeof err === 'object' && err !== null && typeof (err as { readonly error?: unknown }).error === 'string';
 
 /** The first failure of `exit`, if it failed with one. */
-const failureOf = <A, E>(exit: Exit.Exit<A, E>): E | undefined =>
+const failureOf = <A, E>(exit: Exit.Exit<A, E>) =>
   Exit.isFailure(exit) ? Option.getOrUndefined(Cause.findErrorOption(exit.cause)) : undefined;
 
 /**
@@ -56,7 +56,7 @@ const attempt = <A, E>(
   );
 
 /** A daemon that took the read and did not answer it within `boundMs`: refused, naming its status and its restart. */
-const notInTime = (verb: string, base: string, boundMs: number): Refused =>
+const notInTime = (verb: string, base: string, boundMs: number) =>
   new Refused(
     `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`, or restart it, \`nemia service restart\``,
   );
@@ -68,7 +68,7 @@ const notInTime = (verb: string, base: string, boundMs: number): Refused =>
 export type Releases = { readonly daemon: string | null | undefined; readonly client: string | null };
 
 /** How `releases` say each side: the daemon's release or that it says none, this client's tag or that it is a checkout. */
-const sidesOf = ({ daemon, client }: Releases): string =>
+const sidesOf = ({ daemon, client }: Releases) =>
   `the daemon ${daemon === undefined ? 'was not asked its release' : daemon === null ? 'says no release (GET /api/health)' : `runs ${daemon}`}, and this nemia is ${client ?? 'a checkout'}`;
 
 /**
@@ -80,7 +80,7 @@ const sidesOf = ({ daemon, client }: Releases): string =>
  * @param failed What the decode failed with, its message named.
  * @param releases The daemon's release and this client's, as far as they are known.
  */
-export const undecoded = (verb: string, base: string, failed: unknown, releases: Releases): Refused =>
+export const undecoded = (verb: string, base: string, failed: unknown, releases: Releases) =>
   new Refused(
     `nemia ${verb}: the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): ${sidesOf(releases)}. ` +
       "Type `nemia version` on both machines, then upgrade the older to the other's release: this machine with `nemia upgrade <tag>`, the server with `nemia server upgrade <tag>`; or run this command with the nemia of the daemon's release",
@@ -90,7 +90,7 @@ export const undecoded = (verb: string, base: string, failed: unknown, releases:
  * The answer of `exit`, or the refusal it is as a person reads it, for the read `verb` names, of the daemon at `base`, which had `boundMs`
  * to answer, the two sides being of `releases`.
  */
-function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, boundMs: number, releases: Releases): A {
+function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, boundMs: number, releases: Releases) {
   if (Exit.isSuccess(exit)) return exit.value;
   const failed = failureOf(exit);
   if (failed === undefined) throw Cause.squash(exit.cause);
@@ -127,9 +127,12 @@ export async function asked<A, E>(
   env: NodeJS.ProcessEnv = process.env,
   boundMs: number = READ_BOUND_MS,
   headers: Readonly<Record<string, string>> = {},
-): Promise<A> {
+) {
   const { base, release } = await servedWith(verb, env);
-  return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs, { daemon: release, client: clientRelease() });
+  return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs, {
+    daemon: release,
+    client: clientRelease(),
+  }) satisfies A as A;
 }
 
 /**
@@ -146,7 +149,7 @@ export async function askedAcross<A, E>(
   call: (client: ObjectsClient) => Effect.Effect<A, E>,
   env: NodeJS.ProcessEnv = process.env,
   boundMs: number = READ_BOUND_MS,
-): Promise<A> {
+) {
   const { base, release } = await servedWith(verb, env, null);
   return answerOf(await attempt(base, call, boundMs, env, {}), verb, base, boundMs, { daemon: release, client: clientRelease() });
 }
@@ -165,8 +168,11 @@ export async function askedBare<A, E>(
   base: string,
   call: (client: ObjectsClient) => Effect.Effect<A, E>,
   boundMs: number = READ_BOUND_MS,
-): Promise<A> {
-  return answerOf(await attempt(base, call, boundMs, {}, {}, false), verb, base, boundMs, { daemon: undefined, client: clientRelease() });
+) {
+  return answerOf(await attempt(base, call, boundMs, {}, {}, false), verb, base, boundMs, {
+    daemon: undefined,
+    client: clientRelease(),
+  }) satisfies A as A;
 }
 
 /**
@@ -174,14 +180,12 @@ export async function askedBare<A, E>(
  * `Table` all the same is an api this client does not read, said as such.
  * @param listed The list asked for, which answers its page or a `Table`.
  */
-export const pageOf = <L extends { readonly items: readonly unknown[] }, E>(
-  listed: Effect.Effect<L | Table, E>,
-): Effect.Effect<L, E | Error> =>
+export const pageOf = <L extends { readonly items: readonly unknown[] }, E>(listed: Effect.Effect<L | Table, E>) =>
   Effect.flatMap(listed, (list) =>
     'items' in list
       ? Effect.succeed(list)
       : Effect.fail(new Error('the api answered a Table to a list asked for its objects: restart it, `nemia service restart`')),
-  );
+  ) satisfies Effect.Effect<L, E | Error> as Effect.Effect<L, E | Error>;
 
 /** The page of a list asked: `limit`, and past the first page the `continue` the page before answered, sent back as it is. */
 export type PageAsked = { readonly limit: string; readonly continue?: string };
@@ -193,7 +197,7 @@ type Paged = { readonly metadata: { readonly continue?: string } } & (
 );
 
 /** The pages of one list read as one: the first page's shape, every page's objects or rows in order, the last page's metadata. */
-const joined = <P extends Paged>(first: P, pages: readonly P[]): P => {
+const joined = <P extends Paged>(first: P, pages: readonly P[]) => {
   const { metadata } = pages.at(-1) ?? first;
   return 'rows' in first
     ? Object.assign({}, first, { metadata, rows: pages.flatMap((page) => ('rows' in page ? page.rows : [])) })
@@ -207,7 +211,7 @@ const joined = <P extends Paged>(first: P, pages: readonly P[]): P => {
  * be asked forever, refused naming the restart.
  * @param ask Asks for one page of the list, given its `limit` and the `continue` the page before answered.
  */
-export const everyPage = <P extends Paged, E>(ask: (page: PageAsked) => Effect.Effect<P, E>): Effect.Effect<P, E | Error> =>
+export const everyPage = <P extends Paged, E>(ask: (page: PageAsked) => Effect.Effect<P, E>) =>
   Effect.gen(function* () {
     const limit = String(LIST_PAGE.most);
     const first = yield* ask({ limit });
@@ -225,7 +229,7 @@ export const everyPage = <P extends Paged, E>(ask: (page: PageAsked) => Effect.E
       next = page.metadata.continue;
     }
     return joined(first, pages);
-  });
+  }) satisfies Effect.Effect<P, E | Error> as Effect.Effect<P, E | Error>;
 
 /**
  * The factories the api lists (`FactoryList`, `GET /api/factories`), every page, the default first, on no repository, for the read
@@ -241,11 +245,11 @@ export const factoriesListed = (verb: string, env: NodeJS.ProcessEnv = process.e
  * @param verb The verb the person typed, named in a refusal.
  * @param env The environment read for the context in use, the store and the token.
  */
-export const discovered = async (verb: string, env: NodeJS.ProcessEnv = process.env): Promise<readonly APIResource[]> =>
+export const discovered = async (verb: string, env: NodeJS.ProcessEnv = process.env) =>
   (await asked(verb, (client) => client.discovery.resources(), env)).resources;
 
 /** The kinds' own resources of `resources`, by their plurals: what a refusal names. */
-const servedNames = (resources: readonly APIResource[]): string =>
+const servedNames = (resources: readonly APIResource[]) =>
   resources
     .filter((r) => !r.name.includes('/'))
     .map((r) => r.name)
@@ -258,7 +262,7 @@ const servedNames = (resources: readonly APIResource[]): string =>
  * @param resources The resources discovery lists.
  * @param word The word typed, in any case.
  */
-export function resourceFor(verb: string, resources: readonly APIResource[], word: string): APIResource {
+export function resourceFor(verb: string, resources: readonly APIResource[], word: string) {
   const named = resourceNamed(resources, word.toLowerCase());
   if (!('refused' in named)) return named;
   throw new Refused(

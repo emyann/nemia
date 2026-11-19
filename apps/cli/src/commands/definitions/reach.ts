@@ -10,7 +10,7 @@ import { said, textArg } from '../requests.ts';
 type Row = PolicyReach['gates'][number];
 
 /** What a row says of its step: who reaches it, else why none can. */
-function rowLines(row: Row): string[] {
+function rowLines(row: Row) {
   const head = `  ${row.step} of ${row.workflow}`;
   const reached = row.reachedBy.length
     ? [`${head}: approved on its own by ${row.reachedBy.join(', ')}`]
@@ -26,7 +26,7 @@ function rowLines(row: Row): string[] {
  * The lines `nemia policy reach` prints.
  * @param r The reach the api answers: the agent, the factory or run read, each step at its gate, and the rules suggested.
  */
-export function reachLines(r: PolicyReach): string[] {
+export function reachLines(r: PolicyReach) {
   const reached = r.gates.filter((g) => g.reachedBy.length).length;
   const of = r.run === null ? `the factory ${r.factory}` : `the run ${r.run} (factory ${r.factory})`;
   const lines = [
@@ -48,7 +48,7 @@ export function reachLines(r: PolicyReach): string[] {
  * `nemia policy reach`'s runner: the factory `--factory` names, or the run `--run` does, sent as the reach's query.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function policyReach(args: Args): Promise<number> {
+export async function policyReach(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const factory = textArg(args, 'factory');
   const run = textArg(args, 'runId');

@@ -5,7 +5,7 @@
  * is no one left to tell.
  * @param code The exit code the process ends with.
  */
-export function exited(code: number): void {
+export function exited(code: number) {
   process.exitCode = code;
   const streams = [process.stdout, process.stderr];
   let left = streams.length;

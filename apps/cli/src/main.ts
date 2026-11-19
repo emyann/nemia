@@ -37,6 +37,7 @@ export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias 
 const READS: Readonly<Record<ReadVerb, (args: readonly string[]) => Promise<number>>> = { doctor, daemon };
 
 /** Each of the client's own verbs' runner, on the words after its name. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const own = (entry: Entry): Readonly<Record<ClientVerb, (args: readonly string[]) => Promise<number>>> => ({
   get,
   apply,
@@ -55,7 +56,7 @@ const isMoved = (name: string): name is MovedName => (MOVED_COMMANDS as readonly
  * `--local` typed, which reads no store in process any more: refused, exit 2, naming the command typed without it, and, under a context
  * other than this machine's, the same command asked of this machine's daemon (`NEMIA_CONTEXT=local`).
  */
-const localRefused = (argv: readonly string[], here: boolean): Refused => {
+const localRefused = (argv: readonly string[], here: boolean) => {
   const command = ['nemia', ...argv.filter((word) => word !== '--local')].join(' ');
   return new Refused(
     `--local reads no store in process any more: every command asks a daemon's api, this machine's started on demand. Type \`${command}\`` +
@@ -64,14 +65,14 @@ const localRefused = (argv: readonly string[], here: boolean): Refused => {
 };
 
 /** Whether `name` is one of `MACHINE_VERBS`, which runs here whatever context is named, held or not. */
-const ofTheMachine = (name: string): boolean => (MACHINE_VERBS as readonly string[]).includes(name);
+const ofTheMachine = (name: string) => (MACHINE_VERBS as readonly string[]).includes(name);
 
 /**
  * A word typed under the remote context `context` that the client does not answer and that is no verb of this machine: refused, exit 2,
  * since no path takes it to that daemon and this machine's store is not the context's, naming the commands there are and how to ask this
  * machine's store instead.
  */
-const stranded = (argv: readonly string[], name: string, context: string): Refused =>
+const stranded = (argv: readonly string[], name: string, context: string) =>
   new Refused(
     `nemia ${name} is no command the client answers, and the context in use, ${context}, is a remote daemon: see the commands with \`nemia --help\`, or ask this machine's store with \`NEMIA_CONTEXT=local nemia ${argv.join(' ')}\``,
   );
@@ -81,8 +82,10 @@ const stranded = (argv: readonly string[], name: string, context: string): Refus
  * types to run the new release's carry, and which runs in process whatever is typed (`src/doctor.ts`); every other `argv` as it is, its
  * `--local` refused (`localRefused`).
  */
-const carryUnlocal = (argv: readonly string[]): readonly string[] =>
-  argv[0] === 'doctor' && argv[1] === 'carry' ? argv.filter((word) => word !== '--local') : argv;
+const carryUnlocal = (argv: readonly string[]) =>
+  (argv[0] === 'doctor' && argv[1] === 'carry'
+    ? argv.filter((word) => word !== '--local')
+    : argv) satisfies readonly string[] as readonly string[];
 
 /**
  * The verbs answered before any context or route is read: `nemia config` and `nemia pair`, about the client's own config, and the
@@ -98,11 +101,11 @@ const FIRST: Readonly<Record<string, (args: readonly string[]) => Promise<number
  * `argv` run on the old path, here, and its exit code; a bare `nemia upgrade` typed under a remote context then names on stderr the form
  * that upgrades that context's server (`serverHint`): the words keep upgrading this machine, whatever the context.
  */
-async function spawnedHere(argv: readonly string[], entry: Entry, help: boolean, chosen: Chosen): Promise<number> {
+async function spawnedHere(argv: readonly string[], entry: Entry, help: boolean, chosen: Chosen) {
   const code = await spawned(argv, entry);
   if (argv[0] === 'upgrade' && !help && !argv.includes('-h') && chosen.kind === 'remote')
     process.stderr.write(serverHint(chosen.name, chosen.server));
-  return code;
+  return code satisfies number as number;
 }
 
 /**
@@ -115,6 +118,7 @@ async function spawnedHere(argv: readonly string[], entry: Entry, help: boolean,
  * @param typed The words typed after the bin's name.
  * @param entry Which bin was typed, `nemia` or the `wf` alias, whose entry a spawn takes: `nemia` where it is left out.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export async function main(typed: readonly string[], entry: Entry = 'nemia'): Promise<number> {
   const renamed = renamedIn(carryUnlocal(typed));
   const retired = retiredIn(renamed.words);
@@ -127,6 +131,7 @@ export async function main(typed: readonly string[], entry: Entry = 'nemia'): Pr
 }
 
 /** `argv`, named `name`, sent the way its route says (`routeOf`), under the context in use. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 async function routed(argv: readonly string[], name: string, entry: Entry): Promise<number> {
   const chosen = chosenOf();
   const help = argv.includes('--help') || name === '';

@@ -9,13 +9,13 @@ import { asked } from '../../objects.ts';
 import { said, textArg } from '../requests.ts';
 
 /** The text under `key`, which the spec requires: refused by the parse before a runner where it is left out. */
-const required = (args: Args, key: string): string => textArg(args, key) ?? '';
+const required = (args: Args, key: string) => textArg(args, key) ?? '';
 
 /**
  * `nemia concluded <runId>`'s runner: the section it would be handed, its leading blank lines dropped.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function concluded(args: Args): Promise<number> {
+export async function concluded(args: Args) {
   const name = required(args, 'runId');
   const { section } = await asked(CONCLUDED_WORDS.name, (c) => c.runs.concluded({ params: { name } }));
   said([section.replace(/^\n+/, '')]);
@@ -27,7 +27,7 @@ export async function concluded(args: Args): Promise<number> {
  * has none; where the api left lines out, stderr says so.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function logs(args: Args): Promise<number> {
+export async function logs(args: Args) {
   const runId = required(args, 'runId');
   const step = required(args, 'step');
   const log = await asked(LOGS_WORDS.name, (c) => c.steps.log({ params: { runId, step }, query: { tail: String(LOG_TAIL.most) } }));
@@ -41,7 +41,7 @@ export async function logs(args: Args): Promise<number> {
  * What `nemia memory` prints: one fact's words, or the facts she keeps and where.
  * @param data What the api answers of her memory: one fact's words, or the facts she keeps and their folder.
  */
-export const memoryLines = (data: typeof NemiaMemory.Type): string[] => {
+export const memoryLines = (data: typeof NemiaMemory.Type) => {
   if (data.fact !== null) return data.fact.text.replace(/\n$/, '').split('\n');
   if (!data.facts.length) return [`Nemia keeps no fact yet (${data.dir}).`];
   return [`Nemia keeps ${data.facts.length} fact${data.facts.length === 1 ? '' : 's'} in ${data.dir}:`, ...data.facts.map((f) => `  ${f}`)];
@@ -51,7 +51,7 @@ export const memoryLines = (data: typeof NemiaMemory.Type): string[] => {
  * `nemia memory [<fact>]`'s runner: bare, the facts she keeps (`nemia.memory`); given one, its words (`nemia.fact`).
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function memory(args: Args): Promise<number> {
+export async function memory(args: Args) {
   const fact = textArg(args, 'fact');
   const data = await asked(MEMORY_WORDS.name, (c) => (fact === undefined ? c.nemia.memory() : c.nemia.fact({ params: { fact } })));
   said(memoryLines(data));

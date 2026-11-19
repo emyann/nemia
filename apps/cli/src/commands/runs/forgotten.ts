@@ -12,7 +12,7 @@ type Engine = NonNullable<RunRemoved['engine']>;
  * Bytes, as a person reads them.
  * @param bytes The size, in bytes.
  */
-export const sizeOf = (bytes: number): string =>
+export const sizeOf = (bytes: number) =>
   bytes < 1024
     ? `${bytes} B`
     : bytes < 1024 ** 2
@@ -22,23 +22,23 @@ export const sizeOf = (bytes: number): string =>
         : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 
 /** `n` tasks, in words. */
-const tasksWord = (n: number): string => `${n} task${n === 1 ? '' : 's'}`;
+const tasksWord = (n: number) => `${n} task${n === 1 ? '' : 's'}`;
 
 /** What the engine forgot of the run's tasks, with their journals' size and feed lines; empty where it forgot none. */
-const forgotWords = (f: Engine): string =>
+const forgotWords = (f: Engine) =>
   f.forgotten.length
     ? `the engine forgot ${tasksWord(f.forgotten.length)} of it (${sizeOf(f.journalBytes)} of journal, ${f.feedLines} feed line${f.feedLines === 1 ? '' : 's'})`
     : '';
 
 /** What waits of the run's tasks, and why, and that the daemon's passes forget it from `marker`; empty where nothing waits. */
-const waitWords = (f: Engine, marker: string): string => {
+const waitWords = (f: Engine, marker: string) => {
   if (!f.waiting.length) return '';
   const one = f.waiting.length === 1;
   return `${tasksWord(f.waiting.length)} of it ${one ? 'waits' : 'wait'} — ${f.why.join('; ')} — and the daemon's passes forget ${one ? 'it once it settles' : 'them once they settle'}, from ${marker}`;
 };
 
 /** The engine's refusals, of tasks by name and of the whole call, and the marker they leave, which only a person removes; empty without. */
-const refusalWords = (f: Engine, marker: string): string => {
+const refusalWords = (f: Engine, marker: string) => {
   if (!f.refused.length && f.refusal === undefined) return '';
   const said = [
     f.refused.length ? `the engine refused to forget ${tasksWord(f.refused.length)} of it: ${f.refusedWhy.join('; ')}` : '',
@@ -54,14 +54,14 @@ const refusalWords = (f: Engine, marker: string): string => {
  * @param f What the engine answers of the run's tasks: those forgotten, left, waited on and refused, and its marker.
  * @param id The run's id, said for the marker where the engine names none.
  */
-export const engineWords = (f: Engine, id: string): string => {
+export const engineWords = (f: Engine, id: string) => {
   const marker = f.marker ?? `the marker of ${id}`;
   const left = f.left.length ? `it left ${f.left.join('; ')}` : '';
   return [forgotWords(f), left, waitWords(f, marker), refusalWords(f, marker)].filter(Boolean).join('; ');
 };
 
 /** What became of the run's worktrees: removed, what each held committed first, and those already gone. */
-const worktreeWords = ({ worktrees = [], handedOff = [], gone = [] }: RunRemoved): string[] =>
+const worktreeWords = ({ worktrees = [], handedOff = [], gone = [] }: RunRemoved) =>
   [
     worktrees.length ? `removed ${worktrees.length} worktree${worktrees.length > 1 ? 's' : ''}` : '',
     ...handedOff.map((h) => `committed what ${h.step} left uncommitted${h.branch ? ` on ${h.branch}` : ''} as ${h.commit.slice(0, 7)}`),
@@ -69,7 +69,7 @@ const worktreeWords = ({ worktrees = [], handedOff = [], gone = [] }: RunRemoved
   ].filter(Boolean);
 
 /** What became of the run's branches: deleted, merged or forced; kept, unasked or not merged; and kept by git or an unanswered place. */
-function branchWords({ id, branches = [], base: named }: RunRemoved): string[] {
+function branchWords({ id, branches = [], base: named }: RunRemoved) {
   const base = named ?? 'its base branch';
   const them = (n: number) => (n > 1 ? 'them' : 'it');
   const deleted = branches.filter((b) => b.deleted);
@@ -97,7 +97,7 @@ function branchWords({ id, branches = [], base: named }: RunRemoved): string[] {
 }
 
 /** What `nemia rm` did with the run's worktrees, branches and files. */
-function storeLine(r: RunRemoved): string {
+function storeLine(r: RunRemoved) {
   const files = r.files?.length ? `removed ${r.files.join(', ')}` : '';
   const unfrozen = r.unfrozen ? `its workflow was never frozen, and ${r.unfrozen}` : '';
   if (r.folder)
@@ -120,7 +120,7 @@ function storeLine(r: RunRemoved): string {
  * The one line `nemia rm` prints of a run it forgot: what it did with the run, then what the engine did with its tasks.
  * @param r What the api answers of the run removed.
  */
-export function forgottenLine(r: RunRemoved): string {
+export function forgottenLine(r: RunRemoved) {
   const engine = r.engine ? engineWords(r.engine, r.id) : '';
   return engine ? `${storeLine(r)}; ${engine}` : storeLine(r);
 }

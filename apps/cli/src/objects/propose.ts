@@ -17,7 +17,6 @@ import {
   type ChangeVerb,
   DEFAULT_NAMESPACE,
   PROPOSABLE_KINDS,
-  type ProposableKind,
   type Proposal,
   type ProposalCreate,
   type ProposedObject,
@@ -68,7 +67,7 @@ type Asked = {
 const oneOf = <W extends string>(words: readonly W[], word: unknown): word is W => (words as readonly unknown[]).includes(word);
 
 /** The option words of `args` and their values, each option taking one; refused, naming the help, at a word no option of `verb`. */
-function options(args: readonly string[], verb: string, takes: Readonly<Record<string, string>>): Map<string, string> {
+function options(args: readonly string[], verb: string, takes: Readonly<Record<string, string>>) {
   const said = new Map<string, string>();
   for (let at = 0; at < args.length; at++) {
     const arg = args[at] ?? '';
@@ -83,7 +82,7 @@ function options(args: readonly string[], verb: string, takes: Readonly<Record<s
 }
 
 /** What `args` ask of propose: a file or an undo, the factory, when it applies and why. */
-function parsed(args: readonly string[]): Asked {
+function parsed(args: readonly string[]) {
   const said = options(args, 'propose', {
     '-f': 'file',
     '--filename': 'file',
@@ -118,7 +117,7 @@ function parsed(args: readonly string[]): Asked {
  * @param proposal The proposal as the api answers it.
  * @param namespace The factory it was asked in, named where the proposal's metadata names none.
  */
-export const proposalLines = (proposal: Proposal, namespace: string): string => {
+export const proposalLines = (proposal: Proposal, namespace: string) => {
   const factory = proposal.metadata.namespace ?? namespace;
   const { name } = proposal.metadata;
   const widens = proposal.status.widens ? ' (widens access)' : '';
@@ -128,14 +127,14 @@ export const proposalLines = (proposal: Proposal, namespace: string): string => 
 };
 
 /** The metadata of a proposed object: its name, its namespace where its kind has one, and the version it is at where it is served. */
-const metadataOf = (namespaced: boolean, name: string, namespace: string, version: string | undefined): ProposedObject['metadata'] => ({
+const metadataOf = (namespaced: boolean, name: string, namespace: string, version: string | undefined) => ({
   name,
   ...(namespaced ? { namespace } : {}),
   ...(version !== undefined ? { resourceVersion: version } : {}),
 });
 
 /** The kind of `read` as a proposal takes it; refused, naming apply, where the kind is not one a proposal changes. */
-function proposable(read: Read): ProposableKind {
+function proposable(read: Read) {
   const kind = read.resource.kind;
   if (oneOf(PROPOSABLE_KINDS, kind)) return kind;
   throw new Refused(
@@ -144,7 +143,7 @@ function proposable(read: Read): ProposableKind {
 }
 
 /** One object of the file, as the proposal carries it: at the version the file says, else the one served now, else none (it is made). */
-async function proposedOf(object: unknown, resources: readonly APIResource[], namespace: string): Promise<ProposedObject> {
+async function proposedOf(object: unknown, resources: readonly APIResource[], namespace: string) {
   const read = readOf(object, resources, namespace, 'propose');
   const kind = proposable(read);
   const said = isObject(object) ? object.verb : undefined;
@@ -161,11 +160,11 @@ async function proposedOf(object: unknown, resources: readonly APIResource[], na
     metadata: metadataOf(read.resource.namespaced, read.name, namespace, version),
     ...(verb !== 'delete' && read.spec !== undefined ? { spec: read.spec } : {}),
     ...(verb !== undefined ? { verb } : {}),
-  };
+  } satisfies ProposedObject;
 }
 
 /** The namespace a file proposes in: `-n`'s, else the one its objects name, else `default`; refused where they name two. */
-function namespaceOf(objects: readonly unknown[], namespace: string | undefined): string {
+function namespaceOf(objects: readonly unknown[], namespace: string | undefined) {
   if (namespace !== undefined) return namespace;
   const named = new Set(
     objects.flatMap((o) => (isObject(o) && isObject(o.metadata) && typeof o.metadata.namespace === 'string' ? [o.metadata.namespace] : [])),
@@ -181,11 +180,7 @@ function namespaceOf(objects: readonly unknown[], namespace: string | undefined)
  * The objects of `text`, read from the file `file` names or given on the line (`--objects`, where `file` says so), as the proposal
  * carries them, in `namespace`.
  */
-async function fromText(
-  text: string,
-  file: string,
-  namespace: string | undefined,
-): Promise<{ namespace: string; objects: ProposedObject[] }> {
+async function fromText(text: string, file: string, namespace: string | undefined) {
   const objects = objectsOf(text, file, 'propose');
   if (objects.length === 0) throw new Refused(`nemia propose: ${file} holds no object: name one, then \`nemia propose -f <file>\``);
   const where = namespaceOf(objects, namespace);
@@ -196,11 +191,10 @@ async function fromText(
 }
 
 /** The resource of `kind` among `resources`. */
-const resourceOf = (resources: readonly APIResource[], kind: string): APIResource | undefined =>
-  resources.find((r) => r.kind === kind && !r.name.includes('/'));
+const resourceOf = (resources: readonly APIResource[], kind: string) => resources.find((r) => r.kind === kind && !r.name.includes('/'));
 
 /** `object` as it is served now in `namespace`: its version, or undefined where none is. */
-async function versionNow(resources: readonly APIResource[], object: ProposedObject, namespace: string): Promise<string | undefined> {
+async function versionNow(resources: readonly APIResource[], object: ProposedObject, namespace: string) {
   const resource = resourceOf(resources, object.kind);
   if (resource === undefined) return undefined;
   const read: Read = { resource, name: object.metadata.name, meta: {}, spec: object.spec, where: namespace };
@@ -211,7 +205,7 @@ async function versionNow(resources: readonly APIResource[], object: ProposedObj
  * The objects that undo `proposal`: each it changed or removed, back as it stood before (`status.before`), at the version served now, or
  * made again where it is gone; and each it made, removed. Refused, naming what to type, where it has not applied.
  */
-async function undoOf(proposal: Proposal, namespace: string): Promise<ProposedObject[]> {
+async function undoOf(proposal: Proposal, namespace: string) {
   const { name } = proposal.metadata;
   const before = proposal.status.before;
   if (proposal.status.phase !== 'applied' || before === undefined)
@@ -246,7 +240,7 @@ async function undoOf(proposal: Proposal, namespace: string): Promise<ProposedOb
  * proposal and printed; answers the exit code, or throws its refusal.
  * @param args The words typed after `propose`, as `--help` lists them.
  */
-export async function propose(args: readonly string[]): Promise<number> {
+export async function propose(args: readonly string[]) {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(PROPOSE_HELP);
     return 0;
@@ -278,7 +272,7 @@ export async function propose(args: readonly string[]): Promise<number> {
  * @param namespace The factory the proposal is made in.
  * @param payload The proposal asked: its objects, and when it applies and why where they are said.
  */
-export async function proposalMade(verb: string, namespace: string, payload: ProposalCreate): Promise<number> {
+export async function proposalMade(verb: string, namespace: string, payload: ProposalCreate) {
   const made = await asked(verb, (c) => c.proposals.create({ params: { namespace }, payload }));
   process.stdout.write(proposalLines(made, namespace));
   return 0;
@@ -288,7 +282,7 @@ export async function proposalMade(verb: string, namespace: string, payload: Pro
  * `nemia proposals approve|decline <name>`: the proposal judged by the caller, as the api allows it.
  * @param args The words typed after `proposals`: `approve` or `decline`, the proposal's name, and `-n <factory>`.
  */
-export async function proposals(args: readonly string[]): Promise<number> {
+export async function proposals(args: readonly string[]) {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(PROPOSALS_HELP);
     return 0;

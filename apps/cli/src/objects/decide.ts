@@ -36,10 +36,10 @@ export type DecideIo = {
 };
 
 /** `n` with its unit, plural where it is not one. */
-const counted = (n: number, unit: string): string => `${n} ${unit}${n === 1 ? '' : 's'}`;
+const counted = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
 
 /** What each branch touched, by group, and the agent-facing and check-affecting files among it; or why it is not known. */
-const touchedLines = (d: Decidable): string[] =>
+const touchedLines = (d: Decidable) =>
   d.touched.flatMap(({ branch, radius }) =>
     'error' in radius
       ? [`touched  ${branch}: not known — ${radius.error}`]
@@ -54,7 +54,7 @@ const touchedLines = (d: Decidable): string[] =>
   );
 
 /** Each branch's check-affecting files in full, each cut where the read model cut it; or why they are not known. */
-const inFullLines = (d: Decidable): string[] =>
+const inFullLines = (d: Decidable) =>
   d.sensitive.flatMap(({ branch, files, error }) =>
     error !== null
       ? [`in full  ${branch}: not known — ${error}`]
@@ -66,18 +66,18 @@ const inFullLines = (d: Decidable): string[] =>
   );
 
 /** What each step consumed, then the total and the run's cost. */
-const usedLines = (d: Decidable): string[] => [
+const usedLines = (d: Decidable) => [
   ...Object.entries(d.used).map(([step, u]) => `used  ${step}: ${u.used}, ${u.cost}`),
   ...(Object.keys(d.used).length ? [`used  total: ${d.total.used}, ${d.total.cost}`] : []),
   ...(d.cost !== null ? [`cost  ${d.cost}`] : []),
 ];
 
 /** Where each branch stands against the base, how much it changed, and whether it still merges. */
-const standingLines = (d: Decidable): string[] =>
+const standingLines = (d: Decidable) =>
   d.standings.map((s) => `${s.branch}  ${s.said}${s.stat !== null ? `  ${s.stat}` : ''}${s.merge !== null ? `  · ${s.merge.said}` : ''}`);
 
 /** The collisions read at an ending's decision: the whole in one line, then each branch that does not merge and the semantic refusal. */
-const collisionLines = (d: Decidable): string[] =>
+const collisionLines = (d: Decidable) =>
   d.collisions === null
     ? []
     : [
@@ -87,7 +87,7 @@ const collisionLines = (d: Decidable): string[] =>
       ];
 
 /** One question as asked: its number and title, its body, each option by its letter, the recommended marked, and how many it takes. */
-const questionBlock = (q: DecisionQuestion): string[] => [
+const questionBlock = (q: DecisionQuestion) => [
   `  ${q.number}. ${q.title}`,
   ...(q.body.trim()
     ? q.body
@@ -103,21 +103,21 @@ const questionBlock = (q: DecisionQuestion): string[] => [
  * What each step waiting on you asks, numbered as `--answer <n>=<letter>` names them back: the step, then each field it asked under and its
  * questions. None for a decision read before them.
  */
-const questionLines = (d: Decidable): string[] =>
+const questionLines = (d: Decidable) =>
   (d.questions ?? []).flatMap(({ step, questions }) => [
     `${step} asks:`,
     ...questions.flatMap((q, i) => [...(questions[i - 1]?.field === q.field ? [] : [`${q.field}:`]), ...questionBlock(q)]),
   ]);
 
 /** A command as offered: its number, its label, the line, and the sentence it ends with. */
-const offered = (c: DecideCommand, at: number): string => `${at + 1}. ${c.label}: ${c.command}${c.said !== null ? `  — ${c.said}` : ''}`;
+const offered = (c: DecideCommand, at: number) => `${at + 1}. ${c.label}: ${c.command}${c.said !== null ? `  — ${c.said}` : ''}`;
 
 /**
  * The screen of `decision`, run `runId`'s: every line, each but the head indented.
  * @param runId The run's id, the screen's head.
  * @param decision The run's decision as the api answers it.
  */
-export function decisionLines(runId: string, decision: RunDecision): string[] {
+export function decisionLines(runId: string, decision: RunDecision) {
   const body = (lines: readonly string[]) => [runId, '', ...lines.map((line) => (line === '' ? '' : `  ${line}`))];
   if ('waiting' in decision)
     return body([
@@ -152,19 +152,19 @@ export function decisionLines(runId: string, decision: RunDecision): string[] {
  * The words of a command line as a shell would read them: split on spaces, a double-quoted stretch one word without its quotes.
  * @param line The command line as offered.
  */
-export const wordsOf = (line: string): string[] => [...line.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2] ?? '');
+export const wordsOf = (line: string) => [...line.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2] ?? '');
 
 /** The placeholders a command line holds, `<objection>` and its like, each once, in order. */
-const placeholdersOf = (line: string): string[] => [...new Set([...line.matchAll(/<([^<>]+)>/g)].map((m) => m[1] ?? ''))];
+const placeholdersOf = (line: string) => [...new Set([...line.matchAll(/<([^<>]+)>/g)].map((m) => m[1] ?? ''))];
 
 /**
  * The commands of `decision` a person may pick, asked at a terminal: the one picked run as this client runs it, its placeholders asked
  * first; a `git` command printed, never run. Answers the exit code of the command run, 0 where none is.
  */
-async function picked(commands: readonly DecideCommand[], io: DecideIo): Promise<number> {
+async function picked(commands: readonly DecideCommand[], io: DecideIo) {
   const prompt = readline.createInterface({ input: io.input, terminal: false });
   const lines = prompt[Symbol.asyncIterator]();
-  const question = async (words: string): Promise<string> => {
+  const question = async (words: string) => {
     io.output.write(words);
     const line = await lines.next();
     return line.done === true ? '' : String(line.value);
@@ -193,7 +193,7 @@ async function picked(commands: readonly DecideCommand[], io: DecideIo): Promise
 }
 
 /** The process's own terminal, and the client run on a command line. */
-const terminal = (run: DecideIo['run']): DecideIo => ({
+const terminal = (run: DecideIo['run']) => ({
   input: process.stdin,
   output: process.stdout,
   interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
@@ -204,7 +204,7 @@ const terminal = (run: DecideIo['run']): DecideIo => ({
  * `--sensitive <globs>` (or `--sensitive=<globs>`) taken out of `args`, once, its comma-separated globs sent as the read's `?sensitive=`;
  * refused given twice or with no glob, before any run is read.
  */
-function sensitiveOf(args: readonly string[]): { rest: string[]; sensitive?: string } {
+function sensitiveOf(args: readonly string[]) {
   const rest: string[] = [];
   let sensitive: string | undefined;
   for (let i = 0; i < args.length; i++) {
@@ -235,7 +235,7 @@ export async function decide(
   run: DecideIo['run'],
   io: DecideIo = terminal(run),
   env: NodeJS.ProcessEnv = process.env,
-): Promise<number> {
+) {
   if (args.includes('--help')) {
     io.output.write(`${DECIDE_HELP}\n`);
     return 0;

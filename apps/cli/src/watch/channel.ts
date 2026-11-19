@@ -78,11 +78,11 @@ export const channelNotice: ChannelNoticeOf = (event) => {
 type ChannelAsked = { readonly selectors: string[]; namespace?: string; cursorFile?: string };
 
 /** A word of the channel's refused, naming it and the usage. */
-const unknownWord = (word: string, why: string): Refused =>
+const unknownWord = (word: string, why: string) =>
   new Refused(`nemia channel: ${word} ${why}. See \`nemia channel --help\`:\n\n${CHANNEL_USAGE}`);
 
 /** Takes `word` and its `value` into `asked`, refused where the channel takes no such word, or takes it once and has it. */
-function took(asked: ChannelAsked, word: string, value: string | undefined): void {
+function took(asked: ChannelAsked, word: string, value: string | undefined) {
   if (!['-l', '-n', '--cursor-file'].includes(word)) throw unknownWord(word, 'is no option of the channel');
   if (value === undefined || value.startsWith('-')) throw unknownWord(word, 'takes a value after it');
   if (word === '-l') asked.selectors.push(value);
@@ -95,7 +95,7 @@ function took(asked: ChannelAsked, word: string, value: string | undefined): voi
  * The words read, `help` for `--help`; refused, exit 2, for any word the channel does not take.
  * @param args The words typed after `channel`.
  */
-export function channelAsked(args: readonly string[]): ChannelAsked | 'help' {
+export function channelAsked(args: readonly string[]) {
   if (args.includes('--help') || args.includes('-h')) return 'help';
   const asked: ChannelAsked = { selectors: [] };
   for (let i = 0; i < args.length; i += 2) took(asked, args[i] ?? '', args[i + 1]);
@@ -106,7 +106,7 @@ export function channelAsked(args: readonly string[]): ChannelAsked | 'help' {
 }
 
 /** The cap of a backlog: `RESUME_MOST_VARIABLE` where it holds a whole number, else `RESUME_MOST`. */
-const resumeMost = (env: NodeJS.ProcessEnv = process.env): number => {
+const resumeMost = (env: NodeJS.ProcessEnv = process.env) => {
   const set = env[RESUME_MOST_VARIABLE];
   return set !== undefined && /^\d+$/.test(set) ? Number(set) : RESUME_MOST;
 };
@@ -116,7 +116,7 @@ const resumeMost = (env: NodeJS.ProcessEnv = process.env): number => {
  * @param selectors The label selectors typed with `-l`, none where every event is sent.
  * @param namespace The namespace `-n` names, undefined where every namespace's events are sent.
  */
-export function channelInstructions(selectors: readonly string[], namespace: string | undefined): string {
+export function channelInstructions(selectors: readonly string[], namespace: string | undefined) {
   const which = selectors.length === 0 ? 'every event' : `each event one of the selectors ${selectors.join(', ')} takes`;
   const where = namespace === undefined ? '' : ` of the namespace ${namespace}`;
   return [
@@ -138,7 +138,7 @@ export function channelInstructions(selectors: readonly string[], namespace: str
 type Notice = ChannelNotice | { readonly content: string; readonly meta: Readonly<Record<string, string>> };
 
 /** A notice of the channel about itself: its words, and `notice` naming which, beside what it carries. */
-const noticeOf = (notice: string, content: string, more: Readonly<Record<string, string>> = {}): Notice => ({
+const noticeOf = (notice: string, content: string, more: Readonly<Record<string, string>> = {}) => ({
   content,
   meta: { notice, ...more },
 });
@@ -156,7 +156,7 @@ type Outbox = {
 };
 
 /** Serves the channel over this process's stdio and answers its outbox. */
-async function outboxOf(asked: ChannelAsked): Promise<Outbox> {
+async function outboxOf(asked: ChannelAsked) {
   const server = new Server(
     { name: 'nemia', version: '1' },
     { capabilities: { experimental: { 'claude/channel': {} } }, instructions: channelInstructions(asked.selectors, asked.namespace) },
@@ -169,7 +169,7 @@ async function outboxOf(asked: ChannelAsked): Promise<Outbox> {
   server.onclose = () => (open(false), ended());
   await server.connect(new StdioServerTransport());
   let chain: Promise<unknown> = opened;
-  const send = (notice: Notice | undefined, cursor?: string): Promise<void> => {
+  const send = (notice: Notice | undefined, cursor?: string) => {
     const next = chain.then(async () => {
       if (!(await opened)) return;
       if (notice !== undefined) await server.notification({ method: CHANNEL_METHOD, params: notice });
@@ -182,7 +182,7 @@ async function outboxOf(asked: ChannelAsked): Promise<Outbox> {
 }
 
 /** Sends `notice` (and keeps `cursor`) in its turn, its failure, a connection gone, being the close's to say. */
-const sent = (f: Following, notice: Notice | undefined, cursor?: string): void => void f.out.send(notice, cursor).catch(() => undefined);
+const sent = (f: Following, notice: Notice | undefined, cursor?: string) => void f.out.send(notice, cursor).catch(() => undefined);
 
 /** Where the channel is: what it was asked, the api it follows, the cursor it has sent up to (none: from now), and its liveness. */
 type Following = {
@@ -197,56 +197,61 @@ type Following = {
 type Answer = { kind: 'ok'; response: Response } | { kind: 'refused'; status: number; said: string } | { kind: 'none'; why: string };
 
 /** The JSON of `text`, or none where it is no JSON. */
-const jsonOf = (text: string): unknown => {
+const jsonOf = (text: string) => {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) satisfies unknown as unknown;
   } catch {
-    return undefined;
+    return undefined satisfies unknown as unknown;
   }
 };
 
 /** The api's words in a refusal's body, `{ error }`, else its status and text. */
-function refusalOf(status: number, text: string): string {
+function refusalOf(status: number, text: string) {
   const body = jsonOf(text);
-  if (typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string') return body.error;
-  return `the api answered ${status}: ${text.slice(0, 200)}`;
+  if (typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string')
+    return body.error satisfies string as string;
+  return `the api answered ${status}: ${text.slice(0, 200)}` satisfies string as string;
 }
 
 /** `url` asked with the session's headers, aborted with `signal`. */
-async function answerAt(url: URL, accept: string, signal: AbortSignal): Promise<Answer> {
+async function answerAt(url: URL, accept: string, signal: AbortSignal) {
   let response: Response;
   try {
     response = await fetch(url, { headers: { accept, ...sessionHeaders() }, signal });
   } catch (err) {
     if (signal.aborted) throw err;
     const cause = (err as { cause?: { code?: string } }).cause;
-    return { kind: 'none', why: cause?.code ?? (err as Error).message };
+    return { kind: 'none', why: cause?.code ?? (err as Error).message } satisfies Answer;
   }
-  if (response.ok && response.body !== null) return { kind: 'ok', response };
-  return { kind: 'refused', status: response.status, said: refusalOf(response.status, await response.text()) };
+  if (response.ok && response.body !== null) return { kind: 'ok', response } satisfies Answer;
+  return {
+    kind: 'refused',
+    status: response.status,
+    said: refusalOf(response.status, await response.text()),
+  } satisfies Answer;
 }
 
 /** The Event list the channel follows: every namespace's, or one's. */
-const listPath = (asked: ChannelAsked): string =>
+const listPath = (asked: ChannelAsked) =>
   asked.namespace === undefined ? '/api/events' : `/api/namespaces/${encodeURIComponent(asked.namespace)}/events`;
 
 /** Where the feed ends now: a page of the list's `metadata.resourceVersion`, or what its read came to. */
-async function nowAt(f: Following, signal: AbortSignal): Promise<Exclude<Answer, { kind: 'ok' }> | { kind: 'at'; at: string }> {
+async function nowAt(f: Following, signal: AbortSignal) {
   const got = await answerAt(urlOf(f.base, listPath(f.asked), { limit: '1' }), 'application/json', signal);
-  if (got.kind !== 'ok') return got;
+  if (got.kind !== 'ok') return got satisfies Exclude<Answer, { kind: 'ok' }> | { kind: 'at'; at: string };
   const page = (await got.response.json()) as { metadata?: { resourceVersion?: unknown } };
   const at = page.metadata?.resourceVersion;
-  if (typeof at === 'string') return { kind: 'at', at };
+  if (typeof at === 'string') return { kind: 'at', at } satisfies Exclude<Answer, { kind: 'ok' }> | { kind: 'at'; at: string };
   const said = `the api at ${f.base} says no resourceVersion on a page of events: it is older than this nemia. Restart it, \`nemia service restart\``;
-  return { kind: 'refused', status: 400, said };
+  return { kind: 'refused', status: 400, said } satisfies Exclude<Answer, { kind: 'ok' }> | { kind: 'at'; at: string };
 }
 
 /** The watch of the list from `cursor`, with the selectors. */
-const watchUrl = (f: Following, cursor: string): URL =>
+const watchUrl = (f: Following, cursor: string) =>
   urlOf(f.base, listPath(f.asked), { watch: 'true', resourceVersion: cursor, labelSelector: f.asked.selectors });
 
 /** The `data` of each whole server-sent block of `text`, and what is left after them. */
-function framesOf(text: string): { data: string[]; rest: string } {
+function framesOf(text: string) {
   const blocks = text.split('\n\n');
   const rest = blocks.pop() ?? '';
   const data = blocks.flatMap((block) => {
@@ -259,7 +264,7 @@ function framesOf(text: string): { data: string[]; rest: string } {
 const decodeWatched = Schema.decodeUnknownSync(watchEventOf(Event));
 
 /** `word` as a shell reads it back unchanged: in single quotes, each quote of its own closed, escaped and opened again. */
-const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
+const quoted = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
 
 /**
  * The command that prints the lines a resumed channel skipped, the events after `from` its selectors take, from the store the channel
@@ -272,7 +277,7 @@ const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
  * @param from The resourceVersion the skipped events come after.
  * @param context The name of the context the channel resolved.
  */
-export function skippedRead(asked: ChannelAsked, from: string, context: string): string {
+export function skippedRead(asked: ChannelAsked, from: string, context: string) {
   const namespace = asked.namespace === undefined || asked.namespace === 'default' ? undefined : `factory=${asked.namespace}`;
   const each =
     namespace === undefined
@@ -287,7 +292,7 @@ export function skippedRead(asked: ChannelAsked, from: string, context: string):
  * Sends the backlog `held` a watch opened at `from` sent before its first BOOKMARK: each Event where they are the cap or fewer, else one
  * notice of how many were skipped, from where, and how to read them.
  */
-function released(f: Following, held: readonly Event[], from: string): void {
+function released(f: Following, held: readonly Event[], from: string) {
   const most = resumeMost();
   if (held.length <= most) {
     for (const event of held) sent(f, channelNotice(event), event.metadata.resourceVersion);
@@ -301,7 +306,7 @@ function released(f: Following, held: readonly Event[], from: string): void {
 }
 
 /** The name of the context the channel reads the store of: a remote one's, else `local`. */
-const contextName = (): string => {
+const contextName = () => {
   const chosen = chosenOf();
   return chosen.kind === 'local' ? LOCAL_CONTEXT : chosen.name;
 };
@@ -310,7 +315,7 @@ const contextName = (): string => {
 type Opened = { held: Event[] | undefined; readonly from: string };
 
 /** One frame of an open watch: an Event sent (or held, before the first BOOKMARK), a BOOKMARK's cursor kept and the backlog released. */
-function onFrame(f: Following, data: string, state: Opened): void {
+function onFrame(f: Following, data: string, state: Opened) {
   let watched: ReturnType<typeof decodeWatched>;
   try {
     watched = decodeWatched(JSON.parse(data));
@@ -331,7 +336,7 @@ function onFrame(f: Following, data: string, state: Opened): void {
 }
 
 /** Reads an open watch until it drops: a watch never ends of itself. */
-async function readOn(f: Following, body: ReadableStream<Uint8Array>, from: string): Promise<void> {
+async function readOn(f: Following, body: ReadableStream<Uint8Array>, from: string) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   const state: Opened = { held: [], from };
@@ -352,7 +357,7 @@ async function readOn(f: Following, body: ReadableStream<Uint8Array>, from: stri
 }
 
 /** The liveness said once per change: `down` where it was up, `up` where it was down. */
-function liveness(f: Following, live: 'up' | 'down', why?: string): void {
+function liveness(f: Following, live: 'up' | 'down', why?: string) {
   if (f.live === live) return;
   f.live = live;
   const content =
@@ -363,7 +368,7 @@ function liveness(f: Following, live: 'up' | 'down', why?: string): void {
 }
 
 /** A cursor the feed cannot be read from (410): started over from now, said once on stderr and in a notice. */
-function startedOver(f: Following, cursor: string, why: string): void {
+function startedOver(f: Following, cursor: string, why: string) {
   console.error(`nemia channel: resourceVersion ${cursor} cannot be read on (${why}): starting over from now`);
   const content = `The channel could not go on from resourceVersion ${cursor} (${why}): it starts over from now, and lines written since may have been missed.`;
   sent(f, noticeOf('missed', content, { after: cursor }));
@@ -374,14 +379,14 @@ function startedOver(f: Following, cursor: string, why: string): void {
 type Stretched = 'later' | 'again' | { readonly code: number; readonly said: string };
 
 /** What a refused or unanswered request makes of the stretch: a 4xx of the api ends the channel; anything else is the api down. */
-function failedWith(f: Following, got: Exclude<Answer, { kind: 'ok' }>): Stretched {
+function failedWith(f: Following, got: Exclude<Answer, { kind: 'ok' }>) {
   if (got.kind === 'refused' && got.status >= 400 && got.status < 500) return { code: 2, said: got.said };
   liveness(f, 'down', got.kind === 'none' ? got.why : got.said);
   return 'later';
 }
 
 /** One stretch: where the feed ends now if the channel has no cursor, then the watch opened from its cursor and read until it drops. */
-async function stretch(f: Following, signal: AbortSignal): Promise<Stretched> {
+async function stretch(f: Following, signal: AbortSignal) {
   f.base = servedAt() ?? f.base;
   if (f.cursor === undefined) {
     const now = await nowAt(f, signal);
@@ -400,7 +405,7 @@ async function stretch(f: Following, signal: AbortSignal): Promise<Stretched> {
 }
 
 /** A refusal said on stderr and, once the session has opened the connection (bounded), in a notice: answers its exit code. */
-async function refusedWith(out: Outbox, words: string, code: number): Promise<number> {
+async function refusedWith(out: Outbox, words: string, code: number) {
   console.error(words.startsWith('nemia channel') ? words : `nemia channel: ${words}`);
   const bound = new Promise<boolean>((resolve) => setTimeout(resolve, OPEN_WITHIN_MS, false).unref());
   if (await Promise.race([out.opened, bound])) await out.send(noticeOf('refused', `The channel stopped: ${words}`)).catch(() => undefined);
@@ -408,7 +413,7 @@ async function refusedWith(out: Outbox, words: string, code: number): Promise<nu
 }
 
 /** Follows the feed until a refusal of the api, which it says on stderr and in a notice and answers the exit code of. */
-async function follow(f: Following, signal: AbortSignal): Promise<number> {
+async function follow(f: Following, signal: AbortSignal) {
   for (;;) {
     const got = await stretch(f, signal);
     if (typeof got === 'object') return refusedWith(f.out, got.said, got.code);
@@ -417,7 +422,7 @@ async function follow(f: Following, signal: AbortSignal): Promise<number> {
 }
 
 /** The cursor a cursor file saved, as a resourceVersion; none where there is no file; refused for one holding no cursor. */
-function savedCursor(asked: ChannelAsked): string | undefined {
+function savedCursor(asked: ChannelAsked) {
   const saved = savedIn(asked.cursorFile);
   if (saved === 'refused')
     throw new Refused(
@@ -431,7 +436,7 @@ function savedCursor(asked: ChannelAsked): string | undefined {
  * and its number), or the api refuses what it asks (2).
  * @param args The words typed after `channel`: `-l`, `-n` and `--cursor-file` with their values, or `--help`.
  */
-export async function channel(args: readonly string[]): Promise<number> {
+export async function channel(args: readonly string[]) {
   const asked = channelAsked(args);
   if (asked === 'help') return (process.stdout.write(CHANNEL_USAGE), 0);
   const cursor = savedCursor(asked);

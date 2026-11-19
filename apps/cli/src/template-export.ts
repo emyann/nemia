@@ -19,7 +19,7 @@ const VERB = 'template export';
  * The factory `words` name with `--factory <name>` or `--factory=<name>`, else none.
  * @param words The words typed after the bin's name.
  */
-export const factoryNamed = (words: readonly string[]): string | undefined => {
+export const factoryNamed = (words: readonly string[]) => {
   const at = words.findIndex((word) => word === '--factory' || word.startsWith('--factory='));
   if (at < 0) return undefined;
   const word = words[at] ?? '';
@@ -30,18 +30,21 @@ export const factoryNamed = (words: readonly string[]): string | undefined => {
  * Whether `words` are a `nemia template export` that holds a factory's parts (`--factory`), asking no help.
  * @param words The words typed after the bin's name.
  */
-export const exportsAFactory = (words: readonly string[]): boolean =>
-  words[0] === 'template' && words[1] === 'export' && !words.includes('--help') && factoryNamed(words) !== undefined;
+export const exportsAFactory = (words: readonly string[]) =>
+  (words[0] === 'template' &&
+    words[1] === 'export' &&
+    !words.includes('--help') &&
+    factoryNamed(words) !== undefined) satisfies boolean as boolean;
 
 /**
  * Where the factory `name` is kept, as an export says where its hires came from: its file in this machine's store under this machine's
  * context, else its address on the daemon the context names.
  */
-const keptAt = (name: string, env: NodeJS.ProcessEnv): string => {
+const keptAt = (name: string, env: NodeJS.ProcessEnv) => {
   const chosen = chosenOf(env);
-  return chosen.kind === 'remote'
+  return (chosen.kind === 'remote'
     ? `${chosen.server.replace(/\/+$/, '')}/api/factories/${name}`
-    : path.join(storeRoot(env), 'factories', `${name}.json`);
+    : path.join(storeRoot(env), 'factories', `${name}.json`)) satisfies string as string;
 };
 
 /**
@@ -71,7 +74,7 @@ export const partsOf = (factory: Factory, rules: FactoryRules, instruction: Fact
  * @param entry Which bin's entry the orchestrator's CLI is spawned by.
  * @param env The environment read for the context in use, the store and the token, and given the child.
  */
-export async function templateExported(words: readonly string[], entry: Entry, env: NodeJS.ProcessEnv = process.env): Promise<number> {
+export async function templateExported(words: readonly string[], entry: Entry, env: NodeJS.ProcessEnv = process.env) {
   const name = factoryNamed(words) ?? '';
   const { factory, rules, instruction } = await asked(
     VERB,

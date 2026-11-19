@@ -34,9 +34,9 @@ const RUNNERS: Readonly<Record<MovedCommand, Runner>> = {
 };
 
 /** `rest` read against `spec` (`parseArgv`), its usage refusal said as this client's own, exit 2. */
-const parsed = (spec: Parameters<typeof parseArgv>[0], rest: readonly string[]): Args | undefined => {
+const parsed = (spec: Parameters<typeof parseArgv>[0], rest: readonly string[]) => {
   try {
-    return parseArgv(spec, rest);
+    return parseArgv(spec, rest) satisfies Args | undefined as Args | undefined;
   } catch (err) {
     if (err instanceof CommandRefused) throw new Refused(err.message);
     throw err;
@@ -48,17 +48,17 @@ const parsed = (spec: Parameters<typeof parseArgv>[0], rest: readonly string[]):
  * @param name The moved command to run, the key of its words and its runner.
  * @param rest The words typed after the command's name, its flags and positionals.
  */
-export async function commanded(name: MovedCommand, rest: readonly string[]): Promise<number> {
+export async function commanded(name: MovedCommand, rest: readonly string[]) {
   const words = COMMAND_WORDS.find((command) => command.name === name);
   if (words === undefined) throw new Error(`${name} is in MOVED_COMMANDS and has no words in objects' COMMAND_WORDS: add them there`);
   if (words.manual !== undefined && rest.includes('--help')) {
     process.stdout.write(`${words.manual}\n`);
-    return 0;
+    return 0 satisfies number as number;
   }
   const args = parsed(words.spec, rest);
   if (args === undefined) {
     process.stdout.write(`${helpOf([words])}\n`);
-    return 0;
+    return 0 satisfies number as number;
   }
   const wrong = words.check?.(args);
   if (wrong) throw new Refused(wrong);

@@ -19,13 +19,13 @@ const WORD_WIDTH = 20;
 const NEEDS_HUMAN = 'needs-human';
 
 /** A step's word: a session at `needs-human` says what it waits for, before what its closeout said. */
-const stepWordOf = (step: RunStepStatus): string =>
+const stepWordOf = (step: RunStepStatus) =>
   step.waitingFor && step.message.startsWith(NEEDS_HUMAN)
     ? `${NEEDS_HUMAN}: ${step.waitingFor.words}${step.message.slice(NEEDS_HUMAN.length)}`
     : step.message;
 
 /** What a step at work runs on, `on v1.2.0, codex 0.200.0`, off its latest attempt while that has not ended; none else. */
-const ranOnOf = ({ attempts: { latest } }: RunStepStatus): string | undefined => {
+const ranOnOf = ({ attempts: { latest } }: RunStepStatus) => {
   if (latest === null || latest.ended !== null) return undefined;
   const said = [
     ...(latest.release === null ? [] : [latest.release.kind === 'install' ? latest.release.tag : 'checkout']),
@@ -35,20 +35,20 @@ const ranOnOf = ({ attempts: { latest } }: RunStepStatus): string | undefined =>
 };
 
 /** A step's note: its own, how many questions its closeout asks, what it runs on and what its try was denied; none where it has none. */
-const noteOf = (step: RunStepStatus): string | undefined =>
+const noteOf = (step: RunStepStatus) =>
   [step.note, step.asks ? `asks ${step.asks} question${step.asks === 1 ? '' : 's'}` : '', ranOnOf(step), step.denied?.words]
     .filter(Boolean)
     .join(' · ') || undefined;
 
 /** The labels asked beside the head line: the whole map with `--show-labels`, and each `-L <key>`'s value, `<none>` where unset. */
-const labelsOf = (labels: Readonly<Record<string, string>>, asked: TableAsked): string => {
+const labelsOf = (labels: Readonly<Record<string, string>>, asked: TableAsked) => {
   const keys = Object.keys(labels).sort();
   const all = keys.length === 0 ? '<none>' : keys.map((key) => `${key}=${labels[key] ?? ''}`).join(',');
   return `${asked.showLabels ? `  labels: ${all}` : ''}${asked.columns.map((key) => `  ${key}: ${labels[key] ?? '<none>'}`).join('')}`;
 };
 
 /** What the run asks of a person, a line each: what to decide, the steps that wait on you, a wait or a hold, and its result. */
-const asksLines = ({ metadata: { name }, status }: Run): string[] => {
+const asksLines = ({ metadata: { name }, status }: Run) => {
   const { toDecide, waiting, holding, result = [] } = status;
   const words = status.waitingOnYouWords.filter((said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`));
   const lifting = holding !== null && holding.runs.length > 0 && holding.runs.every((r) => r.landed);
@@ -70,7 +70,7 @@ const asksLines = ({ metadata: { name }, status }: Run): string[] => {
  * @param run The run as the api serves it.
  * @param asked How the table is asked to print: wide, with its labels, or a column per label.
  */
-export function runLines(run: Run, asked: TableAsked): string[] {
+export function runLines(run: Run, asked: TableAsked) {
   const { status } = run;
   const calledOff = `${status.cancelledAt ? '  (cancelled)' : ''}${status.pruned ? '  (pruned)' : ''}`;
   const cost = status.cost ? `  ${status.cost.said}` : '';

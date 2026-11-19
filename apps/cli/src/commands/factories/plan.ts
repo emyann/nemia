@@ -14,29 +14,29 @@ export const UNKNOWN = 'a version no status names';
  * @param name The factory's name.
  * @param at Where the conflict is, as the plan says it.
  */
-export const resolveLine = (name: string, at: string): string => `nemia factory resolve ${name} '${at}' --ours|--theirs|--file <path>`;
+export const resolveLine = (name: string, at: string) => `nemia factory resolve ${name} '${at}' --ours|--theirs|--file <path>`;
 
 /**
  * The line that approves the proposal `proposal` resolving conflicts of the factory `name`, as a person types it.
  * @param name The factory's name.
  * @param proposal The name of the proposal to approve.
  */
-export const approveLine = (name: string, proposal: string): string => `nemia proposals approve ${proposal} -n ${name}`;
+export const approveLine = (name: string, proposal: string) => `nemia proposals approve ${proposal} -n ${name}`;
 
 /** Where a clean change came from, as the plan says it. */
 const FROM = { template: 'the template', factory: 'your tree', both: 'both, merged' } as const;
 
 /** The lines of `text`, each without its newline: none for an empty text. */
-const linesOf = (text: string): string[] => (text === '' ? [] : text.split(/(?<=\n)/).map((line) => line.replace(/\n$/, '')));
+const linesOf = (text: string) => (text === '' ? [] : text.split(/(?<=\n)/).map((line) => line.replace(/\n$/, '')));
 
 /** A side as the plan quotes it: each line indented under its name, or that it has none. */
-function sideLines(name: string, text: string | null): string[] {
+function sideLines(name: string, text: string | null) {
   if (text === null) return [`    ${name}: none`];
   return [`    ${name}:`, ...linesOf(text).map((line) => `      | ${line}`)];
 }
 
 /** The head of an upgrade's plan: the versions, or, for a switch, both templates and that the merge has no common base. */
-function headLines({ name, from, to, switched }: FactoryUpgradePlan): string[] {
+function headLines({ name, from, to, switched }: FactoryUpgradePlan) {
   const was = from ?? UNKNOWN;
   if (switched === undefined) return [was === to ? `${name}: its parameters at ${to}` : `${name}: ${was} → ${to}`];
   return [
@@ -51,7 +51,7 @@ function headLines({ name, from, to, switched }: FactoryUpgradePlan): string[] {
  * it; then, where there are conflicts, the line that resolves each, after the upgrade's, since a resolve is taken for a filed upgrade.
  * @param plan The upgrade's plan as the api answers it: the factory, the merge and what the upgrade files.
  */
-export function planLines(plan: FactoryUpgradePlan): string[] {
+export function planLines(plan: FactoryUpgradePlan) {
   const { name, merge, next } = plan;
   const lines = headLines(plan);
   lines.push(`merges cleanly: ${merge.merged.length}`);
@@ -76,10 +76,10 @@ export function planLines(plan: FactoryUpgradePlan): string[] {
 }
 
 /** `names` as a list a person reads, or `none`. */
-const listed = (names: readonly string[]): string => (names.length ? names.join(', ') : 'none');
+const listed = (names: readonly string[]) => (names.length ? names.join(', ') : 'none');
 
 /** A hire's change as a line: the step, and the agent it had and has. */
-const hireLine = (h: FactoryAdoptPlan['plan']['hires'][number]): string =>
+const hireLine = (h: FactoryAdoptPlan['plan']['hires'][number]) =>
   h.kind === 'added'
     ? `  + ${h.step}: ${h.now ?? ''}`
     : h.kind === 'dropped'
@@ -87,7 +87,7 @@ const hireLine = (h: FactoryAdoptPlan['plan']['hires'][number]): string =>
       : `  ~ ${h.step}: ${h.was ?? ''} → ${h.now ?? ''}`;
 
 /** The runs a takeover finds waiting or in flight, and the policy they follow after it. */
-const runsLine = ({ ids, policy }: FactoryAdoptPlan['plan']['runs']): string =>
+const runsLine = ({ ids, policy }: FactoryAdoptPlan['plan']['runs']) =>
   ids.length
     ? `runs waiting or in flight: ${ids.join(', ')} — each keeps the workflow frozen on its record; ${policy === 'follow' ? "under follow, each takes the tree's hires and rules at its next step" : 'under pinned, each keeps what it resolved'}`
     : 'runs waiting or in flight: none';
@@ -97,7 +97,7 @@ const runsLine = ({ ids, policy }: FactoryAdoptPlan['plan']['runs']): string =>
  * the line that writes them into the tree, the runs waiting or in flight, what it would strand, and the line to type, which carries the
  * plan's digest. Nothing is written.
  */
-export function adoptLines({ plan, digest, line }: FactoryAdoptPlan): string[] {
+export function adoptLines({ plan, digest, line }: FactoryAdoptPlan) {
   const { factory, kept, workflows, hires, revisions, rules, stranded } = plan;
   const blocked = stranded.cards.length > 0 || stranded.schedules.length > 0;
   return [

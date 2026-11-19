@@ -21,10 +21,10 @@ export type ApplyWrites = { readonly create: boolean; readonly update: boolean; 
 export type ApplyAction = 'create' | 'update' | 'unchanged' | 'no-create' | 'no-update';
 
 /** Whether the read found the object and it differs from the file's. */
-const changed = (found: ApplyFound): boolean => found.exists && !found.same;
+const changed = (found: ApplyFound) => found.exists && !found.same;
 
 /** Whether the kind can make a missing object at all: a create, or an update that makes one. */
-const makes = (writes: ApplyWrites): boolean => writes.create || (writes.upsert && writes.update);
+const makes = (writes: ApplyWrites) => writes.create || (writes.upsert && writes.update);
 
 const applyOfSpec = spec<(found: ApplyFound, writes: ApplyWrites) => ApplyAction>({
   ensures: {

@@ -16,30 +16,30 @@ import { listArg, pathSent, said, textArg } from '../requests.ts';
 import { repoSent, textOf } from './lines.ts';
 
 /** The command a person types next, under the context `context`. */
-const under = (context: string, command: string): string => `${CONTEXT_VARIABLE}=${context} ${command}`;
+const under = (context: string, command: string) => `${CONTEXT_VARIABLE}=${context} ${command}`;
 
 /** The context in use, by its name: `NEMIA_CONTEXT`, else the config's, else this machine's. */
-function inUse(env: NodeJS.ProcessEnv): string {
+function inUse(env: NodeJS.ProcessEnv) {
   const named = env[CONTEXT_VARIABLE]?.trim();
   return named !== undefined && named !== '' ? named : (configRead(env).current ?? LOCAL_CONTEXT);
 }
 
 /** `env` with the context `name` in use, which the config holds; refused naming `nemia config get-contexts` where it holds none. */
-function envOf(name: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+function envOf(name: string, env: NodeJS.ProcessEnv) {
   if (contextOf(configRead(env), name).kind === 'refused') throw unheld(name);
   return { ...env, [CONTEXT_VARIABLE]: name };
 }
 
 /** The `<key>=<value>` words of `key`, by their key, each value sent as `sent` makes it; the objects' check has refused one with no `=`. */
-function pairsOf(args: Args, key: string, sent: (value: string) => string): Record<string, string> | undefined {
+function pairsOf(args: Args, key: string, sent: (value: string) => string) {
   const words = listArg(args, key);
-  if (!words.length) return undefined;
+  if (!words.length) return undefined satisfies Record<string, string> | undefined as Record<string, string> | undefined;
   return Object.fromEntries(
     words.map((word) => {
       const at = word.indexOf('=');
       return [word.slice(0, at), sent(word.slice(at + 1))];
     }),
-  );
+  ) satisfies Record<string, string> | undefined as Record<string, string> | undefined;
 }
 
 /**
@@ -49,7 +49,7 @@ function pairsOf(args: Args, key: string, sent: (value: string) => string): Reco
  * @param exp The export read of `from`'s store: the cards left there and what stays.
  * @param filed What the import into `to`'s store answers: the file, the repositories, volumes and cards, and the places left untrusted.
  */
-export function movedLines(from: string, to: string, exp: FactoryExport, filed: FactoryImported): string[] {
+export function movedLines(from: string, to: string, exp: FactoryExport, filed: FactoryImported) {
   const cloned = new Set(filed.cloned);
   return [
     `${filed.name}: moved from ${from} to ${to}`,
@@ -73,7 +73,7 @@ export function movedLines(from: string, to: string, exp: FactoryExport, filed: 
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  * @param env The environment whose contexts name both stores; this process's by default.
  */
-export async function factoryMove(args: Args, env: NodeJS.ProcessEnv = process.env): Promise<number> {
+export async function factoryMove(args: Args, env: NodeJS.ProcessEnv = process.env) {
   const name = textOf(args, 'name');
   const to = textOf(args, 'to');
   const from = textArg(args, 'from') ?? inUse(env);

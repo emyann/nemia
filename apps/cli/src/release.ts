@@ -22,16 +22,16 @@ export const releaseMet: ReleaseMet = (client, daemon) => {
 };
 
 /** The JSON of `file`, or undefined where it is not there or does not read. */
-const jsonOf = (file: string): unknown => {
+const jsonOf = (file: string) => {
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+    return JSON.parse(fs.readFileSync(file, 'utf8')) satisfies unknown as unknown;
   } catch {
-    return undefined;
+    return undefined satisfies unknown as unknown;
   }
 };
 
 /** Whether `dir`'s `package.json` names the daemon: the root of a checkout or an install. */
-const namesTheDaemon = (dir: string): boolean => {
+const namesTheDaemon = (dir: string) => {
   const read = jsonOf(path.join(dir, 'package.json'));
   if (typeof read !== 'object' || read === null || !('nemia' in read)) return false;
   const { nemia } = read;
@@ -43,21 +43,21 @@ const namesTheDaemon = (dir: string): boolean => {
  * daemon; null where that folder has none (a checkout), where its `tag` is not a word, or where no folder names the daemon.
  * @param from The folder the search starts at, and goes up from.
  */
-export function releaseAt(from: string): string | null {
+export function releaseAt(from: string) {
   let at: string;
   try {
     at = fs.realpathSync(from);
   } catch {
-    return null;
+    return null satisfies string | null as string | null;
   }
   for (;;) {
     if (namesTheDaemon(at)) {
       const file = jsonOf(path.join(at, 'release.json'));
-      if (typeof file !== 'object' || file === null || !('tag' in file)) return null;
-      return typeof file.tag === 'string' && file.tag !== '' ? file.tag : null;
+      if (typeof file !== 'object' || file === null || !('tag' in file)) return null satisfies string | null as string | null;
+      return (typeof file.tag === 'string' && file.tag !== '' ? file.tag : null) satisfies string | null as string | null;
     }
     const up = path.dirname(at);
-    if (up === at) return null;
+    if (up === at) return null satisfies string | null as string | null;
     at = up;
   }
 }
@@ -65,4 +65,5 @@ export function releaseAt(from: string): string | null {
 let mine: string | null | undefined;
 
 /** This client's own release, read once from its install's `release.json` (`releaseAt`); null for a checkout. */
-export const clientRelease = (): string | null => (mine === undefined ? (mine = releaseAt(import.meta.dirname)) : mine);
+export const clientRelease = () =>
+  (mine === undefined ? (mine = releaseAt(import.meta.dirname)) : mine) satisfies string | null as string | null;

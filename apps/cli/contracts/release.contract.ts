@@ -14,7 +14,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type ReleaseMeeting = 'met' | 'differs' | 'unsaid';
 
 /** Whether both sides say a release. */
-const bothSay = (client: string | null, daemon: string | null): boolean => client !== null && daemon !== null;
+const bothSay = (client: string | null, daemon: string | null) => client !== null && daemon !== null;
 
 const releaseMetSpec = spec<(client: string | null, daemon: string | null) => ReleaseMeeting>({
   ensures: {

@@ -14,13 +14,13 @@ import { listArg, namespaceOfRun, said, switchArg } from '../requests.ts';
 import { forgottenLine, sizeOf } from './forgotten.ts';
 
 /** The runs named, in the order typed. */
-const idsOf = (args: Args): readonly string[] => listArg(args, 'runId');
+const idsOf = (args: Args) => listArg(args, 'runId') satisfies readonly string[] as readonly string[];
 
 /** The runs a verb named and left, and whether one failed otherwise than by a refusal, which makes its exit 1 and not 2. */
 type Tally = { left: string[]; failed: boolean };
 
 /** The exit of a verb that judged each run on its own: 0 where none was left; else refused, naming them, 2, or 1 where one failed. */
-function tallied(verb: string, did: string, { left, failed }: Tally): number {
+function tallied(verb: string, did: string, { left, failed }: Tally) {
   if (!left.length) return 0;
   throw new Refused(
     `nemia ${verb}: ${left.join(', ')} not ${did} — ${left.length > 1 ? 'each' : 'its'} line above says why, and what to do.`,
@@ -29,11 +29,10 @@ function tallied(verb: string, did: string, { left, failed }: Tally): number {
 }
 
 /** The line of a run a verb could not act on: the api's words as they are where they already open with the run, else after its id. */
-const refusedLine = (id: string, did: string, words: string): string =>
-  words.startsWith(`${id}  `) ? words : `${id}  not ${did}: ${words}`;
+const refusedLine = (id: string, did: string, words: string) => (words.startsWith(`${id}  `) ? words : `${id}  not ${did}: ${words}`);
 
 /** A run a verb could not act on: its line (`refusedLine`), and its place in the tally. */
-function leftLine(id: string, did: string, err: unknown, tally: Tally): void {
+function leftLine(id: string, did: string, err: unknown, tally: Tally) {
   said([refusedLine(id, did, err instanceof Error ? err.message : String(err))]);
   tally.left.push(id);
   if (!(err instanceof Refused)) tally.failed = true;
@@ -43,7 +42,7 @@ function leftLine(id: string, did: string, err: unknown, tally: Tally): void {
  * `nemia rm <runId>... [--delete-branches [--force-unmerged]]`: each run forgotten whole, its line each; none named, the help.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function rm(args: Args): Promise<number> {
+export async function rm(args: Args) {
   const ids = idsOf(args);
   if (!ids.length) {
     said([helpOf([RM_WORDS])]);
@@ -83,7 +82,7 @@ export async function rm(args: Args): Promise<number> {
  * The namespace `nemia rm` asks to forget the run `name` in: its own, read across namespaces (`namespaceOfRun`); the default namespace
  * where the store has no record of it, where the api still forgets what was left under its id.
  */
-const namespaceToForget = async (name: string): Promise<string> =>
+const namespaceToForget = async (name: string) =>
   asked(RM_WORDS.name, (c) =>
     c.runs.show({ params: { name } }).pipe(
       Effect.map((run) => run.metadata.namespace ?? DEFAULT_NAMESPACE),
@@ -95,7 +94,7 @@ const namespaceToForget = async (name: string): Promise<string> =>
   );
 
 /** Whether the person at the terminal says y to `question`; no terminal, no. */
-async function confirmed(question: string): Promise<boolean> {
+async function confirmed(question: string) {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
   const terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -106,7 +105,7 @@ async function confirmed(question: string): Promise<boolean> {
 }
 
 /** Every run that is over, by its name: what `nemia prune` judges when it names none. */
-async function overRuns(): Promise<string[]> {
+async function overRuns() {
   const listed = await asked(PRUNE_WORDS.name, (c) =>
     pageOf(everyPage((page) => c.runs.listAll({ query: { ...page, fieldSelector: 'status.state=finished' } }))),
   );
@@ -120,7 +119,7 @@ type Ready = { name: string; namespace: string; preview: RunPruned };
 const NOTHING = 'Nothing to prune';
 
 /** A run `nemia prune` could not preview, said: nothing to prune, said only where named; else its refusal, tallied where named. */
-function unready(name: string, named: boolean, err: unknown, tally: Tally): void {
+function unready(name: string, named: boolean, err: unknown, tally: Tally) {
   const words = err instanceof Error ? err.message : String(err);
   if (words.includes(NOTHING)) {
     if (named) said([`${name}  ${words}`]);
@@ -131,7 +130,7 @@ function unready(name: string, named: boolean, err: unknown, tally: Tally): void
 }
 
 /** Each of `ids` previewed, said and tallied, in the order named (`unready`). */
-async function previewed(ids: readonly string[], named: boolean, payload: object, tally: Tally): Promise<Ready[]> {
+async function previewed(ids: readonly string[], named: boolean, payload: object, tally: Tally) {
   const ready: Ready[] = [];
   for (const name of ids) {
     try {
@@ -149,14 +148,14 @@ async function previewed(ids: readonly string[], named: boolean, payload: object
 }
 
 /** What `nemia prune` says where nothing is ready: nothing to prune, unless a run named was refused, which its line said. */
-function noneReady(named: boolean, artifacts: boolean, tally: Tally): number {
+function noneReady(named: boolean, artifacts: boolean, tally: Tally) {
   if (!tally.left.length)
     said([named ? 'nothing to prune' : `nothing to prune: no run that is over has a worktree${artifacts ? ' or files' : ''} left`]);
   return tallied(PRUNE_WORDS.name, 'pruned', tally);
 }
 
 /** Whether `nemia prune` removes what it listed: on `--yes`, or a person's y; else it says the command that would, and removes nothing. */
-async function removing(args: Args, ready: readonly Ready[], named: boolean): Promise<boolean> {
+async function removing(args: Args, ready: readonly Ready[], named: boolean) {
   if (switchArg(args, 'yes') || (await confirmed('remove them? [y/N] '))) return true;
   const flags = ['unmerged', 'artifacts'].filter((key) => switchArg(args, key)).map((key) => `--${key}`);
   said([`nothing removed: nemia prune ${[...(named ? ready.map((r) => r.name) : []), ...flags, '--yes'].join(' ')} removes them`]);
@@ -164,7 +163,7 @@ async function removing(args: Args, ready: readonly Ready[], named: boolean): Pr
 }
 
 /** Each run of `ready` pruned, its lines said, a run not pruned or with something left tallied. */
-async function removed(ready: readonly Ready[], payload: object, tally: Tally): Promise<void> {
+async function removed(ready: readonly Ready[], payload: object, tally: Tally) {
   for (const { name, namespace } of ready) {
     try {
       const done = await asked(PRUNE_WORDS.name, (c) => c.runs.prune({ params: { namespace, name }, payload }));
@@ -181,7 +180,7 @@ async function removed(ready: readonly Ready[], payload: object, tally: Tally): 
  * `--yes` or a person's y; with none named, every run that is over.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function prune(args: Args): Promise<number> {
+export async function prune(args: Args) {
   const ids = idsOf(args);
   const named = ids.length > 0;
   const unmerged = switchArg(args, 'unmerged');

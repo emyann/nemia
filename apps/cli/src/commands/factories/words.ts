@@ -17,7 +17,7 @@ import { textOf } from './lines.ts';
  * @param file The path of the file to read, or `-` for stdin.
  * @param command The command's name, said in a refusal.
  */
-export function wordsOf(file: string, command: string): string {
+export function wordsOf(file: string, command: string) {
   if (file !== '-') return fileText(file, command);
   try {
     return fs.readFileSync(0, 'utf8');
@@ -36,7 +36,7 @@ const KEPT = 'a run already started keeps the rules it was started with';
  * @param data The factory's rules as the api answers them: its file, its words, why they cannot be told, or whether they were removed.
  * @param wrote Whether the command wrote the rules.
  */
-export function rulesLines(data: FactoryRules, wrote: boolean): string[] {
+export function rulesLines(data: FactoryRules, wrote: boolean) {
   const { name } = data;
   if (data.removed !== undefined)
     return [data.removed ? `${name}: rules removed, ${data.file} — ${KEPT}` : `${name} has no rules to remove`];
@@ -51,7 +51,7 @@ export function rulesLines(data: FactoryRules, wrote: boolean): string[] {
  * `nemia factory rules`: a factory's rules, read bare, written from `--file`, removed with `--clear`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryRules(args: Args): Promise<number> {
+export async function factoryRules(args: Args) {
   const name = textOf(args, 'factory');
   const file = textArg(args, 'file');
   const words = file === undefined ? undefined : wordsOf(file, 'factory rules');
@@ -67,14 +67,14 @@ export async function factoryRules(args: Args): Promise<number> {
 }
 
 /** Where a factory's instruction is kept, as its lines say it. */
-const keptLine = (data: FactoryInstruction): string =>
+const keptLine = (data: FactoryInstruction) =>
   data.store ? `kept in the store: ${data.file}` : `read from ${data.file}, in the factory's first folder`;
 
 /**
  * What `nemia factory instruction` prints of a read: where it is kept, then the words, or why there are none.
  * @param data The factory's instruction as the api answers it: where it is kept, its words, or why it does not read.
  */
-export function instructionLines(data: FactoryInstruction): string[] {
+export function instructionLines(data: FactoryInstruction) {
   const where = `${data.name}: ${keptLine(data)}`;
   if (data.error !== null) return [where, `it does not read: ${data.error}`];
   if (data.words === null)
@@ -91,7 +91,7 @@ export function instructionLines(data: FactoryInstruction): string[] {
  * `nemia factory instruction`: where a factory's instruction is kept, read bare, or set with `--path`, `--store` or `--clear`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryInstruction(args: Args): Promise<number> {
+export async function factoryInstruction(args: Args) {
   const name = textOf(args, 'factory');
   const at = textArg(args, 'path');
   const placed = switchArg(args, 'clear') || switchArg(args, 'store') || at !== undefined;
@@ -112,7 +112,7 @@ export async function factoryInstruction(args: Args): Promise<number> {
  * `nemia factory instruct`: the instruction the store keeps for a factory, written from `--file` or removed with `--clear`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryInstruct(args: Args): Promise<number> {
+export async function factoryInstruct(args: Args) {
   const name = textOf(args, 'factory');
   const file = textArg(args, 'file');
   const words = file === undefined ? undefined : wordsOf(file, 'factory instruct');

@@ -21,11 +21,11 @@ import { listArg, pathSent, said, textArg } from '../requests.ts';
 import { onRepo } from './sent.ts';
 
 /** The line of an agent copied in: the file and version it came from, and whether that file has changed since or is gone. */
-const copiedLine = ({ source, version, now }: NonNullable<Agent['status']['copied']>): string =>
+const copiedLine = ({ source, version, now }: NonNullable<Agent['status']['copied']>) =>
   `   copied from ${source} at ${version}${now === 'changed' ? '; the source has changed since' : now === 'gone' ? '; the source is gone' : ''}`;
 
 /** One agent's lines on `nemia agents`: what it is for, what it says it can do, and the skills it is given; or why it does not read. */
-function agentLines({ metadata: { name }, spec, status }: Agent): string[] {
+function agentLines({ metadata: { name }, spec, status }: Agent) {
   const from = status.origin;
   if (status.error !== null) return [`${name}  ${from}  does not read: ${status.error.split('\n')[0]}`];
   const custom = status.custom ?? null;
@@ -45,16 +45,16 @@ function agentLines({ metadata: { name }, spec, status }: Agent): string[] {
  * `nemia agents`' lines: each agent, and how to get one's card; or where an agent would be, for none.
  * @param agents The agents the api lists, in its order; none prints where an agent would be.
  */
-export const agentsLines = (agents: readonly Agent[]): string[] =>
-  agents.length
+export const agentsLines = (agents: readonly Agent[]) =>
+  (agents.length
     ? [...agents.flatMap(agentLines), `\none in A2A's shape: nemia agents card <name>`]
-    : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"];
+    : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"]) satisfies string[] as string[];
 
 /**
  * `nemia agents`' runner: every agent the api lists in `default`, on the repository `--repo` names or it is typed in.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function agentsListed(args: Args): Promise<number> {
+export async function agentsListed(args: Args) {
   const list = await asked(AGENTS_WORDS.name, (c) =>
     onRepo(args, (repo) =>
       pageOf(everyPage((page) => c.agents.list({ params: { namespace: DEFAULT_NAMESPACE }, query: { ...page, ...repo } }))),
@@ -68,7 +68,7 @@ export async function agentsListed(args: Args): Promise<number> {
  * `nemia agents card <name>`'s runner: the card printed as JSON, and on stderr that it is a card, not an address.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function agentsCard(args: Args): Promise<number> {
+export async function agentsCard(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const origin = textArg(args, 'from');
   const from = origin !== undefined ? { origin } : {};
@@ -83,11 +83,11 @@ export async function agentsCard(args: Args): Promise<number> {
 }
 
 /** The heading of the agents of one folder: the repository's, the library's, or the one named. */
-const headingOf = ({ place, repo, dir }: AgentSource): string =>
+const headingOf = ({ place, repo, dir }: AgentSource) =>
   place === 'repository' ? `${dir}  (the repository ${repo})` : place === 'library' ? `${dir}  (your library)` : dir;
 
 /** `nemia agents sources`' lines: the agents of each folder under its heading, then how to copy one; or that there is none. */
-export function sourcesLines({ sources }: AgentSources): string[] {
+export function sourcesLines({ sources }: AgentSources) {
   if (!sources.length)
     return ['no agent file found in the repositories the store knows, nor in your library: name a folder of them with --path <folder>.'];
   const lines: string[] = [];
@@ -109,7 +109,7 @@ export function sourcesLines({ sources }: AgentSources): string[] {
  * `nemia agents sources`' runner: the folder `--path` names a path on the daemon's machine.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function agentsSources(args: Args): Promise<number> {
+export async function agentsSources(args: Args) {
   const at = textArg(args, 'path');
   const query = at === undefined ? {} : { path: pathSent(at) };
   said(sourcesLines(await asked(AGENTS_SOURCES_WORDS.name, (c) => c.agents.sources({ query }))));
@@ -117,7 +117,7 @@ export async function agentsSources(args: Args): Promise<number> {
 }
 
 /** The words of a copy: what it wrote, what it reused, and how the agent is given to a step. */
-export const copiedLines = ({ name, copied, reused }: AgentCopied): string[] => [
+export const copiedLines = ({ name, copied, reused }: AgentCopied) => [
   `${name} copied into your library${copied.length ? `: ${copied.join(', ')}` : ', which held it already'}`,
   ...(reused.length && copied.length ? [`reused as they were: ${reused.join(', ')}`] : []),
   `give it to a step: nemia factory hire <factory> ${name} --step <workflow>/<step>`,
@@ -127,7 +127,7 @@ export const copiedLines = ({ name, copied, reused }: AgentCopied): string[] => 
  * `nemia agents copy <file>`'s runner: the file a path on the daemon's machine, which reads and judges it.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function agentsCopy(args: Args): Promise<number> {
+export async function agentsCopy(args: Args) {
   const file = pathSent(textArg(args, 'file') ?? '');
   const as = textArg(args, 'as');
   const keep = listArg(args, 'keep');

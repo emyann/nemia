@@ -12,10 +12,10 @@ import type { APIResource } from 'objects';
 export type NoResource = { readonly refused: 'unknown' };
 
 /** Whether `resource` is a kind's own, never a sub-resource of one. */
-const whole = (resource: APIResource): boolean => !resource.name.includes('/');
+const whole = (resource: APIResource) => !resource.name.includes('/');
 
 /** Whether `word` names `resource`: its plural or its singular. */
-const names = (resource: APIResource, word: string): boolean => resource.name === word || resource.singularName === word;
+const names = (resource: APIResource, word: string) => resource.name === word || resource.singularName === word;
 
 /** Whether `out` is a resource, not a refusal. */
 const isResource = (out: APIResource | NoResource): out is APIResource => !('refused' in out);

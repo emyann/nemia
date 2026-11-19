@@ -10,14 +10,14 @@ import { said, switchArg } from '../requests.ts';
 import { dollars, repoSent, textOf, trustedLines, volumeSent, writtenOf } from './lines.ts';
 
 /** How a volume is said: `:ro` or `:rw`, as docker compose marks it. */
-const markOf = (readOnly: boolean): ':ro' | ':rw' => (readOnly ? ':ro' : ':rw');
+const markOf = (readOnly: boolean) => (readOnly ? ':ro' : ':rw');
 
 /**
  * `nemia factory volume add`: a writable volume, a repository the factory works on, its place trusted unless `--no-trust`; or a
  * read-only one, mounted for every local step of its runs; and how it was marked before.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryVolumeAdd(args: Args): Promise<number> {
+export async function factoryVolumeAdd(args: Args) {
   const factory = textOf(args, 'factory');
   const added = await asked('factory volume add', (c) =>
     c.factories.addVolume({
@@ -39,7 +39,7 @@ export async function factoryVolumeAdd(args: Args): Promise<number> {
  * `nemia factory volume rm`: a volume taken off a factory, by its path or the git URL it was cloned from.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryVolumeRm(args: Args): Promise<number> {
+export async function factoryVolumeRm(args: Args) {
   const factory = textOf(args, 'factory');
   const { file, removed } = await asked('factory volume rm', (c) =>
     c.factories.removeVolume({ params: { factory }, query: { path: repoSent(textOf(args, 'path')) } }),
@@ -52,7 +52,7 @@ export async function factoryVolumeRm(args: Args): Promise<number> {
  * `nemia factory setting set`: a harness setting given to a factory's runs, printed as its file now holds it.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factorySettingSet(args: Args): Promise<number> {
+export async function factorySettingSet(args: Args) {
   const [factory, setting] = [textOf(args, 'factory'), textOf(args, 'setting')];
   const answer = await asked('factory setting set', (c) =>
     c.factories.putSetting({ params: { name: factory, setting }, payload: { value: textOf(args, 'value') } }),
@@ -70,7 +70,7 @@ export async function factorySettingSet(args: Args): Promise<number> {
  * `nemia factory setting rm`: a harness setting taken off a factory, by its key.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factorySettingRm(args: Args): Promise<number> {
+export async function factorySettingRm(args: Args) {
   const [factory, setting] = [textOf(args, 'factory'), textOf(args, 'setting')];
   const answer = await asked('factory setting rm', (c) => c.factories.deleteSetting({ params: { name: factory, setting } }));
   said([`${factory}  setting ${setting} removed`, `changed: ${writtenOf(answer, 'factory setting rm').file}`]);
@@ -81,7 +81,7 @@ export async function factorySettingRm(args: Args): Promise<number> {
  * `nemia factory cost-line set`: the cost line of a workflow in a factory, and the line it replaced.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryCostLineSet(args: Args): Promise<number> {
+export async function factoryCostLineSet(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const usd = Number(textOf(args, 'usd'));
   const answer = await asked('factory cost-line set', (c) =>
@@ -99,7 +99,7 @@ export async function factoryCostLineSet(args: Args): Promise<number> {
  * `nemia factory cost-line rm`: the cost line of a workflow taken off a factory.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryCostLineRm(args: Args): Promise<number> {
+export async function factoryCostLineRm(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const answer = await asked('factory cost-line rm', (c) => c.factories.deleteCostLine({ params: { name: factory, workflow } }));
   said([

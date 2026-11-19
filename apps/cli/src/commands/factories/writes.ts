@@ -14,7 +14,7 @@ import { textOf, trustedLines, volumeSent, worksOnLine, writtenOf } from './line
  * `--no-trust`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryAdd(args: Args): Promise<number> {
+export async function factoryAdd(args: Args) {
   const name = textOf(args, 'name');
   const volumes = listArg(args, 'volumes').map((v) => volumeSent(v));
   const filed = await asked('factory add', (c) =>
@@ -29,7 +29,7 @@ export async function factoryAdd(args: Args): Promise<number> {
  * already.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryAttach(args: Args): Promise<number> {
+export async function factoryAttach(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const repo = textArg(args, 'repo');
   const answer = await asked('factory attach', (c) =>
@@ -47,7 +47,7 @@ export async function factoryAttach(args: Args): Promise<number> {
  * `nemia factory detach`: one workflow taken from one factory.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryDetach(args: Args): Promise<number> {
+export async function factoryDetach(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const answer = await asked('factory detach', (c) => c.factories.detach({ params: { name: factory, workflow } }));
   said([`${factory}  detached ${workflow}`, `detached: ${writtenOf(answer, 'factory detach').file}`]);
@@ -55,13 +55,13 @@ export async function factoryDetach(args: Args): Promise<number> {
 }
 
 /** The Hire's name of the step `<workflow>/<step>`: `<workflow>.<step>`. */
-const hireName = (step: string): string => step.replace('/', '.');
+const hireName = (step: string) => step.replace('/', '.');
 
 /**
  * `nemia factory hire`: an agent hired into a workflow's step, and the one it replaced.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryHire(args: Args): Promise<number> {
+export async function factoryHire(args: Args) {
   const [factory, agent, step] = [textOf(args, 'factory'), textOf(args, 'agent'), textOf(args, 'step')];
   const answer = await asked('factory hire', (c) =>
     c.hires.put({ params: { namespace: factory, name: hireName(step) }, payload: { agent } }),
@@ -75,7 +75,7 @@ export async function factoryHire(args: Args): Promise<number> {
  * `nemia factory fire`: a step's hire taken back, and the agent fired.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryFire(args: Args): Promise<number> {
+export async function factoryFire(args: Args) {
   const [factory, step] = [textOf(args, 'factory'), textOf(args, 'step')];
   const answer = await asked('factory fire', (c) => c.hires.delete({ params: { namespace: factory, name: hireName(step) } }));
   const { file, was } = writtenOf(answer, 'factory fire');
@@ -87,7 +87,7 @@ export async function factoryFire(args: Args): Promise<number> {
  * `nemia factory revisions`: whether a factory's runs follow merged revisions, and what it said before.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryRevisions(args: Args): Promise<number> {
+export async function factoryRevisions(args: Args) {
   const factory = textOf(args, 'factory');
   const revisions = REVISIONS_POLICIES.find((p) => p === textOf(args, 'revisions'));
   if (revisions === undefined)
@@ -107,7 +107,7 @@ export async function factoryRevisions(args: Args): Promise<number> {
  * `nemia factory trust`: the trust of each of a factory's places asked again, and what was done of it.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryTrust(args: Args): Promise<number> {
+export async function factoryTrust(args: Args) {
   const factory = textOf(args, 'factory');
   const { name, trusts } = await asked('factory trust', (c) => c.factories.trust({ params: { name: factory } }));
   const lines = trustedLines(name, trusts);
@@ -119,7 +119,7 @@ export async function factoryTrust(args: Args): Promise<number> {
  * `nemia factory rm`: a factory's file removed, and the instruction and rules the store kept for it.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryRm(args: Args): Promise<number> {
+export async function factoryRm(args: Args) {
   const factory = textOf(args, 'factory');
   const { file, instruction } = await asked('factory rm', (c) => c.factories.delete({ params: { name: factory } }));
   said([`${factory}  removed — ${file}`, ...(instruction === null ? [] : [`instruction removed: ${instruction}`])]);

@@ -15,7 +15,7 @@
  * file of its own renamed over it, its times kept, and only when the reader reads the kept text as it read the whole (`keepCapture`);
  * what was read is then kept under the kept capture's key. `SAID_VERSION` stays the readers': a capture kept so reads the same.
  */
-import { Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import { UsageSchema } from '../../core/event-schema.ts';
@@ -67,14 +67,14 @@ const KeptSchema = Schema.Struct({
     usage: Schema.optional(UsageSchema),
     ownTokens: Schema.optional(UsageSchema),
     limit: Schema.optional(Schema.String),
-    denials: Schema.optional(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) }))),
-    skills: Schema.optional(Schema.Array(Schema.String)),
-    files: Schema.optional(Schema.Array(Schema.String)),
+    denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),
+    skills: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+    files: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
     ranIn: Schema.optional(Schema.String),
   }),
 });
 
-const isKept = Schema.is(KeptSchema);
+const keptIn = Schema.decodeUnknownOption(Schema.fromJsonString(KeptSchema));
 
 /** Whether a kept output of `version` is taken: the shipped readers' own, or one of `SAID_EXTENDED`. */
 const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_EXTENDED.includes(version);
@@ -86,14 +86,16 @@ const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_E
  * @param key The capture's size and modification time now, which the kept reading must have been read at.
  */
 export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined => {
-  let parsed: unknown;
+  let text: string;
   try {
-    parsed = JSON.parse(readText(file));
+    text = readText(file);
   } catch {
     return undefined;
   }
-  if (!isKept(parsed) || !isTaken(parsed.version) || parsed.size !== key.size || parsed.mtimeMs !== key.mtimeMs) return undefined;
-  return parsed.read as HarnessOutput;
+  const kept = Option.getOrUndefined(keptIn(text));
+  if (!kept || !isTaken(kept.version) || kept.size !== key.size || kept.mtimeMs !== key.mtimeMs) return undefined;
+  const read: HarnessOutput = kept.read;
+  return read;
 };
 
 /**

@@ -5,6 +5,7 @@
  * `Options.mcpServers` instead of a file. And as Codex is handed them: the server names an operator's Codex config already
  * has, and a task's servers as its `mcp_servers` table.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { McpServer, RemoteMcpServer } from './seam.ts';
@@ -23,6 +24,12 @@ export { MCP_TRANSPORTS } from './mcp-transports.ts';
 export const transportOf: TransportOf = (written) => MCP_TRANSPORTS.find((transport) => transport === written) ?? 'unknown';
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** A `.mcp.json` whose servers a task picks: its `mcpServers`, a map. */
+const ServersMap = Schema.Struct({ mcpServers: Schema.Record(Schema.String, Schema.Unknown) });
+
+/** A checkout's `.mcp.json`, as a session is given it whole: its `mcpServers`, a map where it has one. */
+const CheckoutConfig = Schema.fromJsonString(Schema.Struct({ mcpServers: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) }));
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
 
 /** Why `mcp.<name>`, a server with a `command`, is not one a harness can start — or `undefined`. */
@@ -180,17 +187,19 @@ export const pickedProjectMcp = (cwd: string, names: readonly string[]): Record<
       { cause: e },
     );
   }
-  let servers: unknown;
+  let json: unknown;
   try {
-    servers = (JSON.parse(text) as { mcpServers?: unknown } | null)?.mcpServers;
+    json = JSON.parse(text);
   } catch (e) {
     throw new Error(`${file} is not valid JSON (${(e as Error).message}), and ${asked} names servers of it. Fix the file.`, { cause: e });
   }
-  if (!isMap(servers)) {
+  const declared = Option.getOrUndefined(Schema.decodeUnknownOption(ServersMap)(json))?.mcpServers;
+  if (!isMap(declared)) {
     throw new Error(
       `${file} has no \`mcpServers\` map, and ${asked} names servers of it. Declare them there, or take the names off the task.`,
     );
   }
+  const servers = declared;
   const absent = names.filter((name) => !Object.hasOwn(servers, name));
   if (absent.length) {
     const declared = Object.keys(servers);
@@ -211,6 +220,21 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
   config?.projectMcp ? { ...pickedProjectMcp(cwd, config.projectMcp), ...config.mcp } : config?.mcp;
 
 /**
+ * The servers the `.mcp.json` at `file` declares, none where it declares none. Refused, naming the file and what `mcpServers` must be,
+ * where its JSON is no object or its `mcpServers` no map: Claude Code would start the session with them dropped.
+ * @param file The checkout's `.mcp.json`, which `projectMcpConfig` found to be JSON.
+ */
+const checkoutServers = (file: string): Record<string, unknown> => {
+  const read = Schema.decodeUnknownOption(CheckoutConfig)(fs.readFileSync(file, 'utf8'));
+  const servers = Option.isSome(read) ? (read.value.mcpServers ?? {}) : undefined;
+  if (!isMap(servers))
+    throw new Error(
+      `${file} is no MCP config: it is a JSON object whose \`mcpServers\` is a map of servers by name, as { "mcpServers": { "docs": { "type": "http", "url": "https://…" } } }. Fix the file, or remove it from the checkout.`,
+    );
+  return servers;
+};
+
+/**
  * Every server a session is given, as a value: the checkout's own `.mcp.json` whole, as `claude -p` reads its second config — unless
  * the task picks entries of it by name (`projectMcp`), which `sessionMcp` has already taken — with the session's own laid over it, so
  * the task's server wins a name both give. `{}` where neither gives one.
@@ -223,8 +247,7 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
  */
 export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> => {
   const checkout = config?.projectMcp ? undefined : projectMcpConfig(cwd);
-  const theirs = checkout ? ((JSON.parse(fs.readFileSync(checkout, 'utf8')) as { mcpServers?: object }).mcpServers ?? {}) : {};
-  return { ...theirs, ...sessionMcp(cwd, config) };
+  return { ...(checkout ? checkoutServers(checkout) : {}), ...sessionMcp(cwd, config) };
 };
 
 /**

@@ -852,7 +852,13 @@ export function volumesMovedAt(home: string): VolumesMoved {
   const left: { file: string; why: string }[] = [];
   for (const name of names.filter((n) => n.endsWith('.json') && !n.startsWith('.')).sort()) {
     const file = path.join(factoriesDirAt(home), name);
-    const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(fs.readFileSync(file, 'utf8'));
+    let text: string;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+    const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
     if (Option.isNone(json)) continue;
     const raw = json.value;
     if (!isFormer(raw)) continue;

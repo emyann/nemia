@@ -22,7 +22,7 @@ import type {
   SDKStatusMessage,
   SDKSystemMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { firstRefusal } from '../../core/index.ts';
 import type { PartialMark } from '../detached/follow.ts';
 import type { InitRead } from '../../../contracts/capture.contract.ts';
@@ -238,13 +238,10 @@ const kindOf = (value: unknown, kinds: readonly PrintedKind[]): PrintedKind | un
 };
 
 /** The JSON object `text` holds, when it parses: `undefined` for a line torn mid-write, stderr, or prose. */
-const parsed = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
+const parsed = (text: string): unknown => Option.getOrUndefined(jsonOf(text));
+
+/** A line's text decoded as JSON, or none where it is not. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /**
  * The kind of the line `text`: one of `PRINTED`'s when it is a JSON object of that kind, `'other'` for a JSON object of another kind

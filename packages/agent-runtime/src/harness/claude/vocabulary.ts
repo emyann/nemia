@@ -303,11 +303,18 @@ const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | unde
 export const settingsObject = (settings: string): Record<string, unknown> | undefined => {
   try {
     const read: unknown = JSON.parse(settings);
-    return typeof read === 'object' && read !== null && !Array.isArray(read) ? (read as Record<string, unknown>) : undefined;
+    return isJsonObject(read) ? read : undefined;
   } catch {
     return undefined;
   }
 };
+
+/**
+ * Whether `value`, read from JSON, is an object with keys: no array, no null.
+ * @param value What was read.
+ */
+export const isJsonObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
  * Whether a task asks for its session bridged to claude.ai (`config.claude.remoteControl`): opened on the SDK's control request at the

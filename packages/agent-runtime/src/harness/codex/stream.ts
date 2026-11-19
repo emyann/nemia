@@ -10,7 +10,7 @@
  *
  * Its first line is its start, `thread.started`, whose `thread_id` the worker reads as the session's own id (`CODEX_START`).
  */
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { firstRefusal, own, type Usage } from '../../core/index.ts';
 import type { HarnessOutput, StartEvent } from '../detached/detached.ts';
 import type { PartialMark } from '../detached/follow.ts';
@@ -69,12 +69,9 @@ const FIX =
  */
 const ours = (line: string): { event: Record<string, unknown> & { type: string }; decode: (typeof DECODERS)[string] } | undefined => {
   if (!line.includes('"type"')) return undefined;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(line);
-  } catch {
-    return undefined;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(line);
+  if (Option.isNone(json)) return undefined;
+  const parsed = json.value;
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
   const { type } = parsed as { type?: unknown };
   const decode = typeof type === 'string' ? own(DECODERS, type) : undefined;

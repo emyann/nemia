@@ -3,9 +3,13 @@
  * only, and the cursor to ask again with. What a line means is the harness's — Claude Code's lines are read in
  * `harness/claude/transcript.ts`, Codex's rollout in `harness/codex/transcript.ts`.
  */
+import { Option, Schema } from 'effect';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import type { Transcript, TranscriptCursor, TranscriptEvent } from './seam.ts';
+
+/** A line's text decoded as JSON, or none where it is not. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /**
  * How much of a file, before a cursor's offset, its hash covers. Past the end of what every line of one
@@ -94,13 +98,8 @@ export const readTranscript = async (
     const events: TranscriptEvent[] = [];
     let read = 0;
     for (let end = chunk.indexOf(0x0a); end !== -1; end = chunk.indexOf(0x0a, read)) {
-      let entry: unknown;
-      try {
-        entry = JSON.parse(chunk.toString('utf8', read, end));
-      } catch {
-        entry = undefined;
-      }
-      if (entry !== undefined) events.push(...eventsOf(entry, from + read, file));
+      const entry = jsonOf(chunk.toString('utf8', read, end));
+      if (Option.isSome(entry)) events.push(...eventsOf(entry.value, from + read, file));
       read = end + 1;
     }
     const offset = from + read;

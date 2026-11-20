@@ -9,7 +9,7 @@ const [GAP, RING] = [2, 3];
 
 /**
  * What the tag takes off what it holds, at every depth: a border, a ring or a shadow, and an outline, each of which its clip would cut
- * open at the diagonal. Each wins over the held part's own, a focus state's too (`focus-visible:ring-*`, the kit's `focusRing`): the
+ * open at the diagonal. Each wins over the held part's own, a ring or an outline shown behind a focus state too: the
  * tag draws its edge and its ring itself, in its cut shape. The border is made transparent rather than taken off, so the tag keeps
  * its size.
  */

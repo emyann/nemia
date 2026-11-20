@@ -68,7 +68,7 @@ export function RunMark({ id, run }: { id: string; run?: NamedRun }) {
 export function Chip({ now, small = false }: { now: Pick<Now, 'step' | 'tone'>; small?: boolean }) {
   const tag = CHIP_TAG[now.tone];
   return (
-    <CutTag>
+    <CutTag edge={tag.variant === 'outlined'}>
       <Tag
         data-now-word
         data-tone={now.tone}

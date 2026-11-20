@@ -2,10 +2,12 @@
  * The look's cuts, read in pixels: each story opened alone in Storybook's static build (`iframe.html?id=<id>`, `stories/built.ts`), in
  * dark. The cut button's shape and its ring, as a link and as a press, a frame's cut corner and its glow, the grain of a card's ground,
  * a sticker and a plate, a focus ring inside the cut-corner frame drawn whole over its cut corner, a disabled press's ground, and ids
- * of different lengths holding their copy controls at one edge: each read in a picture, pixel by pixel, and refused for a fault put
- * back. Beside them what needs the browser's own input, which a play function's events are not: the pager's and the text link's
- * Enter, which the browser turns into a click and which navigates once, and a text link's line under the pointer (CSS's `:hover`)
- * and the keyboard. What a person does to a part that needs neither is its story's play function (`npm run stories`).
+ * of different lengths holding their copy controls at one edge; and, at twice the page's pixels in dark and light, a cut tag's edge
+ * along its whole shape and its focus ring in its cut, and a cut field's control at its end inside its cut: each read in a picture,
+ * pixel by pixel, and refused for a fault put back. Beside them what needs the browser's own input, which a play function's events
+ * are not: the pager's and the text link's Enter, which the browser turns into a click and which navigates once, and a text link's
+ * line under the pointer (CSS's `:hover`) and the keyboard. What a person does to a part that needs neither is its story's play
+ * function (`npm run stories`).
  * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
 import { afterAll, beforeAll, test } from 'vitest';
@@ -576,5 +578,208 @@ test('ids of different lengths given one room hold their copy controls at one ed
     assert.equal(lefts[0], lefts[1], `the two controls stand at one left edge: ${lefts.join(' and ')}`);
   } finally {
     await page.context().close();
+  }
+});
+
+/** How many pixels of a picture draw one of the page, for the cut tag's and the cut field's tests: a pixel's line read whole. */
+const SCALE = 2;
+
+/** The cut tag's shape, the box its clip cuts, and the tag's stories whose edge it draws. */
+const TAG_SHAPE = '[data-cut-tag] [data-cut-shape]';
+const EDGED_TAGS = { outlined: 'look-cuttag--outlined', hairline: 'look-cuttag--hairline' } as const;
+const LINKED_TAG = 'look-cuttag--linked';
+
+/** The box `selector` finds, brought to the window's middle, in the pixels of a picture taken at `SCALE`. */
+async function scaledBox(page: Page, selector: string) {
+  await page.locator(selector).evaluate((found) => found.scrollIntoView({ block: 'center' }));
+  const box = await page.locator(selector).boundingBox();
+  assert.ok(box, `${selector} is drawn`);
+  const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height].map((edge) => edge * SCALE);
+  return { left, top, right, bottom };
+}
+
+/** A point of a picture taken at `SCALE`, the pixel that holds it. */
+const pixel = (x: number, y: number) => [Math.floor(x), Math.floor(y)] as const;
+
+/**
+ * Where the cut tag's edge is missing, none when it runs along the whole shape: a pixel inside each straight side, within the band of
+ * a page's pixel the edge draws, and three along the diagonal, each a page's half pixel inside its line, each closer to the edge's
+ * colour, read in the middle of the top, than to the card's ground beside the tag.
+ */
+async function tagEdgeGaps(page: Page, name: string) {
+  const box = await scaledBox(page, TAG_SHAPE);
+  const [midX, midY, cut] = [(box.left + box.right) / 2, (box.top + box.bottom) / 2, 7 * SCALE];
+  const sides: Record<string, readonly [number, number]> = {
+    'top, at its left': pixel(box.left + 6, box.top + 1),
+    'right, in its middle': pixel(box.right - 1, midY),
+    'bottom, in its middle': pixel(midX, box.bottom - 1),
+    'left, in its middle': pixel(box.left + 1, midY),
+  };
+  const diagonal = Object.fromEntries(
+    [4, 7, 10].map((along, i) => {
+      const x = Math.floor(box.right - cut + along) + 0.5;
+      return [`the diagonal, ${i + 1} of 3`, pixel(x, box.top + (x - (box.right - cut)) + 0.5 * SCALE * Math.SQRT2)];
+    }),
+  ) as Record<string, readonly [number, number]>;
+  const points: Record<string, readonly [number, number]> = {
+    ground: pixel(box.left - 7 * SCALE, box.top - 7 * SCALE),
+    edge: pixel(midX, box.top + 1),
+    ...sides,
+    ...diagonal,
+  };
+  const found = await coloursOf(page, name, points);
+  const { ground, edge } = found;
+  assert.ok(apart(edge, ground) > 12, `the edge is read apart from the card: ${edge.join(' ')} on ${ground.join(' ')}`);
+  return [...Object.keys(sides), ...Object.keys(diagonal)].filter((where) => !(apart(found[where], edge) < apart(found[where], ground)));
+}
+
+/** The tag's own edge taken away, and the border of what it holds put back: a clip over a bordered tag, as the count chip was. */
+const BORDERED_TAG = `[data-cut-tag] [data-cut-edge] { display: none !important; }
+${TAG_SHAPE} > * { border: 1px solid var(--md-sys-color-outline-variant) !important; }`;
+
+test(
+  "REFUSED: a cut tag's edge runs along its whole shape, its diagonal too; a child's own border, cut open by the clip, is seen",
+  WAITED,
+  async () => {
+    for (const [what, id] of Object.entries(EDGED_TAGS))
+      for (const theme of ['dark', 'light'] as const) {
+        const page = await open(id, theme, { scale: SCALE });
+        try {
+          assert.deepEqual(await tagEdgeGaps(page, `tag-edge-${what}-${theme}`), [], `${what}: the edge is drawn whole, in ${theme}`);
+          await page.addStyleTag({ content: BORDERED_TAG });
+          const cutOpen = await tagEdgeGaps(page, `tag-edge-${what}-bordered-${theme}`);
+          assert.ok(
+            cutOpen.length === 3 && cutOpen.every((where) => where.startsWith('the diagonal')),
+            `${what}: a border cut by the clip draws the sides and leaves the diagonal open, in ${theme}: seen (${cutOpen.join('; ')})`,
+          );
+        } finally {
+          await page.context().close();
+        }
+      }
+  },
+);
+
+/**
+ * The focus ring of the cut tag around a link, with the keyboard on the link: where the band it draws in the cut shape is missing,
+ * none when it is whole, a pixel in the middle of its width at each side and three along its diagonal, each closer to `ring` than to
+ * the card's ground; and whether a ring of the held link's own is drawn inside the tag, read a page's pixel and a half inside its top
+ * edge against the tag's ground. `ring`, the ring's colour, is read off the band's left side where it is not given.
+ */
+async function tagRing(page: Page, name: string, given?: Rgb) {
+  const box = await scaledBox(page, TAG_SHAPE);
+  const [midX, midY, out] = [(box.left + box.right) / 2, (box.top + box.bottom) / 2, 3.5 * SCALE];
+  const sides: Record<string, readonly [number, number]> = {
+    top: pixel(midX, box.top - out),
+    right: pixel(box.right + out, midY),
+    bottom: pixel(midX, box.bottom + out),
+    left: pixel(box.left - out, midY),
+  };
+  const [cx, cy] = [box.right - 3.5 * SCALE + out / Math.SQRT2, box.top + 3.5 * SCALE - out / Math.SQRT2];
+  const diagonal = Object.fromEntries(
+    [-2.5, 0, 2.5].map((along, i) => [`the diagonal, ${i + 1} of 3`, pixel(cx + along * SCALE, cy + along * SCALE)]),
+  ) as Record<string, readonly [number, number]>;
+  const points: Record<string, readonly [number, number]> = {
+    ground: pixel(box.left - 12 * SCALE, box.top - 12 * SCALE),
+    tag: pixel(box.left + 2 * SCALE, midY),
+    'inside its top': pixel(midX, box.top + 1.5 * SCALE),
+    ...sides,
+    ...diagonal,
+  };
+  const found = await coloursOf(page, name, points);
+  const { ground, tag } = found;
+  const ring = given ?? found.left;
+  assert.ok(apart(ring, ground) > 12, `the ring is read apart from the card: ${ring.join(' ')} on ${ground.join(' ')}`);
+  assert.ok(apart(ring, tag) > 12, `the ring is read apart from the tag: ${ring.join(' ')} on ${tag.join(' ')}`);
+  return {
+    ring,
+    gaps: [...Object.keys(sides), ...Object.keys(diagonal)].filter((where) => !(apart(found[where], ring) < apart(found[where], ground))),
+    held: apart(found['inside its top'], ring) < apart(found['inside its top'], tag),
+  };
+}
+
+/**
+ * The tag's ring taken away, and the held link's own focus ring left to it, as the kit's `focusRing` or a `focus-visible:ring-*` of
+ * its class draws one, laid inside its box where the clip leaves it seen: the ring the clip cuts at the diagonal.
+ */
+const HELD_RING = `[data-cut-tag] [data-cut-ring] { display: none !important; }
+${TAG_SHAPE} :focus-visible { outline: 3px solid var(--md-sys-color-ring) !important; outline-offset: -3px !important; }`;
+
+test(
+  "REFUSED: a cut tag around a link draws the focus ring in its cut shape, the held link's own taken off; the link's own ring is seen",
+  WAITED,
+  async () => {
+    for (const theme of ['dark', 'light'] as const) {
+      const page = await open(LINKED_TAG, theme, { scale: SCALE });
+      try {
+        await tabTo(page, 'labelLink');
+        const whole = await tagRing(page, `tag-ring-${theme}`);
+        assert.deepEqual({ gaps: whole.gaps, held: whole.held }, { gaps: [], held: false }, `the ring is the tag's, whole, in ${theme}`);
+        await page.addStyleTag({ content: HELD_RING });
+        const { gaps, held } = await tagRing(page, `tag-ring-held-${theme}`, whole.ring);
+        assert.ok(
+          held && gaps.filter((where) => where.startsWith('the diagonal')).length === 3,
+          `the link's own ring is drawn inside the tag, cut at the diagonal, and the band is gone, in ${theme}: seen (${gaps.join('; ')})`,
+        );
+      } finally {
+        await page.context().close();
+      }
+    }
+  },
+);
+
+/** The cut field whose row holds a control at its end, the field, the control, and its cut. */
+const ENDED_FIELD = 'look-cutfield--with-end';
+const FIELD = '[data-cut-field]';
+const FIELD_END = '[data-cut-end] button';
+const FIELD_CUT = 12;
+
+/**
+ * Where a cut field's control at its end stands against the field's cut: how far its top-right corner is inside the field's own
+ * diagonal, along each side, which must be the cut and the focused edge's two pixels across it at least (`cut + 2√2`); and each of
+ * three pixels a page's pixel outside the diagonal, where the control's corner would stand were it laid flush, drawn closer to the
+ * control's colour than to the page's ground.
+ */
+async function endSpill(page: Page, name: string) {
+  const field = await scaledBox(page, FIELD);
+  const button = await scaledBox(page, FIELD_END);
+  const inside = (field.right - button.right + (button.top - field.top)) / SCALE;
+  const out = SCALE / Math.SQRT2;
+  const [cx, cy] = [field.right - 6 * SCALE + out, field.top + 6 * SCALE - out];
+  const past = Object.fromEntries(
+    [-0.5, 0, 0.5].map((along, i) => [`past the diagonal, ${i + 1} of 3`, pixel(cx + along * SCALE, cy + along * SCALE)]),
+  ) as Record<string, readonly [number, number]>;
+  const points: Record<string, readonly [number, number]> = {
+    ground: pixel(field.left - 12 * SCALE, field.top - 12 * SCALE),
+    control: pixel(button.left + 3 * SCALE, (button.top + button.bottom) / 2),
+    ...past,
+  };
+  const found = await coloursOf(page, name, points);
+  const { ground, control } = found;
+  assert.ok(apart(control, ground) > 12, `the control is read apart from the ground: ${control.join(' ')} on ${ground.join(' ')}`);
+  return {
+    clear: inside >= FIELD_CUT + 2 * Math.SQRT2,
+    spilled: Object.keys(past).filter((where) => apart(found[where], control) < apart(found[where], ground)),
+  };
+}
+
+/** The control laid flush with the field's end, as the label filter was, and the field's hold of what it holds taken off. */
+const FLUSH_END = `[data-cut-end] { margin-right: 4px !important; }
+${FIELD} > div { clip-path: none !important; }`;
+
+test("REFUSED: a control at a cut field's end stands inside its cut; one laid flush with the corner is seen", WAITED, async () => {
+  for (const theme of ['dark', 'light'] as const) {
+    const page = await open(ENDED_FIELD, theme, { scale: SCALE });
+    try {
+      await tabTo(page, 'filterInput');
+      assert.deepEqual(await endSpill(page, `field-end-${theme}`), { clear: true, spilled: [] }, `inside the cut, in ${theme}`);
+      await page.addStyleTag({ content: FLUSH_END });
+      const flush = await endSpill(page, `field-end-flush-${theme}`);
+      assert.ok(
+        !flush.clear && flush.spilled.length === 3,
+        `a control laid flush stands over the cut, its colour past the diagonal, in ${theme}: seen (${flush.spilled.join('; ')})`,
+      );
+    } finally {
+      await page.context().close();
+    }
   }
 });

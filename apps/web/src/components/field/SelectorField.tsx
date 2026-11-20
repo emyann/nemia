@@ -40,20 +40,21 @@ export function SelectorField({
         );
       }}
     >
-      <CutField>
-        <div className="flex items-center gap-2 py-1 pr-1 pl-3.5">
-          <input
-            aria-label="Filter by labels"
-            name="selector"
-            value={text}
-            placeholder="Filter by labels: team=core"
-            onChange={(event) => setText(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent py-1.5 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
-          />
+      <CutField
+        end={
           <Button type="submit" size="xsmall" variant="tonal">
             Filter
           </Button>
-        </div>
+        }
+      >
+        <input
+          aria-label="Filter by labels"
+          name="selector"
+          value={text}
+          placeholder="Filter by labels: team=core"
+          onChange={(event) => setText(event.target.value)}
+          className="min-w-0 flex-1 bg-transparent py-1.5 pl-3.5 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
+        />
       </CutField>
       {refused === null ? null : (
         <p role="alert" data-selector-refused className="m-0 text-body-small text-failure">

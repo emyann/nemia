@@ -1,7 +1,7 @@
 import { Button as AriaButton, Link as AriaLink, type ButtonProps, type LinkProps } from 'react-aria-components';
 import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
-import { cutRing, cutShape } from './cut';
+import { cutEdge, cutRing, cutShape } from './cut';
 import { Pending } from './Pending';
 import { routeLink } from '../nav/routeLink';
 
@@ -19,10 +19,9 @@ const QUIET = 'text-on-surface';
 
 /**
  * The clip that leaves the quiet form's hairline: a band one pixel wide along the inside of the button's cut shape, both cuts too, as
- * a cut frame's edge runs outside its ground (`cutPoints(size, 1)`). `cutRing` grows the shape it rings by 2 − √2 for each pixel of
- * its gap and its width, so the shape it is given is the button's cut less that, and its outer edge is the button's own.
+ * a cut frame's edge runs outside its ground (`cutEdge`).
  */
-const HAIRLINE = cutRing(CUT - (2 - Math.SQRT2), 0, 1);
+const HAIRLINE = cutEdge(CUT, 1);
 
 /**
  * The hairline's paint, the outline's colour as an image: a ground colour under the words would be taken by the accessibility check,

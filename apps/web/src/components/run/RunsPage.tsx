@@ -135,7 +135,7 @@ function CountChip({ count, word, tone }: { count: number; word: string; tone: '
   const tag = COUNT_TAG[drawn];
   return (
     <h2 className="m-0 flex">
-      <CutTag>
+      <CutTag edge={drawn === 'quiet'}>
         <Tag data-count-chip={count} data-count-tone={drawn} variant={tag.variant} color={tag.color} className="h-8 px-3">
           <span className="inline-flex items-baseline gap-2.5">
             <span className="font-mono text-body-large">{count}</span>

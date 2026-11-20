@@ -33,7 +33,7 @@ function Key({ children, className }: { children: string; className?: string }) 
 /** The step's word as a cut tag. */
 function StateTag({ head }: { head: Head }) {
   return (
-    <CutTag>
+    <CutTag edge={head.tag.variant === 'outlined'}>
       <Tag data-step-tag color={head.tag.color} variant={head.tag.variant} className="uppercase">
         {head.tag.word}
       </Tag>

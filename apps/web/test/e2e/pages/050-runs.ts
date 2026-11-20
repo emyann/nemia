@@ -906,7 +906,9 @@ const drawnOf = (page: Page, marks: string) =>
         return {
           face: style.fontFamily,
           tracking: style.letterSpacing,
-          cut: element.closest('[data-cut-tag]') ? getComputedStyle(element.closest('[data-cut-tag]')!).clipPath : 'none',
+          cut: element.closest('[data-cut-tag] [data-cut-shape]')
+            ? getComputedStyle(element.closest('[data-cut-tag] [data-cut-shape]')!).clipPath
+            : 'none',
           bars: style.backgroundImage,
           glow: style.boxShadow,
         };

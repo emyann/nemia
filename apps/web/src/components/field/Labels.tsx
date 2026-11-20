@@ -70,20 +70,21 @@ export function Labels({ labels, edit }: { labels: Readonly<LabelMap>; edit: (ed
           if (typed !== '') void send([typed], () => setText(''));
         }}
       >
-        <CutField>
-          <div className="flex items-center gap-2 py-1 pr-1 pl-3.5">
-            <input
-              aria-label="Add a label"
-              name="label"
-              value={text}
-              placeholder="key=value"
-              onChange={(event) => setText(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent py-1.5 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
-            />
+        <CutField
+          end={
             <Button type="submit" size="xsmall" variant="tonal">
               Add
             </Button>
-          </div>
+          }
+        >
+          <input
+            aria-label="Add a label"
+            name="label"
+            value={text}
+            placeholder="key=value"
+            onChange={(event) => setText(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent py-1.5 pl-3.5 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
+          />
         </CutField>
         {refused === null ? null : (
           <p role="alert" data-labels-refused className="m-0 text-body-small text-failure">

@@ -8,14 +8,20 @@ import { asked } from '../../objects.ts';
 import { said, switchArg } from '../requests.ts';
 
 /**
- * A window as a line says it: its label, its used share whole, when it resets, and the mark where it is past the board's.
+ * A window as a line says it: its label, its used share whole, when it resets, and the mark where it is past the board's; a window
+ * that reset since the reading (`reset`), as the board says it, not read since, its share the window before's, and never marked.
  * @param w The window, as the api answers it.
  * @param markAt The percent of a window at which the board marks it.
  */
-const windowLine = (w: QuotaWindow, markAt: number) =>
-  `  ${w.label}: ${Math.round(w.usedPercentage)}% used, ` +
-  (w.resetsAt === null ? 'no reset given' : `${w.reset ? 'reset' : 'resets'} ${w.resetsAt}`) +
-  (w.marked ? `, past ${markAt}%` : '');
+const windowLine = (w: QuotaWindow, markAt: number) => {
+  const used = `${Math.round(w.usedPercentage)}%`;
+  if (w.reset) return `  ${w.label}: reset ${w.resetsAt ?? 'since the reading'}, not read since (${used} used of the window before)`;
+  return (
+    `  ${w.label}: ${used} used, ` +
+    (w.resetsAt === null ? 'no reset given' : `resets ${w.resetsAt}`) +
+    (w.marked ? `, past ${markAt}%` : '')
+  );
+};
 
 /**
  * `nemia quota`'s lines: fresh, when it was read and a line a window; else the api's sentence, then the last reading's windows under

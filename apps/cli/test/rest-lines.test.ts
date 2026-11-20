@@ -218,6 +218,20 @@ describe("`nemia quota`'s lines", () => {
     assert.ok(!lines.some((l) => l.includes('38.4')), 'the share is whole');
   });
 
+  test("a window that reset since the reading is said not read since, its share the window before's, and is not marked", () => {
+    const lines = quotaLines(
+      quota({
+        windows: [quotaWindow({ label: 'week', usedPercentage: 86, resetsAt: '2026-11-19T09:00:00.000Z', reset: true, marked: true })],
+      }),
+    );
+    const week = lines.find((l) => l.includes('week'));
+    assert.ok(week !== undefined, lines.join('\n'));
+    assert.match(week, /not read since/);
+    assert.match(week, /2026-11-19T09:00:00\.000Z/);
+    assert.ok(!week.includes('80%'), week);
+    assert.ok(!/^ {2}week: 86% used/.test(week), week);
+  });
+
   test("not fresh: the api's own sentence first, and no window line where it held none", () => {
     const lines = quotaLines(quota({ state: 'no-claude', windows: [], said: 'PLANTED SAID', askedAt: null, ageMs: null }));
     assert.equal(lines[0], 'PLANTED SAID');

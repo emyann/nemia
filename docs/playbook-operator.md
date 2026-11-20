@@ -421,7 +421,7 @@ rebuilt.
 - **Chain** with `--after <run>` when runs touch the same files, or when one's design depends on another's result. `--after` also hands
   the run that waited the other's conclusions (`## From run`); context without a wait is `--from` once it lands
   (`context-is-not-a-wait-a-run-zovw`).
-- **Pace by the harness quota.** Before running work side by side instead of waiting, read `GET /api/quota`: the week's use against the
+- **Pace by the harness quota.** Before running work side by side instead of waiting, read `nemia quota` (its tool on the port: `quota`): the week's use against the
   share of the window elapsed, the last day's burn, the idle slots. Size a dollar against the week (2026-10-05: about $1,200 of runs was
   67%), spend when on or under pace, wait when ahead of it, and say the numbers.
 - **Park, don't widen:** a reviewer's finding "not worth a round", an architect's out-of-scope item, a follow-up the person agreed to,
@@ -528,7 +528,7 @@ English; never push or open a pull request unless asked.
 
 ## What a supervisor agent needs
 
-- **Reads:** `nemia ls`, `nemia decide`, `nemia inbox`, `nemia stats`, `nemia passes`, `GET /api/quota`, the task journals, the check
+- **Reads:** `nemia ls`, `nemia decide`, `nemia inbox`, `nemia stats`, `nemia passes`, `nemia quota`, the task journals, the check
   logs, the session transcripts; `git log`, `git diff`, `git merge-tree`, `git grep` on any branch.
 - **Acts:** `nemia start` (`--after`, later `--from`), `nemia approve`, `nemia retry` (`--message`, `--recheck`), `nemia say`,
   `nemia hold` (`--until`, or none to hold until `--off`; `--why`, `--off`), `nemia pause` (`--timeout <d>`; `--now` cuts the calls at once, no try spent) and

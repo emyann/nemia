@@ -11,6 +11,7 @@ import {
   COMMAND_WORDS,
   CommandRefused,
   MACHINE_VERBS,
+  QUOTA_WORDS,
   RENAMED,
   STREAM_COMMANDS,
   parseArgv as parseArgvOf,
@@ -127,7 +128,8 @@ export const amountIn = (args: Args, key: string) => {
 /**
  * The verbs outside the table the api serves, each with its usage and help as `nemia`'s help prints them, its class, and the endpoint
  * that serves it: `nemia decide`, a read, which the client prints off the run's decision (`decisionRead`), served as data
- * (`runs.decision`); this CLI runs none of them, and answers each with its help.
+ * (`runs.decision`); and `nemia quota`, a read whose words the client holds (`objects`' `QUOTA_WORDS`), the subscription's quota the api
+ * reads itself (`server.quota`, its keep and its backoff the api's). This CLI runs none of them, and answers each with its help.
  */
 export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'>[] = [
   {
@@ -137,6 +139,7 @@ export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | '
     class: 'read',
     served: [{ endpoint: 'runs.decision', query: { diffs: '' } }],
   },
+  QUOTA_WORDS,
 ];
 
 /** An entry of a table as `commandBreaks` reads it: whether it has a handler and an `input`, its spec, and its links. */

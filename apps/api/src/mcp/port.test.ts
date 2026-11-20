@@ -26,7 +26,7 @@ import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { until } from '../../test/waits.ts';
 import { Beats } from '../layer.ts';
-import { Api, type Decidable, EventList, RUN_STATES } from 'objects';
+import { Api, type Decidable, EventList, QUOTA_STATES, RUN_STATES } from 'objects';
 import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
 import { portTools } from './tools.ts';
@@ -214,11 +214,11 @@ const textOf = (result: object) => {
 };
 
 for (const era of ERAS)
-  test(`${era}: with a person's token, tools/list lists the generated tools, wait, hold, cancel and decide among them`, async () => {
+  test(`${era}: with a person's token, tools/list lists the generated tools, wait, hold, cancel, decide and quota among them`, async () => {
     const client = await connected(app, era);
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name);
-    for (const name of ['wait', 'hold', 'cancel', 'decide']) assert.ok(names.includes(name), name);
+    for (const name of ['wait', 'hold', 'cancel', 'decide', 'quota']) assert.ok(names.includes(name), name);
     const hold = tools.find((t) => t.name === 'hold');
     assert.equal(hold?.annotations?.readOnlyHint, false);
     assert.equal(hold?.inputSchema.type, 'object');
@@ -234,6 +234,16 @@ for (const era of ERAS)
     assert.notEqual(result.isError, true, textOf(result));
     assert.equal((result.structuredContent as { id?: string } | undefined)?.id, id);
     assert.ok(fs.existsSync(path.join(root, 'runs', `${id}.hold`)), 'the hold is written');
+    await client.close();
+  });
+
+for (const era of ERAS)
+  test(`${era}: tools/call quota answers the subscription's quota, a state the api declares`, async () => {
+    const client = await connected(app, era);
+    const result = await client.callTool({ name: 'quota', arguments: {} });
+    assert.notEqual(result.isError, true, textOf(result));
+    const state = (result.structuredContent as { state?: string } | undefined)?.state ?? '';
+    assert.ok((QUOTA_STATES as readonly string[]).includes(state), state);
     await client.close();
   });
 

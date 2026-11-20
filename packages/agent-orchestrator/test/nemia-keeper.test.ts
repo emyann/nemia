@@ -60,6 +60,7 @@ import { factoryLevelFile } from '../src/level/level.store.ts';
 import { DEFAULT_HARNESS } from '../src/harness/harness.ts';
 import { nemiaFence } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
+import { CLI_VERBS } from '../src/command/command.ts';
 import { engineOf, over, runWith } from '../src/runtime-client.ts';
 import { SESSION_TOKEN } from '../src/filed/filed.ts';
 import { readToken } from '../src/token/token.store.ts';
@@ -295,18 +296,27 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }], "every factory's folders, read-only");
       assert.equal('closeoutSchema' in spec || 'closeoutSchema' in spec.config, false, 'no closeout: she never ends');
       assert.ok((spec.config.allowedTools as string[]).includes(`Edit(/${memoryDir(ROOT)}/**)`), 'her memory hers to write');
-      assert.ok((spec.config.allowedTools as string[]).includes('Bash(curl -s http://127.0.0.1:8787/api/quota)'), 'the quota hers to read');
+      const allowed = spec.config.allowedTools as string[];
+      assert.ok(allowed.includes('Bash(nemia quota)'), 'the quota hers to read, by its verb');
+      assert.ok(allowed.includes('Bash(nemia decide)'), 'the verbs the api serves beside the table are in her fence');
+      assert.deepEqual(
+        allowed.filter((rule) => rule.startsWith('Bash(curl')),
+        [],
+        'no call of hers reaches the api but through a verb',
+      );
       const token = (spec.config.env as Record<string, string>)[SESSION_TOKEN] ?? '';
       assert.match(token, /^[A-Za-z0-9_-]{43}$/, 'her session token in her environment');
       assert.deepEqual(readToken(ROOT, token), { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: first });
-      assert.match((spec as unknown as { brief: string }).brief, /`curl -s http:\/\/127\.0\.0\.1:8787\/api\/quota`/);
+      const brief = (spec as unknown as { brief: string }).brief;
+      assert.match(brief, /`nemia quota`/);
+      assert.ok(!brief.includes('curl') && !brief.includes('/api/'), 'her brief hands her no call of the api but a verb');
       assert.match((spec as unknown as { brief: string }).brief, /feed/, 'operating: told the feed is said to her');
       const own = spec.config[DEFAULT_HARNESS] as { remoteControl: boolean; appendSystemPromptFile: string; settings: string };
       assert.equal(own.remoteControl, true);
       const settings = JSON.parse(own.settings) as { permissions: { ask: string[]; deny: string[] }; env: Record<string, string> };
       assert.equal(settings.env.PATH, [bin, '/usr/local/bin', '/usr/bin'].join(path.delimiter), "the daemon's own bin first, and once");
       assert.equal(settings.env.NEMIA_DAEMON_START, 'off', 'a nemia she types starts no daemon beside the one that keeps her');
-      const fence = nemiaFence(TABLE);
+      const fence = nemiaFence([...TABLE, ...CLI_VERBS]);
       assert.deepEqual(
         settings.permissions.ask,
         fence.ask.filter((rule) => rule !== 'Bash(nemia cancel:*)'),

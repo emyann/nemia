@@ -299,11 +299,8 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       const allowed = spec.config.allowedTools as string[];
       assert.ok(allowed.includes('Bash(nemia quota)'), 'the quota hers to read, by its verb');
       assert.ok(allowed.includes('Bash(nemia decide)'), 'the verbs the api serves beside the table are in her fence');
-      assert.deepEqual(
-        allowed.filter((rule) => rule.startsWith('Bash(curl')),
-        [],
-        'no call of hers reaches the api but through a verb',
-      );
+      const curls = allowed.filter((rule) => /^Bash\(curl\b/.test(rule));
+      assert.deepEqual(curls, [], 'no call of hers reaches the api but through a verb');
       const token = (spec.config.env as Record<string, string>)[SESSION_TOKEN] ?? '';
       assert.match(token, /^[A-Za-z0-9_-]{43}$/, 'her session token in her environment');
       assert.deepEqual(readToken(ROOT, token), { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: first });

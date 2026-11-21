@@ -1,8 +1,9 @@
 /**
  * A factory's triggers on its settings page: what starts its work on its own, at a time (its schedules) or on the cards its selector
  * selects. Each says, in a tag of its own, whether it can spend quota — whether anything its target reaches runs an agent — apart from what
- * it does now: the cards it queues and those that wait on a clash, or its next fire. A card trigger of the factory's own is taken back with
- * Remove; one its template defines is said as the template's; a new one is written by the line the api answers for it.
+ * it does now: the cards it queues and those that wait on a clash, or a schedule's details (`ScheduleRow`: its cron, brief, next fire, last
+ * run, refusal and the line that takes it back). A card trigger of the factory's own is taken back with Remove; one its template defines is
+ * said as the template's; a new one is written by the line the api answers for it, and with no schedule, the line that schedules one.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Trigger } from 'objects';
@@ -12,10 +13,26 @@ import { deleteTrigger, factoryTriggersQuery } from '@/lib/api/factories';
 import { firesWhen, queuesWords, quotaWords } from '@/lib/triggers';
 import { fireWord } from '@/lib/schedules';
 import { useNow } from '@/lib/useNow';
-import { CommandText } from './FactorySchedules';
+import type { FactorySchedule } from '@/lib/api/factories';
+import { CommandText, ScheduleRow } from './FactorySchedules';
 
-/** One trigger: its name, kind and target, when it fires, its quota, what it does now, and a Remove for a card trigger of its own. */
-function TriggerRow({ trigger: t, now, onRemove, pending }: { trigger: Trigger; now: Date; onRemove: () => void; pending: boolean }) {
+/**
+ * One trigger: its name, kind and target, when it fires, its quota, what it does now — a time trigger's schedule (`schedule`) where the
+ * factory lists it — and a Remove for a card trigger of its own.
+ */
+function TriggerRow({
+  trigger: t,
+  schedule,
+  now,
+  onRemove,
+  pending,
+}: {
+  trigger: Trigger;
+  schedule: FactorySchedule | undefined;
+  now: Date;
+  onRemove: () => void;
+  pending: boolean;
+}) {
   const cards = t.spec.when.kind === 'cards';
   const clashes = t.status.clashes ?? [];
   return (
@@ -31,9 +48,13 @@ function TriggerRow({ trigger: t, now, onRemove, pending }: { trigger: Trigger; 
       <p data-trigger-quota={t.status.quota} className="text-label-large">
         {quotaWords(t)}
       </p>
-      <p data-trigger-now className="text-body-medium">
-        {cards ? queuesWords(t) : t.status.next ? `Next fire ${fireWord(new Date(t.status.next), now)}` : 'Its cron never fires'}
-      </p>
+      {schedule === undefined ? (
+        <p data-trigger-now className="text-body-medium">
+          {cards ? queuesWords(t) : t.status.next ? `Next fire ${fireWord(new Date(t.status.next), now)}` : 'Its cron never fires'}
+        </p>
+      ) : (
+        <ScheduleRow schedule={schedule} now={now} />
+      )}
       {clashes.map((c) => (
         <p key={c.card} data-trigger-clash={c.card} className="text-body-medium text-muted-foreground">
           {c.card} waits: triggers {c.with.join(', ')} clash. Change a selector or the card's labels.
@@ -50,8 +71,21 @@ function TriggerRow({ trigger: t, now, onRemove, pending }: { trigger: Trigger; 
   );
 }
 
-/** The triggers of the factory `name`, read now, and `line`, the line that writes a card trigger of it, as the api answered it. */
-export function FactoryTriggers({ name, line }: { name: string; line: string }) {
+/**
+ * The triggers of the factory `name`, read now; `line`, the line that writes a card trigger of it, as the api answered it; `schedules`,
+ * its schedules, the details of its time triggers; and `scheduleLine`, the line that schedules a workflow, shown while it has none.
+ */
+export function FactoryTriggers({
+  name,
+  line,
+  schedules,
+  scheduleLine,
+}: {
+  name: string;
+  line: string;
+  schedules: readonly FactorySchedule[];
+  scheduleLine: string;
+}) {
   const queryClient = useQueryClient();
   const now = new Date(useNow(60_000));
   const { data } = useQuery(factoryTriggersQuery(name));
@@ -82,6 +116,7 @@ export function FactoryTriggers({ name, line }: { name: string; line: string }) 
             <TriggerRow
               key={t.metadata.name}
               trigger={t}
+              schedule={t.spec.when.kind === 'time' ? schedules.find((s) => s.workflow === t.spec.target.name) : undefined}
               now={now}
               pending={remove.isPending && remove.variables === t.metadata.name}
               onRemove={() => remove.mutate(t.metadata.name)}
@@ -90,6 +125,12 @@ export function FactoryTriggers({ name, line }: { name: string; line: string }) 
         </ul>
       )}
       <CommandText text={line} />
+      {schedules.length === 0 && (
+        <div data-no-schedules className="flex flex-col gap-1">
+          <p className="text-body-medium text-muted-foreground">No schedule: to start one of its workflows on a cron, type:</p>
+          <CommandText text={scheduleLine} />
+        </div>
+      )}
     </section>
   );
 }

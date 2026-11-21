@@ -4,10 +4,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { http, HttpResponse } from 'msw';
 import type { Trigger } from 'objects';
-import { factoryTriggersQuery } from '@/lib/api/factories';
+import { factoryTriggersQuery, type FactorySchedule } from '@/lib/api/factories';
 import { FactoryTriggers } from './FactoryTriggers';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
-import { triggerLine } from '../../../.storybook/fixtures/factories';
+import { scheduleLine, triggerLine } from '../../../.storybook/fixtures/factories';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
 const TRIGGER = '/api/namespaces/:namespace/triggers/:name';
@@ -39,6 +39,18 @@ const NIGHTLY = trigger(
   { since: '2026-11-19T00:00:00.000Z', from: 'factory', quota: 'spends', quotaBy: 'janitor', next: '2026-11-22T02:00:00.000Z' },
 );
 
+/** The factory's schedule of janitor: the details of the trigger NIGHTLY. */
+const NIGHTLY_SCHEDULE = {
+  workflow: 'janitor',
+  cron: '0 3 * * *',
+  tz: 'Europe/Paris',
+  brief: 'Sweep the stats',
+  next: '2026-11-22T02:00:00.000Z',
+  last: null,
+  refused: null,
+  commands: { unschedule: `nemia factory unschedule ${FACTORY} janitor` },
+} satisfies FactorySchedule;
+
 /** `children` over a query client that holds `items` as the factory's triggers, asking the network nothing. */
 function Served({ items, children }: { items: readonly Trigger[]; children: ReactNode }) {
   const [client] = useState(() => seeded([[factoryTriggersQuery(FACTORY).queryKey, items]]));
@@ -53,7 +65,7 @@ function Served({ items, children }: { items: readonly Trigger[]; children: Reac
 const meta: Meta<typeof FactoryTriggers> = {
   title: 'Factory/FactoryTriggers',
   component: FactoryTriggers,
-  args: { name: FACTORY, line: triggerLine },
+  args: { name: FACTORY, line: triggerLine, schedules: [], scheduleLine: scheduleLine },
 };
 export default meta;
 
@@ -61,7 +73,7 @@ type Story = StoryObj<typeof meta>;
 
 /** `items` served as the factory's triggers, in the settings page's width. */
 const served = (items: readonly Trigger[]) =>
-  function ServedTriggers(args: { name: string; line: string }) {
+  function ServedTriggers(args: Parameters<typeof FactoryTriggers>[0]) {
     return (
       <Served items={items}>
         <div style={{ width: 640 }}>
@@ -88,19 +100,26 @@ export const None: Story = {
   render: served([]),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-no-triggers]')).not.toBeNull();
+    await expect(canvasElement.querySelector('[data-no-schedules] code')).toHaveTextContent(scheduleLine);
   },
 };
 
-/** A card trigger to a workflow that runs an agent spends quota; a schedule beside it reads as the time kind with its next fire. */
+/**
+ * A card trigger to a workflow that runs an agent spends quota; a schedule beside it reads as the time kind with its schedule's details:
+ * its next fire and the line that takes it back.
+ */
 export const Spends: Story = {
+  args: { schedules: [NIGHTLY_SCHEDULE] },
   render: served([onCards('ready', 'ready=yes', 'build', { quota: 'spends', quotaBy: 'build', queued: ['fix-login'] }), NIGHTLY]),
   play: async ({ canvasElement }) => {
     const ready = canvasElement.querySelector('[data-factory-trigger="ready"]');
     await expect(ready?.querySelector('[data-trigger-quota]')).toHaveTextContent('Spends quota: build runs an agent');
     await expect(ready?.querySelector('[data-trigger-now]')).toHaveTextContent('queues 1 card now');
     const nightly = canvasElement.querySelector('[data-factory-trigger="janitor"]');
-    await expect(nightly?.querySelector('[data-trigger-now]')).toHaveTextContent(/^Next fire/);
-    await expect(nightly?.querySelector('button')).toBeNull();
+    await expect(nightly?.querySelector('[data-schedule-next]')).not.toBeNull();
+    await expect(nightly?.querySelector('code')).toHaveTextContent(`nemia factory unschedule ${FACTORY} janitor`);
+    await expect(nightly).not.toBeNull();
+    await expect(within(nightly as HTMLElement).queryByRole('button', { name: 'Remove' })).toBeNull();
   },
 };
 

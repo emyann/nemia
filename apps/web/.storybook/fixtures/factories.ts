@@ -1,8 +1,8 @@
 /**
  * What the factory's own parts read, typed by the board's views of `objects`: a factory's block on the Factories canvas (`block`), a
  * workflow it offers on its repository (`listing`), the template it is made from (`template`), its volumes (`volumes`), the line that
- * opens its home (`homeLine`), the line that writes a card trigger (`triggerLine`) and its instruction (`instruction`). Each story seeds
- * its query client with them (`seeded`, beside the proposals' fixtures).
+ * opens its home (`homeLine`), the line that writes a card trigger (`triggerLine`), the one that schedules a workflow (`scheduleLine`)
+ * and its instruction (`instruction`). Each story seeds its query client with them (`seeded`, beside the proposals' fixtures).
  */
 import type { FactoryTemplate, FactoryVolume } from '../../src/lib/api/factories';
 import type { WorkflowListing } from '../../src/lib/api/workflows';
@@ -10,6 +10,9 @@ import { FACTORY, factoryView } from './proposals';
 
 /** The line that opens the factory's home in a person's own session, as the api answers it on `FactoryCommands.home`. */
 export const homeLine = `nemia factory home ${FACTORY}`;
+
+/** The line that schedules one of its workflows, as the api answers it on `FactoryCommands.schedule`. */
+export const scheduleLine = `nemia factory schedule ${FACTORY} <workflow> --cron <cron> --brief <brief>`;
 
 /** The line that writes a card trigger of the factory, as the api answers it on `FactoryCommands.trigger`. */
 export const triggerLine = `nemia factory trigger ${FACTORY} <name> --labels <key>=<value> --to <workflow>`;

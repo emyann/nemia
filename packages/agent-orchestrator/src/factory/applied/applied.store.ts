@@ -95,6 +95,18 @@ export const readTreeWiring = (home: string, name: string) => {
   return read;
 };
 
+/**
+ * The names of the card triggers the tree at `tree` renders onto `workflow`: those of its template, read from its `factory.json`; none
+ * where it is not rendered or does not read.
+ * @param tree The factory's tree, its rendered folder.
+ * @param workflow The workflow the triggers send to.
+ */
+export function treeTriggersOn(tree: string, workflow: string) {
+  const read: { wiring: TreeWiring } | { absent: true } | { error: string } = wiringIn(path.join(tree, 'factory.json'));
+  const triggers = 'wiring' in read ? (read.wiring.triggers ?? {}) : {};
+  return Object.keys(triggers).filter((name) => triggers[name]?.target.name === workflow);
+}
+
 /** The wiring a tree's `file` holds, none while it is not there, or why it does not read. */
 function wiringIn(file: string) {
   let text: string;

@@ -1,13 +1,8 @@
-import { Fragment } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { LinkButton } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Separator } from '@/components/ui/separator';
-import type { Factory, FactorySchedule } from '../../lib/api/factories.ts';
+import type { FactorySchedule } from '../../lib/api/factories.ts';
 import { fireWord } from '../../lib/schedules';
-import { useNow } from '../../lib/useNow';
 import { CopyButton } from '../command/CopyButton';
 import { routeLink } from '../nav/routeLink';
 
@@ -25,10 +20,11 @@ export function CommandText({ text }: { text: string }) {
 }
 
 /**
- * One schedule: its workflow and cron, read in its time zone; what each run is asked; its next fire and its last scheduled run, linked
- * to the run's page; why its latest fire was not started, where it was refused; and the line that takes it back.
+ * One schedule, the details of a trigger of the time kind on the Triggers section (`FactoryTriggers`): its workflow and cron, read in its
+ * time zone; what each run is asked; its next fire and its last scheduled run, linked to the run's page; why its latest fire was not
+ * started, where it was refused; and the line that takes it back.
  */
-function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Date }) {
+export function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Date }) {
   return (
     <div data-factory-schedule={s.workflow} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -66,44 +62,5 @@ function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Dat
       )}
       <CommandText text={s.commands.unschedule} />
     </div>
-  );
-}
-
-/**
- * A factory's schedules, on its settings page, read-only: each workflow the daemon starts on its own, at each fire of its cron and at
- * every level, unless the store is paused (`ScheduleRow`). With none, the line that schedules one, as the api answered it.
- */
-export function FactorySchedules({ factory }: { factory: Factory }) {
-  const now = new Date(useNow(60_000));
-  return (
-    <Card data-factory-schedules={factory.name}>
-      <CardHeader>
-        <CardTitle>Schedules</CardTitle>
-        <CardDescription>
-          The workflows this factory starts on its own: the daemon starts a run at each fire of its cron, at every level, unless the store
-          is paused. A schedule is written and taken back on the command line.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {factory.schedules.length === 0 ? (
-          <Empty data-no-schedules className="border">
-            <EmptyHeader>
-              <EmptyTitle>No schedule</EmptyTitle>
-              <EmptyDescription>This factory starts no run on its own. To start one of its workflows on a cron, type:</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent className="max-w-full">
-              <CommandText text={factory.commands.schedule} />
-            </EmptyContent>
-          </Empty>
-        ) : (
-          factory.schedules.map((s, i) => (
-            <Fragment key={s.workflow}>
-              {i > 0 && <Separator />}
-              <ScheduleRow schedule={s} now={now} />
-            </Fragment>
-          ))
-        )}
-      </CardContent>
-    </Card>
   );
 }

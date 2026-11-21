@@ -1072,6 +1072,16 @@ export const triggeredDetachRefusal = (factory: string, workflow: string, trigge
   `${factory} triggers ${workflow} by ${triggers.join(', ')}: take each back first — nemia factory untrigger ${factory} ${triggers[0] ?? '<name>'} — then detach it. Nothing was detached.`;
 
 /**
+ * Why `factory` cannot detach `workflow`: its template's triggers `triggers` send cards to it, and would queue them on a workflow it no
+ * longer offers.
+ * @param factory The factory's name.
+ * @param workflow The workflow it would detach.
+ * @param triggers The names of its template's triggers on it.
+ */
+export const templateTriggeredDetachRefusal = (factory: string, workflow: string, triggers: readonly string[]) =>
+  `${factory}'s template triggers ${workflow} by ${triggers.join(', ')}, which would queue cards on a workflow it no longer offers: set the parameter each trigger's selector reads empty, at the version applied — nemia factory upgrade ${factory} --to <its version> --set <parameter>= --plan <the digest nemia factory diff prints> — then detach it. Nothing was detached.`;
+
+/**
  * Why `factory` cannot name a trigger `name`: its schedule of the workflow so named is the trigger of the time kind by that name.
  * @param factory The factory's name.
  * @param name The trigger's name.

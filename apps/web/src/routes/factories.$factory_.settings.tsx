@@ -7,7 +7,6 @@ import { FactoryInstruction } from '@/components/factory/FactoryInstruction';
 import { FactoryRules } from '@/components/factory/FactoryRules';
 import { TemplateCard } from '@/components/factory/TemplateCard';
 import { FactoryTrust } from '@/components/factory/FactoryTrust';
-import { FactorySchedules } from '@/components/factory/FactorySchedules';
 import { FactoryTriggers } from '@/components/factory/FactoryTriggers';
 import { FactoryServers } from '@/components/factory/FactoryServers';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
@@ -54,14 +53,14 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
 const OPENED = { enter: 0, stay: Infinity } as const;
 
 /**
- * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); the line that
- * opens their own session in its home, where it has one (`FactoryHome`); then a place of it that is not trusted, with the line that
- * trusts it (`FactoryTrust`); the folders its runs reach beside its repositories, each with its two switches and the line that takes it
- * back (`FactoryVolumes`); the cost line it sets per workflow it offers, which a gate whose caps pass it says
- * (`FactoryCostLines`); its rules, what every agent hired into it is told (`FactoryRules`); the agents it lets approve its proposals
- * (`FactoryDelegations`); its instruction, what Nemia is to know about it (`FactoryInstruction`); then its schedules, shown as the
- * factories' read answers them (`FactorySchedules`). The default factory, and a name no factory has, have no settings to keep, and say so:
- * neither the rules nor the instruction is read for them. Its head says where it is: the factory, leading to its floor, then Settings.
+ * What a person sets of one factory: first, the template it is made from, where it has one, read-only (`TemplateCard`); the line that opens
+ * their own session in its home, where it has one (`FactoryHome`); then a place of it that is not trusted, with the line that trusts it
+ * (`FactoryTrust`); the folders its runs reach beside its repositories, each with its two switches and the line that takes it back
+ * (`FactoryVolumes`); the cost line it sets per workflow it offers, which a gate whose caps pass it says (`FactoryCostLines`); its rules,
+ * what every agent hired into it is told (`FactoryRules`); the agents it lets approve its proposals (`FactoryDelegations`); its
+ * instruction, what Nemia is to know about it (`FactoryInstruction`); then its triggers, its schedules among them as the factories' read
+ * answers them (`FactoryTriggers`). The default factory, and a name no factory has, have no settings to keep, and say so: neither the rules
+ * nor the instruction is read for them. Its head says where it is: the factory, leading to its floor, then Settings.
  */
 function SettingsPage() {
   const { factory: name } = Route.useParams();
@@ -101,8 +100,12 @@ function SettingsPage() {
           <FactoryInstruction name={name} />
           <FactoryServers name={name} />
           <LibraryAdds name={name} />
-          <FactoryTriggers name={name} line={factory.commands.trigger} />
-          <FactorySchedules factory={factory} />
+          <FactoryTriggers
+            name={name}
+            line={factory.commands.trigger}
+            schedules={factory.schedules}
+            scheduleLine={factory.commands.schedule}
+          />
         </>
       )}
     </article>

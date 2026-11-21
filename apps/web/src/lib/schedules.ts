@@ -1,4 +1,7 @@
-/** The words of a factory's schedules on its settings page (`FactorySchedules`). Pure: the time and the time zone are handed in. */
+/**
+ * The words of a factory's schedules on its settings page (`ScheduleRow`, on the Triggers section). Pure: the time and the time zone are
+ * handed in.
+ */
 import { clockWord } from './quota.ts';
 import { instantWords } from './instant.ts';
 

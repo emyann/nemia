@@ -33,8 +33,9 @@ cards it queues now.
 ## A card routed wrong
 
 The routed run is a run of its own. A step of it that finds its card is not what its workflow is for signs off `blocked`, saying so and
-which workflow the card needs (`RULES.md`, *Routing*); the person cancels it and queues the card again on that workflow
-(`nemia inbox queue <card> --workflow <workflow>`), or labels it again for the door.
+which workflow the card needs (`RULES.md`, *Routing*); the person cancels it and files the idea again, since a card is started once
+and the routed card is neither queued again nor read by the door: under a name of its own, on the workflow it needs (`nemia inbox add
+<file> --workflow <workflow>`), or with the door's label for the door to route it again (`--label <key=value>`).
 
 ## What an overlay can change
 

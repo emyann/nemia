@@ -19,6 +19,7 @@ import {
   ambiguousFactoryRefusal,
   takenFactoryRefusal,
   unhiredFireRefusal,
+  templateTriggeredDetachRefusal,
   unrenderedTreeRefusal,
   unscheduledRefusal,
   scheduleRepoRefusal,
@@ -47,7 +48,7 @@ import { volumesFromRepos, type FileVolume } from './from-repos/from-repos.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';
-import { CardTriggerSchema, readStatus, readTreeWiring, treeDir, writeTreeWiring } from './applied/applied.store.ts';
+import { CardTriggerSchema, readStatus, readTreeWiring, treeDir, treeTriggersOn, writeTreeWiring } from './applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { generationWritten } from './door/generation.ts';
@@ -635,6 +636,10 @@ export function wiringChecked(factory: Factory, change: WiringChange, onDisk: (f
     throw new Conflict({ message: unrenderedTreeRefusal(factory.name, tree, `Nothing was ${DONE[change.verb]}.`) });
   const judged = wiringRefusal(factory, change);
   if (judged) throw judged.kind === 'Missing' ? new Missing({ message: judged.message }) : new Invalid({ message: judged.message });
+  const templated = tree !== undefined && change.verb === 'detach' ? treeTriggersOn(tree, change.workflow) : [];
+  const unowned = templated.filter((t) => factory.triggers === undefined || !Object.hasOwn(factory.triggers, t));
+  if (unowned.length && change.verb === 'detach')
+    throw new Invalid({ message: templateTriggeredDetachRefusal(factory.name, change.workflow, unowned) });
   const bad = onDisk(factory);
   if (bad) throw bad;
   return rewired(factory, change);

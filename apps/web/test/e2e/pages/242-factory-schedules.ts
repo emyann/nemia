@@ -78,14 +78,15 @@ async function photographNext(page: Page, next: Locator) {
 }
 
 /**
- * The card of the scheduled factory: its workflow, cron and time zone, brief, the next fire as the api answers it and as `fireWord`
- * writes it, and the last run, a link to the run's page; no refusal, since the kept try started its run.
+ * The scheduled factory's Triggers section, where its schedule is a trigger of the time kind: its workflow, cron and time zone, brief, the
+ * next fire as the api answers it and as `fireWord` writes it, and the last run, a link to the run's page; no refusal, since the kept try
+ * started its run.
  */
 async function expectScheduled(page: Page) {
-  const card = page.locator(`[data-factory-schedules="${FACTORY}"]`);
-  await expectVisible(card.getByText('Schedules', { exact: true }), 'the settings page draws the Schedules card');
-  const row = card.locator(`[data-factory-schedule="${WORKFLOW}"]`);
-  await expectVisible(row, `the card has a row for ${WORKFLOW}`);
+  const card = page.locator(`[data-factory-triggers="${FACTORY}"]`);
+  await expectVisible(card.getByText('Triggers', { exact: true }), 'the settings page draws the Triggers section');
+  const row = card.locator(`[data-factory-trigger="${WORKFLOW}"] [data-factory-schedule="${WORKFLOW}"]`);
+  await expectVisible(row, `its time trigger ${WORKFLOW} draws its schedule`);
   await expectVisible(row.getByText(CRON, { exact: true }), 'the row says its cron');
   await expectVisible(row.getByText('UTC', { exact: true }), 'and the time zone it is read in');
   await expectVisible(row.getByText(BRIEF, { exact: true }), 'and what each run is asked');
@@ -110,11 +111,11 @@ async function expectScheduled(page: Page) {
   await idle(page);
 }
 
-/** The card of a factory with no schedule: an empty state that shows the api's line to schedule one. */
+/** The Triggers section of a factory with no schedule: it says so, and shows the api's line to schedule one. */
 async function expectNone(page: Page) {
   const line = await scheduleLine(page, NONE);
   await settingsOf(page, NONE);
-  const empty = page.locator(`[data-factory-schedules="${NONE}"] [data-no-schedules]`);
+  const empty = page.locator(`[data-factory-triggers="${NONE}"] [data-no-schedules]`);
   await expectVisible(empty, 'a factory with no schedule says it has none');
   await expectVisible(empty.locator('code', { hasText: line }), `and shows the api's line to schedule one, ${line}`);
   await settled(page);
@@ -122,12 +123,12 @@ async function expectNone(page: Page) {
 }
 
 /**
- * The card of a schedule whose latest fire the package refused, its workflow detached by hand from the factory's file: the refusal, in
- * the package's words, under a destructive alert, and no last run, since the fire started none.
+ * The time trigger of a schedule whose latest fire the package refused, its workflow detached by hand from the factory's file: the refusal,
+ * in the package's words, under a destructive alert, and no last run, since the fire started none.
  */
 async function expectRefused(page: Page, why: string) {
   await settingsOf(page, FACTORY);
-  const row = page.locator(`[data-factory-schedules="${FACTORY}"] [data-factory-schedule="${WORKFLOW}"]`);
+  const row = page.locator(`[data-factory-triggers="${FACTORY}"] [data-factory-schedule="${WORKFLOW}"]`);
   const alert = row.locator('[data-schedule-refused]');
   await expectVisible(alert.getByText('Its latest fire started no run', { exact: true }), 'a refused fire says it started no run');
   await expectVisible(alert.getByText(why, { exact: true }), 'and why, whole, in the words the tick kept');
@@ -155,9 +156,10 @@ export default {
   /**
    * A factory's schedules on its settings page, read-only. The page writes a schedule of the workflow attached to FACTORIES' `hiring` into
    * its file, as `nemia factory schedule` writes it, and the tick's kept try of it, naming FOLDER's run as the run its last fire started:
-   * the card says the cron, the time zone, the brief, the next fire and the last run, a link to its page, and the line that takes it back.
-   * A factory with no schedule shows the api's line to schedule one. Then the workflow is detached by hand and the kept try is the tick's
-   * refusal of the latest fire: the card says it, whole. The factory's file and the kept try are taken back whatever happens.
+   * the Triggers section says the cron, the time zone, the brief, the next fire and the last run, a link to its page, and the line that
+   * takes it back. A factory with no schedule shows the api's line to schedule one. Then the workflow is detached by hand and the kept try
+   * is the tick's refusal of the latest fire: its time trigger says it, whole. The factory's file and the kept try are taken back whatever
+   * happens.
    */
   name: 'factory-schedules',
   route: '/',

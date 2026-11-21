@@ -241,6 +241,11 @@ const transcriptQuery = {
  * each line kept under its number in the stream, so a page before a line holds the matched lines just before it.
  */
 const checkOutputQuery = {
+  check: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The check to read, by its name in the step's checks; the step's only check where not given, refused where it has several.",
+    }),
+  ),
   stream: Schema.optionalKey(
     Schema.Literals(OUTPUT_STREAMS).annotate({ description: 'The stream to read, stdout or stderr; stdout where not given.' }),
   ),

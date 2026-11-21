@@ -1,5 +1,5 @@
 /**
- * `nemia check-output <run> <step> [--try <n>]`, its words parsed against `objects`' `CHECK_OUTPUT_WORDS`, read from the api through the
+ * `nemia check-output <run> <step> [--try <n>] [--check <name>]`, its words parsed against `objects`' `CHECK_OUTPUT_WORDS`, read from the api through the
  * objects' client (`…/tries/:try/check/output`): what the check of the try `--try` names printed, else of its latest, the last of its
  * tries (`…/tries`). Its stdout, or its stderr with `--stderr`.
  *
@@ -37,12 +37,12 @@ export const checkOutputPrinted = (read: CheckOutput, again: string) => {
 };
 
 /** The keys a read of a check's output is asked with, each as the api's query spells it; absent where not given. */
-type Asked = { stream?: 'stderr'; from?: string; before?: string; limit?: string; last?: string; match?: string };
+type Asked = { stream?: 'stderr'; from?: string; before?: string; limit?: string; last?: string; match?: string; check?: string };
 
 /** The words of `args` the api's query takes, each present only where given. */
 const askedOf = (args: Args) =>
   Object.fromEntries(
-    (['from', 'before', 'limit', 'last', 'match'] as const).flatMap((key) => {
+    (['from', 'before', 'limit', 'last', 'match', 'check'] as const).flatMap((key) => {
       const value = textArg(args, key);
       return value === undefined ? [] : [[key, value]];
     }),

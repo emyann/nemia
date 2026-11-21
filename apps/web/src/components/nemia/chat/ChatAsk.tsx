@@ -14,15 +14,12 @@
 import { useState } from 'react';
 import { CheckIcon } from 'lucide-react';
 import { Button, Checkbox, Radio, RadioGroup } from '@/components/ui/ds';
-import { CutTag, cutShape, TEXT_LINK } from '@/components/look';
+import { CutBubble, CutTag, TEXT_LINK } from '@/components/look';
 import { container } from '@/lib/meaning';
 import { askAnswered, linksOf, type ChatAsk as Ask } from '@/lib/chatFollowing';
 import type { AskPick, AskQuestion, PermissionFacts } from '@/lib/api/chat';
 import { timeOfDay } from '@/lib/timeOfDay';
 import { Markdown } from '../../markdown/Markdown';
-
-/** How far an ask's bubble is cut, in pixels: her words' own cut. */
-const ASK_CUT = 10;
 
 /**
  * One option row, the canvas's `opt`, laid over the kit's radio or checkbox: the kit's mark in the first column, the option's words in
@@ -111,13 +108,9 @@ export function AskHead({ ask }: { ask: Ask }) {
 /** Her words over the ask, in her own bubble, the links in them left for the row under it (`linksOf`). */
 export function AskWords({ text }: { text: string }) {
   return (
-    <div
-      data-chat-bubble="agent"
-      className="bg-surface-container-highest px-3.5 py-2.5 text-body-medium text-on-surface"
-      style={{ clipPath: cutShape(ASK_CUT) }}
-    >
+    <CutBubble data-chat-bubble="agent">
       <Markdown>{text}</Markdown>
-    </div>
+    </CutBubble>
   );
 }
 

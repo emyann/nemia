@@ -11,7 +11,7 @@
  * Every data mark is written under the prefix `marks` names (`mark`), so each conversation keeps the names its own pages read.
  */
 import type { ReactNode } from 'react';
-import { CutButton, cutShape, Marker } from '@/components/look';
+import { CutBubble, CutButton, Marker } from '@/components/look';
 import { mark, type ConversationItem } from '@/lib/conversation';
 import { routeOfHref } from '@/lib/routeHref';
 import { timeOfDay } from '@/lib/timeOfDay';
@@ -19,9 +19,6 @@ import { Markdown } from '../markdown/Markdown';
 
 /** What was said, as the family's `said` item holds it. */
 type Spoken = Extract<ConversationItem, { kind: 'said' }>;
-
-/** How far a bubble's two corners are cut, in pixels. */
-const BUBBLE_CUT = 10;
 
 /** Who said it, over the words: `Nemia · 5:40 PM`, `You · 5:52 PM`. */
 export function Who({ who, at, children }: { who: string; at: string; children?: ReactNode }) {
@@ -50,13 +47,7 @@ function Theirs({ said, marks }: { said: Spoken; marks: string }) {
   return (
     <div {...mark(marks, 'message', 'agent')} className="flex max-w-[94%] flex-col gap-1.5">
       <Who who={said.who} at={said.at} />
-      <div
-        {...mark(marks, 'bubble', 'agent')}
-        className="bg-surface-container-highest px-3.5 py-2.5 text-body-medium text-on-surface"
-        style={{ clipPath: cutShape(BUBBLE_CUT) }}
-      >
-        {said.markdown ? <Markdown>{said.text}</Markdown> : said.text}
-      </div>
+      <CutBubble {...mark(marks, 'bubble', 'agent')}>{said.markdown ? <Markdown>{said.text}</Markdown> : said.text}</CutBubble>
       {said.links.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {said.links.map((link) => (
@@ -74,13 +65,9 @@ function Theirs({ said, marks }: { said: Spoken; marks: string }) {
 export function Writing({ text, marks }: { text: string; marks: string }) {
   return (
     <div {...mark(marks, 'message', 'writing')} className="flex max-w-[94%] flex-col gap-1.5">
-      <div
-        {...mark(marks, 'bubble', 'writing')}
-        className="bg-surface-container-highest px-3.5 py-2.5 whitespace-pre-wrap text-body-medium text-on-surface"
-        style={{ clipPath: cutShape(BUBBLE_CUT) }}
-      >
+      <CutBubble pre {...mark(marks, 'bubble', 'writing')}>
         {text}
-      </div>
+      </CutBubble>
     </div>
   );
 }

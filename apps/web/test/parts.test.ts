@@ -78,15 +78,35 @@ const grains = (markup: string) => markup.split('data-grain=').length - 1;
 const clips = (markup: string) => [...markup.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
 
 describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears, and no clip on what a frame holds', () => {
-  test('the cut tag cuts its top-right corner by seven pixels, around what it holds', async () => {
+  test('the cut tag cuts its top-right corner by seven pixels on its shape, draws its own edge and ring, and bares what it holds', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(CutTag, { children: 'YOUR WORD' }));
+    assert.deepEqual(clips(tagWith(html, 'data-cut-tag')), [], 'the holder is cut by nothing, so its ring stands outside it');
+    const shape = tagWith(html, 'data-cut-shape');
     assert.match(
-      tagWith(html, 'data-cut-tag'),
-      /clip-path:polygon\(0 0, calc\(100% - 7px\) 0, 100% 7px, 100% 100%, 0 100%\)/,
+      shape,
+      /clip-path:polygon\(0px 0px, calc\(100% - 7px\) 0px, 100% 7px, 100% 100%, 0px 100%\)/,
       'the corner is cut as the canvas cuts it',
     );
-    assert.match(html, />YOUR WORD<\/span>$/);
+    assert.match(shape, /\*\*:border-transparent!/, 'what it holds loses its border, which the clip would cut open');
+    assert.match(shape, /\*\*:\[box-shadow:none\]!/, 'and its ring');
+    assert.match(shape, /\*\*:outline-none!/, 'and its outline');
+    const ring = tagWith(html, 'data-cut-ring');
+    assert.match(ring, /aria-hidden="true"/);
+    assert.match(ring, /\bhidden\b[^"]*group-has-\[:focus-visible\]\/tag:block/, 'shown with the keyboard on what it holds');
+    assert.match(ring, /clip-path:polygon\(evenodd, 0px 0px, calc\(100% - 9\.93px\) 0px, 100% 9\.93px, 100% 100%, 0px 100%,/);
+    assert.doesNotMatch(html, /data-cut-edge/, 'no edge unless it is asked for');
+    assert.match(html, />YOUR WORD<\/span><\/span>$/);
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const edged = await drawn(createElement(CutTag, { edge: true, children: 'TO COME' }));
+    const edge = tagWith(edged, 'data-cut-edge');
+    assert.match(edge, /aria-hidden="true"/);
+    assert.match(
+      edge,
+      /clip-path:polygon\(evenodd, 0px 0px, calc\(100% - 7px\) 0px, 100% 7px, 100% 100%, 0px 100%, 0px 0px, 1px 1px, calc\(100% - 7\.41px\) 1px,/,
+      'a band a pixel wide along the whole cut shape, the diagonal too',
+    );
+    assert.match(edge, /background-image:linear-gradient\(var\(--md-sys-color-outline-variant\)/, 'painted as an image, never a ground');
   });
   test('the cut frame: a shape nobody reads or presses, before what the frame holds: an edge in its hue around the card ground', async () => {
     const child = createElement('button', { type: 'button' }, 'Approve');
@@ -155,6 +175,46 @@ describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each w
     const quiet = await drawn(createElement(CutField, { ground: 'bg-surface-container', children: field }));
     assert.match(tagWith(quiet, 'data-cut-edge'), /calc\(100% - 12px\) 0px/, 'a field cut 12 by default');
     for (const layer of ['quiet', 'focus']) assert.match(tagWith(quiet, `data-cut-ground="${layer}"`), /\bbg-surface-container\b/);
+    assert.match(
+      html,
+      /<div class="relative" style="clip-path:polygon\(-9999px -9999px, calc\(100% - 10011\.83px\) -9999px, calc\(100% \+ 9999px\) 10011\.83px,/,
+      'what it holds is kept two pixels inside each diagonal, its straight sides open',
+    );
+    assert.doesNotMatch(html, /data-cut-end/, 'no end unless one is given');
+    const button = createElement('button', { type: 'submit' }, 'Filter');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const ended = await drawn(createElement(CutField, { end: button, children: field }));
+    assert.match(
+      tagWith(ended, 'data-cut-end'),
+      /style="padding-block:4px;margin-right:16px"/,
+      'the control at its end set in from the right by the cut and the room the row keeps, above and below it too',
+    );
+    assert.ok(ended.indexOf('<input') < ended.indexOf('data-cut-end'), 'what it holds before the control');
+  });
+  test("the cut bubble: the agent's words on the highest surface, the bubble's own element cut at two corners, its padding its own", async () => {
+    const { CutBubble } = await import('../src/components/look/CutBubble.tsx');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(CutBubble, { 'data-chat-bubble': 'agent', children: 'Hello' }));
+    assert.equal(
+      html,
+      '<div data-chat-bubble="agent" class="bg-surface-container-highest px-3.5 py-2.5 text-body-medium text-on-surface" style="clip-path:polygon(0px 0px, calc(100% - 10px) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc(100% - 10px))">Hello</div>',
+      "the conversation's bubble as it was drawn by hand: one element, its ground, its padding and its cut",
+    );
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const pre = await drawn(createElement(CutBubble, { pre: true, children: 'a\nb' }));
+    assert.match(pre, /class="bg-surface-container-highest px-3\.5 py-2\.5 whitespace-pre-wrap text-body-medium text-on-surface"/);
+  });
+  test("the cut icon press: the kit's tonal icon button in the cut, its ring a band in the cut shape around it", async () => {
+    const { CutIconPress } = await import('../src/components/look/CutIconPress.tsx');
+    const { ArrowUpIcon } = await import('lucide-react');
+    const html = await drawn(createElement(CutIconPress, { label: 'Send', icon: ArrowUpIcon, 'data-chat-button': 'send' }));
+    const ring = tagWith(html, 'data-cut-ring');
+    assert.match(ring, /\bhidden\b[^"]*group-has-data-focus-visible\/cutpress:block/, 'shown with the keyboard on it');
+    assert.match(ring, /clip-path:polygon\(evenodd, 0px 0px, calc\(100% - 12\.93px\) 0px,/, 'a band in the cut shape grown by its gap');
+    const button = tagWith(html, 'data-chat-button');
+    assert.match(button, /aria-label="Send"/);
+    assert.match(button, /clip-path:polygon\(0px 0px, calc\(100% - 10px\) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc\(100% - 10px\)\)/);
+    assert.doesNotMatch(button, /class="[^"]*(?<![\w-])border(?![\w-])/, 'tonal: no border for the clip to cut open');
   });
   test('a cue: its words in small caps, in the ink of its hue, in a frame of that hue cut 9', async () => {
     const inks = { yours: 'text-yours', alive: 'text-alive', failure: 'text-failure', none: 'text-on-surface-variant' } as const;

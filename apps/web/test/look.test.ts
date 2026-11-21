@@ -112,6 +112,14 @@ export const ringedCut = (source: string) =>
     ...(source.match(/\bfocusRing\(/g) ?? []),
   ] satisfies string[];
 
+/**
+ * Each cut written in `source`, a file's text: a clip path in either spelling, a polygon, and a call of the look's cut geometry. A cut
+ * is the look's own, drawn by its parts (`src/components/look`), so a file outside it that writes one is cutting by hand, where a part
+ * keeps the edge along the diagonal and what it holds inside it.
+ */
+export const handCuts = (source: string) =>
+  (source.match(/clipPath|clip-path|polygon\(|\bcut(?:Shape|Ring|Points|Edge|Hold)\(/g) ?? []) satisfies string[];
+
 /** The one file that writes a grain's tile, by its path from `src`. */
 const GRAIN = 'components/look/grain.css';
 
@@ -170,17 +178,33 @@ describe("the cut and the grain in the board's source: no ring a clip breaks, th
     const drawing = filesUnder(SRC).filter(
       (file) => /\.tsx?$/.test(file) && /\bcut(?:Shape|Ring)\(/.test(fs.readFileSync(path.join(SRC, file), 'utf8')),
     );
-    assert.ok(drawing.includes('components/conversation/Composer.tsx'), `the files that draw a cut are read: ${drawing.join(', ')}`);
+    assert.ok(drawing.includes('components/look/CutIconPress.tsx'), `the files that draw a cut are read: ${drawing.join(', ')}`);
     for (const file of drawing)
       assert.deepEqual(ringedCut(fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} draws a ring the cut would break`);
   });
-  test("a field drawn in a cut takes the look's cut field, and the send beside it a band in the cut shape", () => {
+  test("REFUSED: a cut written by hand outside the look's parts: the look draws every cut, its edge and what it holds", () => {
+    assert.deepEqual(handCuts('<div style={{ clipPath: cutShape(10) }} />'), ['clipPath', 'cutShape(']);
+    assert.deepEqual(
+      handCuts("'[clip-path:polygon(0_0)]' cutRing(10, 2, 3) cutPoints(10) cutEdge(10, 1) cutHold(10, 2)"),
+      ['clip-path', 'polygon(', 'cutRing(', 'cutPoints(', 'cutEdge(', 'cutHold('],
+      'every other spelling of a cut is found',
+    );
+    assert.deepEqual(handCuts("'bg-surface-container-highest px-3.5 py-2.5'"), [], 'a plain class string is none');
+    const sources = filesUnder(SRC).filter((file) => !file.startsWith('components/look/') && ours(`src/${file}`));
+    assert.ok(sources.includes('components/conversation/Said.tsx'), `the files outside the look are read: ${sources.length}`);
+    for (const file of sources)
+      assert.deepEqual(handCuts(fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} cuts by hand: take the look's part`);
+  });
+  test("a field drawn in a cut takes the look's cut field, and the send beside it the look's cut icon press", () => {
     const composer = fs.readFileSync(path.join(SRC, 'components', 'conversation', 'Composer.tsx'), 'utf8');
-    assert.match(composer, /import\s*\{[^}]*\bCutField\b[^}]*\}\s*from\s*'@\/components\/look'/, 'the field through the door');
+    assert.match(
+      composer,
+      /import\s*\{[^}]*\bCutField\b[^}]*\bCutIconPress\b[^}]*\}\s*from\s*'@\/components\/look'/,
+      'the field and the send through the door',
+    );
     assert.match(composer, /<CutField\s+size=\{COMPOSER_CUT\}/, 'its edge is drawn in its cut, never a ring a clip breaks');
+    assert.match(composer, /<CutIconPress\s+cut=\{COMPOSER_CUT\}/, 'the send in the same cut, its ring a band in it');
     assert.doesNotMatch(composer, /ring-outline-variant|ring-inset/, 'and no rectangular edge is left on it');
-    assert.match(composer, /clipPath:\s*cutRing\(COMPOSER_CUT, GAP, RING\)/, "the send's focus ring is a band in the send's cut");
-    assert.match(composer, /group-has-data-focus-visible\/send:block/, 'shown when the keyboard reaches the send');
   });
   test("REFUSED: a grain's tile written outside the look's grain, which holds three, each once", () => {
     const sources = Object.fromEntries(

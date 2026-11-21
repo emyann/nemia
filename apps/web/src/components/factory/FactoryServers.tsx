@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { CutFrame, CutPress, CutTag, FRAMED_BOX, Plate, Reading, ReadingLines } from '@/components/look';
-import { container, hairline } from '@/lib/meaning';
+import { container } from '@/lib/meaning';
 import { CHIP } from '../step/Reach';
 import { ServerSignIn } from './ServerSignIn';
 import { stateDrawn } from '../../lib/serverState';
@@ -49,8 +49,8 @@ const SAID: Record<Change['kind'], { done: string; refused: string }> = {
 export function ServerState({ state }: { state: string | null }) {
   const { word, hue, title } = stateDrawn(state);
   return (
-    <CutTag>
-      <span data-server-state={word} title={title} className={`${CHIP} ${hue === 'grey' ? hairline : container[hue]}`}>
+    <CutTag edge={hue === 'grey'}>
+      <span data-server-state={word} title={title} className={`${CHIP} ${hue === 'grey' ? 'text-on-surface-variant' : container[hue]}`}>
         {word}
       </span>
     </CutTag>

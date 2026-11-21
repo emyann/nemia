@@ -71,8 +71,10 @@ root.
 
 The look's own parts, for a cut, a plate, a tile or a rail, are in `apps/web/src/components/look`, taken through its door (`@/components/look`), never from a part's own file. `CutFrame` for a card
 or a table in a cut frame (with `FRAMED_BOX`, `FRAMED_END`, `FRAMED_TABLE` and `FRAMED_ROW` around a table), `CutTag` for a tag
-with a cut corner, `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
-`CutCue` for a cue in a small cut frame beside a face or in a header, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, and `cutShape`, `cutRing` and `cutPoints` for a new part that takes the cut; `Plate` for a section's heading and `PageName` for
+with a cut corner, which takes off the border, ring and outline of what it holds and draws its own edge with `edge` (an outlined tag,
+a hairline) and its own focus ring in its cut, `CutBubble` for the agent's words in a cut bubble, `CutIconPress` for the kit's tonal
+icon button in a cut (a composer's send), `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
+`CutCue` for a cue in a small cut frame beside a face or in a header, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, which keeps what it holds inside its diagonals and sets a control given as `end` in from its cut; `Plate` for a section's heading and `PageName` for
 a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
 `BreakdownPreview` for one hung off a focusable trigger of your own; `StepGraph` for a run's steps as its workflow's graph;
 `Run` for a run at any of its five sizes, from its mark in a sentence to the floor's opened panel (`RunMeta`, `RunClock` and
@@ -289,8 +291,11 @@ here.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal.
-- A cut corner is a shape of its own under unclipped content: `look/cut.ts`, `look/CutFrame.tsx`, `look/CutButton.tsx`, with
-  `cutShape`, `cutRing` and `cutPoints` for a new part that takes one; the copy control is `look/CopyId.tsx`.
+- A cut corner is a shape of its own under unclipped content: `look/cut.ts`, `look/CutFrame.tsx`, `look/CutButton.tsx`. Its
+  geometry (`cutShape`, `cutRing`, `cutPoints`, `cutEdge` and `cutHold`) is taken from `./cut` by a part of the look alone, and no
+  file outside the look writes a cut, a clip path or a polygon (`test/look.test.ts`): it takes the part that draws one. A part that
+  draws an edge draws it as a shape along the whole cut, and one that holds a control at its corner keeps it inside its diagonals.
+  The copy control is `look/CopyId.tsx`.
 - The look's own parts are `src/components/look`, taken through its door (`index.ts`) by every file outside it; each has its stories
   beside it (`<Part>.stories.tsx`), one a state. A breakdown is drawn once, by `look/Breakdown.tsx`: `BreakdownRows` for its rows and
   its foot, `BreakdownPreview` for the kit's rich tooltip over a focusable trigger the caller gives — the look's `StatTile` hangs its

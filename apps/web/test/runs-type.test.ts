@@ -38,6 +38,8 @@ const FILES = [
   'components/look/TextLink.tsx',
   'components/look/CutFrame.tsx',
   'components/look/CutTag.tsx',
+  'components/look/CutBubble.tsx',
+  'components/look/CutIconPress.tsx',
   'components/look/ScanLines.tsx',
   'components/look/Marker.tsx',
   'components/look/Trace.tsx',

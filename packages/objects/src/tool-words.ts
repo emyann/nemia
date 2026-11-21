@@ -14,6 +14,7 @@ import { OpenApi } from 'effect/http-api';
 import type { ApiEndpointName } from './api.ts';
 import { CLI, type CommandWords } from './command.ts';
 import { type EndpointShape, keysOfEndpoint, streamsOf } from './endpoint-keys.ts';
+import { READS } from './reads.ts';
 import { Table } from './table.ts';
 
 /** The page a list tool asks for where its call gives no `limit`. */
@@ -300,9 +301,18 @@ export function toolWordsOf<V extends ToolVerb>(table: readonly V[], verbs: read
 }
 
 /**
+ * Whether the port asks a page of `PORT_PAGE` of the endpoint `endpoint` where a call gives no `limit`: a list's, or a read from a cursor's,
+ * or a read `READS` does not bound; never a read by part, whose `limit` is its own.
+ */
+const portPaged = (endpoint: ApiEndpointName) => {
+  const shape = Object.entries(READS).find(([name]) => name === endpoint)?.[1].shape;
+  return shape === undefined || shape === 'page' || shape === 'cursor';
+};
+
+/**
  * A tool's description in its parts: its verb's help, what its endpoint says it does, how the CLI says it, the endpoint it calls, what
  * each key of its input says it takes (since the help is the command line's and its forms are not the input's), and how the port
- * answers it — a `Table` as its lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends.
+ * answers it — a `Table` as its lines, a page of `PORT_PAGE` where a call gives no `limit` of a read the port pages (`portPaged`), and each default its link sends.
  * @param verb The verb the tool is a link of.
  * @param tool The tool's words (`toolWordsOf`).
  */
@@ -315,7 +325,7 @@ export function toolLinesOf(verb: Pick<ToolVerb, 'name' | 'usage' | 'help'>, too
     keys: tool.keys.map(({ key, words }) => `${key}: ${words}`),
     answers: [
       ...(tool.table ? [`Answers a line per item, as \`${verb.name} -o wide\` prints them.`] : []),
-      ...(tool.queryKeys.includes('limit')
+      ...(tool.queryKeys.includes('limit') && portPaged(tool.endpoint)
         ? [`Answers ${PORT_PAGE} at most unless limit is given; a last line or metadata.continue names the token for the next page.`]
         : []),
       ...Object.entries(tool.defaults).map(

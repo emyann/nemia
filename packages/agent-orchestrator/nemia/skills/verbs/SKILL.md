@@ -283,6 +283,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                on the port: decide
   nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]
                                the objects of a resource the api serves, or one by its name (nemia get --help)
+                               CLI only: generic over every kind discovery lists, where a port tool calls one endpoint: each kind's read is said in objects' UNLINKED_READS
   nemia explain <resource>[.<field>]...
                                what a resource the api serves is, and each of its fields (nemia explain --help)
                                each tool's words: tools.md#explain

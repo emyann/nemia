@@ -148,7 +148,9 @@ export const amountIn = (args: Args, key: string) => {
  * its spec, by which her verbs skill spells each key at a shell. Her fence, the MCP port and the floor read them beside the table. This
  * CLI runs none of them, and answers each with its help.
  */
-export const CLI_VERBS: readonly (Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'> & { readonly spec?: Spec })[] = [
+export const CLI_VERBS: readonly (Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served' | 'only'> & {
+  readonly spec?: Spec;
+})[] = [
   {
     name: 'decide',
     usage: '<runId> [--sensitive <globs>]',
@@ -161,6 +163,10 @@ export const CLI_VERBS: readonly (Pick<CommandSpec, 'name' | 'usage' | 'help' | 
     usage: '<resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]',
     help: ['the objects of a resource the api serves, or one by its name (nemia get --help)'],
     class: 'read',
+    only: {
+      side: 'cli',
+      why: "generic over every kind discovery lists, where a port tool calls one endpoint: each kind's read is said in objects' UNLINKED_READS",
+    },
   },
   {
     name: 'explain',

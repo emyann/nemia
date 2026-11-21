@@ -24,7 +24,7 @@ import { resultSteps } from '../branches/index.ts';
 import { runWords } from '../route/routed/index.ts';
 import { merges, unrunEnding } from '../ending/ending.ts';
 import type { DecideLabel, RunStatusWord } from 'objects';
-import { checksPhase } from '../check/checks-due.ts';
+import { checksPhase } from '../check/index.ts';
 
 /**
  * What is left for a person to do about this run.

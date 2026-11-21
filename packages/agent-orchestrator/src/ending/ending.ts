@@ -33,7 +33,7 @@ import type { CheckoutHold } from '../cap/cap.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { ClaimedAt } from '../../contracts/checkout-claim.contract.ts';
-import { checksPhase } from '../check/checks-due.ts';
+import { checksPhase } from '../check/index.ts';
 
 /**
  * The deny list a step is filed with, each try and each round: its own, and `landingDenied` — what its place denies a landing session

@@ -5,8 +5,8 @@
  * money's `money/money.ts`'s, and a person's route for a try `route/person-route.ts`'s. Pure, and read by nearly every other part of the
  * run's judgement; it reads the record alone.
  */
-import { onItsCheck, type Verdict } from '../check/index.ts';
-import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
+import { onItsCheck, type Verdict, checksPhase } from '../check/index.ts';
+import { DEFAULT_ROUNDS, endsOnBase, hasChecks, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
 import { budgetWord, dollars } from '../money/money.ts';
@@ -35,7 +35,6 @@ import {
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
-import { checksPhase } from '../check/checks-due.ts';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -402,7 +401,7 @@ export const sendBackTo = (step: StepSpec, run: Run) => (run.steps[step.name]?.t
  * @param _run The run the step belongs to, which it no longer reads.
  */
 export const landsOnCheck = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>) =>
-  endsOnBase(step) && step.check !== undefined;
+  endsOnBase(step) && hasChecks(step);
 
 /**
  * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: base`), and another run's
@@ -654,7 +653,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
     s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
   const phase = phaseOf(st.taskId);
   if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded)
-    return step.check && st.check ? signed(onItsCheck(step, st, phaseOf)) : 'budget exhausted';
+    return hasChecks(step) && st.check ? signed(onItsCheck(step, st, phaseOf)) : 'budget exhausted';
   const asked = askedCloseout(st.taskId);
   if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
   if (phase === 'failed' || phase === 'stopped') return phase;
@@ -662,13 +661,14 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (!said && (asked || step.output)) return 'unsigned';
   if (said && unaccepted(step, run, steps, said)) return 'unsigned';
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
-  if (!step.check) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
+  if (step.run !== undefined) return said ? 'verified' : 'unsigned';
+  if (!hasChecks(step)) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
   return signed(onItsCheck(step, st, phaseOf));
 };
 
 /** Whether a step stands `blocked`: its closeout accepted as blocked, and its check not run again on that very task (`rechecked`). */
 const standsBlocked = (step: StepSpec, st: StepRecord, said: Closeout | undefined, steps: readonly StepSpec[]) =>
-  blockedAccepted(step, said, steps) && !(step.check && rechecked(st));
+  blockedAccepted(step, said, steps) && !(hasChecks(step) && rechecked(st));
 
 /** Whether the try just behind a step's current one is a recheck of that very task: its current task's check was run again. */
 const rechecked = (st: StepRecord) => {

@@ -423,8 +423,8 @@ export const AGENT_SOURCE_PLACES = ['repository', 'library', 'harness', 'path'] 
 /** One of `AGENT_SOURCE_PLACES`. */
 export type AgentSourcePlace = (typeof AGENT_SOURCE_PLACES)[number];
 
-/** What a node of a workflow's graph is: a step, a condition that routes, or a node that files a card for another workflow. */
-export const NODE_KINDS = ['step', 'condition', 'workflow'] as const;
+/** What a node of a workflow's graph is: a step, a condition that routes, a node that files a card for another workflow, or a command run with no session. */
+export const NODE_KINDS = ['step', 'condition', 'workflow', 'command'] as const;
 
 /** One of `NODE_KINDS`. */
 export type NodeKind = (typeof NODE_KINDS)[number];

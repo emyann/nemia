@@ -20,8 +20,7 @@ import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../temp
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
-import { checkFailurePolicyOf } from '../../check/index.ts';
-import { checksOf } from '../../check/checks-plan.ts';
+import { checkFailurePolicyOf, checksOf } from '../../check/index.ts';
 import { selectorsRefusal } from '../../watch/selector.ts';
 
 /**

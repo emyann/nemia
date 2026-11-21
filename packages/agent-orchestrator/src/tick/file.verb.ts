@@ -9,19 +9,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
-import {
-  CHECK_DEADLINE_SECONDS,
-  CHECK_NICENESS,
-  checkArgv,
-  checkEnvOf,
-  LANDING_CHECK_DEADLINE_SECONDS,
-  type CheckHanded,
-  type CheckRefusal,
-  type LandingSaid,
-} from '../check/index.ts';
+import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkArgv, checkEnvOf, LANDING_CHECK_DEADLINE_SECONDS, type CheckHanded, type CheckRefusal, type LandingSaid, checksDue, currentCheckTask, stepChecksDue } from '../check/index.ts';
 import { isRemoteHarness, type StepSpec } from '../workflow.ts';
 import { SHORTHAND_CHECK, stepChecks, type CheckSpec } from '../step/step.ts';
-import { checksDue, currentCheckTask, stepChecksDue } from '../check/checks-due.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
 import {
@@ -76,6 +66,8 @@ import { localFields } from './assess.ts';
 import { stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
+import { fileCommand, fileCommands } from '../command-node/command-node.verb.ts';
+import { isCommandNode } from '../command-node/index.ts';
 import {
   filedAt,
   sessionCwd,
@@ -306,6 +298,7 @@ const remoteTry = (r: Retry, status: StepStatus) =>
 const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec, taskId: string, answers: boolean, landing: PlaceTold) {
   const home = yield* StoreRoot;
   const { e, run, reads } = f;
+  if (isCommandNode(step)) return yield* fileCommand(f, step, taskId).pipe(Effect.as(undefined));
   const record = recordNamed(run, r.step);
   const files = artifactsDir(home, run, r.step);
   fs.mkdirSync(files, { recursive: true });
@@ -667,7 +660,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   const ready = due.ready;
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
-  const scripts: string[] = yield* fileScripts(f, ready);
+  const scripts: string[] = [...(yield* fileScripts(f, ready)), ...(yield* fileCommands(f, ready))];
   const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
   const servers = yield* serversFiling(run.factory ?? DEFAULT_NAMESPACE, f.home, ready, f.notes);

@@ -45,7 +45,7 @@ import {
 } from '../status/status.ts';
 import { budgetWord, dollars } from '../money/money.ts';
 import type { Verdict } from '../check/index.ts';
-import { checkFailureAction } from '../check/index.ts';
+import { checkFailureAction, checksPhase } from '../check/index.ts';
 import { retriesSpent, signoffDue, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
@@ -57,7 +57,6 @@ import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.t
 import type { RaiseBy } from 'objects';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-recheck.ts';
-import { checksPhase } from '../check/checks-due.ts';
 
 /**
  * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory`, read by `checkKills` in
@@ -568,6 +567,14 @@ export function retriesDue(
       retriesSpent(record) < (step.retries ?? 0)
     ) {
       due.push({ step: step.name, try: next, mode: 'continue', by: 'retries' });
+    } else if (
+      status === 'failed' &&
+      step.run !== undefined &&
+      typeof verdictOf(step.name) === 'number' &&
+      personsRefusal(step, verdictOf(step.name)) === undefined &&
+      retriesSpent(record) < (step.retries ?? 0)
+    ) {
+      due.push({ step: step.name, try: next, mode: 'fresh', by: 'retries' });
     } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(step, closeoutOf(step.name), steps))) {
       due.push({ step: step.name, try: next, mode: 'continue', by: 'signoff' });
     }

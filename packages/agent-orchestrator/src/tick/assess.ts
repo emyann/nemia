@@ -35,7 +35,7 @@ import { answeredRoute, routedWords } from '../route/routed/index.ts';
 import type { RunStatusWord } from 'objects';
 import { hasStarted } from '../wait/wait.ts';
 import { needsWaited, type NeedHeld, type NeedWaited } from '../needs/index.ts';
-import { stepChecksDue } from '../check/checks-due.ts';
+import { stepChecksDue } from '../check/index.ts';
 
 export type Assessment = {
   /**

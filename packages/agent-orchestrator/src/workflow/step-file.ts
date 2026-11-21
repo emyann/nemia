@@ -20,8 +20,7 @@ import {
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeOf, routeWritten, routingOf } from '../route/index.ts';
-import { checkFailurePolicyOf, checkFailurePolicyWritten } from '../check/index.ts';
-import { checksOf, checksWritten } from '../check/checks-plan.ts';
+import { checkFailurePolicyOf, checkFailurePolicyWritten, checksOf, checksWritten } from '../check/index.ts';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
@@ -408,7 +407,7 @@ export function stepFrom(
     run: commandRunOf(name, meta.run),
     checkMemory: checkMemoryOf(name, meta.checkMemory, meta.check ?? meta.checks),
     retries: countOf(name, 'retries', meta.retries),
-    checkFailurePolicy: checkPolicyOf(name, meta.checkFailurePolicy, meta.check ?? meta.checks),
+    checkFailurePolicy: checkPolicyOf(name, meta.checkFailurePolicy, meta.check ?? meta.checks ?? meta.run),
     gate: gateOf(name, meta.gate),
     input: meta.input
       ?.split(',')

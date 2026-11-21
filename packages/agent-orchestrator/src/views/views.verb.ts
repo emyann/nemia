@@ -10,19 +10,7 @@
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
 import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
-import {
-  attemptVerdict,
-  CHECK_TAIL_LINES,
-  failingLines,
-  keptOutput,
-  lastLines,
-  REFUSAL_FILE_BYTES,
-  REFUSAL_LINES,
-  reportedLines,
-  type CheckHanded,
-  type CheckRefusal,
-  type LandingSaid,
-} from '../check/index.ts';
+import { attemptVerdict, CHECK_TAIL_LINES, failingLines, keptOutput, lastLines, REFUSAL_FILE_BYTES, REFUSAL_LINES, reportedLines, type CheckHanded, type CheckRefusal, type LandingSaid, checksPhase, decidingCheckTask } from '../check/index.ts';
 import { stepChecks, type StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
@@ -45,7 +33,6 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ranOnWords, sessionRanOn } from '../release/index.ts';
 import { RunId } from '../record/record.model.ts';
-import { checksPhase, decidingCheckTask } from '../check/checks-due.ts';
 
 /**
  * How many answers a task held open has been given (`answer`): the turns after its first. Zero for any other task, and for one nobody read.
@@ -383,11 +370,13 @@ export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => 
 
 /**
  * The task of a step's current checks whose end its verdict is read off (`decidingCheckTask`): its one check's, or of several, the first
- * that refused with an exit code; undefined for a step with no check filed.
+ * that refused with an exit code; a command node's own task, run on the command harness, whose exit is its verdict; undefined for a
+ * step with no check filed.
  */
 const decidingTaskOf = (views: ReadonlyMap<string, TaskView>, run: Run, step: string) => {
   const check = run.steps[step]?.check;
-  if (!check) return undefined;
+  const own = run.steps[step]?.taskId;
+  if (!check) return own && views.get(own)?.state.harness === 'command' ? own : undefined;
   const phaseOf = (id: string) => phaseOfView(views.get(id));
   return decidingCheckTask(check, phaseOf, (id) => typeof attemptVerdict(views.get(id)?.state.attempts.at(-1)) === 'number');
 };

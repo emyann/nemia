@@ -43,7 +43,7 @@ import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
 import { answersOr } from '../question/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
-import { checksPhase } from '../check/checks-due.ts';
+import { checksPhase } from '../check/index.ts';
 
 /** What `retryRefusal` was asked: its arguments, and the command its refusals name. */
 type Asked = {

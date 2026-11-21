@@ -9,6 +9,7 @@ import { summaryLine, type Closeout } from '../closeout/index.ts';
 import { stepTaskId, tryOf, type Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import { scriptRoute, type ScriptAnswer } from '../route/index.ts';
+import { commandCloseout, isCommandNode } from '../command-node/index.ts';
 
 /** A task's last attempt, as far as a script condition reads it: its exit and the answer file the runtime kept. */
 export type AttemptOf = (taskId: string) => { exitCode?: number | null; reason?: string | null; terminationMessage?: string } | undefined;
@@ -64,7 +65,8 @@ export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf) {
 }
 
 /**
- * The pass's closeouts, with each script condition's answer read as its closeout: a route as a `done` one whose output is the route, an
+ * The pass's closeouts, with each command node's exit read as its closeout (`commandCloseout`), and each script condition's answer read
+ * as its closeout: a route as a `done` one whose output is the route, an
  * unsure answer as a `blocked` one that needs its words, so the step reads as one that signed so (`unverified`, `blocked`). Every other
  * read (no answer, an undeclared route, a failed or stopped script) leaves it none, and its task's phase says the rest.
  * @param steps The workflow's steps: which of them are script conditions.
@@ -75,6 +77,7 @@ export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf) {
 export const scriptCloseouts =
   (steps: readonly StepSpec[], attemptOf: AttemptOf, run: Run, closeoutOf: (step: string) => Closeout | undefined) => (name: string) => {
     const step = steps.find((s) => s.name === name);
+    if (isCommandNode(step)) return commandCloseout(step, run, attemptOf) satisfies Closeout | undefined;
     if (!isScript(step)) return closeoutOf(name) satisfies Closeout | undefined;
     const read = scriptRead(step, run, attemptOf);
     if (read?.kind === 'route')

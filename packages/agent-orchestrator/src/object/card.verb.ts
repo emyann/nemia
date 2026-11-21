@@ -24,6 +24,9 @@ import {
 } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardVersion } from '../card-write/card-write.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { fileAt } from '../start/files.store.ts';
+import { namedInText } from '../inbox/card-files.ts';
 
 /** The Card's whole write, served beside its reads (`update`): the api reads it off the package's entry with them. */
 export { cardWriteRefusal } from '../card-write/index.ts';
@@ -78,7 +81,7 @@ const queueStatusOf = (l: InboxListing) => ({
 });
 
 /** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
-const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) => {
+const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, files?: Card['status']['files']) => {
   const { body, error } = bodyOf(l, text);
   return {
     apiVersion: API_VERSION,
@@ -97,6 +100,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) 
       ...(l.model !== undefined ? { model: { ...l.model } } : {}),
       ...(l.from.length ? { from: [...l.from] } : {}),
       ...(l.queued !== undefined && l.queued.by === undefined ? { queued: l.queued.at } : {}),
+      ...(l.files !== undefined && l.files.length ? { files: l.files.map((f) => ({ ...f })) } : {}),
       ...(body !== undefined ? { body } : {}),
     },
     status: {
@@ -105,6 +109,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) 
       ...(l.tried !== undefined ? { lastStart: { ...l.tried } } : {}),
       ...(l.title !== null ? { title: l.title } : {}),
       ...(error !== undefined ? { error } : {}),
+      ...(files !== undefined && files.length ? { files } : {}),
       inPlay: CARD_IN_PLAY[l.state],
       ...queueStatusOf(l),
       file: l.file,
@@ -130,8 +135,35 @@ const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
   const name = CardName.read(l.name);
   const text = yield* door.cards.read(name);
   const filedAt = yield* door.cards.filedAt(name);
-  return text === null || filedAt === null ? null : cardOf(l, text, filedAt, source);
+  if (text === null || filedAt === null) return null;
+  const root = yield* Effect.serviceOption(StoreRoot);
+  return cardOf(l, text, filedAt, source, filesOf(root._tag === 'Some' ? root.value : undefined, l, bodyOf(l, text).body ?? ''));
 });
+
+/**
+ * The files the listed card `l` carries, as its status says them: each with what its File is where its namespace keeps it, whether its
+ * text names it, and whether it is kept.
+ * @param home The store's root, whose Files are read; none where the program is given none, every File then read as not kept.
+ * @param l The listed card.
+ * @param body The card's body, read for the names it uses.
+ */
+function filesOf(home: string | undefined, l: InboxListing, body: string) {
+  const files = l.files ?? [];
+  const named = namedInText(
+    body,
+    files.map((f) => f.name),
+  );
+  return files.map((f) => {
+    const at = home === undefined ? undefined : fileAt(home, namespaceOf(l), f.file);
+    return {
+      name: f.name,
+      file: f.file,
+      ...(at !== undefined ? { mediaType: at.file.mediaType, size: at.file.size } : {}),
+      inText: named.includes(f.name),
+      kept: at !== undefined,
+    };
+  });
+}
 
 /**
  * The entries of `listing` that `fieldSelector` keeps: every one where it is empty or none, else those whose `cardInPlay` is what it

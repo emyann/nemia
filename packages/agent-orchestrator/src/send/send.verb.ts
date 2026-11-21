@@ -11,6 +11,7 @@ import { CardDoor, type CardDoorShape } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import type { Labels } from '../labels/labels.ts';
+import { DEFAULT_NAMESPACE } from 'objects';
 import { CardName } from '../inbox/inbox.model.ts';
 import { parseInboxCard } from '../inbox/index.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -72,8 +73,16 @@ export function sentCardTitle(run: Run, producer: Closeout | undefined) {
   return title || firstPiece(run.brief, '\n').trim() || `Work routed on from run ${run.id}`;
 }
 
-/** The run's own card as it was given, which a `card: given` or `card: backlog` node files on: its body and its labels. */
-export type GivenCard = { readonly body: string; readonly labels: Labels };
+/**
+ * The run's own card as it was given, which a `card: given` or `card: backlog` node files on: its body, its labels, its files and the
+ * namespace that keeps them (its factory, `default` for none).
+ */
+export type GivenCard = {
+  readonly body: string;
+  readonly labels: Labels;
+  readonly files?: readonly { readonly name: string; readonly file: string }[];
+  readonly namespace?: string;
+};
 
 /** Why a card was filed by a node, worded once for its text: the run, its condition, the route and the reason the producer gave. */
 type Why = { readonly condition: string; readonly route: string | undefined; readonly reason: string | undefined };
@@ -98,7 +107,9 @@ const withoutKeys = (labels: Labels, unlabel: readonly string[]) =>
  * (`from:`), its repository and factory kept, the run's labels (`labels`, `runs/<id>.labels`) as its own `labels:`, so a card routed out
  * of a labelled run is selected by the same labels, and `title` its first line. `given`: the same, but the run's own card as it was given
  * (`given`), its body and its labels, else the run's brief, then why it was routed and the producer's reason. `backlog`: the run's card
- * filed back to the inbox naming no workflow and unqueued, without the label keys the node's `unlabel:` names.
+ * filed back to the inbox naming no workflow and unqueued, without the label keys the node's `unlabel:` names. `given` and `backlog`
+ * keep the given card's files (`files:`), the same Files by id, where the card's namespace is the run's factory, whose inbox the card
+ * is filed in: a File of another namespace is none the onward card's factory keeps, so it is left off there.
  * @param run The run the card is routed from: its id, repository and factory.
  * @param node The node that files the card: its name, its workflow, its `card:` and `unlabel:`.
  * @param why The name of the condition whose route filed the card, the route it took where one is said, and the producer's reason.
@@ -118,12 +129,22 @@ export function sentCardText(run: Run, node: StepSpec, why: Why, at: string, tit
     ['from', run.id],
     ...(kind === 'backlog' ? [] : [['queued', at] as const]),
     ...(Object.keys(carried).length ? [['labels', carried] as const] : []),
+    ...filesCarried(run, kind, given),
   ];
   const head = ['---', renderFrontmatter(keys).replace(/\n$/, ''), '---', ''];
   if (kind === 'routed') return [...head, title, '', ...whyLines(run, node, { ...why, reason: undefined }), ''].join('\n');
   const body = (given?.body ?? run.brief).trim();
   return [...head, body, '', ...whyLines(run, node, why), ''].join('\n');
 }
+
+/** The `files:` pair the onward card carries: the given card's files, for `given` and `backlog`, kept in the run's factory. */
+const filesCarried = (run: Run, kind: string, given: GivenCard | undefined) => {
+  const files = given?.files ?? [];
+  const same = (given?.namespace ?? DEFAULT_NAMESPACE) === (run.factory ?? DEFAULT_NAMESPACE);
+  const pairs: FrontmatterPair[] =
+    kind !== 'routed' && files.length && same ? [['files', Object.fromEntries(files.map((f) => [f.name, f.file]))]] : [];
+  return pairs;
+};
 
 /**
  * The run's own card as it was given, where it was started from one that is still filed and reads: its body and its labels.
@@ -137,7 +158,12 @@ const givenCard = Effect.fnUntraced(function* (door: CardDoorShape, run: Run) {
   if (text === null) return undefined;
   try {
     const card = parseInboxCard(`${name}.md`, text);
-    return { body: card.body, labels: card.labels ?? {} } satisfies GivenCard;
+    return {
+      body: card.body,
+      labels: card.labels ?? {},
+      ...(card.files !== undefined ? { files: card.files } : {}),
+      namespace: card.factory ?? DEFAULT_NAMESPACE,
+    } satisfies GivenCard;
   } catch {
     return undefined;
   }

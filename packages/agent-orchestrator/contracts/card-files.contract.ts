@@ -41,12 +41,7 @@ const CARDS = 'cards';
 
 /** Whether `name` is a file's own name: not empty, no folder in it, not hidden, no NUL, and not the cards' folder. */
 const ownName = (name: string) =>
-  name.length > 0 &&
-  !name.includes('/') &&
-  !name.includes('\\') &&
-  !name.includes('\u0000') &&
-  !name.startsWith('.') &&
-  name !== CARDS;
+  name.length > 0 && !name.includes('/') && !name.includes('\\') && !name.includes('\u0000') && !name.startsWith('.') && name !== CARDS;
 
 /** Whether `name` is given to more than one file of `given`. */
 const givenTwice = (given: readonly CardFileGiven[], name: string) => given.filter((f) => f.name === name).length > 1;
@@ -56,7 +51,9 @@ const sameFile = (a: CardFileHeld, b: CardFileHeld) => a.name === b.name && a.fi
 
 /** Whether `given` holds the very files of `held`: each of either is in the other, as many of them. */
 const sameFiles = (given: readonly CardFileGiven[], held: readonly CardFileHeld[]) =>
-  given.length === held.length && given.every((g) => held.some((h) => sameFile(g, h))) && held.every((h) => given.some((g) => sameFile(g, h)));
+  given.length === held.length &&
+  given.every((g) => held.some((h) => sameFile(g, h))) &&
+  held.every((h) => given.some((g) => sameFile(g, h)));
 
 /** The bytes of every kept File of `given`, together. */
 const bytesOf = (given: readonly CardFileGiven[]) => given.reduce((sum, f) => sum + (f.size ?? 0), 0);
@@ -107,7 +104,8 @@ const cardFilesRefusalSpec = spec<
     },
     aKeptFile: {
       description: 'A change that names an id the namespace keeps no File under is refused: a card names files that are there',
-      condition: ({ input: [given, held], output }) => sameFiles(given, held) || given.every((f) => f.size !== null) || output !== undefined,
+      condition: ({ input: [given, held], output }) =>
+        sameFiles(given, held) || given.every((f) => f.size !== null) || output !== undefined,
     },
     asManyAsACardHolds: {
       description: 'A change to more files than a card holds is refused',

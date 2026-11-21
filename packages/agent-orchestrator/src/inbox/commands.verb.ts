@@ -14,6 +14,7 @@ import {
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
   INBOX_RM_WORDS,
+  CardFileRef,
   runsNamed,
 } from 'objects';
 import { Effect, Schema } from 'effect';
@@ -77,6 +78,7 @@ export const InboxAddInput = Schema.Struct({
   repo: Schema.optionalKey(Schema.String),
   factory: Schema.optionalKey(Schema.String),
   label: Schema.optionalKey(Schema.Array(Schema.String)),
+  files: Schema.optionalKey(Schema.Array(CardFileRef)),
 });
 export type InboxAddInput = typeof InboxAddInput.Type;
 
@@ -87,7 +89,8 @@ export type InboxAddInput = typeof InboxAddInput.Type;
 export const INBOX_ADD: Served<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }, InboxAddInput> = {
   ...INBOX_ADD_WORDS,
   input: InboxAddInput,
-  handler: ({ idea, label, ...keys }) => Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])] })),
+  handler: ({ idea, label, files, ...keys }) =>
+    Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])], ...(files !== undefined ? { files } : {}) })),
 };
 
 /** What `nemia inbox queue` did, and the card as it now reads. */

@@ -27,6 +27,10 @@
  * workflow, else its only one (`workflowRepo`). A card is started only in a factory named for it, here or at start, never one inferred from
  * its folder (`unfactoredCardRefusal`). Whether the factory is there, offers the workflow and names it a repository is the start's to say.
  *
+ * `files:` is the files the card carries, a YAML map of the name its text and its run find each by to the File it names (`files: {
+ * shot.png: file_… }`), uploaded to its factory first: each copied into the `inputs/` of every run started from it (`startFromInbox`),
+ * and kept by the files' prune while the card's text names its id (`filesPruned`).
+ *
  * `labels:` is a person's labels on the card, a YAML map of a key to its value (`labels: { team: core }`), each pair as a label is
  * spelled (`labelRefusal`): what a selector picks the card by, beside its `workflow:` and `factory:` (`cardLabels`), and what the run it
  * starts is created with (`inheritedLabels`).
@@ -58,6 +62,7 @@ import {
   type FrontmatterPair,
 } from '../frontmatter/frontmatter.ts';
 import { labelRefusal, labelsText, type Labels } from '../labels/labels.ts';
+import { FILE_ID_PREFIX } from 'objects';
 import { cardTriggered, matchingTriggers, triggerCardOf, type SelectingTrigger } from './triggered.ts';
 
 export type InboxCard = {
@@ -87,6 +92,8 @@ export type InboxCard = {
   from?: string[];
   /** A person's labels on it (`labels:`), a key to its value: absent on a card that carries none. */
   labels?: Labels;
+  /** The files it carries (`files:`), each its name in the card and the File it names, in the order written: absent on a card with none. */
+  files?: CardFiles;
   /** Everything below the frontmatter: the idea, and its run's brief unless a brief given at start replaces it. */
   body: string;
 };
@@ -97,14 +104,20 @@ export const INBOX_KEYS = CARD_KEYS;
 /** A key an inbox card may set. */
 type InboxKey = (typeof INBOX_KEYS)[number];
 
-/** A key whose value is one line of text: every key but `labels`, which is a map. */
-type FlatKey = Exclude<InboxKey, 'labels'>;
+/** The files a card carries: each its name in the card and the File it names, in the order written. */
+export type CardFiles = readonly { readonly name: string; readonly file: string }[];
+
+/** A key whose value is one line of text: every key but `labels` and `files`, which are maps. */
+type FlatKey = Exclude<InboxKey, 'labels' | 'files'>;
 
 /** The keys whose value is one line of text, in `INBOX_KEYS`' order. */
-const FLAT_KEYS = INBOX_KEYS.filter((key): key is FlatKey => key !== 'labels');
+const FLAT_KEYS = INBOX_KEYS.filter((key): key is FlatKey => key !== 'labels' && key !== 'files');
 
-/** A card's keys as its frontmatter gives them: each line of text, and the labels' map. */
-type CardKeys = Partial<Record<FlatKey, string>> & { labels?: Labels };
+/** A card's keys as its frontmatter gives them: each line of text, the labels' map and the files'. */
+type CardKeys = Partial<Record<FlatKey, string>> & { labels?: Labels; files?: CardFiles };
+
+/** A File's id as the api mints it: the prefix, then 32 hexadecimal digits. */
+const FILE_ID = new RegExp(`^${FILE_ID_PREFIX}[0-9a-f]{32}$`);
 
 /**
  * An ISO time as `new Date().toISOString()` writes it, to the second or the millisecond, in UTC: what `queued:` takes, so the order is
@@ -242,10 +255,44 @@ export function unfactoredCardRefusal(file: string, names: readonly string[], fi
  * that gives the wait, since `file` is where the idea is now, and no card's path.
  */
 function inboxKeys(file: string, block: string, filing = false) {
-  const entries = readFrontmatter(file, block).entries.filter((entry) => entry.key === 'labels');
-  const flatBlock = entries.length ? withKey(file, block, 'labels', undefined) : block;
+  const all = readFrontmatter(file, block).entries;
+  const entries = all.filter((entry) => entry.key === 'labels');
+  const fileEntries = all.filter((entry) => entry.key === 'files');
+  const labelless = entries.length ? withKey(file, block, 'labels', undefined) : block;
+  const flatBlock = fileEntries.length ? withKey(file, labelless, 'files', undefined) : labelless;
   const labels = labelsOf(file, entries);
-  return { ...flatKeys(file, flatBlock, filing), ...(labels !== undefined ? { labels } : {}) };
+  const files = filesOf(file, fileEntries);
+  return {
+    ...flatKeys(file, flatBlock, filing),
+    ...(labels !== undefined ? { labels } : {}),
+    ...(files !== undefined ? { files } : {}),
+  };
+}
+
+/**
+ * A card's `files:` as the files it carries, in the order written, or undefined where the card has none — refused, naming the file and
+ * the line: the key set twice, a value that is not a map, and a value that is not a File's id. Whether each name is a file's own, and each
+ * File is kept, is the write's to judge (`cardFilesRefusal`).
+ */
+function filesOf(file: string, entries: readonly FrontmatterEntry[]) {
+  const [entry, twice] = entries;
+  if (entry === undefined) return undefined;
+  if (twice !== undefined)
+    refuse(`${file}: \`files\` is set twice, and a card that says two things says nothing. Keep one map with every file in it.`);
+  const { value, line } = entry;
+  if (typeof value === 'string' || Array.isArray(value))
+    refuse(
+      `${file}:${line}: \`files\` is a map of a file's name to the File it names — \`files: { shot.png: file_… }\`, or each \`shot.png: file_…\` indented under it. Attach a file with nemia inbox attach <card> <path>, or delete the line.`,
+    );
+  const files: { name: string; file: string }[] = [];
+  for (const [name, id] of Object.entries(value as Readonly<Record<string, unknown>>)) {
+    if (typeof id !== 'string' || !FILE_ID.test(id))
+      refuse(
+        `${file}:${line}: \`files\` gives ${name} ${JSON.stringify(id)}, which is no File's id (${FILE_ID_PREFIX} and 32 hexadecimal digits). Attach the file with nemia inbox attach <card> <path>, which uploads it and writes its id.`,
+      );
+    files.push({ name, file: id });
+  }
+  return files;
 }
 
 /**
@@ -280,7 +327,7 @@ function flatKeys(file: string, block: string, filing: boolean) {
       ? filing
         ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card nemia inbox add names: nemia start <inbox>/<name>.md --after <runId>.`
         : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>/${file} --after <runId>. Delete the line.`
-      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, an old card's retired repository, when it was queued to start on its own, the step its run waits at for a person, the model a step runs on in its run, the factory that processes it, the runs it is handed as context, and a person's labels on it; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
+      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, an old card's retired repository, when it was queued to start on its own, the step its run waits at for a person, the model a step runs on in its run, the factory that processes it, the runs it is handed as context, a person's labels on it, and the files it carries; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
   );
 }
 
@@ -360,6 +407,8 @@ export type InboxListing = {
   startedAs: string[];
   /** A person's labels on the card (`labels:`): none, `{}`, on a card that carries none and on an entry that does not read as a card. */
   labels: Labels;
+  /** The files the card carries (`files:`): absent on a card that carries none and on an entry that does not read as a card. */
+  files?: CardFiles;
   /** Where the card is in its life (`cardState`): computed here once, its run's phase once started, and read as is above. */
   state: CardState;
   /** Why the entry does not read as a card: its card's refusal, or not a `.md` file. Null for a card. */
@@ -533,6 +582,7 @@ export function cardsListed(
           from: card.from ?? [],
           startedAs,
           labels: card.labels ?? {},
+          ...(card.files !== undefined ? { files: card.files } : {}),
           factoryRepo: factoryRepoOf({ workflow: card.workflow ?? null, factory: card.factory ?? null }, factories),
           error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
@@ -798,8 +848,12 @@ function splitOrProse(from: string, text: string) {
  * @param text The idea as given: a note, or a file's text.
  * @param givenKeys The `workflow`, `factory` and labels given beside the idea, written over the text's own.
  */
-export function ideaCard(from: string, text: string, givenKeys: { workflow?: string; factory?: string; labels?: Labels }) {
-  const { labels: givenLabels, ...given } = givenKeys;
+export function ideaCard(
+  from: string,
+  text: string,
+  givenKeys: { workflow?: string; factory?: string; labels?: Labels; files?: CardFiles },
+) {
+  const { labels: givenLabels, files: givenFiles, ...given } = givenKeys;
   if (!text.trim()) {
     refuse(
       `nemia inbox add takes the idea, and ${from} has nothing in it. Give it as text — nemia inbox add "<idea>" — or as a file: nemia inbox add ./idea.md. Nothing was filed.`,
@@ -831,7 +885,12 @@ export function ideaCard(from: string, text: string, givenKeys: { workflow?: str
     keys = read;
     body = split.body;
   }
-  const written = { ...keys, ...definedOf(given), ...(givenLabels !== undefined ? { labels: givenLabels } : {}) };
+  const written = {
+    ...keys,
+    ...definedOf(given),
+    ...(givenLabels !== undefined ? { labels: givenLabels } : {}),
+    ...(givenFiles !== undefined ? { files: givenFiles } : {}),
+  };
   const refusedWorkflow =
     written.workflow === undefined ? undefined : cardWorkflowRefusal(`${from}: workflow`, written.workflow, 'Nothing was filed.');
   if (refusedWorkflow !== undefined) refuse(refusedWorkflow);
@@ -852,8 +911,12 @@ export const retiredRepoRefusal = (notDone: string) =>
  * A card's file: its keys in `INBOX_KEYS`' order, written as YAML (`renderFrontmatter`), then its body. A body that opens with a `---`
  * rule of its own, under no key, is given a frontmatter of one YAML comment line, so the rule is not read as the card's frontmatter.
  */
-function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }, body: string) {
+function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels; files?: CardFiles }, body: string) {
   const pairs = INBOX_KEYS.flatMap<FrontmatterPair>((key) => {
+    if (key === 'files') {
+      const files = keys.files ?? [];
+      return files.length ? [[key, Object.fromEntries(files.map((f) => [f.name, f.file]))]] : [];
+    }
     if (key !== 'labels') {
       const value = keys[key];
       return value !== undefined ? [[key, value]] : [];
@@ -900,13 +963,21 @@ export const fromText = (card: InboxCard, runs: readonly string[]) => cardText(c
 export const labelledText = (card: InboxCard, labels: Labels) => cardText(card, { labels });
 
 /**
+ * A card's text with `files:` set to `files`, in the order given — or taken off, for none — every other key kept: what `nemia inbox
+ * attach` and `detach` write. Written again as `queuedText` writes it; pure, and the text reads back as a card (`parseInboxCard`).
+ * @param card The card as read.
+ * @param files The files to write; none takes the line off.
+ */
+export const filesText = (card: InboxCard, files: CardFiles) => cardText(card, { files });
+
+/**
  * A card's text, its keys written over by `over` and the frontmatter written again in the keys' order, its comments dropped; a body that
  * opens with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Read back before it is given.
  * @param card The card as read.
  * @param over The keys to write over the card's own; an undefined key is taken off.
  */
-export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }) {
-  const keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels } = {
+export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels; files?: CardFiles }) {
+  const keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels; files?: CardFiles } = {
     workflow: card.workflow,
     repo: card.repo,
     queued: card.queued,
@@ -915,6 +986,7 @@ export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string |
     factory: card.factory,
     from: fromLine(card.from),
     ...(card.labels !== undefined ? { labels: card.labels } : {}),
+    ...(card.files !== undefined ? { files: card.files } : {}),
     ...over,
   };
   const text = cardWritten(keys, card.body);

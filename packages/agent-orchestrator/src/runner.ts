@@ -458,7 +458,17 @@ export { subscriptionList, subscriptionObject } from './subscription-object/subs
 export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
 export { cardRepoRefusal, CONCLUDED, START, StartInput, startedFacts } from './start/commands.verb.ts';
 export { sentInputRefusal, sentInputsRemoved, sentInputsWritten, type SentInput } from './start/sent.store.ts';
-export { fileAt, fileBegun, fileDropped, fileKept, filesDir, filesPruned, type FileBegun } from './start/files.store.ts';
+export {
+  fileAt,
+  fileBegun,
+  fileDropped,
+  fileKept,
+  filePut,
+  filesDir,
+  filesPruned,
+  type FileBegun,
+  type FilePutRefused,
+} from './start/files.store.ts';
 export { INBOX, INBOX_ADD, INBOX_EDIT, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';

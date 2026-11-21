@@ -19,7 +19,25 @@ import { HANDED_CLOSEOUT, type HandedFiles } from '../artifacts/artifacts.ts';
  * A file `nemia start --input` was given, as start.verb.ts found it: the path as typed, where it resolves, and what is there. What
  * `inputRefusal` judges; start.verb.ts looks, and this file does not.
  */
-export type InputFile = { given: string; resolved: string; kind: 'file' | 'directory' | 'missing' | 'other' };
+export type InputFile = {
+  given: string;
+  resolved: string;
+  kind: 'file' | 'directory' | 'missing' | 'other';
+  /** The name it takes in the run's `inputs/`, where it is not its path's own: a card's file, kept by the api under its id. */
+  name?: string;
+};
+
+/**
+ * The name `f` takes in the run's `inputs/`: its own name where it is given one, a card's file's, else its path's.
+ * @param f The file as found.
+ */
+export const inputName = (f: Pick<InputFile, 'resolved' | 'name'>) => f.name ?? path.basename(f.resolved);
+
+/**
+ * What a refusal calls `f`: the `--input` it was given as, or a card's file by its own words.
+ * @param f The file as found.
+ */
+const inputSaid = (f: Pick<InputFile, 'given' | 'name'>) => (f.name !== undefined ? f.given : `--input ${f.given}`);
 
 /**
  * Why `nemia start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything
@@ -29,6 +47,8 @@ export type InputFile = { given: string; resolved: string; kind: 'file' | 'direc
  */
 export function inputRefusal(inputs: readonly InputFile[]) {
   for (const f of inputs) {
+    if (f.name !== undefined && f.kind === 'missing')
+      return `${f.given} is no longer kept: its File was let go of. Attach it to the card again — nemia inbox attach <card> <path> — and start it again.`;
     if (f.kind === 'missing')
       return `--input ${f.given}: there is no file at ${f.resolved}. Give the path to a file to hand the run's steps, from where nemia start is typed or absolute.`;
     if (f.kind === 'directory')
@@ -38,11 +58,12 @@ export function inputRefusal(inputs: readonly InputFile[]) {
   }
   const named = new Map<string, InputFile>();
   for (const f of inputs) {
-    const name = path.basename(f.resolved);
+    const name = inputName(f);
     const other = named.get(name);
-    if (other?.resolved === f.resolved) return `--input ${f.given} is given twice. Each file is copied once: give it one --input.`;
+    if (other?.resolved === f.resolved && other.name === undefined && f.name === undefined)
+      return `--input ${f.given} is given twice. Each file is copied once: give it one --input.`;
     if (other) {
-      return `--input ${other.given} and --input ${f.given} are both named ${name}, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.`;
+      return `${inputSaid(other)} and ${inputSaid(f)} are both named ${name}, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.`;
     }
     named.set(name, f);
   }

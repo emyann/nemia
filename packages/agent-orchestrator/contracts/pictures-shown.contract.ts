@@ -45,12 +45,7 @@ export type PictureBounds = { readonly count: number; readonly bytes: number; re
 
 /** Whether `p` may be put before a model as it is: a format it takes, its bytes and both its sides within the bounds. */
 const fits = (p: HandedPicture, bounds: PictureBounds) =>
-  p.type !== null &&
-  p.bytes <= bounds.bytes &&
-  p.width !== null &&
-  p.height !== null &&
-  p.width <= bounds.side &&
-  p.height <= bounds.side;
+  p.type !== null && p.bytes <= bounds.bytes && p.width !== null && p.height !== null && p.width <= bounds.side && p.height <= bounds.side;
 
 /** Where the picture named `name` stands in what was handed. */
 const placeOf = (handed: readonly HandedPicture[], name: string) => handed.findIndex((p) => p.name === name);

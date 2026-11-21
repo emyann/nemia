@@ -32,7 +32,7 @@ import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
 import { settingsAt } from '../harness-settings/harness-settings.verb.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
-import { cardsRefusal, inputRefusal, type InputFile } from './inputs.ts';
+import { cardsRefusal, inputName, inputRefusal, type InputFile } from './inputs.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { inboxNameRefusal } from '../inbox/index.ts';
@@ -349,6 +349,11 @@ export type StartOptions = {
   after?: readonly string[];
   context?: readonly string[];
   inputs?: readonly string[];
+  /**
+   * The files of the card it is started from (`startFromInbox`), each by the name the card gives it and the path the store keeps it at:
+   * copied into its `inputs/` under that name, beside `inputs`, and judged with them (`inputRefusal`).
+   */
+  cardFiles?: readonly { readonly name: string; readonly path: string }[];
   /** The inbox cards to hand the run (`nemia start --card`), by name: each copied into its `inputs/cards/` (`cardsDir`). */
   cards?: readonly string[];
   from?: { inbox: string };
@@ -409,8 +414,17 @@ const repoNamedRefusal = (home: string, repo: string) =>
 /**
  * The files `nemia start --input` names, each resolved from where it is typed, and what is there: a file, a directory, other or nothing.
  */
-function inputsOf(given: readonly string[]) {
-  return given.map((g) => {
+function inputsOf(given: readonly string[], cardFiles: StartOptions['cardFiles'] = []) {
+  const ofCard = cardFiles.map((f) => {
+    const at = fs.statSync(f.path, { throwIfNoEntry: false });
+    return {
+      given: `the card's file ${f.name}`,
+      resolved: f.path,
+      name: f.name,
+      kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other',
+    } satisfies InputFile;
+  });
+  const typed = given.map((g) => {
     const resolved = path.resolve(g);
     const at = fs.statSync(resolved, { throwIfNoEntry: false });
     return {
@@ -418,7 +432,8 @@ function inputsOf(given: readonly string[]) {
       resolved,
       kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other',
     } satisfies InputFile;
-  }) satisfies InputFile[];
+  });
+  return [...ofCard, ...typed] satisfies InputFile[];
 }
 
 /** Whether `at` is a directory now. */
@@ -541,7 +556,7 @@ function toldOf(
     workflow: steps,
     ...(after.length ? { after: [...after] } : {}),
     ...(context.length ? { context: [...context] } : {}),
-    ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
+    ...(inputs.length ? { inputs: inputs.map(inputName) } : {}),
     ...(opts.cards?.length ? { cards: [...opts.cards] } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
     ...(opts.scheduled
@@ -625,7 +640,7 @@ function copyInputs(home: string, run: Run, inputs: readonly InputFile[], cards:
   const dir = inputsDir(home, run);
   try {
     fs.mkdirSync(dir, { recursive: true });
-    for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
+    for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, inputName(f)), fs.constants.COPYFILE_EXCL);
     if (cards.size) fs.mkdirSync(cardsDir(home, run));
     for (const [name, text] of cards) fs.writeFileSync(path.join(cardsDir(home, run), `${name}.md`), text, { flag: 'wx' });
   } catch (err) {
@@ -845,7 +860,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (outside) return yield* Effect.fail(new Invalid({ message: outside }));
   const refusedGates = gateRefusal(opts.gates ?? [], steps);
   if (refusedGates) return yield* Effect.fail(new Invalid({ message: refusedGates }));
-  const inputs = yield* tried(() => inputsOf(opts.inputs ?? []));
+  const inputs = yield* tried(() => inputsOf(opts.inputs ?? [], opts.cardFiles));
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const cards = yield* cardsOf(opts.cards ?? [], inputs);
@@ -887,7 +902,8 @@ const homeTrusted = Effect.fnUntraced(function* (home: string, run: Run, steps: 
 });
 
 /** Whether a start hands its run anything to copy into its inputs: a file (`--input`) or a card (`--card`). */
-const givenAny = (opts: Pick<StartOptions, 'inputs' | 'cards'>) => Boolean(opts.inputs?.length || opts.cards?.length);
+const givenAny = (opts: Pick<StartOptions, 'inputs' | 'cards' | 'cardFiles'>) =>
+  Boolean(opts.inputs?.length || opts.cards?.length || opts.cardFiles?.length);
 
 /**
  * The text of each inbox card `cards` names, by name, read through the Card door: refused before anything is written where they cannot
@@ -901,7 +917,7 @@ const cardsOf = Effect.fn('cardsOf')(function* (cards: readonly string[], inputs
     const text = yield* door.cards.read(CardName.read(card));
     if (text !== null) texts.set(card, text);
   }
-  const names = inputs.map((f) => path.basename(f.resolved));
+  const names = inputs.map(inputName);
   const unnamed = cards.filter((card) => inboxNameRefusal(card) !== undefined);
   const refused = cardsRefusal(cards, unnamed, [...texts.keys()], names);
   if (refused === null) return texts;

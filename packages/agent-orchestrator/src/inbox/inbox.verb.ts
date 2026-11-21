@@ -49,6 +49,7 @@ import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { defaultStartRefusal, unattachedRefusal, wiredRepo, type Factory } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { fileAt, filesDir } from '../start/files.store.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
 export type InboxStart = {
@@ -199,7 +200,9 @@ const cardFactory = Effect.fn('cardFactory')(function* (
  * its name, one the factory does not offer or wires no repository for, one that does not load — a `gate:` naming no step of it, in the
  * card's words, a `from:` naming a run the store does not have or one also waited
  * on (`contextRefusal`), and a `brief` with nothing in it. The run is handed as context the card's `from:` and `context`, in that order.
- * And refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, or a factory not there.
+ * And refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, or a factory not there. The card's files
+ * (`files:`) are copied into the run's `inputs/` under their names in the card, beside `inputs`: a File its factory no longer keeps,
+ * or one whose name an `--input` takes too, is refused before anything is written (`inputRefusal`), naming `nemia inbox attach`.
  */
 export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: InboxStart) {
   const refused = inboxNameRefusal(opts.name);
@@ -232,6 +235,13 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const ids = new Set(yield* runs.runs.ids());
   const context = cardContext(card, opts, (id) => ids.has(id));
 
+  const home = yield* StoreRoot;
+  const filesAt = card.factory ?? DEFAULT_NAMESPACE;
+  const cardFiles = (card.files ?? []).map((f) => ({
+    name: f.name,
+    path: fileAt(home, filesAt, f.file)?.path ?? path.join(filesDir(home, filesAt), f.file),
+  }));
+
   const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,
     repo,
@@ -241,6 +251,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     after: opts.after,
     ...(context.length ? { context } : {}),
     inputs: opts.inputs,
+    ...(cardFiles.length ? { cardFiles } : {}),
     cards: opts.cards,
     from: { inbox: card.name, ...(opts.trigger === undefined ? {} : { trigger: opts.trigger }) },
     ...(gates.length ? { gates } : {}),

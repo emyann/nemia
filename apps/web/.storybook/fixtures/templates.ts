@@ -15,7 +15,22 @@ export const SDLC: Template = {
   spec: {
     version: '3.11.0',
     description: 'A software team: an idea to an intent, an intent to main through a design, an implement and a review.',
-    parameters: {},
+    parameters: {
+      github: {
+        type: 'boolean',
+        description: 'Whether the factory judges and lands its work on GitHub.',
+        default: false,
+        whenOrigin: 'github.com',
+      },
+      frontDoorLabel: {
+        type: 'string',
+        description: 'The label key that sends a card through the front door. Empty makes no trigger.',
+        default: '',
+        ask: true,
+      },
+      ciCheck: { type: 'string', description: 'The name of the CI status check a pull request waits on.', default: 'ci' },
+      landingWaitsOnCi: { type: 'boolean', description: "Whether the landing waits on main's own CI.", default: true },
+    },
     hires: { 'build/implement': 'grace', 'build/review': 'agora' },
   },
   status: {

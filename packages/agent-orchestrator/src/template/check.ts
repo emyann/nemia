@@ -87,11 +87,24 @@ const stringsOf = (value: unknown) =>
 /** A bare lower-case host name: labels of letters, digits and hyphens, joined by dots. */
 const BARE_HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
 
-/** Each parameter's `whenOrigin` that is not a bare lower-case host on a boolean. */
+/**
+ * Each parameter's `whenOrigin` that is not a bare lower-case host on a boolean, and each that the template also asks (`ask: true`),
+ * which the volume sets rather than the person.
+ */
 function originRefusals(held: Held) {
   const parameters = isMap(held.manifest.parameters) ? held.manifest.parameters : {};
   return Object.entries(parameters).flatMap(([name, parameter]) => {
     if (!isMap(parameter) || parameter.whenOrigin === undefined) return [];
+    const asked =
+      parameter.ask === true
+        ? [
+            {
+              file: 'nemia.yaml',
+              at: ['spec', 'parameters', name, 'ask'],
+              message: `${name} is set by the factory's first writable volume (whenOrigin), so it asks nothing of a person: remove ask, or remove whenOrigin.`,
+            },
+          ]
+        : [];
     const at = ['spec', 'parameters', name, 'whenOrigin'];
     const host = typeof parameter.whenOrigin === 'string' ? parameter.whenOrigin : JSON.stringify(parameter.whenOrigin);
     const messages = [
@@ -102,7 +115,7 @@ function originRefusals(held: Held) {
         ? []
         : [`whenOrigin is a bare lower-case host, such as example.org, and ${host} is none: write the host alone.`]),
     ];
-    return messages.map((message) => ({ file: 'nemia.yaml', at, message }));
+    return [...asked, ...messages.map((message) => ({ file: 'nemia.yaml', at, message }))];
   });
 }
 
@@ -521,11 +534,11 @@ const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string
 
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
- * parameter or file named that the folder lacks, a `whenOrigin` that is no bare host on a boolean, a step's words, each harness's block
- * against the runtime's knobs for it, and an undeclared parameter's expression in a text the render writes, at its line. `packageSkills`:
- * Nemia's place and builtin skills, each a skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`,
- * the lines of a file of shared lines, or undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the builtin
- * places declare, which a workflow's need may fill. None for a template that passes.
+ * parameter or file named that the folder lacks, a `whenOrigin` that is no bare host on a boolean or is asked (`ask`), a step's words, each
+ * harness's block against the runtime's knobs for it, and an undeclared parameter's expression in a text the render writes, at its line.
+ * `packageSkills`: Nemia's place and builtin skills, each a skill the folder need not carry; `text`, the words of one of its files, by its
+ * path; `lines`, the lines of a file of shared lines, or undefined where it is no YAML list of strings; `placeNeeds`, the names of the
+ * needs the builtin places declare, which a workflow's need may fill. None for a template that passes.
  * @param folder The template's folder as read: its files and documents.
  * @param packageSkills Nemia's place and builtin skills, each a skill the folder need not carry.
  * @param text The words of one of the folder's files, by its path.

@@ -36,7 +36,7 @@ async function fileFrom(page: Page, idea: string) {
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
   const [filed] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath().test(new URL(r.url()).pathname), { timeout: WAIT_MS }),
-    box.getByRole('button', { name: 'File' }).click(),
+    box.getByRole('button', { name: 'File', exact: true }).click(),
   ]);
   if (filed.status() !== 201) throw new Refused(`the api files the card — it answered ${filed.status()}: ${await filed.text()}`);
   const {
@@ -194,7 +194,7 @@ export default {
       if ((await heldIn(list)) !== '') throw new Refused(`no factory is chosen until a person picks — it held ${await heldIn(list)}`);
       await expectCount(box.locator('[data-workflow-field]'), 0, 'with no factory, the box has no Workflow list');
       await expectCount(box.locator('[data-slot="select"]', { hasText: 'Repository' }), 0, 'no Repository list');
-      await expectCount(box.locator('input'), 0, 'and no field to type a path into');
+      await expectCount(box.locator('input:not([type="file"])'), 0, 'and no field to type a path into');
       await expectVisible(
         box.locator('[data-parked]', {
           hasText: 'Parked with no factory: it gets its factory, workflow and repository when you start it.',
@@ -218,7 +218,7 @@ export default {
         throw new Refused(`the list is preset to the factory the address names (${factory}) — it held ${await heldIn(list)}`);
       await expectTexts(box.locator('[data-factory-repo]'), [checkout], "the box says the factory's one repository as text");
       await expectCount(box.locator('[data-slot="select"]', { hasText: 'Repository' }), 0, 'with no Repository list');
-      await expectCount(box.locator('input'), 0, 'and no field to type a path into');
+      await expectCount(box.locator('input:not([type="file"])'), 0, 'and no field to type a path into');
       await pickIn(page, box.locator('[data-workflow-field]'), WORKFLOWS.good.name);
       await box.getByRole('textbox', { name: 'An idea' }).fill(ASSIGNED);
       await settled(page);

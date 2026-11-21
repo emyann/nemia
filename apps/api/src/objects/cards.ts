@@ -20,12 +20,12 @@
 import { Effect } from 'effect';
 import {
   actorOf,
-  attachToCard,
-  detachFromCard,
   cardList,
   cardObject,
   cardTable,
   INBOX_ADD,
+  INBOX_ATTACH,
+  INBOX_DETACH,
   INBOX_EDIT,
   INBOX_QUEUE,
   INBOX_RESEND,
@@ -216,14 +216,14 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
     .handle('attach', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         await cardIn(s, namespace, name);
-        await s.inRequest(attachToCard(name, namespace, payload.files));
+        await s.inRequest(INBOX_ATTACH.handler({ name, namespace, files: payload.files }));
         return cardIn(s, namespace, name);
       }),
     )
     .handle('detach', ({ params: { namespace, name, file } }) =>
       answered(async (s) => {
         await cardIn(s, namespace, name);
-        await s.inRequest(detachFromCard(name, namespace, [file]));
+        await s.inRequest(INBOX_DETACH.handler({ name, namespace, files: [file] }));
         return cardIn(s, namespace, name);
       }),
     ),

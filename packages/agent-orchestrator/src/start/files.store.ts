@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FILE_ID_PREFIX, FILE_KEPT_FOR, FileObject } from 'objects';
 import { FACTORY_NAME } from '../factory/factory.ts';
-import { fileLetGo } from '../inbox/card-files.ts';
+import { fileLetGo } from '../inbox/index.ts';
 
 /** A kept file's record, `<id>.json`, decoded: none where it does not read as a file. */
 const fileIn = Schema.decodeUnknownOption(Schema.fromJsonString(FileObject));

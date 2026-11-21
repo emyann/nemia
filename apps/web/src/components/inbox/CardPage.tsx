@@ -60,7 +60,7 @@ export function CardPage({ name }: { name: string }) {
       {card.error === null && (
         <CardFiles
           files={card.files}
-          canChange={card.startedAs.length === 0}
+          canChange={!startedCard(card)}
           onAttach={(given) => given.length > 0 && attach.mutate(given)}
           onDetach={(file) => detach.mutate(file)}
           pending={attach.isPending || detach.isPending}

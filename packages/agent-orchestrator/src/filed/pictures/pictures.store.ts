@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { HandedPicture, PictureHeld, PictureType } from '../../../contracts/pictures-shown.contract.ts';
 import { declarationOf, isRemoteHarness } from '../../harness/harness.ts';
-import { PICTURES } from '../../start/inputs.ts';
+import { PICTURES } from '../../start/index.ts';
 import { PICTURE_BOUNDS, picturesShown } from './pictures.ts';
 
 /** The bytes of a header read: enough for every format's sides, a JPEG's SOF past its EXIF included. */

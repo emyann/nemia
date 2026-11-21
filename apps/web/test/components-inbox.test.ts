@@ -103,7 +103,7 @@ test('the box that files a card lists No factory and each factory offered; under
     'never the default factory, and none picked: the one Select, the Factory',
   );
   assert.match(html, /data-parked="true"[^>]*>Parked with no factory: it gets its factory, workflow and repository when you start it\./);
-  assert.doesNotMatch(html, />Workflow<|>Repository<|<input/, 'nothing to type or pick but the idea and the factory');
+  assert.doesNotMatch(html, />Workflow<|>Repository<|<input(?![^>]*type="file")/, 'nothing to type or pick but the idea and the factory');
   assert.match(html, /<textarea[^>]*id="[^"]+"/, 'the idea is the one box to type in');
   assert.doesNotMatch(html, /data-no-factory/);
 });
@@ -125,7 +125,7 @@ test("the box preset to the address's factory lists the workflows it offers by n
     [['solo', 'solo', true]],
   );
   assert.match(solo, /data-factory-repo="true"[^>]*>\/r\/a<\/p>/);
-  assert.doesNotMatch(solo, /<input|data-parked/, 'no repository to type');
+  assert.doesNotMatch(solo, /<input(?![^>]*type="file")|data-parked/, 'no repository to type');
   assert.match(solo, /data-workflow-field="true"/);
   assert.deepEqual(
     workflows,

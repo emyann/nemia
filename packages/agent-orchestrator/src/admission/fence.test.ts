@@ -61,12 +61,7 @@ test('REFUSED to widen what is not a prompt allowed by its own rule: an answer, 
   const allows = ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)', 'Bash(nemia tick:*)', 'Bash(nemia:*)', 'Bash(nemia level:*)'];
   assert.deepEqual(widened(fence, allows), {
     ...fence,
-    ask: [
-      'Bash(nemia level manual:*)',
-      'Bash(nemia agents custom *--clear*)',
-      'Bash(nemia library add:*)',
-      'Bash(nemia library rm:*)',
-    ],
+    ask: ['Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)', 'Bash(nemia library add:*)', 'Bash(nemia library rm:*)'],
   });
   assert.deepEqual(widened(fence, ['Bash(nemia:*)', 'Bash(nemia level:*)']), fence);
 });

@@ -1,9 +1,9 @@
 /**
  * The run object's reads at the command line, entries of the command table: `nemia show` (the run as one object, or its record), a
- * step's tries, one try, its closeout and what it was told, and `nemia logs` (a step's session output).
+ * step's tries, one try, its closeout, what its check printed (`nemia check-output`) and what it was told, and `nemia logs` (a step's session output).
  */
 import { Effect, Schema } from 'effect';
-import { CLOSEOUT_WORDS, LOGS_WORDS, Run as RunObject, SHOW_WORDS } from 'objects';
+import { CHECK_OUTPUT_WORDS, type CheckOutput, CLOSEOUT_WORDS, LOGS_WORDS, OUTPUT_STREAMS, Run as RunObject, SHOW_WORDS } from 'objects';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -12,6 +12,7 @@ import type { Refusal } from '../refusal/refusal.ts';
 import type { StepTry } from '../resource/tries.verb.ts';
 import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout } from './run.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
+import { stepCheckOutput } from '../check-output/check-output.verb.ts';
 import type { Run } from '../record/record.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 
@@ -115,6 +116,32 @@ export const CLOSEOUT: Served<TryCloseout, CloseoutInput> = {
   ...CLOSEOUT_WORDS,
   input: CloseoutInput,
   handler: ({ runId, step, try: n }) => stepCloseout(runId, step, n),
+};
+
+/**
+ * What `nemia check-output` takes: the step's, the try's number (none for its latest), the stream (stdout where none), the page — the line
+ * to read on from and how many lines, or the last lines — and the text the lines answered contain.
+ */
+export const CheckOutputInput = Schema.Struct({
+  ...StepInput.fields,
+  try: Schema.optionalKey(Schema.String),
+  stream: Schema.optionalKey(Schema.Literals(OUTPUT_STREAMS)),
+  from: Schema.optionalKey(Schema.String),
+  limit: Schema.optionalKey(Schema.String),
+  last: Schema.optionalKey(Schema.String),
+  match: Schema.optionalKey(Schema.String),
+});
+export type CheckOutputInput = typeof CheckOutputInput.Type;
+
+/**
+ * `nemia check-output <run> <step> [--try n]`, whose words the client holds (`objects`' `CHECK_OUTPUT_WORDS`): a page of what a try's
+ * check printed, its latest try's by default (`CheckOutput`, `stepCheckOutput`); the api's `steps` group serves it (`checkOutput`),
+ * calling this handler.
+ */
+export const CHECK_OUTPUT: Served<CheckOutput, CheckOutputInput> = {
+  ...CHECK_OUTPUT_WORDS,
+  input: CheckOutputInput,
+  handler: ({ runId, step, try: n, ...ask }) => stepCheckOutput(runId, step, n, ask),
 };
 
 /** What a step was told, its brief by layer and its task by part (`toldOf`): the api's `steps` group serves it (`told`). */

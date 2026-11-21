@@ -206,8 +206,12 @@ export const startOf = (step: StepSpec, workspace: string, found: StartFound | u
 const withRules = (rules: readonly string[] | undefined, rule: (r: string) => string, more: readonly string[]) =>
   (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]) satisfies string[] | undefined;
 
-/** A mount as the runtime takes it: its path, its mode, and whether its rules are the task's own; no switch of a volume's. */
-const mountOf = (m: Mount) =>
+/**
+ * A mount as the runtime takes it: its path, its mode, and whether its rules are the task's own; no switch of a volume's, which the
+ * runtime's task refuses. Every task filed with a run's or a factory's mounts is given them through it: a step's, and Nemia's.
+ * @param m The mount, frozen with its volume's switches or not.
+ */
+export const mountOf = (m: Mount) =>
   ({ path: m.path, readOnly: m.readOnly, ...(m.ruled === true ? { ruled: true as const } : {}) }) satisfies Mount as Mount;
 
 /**

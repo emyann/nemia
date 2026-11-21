@@ -8,7 +8,8 @@
  * conversation goes on. A factory raised for a stretch keeps her operating until the raise's end passes. Kept, she is told the person's
  * changed custom words once, and their chat words once she is live. In conversation, a message on a fresh store files her at manual, she
  * is put to rest once the conversation has been quiet fifteen minutes, never while operating, and the next message files a task that
- * continues her session; an older store's task is adopted. And the table of what `nemia level` refuses.
+ * continues her session; an older store's task is adopted. And the table of what `nemia level` refuses, and her task's mounts, from a
+ * factory whose volume has its switches set, taken by the runtime's own check of a task's config (`configRefusal`).
  *
  * Over the engine's stand-in, its `view` laid over to say each task's spend, and a scratch store of its own, at `ROOT`, given as `ENV`,
  * and a config folder of its own for the harness. Each story mocks `Date` at a moment written as a literal, so her task's id,
@@ -27,7 +28,7 @@ import { until } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
-import { keep, keepOnce } from '../src/nemia/keep.verb.ts';
+import { keep, keepOnce, nemiaSpec } from '../src/nemia/keep.verb.ts';
 import { LEVEL } from '../src/nemia/level.verb.ts';
 import { typed } from './typed.ts';
 import { MEMORY } from '../src/nemia/memory.verb.ts';
@@ -55,13 +56,13 @@ import { customInstructionsFile } from '../src/agents/read.store.ts';
 import { AgentDoor } from '../src/agents/agent-door.store.ts';
 import { agentDoorMemory } from '../src/agents/agent-memory.store.ts';
 import { AgentName } from '../src/agents/agents.model.ts';
-import { addFactoryAt, factoryNamesAt } from '../src/factory/factory.store.ts';
+import { addFactoryAt, factoryNamesAt, rewriteFactoryAt } from '../src/factory/factory.store.ts';
 import { factoryLevelFile } from '../src/level/level.store.ts';
 import { DEFAULT_HARNESS } from '../src/harness/harness.ts';
 import { nemiaFence } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { CLI_VERBS } from '../src/command/command.ts';
-import { engineOf, over, runWith } from '../src/runtime-client.ts';
+import { configRefusal, engineOf, over, runWith } from '../src/runtime-client.ts';
 import { SESSION_TOKEN } from '../src/filed/filed.ts';
 import { readToken } from '../src/token/token.store.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -834,5 +835,17 @@ describe('She answers her chat at any level: a message files her, she rests once
     assert.deepEqual(herTasks(ROOT), ['nemia-older']);
     assert.deepEqual(nemiaChatPlace(ROOT).tasks, ['nemia-older']);
     assert.equal((await level({})).task, 'nemia-older');
+  });
+});
+
+describe("Her task's mounts are those the runtime takes, whatever switches a factory's volume has", () => {
+  test("a volume with its CLAUDE.md on and its skills off: her task's config is one the runtime's file takes", () => {
+    const home = scratch('wf-nemia-mounts-');
+    const repo = fs.mkdtempSync(path.join(home, 'repo-'));
+    const { factory } = addFactoryAt(home, { name: 'pipao', volumes: [`${repo}:rw`] });
+    rewriteFactoryAt(home, { ...factory, volumes: factory.volumes.map((v) => ({ ...v, claudeMd: true, skills: false })) });
+    const spec = nemiaSpec('nemia-mounts', undefined, 'token', home);
+    assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }]);
+    assert.equal(configRefusal(spec.harness, spec.config), undefined);
   });
 });

@@ -20,15 +20,20 @@ import {
   workflowNameRefusal,
   repoNameRefusal,
   reposNamed,
+  unofferedTriggerRefusal,
+  untriggeredRefusal,
+  triggeredDetachRefusal,
+  triggerNameTakenRefusal,
+  type CardTrigger,
   type Factory,
   type Schedule,
 } from '../src/factory/factory.ts';
-import { hiresInto, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
-import { accepted } from './laws.ts';
+import { hiresInto, triggersOn, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
+import { accepted, targets, triggerAccepted, triggerHeld, workflowAccepted } from './laws.ts';
 
 /**
  * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired
- * from it, a workflow's schedule written or taken back.
+ * from it, a workflow's schedule written or taken back, a card trigger written or taken back by its name.
  */
 export type WiringChange =
   | { readonly verb: 'attach'; readonly workflow: string; readonly repo?: string }
@@ -36,7 +41,9 @@ export type WiringChange =
   | { readonly verb: 'hire'; readonly step: string; readonly agent: string }
   | { readonly verb: 'fire'; readonly step: string }
   | { readonly verb: 'schedule'; readonly workflow: string; readonly schedule: Schedule }
-  | { readonly verb: 'unschedule'; readonly workflow: string };
+  | { readonly verb: 'unschedule'; readonly workflow: string }
+  | { readonly verb: 'trigger'; readonly name: string; readonly trigger: CardTrigger }
+  | { readonly verb: 'untrigger'; readonly name: string };
 
 /** What a change of wiring is refused as: a name or a state that cannot take it (`Invalid`), or what it names is not there (`Missing`). */
 export type WiringRefused = { readonly kind: 'Invalid' | 'Missing'; readonly message: string };
@@ -54,6 +61,10 @@ export const words = [
   assume(unofferedScheduleRefusal, { pure: true }),
   assume(unscheduledRefusal, { pure: true }),
   assume(repoNameRefusal, { pure: true }),
+  assume(unofferedTriggerRefusal, { pure: true }),
+  assume(untriggeredRefusal, { pure: true }),
+  assume(triggeredDetachRefusal, { pure: true }),
+  assume(triggerNameTakenRefusal, { pure: true }),
 ];
 
 /**
@@ -64,6 +75,9 @@ export const repoCount = assume(reposNamed, { pure: true });
 
 /** Whether hires hire into a workflow's steps: the domain's word, read the same by the laws and the code. */
 export const hiring = assume(hiresInto, { pure: true });
+
+/** The triggers of a factory on a workflow: the domain's word, read the same by the laws and the code. */
+export const triggering = assume(triggersOn, { pure: true });
 
 /** Names given one more hold it, and each they held. */
 export const named = assume(withName, {
@@ -173,34 +187,261 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
       condition: ({ input: [factory, change], output }) =>
         change.verb !== 'attach' || change.repo === undefined || reposNamed(factory, change.repo) === 1 || output?.kind === 'Invalid',
     },
-    takesWhatItCan: {
-      description: 'A change but a hire, well named, that the factory can take is never refused',
+    triggerOnlyToOffered: {
+      description: 'A trigger whose target is a workflow the factory does not offer is refused',
       condition: ({ input: [factory, change], output }) =>
-        change.verb === 'hire' ||
-        (change.verb !== 'fire' && workflowNameRefusal(change.workflow) !== undefined) ||
-        !accepted(factory, change) ||
+        change.verb !== 'trigger' || factory.workflows.includes(change.trigger.target.name) || output !== null,
+    },
+    triggerNameIsFree: {
+      description: 'A trigger named as a workflow the factory schedules, its trigger of the time kind, is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'trigger' || !Object.hasOwn(factory.schedules, change.name) || output !== null,
+    },
+    untriggerOnlyTriggered: {
+      description: 'An untrigger of a well-named trigger the factory does not hold is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'untrigger' ||
+        workflowNameRefusal(change.name) !== undefined ||
+        triggerHeld(factory, change.name) ||
+        output?.kind === 'Missing',
+    },
+    detachLeavesNoTrigger: {
+      description: 'A detach of a workflow a trigger of the factory targets is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !targets(factory, change.workflow) || output !== null,
+    },
+    takesWhatItCanOfAWorkflow: {
+      description: 'An attach, a detach, a schedule or an unschedule, well named, that the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        (change.verb !== 'attach' && change.verb !== 'detach' && change.verb !== 'schedule' && change.verb !== 'unschedule') ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        !workflowAccepted(factory, change) ||
         output === null,
     },
-    aBadNameIsInvalid: {
-      description: 'A change of a workflow whose name is not one is refused as Invalid, whatever the factory holds',
+    takesWhatItCanOfATrigger: {
+      description: 'A trigger or an untrigger, well named, that the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        (change.verb !== 'trigger' && change.verb !== 'untrigger') ||
+        workflowNameRefusal(change.name) !== undefined ||
+        !triggerAccepted(factory, change) ||
+        output === null,
+    },
+    takesWhatItCanOfAFire: {
+      description: 'A fire of a step the factory hires into is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'fire' || !Object.hasOwn(factory.hires, change.step) || output === null,
+    },
+    aBadNameIsInvalidOfAWorkflow: {
+      description:
+        'An attach, a detach, a schedule or an unschedule whose workflow name is not one is refused as Invalid, whatever the factory holds',
       condition: ({ input: [, change], output }) =>
-        change.verb === 'hire' ||
-        change.verb === 'fire' ||
+        (change.verb !== 'attach' && change.verb !== 'detach' && change.verb !== 'schedule' && change.verb !== 'unschedule') ||
         workflowNameRefusal(change.workflow) === undefined ||
+        output?.kind === 'Invalid',
+    },
+    aBadNameIsInvalidOfATrigger: {
+      description: 'A trigger or an untrigger whose name is not one is refused as Invalid, whatever the factory holds',
+      condition: ({ input: [, change], output }) =>
+        (change.verb !== 'trigger' && change.verb !== 'untrigger') ||
+        workflowNameRefusal(change.name) === undefined ||
         output?.kind === 'Invalid',
     },
     missingOnlyOfWhatIsNotThere: {
       description:
-        'Missing only where what the change names is not there: a step it hires no one into, a workflow it does not offer or schedule',
+        'Missing only where what the change names is not there: a step it hires no one into, a workflow it does not offer or schedule, a trigger it does not hold',
       condition: ({ input: [factory, change], output }) =>
         output?.kind !== 'Missing' ||
         (change.verb === 'fire' && !Object.hasOwn(factory.hires, change.step)) ||
         (change.verb === 'detach' && !factory.workflows.includes(change.workflow)) ||
-        (change.verb === 'unschedule' && !Object.hasOwn(factory.schedules, change.workflow)),
+        (change.verb === 'unschedule' && !Object.hasOwn(factory.schedules, change.workflow)) ||
+        (change.verb === 'untrigger' && !triggerHeld(factory, change.name)),
     },
   },
 });
 export type WiringRefusal = Implementation<typeof wiringRefusalSpec>;
+
+/** A hire: an agent into a step `<workflow>/<step>`. */
+export type HireChange = Extract<WiringChange, { readonly verb: 'hire' }>;
+
+/**
+ * Why a factory cannot take a hire (`hireChangeRefusal`), the part of `wiringRefusal` for a hire, which its laws of a hire lean on: its
+ * own contract, so a proof of the whole reads these laws rather than this path's body.
+ */
+const hireChangeRefusalSpec = spec<(factory: Factory, change: HireChange) => WiringRefused | null>({
+  /**
+   * Whether a hire into a workflow the factory offers is refused turns on `hireRefusal`, declared not pure (`hireNamed`): left to the
+   * code.
+   */
+  open: ['output'],
+  ensures: {
+    hireOnlyIntoOffered: {
+      description: 'A hire into a step of a workflow the factory does not offer is refused',
+      condition: ({ input: [factory, change], output }) =>
+        factory.workflows.includes(change.step.slice(0, change.step.indexOf('/'))) || output !== null,
+    },
+    neverMissing: {
+      description: 'A hire is never refused as Missing',
+      condition: ({ output }) => output?.kind !== 'Missing',
+    },
+  },
+});
+export type HireChangeRefusal = Implementation<typeof hireChangeRefusalSpec>;
+
+/** A fire: the agent of a step taken off it. */
+export type FireChange = Extract<WiringChange, { readonly verb: 'fire' }>;
+
+/** Why a factory cannot take a fire (`fireRefusal`), the part of `wiringRefusal` for a fire, which its laws of a fire lean on. */
+const fireRefusalSpec = spec<(factory: Factory, change: FireChange) => WiringRefused | null>({
+  open: ['output'],
+  ensures: {
+    fireOnlyHired: {
+      description: 'A fire of a step it hires no one into is refused, as Missing',
+      condition: ({ input: [factory, change], output }) => Object.hasOwn(factory.hires, change.step) || output?.kind === 'Missing',
+    },
+    takesWhatItCan: {
+      description: 'A fire of a step it hires into is never refused',
+      condition: ({ input: [factory, change], output }) => !Object.hasOwn(factory.hires, change.step) || output === null,
+    },
+  },
+});
+export type FireRefusal = Implementation<typeof fireRefusalSpec>;
+
+/** A change of a workflow the factory offers or schedules: an attach, a detach, a schedule or an unschedule. */
+export type WorkflowChange = Extract<WiringChange, { readonly verb: 'attach' | 'detach' | 'schedule' | 'unschedule' }>;
+
+/**
+ * Why a factory cannot take an attach, a detach, a schedule or an unschedule (`workflowChangeRefusal`), the part of `wiringRefusal` for
+ * those four verbs, which `wiringRefusal`'s laws of them lean on: its own contract, as `triggerRefusal` is for the triggers, so a proof
+ * of the whole reads these laws rather than this path's body.
+ */
+const workflowChangeRefusalSpec = spec<(factory: Factory, change: WorkflowChange) => WiringRefused | null>({
+  open: ['output'],
+  ensures: {
+    detachOnlyOffered: {
+      description: 'A detach of a well-named workflow it does not offer is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        factory.workflows.includes(change.workflow) ||
+        output?.kind === 'Missing',
+    },
+    detachLeavesNoHire: {
+      description: 'A detach of a workflow it still hires into is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !hiresInto(factory.hires, change.workflow) || output !== null,
+    },
+    detachLeavesNoSchedule: {
+      description: 'A detach of a workflow it schedules is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !Object.hasOwn(factory.schedules, change.workflow) || output !== null,
+    },
+    detachLeavesNoCostLine: {
+      description: 'A detach of a workflow it sets a cost line for is refused, as Invalid',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' ||
+        !factory.workflows.includes(change.workflow) ||
+        factory.costLines === undefined ||
+        !Object.hasOwn(factory.costLines, change.workflow) ||
+        output?.kind === 'Invalid',
+    },
+    detachLeavesNoTrigger: {
+      description: 'A detach of a workflow a trigger of the factory targets is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !targets(factory, change.workflow) || output !== null,
+    },
+    scheduleOnlyOffered: {
+      description: 'A schedule of a workflow it does not offer is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'schedule' || factory.workflows.includes(change.workflow) || output !== null,
+    },
+    unscheduleOnlyScheduled: {
+      description: 'An unschedule of a well-named workflow it does not schedule is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'unschedule' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        Object.hasOwn(factory.schedules, change.workflow) ||
+        output?.kind === 'Missing',
+    },
+    attachAccepted: {
+      description:
+        'An attach of a well-named workflow that names no repository, or one by a folder name one repository alone has, is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'attach' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        (change.repo !== undefined && reposNamed(factory, change.repo) !== 1) ||
+        output === null,
+    },
+    attachRepoKnown: {
+      description:
+        'An attach that names a repository by a folder name none of its repositories has, or several share, is refused, as Invalid',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'attach' || change.repo === undefined || reposNamed(factory, change.repo) === 1 || output?.kind === 'Invalid',
+    },
+    aBadNameIsInvalid: {
+      description: 'A change of a workflow whose name is not one is refused as Invalid, whatever the factory holds',
+      condition: ({ input: [, change], output }) => workflowNameRefusal(change.workflow) === undefined || output?.kind === 'Invalid',
+    },
+    missingOnlyOfWhatIsNotThere: {
+      description: 'Missing only for a detach of a workflow it does not offer, or an unschedule of one it does not schedule',
+      condition: ({ input: [factory, change], output }) =>
+        output?.kind !== 'Missing' ||
+        (change.verb === 'detach' && !factory.workflows.includes(change.workflow)) ||
+        (change.verb === 'unschedule' && !Object.hasOwn(factory.schedules, change.workflow)),
+    },
+    takesWhatItCan: {
+      description: 'A well-named change of a workflow the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        workflowNameRefusal(change.workflow) !== undefined || !workflowAccepted(factory, change) || output === null,
+    },
+  },
+});
+export type WorkflowChangeRefusal = Implementation<typeof workflowChangeRefusalSpec>;
+
+/** A change of a factory's own card triggers: one written by its name, or one taken back. */
+export type TriggerChange = Extract<WiringChange, { readonly verb: 'trigger' | 'untrigger' }>;
+
+/**
+ * Why a factory cannot take a trigger or an untrigger (`triggerRefusal`), the part of `wiringRefusal` for those two verbs, which
+ * `wiringRefusal`'s laws of them lean on: its own contract, so a proof of the whole reads these laws rather than this path's body.
+ */
+const triggerRefusalSpec = spec<(factory: Factory, change: TriggerChange) => WiringRefused | null>({
+  open: ['output'],
+  ensures: {
+    aBadNameIsInvalid: {
+      description: 'A trigger or an untrigger whose name is not one is refused as Invalid, whatever the factory holds',
+      condition: ({ input: [, change], output }) => workflowNameRefusal(change.name) === undefined || output?.kind === 'Invalid',
+    },
+    triggerOnlyToOffered: {
+      description: 'A trigger whose target is a workflow the factory does not offer is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'trigger' || factory.workflows.includes(change.trigger.target.name) || output !== null,
+    },
+    triggerNameIsFree: {
+      description: 'A trigger named as a workflow the factory schedules, its trigger of the time kind, is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'trigger' || !Object.hasOwn(factory.schedules, change.name) || output !== null,
+    },
+    untriggerOnlyTriggered: {
+      description: 'An untrigger of a well-named trigger the factory does not hold is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'untrigger' ||
+        workflowNameRefusal(change.name) !== undefined ||
+        triggerHeld(factory, change.name) ||
+        output?.kind === 'Missing',
+    },
+    missingOnlyOfWhatIsNotThere: {
+      description: 'Missing only for an untrigger of a trigger the factory does not hold',
+      condition: ({ input: [factory, change], output }) =>
+        output?.kind !== 'Missing' || (change.verb === 'untrigger' && !triggerHeld(factory, change.name)),
+    },
+    takesWhatItCan: {
+      description: 'A well-named trigger or untrigger the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        workflowNameRefusal(change.name) !== undefined || !triggerAccepted(factory, change) || output === null,
+    },
+  },
+});
+export type TriggerRefusal = Implementation<typeof triggerRefusalSpec>;
 
 const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
   /**
@@ -226,6 +467,7 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     'output.harnessSettings',
     'output.costLines',
     'output.workflowRepos',
+    'output.triggers',
   ],
   ensures: {
     detachWithdraws: {
@@ -270,6 +512,32 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
   },
 });
 export type Rewired = Implementation<typeof rewiredSpec>;
+
+/**
+ * A factory's own card triggers after a change of the wiring (`triggersRewired`), which `rewired` writes as the factory's `triggers`: its
+ * own function, as `reposRewired` is, since the verifier reads no optional field of the factory through the spread `rewired` copies the
+ * rest by (tsverify's `docs/reads.md`), so `rewired` leaves `output.triggers` open to these laws. A trigger named `__proto__` is left out
+ * of `triggerHolds`, as a workflow so named is of `attachWiresRepo`: a record holds no key of that name.
+ */
+const triggersRewiredSpec = spec<
+  (triggers: Readonly<Record<string, CardTrigger>> | undefined, change: WiringChange) => Readonly<Record<string, CardTrigger>> | undefined
+>({
+  /** Whether a factory that holds no trigger is said by an empty record or by none is the code's: its file writes neither. */
+  open: ['output'],
+  ensures: {
+    triggerHolds: {
+      description: 'After a trigger the factory holds it by its name',
+      condition: ({ input: [, change], output }) =>
+        change.verb !== 'trigger' || change.name === '__proto__' || (output !== undefined && Object.hasOwn(output, change.name)),
+    },
+    untriggerLeaves: {
+      description: 'After an untrigger the factory holds no trigger by that name',
+      condition: ({ input: [, change], output }) =>
+        change.verb !== 'untrigger' || output === undefined || !Object.hasOwn(output, change.name),
+    },
+  },
+});
+export type TriggersRewired = Implementation<typeof triggersRewiredSpec>;
 
 /**
  * The workflows' repositories after a change of the wiring (`reposRewired`), which `rewired` writes as the factory's `workflowRepos`

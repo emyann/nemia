@@ -108,6 +108,7 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     Factory: '/api/factories/{name}',
     McpServer: '/api/namespaces/{namespace}/mcpservers/{name}',
     Schedule: '/api/namespaces/{namespace}/schedules/{name}',
+    Trigger: '/api/namespaces/{namespace}/triggers/{name}',
     Hire: '/api/namespaces/{namespace}/hires/{name}',
     Volume: '/api/namespaces/{namespace}/volumes/{name}',
     Workflow: '/api/namespaces/{namespace}/workflows/{name}',
@@ -132,7 +133,18 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   for (const kind of ['Factory', 'McpServer', 'Schedule', 'Hire', 'Volume', 'Workflow', 'Agent', 'Skill', 'Proposal', 'Delegation'])
     assert.ok(doc.components.schemas[`${kind}List`], `${kind}List is a component`);
   assert.ok(doc.paths['/api/factories']?.get, 'the factories are listed, cluster-scoped');
-  for (const plural of ['mcpservers', 'schedules', 'hires', 'volumes', 'workflows', 'agents', 'skills', 'proposals', 'delegations'])
+  for (const plural of [
+    'mcpservers',
+    'schedules',
+    'triggers',
+    'hires',
+    'volumes',
+    'workflows',
+    'agents',
+    'skills',
+    'proposals',
+    'delegations',
+  ])
     assert.ok(doc.paths[`/api/namespaces/{namespace}/${plural}`]?.get, `the ${plural} are listed in a factory's namespace`);
   for (const plural of ['mcpservers', 'workflows', 'agents', 'skills'])
     assert.ok(doc.paths[`/api/${plural}`]?.get, `the store's library of ${plural} is listed, in no namespace`);

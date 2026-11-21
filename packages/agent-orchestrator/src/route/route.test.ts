@@ -196,6 +196,13 @@ describe('a step file reads route: in its three shapes, and refuses any other', 
     const c = parseWorkflow('triage', file('routes: [web, docs]\nroute: judge\nends: [docs]'));
     assert.deepEqual(c.ends, ['docs']);
   });
+  test('card: and unlabel:, a given card for a workflow and a backlog node that removes labels; a blank unlabel: is refused as any blank key, since a template renders an empty parameter as no line', () => {
+    const given = parseWorkflow('w', file('after: triage\nwhen: [web]\nworkflow: build\ncard: given'));
+    assert.deepEqual([given.workflow, given.card], ['build', 'given']);
+    const back = parseWorkflow('b', file('after: triage\nwhen: [docs]\ncard: backlog\nunlabel: [ready, door]'));
+    assert.deepEqual([back.card, back.workflow, back.unlabel], ['backlog', undefined, ['ready', 'door']]);
+    assert.throws(() => parseWorkflow('b', file("after: triage\nwhen: [docs]\ncard: backlog\nunlabel: ''")), WorkflowError);
+  });
   const refused: Array<[string, string]> = [
     ['a word that is no eval', 'routes: [web, docs]\nroute: table'],
     ['a map with neither from and table nor script', 'routes: [web, docs]\nroute: { judge: true }'],
@@ -208,6 +215,11 @@ describe('a step file reads route: in its three shapes, and refuses any other', 
     ['ends: on a step that is no condition', 'ends: [docs]'],
     ['a route that is no word', 'routes: [Web, docs]\nroute: judge'],
     ['a workflow: that is no name', 'workflow: ../build'],
+    ['a card: that is no word of its list', 'workflow: build\ncard: copied'],
+    ['a backlog node that names a workflow', 'workflow: build\ncard: backlog'],
+    ['a given card that names no workflow', 'card: given'],
+    ['a routed card that names no workflow', 'card: routed'],
+    ['unlabel: on a node that is no backlog', 'workflow: build\ncard: given\nunlabel: [ready]'],
   ];
   for (const [name, keys] of refused) {
     test(`REFUSED: ${name}`, () =>
@@ -224,6 +236,8 @@ describe('a step file with the routing keys renders to a file that reads back as
     'routes: [web, docs]\nroute: { script: routes/pick.ts }',
     'routes: [web, docs]\nroute: judge',
     'after: triage\nwhen: [web]\nworkflow: build',
+    'after: triage\nwhen: [web]\nworkflow: build\ncard: given',
+    'after: triage\nwhen: [web]\ncard: backlog\nunlabel: [ready]',
   ]) {
     test(keys.split('\n').join('; '), () => {
       const read = parseWorkflow('triage', file(keys));

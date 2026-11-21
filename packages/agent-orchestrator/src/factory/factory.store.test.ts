@@ -27,11 +27,12 @@ import {
   readFactoryAt,
   setScheduleAt,
   volumesMovedAt,
+  wiringChecked,
 } from './factory.store.ts';
 import { detached } from '../../test/factory-planted.ts';
 import { typed } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';
-import { revisionsOf } from './factory.ts';
+import { revisionsOf, type Factory } from './factory.ts';
 import { volumeBase } from './volume/volume.ts';
 import type { Env } from '../config/config.store.ts';
 
@@ -639,4 +640,24 @@ describe("a factory's revisions: pinned when its file says nothing, written by `
       await assert.rejects(main([...argv], noEngine()), refused(tag));
       assert.deepEqual(bytesOf('pipao'), before);
     });
+});
+
+describe('REFUSED: a detach of a workflow its template still triggers', () => {
+  const treeTriggering = (workflow: string) => {
+    const tree = scratch('wf-tree-triggers-');
+    const trigger = { selector: 'ready', target: { kind: 'Workflow', name: workflow }, since: '' };
+    fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: [workflow], hires: {}, triggers: { door: trigger } }));
+    return tree;
+  };
+  const templated = (tree: string) => {
+    const factory: Factory = { name: 'acme', volumes: [], workflows: ['front-door'], hires: {}, schedules: {}, tree };
+    return factory;
+  };
+  test("its template's trigger on it refuses the detach as Invalid, naming the trigger; one on another workflow lets it go", () => {
+    assert.throws(
+      () => wiringChecked(templated(treeTriggering('front-door')), { verb: 'detach', workflow: 'front-door' }),
+      refused('Invalid', 'door', 'front-door'),
+    );
+    assert.deepEqual(wiringChecked(templated(treeTriggering('intake')), { verb: 'detach', workflow: 'front-door' }).workflows, []);
+  });
 });

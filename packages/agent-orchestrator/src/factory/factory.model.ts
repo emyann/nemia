@@ -12,7 +12,12 @@ import { AgentName } from '../agents/agents.model.ts';
 import { TemplateSource } from '../template/door/templates.model.ts';
 import { factoryNameRefusal, REVISIONS_POLICIES } from './factory.ts';
 import { HarnessSettings } from '../harness-settings/harness-settings.model.ts';
-import type { Factory as FactoryAsRead, Schedule as ScheduleAsRead, Volume as VolumeAsRead } from './factory.ts';
+import type {
+  CardTrigger as CardTriggerAsRead,
+  Factory as FactoryAsRead,
+  Schedule as ScheduleAsRead,
+  Volume as VolumeAsRead,
+} from './factory.ts';
 import type { SettingsAsRead } from '../harness-settings/harness-settings.ts';
 
 /** A factory's name: its file's in the store, minus `.json`, a lowercase slug (`factoryNameRefusal`, over `FACTORY_NAME`). */
@@ -41,6 +46,13 @@ export const Schedule = Schema.Struct({
   brief: Schema.String,
   repo: Schema.optional(Schema.String),
   tz: Schema.optional(Schema.String),
+  since: Schema.String,
+});
+
+/** A card trigger of a factory (`CardTrigger`): its selector, the workflow it targets, and when it was set. */
+export const CardTrigger = Schema.Struct({
+  selector: Schema.String,
+  target: Schema.Struct({ kind: Schema.Literal('Workflow'), name: Schema.String }),
   since: Schema.String,
 });
 
@@ -87,6 +99,7 @@ export const Factory = Schema.Struct({
    * factory unreadable; a name no repository has is refused at the attach (`wiringRefusal`) and at a start.
    */
   workflowRepos: Schema.optional(Schema.Record(WorkflowName.OnRead, Schema.String)),
+  triggers: Schema.optional(Schema.Record(Schema.String, CardTrigger)),
   generation: Schema.optional(Schema.Number),
 })
   .check(
@@ -103,6 +116,18 @@ export const Factory = Schema.Struct({
       return (
         unoffered === undefined ||
         `it sets a cost line for ${unoffered}, which it does not offer: nemia factory attach ${factory.name} ${unoffered}, or nemia factory cost-line rm ${factory.name} ${unoffered}`
+      );
+    }),
+    Schema.makeFilter((factory) => {
+      const offered: ReadonlyArray<string> = factory.workflows;
+      const triggers = Object.entries(factory.triggers ?? {});
+      const unoffered = triggers.find(([, t]) => !offered.includes(t.target.name));
+      if (unoffered !== undefined)
+        return `its trigger ${unoffered[0]} targets ${unoffered[1].target.name}, which it does not offer: nemia factory attach ${factory.name} ${unoffered[1].target.name}, or nemia factory untrigger ${factory.name} ${unoffered[0]}`;
+      const taken = triggers.find(([name]) => Object.hasOwn(factory.schedules, name));
+      return (
+        taken === undefined ||
+        `its trigger ${taken[0]} is named as the workflow it schedules: nemia factory untrigger ${factory.name} ${taken[0]}, and name it otherwise`
       );
     }),
     Schema.makeFilter((factory) => {
@@ -157,6 +182,7 @@ export const factoryHeld: Same<FactoryAsRead, Omit<typeof Factory.Encoded, 'harn
   true;
 export const volumeHeld: Same<VolumeAsRead, typeof Volume.Encoded> = true;
 export const scheduleHeld: Same<ScheduleAsRead, typeof Schedule.Encoded> = true;
+export const triggerHeld: Same<CardTriggerAsRead, typeof CardTrigger.Encoded> = true;
 
 /** A factory's hire of an agent into one step of a workflow (`nemia factory hire`): a key `<workflow>/<step>` of its hires, split. */
 export const Hire = Schema.Struct({

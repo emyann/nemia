@@ -34,6 +34,7 @@ import {
   hiresHandlers,
   mcpServersHandlers,
   schedulesHandlers,
+  triggersHandlers,
   volumesHandlers,
 } from '../factory/index.ts';
 import { agentsHandlers } from '../agents/index.ts';
@@ -187,6 +188,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         mcpServersHandlers,
         libraryAddsHandlers,
         schedulesHandlers,
+        triggersHandlers,
         hiresHandlers,
         volumesHandlers,
         workflowsHandlers,

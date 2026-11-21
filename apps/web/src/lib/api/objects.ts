@@ -89,6 +89,9 @@ import {
   Schedule,
   ScheduleList,
   type ScheduleWrite,
+  Trigger,
+  TriggerList,
+  type TriggerWrite,
   SignedOut,
   SignInStarted,
   SignInState,
@@ -699,6 +702,22 @@ export const schedules = {
       (c) => c.schedules.delete({ params: { namespace, name } }),
       write(Schedule, "The schedule may be removed: read the factory's schedules again before removing it again."),
     ),
+};
+
+/** What a trigger's write may have done, and what to read before sending it again. */
+const TRIGGER_WRITTEN = "The factory's triggers may be changed: read them again before writing again.";
+
+/** A factory's triggers: its schedules as the time kind, each named by its workflow, and its card triggers by their names. */
+export const triggers = {
+  /** Every trigger of the factory `namespace`, every page. */
+  list: (namespace: string) =>
+    everyPage((asked) => call((c) => c.triggers.list({ params: { namespace }, query: asked }), read(TriggerList))).then((l) => [
+      ...l.items,
+    ]),
+  put: (namespace: string, name: string, trigger: TriggerWrite) =>
+    call((c) => c.triggers.put({ params: { namespace, name }, payload: trigger }), write(Trigger, TRIGGER_WRITTEN)),
+  delete: (namespace: string, name: string) =>
+    call((c) => c.triggers.delete({ params: { namespace, name } }), write(Trigger, TRIGGER_WRITTEN)),
 };
 
 /**

@@ -1,5 +1,6 @@
 /**
- * The runners of a factory's parts kept in its namespace: `nemia factory schedule` and `unschedule` (a Schedule, named by its
+ * The runners of a factory's parts kept in its namespace: `nemia factory trigger` and `untrigger` (a card Trigger), `nemia factory
+ * schedule` and `unschedule` (a Schedule, named by its
  * workflow, a retired `--repo` still sent as `repoSent` says, for the api to refuse naming the attach) and its MCP servers, listed with
  * their states (`servers`), recorded (`server add`, its flags mapped here to the McpServer's write) and taken off (`server rm`). Each
  * prints, word for word as the old path did, what the answer says it wrote (`writtenOf`).
@@ -42,6 +43,45 @@ export async function factoryUnschedule(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const answer = await asked('factory unschedule', (c) => c.schedules.delete({ params: { namespace: factory, name: workflow } }));
   said([`${factory}  ${workflow} no longer at ${answer.spec.cron}`, `unscheduled: ${writtenOf(answer, 'factory unschedule').file}`]);
+  return 0;
+}
+
+/**
+ * `nemia factory trigger`: a card trigger, which queues each card of the factory its labelSelector matches, and whether it can spend quota.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
+export async function factoryTrigger(args: Args) {
+  const [factory, name] = [textOf(args, 'factory'), textOf(args, 'name')];
+  const payload = {
+    when: { kind: 'cards' as const, labelSelector: textOf(args, 'labelSelector') },
+    target: { kind: 'Workflow' as const, name: textOf(args, 'to') },
+  };
+  const answer = await asked('factory trigger', (c) => c.triggers.put({ params: { namespace: factory, name }, payload }));
+  const { file, was } = writtenOf(answer, 'factory trigger');
+  const queued = answer.status.queued ?? [];
+  said([
+    `${factory}  ${name}: ${payload.when.labelSelector} to ${payload.target.name}${was ? ` (was ${was})` : ''}`,
+    `${QUOTA_SAID[answer.status.quota]}${answer.status.quotaBy ? `: ${answer.status.quotaBy}` : ''}; queues ${queued.length} card${queued.length === 1 ? '' : 's'} now`,
+    `triggered: ${file}`,
+  ]);
+  return 0;
+}
+
+/** What a trigger's quota is said as. */
+const QUOTA_SAID = {
+  spends: 'spends quota, since an agent runs where it reaches',
+  free: 'no quota: nothing it reaches runs an agent',
+  unknown: 'quota unknown: a workflow it reaches does not read',
+} as const;
+
+/**
+ * `nemia factory untrigger`: a factory's own card trigger taken back.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
+export async function factoryUntrigger(args: Args) {
+  const [factory, name] = [textOf(args, 'factory'), textOf(args, 'name')];
+  const answer = await asked('factory untrigger', (c) => c.triggers.delete({ params: { namespace: factory, name } }));
+  said([`${factory}  ${name} no longer queues cards`, `untriggered: ${writtenOf(answer, 'factory untrigger').file}`]);
   return 0;
 }
 

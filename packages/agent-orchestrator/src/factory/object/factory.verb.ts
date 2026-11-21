@@ -285,8 +285,8 @@ const named = (name: string) => {
 
 /**
  * The lines a person types for the factory `name`, built off the command table: a workflow attached, its file removed and filed again,
- * a workflow scheduled, its places trusted again, a volume mounted; and of the factory's own parts, each schedule taken back, by its
- * workflow, and each volume unmounted, by its name.
+ * a workflow scheduled, its places trusted again, a volume mounted, a card trigger written; and of the factory's own parts, each
+ * schedule taken back, by its workflow, and each volume unmounted, by its name.
  * @param factory The factory as its parts read it.
  * @param schedules The workflows the factory schedules, each by its folder name.
  */
@@ -299,6 +299,7 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
     schedule: commandLine(named('factory schedule'), { factory: name }, { cron: '<expr>', brief: '<text>' }),
     trust: commandLine(named('factory trust'), { factory: name }),
     volume: commandLine(named('factory volume add'), { factory: name, volume: '<path|url>:ro|:rw' }),
+    trigger: commandLine(named('factory trigger'), { factory: name }, { labelSelector: '<key>=<value>', to: '<workflow>' }),
     unschedule: Object.fromEntries(
       schedules.map((workflow) => [workflow, commandLine(named('factory unschedule'), { factory: name, workflow })]),
     ),

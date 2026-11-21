@@ -2,9 +2,9 @@ apiVersion: nemia.dev/v1alpha1
 kind: FactoryTemplate
 metadata:
   name: sdlc
-  description: "For building software on a repository, each change reviewed before it lands. Four workflows: intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing; quick lands once its review passes."
+  description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card labelled for it to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing, and the front door asks only where it cannot tell; quick lands once its review passes."
 spec:
-  version: 4.11.1
+  version: 4.13.0
   rules:
     path: RULES.md
   parameters:
@@ -53,15 +53,27 @@ spec:
       type: string
       description: The areas a card's title and its area= label name, in the words RULES.md writes them in.
       default: the top-level folders of the repository
+    frontDoorLabel:
+      type: string
+      description: "The label key that sends a card through the front door: each card of the factory that carries it, with any value, and names no workflow is queued on front-door in the order filed, and a labelled card that names its workflow on that one. The door's backlog route files a card back without it. Empty (the default) makes no trigger: front-door then runs only on a card started on it by hand. Set it with --set frontDoorLabel=<key>, a label key as Kubernetes spells one."
+      default: ""
     storeRoot:
       type: string
       description: "The Nemia store whose factories, workflows and inbox every agent's fence refuses to edit, written as Claude Code reads a path in a permission rule: ~/ for one under your home, and two slashes for any other absolute path (//srv/nemia), since one slash reads from the settings' folder and the deny would match nothing."
       default: ~/.agent-workflows
+  triggers:
+    front-door:
+      selector: "${{ parameters.frontDoorLabel }}"
+      target:
+        kind: Workflow
+        name: front-door
   hires:
     build/design: seldon
     build/implement: grace
     build/land: otto
     build/review: agora
+    front-door/answer: iris
+    front-door/door: iris
     intake/intake: iris
     janitor/argus: argus
     quick/implement: grace

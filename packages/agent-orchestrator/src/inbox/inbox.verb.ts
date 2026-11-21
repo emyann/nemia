@@ -40,7 +40,7 @@ import { inboxDir } from '../record/files.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
-import { filedNames, inboxCards, readableFactories } from './inbox.store.ts';
+import { filedNames, inboxCards, readableFactories, triggeringOf } from './inbox.store.ts';
 import { startRun, startedSteps, type StartedRun } from '../start/start.verb.ts';
 import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
@@ -87,6 +87,8 @@ export type InboxStart = {
   models?: RunModels;
   /** The start's label edits (`nemia start --label`), over the card's own `labels:` and what its runs agree on. */
   labels?: readonly string[];
+  /** The card trigger that queued the card, which the run records as where it came from (`from.trigger`): the queue's start alone. */
+  trigger?: string;
 };
 
 /**
@@ -240,7 +242,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     ...(context.length ? { context } : {}),
     inputs: opts.inputs,
     cards: opts.cards,
-    from: { inbox: card.name },
+    from: { inbox: card.name, ...(opts.trigger === undefined ? {} : { trigger: opts.trigger }) },
     ...(gates.length ? { gates } : {}),
     ...cardModels(card, opts.models),
     ...(factory !== undefined ? { factory } : {}),
@@ -375,6 +377,35 @@ const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon
   fromDaemon && (card.factory !== null || defaultStarts) ? { on } : {};
 
 /**
+ * What a card a trigger queued starts with: the trigger's target where the card names no workflow, and the first trigger that queued it,
+ * which its run records; nothing for a card queued by hand.
+ */
+const triggeredStart = (card: Pick<InboxListing, 'workflow' | 'queued'>) => {
+  const by = card.queued?.by?.[0];
+  if (by === undefined) return {};
+  const target = card.workflow === null ? card.queued?.workflow : undefined;
+  return { trigger: by, ...(target === undefined ? {} : { workflow: target }) };
+};
+
+/**
+ * Each card of a factory that the card triggers of its factory would send to two workflows, as the inbox lists it now (`clash`): its
+ * factory, its name and the triggers that clash — what the feed says a clash begun and ended by. It reads no run record of its own: a
+ * card's runs are the pass's `runs`, so a pass costs what is in flight; and nothing at all where no factory has a card trigger.
+ * @param runs The runs the pass read, which say which cards were started.
+ */
+export const clashesNow = Effect.fn('clashesNow')(function* (runs: readonly Pick<Run, 'id' | 'from'>[]) {
+  const door = yield* CardDoor;
+  const files = yield* door.cards.entries();
+  const factories = yield* readableFactories();
+  const triggering = yield* triggeringOf(files, factories.values());
+  if (triggering === undefined) return [];
+  const listed = cardsListed(files, runs, yield* door.tries.list(), factories, triggering);
+  return listed.flatMap((l) =>
+    l.clash !== undefined && l.factory !== null ? [{ factory: l.factory, card: l.name, by: [...l.clash] }] : [],
+  ) satisfies Array<{ factory: string; card: string; by: string[] }>;
+});
+
+/**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and `factory:`, on the
  * repository its factory's wiring names for its workflow, or for a card of the default factory `repo`, the daemon's — the one `queueRepo`
  * names, its refusal remembered on it (`''` where the factory names none, so a wiring that names one later is a new try), so its base is
@@ -396,15 +427,15 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   const runs = given ?? (yield* (yield* RunDoor).runs.list());
   const files = yield* door.cards.entries();
   const tries = yield* door.tries.list();
-  const listing = cardsListed(files, runs, tries);
+  const factories = yield* readableFactories();
+  const listing = cardsListed(files, runs, tries, factories, yield* triggeringOf(files, factories.values()));
   yield* dropStaleTries(tries.keys(), listing);
   if (!queueOrder(listing).length) return undefined;
-  const factories = yield* readableFactories();
   const next = nextQueued(listing, repo, factories);
   if (!next) return undefined;
   const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
   const where = daemonsRepo(next, on, fromDaemon, yield* setting('defaultFactoryStarts'));
-  const tried = yield* Effect.exit(startFromInbox({ name: next.name, callerRepo: repo }));
+  const tried = yield* Effect.exit(startFromInbox({ name: next.name, callerRepo: repo, ...triggeredStart(next) }));
   if (Exit.isSuccess(tried)) {
     const started = tried.value;
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};
@@ -445,5 +476,6 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();
   const runs = yield* cardRuns(e, how);
-  return inboxListing(entries, runs, tries, yield* readableFactories());
+  const factories = yield* readableFactories();
+  return inboxListing(entries, runs, tries, factories, yield* triggeringOf(entries, factories.values()));
 });

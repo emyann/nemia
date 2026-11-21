@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string",
+      "description": "Why the card takes the route you chose, in a sentence or two, by the Routing rules of RULES.md: the card's routed run carries it as its reason."
+    }
+  },
+  "required": ["reason"],
+  "additionalProperties": false
+}

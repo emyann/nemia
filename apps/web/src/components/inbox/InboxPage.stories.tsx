@@ -21,7 +21,8 @@ const drawn = (cards: readonly InboxEntry[]) => (
 );
 
 /**
- * The inbox page, one story a state: two cards in play, one filed and one queued, and an empty inbox. Axe's
+ * The inbox page, one story a state: two cards in play, one filed and one queued; cards a trigger queues and one two triggers clash on;
+ * and an empty inbox. Axe's
  * `label-content-name-mismatch` alone is off, for the box's Factory list: the ds kit's `Select` draws its value before its floating
  * label and is named by the label first, which axe reads as visible text left out of its name, an ask of the kit.
  */
@@ -43,6 +44,27 @@ export const TwoInPlay: Story = {
     await expect(page.getByRole('textbox', { name: 'An idea' })).toBeVisible();
     await expect(page.getAllByRole('button', { name: 'Start' })[0]).toHaveAttribute('data-slot', 'button');
     await expect(page.getByRole('button', { name: 'Unqueue' })).toBeVisible();
+  },
+};
+
+/**
+ * Cards the factory's triggers queue: one queued by its trigger, said by name and with no Unqueue, since its labels queue it; and one two
+ * triggers would send to two workflows, waiting, with what to change.
+ */
+export const Triggered: Story = {
+  render: () =>
+    drawn([
+      {
+        ...queuedCard('route-the-idea', FACTORY, 1),
+        workflow: null,
+        queued: { at: '2026-11-19T00:00:00.000Z', place: 1, by: ['front-door'] },
+      },
+      { ...unstartedCard('both-ways', FACTORY), workflow: null, clash: ['bugs', 'ready'] },
+    ]),
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('[data-queued]')).toHaveTextContent('queued by front-door · 1st');
+    await expect(within(canvasElement).queryByRole('button', { name: 'Unqueue' })).toBeNull();
+    await expect(canvasElement.querySelector('[data-card-clash]')).toHaveTextContent('Waiting: triggers bugs, ready clash.');
   },
 };
 

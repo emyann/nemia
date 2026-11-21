@@ -239,6 +239,15 @@
       "term": "Waits",
       "meaning": "`person` on a line that waits on a person: every reason of phase waiting, and `Failed` and `CheckFailed`, from the reason table alone (`PERSON_WAITS`), never from a note.",
       "type": "PERSON_WAITS"
+    },
+    {
+      "term": "Triggers clash",
+      "meaning": "a Warning line about a factory, `TriggersClash`, labelled with it and the card (`labels.factory`, `labels.card`): written by the tick once when a card naming no workflow comes to be selected by two triggers of its factory that target two workflows, its note the triggers and the fix, and not again while the clash stands (`clashLines`, `packages/agent-orchestrator/src/feed/feed.ts`).",
+      "type": "FeedClashes"
+    },
+    {
+      "term": "Clash settled",
+      "meaning": "a Normal line about a factory, `ClashSettled`, labelled with it and the card: written by the tick once when a card said clashing on the feed clashes no more — a selector or its labels changed, or it was removed. A card never said clashing is never said settled."
     }
   ]
 }

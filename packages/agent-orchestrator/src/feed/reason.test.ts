@@ -179,12 +179,17 @@ const STORE_LINES: readonly Case[] = [
   },
 ];
 
-/** The four words a factory's lines say, spelled by hand as the owner named them, each with its `ConflictsPending` condition's message. */
+/**
+ * The six words a factory's lines say, spelled by hand as the owner named them: its conflicts', each with its `ConflictsPending`
+ * condition's message, its library adds', and a card's clash, begun and ended.
+ */
 const FACTORY_LINES: readonly Case[] = [
   { kind: 'Factory', word: 'conflicts pending', note: 'agents/coder.md: choose one', reason: 'ConflictsPending' },
   { kind: 'Factory', word: 'conflicts settled', note: 'merged', reason: 'ConflictsSettled' },
   { kind: 'Factory', word: 'library add missing', note: 'Skill notes is no longer in the library', reason: 'AddsMissing' },
   { kind: 'Factory', word: 'library adds resolved', reason: 'AddsResolved' },
+  { kind: 'Factory', word: 'triggers clash', note: 'card both-ways waits: triggers bugs, ready', reason: 'TriggersClash' },
+  { kind: 'Factory', word: 'clash settled', note: 'card both-ways clashes no more', reason: 'ClashSettled' },
 ];
 
 /** A parked step's words (`pausedWord`): paused between two calls, after the call it stopped after, or with the call it cut. */
@@ -267,8 +272,12 @@ describe('reasonOf names a reason for every word the package writes, only of a k
         `${runCodes('waiting', null, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 54, "the table the owner named has 54 entries, a factory's library adds two of them");
-    assert.equal(REASON_CODES.length, 43, 'of 43 distinct codes');
+    assert.equal(
+      entries.length,
+      56,
+      "the table the owner named has 56 entries: a factory's library adds two of them, and a card its triggers clash on two more (TriggersClash, ClashSettled)",
+    );
+    assert.equal(REASON_CODES.length, 45, 'of 45 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

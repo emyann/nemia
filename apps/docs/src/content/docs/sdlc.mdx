@@ -7,7 +7,7 @@ sdlc is a factory template that comes with Nemia: the team that builds Nemia, wi
 a repository of yours, it makes a factory that takes an idea to an intent, an intent to a change merged into your base branch, and
 reads its own stats to propose what to correct.
 
-**It owns** six agents, four workflows, the skills their steps name, the scripts their checks run, and the rules every agent hired
+**It owns** six agents, five workflows, the skills their steps name, the scripts their checks run, and the rules every agent hired
 into the factory is told.
 
 **It never touches** your repository's history but through a landing the run checks: a step never commits a merge onto your base
@@ -33,6 +33,9 @@ fence refuses an edit of your store's factories, workflows and inbox.
 
 ## Its workflows
 
+- **front-door** routes a raw card to the workflow it needs, with no gate: where the factory's `frontDoorLabel` names a label key,
+  each card carrying it that names no workflow is queued here, and Iris, as a read-only judge, sends it as given to intake, build or
+  quick, answers it, or files it back to the inbox unlabelled. She asks you only where she cannot tell.
 - **intake** turns an idea into an intent, Iris asking you what it leaves open.
 - **build** takes an intent to your base branch: a design, an implement in rounds, a review, and a landing a person approves.
 - **quick** takes a card that settles its change to your base branch: an implement, then a review whose pass lands it, with no gate.
@@ -54,6 +57,7 @@ What your repository decides is a parameter, given with `--set` when you apply t
 | roundCheck     | on GitHub: the command implement's check runs after each round, before CI                                              | npm run --if-present lint && npm run --if-present typecheck                              |
 | implementCheck | either way: a command of your own that implement's check runs after sdlc's scripts, before the push or the local check | true (checks nothing)                                                                    |
 | areas          | the areas of the repository a card names, in the factory's rules                                                       | the top-level folders of the repository                                                  |
+| frontDoorLabel | the label key whose cards, naming no workflow, the front door's trigger queues on front-door                           | empty (no trigger)                                                                       |
 | storeRoot      | the store the agents' fences keep them out of                                                                          | ~/.agent-workflows                                                                       |
 
 github is a boolean, refused at apply unless it is `true` or `false`. A factory reads localCheck where it is false, and ciCheck and

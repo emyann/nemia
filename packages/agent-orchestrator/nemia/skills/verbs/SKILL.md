@@ -652,6 +652,15 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                take a workflow's schedule back: the daemon starts it no more
                                each tool's words: tools.md#factory_unschedule
                                on the port: factory_unschedule
+  nemia factory trigger <factory> <name> --labels <labelSelector> --to <workflow>
+                               queue each card of the factory whose labels its labelSelector matches, in
+                               the order filed: on the card's own workflow, else on --to; a second replaces the first
+                               each tool's words: tools.md#factory_trigger
+                               on the port: factory_trigger
+  nemia factory untrigger <factory> <name>
+                               take a factory's own card trigger back: the cards it queued wait unqueued
+                               each tool's words: tools.md#factory_untrigger
+                               on the port: factory_untrigger
   nemia factory server add <factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]
                                record a remote MCP server for a factory: its steps' sessions are
                                handed it, and an agent `mcp:` line names it

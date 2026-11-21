@@ -276,7 +276,7 @@ test('REFUSED: a github that is no boolean, at apply, naming the --set that fixe
 
 test("each step that writes its own output has its schema beside it, the template's bytes, and so has each agent", () => {
   const tree = treeOf('set');
-  const owned = ['build', 'quick', 'intake', 'janitor'].flatMap((workflow) =>
+  const owned = ['build', 'quick', 'intake', 'janitor', 'front-door'].flatMap((workflow) =>
     fs
       .readdirSync(path.join(tree, 'workflows', workflow))
       .filter((leaf) => leaf.endsWith('.md') && leaf !== 'README.md')
@@ -287,8 +287,13 @@ test("each step that writes its own output has its schema beside it, the templat
   );
   assert.deepEqual(
     owned,
-    ['workflows/quick/implement.schema.json', 'workflows/intake/route.schema.json'],
-    "quick's implement and intake's intake write their own output, and no other step",
+    [
+      'workflows/quick/implement.schema.json',
+      'workflows/intake/route.schema.json',
+      'workflows/front-door/answer.schema.json',
+      'workflows/front-door/door.schema.json',
+    ],
+    "quick's implement, intake's intake and the front door's door and answer write their own output, and no other step",
   );
   for (const file of owned) assert.ok(fs.readFileSync(path.join(tree, file)).equals(fs.readFileSync(path.join(SDLC, file))), file);
   for (const agent of ['agora', 'argus', 'iris', 'otto', 'seldon'])

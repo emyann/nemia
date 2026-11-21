@@ -308,7 +308,7 @@ test('a Template card not rendered yet says the daemon renders it, and lists no 
 });
 
 test('REFUSED: a schedule whose latest fire was refused draws why, whole, under its alert; one whose fire started its run draws none', async () => {
-  const { FactorySchedules } = await import('../src/components/factory/FactorySchedules.tsx');
+  const { ScheduleRow } = await import('../src/components/factory/FactorySchedules.tsx');
   const why =
     'dev: the factory nemia does not offer this workflow — it offers none yet. Attach it: nemia factory attach nemia dev. Nothing was started.';
   const scheduled = (workflow: string, extra: Partial<import('../src/lib/api/factories.ts').FactorySchedule>) => ({
@@ -322,13 +322,12 @@ test('REFUSED: a schedule whose latest fire was refused draws why, whole, under 
     commands: { unschedule: `nemia factory unschedule nemia ${workflow}` },
     ...extra,
   });
-  const factory = filed('nemia', {
-    schedules: [
-      scheduled('dev', { refused: why }),
-      scheduled('janitor', { last: { run: 'read-the-stats-k2v9', at: '2026-10-05T13:00:02.000Z' } }),
-    ],
-  });
-  const html = await routedWith(createElement(FactorySchedules, { factory }));
+  const now = new Date('2026-10-06T00:00:00.000Z');
+  const rows = [
+    scheduled('dev', { refused: why }),
+    scheduled('janitor', { last: { run: 'read-the-stats-k2v9', at: '2026-10-05T13:00:02.000Z' } }),
+  ].map((schedule) => createElement(ScheduleRow, { key: schedule.workflow, schedule, now }));
+  const html = await routedWith(createElement('div', null, ...rows));
   const [, dev = '', janitor = ''] = html.split(/data-factory-schedule="(?=dev"|janitor")/);
   assert.match(dev, /data-schedule-refused="true"[^]*Its latest fire started no run/, 'the refused fire under its alert');
   assert.ok(dev.includes(why), `and why, whole: ${dev}`);

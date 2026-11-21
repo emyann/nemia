@@ -46,7 +46,7 @@ export function resultSteps(steps: readonly StepSpec[], run?: Run) {
  */
 export function routedResult(steps: readonly StepSpec[], run: Run) {
   const read = steps.flatMap((s) => {
-    const condition = s.workflow !== undefined && run.steps[s.name]?.sent ? conditionOf(s, steps) : undefined;
+    const condition = (s.workflow !== undefined || s.card !== undefined) && run.steps[s.name]?.sent ? conditionOf(s, steps) : undefined;
     const names = condition ? (condition.input ?? condition.after) : [];
     return steps.filter((x) => names.includes(x.name));
   });

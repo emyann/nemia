@@ -414,6 +414,21 @@ describe('what a render refuses by name, with nothing of it to write', () => {
     });
     assert.match(renderFactory(openTemplate(dir), {}).refusals.join('\n'), /^RULES\.md opens with a frontmatter block/);
   });
+  test('REFUSED by name: a trigger whose selector a parameter renders unreadable, the parameter named; a readable one is wired', () => {
+    const { dir } = exported();
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.parameters = { ...spec.parameters, doorLabel: { type: 'string', default: '' } };
+      spec.triggers = { door: { selector: '${{ parameters.doorLabel }}', target: { kind: 'Workflow', name: 'dev' } } };
+    });
+    const { out } = rendered(dir, ['doorLabel=Ready Now']);
+    assert.equal(out.refusals.length, 1, out.refusals.join('\n'));
+    assert.ok(out.refusals[0].startsWith("nemia.yaml: trigger door's selector"), out.refusals[0]);
+    assert.ok(out.refusals[0].includes('--set doorLabel='), out.refusals[0]);
+    assert.equal(out.wiring.triggers, undefined);
+    const readable = rendered(dir, ['doorLabel=ready']).out;
+    assert.deepEqual(readable.refusals, []);
+    assert.deepEqual(readable.wiring.triggers?.door?.selector, 'ready');
+  });
   test("REFUSED by name: a step's output.path outside its workflow's folder", () => {
     const { dir } = exported();
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {

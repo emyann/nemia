@@ -42,6 +42,7 @@ export function judgeRefusal(s: StepSpec, fence: JudgeFence, hireable: boolean) 
  */
 function described(target: StepSpec, targets: Readonly<Record<string, string>>) {
   const note = firstLine(target.agent ? target.agent.body : target.body) || firstLine(target.body);
+  if (target.card === 'backlog') return `files the card back to the inbox, unqueued (${target.name}${note ? `: ${note}` : ''})`;
   if (target.workflow === undefined) return `the step ${target.name}${note ? `: ${note}` : ''}`;
   const about = targets[target.workflow] ?? note;
   return `a card for the workflow ${target.workflow} (${target.name}${about ? `: ${about}` : ''})`;

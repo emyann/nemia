@@ -77,7 +77,7 @@ const BLOCK_KEYS = ['model', 'effort', 'context'] as const;
 const WORDS = ['place', 'workspace', 'check', 'checkMemory', 'loop', 'memory'] as const;
 
 /** The step keys of a route read as lists: a condition's routes and those it ends on, and the routes a node runs on. */
-const ROUTE_LISTS = ['routes', 'ends', 'when'] as const;
+const ROUTE_LISTS = ['routes', 'ends', 'when', 'unlabel'] as const;
 
 /** The step keys read as counts. */
 const COUNTED = ['rounds', 'retries', 'deadlineSeconds'] as const;
@@ -98,6 +98,7 @@ const PLACED = new Set<string>([
   'route',
   'checkFailurePolicy',
   'workflow',
+  'card',
   ...ROUTE_LISTS,
   ...WORDS,
   ...COUNTED,
@@ -166,6 +167,7 @@ function routingOf(keys: Readonly<Partial<Record<string, unknown>>>) {
   if (typeof keys.checkFailurePolicy === 'string')
     wired.checkFailurePolicy = checkFailurePolicyOf('checkFailurePolicy', JSON.stringify(flowOf(keys.checkFailurePolicy)));
   if (typeof keys.workflow === 'string') wired.workflow = keys.workflow;
+  if (typeof keys.card === 'string') wired.card = keys.card;
   return wired;
 }
 

@@ -20,6 +20,7 @@ import {
   CARRIED_FOLDER,
   FRONTMATTER,
   isReadme,
+  NODE_CARDS,
   SKILLS_FOLDER,
   STEP_KEYS,
   WorkflowError,
@@ -507,6 +508,8 @@ const frozenStepFields = {
   when: Schema.optionalKey(Strings),
   ends: Schema.optionalKey(Strings),
   workflow: Schema.optionalKey(Schema.String),
+  card: Schema.optionalKey(Schema.Literals(NODE_CARDS)),
+  unlabel: Schema.optionalKey(Strings),
 } satisfies FrozenStepFields;
 
 /** A field under each former name of a key (`FORMER_KEYS`), checked as the key it is now: what `asNamed` moves onto that key. */

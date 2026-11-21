@@ -97,6 +97,8 @@ export const LINE_WORDS = {
   ConflictsSettled: 'conflicts settled',
   AddsMissing: 'library add missing',
   AddsResolved: 'library adds resolved',
+  TriggersClash: 'triggers clash',
+  ClashSettled: 'clash settled',
   RevisionsBehind: 'revisions behind',
   LeftEnded: 'left running, ended',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
@@ -150,6 +152,8 @@ export const REASONS = {
   ConflictsSettled: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   AddsMissing: { kinds: ['Factory'], type: 'Warning', source: 'tick' },
   AddsResolved: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
+  TriggersClash: { kinds: ['Factory'], type: 'Warning', source: 'tick' },
+  ClashSettled: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   LeftEnded: { kinds: ['Store'], type: 'Warning', source: 'daemon' },
 } as const satisfies Record<string, Entry>;
 
@@ -288,13 +292,17 @@ const STORE_WORDS: readonly Rule[] = [
 /**
  * A factory's words: its upgrade waiting on a person's choice for each conflict, and that wait over — a word that stands per factory
  * until its `ConflictsPending` condition turns (`conflictLines`), both `Normal`: a wait on a person, not a fault; and an add of its
- * record the library no longer holds, a `Warning` that stands until none is missing (`addsLines`), and its `Normal` end.
+ * record the library no longer holds, a `Warning` that stands until none is missing (`addsLines`), and its `Normal` end; and a card of
+ * it that its card triggers would send to two workflows, a `Warning` that stands per card until the clash ends (`clashLines`), and its
+ * `Normal` end.
  */
 const FACTORY_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.ConflictsPending, reason: 'ConflictsPending' },
   { is: LINE_WORDS.ConflictsSettled, reason: 'ConflictsSettled' },
   { is: LINE_WORDS.AddsMissing, reason: 'AddsMissing' },
   { is: LINE_WORDS.AddsResolved, reason: 'AddsResolved' },
+  { is: LINE_WORDS.TriggersClash, reason: 'TriggersClash' },
+  { is: LINE_WORDS.ClashSettled, reason: 'ClashSettled' },
 ];
 
 /** Whether `rule` recognises `word`: the whole word, or its beginning. */

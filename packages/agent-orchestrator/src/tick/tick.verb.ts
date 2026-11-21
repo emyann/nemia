@@ -34,7 +34,7 @@ import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
-import type { FeedConflicts, FeedMissing, FeedReadiness } from '../feed/index.ts';
+import type { FeedClashes, FeedConflicts, FeedMissing, FeedReadiness } from '../feed/index.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { conflictsNow } from '../factory/applied/applied.verb.ts';
@@ -53,7 +53,7 @@ import { sameJudgement } from '../summary/judgement.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
-import { startQueued } from '../inbox/inbox.verb.ts';
+import { clashesNow, startQueued } from '../inbox/inbox.verb.ts';
 import { startDue } from '../factory/schedule/schedule.verb.ts';
 import type { ScheduleStarted } from '../factory/schedule/schedule.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
@@ -302,6 +302,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
   const conflicts = yield* conflictsNow().pipe(Effect.orElseSucceed(() => undefined));
   const missing = yield* tried(() => addsMissingNow(home)).pipe(Effect.orElseSucceed(() => undefined));
+  const clashes = yield* clashesNow(runs).pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
   const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());
@@ -320,7 +321,13 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness })),
+    ...passOf(
+      report,
+      runs,
+      judging,
+      queue,
+      yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness, clashes }),
+    ),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
@@ -470,7 +477,8 @@ const feedOf = <F>(id: string, judged: { feed: F } | undefined) => (judged ? [[i
  * Why the feed could not be written with what the pass judged (`emitFeed`), the store's pause it read at its start (`pause`, whose
  * put and lift the feed says), each factory's level in force it read beside it (`levels`, whose changes the feed says) and each
  * factory's `ConflictsPending` condition (`conflicts`, whose turns the feed says), each recorded factory's library adds (`missing`, whose
- * missing adds the feed says) and the store's readiness the daemon last read
+ * missing adds the feed says), each card the triggers of its factory clash on (`clashes`, whose clashes begun and ended the feed says)
+ * and the store's readiness the daemon last read
  * (`readiness`, whose moves the feed says) — each undefined where it was not read, and nothing is said of it — or undefined once it was:
  * never the pass's failure.
  */
@@ -484,11 +492,13 @@ const feedErrorOf = (
     conflicts,
     missing,
     readiness,
+    clashes,
   }: {
     levels: readonly FactoryLevel[] | undefined;
     conflicts: FeedConflicts | undefined;
     missing: FeedMissing | undefined;
     readiness: (() => FeedReadiness | undefined) | undefined;
+    clashes: FeedClashes | undefined;
   },
 ) =>
   Effect.exit(
@@ -499,6 +509,7 @@ const feedErrorOf = (
       ...(levels === undefined ? {} : { levels }),
       ...(conflicts === undefined ? {} : { conflicts }),
       ...(missing === undefined ? {} : { missing }),
+      ...(clashes === undefined ? {} : { clashes }),
       ...readOf(readiness?.()),
     }),
   ).pipe(

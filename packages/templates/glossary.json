@@ -1,0 +1,14 @@
+{
+  "context": "templates",
+  "title": "The templates",
+  "about": "`packages/templates` holds the templates Nemia ships, each a factory's workflows, agents, skills and rules in one folder: sdlc, the team that builds Nemia with this repository's words taken out.",
+  "paths": [
+    "packages/templates"
+  ],
+  "terms": [
+    {
+      "term": "Front door",
+      "meaning": "sdlc's workflow that routes a raw card to the workflow it needs, with no gate: the factory's `front-door` trigger, made where its `frontDoorLabel` parameter names a label key, queues each card carrying it that names no workflow; Iris, as a read-only judge, sends the card as given to intake, build or quick, answers it, or files it back to the inbox without the label, and asks a person only where she cannot tell (`packages/templates/sdlc/workflows/front-door/README.md`)."
+    }
+  ]
+}

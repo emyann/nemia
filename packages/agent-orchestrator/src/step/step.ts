@@ -263,6 +263,14 @@ export type StepSpec = {
   /** `workflow: build`: this node is a route to a workflow, and files a card for it `from:` this run, then reads `sent`. */
   workflow?: string;
   /**
+   * `card: given`: what card a node files (`NODE_CARDS`): `routed`, a card of its own naming this run (the default, a `workflow:` node's
+   * as before); `given`, the run's own card as it was given, body and labels, for the node's `workflow:`; `backlog`, the run's card filed
+   * back to the inbox, unqueued and naming no workflow, with no `workflow:` of its own.
+   */
+  card?: NodeCard;
+  /** `unlabel: [ready]`: the label keys a `card: backlog` node files the card back without, so no trigger queues it again. */
+  unlabel?: string[];
+  /**
    * The agent attached to the step (`agent:`), and what the step said itself: the keys its own file set — never `agent` — and its own note.
    * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions, then a
    * person's custom instructions for it, before the note. What the rest of the run reads is those; this says where each came from, which is
@@ -339,6 +347,11 @@ export const LOOP_REPLIES = 'replies';
  * judge's `output:` may not declare it (`judgeRefusal`, route/judge.ts); its schema is `judgeRouteSchema` in closeout.ts.
  */
 export const JUDGE_ROUTE = 'route';
+
+/** What card a node files (`card:`): one of its own, the run's own as given, or the run's own back to the inbox. */
+export const NODE_CARDS = ['routed', 'given', 'backlog'] as const;
+/** One of `NODE_CARDS`. */
+export type NodeCard = (typeof NODE_CARDS)[number];
 
 /**
  * A step's declared output: the file as the step names it (its agent's where the step names none), the schema at `nemia start` — its
@@ -429,6 +442,8 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'when',
   'ends',
   'workflow',
+  'card',
+  'unlabel',
 ];
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -451,6 +466,7 @@ export const LIST_KEYS: readonly string[] = [
   'routes',
   'when',
   'ends',
+  'unlabel',
   'from',
   'overridable',
   'disallow',
@@ -538,6 +554,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   when: 'the routes of the condition this node waits on that it runs on: on any other it reads `skipped`',
   ends: 'the routes of this condition on which the run ends, nothing after it running',
   workflow: 'the workflow this node routes to: it files a card for it, `from:` this run, and reads `sent`',
+  card: "what card this node files: `routed`, one of its own (the default); `given`, the run's own card as given, for its `workflow:`; `backlog`, the run's card back to the inbox, unqueued",
+  unlabel: 'the label keys a `card: backlog` node files the card back without, so no trigger queues it again',
 };
 
 /**

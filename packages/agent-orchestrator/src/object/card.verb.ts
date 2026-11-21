@@ -70,6 +70,13 @@ const bodyOf = (l: InboxListing, text: string) => {
   }
 };
 
+/** What the listed card `l`'s status says of the queue: its place, the triggers that queue it, and those that clash on it. */
+const queueStatusOf = (l: InboxListing) => ({
+  ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
+  ...(l.queued?.by !== undefined ? { queuedBy: [...l.queued.by] } : {}),
+  ...(l.clash !== undefined ? { clash: [...l.clash] } : {}),
+});
+
 /** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
 const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) => {
   const { body, error } = bodyOf(l, text);
@@ -89,7 +96,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) 
       ...(l.gate !== undefined ? { gate: l.gate } : {}),
       ...(l.model !== undefined ? { model: { ...l.model } } : {}),
       ...(l.from.length ? { from: [...l.from] } : {}),
-      ...(l.queued !== undefined ? { queued: l.queued.at } : {}),
+      ...(l.queued !== undefined && l.queued.by === undefined ? { queued: l.queued.at } : {}),
       ...(body !== undefined ? { body } : {}),
     },
     status: {
@@ -99,7 +106,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) 
       ...(l.title !== null ? { title: l.title } : {}),
       ...(error !== undefined ? { error } : {}),
       inPlay: CARD_IN_PLAY[l.state],
-      ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
+      ...queueStatusOf(l),
       file: l.file,
       ...(source ? { source: text } : {}),
     },

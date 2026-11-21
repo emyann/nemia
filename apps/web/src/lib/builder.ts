@@ -78,6 +78,8 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   tally: [],
   loop: null,
   rounds: null,
+  card: null,
+  unlabel: null,
   routes: null,
   route: null,
   when: null,

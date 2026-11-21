@@ -17,7 +17,7 @@ import {
   type McpTransport,
   type Schedule,
 } from 'objects';
-import { factories, library, hireName, hires, mcpServers, schedules } from './objects.ts';
+import { factories, library, hireName, hires, mcpServers, schedules, triggers } from './objects.ts';
 
 export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInStarted, SignInState } from 'objects';
 
@@ -91,9 +91,18 @@ export type Factory = {
   schedules: FactorySchedule[];
   /**
    * The lines a person types for it: a workflow attached, its file removed, filed again, a workflow scheduled, its places trusted, a
-   * volume mounted, and its home opened in a person's own session (`home`, null where it has no home).
+   * volume mounted, a card trigger written, and its home opened in a person's own session (`home`, null where it has no home).
    */
-  commands: { attach: string; rm: string; add: string; schedule: string; trust: string; volume: string; home: string | null };
+  commands: {
+    attach: string;
+    rm: string;
+    add: string;
+    schedule: string;
+    trust: string;
+    volume: string;
+    trigger: string;
+    home: string | null;
+  };
   template: FactoryTemplate | null;
   untrusted: FactoryUntrusted[];
   volumes: FactoryVolume[];
@@ -144,6 +153,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
       schedule: commands.schedule,
       trust: commands.trust,
       volume: commands.volume,
+      trigger: commands.trigger,
       home: commands.home ?? null,
     },
     template: spec.template ? { ...spec.template, applied: status.applied ?? null, conditions: status.conditions } : null,
@@ -444,3 +454,17 @@ export const completeSignIn = (name: string, server: string, url: string) => mcp
  * @param server The server's name.
  */
 export const signOutServer = (name: string, server: string) => mcpServers.signOut(name, server);
+
+/**
+ * The triggers of the factory `name`, each with whether it can spend quota and what it does now: the cards it queues, or its next fire.
+ * @param name The factory's name.
+ */
+export const factoryTriggersQuery = (name: string) =>
+  queryOptions({ queryKey: ['factory-triggers', name], queryFn: () => triggers.list(name) });
+
+/**
+ * Take back the factory `name`'s own card trigger `trigger`.
+ * @param name The factory's name.
+ * @param trigger The trigger's name.
+ */
+export const deleteTrigger = (name: string, trigger: string) => triggers.delete(name, trigger);

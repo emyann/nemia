@@ -274,6 +274,8 @@ const WIRING = [
   'when',
   'ends',
   'workflow',
+  'card',
+  'unlabel',
 ];
 
 describe('REFUSED at shipped defaults: an agent file, one row per line it may not say', () => {

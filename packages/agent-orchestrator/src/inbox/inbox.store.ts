@@ -26,8 +26,10 @@ import {
   queueRefusal,
   retiredRepoRefusal,
   type InboxCard,
+  type Triggering,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
+import type { PlanFile } from '../plan/plan.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -41,6 +43,7 @@ import { unattachedRefusal, type Factory } from '../factory/factory.ts';
 import { runId } from '../record/record.store.ts';
 import { keptRuns } from '../record/files.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { everyCardTrigger } from '../factory/applied/applied.store.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = Effect.fn('inboxCards')(function* () {
@@ -63,11 +66,13 @@ export const readInbox = Effect.fn('readInbox')(function* () {
   const door = yield* CardDoor;
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();
+  const factories = yield* readableFactories();
   return cardsListed(
     entries,
     keptRuns(home, undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
     tries,
-    yield* readableFactories(),
+    factories,
+    yield* triggeringOf(entries, factories.values()),
   );
 });
 
@@ -289,3 +294,24 @@ export const inboxNameAt = (home: string, given: string) => {
   const named = [given, ...(bare ? [bare] : [])];
   return named.find((name) => fs.existsSync(path.join(inboxAt(home), `${name}.md`))) ?? null;
 };
+
+/**
+ * What the card triggers read on a pass (`Triggering`): every factory's that reads, and when each card of `files` was filed, read once
+ * through the Card door; none where no factory has a card trigger.
+ * @param files The inbox's entries.
+ * @param factories The store's factories that read.
+ */
+export const triggeringOf = Effect.fn('triggeringOf')(function* (files: readonly PlanFile[], factories: Iterable<Factory>) {
+  const triggers = everyCardTrigger(yield* StoreRoot, factories);
+  if (!triggers.length) return undefined;
+  const door = yield* CardDoor;
+  const filed = new Map<string, string>();
+  for (const { file } of files) {
+    if (!file.endsWith('.md')) continue;
+    const name = file.slice(0, -'.md'.length);
+    const at = yield* Effect.orElseSucceed(door.cards.filedAt(CardName.read(name)), () => null);
+    if (at !== null) filed.set(name, at);
+  }
+  const triggering: Triggering = { triggers, filedAt: (name) => filed.get(name) ?? null };
+  return triggering;
+});

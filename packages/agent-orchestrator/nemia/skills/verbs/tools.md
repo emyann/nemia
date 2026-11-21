@@ -637,6 +637,41 @@ Its arguments:
 - namespace: The namespace the object is in: the name of its factory, default for one that names none.
 - name: The object's name, unique in its namespace for its kind.
 
+## factory_trigger
+
+```text
+  nemia factory trigger <factory> <name> --labels <labelSelector> --to <workflow>
+    queue each card of the factory whose labels its labelSelector matches, in
+    the order filed: on the card's own workflow, else on --to; a second replaces the first
+```
+
+Writes a factory's trigger named in the path: a card labelSelector and its target, or a cron, named by its workflow, which writes the schedule. Answers the Trigger as it reads after, with the file written.
+
+Calls `PUT /api/namespaces/:namespace/triggers/:name`.
+
+Its arguments:
+
+- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- name (<name> at a shell): The object's name, unique in its namespace for its kind.
+- when: When the trigger fires: at each fire of a cron (time), or on each card its labelSelector matches (cards).
+- target: What the trigger sends what it matches to: a workflow its factory offers.
+
+## factory_untrigger
+
+```text
+  nemia factory untrigger <factory> <name>
+    take a factory's own card trigger back: the cards it queued wait unqueued
+```
+
+Takes back a factory's own trigger named in the path, a schedule of the time kind. Answers the Trigger as it was, with the file written.
+
+Calls `DELETE /api/namespaces/:namespace/triggers/:name`.
+
+Its arguments:
+
+- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- name (<name> at a shell): The object's name, unique in its namespace for its kind.
+
 ## factory_servers
 
 ```text

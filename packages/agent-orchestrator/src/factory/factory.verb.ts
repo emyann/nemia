@@ -45,6 +45,7 @@ import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
 import { FACTORY_RULES } from './rules/rules.verb.ts';
 import { TEMPLATED_FACTORY_VERBS } from '../adopt/templated.verb.ts';
 import { FACTORY_SCHEDULES } from './schedule/schedule.verb.ts';
+import { FACTORY_TRIGGERS } from './trigger/trigger.verb.ts';
 import { scheduleRun, schedulesListed, type ScheduleRuns } from './schedule/listed.store.ts';
 import type { ScheduleListed } from './schedule/schedule.ts';
 import { keptRuns } from '../record/files.store.ts';
@@ -244,6 +245,7 @@ export const FACTORIES: readonly Served[] = [
   tableEntry(FACTORY_HIRE),
   tableEntry(FACTORY_FIRE),
   ...FACTORY_SCHEDULES,
+  ...FACTORY_TRIGGERS,
   ...FACTORY_SERVER_VERBS,
   ...FACTORY_VOLUMES,
   ...FACTORY_SETTINGS,

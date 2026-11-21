@@ -61,6 +61,12 @@ export type InstructionAt = { path: string } | { store: true };
 export type Schedule = { cron: string; brief: string; repo?: string; tz?: string; since: string };
 
 /**
+ * A factory's card trigger, as its file or its template's rendered wiring holds it under `triggers`, by its name: a label selector in
+ * Kubernetes' spelling over a card's labels, the workflow a card naming none is queued on, and when it was set (empty for a template's).
+ */
+export type CardTrigger = { selector: string; target: { kind: 'Workflow'; name: string }; since: string };
+
+/**
  * Whether a factory's runs take what is merged while they run, as a Pod's `imagePullPolicy` says whether a container takes a newer
  * image: `follow` (Kubernetes' `Always`), every new filing of a run — a step, a retry, a round — is filed on the workflow, agents,
  * skills and rules as the files hold them then; `pinned` (`IfNotPresent`), a run keeps what it resolved at its first filing until
@@ -105,6 +111,7 @@ export type Factory = {
   harnessSettings?: SettingsAsRead;
   costLines?: Readonly<Record<string, number>>;
   workflowRepos?: Readonly<Record<string, string>>;
+  triggers?: Readonly<Record<string, CardTrigger>>;
   generation?: number;
 };
 
@@ -321,6 +328,8 @@ export type FactoryWrite =
   | 'rules'
   | 'schedule'
   | 'unschedule'
+  | 'trigger'
+  | 'untrigger'
   | 'upgrade'
   | 'adopt'
   | 'volume'
@@ -342,6 +351,8 @@ const INSTEAD: Record<FactoryWrite, string> = {
   rules: 'It keeps no rules, since it hires no one: write them for a factory nemia factory ls lists.',
   schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
+  trigger: 'It offers every workflow found, and queues no card by itself: trigger in a factory nemia factory ls lists.',
+  untrigger: 'It triggers nothing: untrigger in a factory nemia factory ls lists.',
   upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',
   volume: 'It mounts no volume, and no run is started in it: add one to a factory nemia factory ls lists.',
   setting: 'It holds no harness settings, and no run is started in it: set one on a factory nemia factory ls lists.',
@@ -417,8 +428,8 @@ export function fillsOf(hires: Hires, workflow: string) {
 }
 
 /** Whether a step runs an agent: every step but a condition a table or a script answers, and a workflow node, which files a card. */
-const runsAnAgent = (s: Pick<StepSpec, 'routes' | 'route' | 'workflow'>) =>
-  s.workflow === undefined && (s.routes === undefined || s.route?.kind === 'judge');
+const runsAnAgent = (s: Pick<StepSpec, 'routes' | 'route' | 'workflow' | 'card'>) =>
+  s.workflow === undefined && s.card === undefined && (s.routes === undefined || s.route?.kind === 'judge');
 
 /**
  * Why a run of `workflow` in the factory `factory` cannot start, or undefined: every step that is left with no agent — its file names none,
@@ -1033,6 +1044,56 @@ export const unofferedScheduleRefusal = (factory: string, workflow: string) =>
  */
 export const unscheduledRefusal = (factory: string, workflow: string, scheduled: readonly string[]) =>
   `${factory} does not schedule ${workflow}. ${scheduled.length ? `It schedules: ${[...scheduled].sort().join(', ')}.` : 'It schedules none.'} Nothing was unscheduled.`;
+
+/**
+ * Why `factory` cannot trigger on `workflow`: it does not offer it.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name the trigger targets.
+ */
+export const unofferedTriggerRefusal = (factory: string, workflow: string) =>
+  `${factory} does not offer the workflow ${workflow}, so no trigger of it can queue a card there. Attach it first — nemia factory attach ${factory} ${workflow} — or name another with --to. Nothing was triggered.`;
+
+/**
+ * Why `factory` untriggers nothing under `name`: it has no trigger of its own by that name, naming those it has.
+ * @param factory The factory's name.
+ * @param name The trigger's name.
+ * @param triggers The names of its own triggers.
+ */
+export const untriggeredRefusal = (factory: string, name: string, triggers: readonly string[]) =>
+  `${factory} has no trigger ${name} of its own. ${triggers.length ? `Its own: ${[...triggers].sort().join(', ')}.` : 'It has none of its own.'} A trigger its template defines is taken back by setting its parameter empty and nemia factory upgrade ${factory}. Nothing was untriggered.`;
+
+/**
+ * Why `factory` cannot be relieved of `workflow` while a trigger of it targets the workflow: the trigger taken back, then the detach.
+ * @param factory The factory's name.
+ * @param workflow The workflow's folder name.
+ * @param triggers The names of the triggers that target it.
+ */
+export const triggeredDetachRefusal = (factory: string, workflow: string, triggers: readonly string[]) =>
+  `${factory} triggers ${workflow} by ${triggers.join(', ')}: take each back first — nemia factory untrigger ${factory} ${triggers[0] ?? '<name>'} — then detach it. Nothing was detached.`;
+
+/**
+ * Why `factory` cannot detach `workflow`: its template's triggers `triggers` send cards to it, and would queue them on a workflow it no
+ * longer offers.
+ * @param factory The factory's name.
+ * @param workflow The workflow it would detach.
+ * @param triggers The names of its template's triggers on it.
+ */
+export const templateTriggeredDetachRefusal = (factory: string, workflow: string, triggers: readonly string[]) =>
+  `${factory}'s template triggers ${workflow} by ${triggers.join(', ')}, which would queue cards on a workflow it no longer offers: set the parameter each trigger's selector reads empty, at the version applied — nemia factory upgrade ${factory} --to <its version> --set <parameter>= --plan <the digest nemia factory diff prints> — then detach it. Nothing was detached.`;
+
+/**
+ * Why `factory` cannot name a trigger `name`: its schedule of the workflow so named is the trigger of the time kind by that name.
+ * @param factory The factory's name.
+ * @param name The trigger's name.
+ */
+export const triggerNameTakenRefusal = (factory: string, name: string) =>
+  `${factory} schedules the workflow ${name}, which is its trigger of the time kind by that name: name the card trigger otherwise — nemia factory trigger ${factory} <another> --labels <labelSelector> --to <workflow>. Nothing was triggered.`;
+
+/**
+ * Why a trigger's selector is refused: what the selector's grammar says of it, then that nothing was triggered.
+ * @param refusal What the selector's grammar refused (`selectorsRefusal`).
+ */
+export const triggerSelectorRefusal = (refusal: string) => `--labels: ${refusal}. Nothing was triggered.`;
 
 /**
  * Why a factory `name` is not filed: there is one already, at `file`, left as it was.

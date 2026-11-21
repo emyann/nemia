@@ -1063,6 +1063,11 @@
       "term": "Milestone",
       "meaning": "one step of a store on its way to its first landed change — a harness signed in, a factory filed, a volume a run would mount, a run landed — done by what the store holds now and never by a saved flag, the first not done `next` (`milestonesOf`, `packages/agent-orchestrator/src/milestones/milestones.ts`; `milestonesNow`, `packages/agent-orchestrator/src/milestones/milestones.verb.ts`).",
       "type": "MilestoneStates"
+    },
+    {
+      "term": "Card node",
+      "meaning": "a node of a workflow that files a card and runs no agent, by its `card:`: `routed` (the default, a workflow node's card, titled and labelled by its run), `given` (the run's own card as it was given, its body and labels, with why it was routed and the reason its condition's producer gave), or `backlog` (the run's card back to the inbox naming no workflow, unqueued, without the label keys its `unlabel:` names) (`NodeCard`, `packages/agent-orchestrator/src/step/step.ts`).",
+      "type": "NodeCard"
     }
   ]
 }

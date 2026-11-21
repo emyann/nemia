@@ -52,7 +52,15 @@ import { LinksGroup, PairingsGroup } from './pairing.ts';
 import { SessionGroup } from './session.ts';
 import { TokensGroup } from './token.ts';
 import { CardsGroup } from './card-api.ts';
-import { FactoriesGroup, HiresGroup, LibraryAddsGroup, McpServersGroup, SchedulesGroup, VolumesGroup } from './factory-api.ts';
+import {
+  FactoriesGroup,
+  HiresGroup,
+  LibraryAddsGroup,
+  McpServersGroup,
+  SchedulesGroup,
+  TriggersGroup,
+  VolumesGroup,
+} from './factory-api.ts';
 import {
   AgentListObject,
   AgentObject,
@@ -69,6 +77,7 @@ export {
   FactoriesGroup,
   McpServersGroup,
   SchedulesGroup,
+  TriggersGroup,
   HiresGroup,
   LibraryAddsGroup,
   VolumesGroup,
@@ -242,6 +251,7 @@ export const RESOURCE_PLURALS = {
   Factory: FactoriesGroup.identifier,
   McpServer: McpServersGroup.identifier,
   Schedule: SchedulesGroup.identifier,
+  Trigger: TriggersGroup.identifier,
   Hire: HiresGroup.identifier,
   LibraryAdd: LibraryAddsGroup.identifier,
   Volume: VolumesGroup.identifier,
@@ -264,6 +274,7 @@ export const Api = HttpApi.make('nemia')
   .add(FactoriesGroup)
   .add(McpServersGroup)
   .add(SchedulesGroup)
+  .add(TriggersGroup)
   .add(HiresGroup)
   .add(LibraryAddsGroup)
   .add(VolumesGroup)

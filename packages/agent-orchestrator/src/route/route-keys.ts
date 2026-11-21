@@ -1,29 +1,77 @@
 /**
  * The routing keys of a step file, read and written: `routes:`, `when:` and `ends:` as lists of route words, `workflow:` as a workflow's
- * name, and `route:` as a condition's eval (`RouteEval`) from its map — `{ from, table }`, `{ script }` — or `judge`, each refused in the
- * file's words where it cannot be read (`routingOf`), and written back as the parser reads it (`routeWritten`).
+ * name, `card:` and `unlabel:` as what card a node files, and `route:` as a condition's eval (`RouteEval`) from its map — `{ from, table
+ * }`, `{ script }` — or `judge`, each refused in the file's words where it cannot be read (`routingOf`), and written back as the parser
+ * reads it (`routeWritten`).
  */
-import { refuse, type RouteEval, type StepKey, type StepSpec } from '../step/step.ts';
+import { NODE_CARDS, refuse, type NodeCard, type RouteEval, type StepKey, type StepSpec } from '../step/step.ts';
 import type { FrontmatterValue } from '../frontmatter/frontmatter.ts';
 
 /** A route's name, a step's `when:` and a condition's `routes:` and `ends:` alike: a lowercase word. */
 const ROUTE_WORD = /^[a-z][a-z0-9-]*$/;
 
 /**
- * The five keys of routing, each read or refused: absent keys stay absent, so a step without them is the step it was.
+ * The seven keys of routing, each read or refused: absent keys stay absent, so a step without them is the step it was.
  * @param step The step's name, which a refusal names.
  * @param meta The step's frontmatter keys, each as the text its line holds.
  */
 export function routingOf(step: string, meta: Partial<Record<StepKey, string>>) {
   const { routes, route, ends } = conditionKeysOf(step, meta);
   const workflow = workflowOf(step, meta.workflow, routes !== undefined);
+  const card = cardOf(step, meta.card, workflow);
+  const unlabel = unlabelOf(step, meta.unlabel, card);
   return {
     ...(routes !== undefined && { routes }),
     ...(route !== undefined && { route }),
     ...(meta.when !== undefined && { when: wordsOf(step, 'when', meta.when) }),
     ...(ends !== undefined && { ends }),
     ...(workflow !== undefined && { workflow }),
+    ...(card !== undefined && { card }),
+    ...(unlabel !== undefined && { unlabel }),
   };
+}
+
+/** Whether `word` is one of `NODE_CARDS`. */
+const isNodeCard = (word: string): word is NodeCard => (NODE_CARDS as readonly string[]).includes(word);
+
+/**
+ * `card:`, what card a node files: `backlog` on a node with no `workflow:`, `routed` or `given` on one with it.
+ * @param step The step's name, which a refusal names.
+ * @param written The text of its `card:` line, or undefined where it has none.
+ * @param workflow The node's `workflow:`, read.
+ */
+function cardOf(step: string, written: string | undefined, workflow: string | undefined) {
+  const card = written?.trim();
+  if (card === undefined) return undefined;
+  if (!isNodeCard(card))
+    refuse(`${step}: \`card: ${card}\` is no card a node files. Write one of ${NODE_CARDS.join(', ')}: \`card: given\`.`);
+  if (card === 'backlog' && workflow !== undefined)
+    refuse(
+      `${step}: \`card: backlog\` files the run's card back to the inbox, naming no workflow, and this node names \`workflow: ${workflow}\`. Delete one of the two lines.`,
+    );
+  if (card !== 'backlog' && workflow === undefined)
+    refuse(`${step}: \`card: ${card}\` files a card for a workflow, and this node names none. Add \`workflow: <name>\`.`);
+  return card;
+}
+
+/**
+ * `unlabel:`, the label keys a backlog node files its card back without, on a `card: backlog` node alone; a line that lists none, as a
+ * template parameter left empty renders it, removes none.
+ * @param step The step's name, which a refusal names.
+ * @param written The text of its `unlabel:` line, or undefined where it has none.
+ * @param card The node's `card:`, read.
+ */
+function unlabelOf(step: string, written: string | undefined, card: NodeCard | undefined) {
+  if (written === undefined) return undefined;
+  if (card !== 'backlog')
+    refuse(
+      `${step}: \`unlabel:\` names the label keys a backlog node files its card back without, and this step is no \`card: backlog\` node. Add \`card: backlog\`, or delete the line.`,
+    );
+  const keys = written
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  return keys.length ? keys : undefined;
 }
 
 /** A condition's own keys: `routes:` (two or more), `route:` beside it and never without it, and `ends:` on a condition alone. */

@@ -10,3 +10,22 @@
   <command> --help`, which can run an alias or an extension; claude's by `claude --help`, `claude --version` and `claude <command>
   [<subcommand>] --help`, typed exactly so. Where your fence refuses it, read the tool's published manual (gh's own help, at
   `cli.github.com/manual/<command>`) and cite it as a page read.
+- **A card routed wrong is said, not worked around.** A card the front door routed (its run's brief says the door's reason) whose ask
+  is not what your workflow is for — an idea still loose in build or quick, a decision left open in quick, a question that asks no
+  change — signs off `blocked`, saying which workflow it needs and why, so the person cancels the run and files the idea again: a card
+  is started once, so the routed card is neither queued again nor read again by the door, and the idea is filed under a name of its own
+  on the workflow it needs (`nemia inbox add <file> --workflow <workflow>`), or with the door's label for the door to route it again
+  (`--label <key=value>`).
+
+## Routing
+
+The front door's judge routes a card by what it asks, never by its size:
+
+- **intake**: an idea still loose — who it is for, what becomes true or what is in scope is not settled.
+- **build**: an intent settled that leaves a decision to make — a shape, a contract, a choice between ways — which a spec a person
+  approves settles first.
+- **quick**: a change the card settles, whatever its size, leaving nothing to decide.
+- **answer**: a question, answered by reading, that asks for no change.
+- **backlog**: a card that says too little to route, or that waits on something else.
+
+Where two routes both fit, the door asks rather than guesses.

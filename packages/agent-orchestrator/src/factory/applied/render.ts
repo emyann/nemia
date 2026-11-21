@@ -21,6 +21,7 @@ import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
 import { checkFailurePolicyOf } from '../../check/index.ts';
+import { selectorsRefusal } from '../../watch/selector.ts';
 
 /**
  * A checked template as the store hands it in: its folder as read, the text of one of its files by its path, and the lines of a file of
@@ -36,7 +37,46 @@ export type TemplateRead = {
  * The wiring a factory made from a template is given: every workflow it holds, by name, who fills each `<workflow>/<step>`, and whether
  * its runs follow merged revisions, where the manifest says (`spec.revisions`).
  */
-export type Wiring = { workflows: string[]; hires: Record<string, string>; revisions?: RevisionsPolicy };
+export type Wiring = {
+  workflows: string[];
+  hires: Record<string, string>;
+  revisions?: RevisionsPolicy;
+  triggers?: Record<string, { selector: string; target: { kind: 'Workflow'; name: string }; since: string }>;
+};
+
+/**
+ * The card triggers of a template's manifest as a tree's wiring holds them, its parameters rendered: each whose selector renders
+ * non-empty, its target's workflow by name; none where none is left. A selector that renders to one no card's labels can be read by
+ * (`selectorsRefusal`) is refused by its trigger's name and the parameters it reads, never kept to queue nothing.
+ * @param triggers The manifest's `triggers`, as its YAML reads, parameters substituted.
+ * @param written The manifest's `triggers` as the template writes them, whose selectors name the parameters they read.
+ */
+export function renderedTriggers(triggers: unknown, written: unknown) {
+  const out: NonNullable<Wiring['triggers']> = {};
+  const refused: string[] = [];
+  for (const [name, t] of Object.entries(isMap(triggers) ? triggers : {})) {
+    if (!isMap(t) || !isMap(t.target)) continue;
+    const selector = typeof t.selector === 'string' ? t.selector.trim() : '';
+    if (!selector) continue;
+    const unread = selectorsRefusal([selector]);
+    if (unread !== undefined) {
+      refused.push(unreadTriggerRefusal(name, selector, unread, isMap(written) ? written[name] : undefined));
+      continue;
+    }
+    out[name] = { selector, target: { kind: 'Workflow', name: String(t.target.name) }, since: '' };
+  }
+  return { wiring: Object.keys(out).length ? { triggers: out } : {}, refused };
+}
+
+/** Why a template's trigger `name` is refused: its selector renders as `selector`, which no card's labels are read by. */
+function unreadTriggerRefusal(name: string, selector: string, unread: string, written: unknown) {
+  const raw = isMap(written) && typeof written.selector === 'string' ? written.selector : '';
+  const named = [...raw.matchAll(/\$\{\{\s*parameters\.([\w-]+)\s*\}\}/g)].map((m) => m[1]);
+  const fix = named.length
+    ? `set ${named.map((p) => `--set ${p}=<value>`).join(' and ')} to what makes it a selector, as the parameter's description says`
+    : "mend the trigger's selector in nemia.yaml";
+  return `nemia.yaml: trigger ${name}'s selector, as rendered, is refused: ${unread}. It would queue no card: ${fix}, and apply again.`;
+}
 
 /**
  * A rendered factory: each file to write, by its path in the tree; each file of the template carried as it is (`from`) to `path`; its
@@ -143,6 +183,8 @@ const STEP_WORDS = [
   'ends',
   'when',
   'workflow',
+  'card',
+  'unlabel',
   'retries',
   'deadlineSeconds',
   'memory',
@@ -165,10 +207,12 @@ function routeEvalOf(route: unknown) {
 }
 
 /**
- * Whether `key` is a step's `checkMemory:` that renders blank, as an empty parameter writes it: no line, so the check asks the daemon's
- * default request. A blank line in a person's step file is still refused by the parser.
+ * Whether `key` is a step's `checkMemory:` or `unlabel:` that renders blank, as an empty parameter writes it: no line, so the check asks
+ * the daemon's default request and the node removes no label. A blank `checkMemory:` in a person's step file is still refused by the
+ * parser.
  */
-const blankAsked = (key: string, value: unknown) => key === 'checkMemory' && lineOf(value).trim() === '';
+const blankAsked = (key: string, value: unknown) =>
+  (key === 'checkMemory' || key === 'unlabel') && lineOf(value).replaceAll(',', '').trim() === '';
 
 /** A template's `checkFailurePolicy:` as the parser reads it, refused as a step's line would be; nothing for none. */
 const policyOf = (step: string, policy: unknown) =>
@@ -335,10 +379,10 @@ function renderRules(rules: string | undefined, out: Rendered) {
 /**
  * The template `read`, which passes its check, rendered with `params` into the files of a factory's tree: each workflow's steps, each
  * agent, each skill carried whole (a `skill.yaml` left behind: what it fetches is refused by the check), `factory.json` holding every
- * workflow, the manifest's hires and its revisions policy, the template's `home/` carried whole into the tree's `home/` (`HOME_FOLDER`),
- * `NEMIA.md` from the manifest's instruction or the template's own, and `RULES.md` from its rules, as `renderRules` writes them. Refused,
- * each by name, nothing to write: what `renderStep`, `renderAgent` or `renderRules` refuses, a harness block's `options`, and a block of a
- * harness the step or agent does not run on.
+ * workflow, the manifest's hires, its revisions policy and its card triggers whose selector renders non-empty, the template's `home/`
+ * carried whole into the tree's `home/` (`HOME_FOLDER`), `NEMIA.md` from the manifest's instruction or the template's own, and `RULES.md`
+ * from its rules, as `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`, `renderAgent` or `renderRules`
+ * refuses, a harness block's `options`, and a block of a harness the step or agent does not run on.
  * @param read The template as read, which passes its check.
  * @param params The parameters' values to render with, by name.
  */
@@ -347,8 +391,14 @@ export function renderFactory(read: TemplateRead, params: Params) {
   const hires = Object.fromEntries(Object.entries(isMap(manifest.hires) ? manifest.hires : {}).map(([k, v]) => [k, String(v)]));
   const workflows = namesOf(read, WORKFLOWS, 'workflow.yaml');
   const revisions = REVISIONS_POLICIES.find((p) => p === manifest.revisions);
-  const wiring: Wiring = { workflows, hires, ...(revisions === undefined ? {} : { revisions }) };
-  const out: Rendered = { files: [], copies: [], wiring, refusals: [] };
+  const triggers = renderedTriggers(manifest.triggers, (read.folder.documents.get('nemia.yaml') as { spec?: Spec } | null)?.spec?.triggers);
+  const wiring: Wiring = {
+    workflows,
+    hires,
+    ...(revisions === undefined ? {} : { revisions }),
+    ...triggers.wiring,
+  };
+  const out: Rendered = { files: [], copies: [], wiring, refusals: [...triggers.refused] };
   const agents = new Map(namesOf(read, 'agents', 'agent.yaml').map((name) => [name, specAt(read, `agents/${name}/agent.yaml`, params)]));
   const substituted: TemplateRead = {
     text: read.text,

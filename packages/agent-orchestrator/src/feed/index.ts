@@ -36,6 +36,7 @@ export type {
   FeedCloseout,
   FeedConflicts,
   FeedMissing,
+  FeedClashes,
   FeedReadiness,
   FeedDenial,
   FeedFold,

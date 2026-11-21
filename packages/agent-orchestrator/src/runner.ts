@@ -450,6 +450,7 @@ export { factoryCommandsOf, factoryHomeOf, factoryList, factoryObject } from './
 export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory/object/mcp-server.verb.ts';
 export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts';
+export { triggerList, triggerObject } from './factory/object/trigger.verb.ts';
 export { hireList, hireObject } from './factory/object/hire.verb.ts';
 export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
@@ -468,6 +469,7 @@ export { FACTORY_COST_LINE_RM, FACTORY_COST_LINE_SET } from './factory/cost-line
  */
 export { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS } from './factory/servers/servers.verb.ts';
 export { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from './factory/schedule/schedule.verb.ts';
+export { FACTORY_TRIGGER, FACTORY_UNTRIGGER } from './factory/trigger/trigger.verb.ts';
 export { serverNameRefusal, type BuiltinServer } from './factory/servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */

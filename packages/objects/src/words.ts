@@ -516,6 +516,8 @@ export const EVENT_REASONS = [
   'ConflictsSettled',
   'AddsMissing',
   'AddsResolved',
+  'TriggersClash',
+  'ClashSettled',
   'LeftEnded',
 ] as const;
 
@@ -693,6 +695,7 @@ export const KINDS = [
   'Factory',
   'McpServer',
   'Schedule',
+  'Trigger',
   'Hire',
   'LibraryAdd',
   'Volume',

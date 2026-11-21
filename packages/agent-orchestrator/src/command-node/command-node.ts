@@ -5,12 +5,10 @@
  * `output:` schema reads as any closeout's output is read. Every node signs off with a closeout: the session's own, a script condition's
  * answer, a command's exit. Pure.
  */
-import { Result, Schema } from 'effect';
 import { attemptVerdict } from '../check/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { stepTaskId, tryOf, type Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
-import type { AttemptOf } from '../script/script.store.ts';
 
 /** The file a command node writes its answer to, in its files folder: its typed fields, as one JSON object. */
 export const COMMAND_ANSWER_FILE = 'command-answer.json';
@@ -21,7 +19,8 @@ export const COMMAND_ANSWER_FILE = 'command-answer.json';
  */
 export const isCommandNode = (step: Pick<StepSpec, 'run'> | undefined): step is StepSpec & { run: string } => step?.run !== undefined;
 
-const AnswerSchema = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown));
+/** The last attempt of a task the pass viewed, by its id: its exit, why it ended, and the answer its script left. */
+type AttemptOf = (taskId: string) => { exitCode?: number | null; reason?: string | null; terminationMessage?: string } | undefined;
 
 /**
  * The closeout a command node signs off with, off its current try's last attempt: `done` on exit 0, its output the answer its script wrote
@@ -30,16 +29,24 @@ const AnswerSchema = Schema.fromJsonString(Schema.Record(Schema.String, Schema.U
  * @param step The command node read.
  * @param run The run whose record holds the node's current task.
  * @param attemptOf The last attempt of each task the pass viewed (`attemptIn`).
+ * @param answerOf The answer a script wrote, read from its text: its fields as one JSON object, or undefined where the text is no JSON
+ *   object.
  */
-export function commandCloseout(step: StepSpec & { run: string }, run: Run, attemptOf: AttemptOf) {
+export function commandCloseout(
+  step: StepSpec & { run: string },
+  run: Run,
+  attemptOf: AttemptOf,
+  answerOf: (text: string) => Readonly<Record<string, unknown>> | undefined,
+) {
   const taskId = run.steps[step.name]?.taskId;
   if (!taskId || taskId !== stepTaskId(run, step.name, tryOf(run, step.name))) return undefined;
   const attempt = attemptOf(taskId);
   if (attemptVerdict(attempt) !== 0) return undefined;
   const text = attempt?.terminationMessage;
-  const decoded = text === undefined || text.trim() === '' ? undefined : Schema.decodeUnknownResult(AnswerSchema)(text);
-  if (decoded !== undefined && Result.isFailure(decoded)) return undefined;
-  const output = decoded === undefined ? undefined : { ...decoded.success };
+  const blank = text === undefined || text.trim() === '';
+  const answer = blank ? undefined : answerOf(text);
+  if (!blank && answer === undefined) return undefined;
+  const output = answer === undefined ? undefined : { ...answer };
   const closeout: Closeout = {
     outcome: 'done',
     summary: `${step.name} exited 0`,

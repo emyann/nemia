@@ -4,16 +4,21 @@
  * object, or on a task of an earlier try.
  */
 import { describe, test } from 'vitest';
+import { Result, Schema } from 'effect';
 import assert from 'node:assert/strict';
 import { commandCloseout } from './command-node.ts';
 import type { StepSpec } from '../step/step.ts';
 import { run } from '../../test/assessed.ts';
 
-const NODE = { name: 'file-cards', after: ['argus'], body: '', run: 'node cards.ts file' } as unknown as StepSpec & { run: string };
+const NODE = { name: 'file-notes', after: ['implementer'], body: '', run: 'node notes.ts file' } as unknown as StepSpec & { run: string };
+
+/** An answer read as the pass reads one (`script.store.ts`): its fields where it is one JSON object, else none. */
+const answerOf = (text: string) =>
+  Result.getOrUndefined(Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)))(text));
 
 /** The closeout the node signs off with where its task's last attempt is `attempt`. */
 const closeoutOn = (attempt: { exitCode?: number | null; reason?: string | null; terminationMessage?: string } | undefined) =>
-  commandCloseout(NODE, run({ 'file-cards': 'r-1-file-cards' }), (id) => (id === 'r-1-file-cards' ? attempt : undefined));
+  commandCloseout(NODE, run({ 'file-notes': 'r-1-file-notes' }), (id) => (id === 'r-1-file-notes' ? attempt : undefined), answerOf);
 
 describe('a command node signs off by its exit', () => {
   test('exit 0 with no answer: done, with no output', () => {
@@ -39,10 +44,10 @@ describe('a command node signs off by its exit', () => {
     });
 
   test("REFUSED: a task of an earlier try is not the node's current closeout", () => {
-    const r = run({ 'file-cards': 'r-1-file-cards' });
-    r.steps['file-cards'] = { ...r.steps['file-cards'], tries: [{ taskId: 'r-1-file-cards' }] } as never;
+    const r = run({ 'file-notes': 'r-1-file-notes' });
+    r.steps['file-notes'] = { ...r.steps['file-notes'], tries: [{ taskId: 'r-1-file-notes' }] } as never;
     assert.equal(
-      commandCloseout(NODE, r, () => ({ exitCode: 0 })),
+      commandCloseout(NODE, r, () => ({ exitCode: 0 }), answerOf),
       undefined,
     );
   });

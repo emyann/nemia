@@ -14,6 +14,14 @@ import { commandCloseout, isCommandNode } from '../command-node/index.ts';
 /** A task's last attempt, as far as a script condition reads it: its exit and the answer file the runtime kept. */
 export type AttemptOf = (taskId: string) => { exitCode?: number | null; reason?: string | null; terminationMessage?: string } | undefined;
 
+const CommandAnswer = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown));
+
+/**
+ * A command node's answer, its fields as one JSON object, or undefined where its text is no JSON object.
+ * @param text The text the runtime kept of the node's answer file.
+ */
+const commandAnswer = (text: string) => Result.getOrUndefined(Schema.decodeUnknownResult(CommandAnswer)(text));
+
 /**
  * The last attempt of each task the pass viewed.
  * @param views The views of the tasks the pass viewed, by task id: their attempts.
@@ -77,7 +85,7 @@ export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf) {
 export const scriptCloseouts =
   (steps: readonly StepSpec[], attemptOf: AttemptOf, run: Run, closeoutOf: (step: string) => Closeout | undefined) => (name: string) => {
     const step = steps.find((s) => s.name === name);
-    if (isCommandNode(step)) return commandCloseout(step, run, attemptOf) satisfies Closeout | undefined;
+    if (isCommandNode(step)) return commandCloseout(step, run, attemptOf, commandAnswer) satisfies Closeout | undefined;
     if (!isScript(step)) return closeoutOf(name) satisfies Closeout | undefined;
     const read = scriptRead(step, run, attemptOf);
     if (read?.kind === 'route')

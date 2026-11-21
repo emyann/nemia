@@ -606,6 +606,8 @@ export const stepPlace = (step: Pick<StepSpec, 'place'>) => step.place ?? 'git';
  * (`validateBaseWorkspace` refuses a second, and refuses anything waiting on it).
  * @param step The step, its `workspace:` among it.
  */
+export const endsOnBase = (step: Pick<StepSpec, 'workspace'>) => step.workspace === 'base';
+
 /**
  * A step's checks, in its order: its `checks:`, or its `check: <line>` as one check named `check` (`SHORTHAND_CHECK`); none where it has
  * neither.
@@ -619,8 +621,6 @@ export const stepChecks = (step: Pick<StepSpec, 'check' | 'checks'>) =>
  * @param step The step.
  */
 export const hasChecks = (step: Pick<StepSpec, 'check' | 'checks'>) => stepChecks(step).length > 0;
-
-export const endsOnBase = (step: Pick<StepSpec, 'workspace'>) => step.workspace === 'base';
 
 /**
  * The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none.

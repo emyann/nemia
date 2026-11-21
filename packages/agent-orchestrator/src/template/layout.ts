@@ -74,7 +74,15 @@ export type FactorySpec = {
   parameters?: Readonly<Record<string, Parameter>>;
   hires: Readonly<Record<string, string>>;
   revisions?: RevisionsPolicy;
+  /**
+   * The card triggers a factory made from the template has, by name: a label selector over a card's labels, often a parameter's value,
+   * and the workflow of the template a card naming none is queued on. One whose selector renders empty is not made (`renderFactory`).
+   */
+  triggers?: Readonly<Record<string, TemplateTrigger>>;
 };
+
+/** A template's card trigger (`FactorySpec.triggers`): its selector, and its target, a workflow of the template. */
+export type TemplateTrigger = { selector: string; target: { kind: 'Workflow'; name: string } };
 
 /** An agent's spec: its portable part, and one block per harness under the harness's name (`Profile`). */
 export type AgentSpec = {
@@ -392,6 +400,13 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
       },
       hires: { fields: {}, rest: 'string' },
       revisions: 'revisions',
+      triggers: {
+        fields: {},
+        rest: {
+          fields: { selector: 'string', target: { fields: { kind: 'string', name: 'string' }, required: ['kind', 'name'] } },
+          required: ['selector', 'target'],
+        },
+      },
       imports: { list: 'not-yet' },
     },
     required: ['version', 'hires'],

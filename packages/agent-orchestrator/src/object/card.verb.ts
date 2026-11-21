@@ -89,7 +89,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) 
       ...(l.gate !== undefined ? { gate: l.gate } : {}),
       ...(l.model !== undefined ? { model: { ...l.model } } : {}),
       ...(l.from.length ? { from: [...l.from] } : {}),
-      ...(l.queued !== undefined ? { queued: l.queued.at } : {}),
+      ...(l.queued !== undefined && l.queued.by === undefined ? { queued: l.queued.at } : {}),
       ...(body !== undefined ? { body } : {}),
     },
     status: {
@@ -100,6 +100,8 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) 
       ...(error !== undefined ? { error } : {}),
       inPlay: CARD_IN_PLAY[l.state],
       ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
+      ...(l.queued?.by !== undefined ? { queuedBy: [...l.queued.by] } : {}),
+      ...(l.clash !== undefined ? { clash: [...l.clash] } : {}),
       file: l.file,
       ...(source ? { source: text } : {}),
     },

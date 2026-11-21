@@ -315,9 +315,9 @@ const runFields = {
    * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
    * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while
    * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line.
-   * Absent on a run started any other way.
+   * Absent on a run started any other way. `trigger`: the card trigger of its factory that queued the card, where one did.
    */
-  from: Schema.optional(Schema.Struct({ inbox: CardName.OnRead })),
+  from: Schema.optional(Schema.Struct({ inbox: CardName.OnRead, trigger: Schema.optional(Schema.String) })),
   /**
    * The schedule that started the run, when the tick did (`startDue` in schedule.verb.ts): the factory, the workflow, and the fire it was
    * started for (`due`). The schedule's last run is read off it. Absent on a run started any other way.

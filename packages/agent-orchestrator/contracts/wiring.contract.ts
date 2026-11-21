@@ -20,15 +20,20 @@ import {
   workflowNameRefusal,
   repoNameRefusal,
   reposNamed,
+  unofferedTriggerRefusal,
+  untriggeredRefusal,
+  triggeredDetachRefusal,
+  triggerNameTakenRefusal,
+  type CardTrigger,
   type Factory,
   type Schedule,
 } from '../src/factory/factory.ts';
 import { hiresInto, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
-import { accepted } from './laws.ts';
+import { accepted, changeNamed, targets, triggerHeld } from './laws.ts';
 
 /**
  * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired
- * from it, a workflow's schedule written or taken back.
+ * from it, a workflow's schedule written or taken back, a card trigger written or taken back by its name.
  */
 export type WiringChange =
   | { readonly verb: 'attach'; readonly workflow: string; readonly repo?: string }
@@ -36,7 +41,9 @@ export type WiringChange =
   | { readonly verb: 'hire'; readonly step: string; readonly agent: string }
   | { readonly verb: 'fire'; readonly step: string }
   | { readonly verb: 'schedule'; readonly workflow: string; readonly schedule: Schedule }
-  | { readonly verb: 'unschedule'; readonly workflow: string };
+  | { readonly verb: 'unschedule'; readonly workflow: string }
+  | { readonly verb: 'trigger'; readonly name: string; readonly trigger: CardTrigger }
+  | { readonly verb: 'untrigger'; readonly name: string };
 
 /** What a change of wiring is refused as: a name or a state that cannot take it (`Invalid`), or what it names is not there (`Missing`). */
 export type WiringRefused = { readonly kind: 'Invalid' | 'Missing'; readonly message: string };
@@ -54,6 +61,10 @@ export const words = [
   assume(unofferedScheduleRefusal, { pure: true }),
   assume(unscheduledRefusal, { pure: true }),
   assume(repoNameRefusal, { pure: true }),
+  assume(unofferedTriggerRefusal, { pure: true }),
+  assume(untriggeredRefusal, { pure: true }),
+  assume(triggeredDetachRefusal, { pure: true }),
+  assume(triggerNameTakenRefusal, { pure: true }),
 ];
 
 /**
@@ -173,30 +184,54 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
       condition: ({ input: [factory, change], output }) =>
         change.verb !== 'attach' || change.repo === undefined || reposNamed(factory, change.repo) === 1 || output?.kind === 'Invalid',
     },
+    triggerOnlyToOffered: {
+      description: 'A trigger whose target is a workflow the factory does not offer is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'trigger' || factory.workflows.includes(change.trigger.target.name) || output !== null,
+    },
+    triggerNameIsFree: {
+      description: 'A trigger named as a workflow the factory schedules, its trigger of the time kind, is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'trigger' || !Object.hasOwn(factory.schedules, change.name) || output !== null,
+    },
+    untriggerOnlyTriggered: {
+      description: 'An untrigger of a well-named trigger the factory does not hold is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'untrigger' ||
+        workflowNameRefusal(change.name) !== undefined ||
+        triggerHeld(factory, change.name) ||
+        output?.kind === 'Missing',
+    },
+    detachLeavesNoTrigger: {
+      description: 'A detach of a workflow a trigger of the factory targets is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !targets(factory, change.workflow) || output !== null,
+    },
     takesWhatItCan: {
       description: 'A change but a hire, well named, that the factory can take is never refused',
       condition: ({ input: [factory, change], output }) =>
         change.verb === 'hire' ||
-        (change.verb !== 'fire' && workflowNameRefusal(change.workflow) !== undefined) ||
+        (change.verb !== 'fire' && workflowNameRefusal(changeNamed(change)) !== undefined) ||
         !accepted(factory, change) ||
         output === null,
     },
     aBadNameIsInvalid: {
-      description: 'A change of a workflow whose name is not one is refused as Invalid, whatever the factory holds',
+      description: 'A change of a workflow or a trigger whose name is not one is refused as Invalid, whatever the factory holds',
       condition: ({ input: [, change], output }) =>
         change.verb === 'hire' ||
         change.verb === 'fire' ||
-        workflowNameRefusal(change.workflow) === undefined ||
+        workflowNameRefusal(changeNamed(change)) === undefined ||
         output?.kind === 'Invalid',
     },
     missingOnlyOfWhatIsNotThere: {
       description:
-        'Missing only where what the change names is not there: a step it hires no one into, a workflow it does not offer or schedule',
+        'Missing only where what the change names is not there: a step it hires no one into, a workflow it does not offer or schedule, a trigger it does not hold',
       condition: ({ input: [factory, change], output }) =>
         output?.kind !== 'Missing' ||
         (change.verb === 'fire' && !Object.hasOwn(factory.hires, change.step)) ||
         (change.verb === 'detach' && !factory.workflows.includes(change.workflow)) ||
-        (change.verb === 'unschedule' && !Object.hasOwn(factory.schedules, change.workflow)),
+        (change.verb === 'unschedule' && !Object.hasOwn(factory.schedules, change.workflow)) ||
+        (change.verb === 'untrigger' && !triggerHeld(factory, change.name)),
     },
   },
 });
@@ -266,6 +301,14 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     attachOffers: {
       description: 'After an attach the factory offers the workflow',
       condition: ({ input: [, change], output }) => change.verb !== 'attach' || output.workflows.includes(change.workflow),
+    },
+    triggerHolds: {
+      description: 'After a trigger the factory holds it by its name',
+      condition: ({ input: [, change], output }) => change.verb !== 'trigger' || triggerHeld(output, change.name),
+    },
+    untriggerLeaves: {
+      description: 'After an untrigger the factory holds no trigger by that name',
+      condition: ({ input: [, change], output }) => change.verb !== 'untrigger' || !triggerHeld(output, change.name),
     },
   },
 });

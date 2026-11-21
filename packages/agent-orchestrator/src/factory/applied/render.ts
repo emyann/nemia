@@ -36,7 +36,28 @@ export type TemplateRead = {
  * The wiring a factory made from a template is given: every workflow it holds, by name, who fills each `<workflow>/<step>`, and whether
  * its runs follow merged revisions, where the manifest says (`spec.revisions`).
  */
-export type Wiring = { workflows: string[]; hires: Record<string, string>; revisions?: RevisionsPolicy };
+export type Wiring = {
+  workflows: string[];
+  hires: Record<string, string>;
+  revisions?: RevisionsPolicy;
+  triggers?: Record<string, { selector: string; target: { kind: 'Workflow'; name: string }; since: string }>;
+};
+
+/**
+ * The card triggers of a template's manifest as a tree's wiring holds them, its parameters rendered: each whose selector renders
+ * non-empty, its target's workflow by name; none where none is left.
+ * @param triggers The manifest's `triggers`, as its YAML reads, parameters substituted.
+ */
+export function renderedTriggers(triggers: unknown) {
+  const out: NonNullable<Wiring['triggers']> = {};
+  for (const [name, t] of Object.entries(isMap(triggers) ? triggers : {})) {
+    if (!isMap(t) || !isMap(t.target)) continue;
+    const selector = typeof t.selector === 'string' ? t.selector.trim() : '';
+    if (!selector) continue;
+    out[name] = { selector, target: { kind: 'Workflow', name: String(t.target.name) }, since: '' };
+  }
+  return Object.keys(out).length ? { triggers: out } : {};
+}
 
 /**
  * A rendered factory: each file to write, by its path in the tree; each file of the template carried as it is (`from`) to `path`; its
@@ -337,7 +358,7 @@ function renderRules(rules: string | undefined, out: Rendered) {
 /**
  * The template `read`, which passes its check, rendered with `params` into the files of a factory's tree: each workflow's steps, each
  * agent, each skill carried whole (a `skill.yaml` left behind: what it fetches is refused by the check), `factory.json` holding every
- * workflow, the manifest's hires and its revisions policy, the template's `home/` carried whole into the tree's `home/` (`HOME_FOLDER`),
+ * workflow, the manifest's hires, its revisions policy and its card triggers whose selector renders non-empty, the template's `home/` carried whole into the tree's `home/` (`HOME_FOLDER`),
  * `NEMIA.md` from the manifest's instruction or the template's own, and `RULES.md` from its rules, as `renderRules` writes them. Refused,
  * each by name, nothing to write: what `renderStep`, `renderAgent` or `renderRules` refuses, a harness block's `options`, and a block of a
  * harness the step or agent does not run on.
@@ -349,7 +370,12 @@ export function renderFactory(read: TemplateRead, params: Params) {
   const hires = Object.fromEntries(Object.entries(isMap(manifest.hires) ? manifest.hires : {}).map(([k, v]) => [k, String(v)]));
   const workflows = namesOf(read, WORKFLOWS, 'workflow.yaml');
   const revisions = REVISIONS_POLICIES.find((p) => p === manifest.revisions);
-  const wiring: Wiring = { workflows, hires, ...(revisions === undefined ? {} : { revisions }) };
+  const wiring: Wiring = {
+    workflows,
+    hires,
+    ...(revisions === undefined ? {} : { revisions }),
+    ...renderedTriggers(manifest.triggers),
+  };
   const out: Rendered = { files: [], copies: [], wiring, refusals: [] };
   const agents = new Map(namesOf(read, 'agents', 'agent.yaml').map((name) => [name, specAt(read, `agents/${name}/agent.yaml`, params)]));
   const substituted: TemplateRead = {

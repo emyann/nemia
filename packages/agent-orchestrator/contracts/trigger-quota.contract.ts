@@ -47,8 +47,7 @@ const triggerQuotaSpec = spec<(reached: readonly ReachedWorkflow[]) => TriggerQu
     },
     freeWhenAllReadAndNoAgent: {
       description: 'A trigger whose reached workflows all read, with no session or judge among their steps, costs no quota',
-      condition: ({ input: [reached], output }) =>
-        !reached.every((w) => w.read === 'known' && !agentIn(w)) || output === 'free',
+      condition: ({ input: [reached], output }) => !reached.every((w) => w.read === 'known' && !agentIn(w)) || output === 'free',
     },
   },
 });

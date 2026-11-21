@@ -108,8 +108,7 @@ const cardTriggeredSpec = spec<(card: TriggerCard, matching: readonly CardTrigge
     },
     clashOnlyOnTwoTargets: {
       description: 'A clash is only ever of a card naming no workflow whose triggers target two workflows',
-      condition: ({ input: [card, matching], output }) =>
-        output.kind !== 'clash' || (card.workflow === null && twoTargets(card, matching)),
+      condition: ({ input: [card, matching], output }) => output.kind !== 'clash' || (card.workflow === null && twoTargets(card, matching)),
     },
   },
 });

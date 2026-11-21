@@ -58,6 +58,7 @@ import {
   type FrontmatterPair,
 } from '../frontmatter/frontmatter.ts';
 import { labelRefusal, labelsText, type Labels } from '../labels/labels.ts';
+import { cardTriggered, matchingTriggers, triggerCardOf, type SelectingTrigger } from './triggered.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `nemia inbox rm` and a start name it by. */
@@ -365,9 +366,15 @@ export type InboxListing = {
   error: string | null;
   /**
    * On a queued card only: when it was queued, and its place in the order the tick starts cards in (`queueOrder`), from 1 — null for a card
-   * a record says was started, which the tick never starts again.
+   * a record says was started, which the tick never starts again. A card a trigger of its factory queues (`cardTriggered`), which writes
+   * nothing on it, is queued when it was filed, `by` those triggers, on `workflow`, its own or their target.
    */
-  queued?: { at: string; place: number | null };
+  queued?: { at: string; place: number | null; by?: string[]; workflow?: string };
+  /**
+   * On a card the card triggers of its factory would send, naming no workflow, to two workflows: each of them. It waits, unqueued, until
+   * a selector or its labels change.
+   */
+  clash?: string[];
   /**
    * On a queued card only, whose start the tick tried and did not make, as the card stands (`MissedStart`): when, on which repository, why,
    * and whether the package refused it or something else failed.
@@ -438,6 +445,31 @@ export const cardInPlay = (l: Pick<InboxListing, 'state'>) => CARD_IN_PLAY[l.sta
 export type CardListing = Omit<InboxListing, 'state'>;
 
 /**
+ * What the card triggers read on a pass: every factory's (`everyCardTrigger`), and when a card was filed, by its name, which orders a
+ * card a trigger queues among those queued by hand.
+ */
+export type Triggering = { readonly triggers: readonly SelectingTrigger[]; readonly filedAt: (name: string) => string | null };
+
+/**
+ * What the card triggers do with a card the listing read, as `cardTriggered` decides: the listing's `queued` or `clash`, or nothing.
+ * @param entry The card: its name, labels, workflow and factory, whether it is queued by hand and the runs it was started as.
+ * @param triggering The card triggers of every factory, and when each card was filed.
+ */
+function triggeredOf(
+  entry: Pick<CardListing, 'name' | 'labels' | 'workflow' | 'factory' | 'queued' | 'startedAs'>,
+  triggering: Triggering | undefined,
+) {
+  if (triggering === undefined || entry.queued !== undefined || entry.startedAs.length) return {};
+  const matching = matchingTriggers(cardLabels(entry), triggering.triggers);
+  const card = triggerCardOf({ factory: entry.factory, workflow: entry.workflow, queued: false, started: false, readable: true });
+  const did = cardTriggered(card, matching);
+  if (did.kind === 'clash') return { clash: [...did.by] } satisfies Pick<CardListing, 'clash'>;
+  if (did.kind === 'none') return {};
+  const at = triggering.filedAt(entry.name) ?? '';
+  return { queued: { at, place: null, by: [...did.by], workflow: did.workflow } } satisfies Pick<CardListing, 'queued'>;
+}
+
+/**
  * The inbox as `nemia inbox` lists it before its runs' phases are read (`CardListing`), by file name: every entry of the folder — a folder
  * inside it by its name and a trailing `/` — each card with the runs its name is on (`startedAs`), and each entry that is not a card listed
  * with why, never hidden. A hidden file and a README are not listed: the one is an editor's, the other says what the folder is for. A
@@ -448,12 +480,15 @@ export type CardListing = Omit<InboxListing, 'state'>;
  * @param runs The store's runs, each with the cards it was started from (`from`).
  * @param tries The tick's last try of each queued card's start, by card name; none where none is handed.
  * @param factories The store's factories that read, by name; none where none is handed.
+ * @param triggering The card triggers of every factory and when each card was filed: a card one selects is listed queued by it, or with
+ *   its clash (`cardTriggered`); none where none is handed.
  */
 export function cardsListed(
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from'>[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
+  triggering?: Triggering,
 ) {
   const triedOf = (name: string, text: string) => {
     const t = tries.get(name);
@@ -486,7 +521,7 @@ export function cardsListed(
       const read = cardOrWhy(file, text);
       if ('card' in read) {
         const { card } = read;
-        return {
+        const listing: CardListing = {
           name,
           file,
           title: headline(card.body),
@@ -502,6 +537,8 @@ export function cardsListed(
           error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
+        const triggered = triggeredOf(listing, triggering);
+        return 'queued' in triggered ? { ...listing, ...triggered, ...triedOf(name, text) } : { ...listing, ...triggered };
       }
       return {
         name,
@@ -530,15 +567,17 @@ export function cardsListed(
  * @param runs The store's runs, each with the cards it was started from and its phase as read now.
  * @param tries The tick's last try of each queued card's start, by card name; none where none is handed.
  * @param factories The store's factories that read, by name; none where none is handed.
+ * @param triggering The card triggers of every factory and when each card was filed; none where none is handed.
  */
 export function inboxListing(
   files: readonly PlanFile[],
   runs: readonly CardRun[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
+  triggering?: Triggering,
 ) {
   const phases = new Map(runs.map((r) => [r.id, r.phase] as const));
-  return cardsListed(files, runs, tries, factories).map((l) => ({
+  return cardsListed(files, runs, tries, factories, triggering).map((l) => ({
     ...l,
     state: cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) }),
   })) satisfies InboxListing[] as InboxListing[];
@@ -566,9 +605,12 @@ export type WiredFactory = Pick<Factory, 'volumes' | 'workflowRepos'>;
  * @param l The card: its workflow and the factory it names, null for the default one.
  * @param factories The store's factories that read, by name.
  */
-export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, factories: ReadonlyMap<string, WiredFactory>) {
+export function factoryRepoOf(
+  l: Pick<InboxListing, 'workflow' | 'factory'> & Partial<Pick<InboxListing, 'queued'>>,
+  factories: ReadonlyMap<string, WiredFactory>,
+) {
   const factory = l.factory === null ? undefined : factories.get(l.factory);
-  const workflow = cardWorkflowName(l.workflow);
+  const workflow = cardWorkflowName(l.queued?.workflow ?? l.workflow);
   if (factory === undefined || workflow === undefined) return null;
   const of = workflowRepo(namedRepos(factory), factory.workflowRepos, workflow);
   return ('repo' in of ? of.repo : null) satisfies string | null;
@@ -583,7 +625,11 @@ export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, fac
  * @param daemonRepo The repository the daemon runs in.
  * @param factories The store's factories that read, by name.
  */
-export function queueRepo(l: Pick<InboxListing, 'workflow' | 'factory'>, daemonRepo: string, factories: ReadonlyMap<string, WiredFactory>) {
+export function queueRepo(
+  l: Pick<InboxListing, 'workflow' | 'factory'> & Partial<Pick<InboxListing, 'queued'>>,
+  daemonRepo: string,
+  factories: ReadonlyMap<string, WiredFactory>,
+) {
   if (l.factory === null) return { repo: daemonRepo, fromDaemon: true };
   return { repo: factoryRepoOf(l, factories) ?? '', fromDaemon: false };
 }
@@ -682,7 +728,9 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}, ${phaseSaid(l.state)}` : '';
-    const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
+    const by = l.queued?.by?.length ? ` by ${l.queued.by.join(', ')}${l.workflow ? '' : ` on ${l.queued.workflow ?? ''}`}` : '';
+    const clash = l.clash?.length ? `  waiting: triggers ${l.clash.join(', ')} clash` : '';
+    const queued = `${l.queued?.place ? `  queued ${l.queued.place} of ${inLine}${by}` : ''}${clash}`;
     const tried = triedClause(l, unfactoredStarts);
     const labelled = labelSegments(cardLabels(l), show);
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}${labelled}`;

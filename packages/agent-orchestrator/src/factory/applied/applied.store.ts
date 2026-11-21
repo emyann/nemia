@@ -44,6 +44,16 @@ export const statusFile = (home: string, name: string) => path.join(folderAt(hom
 /** One file of a folder to stage: its path in it, its bytes, and its mode where it keeps one (an executable script of a skill). */
 export type Entry = { path: string; bytes: Buffer; mode?: number };
 
+/** A card trigger as a factory's file or its tree's wiring holds it (`CardTrigger`), a key a later `nemia` writes beside its own kept. */
+export const CardTriggerSchema = Schema.StructWithRest(
+  Schema.Struct({
+    selector: Schema.String,
+    target: Schema.Struct({ kind: Schema.Literal('Workflow'), name: Schema.String }),
+    since: Schema.String,
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
 /**
  * The wiring a templated factory's tree holds in `factory.json`: its workflows, its hires, whether its runs follow merged revisions
  * when it says, and the repository each workflow works on by folder name, where a person named one (`nemia factory attach … --repo`):
@@ -56,6 +66,7 @@ const TreeWiringSchema = Schema.StructWithRest(
     hires: Schema.Record(Schema.String, Schema.String),
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
     workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    triggers: Schema.optionalKey(Schema.Record(Schema.String, CardTriggerSchema)),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );

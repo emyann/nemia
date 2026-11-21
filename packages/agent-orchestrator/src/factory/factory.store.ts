@@ -47,7 +47,7 @@ import { volumesFromRepos, type FileVolume } from './from-repos/from-repos.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';
-import { readStatus, readTreeWiring, treeDir, writeTreeWiring } from './applied/applied.store.ts';
+import { CardTriggerSchema, readStatus, readTreeWiring, treeDir, writeTreeWiring } from './applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { generationWritten } from './door/generation.ts';
@@ -100,7 +100,8 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * name (`workflowRepos`), where it is made from no
  * template (one made from a template keeps it in its tree's wiring, as an attach writes it); and the template it was made from, when it was
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
- * a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
+ * a file written before the counter; a volume's `name`; its own card triggers, by name (`triggers`), kept here as its schedules are. A key
+ * a later `nemia` writes is kept.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -113,6 +114,7 @@ const FactoryFileSchema = Schema.StructWithRest(
     harnessSettings: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
     costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Number)),
     workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    triggers: Schema.optionalKey(Schema.Record(Schema.String, CardTriggerSchema)),
     generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
       Schema.StructWithRest(
@@ -218,6 +220,7 @@ function factoryOf(home: string, name: string, content: FactoryFile) {
     ...(template === undefined ? {} : { template, tree: treeDir(home, name) }),
     ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
     ...(content.costLines === undefined ? {} : { costLines: content.costLines }),
+    ...(content.triggers === undefined ? {} : { triggers: content.triggers }),
     ...(content.generation === undefined ? {} : { generation: content.generation }),
   } satisfies Factory | { error: string } as Factory | { error: string };
 }
@@ -385,6 +388,7 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory) {
   kept('instruction', factory.instruction);
   kept('harnessSettings', factory.harnessSettings);
   kept('costLines', factory.costLines);
+  kept('triggers', factory.triggers !== undefined && Object.keys(factory.triggers).length ? factory.triggers : undefined);
   kept('template', factory.template === undefined ? undefined : { ...content?.template, ...factory.template });
   if (factory.generation !== undefined) next.generation = factory.generation;
   return next as FactoryFile;
@@ -521,6 +525,8 @@ const DONE = {
   revisions: 'changed',
   schedule: 'scheduled',
   unschedule: 'unscheduled',
+  trigger: 'triggered',
+  untrigger: 'untriggered',
   upgrade: 'upgraded',
 } as const;
 
@@ -606,7 +612,10 @@ function toChange(home: string, name: string, verb: Rewrite) {
  */
 export function wiringNamesRefused(name: string, change: WiringChange) {
   if (change.verb !== 'fire') {
-    const bad = change.verb === 'hire' ? hireRefusal(change.step, change.agent) : workflowNameRefusal(change.workflow);
+    const bad =
+      change.verb === 'hire'
+        ? hireRefusal(change.step, change.agent)
+        : workflowNameRefusal(change.verb === 'trigger' || change.verb === 'untrigger' ? change.name : change.workflow);
     if (bad) throw new Invalid({ message: `${bad} Nothing was ${DONE[change.verb]}.` });
   }
   refuseName(name, change.verb);
@@ -621,7 +630,8 @@ export function wiringNamesRefused(name: string, change: WiringChange) {
  */
 export function wiringChecked(factory: Factory, change: WiringChange, onDisk: (factory: Factory) => Error | undefined = () => undefined) {
   const tree = factory.tree;
-  if (tree !== undefined && change.verb !== 'schedule' && change.verb !== 'unschedule' && !fs.existsSync(path.join(tree, 'factory.json')))
+  const own = ['schedule', 'unschedule', 'trigger', 'untrigger'].includes(change.verb);
+  if (tree !== undefined && !own && !fs.existsSync(path.join(tree, 'factory.json')))
     throw new Conflict({ message: unrenderedTreeRefusal(factory.name, tree, `Nothing was ${DONE[change.verb]}.`) });
   const judged = wiringRefusal(factory, change);
   if (judged) throw judged.kind === 'Missing' ? new Missing({ message: judged.message }) : new Invalid({ message: judged.message });

@@ -40,7 +40,7 @@ import { inboxDir } from '../record/files.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
-import { filedNames, inboxCards, readableFactories } from './inbox.store.ts';
+import { filedNames, inboxCards, readableFactories, triggeringOf } from './inbox.store.ts';
 import { startRun, startedSteps, type StartedRun } from '../start/start.verb.ts';
 import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
@@ -87,6 +87,8 @@ export type InboxStart = {
   models?: RunModels;
   /** The start's label edits (`nemia start --label`), over the card's own `labels:` and what its runs agree on. */
   labels?: readonly string[];
+  /** The card trigger that queued the card, which the run records as where it came from (`from.trigger`): the queue's start alone. */
+  trigger?: string;
 };
 
 /**
@@ -240,7 +242,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     ...(context.length ? { context } : {}),
     inputs: opts.inputs,
     cards: opts.cards,
-    from: { inbox: card.name },
+    from: { inbox: card.name, ...(opts.trigger === undefined ? {} : { trigger: opts.trigger }) },
     ...(gates.length ? { gates } : {}),
     ...cardModels(card, opts.models),
     ...(factory !== undefined ? { factory } : {}),
@@ -396,15 +398,19 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   const runs = given ?? (yield* (yield* RunDoor).runs.list());
   const files = yield* door.cards.entries();
   const tries = yield* door.tries.list();
-  const listing = cardsListed(files, runs, tries);
+  const factories = yield* readableFactories();
+  const listing = cardsListed(files, runs, tries, factories, yield* triggeringOf(files, factories.values()));
   yield* dropStaleTries(tries.keys(), listing);
   if (!queueOrder(listing).length) return undefined;
-  const factories = yield* readableFactories();
   const next = nextQueued(listing, repo, factories);
   if (!next) return undefined;
   const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
   const where = daemonsRepo(next, on, fromDaemon, yield* setting('defaultFactoryStarts'));
-  const tried = yield* Effect.exit(startFromInbox({ name: next.name, callerRepo: repo }));
+  const by = next.queued?.by?.[0];
+  const onTarget = by !== undefined && next.workflow === null && next.queued?.workflow ? { workflow: next.queued.workflow } : {};
+  const tried = yield* Effect.exit(
+    startFromInbox({ name: next.name, callerRepo: repo, ...onTarget, ...(by === undefined ? {} : { trigger: by }) }),
+  );
   if (Exit.isSuccess(tried)) {
     const started = tried.value;
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};
@@ -445,5 +451,6 @@ export const inboxJudged = Effect.fn('inboxJudged')(function* (e: Engine, how: S
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();
   const runs = yield* cardRuns(e, how);
-  return inboxListing(entries, runs, tries, yield* readableFactories());
+  const factories = yield* readableFactories();
+  return inboxListing(entries, runs, tries, factories, yield* triggeringOf(entries, factories.values()));
 });

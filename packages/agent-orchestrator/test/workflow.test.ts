@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fansOut, parseWorkflow, WorkflowError } from '../src/workflow.ts';
 import { workflowDescription, workflowFolder, workflowNeeds, workflowReadme, workflowReadmeWith } from '../src/folder/folder.store.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
+import { stepSetRefusal } from '../src/workflow/index.ts';
 import { CLOSEOUT_FIELDS, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, type StepDraft } from '../src/workflow.ts';
 import { skillsFor } from '../src/skills/read.store.ts';
@@ -195,20 +196,24 @@ test('REFUSED: a folder with a README and no step, as a folder with no step is â
   }
 });
 
-describe('REFUSED: a command node or a named check the run could not file as written, as a WorkflowError with exit 2 opening on the step', () => {
+describe('REFUSED: a command node or a named check the run could not file as written, opening on the step', () => {
   const IMPLEMENT = '---\nplace: git\n---\nImplement it.\n';
   const rows: [string, Record<string, string>, string][] = [
     [
       'a command node with an instruction of its own',
-      { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\n---\nFile them.\n' },
+      { 'file-notes.md': '---\nafter: implement\nplace: git\nrun: node notes.ts\n---\nFile them.\n' },
       'file-notes:',
     ],
     [
       'a command node with a workspace of its own',
-      { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\nworkspace: base\n---\n' },
+      { 'file-notes.md': '---\nafter: implement\nplace: git\nrun: node notes.ts\nworkspace: base\n---\n' },
       'file-notes:',
     ],
-    ['a command node that names no agent', { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\n---\n' }, 'file-notes:'],
+    [
+      'a command node that names no agent',
+      { 'file-notes.md': '---\nafter: implement\nplace: git\nrun: node notes.ts\n---\n' },
+      'file-notes:',
+    ],
     [
       'an ending on the base branch with two checks',
       {
@@ -217,19 +222,21 @@ describe('REFUSED: a command node or a named check the run could not file as wri
       },
       'land:',
     ],
-    [
-      "a step named for another step's named check",
-      {
-        'implement.md': '---\nplace: git\nchecks:\n  - { name: probe, run: npm run probe }\n---\nImplement it.\n',
-        'implement-check-probe.md': '---\nafter: implement\nplace: git\n---\nProbe it.\n',
-      },
-      'implement-check-probe',
-    ],
   ];
   for (const [what, files, at] of rows)
     test(what, () => {
       refusedNaming(at)(folderRefusal(folder({ 'implement.md': IMPLEMENT, ...files })));
     });
+
+  test("a step named for another step's named check loads, and no run may take it (`stepSetRefusal`), the refusal opening on it", () => {
+    const steps = loadWorkflows(
+      folder({
+        'implement.md': '---\nplace: git\nchecks:\n  - { name: probe, run: npm run probe }\n---\nImplement it.\n',
+        'implement-check-probe.md': '---\nafter: implement\nplace: git\n---\nProbe it.\n',
+      }),
+    );
+    names(stepSetRefusal(steps, true) ?? '', 'implement-check-probe:');
+  });
 });
 
 test('REFUSED: a folder of workflows is not a workflow, and the refusal names the ones in it', () => {

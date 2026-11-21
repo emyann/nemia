@@ -170,7 +170,10 @@ describe('a command node is filed once its parent signed off, its line run on th
     const dir = path.join(teamCopy(), 'notes');
     fs.mkdirSync(dir);
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nagent: implementer\n---\nimplement it\n');
-    fs.writeFileSync(path.join(dir, 'file-notes.md'), '---\nafter: implement\nagent: implementer\nrun: node notes.ts file\n---\n');
+    fs.writeFileSync(
+      path.join(dir, 'file-notes.md'),
+      '---\nafter: implement\nplace: git\nagent: implementer\nrun: node notes.ts file\n---\n',
+    );
     id = (await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }))).id;
     assert.deepEqual((await pass(id)).filed, ['implement']);
     assert.equal(stage.board().tasks.has(node()), false, 'a node waits on its parent');

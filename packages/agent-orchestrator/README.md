@@ -1785,8 +1785,13 @@ retries: 1
   own last session (`resumeFrom` the try before, as `resume:` does between steps). Its brief says what became
   of the last try, and carries the check's verdict as data: the command, the exit code, the last 300 lines of
   stdout and of stderr (`REFUSAL_LINES`, within each stream's last 64 kB: enough to fix what failed, where `nemia decide` shows
-  20), and the sentence that it must not weaken the check. At most `n` times. Past that the
-  step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
+  20), and the sentence that it must not weaken the check. Beside that tail it is handed each stream whole, as a file in its own files
+  folder it can read and search (`checks/<check task>.stdout.log` and `.stderr.log`, `writeCheckOutputs`), named in the brief with its
+  line count and the ask to fix every failure in it, not only those at the end: up to `REFUSAL_FILE_BYTES` (8 MiB) a stream, its last
+  8 MiB past it, said as cut. Where the files cannot be written the try is filed all the same, told why, with the tail alone. A loop's
+  target filed to merge a base whose ending's check refused the merged tree is handed that check's streams the same way, in its own
+  files folder. A try on a remote agent is handed no files: its brief carries no refusal (`remoteBrief`). At most `n` times. Past that
+  the step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
   runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
   `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,

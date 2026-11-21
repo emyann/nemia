@@ -32,7 +32,10 @@ import {
   FAILING_LINES,
   failingLines,
   landingSaidSection,
+  keptOutput,
+  REFUSAL_FILE_BYTES,
   type CheckEnv,
+  type RefusalKept,
   type Verdict,
 } from './check.ts';
 import { checkTaskId, refusedCheck, stepTaskId, type Run } from '../record/record.ts';
@@ -352,6 +355,86 @@ describe('refusalSection: what a check said reaches the step tried again as data
     assert.ok(killed.includes('--recheck'));
     assert.ok(!killed.includes('WF_MEMORY_LIMIT'));
     assert.deepEqual(Object.keys(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(killed)![1])), ['command', 'exit', 'stdout', 'stderr']);
+  });
+});
+
+describe('refusalSection: the files of the whole output, named before the data', () => {
+  const said = { command: 'npm test', verdict: 1 as const, stdout: 'tail out', stderr: 'tail err' };
+  const kept: RefusalKept = {
+    stdout: { path: '/a/checks/r-1-implement-check.stdout.log', lines: 3650, cut: false },
+    stderr: { path: '/a/checks/r-1-implement-check.stderr.log', lines: 12, cut: false },
+    capBytes: REFUSAL_FILE_BYTES,
+  };
+  const fenceAt = (text: string) => text.search(/`{3,}json/);
+  test('both paths and both counts, before the fence; the JSON keys unchanged', () => {
+    const text = refusalSection({ ...said, kept });
+    for (const fact of [kept.stdout.path, kept.stderr.path, '3650', '12']) {
+      assert.ok(text.includes(fact), fact);
+      assert.ok(text.indexOf(fact) < fenceAt(text), `${fact} before the fence`);
+    }
+    assert.deepEqual(Object.keys(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(text)![1])), ['command', 'exit', 'stdout', 'stderr']);
+  });
+  test('a stream cut at the bound names its path and the bound in MiB, before the fence', () => {
+    const text = refusalSection({ ...said, kept: { ...kept, stderr: { ...kept.stderr, cut: true } } });
+    const mib = `${REFUSAL_FILE_BYTES / 1024 / 1024} MiB`;
+    assert.ok(text.includes(mib) && text.indexOf(mib) < fenceAt(text), mib);
+    assert.ok(!refusalSection({ ...said, kept }).includes(mib), 'no bound said where nothing was cut');
+  });
+  test('files that could not be written: why, before the fence, and no path', () => {
+    const text = refusalSection({ ...said, kept: { unwritten: 'EACCES: permission denied; the check is task r-1-implement-check' } });
+    assert.ok(text.includes('EACCES') && text.indexOf('EACCES') < fenceAt(text));
+    assert.ok(!text.includes('.log'));
+  });
+  test('no files kept: no path, as before', () => assert.ok(!refusalSection(said).includes('checks/')));
+});
+
+describe('landingSaidSection: the files of the whole output, named before the data', () => {
+  const said = {
+    step: 'ship',
+    check: 'r-ship-check',
+    command: 'npm test',
+    verdict: 1 as const,
+    stdout: 'o',
+    stderr: 'e',
+    failing: [],
+    cut: 0,
+    partial: false,
+  };
+  test('both paths before the fence, and the section still ends with the JSON', () => {
+    const kept: RefusalKept = {
+      stdout: { path: '/a/checks/r-ship-check.stdout.log', lines: 9, cut: false },
+      stderr: { path: '/a/checks/r-ship-check.stderr.log', lines: 1, cut: true },
+      capBytes: REFUSAL_FILE_BYTES,
+    };
+    const text = landingSaidSection({ ...said, kept });
+    const fenceAt = text.search(/`{3,}json/);
+    for (const fact of [kept.stdout.path, kept.stderr.path, `${REFUSAL_FILE_BYTES / 1024 / 1024} MiB`])
+      assert.ok(text.includes(fact) && text.indexOf(fact) < fenceAt, fact);
+    assert.ok(text.endsWith('\n```'));
+  });
+});
+
+describe('keptOutput: a stream kept whole up to its bound, its end past it', () => {
+  const rows: Array<[string, string, number, { cut: boolean; lines: number; text?: string }]> = [
+    ['within the cap, a trailing newline', 'a\nb\n', 10, { cut: false, lines: 2, text: 'a\nb\n' }],
+    ['within the cap, no trailing newline', 'a\nb', 10, { cut: false, lines: 2, text: 'a\nb' }],
+    ['empty', '', 10, { cut: false, lines: 0, text: '' }],
+    ['exactly at the cap', 'abcde', 5, { cut: false, lines: 1, text: 'abcde' }],
+    ['past the cap: its last bytes', 'one\ntwo\nthree', 7, { cut: true, lines: 2, text: 'o\nthree' }],
+  ];
+  for (const [name, text, cap, want] of rows)
+    test(name, () => {
+      const kept = keptOutput(text, cap);
+      assert.equal(kept.cut, want.cut);
+      assert.equal(kept.lines, want.lines);
+      assert.equal(kept.text, want.text);
+      assert.ok(text.endsWith(kept.text) && Buffer.byteLength(kept.text) <= cap);
+    });
+  test('a cut never starts inside a character', () => {
+    const kept = keptOutput('é'.repeat(10), 5);
+    assert.notEqual(kept.text[0], '\uFFFD');
+    assert.equal(Buffer.byteLength(kept.text), 4);
+    assert.equal(kept.cut, true);
   });
 });
 

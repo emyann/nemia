@@ -42,7 +42,8 @@ import {
   runWith,
 } from '../src/runner.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
-import { askFile, asksDir, listRuns, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
+import { artifactsDir, askFile, asksDir, listRuns, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
+import { checkOutputFile } from '../src/check/check.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import { isRepositoryRun, LINE_NAME, shownNote, shownStatus } from '../src/run.ts';
@@ -1977,6 +1978,43 @@ describe('a check killed at its memory limit is told to the step tried again, ou
   test('a record with no kill, or none: nothing of memory', async () => {
     assert.doesNotMatch(await toldAfter({ exitCode: 1, memory: { limitBytes: 6 * GI, peakBytes: GI, oomKills: 0 } }), /out of memory/);
     assert.doesNotMatch(await toldAfter({ exitCode: 1 }), /out of memory/);
+  });
+});
+
+describe("a refused check's whole output reaches the try as files, past the tail it is told", () => {
+  let b!: import('./story.ts').Board;
+  let stdout!: string;
+  let stderr!: string;
+  beforeAll(() => {
+    b = stage.board();
+    stdout = ['FIRST-FAILURE: expected 1 to be 2', ...Array.from({ length: 4000 }, (_, i) => `line ${i + 1}`)].join('\n');
+    stderr = ['first-stderr', ...Array.from({ length: 400 }, (_, i) => `err ${i + 1}`)].join('\n');
+  });
+  const refused = () => throughCheck(['check: npm test', 'retries: 1'], 'failed', { exitCode: 1, printed: { stdout, stderr } });
+  test('the try is told both files, each holds its stream exactly, and the early failure is in the file, not the tail', async () => {
+    const { id } = await refused();
+    assert.deepEqual((await tick(id)).tried, ['implement']);
+    const brief = b.tasks.get(`${id}-implement-try2`)!.spec.brief;
+    const files = artifactsDir(ROOT, { id }, 'implement');
+    const out = checkOutputFile(files, `${id}-implement-check`, 'stdout');
+    const err = checkOutputFile(files, `${id}-implement-check`, 'stderr');
+    assert.ok(brief.includes(out), out);
+    assert.ok(brief.includes(err), err);
+    assert.equal(fs.readFileSync(out, 'utf8'), stdout);
+    assert.equal(fs.readFileSync(err, 'utf8'), stderr);
+    const json = /```+json\n([\s\S]*?)\n```+/.exec(brief.slice(brief.indexOf('## What the check said')))![1];
+    assert.ok(!json.includes('FIRST-FAILURE'), 'the tail does not reach the first failure');
+  });
+  test('files that cannot be written still file the try, told why and the check', async () => {
+    const run = await refused();
+    const files = artifactsDir(ROOT, run, 'implement');
+    fs.mkdirSync(files, { recursive: true });
+    fs.writeFileSync(path.join(files, 'checks'), 'in the way');
+    assert.deepEqual((await tick(run.id)).tried, ['implement']);
+    const brief = b.tasks.get(`${run.id}-implement-try2`)!.spec.brief;
+    assert.ok(!brief.includes('.stdout.log'));
+    assert.match(brief, /EEXIST|ENOTDIR/);
+    assert.ok(brief.includes(`${run.id}-implement-check`));
   });
 });
 

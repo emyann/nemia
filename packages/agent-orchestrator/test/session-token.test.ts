@@ -4,7 +4,8 @@
  * the try is the live one, `session-ended` once it settled or a later try replaced it, `unknown-token` for one the store never minted,
  * and the person for none. Nemia's session is filed one too, in no factory. A standing token is its holder — the person, or an agent —
  * whatever the route needs, until it is retired by name; none, where the route needs one, is refused. `nemia token add`, `ls` and `rm` as
- * the api calls them. Kinds are asserted, never sentences.
+ * the api calls them. A step's check and a command node are filed a token of their own, their agent's, refused once their task settled.
+ * Kinds are asserted, never sentences.
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
@@ -14,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
+import { teamCopy } from './team.ts';
 import { staged, story } from './story.ts';
 import { advanceRun, startRun, runWith, retryRun } from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
@@ -156,6 +158,35 @@ describe("a step's check is filed a token of its own, which names the step's age
   });
   s.test('once the check settled, its token is refused session-ended', async () => {
     stage.board().settle(`${id}-implement-check`, 'succeeded', undefined, 0);
+    assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
+  });
+});
+
+describe("a command node is filed once its parent signed off, its line run on the command harness under a token of the agent it names", () => {
+  const s = story(test);
+  let id = '';
+  const node = () => `${id}-file-notes`;
+  s.test('implement signs off: the next pass files the node, its line run by sh, its answer file named in its environment', async () => {
+    const dir = path.join(teamCopy(), 'notes');
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nagent: implementer\n---\nimplement it\n');
+    fs.writeFileSync(path.join(dir, 'file-notes.md'), '---\nafter: implement\nagent: implementer\nrun: node notes.ts file\n---\n');
+    id = (await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }))).id;
+    assert.deepEqual((await pass(id)).filed, ['implement']);
+    assert.equal(stage.board().tasks.has(node()), false, 'a node waits on its parent');
+    stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'done', artifacts: [], needs: null });
+    await pass(id);
+    const spec = stage.board().tasks.get(node())?.spec;
+    assert.deepEqual(spec?.config?.command, ['sh', '-c', 'node notes.ts file']);
+    assert.ok(spec?.config?.env?.WF_ANSWER, 'the answer file the script writes is named in its environment');
+  });
+  s.test('a request presenting its token is the agent it names, at the node', async () => {
+    const caller = await callerBy(tokenOf(node()));
+    assert.deepEqual(caller.kind === 'agent' ? [caller.agent, caller.run, caller.step] : caller, ['implementer', id, 'file-notes']);
+  });
+  s.test('once it settled, its token is refused session-ended', async () => {
+    const token = tokenOf(node());
+    stage.board().settle(node(), 'succeeded', undefined, 0);
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
   });
 });

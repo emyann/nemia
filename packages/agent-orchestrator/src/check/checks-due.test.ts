@@ -19,7 +19,7 @@ const CHAIN: StepSpec = {
     { name: 'own', run: 'b', after: ['probe'] },
     { name: 'ci', run: 'c', after: ['own'] },
   ],
-} as unknown as StepSpec;
+};
 
 const TASKS = { probe: 't-probe', own: 't-own', ci: 't-ci' };
 

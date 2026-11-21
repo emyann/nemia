@@ -201,12 +201,12 @@ describe('REFUSED: a command node or a named check the run could not file as wri
   const rows: [string, Record<string, string>, string][] = [
     [
       'a command node with an instruction of its own',
-      { 'file-notes.md': '---\nafter: implement\nplace: git\nrun: node notes.ts\n---\nFile them.\n' },
+      { 'file-notes.md': '---\nafter: implement\nplace: git\nagent: implementer\nrun: node notes.ts\n---\nFile them.\n' },
       'file-notes:',
     ],
     [
       'a command node with a workspace of its own',
-      { 'file-notes.md': '---\nafter: implement\nplace: git\nrun: node notes.ts\nworkspace: base\n---\n' },
+      { 'file-notes.md': '---\nafter: implement\nplace: git\nagent: implementer\nrun: node notes.ts\nworkspace: base\n---\n' },
       'file-notes:',
     ],
     [
@@ -223,9 +223,16 @@ describe('REFUSED: a command node or a named check the run could not file as wri
       'land:',
     ],
   ];
+  /** A workflow of `files` beside the tests' team's agents and skills, so an `agent:` it names is one the load finds. */
+  const inTeam = (files: Record<string, string>) => {
+    const dir = path.join(teamCopy(), 'rows');
+    fs.mkdirSync(dir);
+    for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
+    return dir;
+  };
   for (const [what, files, at] of rows)
     test(what, () => {
-      refusedNaming(at)(folderRefusal(folder({ 'implement.md': IMPLEMENT, ...files })));
+      refusedNaming(at)(folderRefusal(inTeam({ 'implement.md': IMPLEMENT, ...files })));
     });
 
   test("a step named for another step's named check loads, and no run may take it (`stepSetRefusal`), the refusal opening on it", () => {

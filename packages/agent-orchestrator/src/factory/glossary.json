@@ -314,8 +314,8 @@
     },
     {
       "term": "Asked parameter",
-      "meaning": "a template's parameter declared with `ask: true`: the template asks it of a person applying it, so the board's welcome draws its field open, where every other parameter no volume sets is folded under More parameters; never a followed parameter, which the volume sets (`TemplateParameter`, `packages/objects/src/template.ts`, refused with `whenOrigin` by `packages/agent-orchestrator/src/template/check.ts`, drawn by `apps/web/src/lib/templateParameters.ts`).",
-      "type": "TemplateParameter"
+      "meaning": "a template's parameter declared with `ask: true`: the template asks it of a person applying it, so the board's welcome draws its field open, where every other parameter no volume sets is folded under More parameters; never a followed parameter, which the volume sets (`Parameter`, `packages/agent-orchestrator/src/template/layout.ts`, served as `objects`' `TemplateParameter`, `packages/objects/src/template.ts`, refused with `whenOrigin` by `packages/agent-orchestrator/src/template/check.ts`, drawn by `apps/web/src/lib/templateParameters.ts`).",
+      "type": "Parameter"
     },
     {
       "term": "Card trigger",

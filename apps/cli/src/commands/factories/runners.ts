@@ -10,7 +10,15 @@ import type { Runner } from '../runner.ts';
 import { factoryHome } from './home.ts';
 import { factoryListed } from './listing.ts';
 import { factoryMove } from './move.ts';
-import { factoryServerAdd, factoryServerRm, factoryServers, factorySchedule, factoryUnschedule } from './parts.ts';
+import {
+  factoryServerAdd,
+  factoryServerRm,
+  factoryServers,
+  factorySchedule,
+  factoryTrigger,
+  factoryUnschedule,
+  factoryUntrigger,
+} from './parts.ts';
 import {
   factoryCostLineRm,
   factoryCostLineSet,
@@ -40,6 +48,8 @@ export const FACTORY_RUNNERS: Readonly<Record<FactoryCommand, Runner>> = {
   'factory fire': factoryFire,
   'factory schedule': factorySchedule,
   'factory unschedule': factoryUnschedule,
+  'factory trigger': factoryTrigger,
+  'factory untrigger': factoryUntrigger,
   'factory servers': factoryServers,
   'factory server add': factoryServerAdd,
   'factory server rm': factoryServerRm,

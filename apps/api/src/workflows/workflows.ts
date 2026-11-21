@@ -444,6 +444,8 @@ const routingOf = (step: StepSpec) => ({
   when: step.when ?? null,
   ends: step.ends ?? null,
   workflow: step.workflow ?? null,
+  card: step.card ?? null,
+  unlabel: step.unlabel ?? null,
 });
 
 /** A key whose value is an object, as its line writes it in YAML flow: `route:` and `checkFailurePolicy:`; null for any other. */

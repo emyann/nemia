@@ -26,6 +26,7 @@ import {
   type ObjectMeta,
   ProposalSpec,
   ScheduleSpec,
+  TriggerSpec,
   SkillSpec,
   WorkflowSpec,
 } from 'objects';
@@ -192,6 +193,13 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     get: { in: (namespace, name) => (c) => c.schedules.get({ params: { namespace, name } }) },
     writes: writable(Schema.decodeUnknownSync(ScheduleSpec), { create: false, update: true, upsert: true, labels: false }, (spec) => ({
       update: (a) => (c) => c.schedules.put({ ...params(a), payload: spec }),
+    })),
+  },
+  Trigger: {
+    list: { in: (namespace, s) => (c) => everyPage((page) => c.triggers.list({ params: { namespace }, query: query(s, page) })) },
+    get: { in: (namespace, name) => (c) => c.triggers.get({ params: { namespace, name } }) },
+    writes: writable(Schema.decodeUnknownSync(TriggerSpec), { create: false, update: true, upsert: true, labels: false }, (spec) => ({
+      update: (a) => (c) => c.triggers.put({ ...params(a), payload: spec }),
     })),
   },
   Hire: {

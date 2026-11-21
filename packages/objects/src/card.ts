@@ -77,12 +77,21 @@ export type CardFileNamed = typeof CardFileNamed.Type;
  * A file named to a card as it is filed or attached: the File by its id, uploaded to the card's namespace first, and the name it takes in
  * the card, absent for the File's own name.
  */
+/**
+ * The identifier of a card's file reference in a JSON Schema's definitions (`$defs`), by which a reader of a tool's input finds each key
+ * that names Files: the MCP port, which takes a file's bytes inline there besides an id.
+ */
+export const CARD_FILE_REF = 'CardFileRef';
+
 export const CardFileRef = Schema.Struct({
   name: Schema.optionalKey(
     Schema.String.annotate({ description: "The name it takes in the card, no folder in it; absent, the File's own name." }),
   ),
   file: Schema.String.annotate({ description: "The id of a File uploaded to the card's namespace, file_…." }),
-}).annotate({ description: 'A file named to a card: a File uploaded first, by its id, and the name it takes in the card.' });
+}).annotate({
+  identifier: CARD_FILE_REF,
+  description: 'A file named to a card: a File uploaded first, by its id, and the name it takes in the card.',
+});
 export type CardFileRef = typeof CardFileRef.Type;
 
 /** A file a card carries, as Nemia read it: its name and File, what the File is, whether the text names it, and whether it is kept. */

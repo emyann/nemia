@@ -170,6 +170,7 @@ export {
   Card,
   CardFile,
   CardFileNamed,
+  CARD_FILE_REF,
   CardFileRef,
   CardFileStatus,
   CardAttach,

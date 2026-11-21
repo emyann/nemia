@@ -5,6 +5,9 @@
  * write with no bearer token sends (but the board's, by its cookie with the header a script sets), an id no file of the namespace is
  * kept under — with nothing kept or started.
  *
+ * Through the MCP port, a card's file given inline to its tool is uploaded and named by its id, and one past the inline bound is the
+ * call's error with nothing kept.
+ *
  * In a factory of the store (`acme`, the orchestrator's test team's `dev`), on a scratch repository: each run is written and nothing is
  * filed.
  */
@@ -17,11 +20,14 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { FILE_LIMIT, type FileObject, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
+import { Api, FILE_LIMIT, type FileObject, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
-import { runsAtOnce } from 'agent-orchestrator';
+import { CLI_VERBS, runsAtOnce, TABLE } from 'agent-orchestrator';
 import { TEAM } from '../../test/team.ts';
 import { OBJECT_BODY_LIMIT } from '../objects/serve.ts';
+import { called } from '../mcp/port.ts';
+import { portTools } from '../mcp/tools.ts';
+import { MAX_INLINE_BYTES } from '../mcp/files.ts';
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -291,4 +297,41 @@ test('a card filed with a kept file says it in its status, attaches another and 
   );
   const unknown = await post('cards', { body: 'Another.', workflow: 'dev', files: [{ file: `file_${'0'.repeat(32)}` }] });
   assert.equal(unknown.status, 422);
+});
+
+test("the port lists a card's files as an id or bytes inline, uploads a file given inline and refuses one past the inline bound", async () => {
+  const tools = portTools(TABLE, CLI_VERBS, Api);
+  const attach = tools.find((t) => t.name === 'inbox_attach');
+  assert.ok(attach, 'the port has a tool for attaching files to a card');
+  assert.deepEqual(attach.fileKeys, ['files']);
+  assert.equal(
+    tools.filter((t) => t.fileKeys.length > 0).every((t) => JSON.stringify(t.inputSchema).includes('"contentEncoding":"base64"')),
+    true,
+  );
+  write(path.join(root, 'inbox', 'port-card.md'), '---\nworkflow: dev\nfactory: acme\n---\nLook at ![it](shot.png).\n');
+  const from = new Request('http://127.0.0.1:8787/mcp', { method: 'POST', headers: BEARER });
+  const shot = crypto.randomBytes(500);
+  const result = await called(
+    attach,
+    { namespace: 'acme', name: 'port-card', files: [{ name: 'shot.png', data: shot.toString('base64'), mediaType: 'image/png' }] },
+    from,
+    { fetch: (r) => app().fetch(r) },
+  );
+  assert.notEqual(result.isError, true, JSON.stringify(result.content));
+  const card = result.structuredContent as { status: { files?: { name: string; file: string; kept: boolean }[] } };
+  assert.deepEqual(
+    card.status.files?.map((f) => [f.name, f.kept]),
+    [['shot.png', true]],
+  );
+  const id = card.status.files?.[0]?.file ?? '';
+  assert.deepEqual(fs.readFileSync(path.join(root, 'files', 'acme', id)), shot);
+  const before = kept();
+  const past = await called(
+    attach,
+    { namespace: 'acme', name: 'port-card', files: [{ name: 'big.bin', data: Buffer.alloc(MAX_INLINE_BYTES + 1).toString('base64') }] },
+    from,
+    { fetch: (r) => app().fetch(r) },
+  );
+  assert.equal(past.isError, true);
+  assert.deepEqual(kept(), before);
 });

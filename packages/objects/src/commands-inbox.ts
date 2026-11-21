@@ -340,7 +340,7 @@ export const INBOX_DETACH_WORDS = {
 /** `nemia inbox files`: the files a card carries, as the card's read says them, and one of them written out with `--get`. */
 export const INBOX_FILES_WORDS = {
   name: 'inbox files',
-  served: [{ endpoint: 'cards.getAll' }, { endpoint: 'files.content', as: 'inbox_file_content' }],
+  served: [{ endpoint: 'cards.getAll' }, { endpoint: 'files.get', as: 'inbox_file' }],
   usage: '<name> [--get <file> [--out <path>]]',
   help: [
     'list the files a card carries; --get writes one of them out,',

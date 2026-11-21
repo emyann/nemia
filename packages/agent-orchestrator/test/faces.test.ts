@@ -578,6 +578,7 @@ describe("each verb's program, given its services, answers what its plain face a
         ['taskPhases', 'view', v.taskPhasesRead(record), { ...e, view: refuse }],
         ['checkReports', 'logs', v.checkReportsRead(record, stepsOf(record), failed, () => true), { ...e, logs: refuse }],
         ['refusalOf', 'logs', v.refusalRead('npm test', check), { ...e, logs: refuse }],
+        ['refusalWhole', 'logs', v.refusalWholeRead('npm test', check), { ...e, logs: refuse }],
         ['parentOf', 'view', v.parentRead(parent.run.id, live), { ...e, view: refuse }],
         ['parentsOf', 'view', v.parentsRead(child, live), { ...e, view: refuse }],
       ] as unknown as Array<[string, string, EffectOf<unknown, Refusal, EngineService>, Engine]>;

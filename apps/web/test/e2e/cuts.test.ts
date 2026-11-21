@@ -633,9 +633,14 @@ async function tagEdgeGaps(page: Page, name: string) {
   return [...Object.keys(sides), ...Object.keys(diagonal)].filter((where) => !(apart(found[where], edge) < apart(found[where], ground)));
 }
 
-/** The tag's own edge taken away, and the border of what it holds put back: a clip over a bordered tag, as the count chip was. */
+/**
+ * The tag's own edge taken away, and the border of what it holds put back: a clip over a bordered tag, as the count chip was. The
+ * border is put back in the first of Tailwind's layers (`theme`): the tag takes the border off with an important utility, and an
+ * important declaration of an earlier layer wins over a later layer's and over one in no layer at all, which is where a style tag's
+ * rules would stand.
+ */
 const BORDERED_TAG = `[data-cut-tag] [data-cut-edge] { display: none !important; }
-${TAG_SHAPE} > * { border: 1px solid var(--md-sys-color-outline-variant) !important; }`;
+@layer theme { ${TAG_SHAPE} > * { border: 1px solid var(--md-sys-color-outline-variant) !important; } }`;
 
 test(
   "REFUSED: a cut tag's edge runs along its whole shape, its diagonal too; a child's own border, cut open by the clip, is seen",
@@ -680,7 +685,7 @@ async function tagRing(page: Page, name: string, given?: Rgb) {
   ) as Record<string, readonly [number, number]>;
   const points: Record<string, readonly [number, number]> = {
     ground: pixel(box.left - 12 * SCALE, box.top - 12 * SCALE),
-    tag: pixel(box.left + 2 * SCALE, midY),
+    tag: pixel(box.left + 5 * SCALE, midY),
     'inside its top': pixel(midX, box.top + 1.5 * SCALE),
     ...sides,
     ...diagonal,
@@ -699,10 +704,11 @@ async function tagRing(page: Page, name: string, given?: Rgb) {
 
 /**
  * The tag's ring taken away, and the held link's own focus ring left to it, as the kit's `focusRing` or a `focus-visible:ring-*` of
- * its class draws one, laid inside its box where the clip leaves it seen: the ring the clip cuts at the diagonal.
+ * its class draws one, laid inside its box where the clip leaves it seen: the ring the clip cuts at the diagonal. It is put back in
+ * the first of Tailwind's layers, as the border of `BORDERED_TAG` is, to win over the tag's important utility that takes it off.
  */
 const HELD_RING = `[data-cut-tag] [data-cut-ring] { display: none !important; }
-${TAG_SHAPE} :focus-visible { outline: 3px solid var(--md-sys-color-ring) !important; outline-offset: -3px !important; }`;
+@layer theme { ${TAG_SHAPE} :focus-visible { outline: 3px solid var(--ring) !important; outline-offset: -3px !important; } }`;
 
 test(
   "REFUSED: a cut tag around a link draws the focus ring in its cut shape, the held link's own taken off; the link's own ring is seen",

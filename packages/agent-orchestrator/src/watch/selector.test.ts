@@ -87,15 +87,20 @@ const EVERY: readonly FeedLine[] = [
   STORE_RESUMED,
 ];
 
-/** A key spelled as no Kubernetes key is, or with a prefix, in each form a clause takes: the key is named, and the grammar said. */
+/**
+ * A key spelled as no Kubernetes key is, in each form a clause takes: a name that opens on a dash, a prefix that is no lowercase DNS
+ * subdomain, two slashes, a prefix written empty, no name after the slash. The key is named, and the grammar said.
+ */
 const MISSPELLED = [
   ['-x=1', '-x'],
   ['-x', '-x'],
   ['-x in (a)', '-x'],
-  ['no/pe=1', 'no/pe'],
-  ['no/pe', 'no/pe'],
-  ['no/pe notin (a)', 'no/pe'],
-  ['a/b=c', 'a/b'],
+  ['No.pe/x=1', 'No.pe/x'],
+  ['team_x/x', 'team_x/x'],
+  ['-a/x notin (a)', '-a/x'],
+  ['a/b/c=1', 'a/b/c'],
+  ['/x=1', '/x'],
+  ['x/ in (a)', 'x/'],
 ] as const;
 
 /** A filing stamps its run's person labels beside the closed five; `FeedLabels` names only those five, hence the cast. */
@@ -380,6 +385,26 @@ describe('selects and selectableOf: what a signed line offers a selector, and th
     }
     assert.equal(selectsLabels(parseSelectors(['team=web', 'workflow=build']), map), true, 'OR across selectors');
     assert.equal(selectsLabels([], map), true, 'and no selector takes every map');
+  });
+  test('a key may take a prefix, in each form a clause takes, and two clauses on prefixed keys hold of a map that carries both', () => {
+    const both = 'team.example/stage=sprint,team.example/state=ready-to-work';
+    for (const [labels, taken] of [
+      [{ 'team.example/stage': 'sprint', 'team.example/state': 'ready-to-work' }, true],
+      [{ 'team.example/stage': 'backlog', 'team.example/state': 'ready-to-work' }, false],
+      [{ 'team.example/stage': 'sprint', 'team.example/state': 'refine' }, false],
+      [{ 'team.example/stage': 'sprint' }, false],
+      [{ 'team.example/state': 'ready-to-work' }, false],
+      [{ stage: 'sprint', state: 'ready-to-work' }, false],
+      [{}, false],
+    ] as const) {
+      assert.equal(selectorsRefusal([both]), undefined, both);
+      assert.equal(selectsLabels(parseSelectors([both]), labels), taken, JSON.stringify(labels));
+    }
+    const map = { 'team.example/stage': 'sprint' };
+    for (const typed of ['team.example/stage in (sprint)', 'team.example/stage', 'team.example/stage!=backlog']) {
+      assert.equal(selectorsRefusal([typed]), undefined, typed);
+      assert.equal(selectsLabels(parseSelectors([typed]), map), true, typed);
+    }
   });
   test('no selector at all selects every line', () => {
     assert.deepEqual(parseSelectors([]), []);

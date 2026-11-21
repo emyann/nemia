@@ -30,7 +30,7 @@ const prefixed = (key: string) => key.includes('/');
 const prefixOf = (key: string) => key.slice(0, key.indexOf('/'));
 
 /** What is after the first slash of `key`, or the whole key where it holds none. */
-const nameOf = (key: string) => (prefixed(key) ? key.slice(key.indexOf('/') + 1) : key);
+const nameOf = (key: string) => (prefixed(key) ? key.slice(key.indexOf('/')).slice(1) : key);
 
 /** Whether `key` holds a second slash, after its first. */
 const twoSlashes = (key: string) => prefixed(key) && nameOf(key).includes('/');

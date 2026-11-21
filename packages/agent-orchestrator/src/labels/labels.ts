@@ -1,5 +1,5 @@
 /**
- * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling with no prefix, put on inbox cards and runs and
+ * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling, a key an optional prefix and a name (`team.example/stage`), put on inbox cards and runs and
  * changed at any time. What a label may be spelled (`labelRefusal`), kubectl's edits of a map (`parseLabelEdits`, `labelEdits`), and
  * what a start copies once, at creation (`inheritedLabels`); and a run's labels as a selection reads them (`runLabelMap`, `selectedRuns`,
  * `labelSegments`). No Effect: every caller wraps a refusal in the package's `Invalid`.
@@ -12,7 +12,7 @@ import type { LabelEdits } from '../../contracts/labels.contract.ts';
 import path from 'node:path';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
-import { LABEL_KEYS, RESERVED_KEYS, selectsLabels, type Selectors } from '../watch/selector.ts';
+import { LABEL_KEYS, labelKeySpellingRefusal, RESERVED_KEYS, selectsLabels, type Selectors } from '../watch/selector.ts';
 import type { Labels, LabelChange } from '../../contracts/labels.contract.ts';
 
 export type { Labels, LabelChange, Edited } from '../../contracts/labels.contract.ts';
@@ -36,16 +36,13 @@ export const LABEL_NAME = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
 const LISTS = `the closed keys are ${CLOSED_LABEL_KEYS.join(', ')} and the reserved ones ${RESERVED_LABEL_KEYS.join(', ')}`;
 
 /**
- * Why `key` cannot be a person's label key, or undefined where it can. Pure.
+ * Why `key` cannot be a person's label key, or undefined where it can: its spelling (`labelKeySpellingRefusal`), then the closed and
+ * reserved keys, each compared whole, so a prefixed key such as `team.example/workflow` is a person's. Pure.
  * @param key The key as given.
  */
 export function labelKeyRefusal(key: string) {
-  if (key.includes('/'))
-    return `${JSON.stringify(key)} has a prefix, and a label takes none for now: drop what is before the /, as in ${key.slice(key.lastIndexOf('/') + 1) || 'team'}=…`;
-  if (key.length > LABEL_CAP)
-    return `the label key ${JSON.stringify(key)} is ${key.length} characters long: keep it to ${LABEL_CAP} at most`;
-  if (!LABEL_NAME.test(key))
-    return `${JSON.stringify(key)} is no label key: begin and end it with a letter or a digit, with - _ . between, as in team or my.key_2`;
+  const spelling = labelKeySpellingRefusal(key);
+  if (spelling !== undefined) return spelling;
   if (CLOSED_LABEL_KEYS.includes(key)) return `${key} is a key Nemia sets itself and no label of a person's: ${LISTS}`;
   if (RESERVED_LABEL_KEYS.includes(key))
     return `${key} is a key a feed line or a selector reads itself: name the label otherwise — ${LISTS}`;

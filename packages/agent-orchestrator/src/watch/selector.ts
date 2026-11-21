@@ -7,7 +7,7 @@
  * any one of them holds for (OR). It is read by `nemia watch` here, and by every other surface that selects the feed's lines.
  *
  * **The keys are the line's own vocabulary and a person's labels, never its message**: the five labels a filing carries
- * (`FeedLabels`), every label a person put on the line's run (any key spelled as Kubernetes spells one, with no prefix), and the
+ * (`FeedLabels`), every label a person put on the line's run (any key spelled as Kubernetes spells one, an optional prefix and a name, as in `team.example/stage`), and the
  * reserved keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via` (where an `AwaitingAnswer` line's
  * answer is asked), `type`, `waits` and `source`. The message a person reads is prose, worded anew whenever a
  * status is reworded, so nothing selects on it: `-l message=…` is refused. A key no line carries is no refusal, as in Kubernetes: it
@@ -19,6 +19,7 @@
  * reason and of the one it would have been written under (`formerOf`), so `reason=NeedsHuman` and `reason notin (WaitingForSlot)` keep
  * their meaning in a selector typed or stored before the codes were renamed, which is never rewritten.
  */
+import type { LabelKeyShape } from '../../contracts/label-key.contract.ts';
 import { formerOf, isFormerReason } from '../former-reason/former-reason.ts';
 import { involvedOf, upgraded, type ClosedFeedLabels, type Codes, type FeedLine } from '../feed/index.ts';
 
@@ -42,7 +43,7 @@ export const SELECTABLE_KEYS: readonly string[] = [...LABEL_KEYS, ...RESERVED_KE
 export const SELECTOR_FORM =
   '-l <key>=<value>, -l <key>!=<value>, -l "<key> in (<a>,<b>)", -l "<key> notin (<a>,<b>)" or -l <key> for a line that carries it; ' +
   `commas between clauses, which all must hold, and -l again for another selector, of which one must. The keys: ${SELECTABLE_KEYS.join(', ')}, ` +
-  'and any label a person put';
+  'and any label a person put, its key an optional prefix and a name (team.example/stage)';
 
 /**
  * Why `keys` cannot be the label keys — a label named as a reserved key, which would decide for a selector what that key means — or
@@ -67,8 +68,56 @@ export type Clause =
 /** Every selector given, parsed: the clauses of one all hold, and one selector of them does (AND within, OR across). */
 export type Selectors = readonly (readonly Clause[])[];
 
-/** A key as a selector spells one: Kubernetes' name segment, with no prefix — alphanumerics at both ends, `-`, `_` and `.` between. */
-const KEY = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
+/** A key's name segment, as Kubernetes spells one: alphanumerics at both ends, `-`, `_` and `.` between. */
+const NAME_SEGMENT = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
+
+/** A key's prefix, a DNS subdomain as Kubernetes spells one: lowercase labels of alphanumerics and `-`, each alphanumeric at both ends, joined by dots. */
+const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
+
+/** A word that may be a bare key: no space, operator or parenthesis in it. */
+const BARE = /^[^\s=!(),]+$/;
+
+/**
+ * A label key's segments, as Kubernetes spells one: a name alone, a prefix and a name split at the one slash, or the first flaw of its
+ * structure — a second slash, a prefix written empty, no name, a prefix past 253 or a name past 63. Pure, and proved by
+ * `contracts/label-key.contract.ts`; what the characters of each segment may be is `labelKeySpellingRefusal`'s.
+ * @param key The key as given.
+ */
+export const labelKeyShape: LabelKeyShape = (key) => {
+  const slashed = key.includes('/');
+  const name = slashed ? key.slice(key.indexOf('/')).slice(1) : key;
+  if (slashed && name.includes('/')) return { kind: 'refused', reason: 'slashes' };
+  if (key.startsWith('/')) return { kind: 'refused', reason: 'empty-prefix' };
+  if (name === '') return { kind: 'refused', reason: 'empty-name' };
+  const prefix = key.slice(0, key.indexOf('/'));
+  if (slashed && prefix.length > 253) return { kind: 'refused', reason: 'long-prefix' };
+  if (name.length > 63) return { kind: 'refused', reason: 'long-name' };
+  if (!slashed) return { kind: 'name', name };
+  return { kind: 'prefixed', prefix, name };
+};
+
+/**
+ * Why `key` is spelled as no label key, or undefined where it is one: its structure (`labelKeyShape`), then its name segment's
+ * characters, then its prefix's, a DNS subdomain. Each refusal names the spelling to write. Pure: what a person's label and a
+ * selector's key both read.
+ * @param key The key as given.
+ */
+export function labelKeySpellingRefusal(key: string) {
+  const shape = labelKeyShape(key);
+  const k = JSON.stringify(key);
+  if (shape.kind === 'refused') {
+    if (shape.reason === 'slashes') return `${k} holds more than one /: a key is an optional prefix, one /, and a name, as in team.example/stage`;
+    if (shape.reason === 'empty-prefix') return `${k} opens on its /: write the prefix before it, as in team.example/stage, or drop the /`;
+    if (shape.reason === 'empty-name') return `${k} has no name after its /: write one, as in ${key}stage`;
+    if (shape.reason === 'long-prefix') return `the prefix of ${k} is ${key.indexOf('/')} characters long: shorten it to 253 at most`;
+    return `the name of ${k} is ${key.length - key.indexOf('/') - 1} characters long: keep it to 63 at most`;
+  }
+  if (!NAME_SEGMENT.test(shape.name))
+    return `${k} is no label key: begin and end its name with a letter or a digit, with - _ . between, as in team or team.example/my.key_2`;
+  if (shape.kind === 'prefixed' && !DNS_SUBDOMAIN.test(shape.prefix))
+    return `the prefix of ${k} is no DNS subdomain: write it in lowercase letters, digits, - and ., each part beginning and ending with a letter or a digit, as in team.example/${shape.name}`;
+  return undefined;
+}
 
 /** The one key a selector refuses however it is spelled: the message, prose a person reads, which nothing selects on. */
 const PROSE_KEYS: readonly string[] = ['message'];
@@ -109,11 +158,8 @@ function clausesOf(text: string) {
 const keyRefusal = (key: string) => {
   if (PROSE_KEYS.includes(key))
     return `${key} is prose a person reads, and nothing selects on it: a selector names a key such as ${SELECTABLE_KEYS.join(', ')} — ${SELECTOR_FORM}`;
-  if (key.includes('/'))
-    return `${JSON.stringify(key)} has a prefix, and a label takes none for now: drop what is before the / — ${SELECTOR_FORM}`;
-  return KEY.test(key)
-    ? undefined
-    : `${JSON.stringify(key)} is no key a selector can name: begin and end it with a letter or a digit, with - _ . between — ${SELECTOR_FORM}`;
+  const refusal = labelKeySpellingRefusal(key);
+  return refusal === undefined ? undefined : `${refusal} — ${SELECTOR_FORM}`;
 };
 
 /** The refusal of a value a selector cannot hold: empty, or spelling a comma or a parenthesis, which the grammar reads itself. */
@@ -146,7 +192,7 @@ function clauseRefusal(text: string) {
   if (t.includes('==')) return `${JSON.stringify(t)} compares with ==, and a selector compares with one =: ${SELECTOR_FORM}`;
   const [, key, op, value] = COMPARED.exec(t) ?? [];
   if (key !== undefined && op !== undefined && value !== undefined) return keyRefusal(key) ?? valueRefusal(key, op, value.trim());
-  if (KEY.test(t)) return keyRefusal(t);
+  if (BARE.test(t)) return keyRefusal(t);
   return `${JSON.stringify(t)} is no clause of a selector: it names no operator: ${SELECTOR_FORM}`;
 }
 

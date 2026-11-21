@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 import { type Args, CHECK_OUTPUT_PAGE, type CheckOutput } from 'objects';
 import { Refused } from '../client.ts';
 import { textArg } from '../commands/requests.ts';
-import { asked } from '../objects.ts';
+import { asked, type ObjectsClient } from '../objects.ts';
 
 /**
  * What the command prints of a read of a check's output: its lines on stdout, each after its number under a match; and on stderr what a
@@ -33,6 +33,40 @@ export const checkOutputPrinted = (read: CheckOutput, again: string) => {
   };
 };
 
+/** The keys a read of a check's output is asked with, each as the api's query spells it; absent where not given. */
+type Asked = { stream?: 'stderr'; from?: string; limit?: string; last?: string; match?: string };
+
+/** The words of `args` the api's query takes, each present only where given. */
+const askedOf = (args: Args) =>
+  Object.fromEntries(
+    (['from', 'limit', 'last', 'match'] as const).flatMap((key) => {
+      const value = textArg(args, key);
+      return value === undefined ? [] : [[key, value]];
+    }),
+  ) as Omit<Asked, 'stream'>;
+
+/** The try `tryNo` names, else the step's latest, the last of its tries; undefined for a step with no try. */
+const tryOf = (client: ObjectsClient, runId: string, step: string, tryNo: string | undefined) =>
+  tryNo !== undefined
+    ? Effect.succeed(tryNo)
+    : Effect.map(client.steps.tries({ params: { runId, step }, query: {} }), ({ tries }) => tries.at(-1)?.try.toString());
+
+/** The check's output of the try `params` names, whole: each page after the first read on from the `next` the page before answered. */
+const whole = (client: ObjectsClient, params: { runId: string; step: string; try: string }, query: Asked) =>
+  Effect.gen(function* () {
+    const asked = { ...query, limit: String(CHECK_OUTPUT_PAGE.most) };
+    let page = yield* client.steps.checkOutput({ params, query: asked });
+    const lines = [...page.lines];
+    while (page.next !== undefined) {
+      const at = page.next;
+      page = yield* client.steps.checkOutput({ params, query: { ...asked, from: String(at) } });
+      lines.push(...page.lines);
+      if (page.next !== undefined && page.next <= at) break;
+    }
+    const { next: _left, ...rest } = page;
+    return { ...rest, lines } satisfies CheckOutput;
+  });
+
 /**
  * Prints what the check of the try `args` names printed, its latest where no `--try` is given; answers 0.
  * @param args The command's words as parsed against `CHECK_OUTPUT_WORDS`: the run, the step, `--try`, the stream, the page and the match.
@@ -40,56 +74,16 @@ export const checkOutputPrinted = (read: CheckOutput, again: string) => {
 export async function checkOutput(args: Args) {
   const runId = textArg(args, 'runId') ?? '';
   const step = textArg(args, 'step') ?? '';
-  const tryNo = textArg(args, 'try');
-  const stream = textArg(args, 'stream') === 'stderr' ? ('stderr' as const) : undefined;
-  const from = textArg(args, 'from');
-  const limit = textArg(args, 'limit');
-  const last = textArg(args, 'last');
-  const match = textArg(args, 'match');
-  const paged = from !== undefined || limit !== undefined || last !== undefined;
-  const query = {
-    ...(stream === undefined ? {} : { stream }),
-    ...(match === undefined ? {} : { match }),
-    ...(paged
-      ? {
-          ...(from === undefined ? {} : { from }),
-          ...(limit === undefined ? {} : { limit }),
-          ...(last === undefined ? {} : { last }),
-        }
-      : { limit: String(CHECK_OUTPUT_PAGE.most) }),
-  };
+  const words = askedOf(args);
+  const query: Asked = { ...(textArg(args, 'stream') === 'stderr' ? { stream: 'stderr' } : {}), ...words };
+  const paged = words.from !== undefined || words.limit !== undefined || words.last !== undefined;
   const read = await asked('check-output', (client) =>
-    Effect.flatMap(
-      tryNo !== undefined
-        ? Effect.succeed(tryNo)
-        : Effect.map(client.steps.tries({ params: { runId, step }, query: {} }), ({ tries }) => tries.at(-1)?.try.toString()),
-      (n) =>
-        n === undefined
-          ? Effect.succeed(undefined)
-          : Effect.gen(function* () {
-              const params = { runId, step, try: n };
-              const first = yield* client.steps.checkOutput({ params, query });
-              if (paged) return first;
-              const lines = [...first.lines];
-              let page = first;
-              while (page.next !== undefined) {
-                const at = page.next;
-                page = yield* client.steps.checkOutput({ params, query: { ...query, from: String(at) } });
-                lines.push(...page.lines);
-                if (page.next !== undefined && page.next <= at) break;
-              }
-              const { matched } = page;
-              return {
-                try: page.try,
-                taskId: page.taskId,
-                stream: page.stream,
-                running: page.running,
-                partial: page.partial,
-                total: page.total,
-                lines,
-                ...(matched === undefined ? {} : { matched }),
-              } satisfies CheckOutput;
-            }),
+    Effect.flatMap(tryOf(client, runId, step, textArg(args, 'try')), (n) =>
+      n === undefined
+        ? Effect.succeed(undefined)
+        : paged
+          ? client.steps.checkOutput({ params: { runId, step, try: n }, query })
+          : whole(client, { runId, step, try: n }, query),
     ),
   );
   if (read === undefined)
@@ -98,9 +92,9 @@ export async function checkOutput(args: Args) {
     );
   const again = [
     `nemia check-output ${runId} ${step} --try ${read.try}`,
-    ...(stream === undefined ? [] : ['--stderr']),
-    ...(limit === undefined ? [] : [`--limit ${limit}`]),
-    ...(match === undefined ? [] : [`--match ${JSON.stringify(match)}`]),
+    ...(query.stream === undefined ? [] : ['--stderr']),
+    ...(words.limit === undefined ? [] : [`--limit ${words.limit}`]),
+    ...(words.match === undefined ? [] : [`--match ${JSON.stringify(words.match)}`]),
   ].join(' ');
   const printed = checkOutputPrinted(read, again);
   for (const line of printed.stdout) process.stdout.write(`${line}\n`);

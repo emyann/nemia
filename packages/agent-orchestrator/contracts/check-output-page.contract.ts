@@ -81,7 +81,8 @@ const checkOutputCutSpec = spec<
         output.to - output.from === least(limit === null ? bounds.byDefault : limit, bounds.most),
     },
     lastLinesReachTheEnd: {
-      description: 'A read of the last lines ends at the last line held, and holds as many as it asked, up to the most and to what there is',
+      description:
+        'A read of the last lines ends at the last line held, and holds as many as it asked, up to the most and to what there is',
       condition: ({ input: [n, , , last, bounds], output }) =>
         'refused' in output || last === null || (output.to === n && output.to - output.from === least(least(last, bounds.most), n)),
     },

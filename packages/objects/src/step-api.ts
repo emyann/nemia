@@ -1,10 +1,10 @@
 /**
  * A run's step's reads, the `Api`'s `steps` group (`StepsGroup`): its tries, one try, a try's closeout, a page of what a try's check
- * printed (`CheckOutput`) and what it was told — the run object's sub-resources — and the board's reads of it: the end of its session output (`StepLog`), a file it wrote, by its path (its
- * files directory's, `artifacts/:file`, and a folder step's own folder's, `files/:file`, each a path under it encoded whole), its
- * task's path through the runtime's lifecycle (`StepPath`), and its conversation read once from a cursor (`StepTranscript`) or followed
- * as server-sent events (`StepStreamEvent`).
- * Each under `/api/runs/:runId/steps/:step/`, found among the runs the store lists, in any namespace. Served by the api's step handlers
+ * printed (`CheckOutput`) and what it was told — the run object's sub-resources — and the board's reads of it: the end of its session
+ * output (`StepLog`), a file it wrote, by its path (its files directory's, `artifacts/:file`, and a folder step's own folder's,
+ * `files/:file`, each a path under it encoded whole), its task's path through the runtime's lifecycle (`StepPath`), and its conversation
+ * read once from a cursor (`StepTranscript`) or followed as server-sent events (`StepStreamEvent`). Each under
+ * `/api/runs/:runId/steps/:step/`, found among the runs the store lists, in any namespace. Served by the api's step handlers
  * (`apps/api/src/steps/steps.ts`).
  */
 import { Schema } from 'effect';

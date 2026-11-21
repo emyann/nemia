@@ -1,11 +1,11 @@
 /**
  * How each read the api serves is bounded, so that no request makes the daemon build an answer it cannot hold. The numbers: a list's page
- * (`LIST_PAGE`), a conversation's (`TRANSCRIPT_PAGE`), a closeout's body's (`BODY_PAGE`), a log's tail (`LOG_TAIL`), a check's output's page (`CHECK_OUTPUT_PAGE`), the output field a
- * closeout keeps when none is named (`SHORT_FIELD`), and the most any answer is, its JSON's length, before the api refuses to build it
- * (`ANSWER_MOST`). And `READS`, one entry for every GET endpoint of the `Api`: the shape of its read — a list's page (`page`), a read
- * from a cursor (`cursor`), a whole read by part (`part`), one object (`one`), a stream (`stream`), a file's bytes (`bytes`) — and the
- * query keys that narrow it, which the api's refusal of an answer past its bound names. Typed over every GET name, so a read the `Api`
- * gains with no entry does not compile, and held to each endpoint's query by `readsUnbounded`.
+ * (`LIST_PAGE`), a conversation's (`TRANSCRIPT_PAGE`), a closeout's body's (`BODY_PAGE`), a log's tail (`LOG_TAIL`), a check's output's
+ * page (`CHECK_OUTPUT_PAGE`), the output field a closeout keeps when none is named (`SHORT_FIELD`), and the most any answer is, its JSON's
+ * length, before the api refuses to build it (`ANSWER_MOST`). And `READS`, one entry for every GET endpoint of the `Api`: the shape of its
+ * read — a list's page (`page`), a read from a cursor (`cursor`), a whole read by part (`part`), one object (`one`), a stream (`stream`), a
+ * file's bytes (`bytes`) — and the query keys that narrow it, which the api's refusal of an answer past its bound names. Typed over every
+ * GET name, so a read the `Api` gains with no entry does not compile, and held to each endpoint's query by `readsUnbounded`.
  */
 import type { ApiGetName } from './api.ts';
 import type { READ_SHAPES } from './words.ts';

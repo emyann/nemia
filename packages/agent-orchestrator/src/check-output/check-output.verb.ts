@@ -33,12 +33,63 @@ const refusedPage = (refused: 'limit' | 'last' | 'both', asked: CheckOutputAsked
         : `${refused} ${JSON.stringify(asked[refused])} is no whole number from 1: pass ?${refused}=<n>, n from 1, or leave it out for ${refused === 'limit' ? `${CHECK_OUTPUT_PAGE.byDefault} lines` : 'a page from the first line'}`,
   });
 
+/** What a page asks once read: the line to read on from, how many lines, and the last lines, each null where not asked. */
+type PageAsked = { readonly from: number | null; readonly limit: number | null; readonly last: number | null };
+
+/**
+ * The page `ask` asks, read before anything else is, or its refusal: a `from` that is no line number, a `limit` or a `last` that is no
+ * whole number from 1, or `last` asked with `from` or `limit`.
+ */
+const pageAskedOf = (ask: CheckOutputAsked) => {
+  const from = countOf(ask.from);
+  if (from !== null && !(Number.isSafeInteger(from) && from >= 1))
+    return new Invalid({
+      message: `from ${JSON.stringify(ask.from)} is no line number: pass ?from=<n>, n from 1, as a page's next says it, or leave it out to read from the first line`,
+    });
+  const page = { from, limit: countOf(ask.limit), last: countOf(ask.last) } satisfies PageAsked;
+  const cut = checkOutputCut(0, from === null ? null : 0, page.limit, page.last, CHECK_OUTPUT_PAGE);
+  return 'refused' in cut ? refusedPage(cut.refused, ask) : page;
+};
+
+/**
+ * What the check's task `taskId` printed on `stream`, whole, off the engine, and whether the runtime kept it: where it kept no stdout,
+ * the end of the task's log; where it kept no stderr, nothing.
+ */
+const printedOn = Effect.fnUntraced(function* (taskId: string, stream: OutputStream) {
+  const e = yield* EngineService;
+  const printed = yield* asked('output', e.output(taskId, stream));
+  if (printed !== undefined) return { text: printed, kept: true };
+  if (stream === 'stderr') return { text: '', kept: true };
+  return { text: yield* asked('logs', e.logs(taskId)), kept: false };
+});
+
+/**
+ * The page `page` cuts of `text`, its lines numbered and those containing `match` kept (`checkOutputLines`), as `CheckOutput`'s lines,
+ * total, matched and next say it; or the refusal of a page asked wrong.
+ */
+const pageOf = (text: string, match: string | undefined, page: PageAsked, ask: CheckOutputAsked) => {
+  const all = checkOutputLines(text, undefined);
+  const matching = match !== undefined && match !== '';
+  const held = matching ? checkOutputLines(text, match) : all;
+  const from = page.from;
+  const start = from === null ? null : held.findIndex((line) => line.n >= from);
+  const cut = checkOutputCut(held.length, start === -1 ? held.length : start, page.limit, page.last, CHECK_OUTPUT_PAGE);
+  if ('refused' in cut) return refusedPage(cut.refused, ask);
+  const next = cut.more ? held[cut.to]?.n : undefined;
+  return {
+    lines: held.slice(cut.from, cut.to),
+    total: all.length,
+    ...(matching ? { matched: held.length } : {}),
+    ...(next === undefined ? {} : { next }),
+  };
+};
+
 /**
  * A page of what the check of the try `tryNo` of the step `step` of the run `runId` printed (`CheckOutput`), its latest try where none is
  * asked: the lines of the stream asked, stdout by default, numbered from 1, those containing `match` where it is asked, from the line
  * `from` or the last `last`, `limit` of them or `CHECK_OUTPUT_PAGE`'s default, and the line to read on from where any is left. A check not
- * filed yet answers no line, not running; a check filed with no verdict yet, or one running, answers `running`. Refused `Missing` for a run, a step or a try
- * it lacks and for a step with no `check:`, `Invalid` for a page asked wrong.
+ * filed yet answers no line, not running; a check filed with no verdict yet, or one running, answers `running`. Refused `Missing` for a
+ * run, a step or a try it lacks and for a step with no `check:`, `Invalid` for a page asked wrong.
  * @param runId The run's id.
  * @param step The step's name.
  * @param tryNo The try's number as the path or the command line says it; undefined for the latest.
@@ -58,51 +109,13 @@ export const stepCheckOutput = Effect.fn('stepCheckOutput')(function* (
         message: `Step ${step} of run ${runId} has no check: line, so nothing checked it. Type \`nemia logs ${runId} ${step}\` for what its session printed.`,
       }),
     );
+  const page = pageAskedOf(ask);
+  if (page instanceof Invalid) return yield* Effect.fail(page);
   const stream = ask.stream ?? 'stdout';
-  const fromAsked = countOf(ask.from);
-  if (fromAsked !== null && !(Number.isSafeInteger(fromAsked) && fromAsked >= 1))
-    return yield* Effect.fail(
-      new Invalid({
-        message: `from ${JSON.stringify(ask.from)} is no line number: pass ?from=<n>, n from 1, as a page's next says it, or leave it out to read from the first line`,
-      }),
-    );
-  const limit = countOf(ask.limit);
-  const last = countOf(ask.last);
-  const asking = checkOutputCut(0, fromAsked === null ? null : 0, limit, last, CHECK_OUTPUT_PAGE);
-  if ('refused' in asking) return yield* Effect.fail(refusedPage(asking.refused, ask));
-  const matching = ask.match !== undefined && ask.match !== '';
   const taskId = check.taskId;
-  if (taskId === null)
-    return {
-      try: one.try,
-      taskId: null,
-      stream,
-      running: false,
-      partial: false,
-      lines: [],
-      total: 0,
-      ...(matching ? { matched: 0 } : {}),
-    } satisfies CheckOutput;
-  const running = check.verdict === null || check.verdict.result === 'running';
-  const e = yield* EngineService;
-  const printed = yield* asked('output', e.output(taskId, stream));
-  const kept = printed !== undefined || stream === 'stderr';
-  const text = printed ?? (stream === 'stdout' ? yield* asked('logs', e.logs(taskId)) : '');
-  const all = checkOutputLines(text, undefined);
-  const held = matching ? checkOutputLines(text, ask.match) : all;
-  const start = fromAsked === null ? null : held.findIndex((line) => line.n >= fromAsked);
-  const cut = checkOutputCut(held.length, start === -1 ? held.length : start, limit, last, CHECK_OUTPUT_PAGE);
-  if ('refused' in cut) return yield* Effect.fail(refusedPage(cut.refused, ask));
-  const next = cut.more ? held[cut.to]?.n : undefined;
-  return {
-    try: one.try,
-    taskId,
-    stream,
-    running,
-    partial: !kept,
-    lines: held.slice(cut.from, cut.to),
-    total: all.length,
-    ...(matching ? { matched: held.length } : {}),
-    ...(next === undefined ? {} : { next }),
-  } satisfies CheckOutput;
+  const { text, kept } = taskId === null ? { text: '', kept: true } : yield* printedOn(taskId, stream);
+  const cut = pageOf(text, ask.match, page, ask);
+  if (cut instanceof Invalid) return yield* Effect.fail(cut);
+  const running = taskId !== null && (check.verdict === null || check.verdict.result === 'running');
+  return { try: one.try, taskId, stream, running, partial: !kept, ...cut } satisfies CheckOutput;
 });

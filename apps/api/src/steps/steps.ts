@@ -1,8 +1,8 @@
 /**
  * The `steps` group's handlers (`objects`' `Api`, `StepsGroup`): a run's step's reads — its tries, one try, a try's closeout, a page of
- * what a try's check printed and what it was told, the run object's sub-resources; the end of its session output, the files it wrote, its conversation read once from a cursor
- * or followed, and its task's path through the runtime's lifecycle. Each calls the orchestrator's entry by its name (`TRIES`, `LOGS`,
- * `STEP_TRANSCRIPT`, …) with its typed input, through the request's services (`inRequest`).
+ * what a try's check printed and what it was told, the run object's sub-resources; the end of its session output, the files it wrote, its
+ * conversation read once from a cursor or followed, and its task's path through the runtime's lifecycle. Each calls the orchestrator's
+ * entry by its name (`TRIES`, `LOGS`, `STEP_TRANSCRIPT`, …) with its typed input, through the request's services (`inRequest`).
  */
 import { type Context, Effect, Queue, Stream } from 'effect';
 import { HttpApiSchema } from 'effect/http-api';

@@ -1,6 +1,7 @@
 /**
- * The run object's reads at the command line, entries of the command table: `nemia show` (the run as one object, or its record), a
- * step's tries, one try, its closeout, what its check printed (`nemia check-output`) and what it was told, and `nemia logs` (a step's session output).
+ * The run object's reads at the command line, entries of the command table: `nemia show` (the run as one object, or its record), a step's
+ * tries, one try, its closeout, what its check printed (`nemia check-output`) and what it was told, and `nemia logs` (a step's session
+ * output).
  */
 import { Effect, Schema } from 'effect';
 import { CHECK_OUTPUT_WORDS, type CheckOutput, CLOSEOUT_WORDS, LOGS_WORDS, OUTPUT_STREAMS, Run as RunObject, SHOW_WORDS } from 'objects';

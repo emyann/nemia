@@ -16,6 +16,8 @@ import { CopyButton } from '../command/CopyButton';
 import { Instant } from '../time/Instant';
 import type { Frozen } from '../../lib/frozen';
 import { focusRing } from '../ui/ds/utils';
+import { CheckOutput, type CheckRead } from './CheckOutput';
+import { Fold } from './part/Fold';
 
 /** A section's quiet heading: small, medium weight, in the muted ink. */
 export const HEADING = 'text-body-small font-medium text-muted-foreground';
@@ -405,9 +407,10 @@ const REBUILT_TITLE =
 
 /**
  * The command a step is judged by, and once it failed its check, what it exited with and the last lines of
- * each stream: its output first, where a test runner says what failed, then its stderr.
+ * each stream: its output first, where a test runner says what failed, then its stderr. Where the check was filed and `read` names its
+ * try, a fold that reads all it printed (`CheckOutput`).
  */
-export function Check({ check: { command, refused } }: { check: Frozen<StepCheck> }) {
+export function Check({ check: { command, refused, taskId }, read }: { check: Frozen<StepCheck>; read: CheckRead | null }) {
   return (
     <section aria-label="Check" className="space-y-2">
       <h3 className="text-label-medium text-muted-foreground">Check</h3>
@@ -429,6 +432,11 @@ export function Check({ check: { command, refused } }: { check: Frozen<StepCheck
       {refused?.unreadable && <p className="text-body-small text-failure">{refused.unreadable}</p>}
       {refused?.stdout && <Stream name="output" log={refused.stdout} />}
       {refused && refused.stderr.lines.length > 0 && <Stream name="stderr" log={refused.stderr} />}
+      {read && taskId !== null && (
+        <Fold name="check-output" title="All it printed">
+          <CheckOutput read={read} />
+        </Fold>
+      )}
     </section>
   );
 }

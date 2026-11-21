@@ -1,7 +1,7 @@
 /**
- * A try's check's output read through its entry of the command table (`CHECK_OUTPUT`, `stepCheckOutput`), on runs started and advanced
- * over the stand-ins: each try reads its own check's task, a check not settled answers `running`, a stream the runtime did not keep answers
- * the log's lines as `partial`, a check not filed answers no line, and a step with no `check:` or a page asked wrong is refused by its kind.
+ * A try's check's output read through its entry of the command table (`CHECK_OUTPUT`, `stepCheckOutput`), on runs started and advanced over
+ * the stand-ins: each try reads its own check's task, a check not settled answers `running`, a stream the runtime did not keep answers the
+ * log's lines as `partial`, a check not filed answers no line, and a step with no `check:` or a page asked wrong is refused by its kind.
  * How a page is cut is the contract's (contracts/check-output-page.contract.ts), and how lines are numbered and matched check-output.ts's:
  * here, only that the door hands them what it was asked.
  *

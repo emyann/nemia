@@ -1,8 +1,8 @@
 /**
- * The words of the moved reads: show, lines, closeout, check-output, ls, inbox and watch, each parsed, helped and printed by the client from these
- * words and read through the `Api`. A check that needs the grammar of a label query is the api's to make: it refuses one in the
- * grammar's own words. The inbox's bare read is `INBOX_READ_WORDS`, apart from the inbox's writes (`INBOX_WORDS`); `nemia watch`'s
- * words are cut into `commands-reads-watch.ts`, and the inbox's manual into `commands-reads-inbox.ts`. Pure.
+ * The words of the moved reads: show, lines, closeout, check-output, ls, inbox and watch, each parsed, helped and printed by the client
+ * from these words and read through the `Api`. A check that needs the grammar of a label query is the api's to make: it refuses one in the
+ * grammar's own words. The inbox's bare read is `INBOX_READ_WORDS`, apart from the inbox's writes (`INBOX_WORDS`); `nemia watch`'s words
+ * are cut into `commands-reads-watch.ts`, and the inbox's manual into `commands-reads-inbox.ts`. Pure.
  */
 import { CLI, type Args, type CommandWords, type Flag } from './command.ts';
 import { answerSpec, labelFlags, SELECTOR_FLAG_FORM, selectorFlag } from './commands-flags.ts';

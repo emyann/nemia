@@ -38,33 +38,64 @@ const readOf = (reads: readonly GetRead[], read: string) => reads.find((r) => r.
 const readsUnlinkedSpec = spec<(reads: readonly GetRead[], linked: readonly string[], reasons: readonly ReadReason[]) => UnlinkedBreak[]>({
   requires: ({ input: [reads, , reasons] }) => distinct(reads) && distinct(reasons),
   ensures: {
-    unlinkedExactly: {
-      description: 'A read is refused as unlinked exactly when it is no stream, no verb links it and no reason names it',
+    unlinkedWhenUnexcused: {
+      description: 'A read that is no stream, that no verb links and that no reason names is refused as unlinked',
       condition: ({ input: [reads, linked, reasons], output }) =>
-        reads.every((r) => breaks(output, r.read, 'unlinked') === (!r.stream && !linked.includes(r.read) && !excused(reasons, r.read))),
+        reads.every((r) => r.stream || linked.includes(r.read) || excused(reasons, r.read) || breaks(output, r.read, 'unlinked')),
+    },
+    unlinkedOnlyWhenUnexcused: {
+      description: 'An unlinked break names no read that is a stream, that a verb links or that a reason names',
+      condition: ({ input: [reads, linked, reasons], output }) =>
+        output.every(
+          (b) =>
+            b.reason !== 'unlinked' ||
+            reads.every((r) => r.read !== b.read || (!r.stream && !linked.includes(r.read) && !excused(reasons, r.read))),
+        ),
     },
     unlinkedNamesARead: {
       description: 'An unlinked break names a GET endpoint of the Api',
       condition: ({ input: [reads], output }) => output.every((b) => b.reason !== 'unlinked' || readOf(reads, b.read) !== undefined),
     },
-    noneExactly: {
-      description: 'A reason is refused as naming none exactly when the Api has no GET endpoint of its name',
+    noneWhenNoRead: {
+      description: 'A reason for a name the Api has no GET endpoint of is refused as naming none',
       condition: ({ input: [reads, , reasons], output }) =>
-        reasons.every((x) => breaks(output, x.read, 'none') === (readOf(reads, x.read) === undefined)),
+        reasons.every((x) => readOf(reads, x.read) !== undefined || breaks(output, x.read, 'none')),
     },
-    streamExactly: {
-      description: 'A reason is refused as needless exactly when it names a stream, which no tool can serve',
+    noneOnlyWhenNoRead: {
+      description: 'A none break of a reason names no GET endpoint the Api has',
       condition: ({ input: [reads, , reasons], output }) =>
-        reasons.every((x) => breaks(output, x.read, 'stream') === (readOf(reads, x.read)?.stream === true)),
+        output.every((b) => b.reason !== 'none' || !excused(reasons, b.read) || readOf(reads, b.read) === undefined),
     },
-    linkedExactly: {
-      description: 'A reason is refused as stale exactly when it names a read, no stream, that a verb links',
+    streamWhenStream: {
+      description: 'A reason for a stream, which no tool can serve, is refused as needless',
+      condition: ({ input: [reads, , reasons], output }) =>
+        reasons.every((x) => readOf(reads, x.read)?.stream !== true || breaks(output, x.read, 'stream')),
+    },
+    streamOnlyWhenStream: {
+      description: 'A stream break of a reason names a stream',
+      condition: ({ input: [reads, , reasons], output }) =>
+        output.every((b) => b.reason !== 'stream' || !excused(reasons, b.read) || readOf(reads, b.read)?.stream === true),
+    },
+    linkedWhenLinked: {
+      description: 'A reason for a read, no stream, that a verb links is refused as stale',
       condition: ({ input: [reads, linked, reasons], output }) =>
-        reasons.every((x) => breaks(output, x.read, 'linked') === (readOf(reads, x.read)?.stream === false && linked.includes(x.read))),
+        reasons.every((x) => readOf(reads, x.read)?.stream !== false || !linked.includes(x.read) || breaks(output, x.read, 'linked')),
     },
-    unsaidExactly: {
-      description: 'A reason is refused as saying nothing exactly when its sentence is empty',
-      condition: ({ input: [, , reasons], output }) => reasons.every((x) => breaks(output, x.read, 'unsaid') === (x.why.length === 0)),
+    linkedOnlyWhenLinked: {
+      description: 'A stale break of a reason names a read, no stream, that a verb links',
+      condition: ({ input: [reads, linked, reasons], output }) =>
+        output.every(
+          (b) => b.reason !== 'linked' || !excused(reasons, b.read) || (readOf(reads, b.read)?.stream === false && linked.includes(b.read)),
+        ),
+    },
+    unsaidWhenEmpty: {
+      description: 'A reason whose sentence is empty is refused as saying nothing',
+      condition: ({ input: [, , reasons], output }) => reasons.every((x) => x.why.length !== 0 || breaks(output, x.read, 'unsaid')),
+    },
+    unsaidOnlyWhenEmpty: {
+      description: 'An unsaid break names no reason whose sentence says something',
+      condition: ({ input: [, , reasons], output }) =>
+        output.every((b) => b.reason !== 'unsaid' || reasons.every((x) => x.read !== b.read || x.why.length === 0)),
     },
     reasonBreaksNameAReason: {
       description: 'A break of a reason names a reason given',

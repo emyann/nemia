@@ -163,10 +163,14 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  * `factory/volume/index.ts`, through which `start/inputs.ts` reads `volumeMounts`, and `factory/volume/origin-params.ts`, the
  * parameters a factory's first writable volume sets, which it exports beside it. Both pure, importing nothing but files already
  * loaded and types, and neither touching a disk.
+ *
+ * Each is two more since a step's checks are named (`checks:`): `check/checks-plan.ts`, the plan the loader resolves a step's checks
+ * into, and `check/checks-due.ts`, which of them a pass files, both through the check folder's face. Both pure, importing nothing but
+ * files already loaded and types, and neither touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 216, effect: 15 },
-  'agent-orchestrator/workflow': { all: 152, effect: 15 },
+  'agent-orchestrator/run': { all: 218, effect: 15 },
+  'agent-orchestrator/workflow': { all: 154, effect: 15 },
 };
 
 const isEffectModule = (url: string) => url.includes('/node_modules/effect/');

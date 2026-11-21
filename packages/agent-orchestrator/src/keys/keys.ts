@@ -427,6 +427,20 @@ export function checkOf(step: string, check: string | undefined) {
 }
 
 /**
+ * A command node's `run:` as written, refused when it is `none` or empty, as `check:` is (`checkOf`): the shell would run it as a command
+ * it cannot find, and the node would fail every time.
+ * @param step The step's name, which a refusal starts with.
+ * @param run The `run:` line's value, undefined where the step has none.
+ */
+export function commandRunOf(step: string, run: string | undefined) {
+  if (run !== undefined && ['none', '""', "''"].includes(run.trim()))
+    refuse(
+      `${step}: \`run: ${run}\` would run \`${run}\` as a shell command, which exits 127 every time. Write the command the node runs, or delete the line.`,
+    );
+  return run;
+}
+
+/**
  * The schema an `output:` names, read and refused unless the run can use it.
  *
  * Strict, because the schema is merged into the closeout the step is filed with and Codex refuses a

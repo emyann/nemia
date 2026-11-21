@@ -123,7 +123,7 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
     closeoutReader(views, run, steps),
     closeoutAsked(views),
     spendReader(views),
-    exitVerdicts(views, run),
+    exitVerdicts(views, run, steps),
   );
   const at = new Date().toISOString();
   const place = yield* PlaceService;

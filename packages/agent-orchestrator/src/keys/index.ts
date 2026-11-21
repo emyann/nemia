@@ -4,6 +4,7 @@ export {
   budgetOf,
   checkMemoryOf,
   checkOf,
+  commandRunOf,
   composedRefusal,
   contextOf,
   contextText,

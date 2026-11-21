@@ -259,6 +259,8 @@ const WIRING = [
   'slot',
   'denials',
   'check',
+  'checks',
+  'run',
   'retries',
   'checkFailurePolicy',
   'checkMemory',

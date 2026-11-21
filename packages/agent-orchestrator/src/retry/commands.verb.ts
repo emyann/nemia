@@ -16,15 +16,22 @@ import { checked, type Served } from '../command/entry.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 
 /** What `nemia retry`'s how is read off: its parsed flags, or its typed input. */
-type HowGiven = { readonly mode?: unknown; readonly model?: unknown; readonly message?: unknown; readonly budget?: unknown };
+type HowGiven = {
+  readonly mode?: unknown;
+  readonly model?: unknown;
+  readonly message?: unknown;
+  readonly budget?: unknown;
+  readonly check?: unknown;
+};
 
-/** `nemia retry`'s how, off its arguments: its way, the model a fresh session runs on, the answer and the cap. */
-function howOf({ mode, model, message, budget }: HowGiven) {
+/** `nemia retry`'s how, off its arguments: its way, the model a fresh session runs on, the answer, the cap and the check to run again. */
+function howOf({ mode, model, message, budget, check }: HowGiven) {
   return {
     mode: mode === 'fresh' || mode === 'recheck' ? mode : 'continue',
     ...(typeof model === 'string' ? { model } : {}),
     ...(typeof message === 'string' ? { message } : {}),
     ...(typeof budget === 'number' ? { budget } : {}),
+    ...(typeof check === 'string' ? { check } : {}),
   } satisfies RetryHow;
 }
 
@@ -69,11 +76,13 @@ const retryRefusal = (args: Args) =>
 
 /**
  * What a typed ask carries that the command line cannot say, refused before anything is read: a blank `model`, which `--model` refuses as
- * no name, a `model` beside a way that is not fresh (`--model` sets it), and a person's `answers` on a recheck, which files no session to
- * read them.
+ * no name, a `model` beside a way that is not fresh (`--model` sets it), a person's `answers` on a recheck, which files no session to
+ * read them, and a `check` on a try that is no recheck.
  */
-function askRefusal({ mode, model, answers }: RetryInput) {
+function askRefusal({ mode, model, answers, check }: RetryInput) {
   const how = howOf({ mode });
+  if (check !== undefined && how.mode !== 'recheck')
+    return `\`check\` names the one refused check a recheck runs again, as \`nemia retry --recheck --check <name>\` does, so it goes with "mode": "recheck". This ask said "${how.mode}".`;
   if (model !== undefined && !model.trim())
     return '`model` is blank, and names no model to run the new session on. Name one, as `nemia retry --model <m>` does — "model": "<m>" — or leave it out for the model the step runs on.';
   if (model !== undefined && how.mode !== 'fresh')

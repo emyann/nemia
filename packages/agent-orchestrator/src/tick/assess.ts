@@ -35,6 +35,7 @@ import { answeredRoute, routedWords } from '../route/routed/index.ts';
 import type { RunStatusWord } from 'objects';
 import { hasStarted } from '../wait/wait.ts';
 import { needsWaited, type NeedHeld, type NeedWaited } from '../needs/index.ts';
+import { stepChecksDue } from '../check/index.ts';
 
 export type Assessment = {
   /**
@@ -45,7 +46,7 @@ export type Assessment = {
   ready: string[];
   /** Workflow nodes (`workflow:`) due their card, on the route taken and never sent. Send these: each files a card for its workflow. */
   send: string[];
-  /** Steps that signed off with a `check:` nobody has filed yet. File their checks. */
+  /** Steps that signed off with checks due: none filed yet, or one whose waits have all passed (`stepChecksDue`). File their checks. */
   check: string[];
   /** Steps to try again, and how: a check `retries:` still covers, or a person's `nemia retry`. File these. */
   retry: Retry[];
@@ -209,7 +210,7 @@ export function assess(read: AssessRead) {
   for (const r of round) status.set(r.step, 'running');
   const sentBack = [...unheld(steps, run, retry, round)];
   for (const name of sentBack) status.set(name, 'pending');
-  const { ready, send, check, unreachable } = dueSteps(steps, run, status, closeoutOf, checkout, waitingOnCheckout);
+  const { ready, send, check, unreachable } = dueSteps(steps, run, status, closeoutOf, checkout, waitingOnCheckout, phaseOf);
 
   const all = [...status.values()];
   const overall: Assessment['status'] = succeeded(all)
@@ -251,12 +252,14 @@ function dueSteps(
   closeoutOf: (step: string) => Closeout | undefined,
   checkout: CheckoutHold | undefined,
   waitingOnCheckout: string[],
+  phaseOf: (taskId: string) => TaskPhase,
 ) {
   const due: Pick<Assessment, 'ready' | 'send' | 'check' | 'unreachable'> = { ready: [], send: [], check: [], unreachable: [] };
   const wordOf = (name: string) => status.get(name) ?? 'pending';
   for (const step of steps) {
     const own = status.get(step.name);
-    if (own === 'checking' && !run.steps[step.name]?.check) due.check.push(step.name);
+    if (own === 'checking' && (!run.steps[step.name]?.check || stepChecksDue(run, step, phaseOf).file.length > 0))
+      due.check.push(step.name);
     if (own !== 'pending') continue;
     const condition = conditionOf(step, steps);
     const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf, steps) : undefined;

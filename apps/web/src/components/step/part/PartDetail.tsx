@@ -19,7 +19,7 @@ import type { StepPartModel } from '@/lib/stepPart';
 import { Approved, endsTheRun, gateWord } from '../../gate/Gate';
 import { AsItCame, attemptsWord, CheckVerdictWords, tryLabel } from '../Closeout';
 import { DebugPanel } from '../DebugPanel';
-import { Check, code, Facts, pathRow, readRows, specRows, spentRows, unreadRows, when } from '../Facts';
+import { Checks, code, Facts, pathRow, readRows, specRows, spentRows, unreadRows, when } from '../Facts';
 import { OutcomeHead } from '../Outcome';
 import { StepNote } from '../StatusChip';
 import { StepPageLink } from '../StepParts';
@@ -218,7 +218,7 @@ export function PartDetail({ run, step, detail, open = false }: { run: RunDetail
         <NowFacts step={step} />
         <StepFacts run={run} step={step} />
         {run.place === 'folder' && step.taskId !== null && <FolderFiles step={step} />}
-        {step.check && <Check check={step.check} read={checkRead(run, step)} />}
+        {step.check && <Checks check={step.check} checks={step.checks} read={checkRead(run, step)} />}
         {step.gate?.approval && <Approved step={step.name} approval={step.gate.approval} ends={ends} budgets={step.gate.budgets} />}
         <Fold name="spec" title="Its spec" open={open}>
           {detail.spec ? (

@@ -20,14 +20,20 @@ const FROZEN = /\$(?:(WF_WORKFLOW_FILES|WF_CARRIED_FILES)|\{(WF_WORKFLOW_FILES|W
 
 type Manifest = {
   spec?: {
-    steps?: Array<{ name?: unknown; check?: unknown }>;
+    steps?: Array<{ name?: unknown; check?: unknown; checks?: Array<{ name?: unknown; run?: unknown }>; run?: unknown }>;
     needs?: Array<{ name?: unknown; check?: unknown; fixes?: Array<{ command?: unknown }> }>;
   };
 };
 
-/** The commands of a manifest that run with the frozen folders: each step's check, and each need's check and its fixes' commands. */
+/**
+ * The commands of a manifest that run with the frozen folders: each step's check, each of its named checks (`<step>/<check>`), a command
+ * node's line, and each need's check and its fixes' commands.
+ */
 const commandsOf = (manifest: Manifest | null) => [
-  ...(manifest?.spec?.steps ?? []).map((step) => ({ step: String(step.name), check: step.check })),
+  ...(manifest?.spec?.steps ?? []).flatMap((step) => [
+    { step: String(step.name), check: step.check ?? step.run },
+    ...(step.checks ?? []).map((c) => ({ step: `${String(step.name)}/${String(c.name)}`, check: c.run })),
+  ]),
   ...(manifest?.spec?.needs ?? []).flatMap((need) =>
     [need.check, ...(need.fixes ?? []).map((fix) => fix.command)].map((check) => ({ step: `needs/${String(need.name)}`, check })),
   ),

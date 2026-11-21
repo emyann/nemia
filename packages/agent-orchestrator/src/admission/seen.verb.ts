@@ -39,7 +39,7 @@ export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: stri
       steps,
       harnessBlocked(views),
       spendOf,
-      exitVerdicts(views, run),
+      exitVerdicts(views, run, steps),
     );
     return WAITS_ON_PERSON[standing.reason];
   };
@@ -47,7 +47,7 @@ export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: stri
   return {
     closeout: step && closeout && { outcome: closeout.outcome, ...(closeout.needs === undefined ? {} : { needs: closeout.needs }) },
     questions: askedQuestions(step, closeout).flatMap((a) => a.questions.map((q) => ({ recommended: q.recommended ?? null }))),
-    verdict: exitVerdicts(views, run)(stepName),
+    verdict: exitVerdicts(views, run, steps)(stepName),
     loops: steps
       .filter((s) => s.loop && closeoutOf(s.name))
       .map((s) => ({ again: closeoutOf(s.name)?.output?.again === true, personAccepted: acceptanceOf(run, s.name) !== undefined })),

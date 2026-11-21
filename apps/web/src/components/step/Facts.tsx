@@ -406,16 +406,27 @@ const REBUILT_TITLE =
   'A resumed session should read its context from the cache. It wrote it again instead, at twenty times the price of a read: the cache was rebuilt.';
 
 /**
- * The command a step is judged by, and once it failed its check, what it exited with and the last lines of
+ * The command a step is judged by, and of a step with several, its name, result, exit and how long it ran (`namedRows`); once it
+ * failed its check, what it exited with and the last lines of
  * each stream: its output first, where a test runner says what failed, then its stderr. Where the check was filed and `read` names its
  * try, a fold that reads all it printed (`CheckOutput`).
  */
-export function Check({ check: { command, refused, taskId }, read }: { check: Frozen<StepCheck>; read: CheckRead | null }) {
+export function Check({
+  check: { name, command, refused, taskId, verdict, started, ended },
+  read,
+  named = false,
+}: {
+  check: Frozen<StepCheck>;
+  read: CheckRead | null;
+  named?: boolean;
+}) {
+  const title = named ? `Check ${name}` : 'Check';
   return (
-    <section aria-label="Check" className="space-y-2">
-      <h3 className="text-label-medium text-muted-foreground">Check</h3>
+    <section aria-label={title} className="space-y-2">
+      <h3 className="text-label-medium text-muted-foreground">{title}</h3>
       <Facts
         rows={[
+          ...(named ? namedRows(verdict, started, ended) : []),
           ['command', code(command)],
           ...(refused
             ? [
@@ -439,6 +450,37 @@ export function Check({ check: { command, refused, taskId }, read }: { check: Fr
       )}
     </section>
   );
+}
+
+/**
+ * The rows a check of several draws above its command: its result (`not filed` for one never run), the code it exited with where it gave
+ * one, and how long it ran once it ended.
+ * @param verdict The check's verdict, null where it was never filed.
+ * @param started When its task started, null where it has not.
+ * @param ended When it ended, null where it has not.
+ */
+const namedRows = (verdict: Frozen<StepCheck>['verdict'], started: string | null, ended: string | null) =>
+  [
+    ['result', verdict?.result ?? 'not filed'],
+    ...(typeof verdict?.exit === 'number' ? [['exit', code(String(verdict.exit))]] : []),
+    ...(started && ended ? [['ran', durationWords(Date.parse(ended) - Date.parse(started), 'second')]] : []),
+  ] as [string, ReactNode][];
+
+/**
+ * A try's checks: the one it is judged by (`check`), as `Check` draws it, or for a step with several, each under its name with its result,
+ * and a fold that reads all it printed by its name.
+ */
+export function Checks({
+  check,
+  checks,
+  read,
+}: {
+  check: Frozen<StepCheck>;
+  checks: readonly Frozen<StepCheck>[] | undefined;
+  read: CheckRead | null;
+}) {
+  if (!checks || checks.length < 2) return <Check check={check} read={read} />;
+  return checks.map((c) => <Check key={c.name} check={c} read={read && { ...read, check: c.name }} named />);
 }
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */

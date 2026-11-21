@@ -902,8 +902,9 @@ describe('the former names a file may still say: read under the names they have 
 
 /**
  * The keys every-key row sets, each as a file writes it: all but those read on a step of their own, the routing keys among them, whose
- * round trip `src/route/route.test.ts` holds, and `checkFailurePolicy:`, a map written as a block, whose round trip
- * `src/check/check-policy.test.ts` holds.
+ * round trip `src/route/route.test.ts` holds, `checkFailurePolicy:`, a map written as a block, whose round trip
+ * `src/check/check-policy.test.ts` holds, `checks:`, a list of maps, held by `src/check/checks-plan.test.ts`, and `run:`, which makes a
+ * command node that takes few of the other keys (`src/command-node/command-node.test.ts`).
  */
 const EVERY: Record<
   Exclude<
@@ -922,6 +923,8 @@ const EVERY: Record<
     | 'card'
     | 'unlabel'
     | 'checkFailurePolicy'
+    | 'checks'
+    | 'run'
   >,
   string
 > = {

@@ -115,6 +115,10 @@ export type Step = {
   gate?: boolean;
   budget?: Value<number>;
   check?: Value<string>;
+  /** The step's named checks (`checks:`), each a name, its shell line, the checks it waits on, and whether it is on. */
+  checks?: readonly { name: string; run: Value<string>; after?: readonly string[]; enabled?: boolean }[];
+  /** A command node's shell line (`run:`). */
+  run?: Value<string>;
   /**
    * The memory the step's check asks of the machine, a Kubernetes quantity (`256Mi`), as its line writes it: often a parameter's value,
    * whose empty value writes no line, so the check asks the daemon's default.
@@ -334,6 +338,8 @@ const STEP: Shape = {
     gate: 'boolean',
     budget: 'count',
     check: 'words',
+    checks: { list: { fields: { name: 'string', run: 'words', after: 'strings', enabled: 'boolean' }, required: ['name', 'run'] } },
+    run: 'words',
     checkMemory: 'string',
     loop: 'string',
     rounds: 'number',

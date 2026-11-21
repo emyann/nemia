@@ -43,6 +43,7 @@ import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
 import { answersOr } from '../question/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
+import { checksPhase } from '../check/index.ts';
 
 /** What `retryRefusal` was asked: its arguments, and the command its refusals name. */
 type Asked = {
@@ -160,6 +161,7 @@ export function retryRefusal(
     pendingRefusal(c) ??
     (c.modes.length ? undefined : nothingToTry(c)) ??
     modeRefusal(c) ??
+    checkNameRefusal(c) ??
     wordlessRefusal(c) ??
     runTriesItself(c) ??
     budgetAskRefusal(c) ??
@@ -346,11 +348,27 @@ function statusRefusal(c: Judged) {
  * `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted; and on a step ended at its
  * budget with no check to run, or whose staged merge the run took back, its session retry with `--budget` named instead.
  */
+/**
+ * `--check <name>` naming no refused check of the step: a step judged by one check, whose recheck runs it whole, or a name that is no check
+ * of its several, or one whose task did not fail.
+ */
+function checkNameRefusal({ how, run, name, command, phaseOf }: Judged) {
+  if (how.check === undefined) return undefined;
+  const tasks = run.steps[name]?.check?.tasks;
+  if (!tasks) return `--check names one of a step's several checks, and ${name} is judged by one: run it again with ${command} --recheck.`;
+  const refused = Object.entries(tasks).flatMap(([check, id]) => (phaseOf(id) === 'failed' ? [check] : []));
+  if (refused.includes(how.check)) return undefined;
+  const which = refused.length
+    ? `its refused ${refused.length === 1 ? 'check is' : 'checks are'} ${refused.join(', ')}`
+    : 'none of its checks refused';
+  return `--check ${how.check} names no refused check of ${name}: ${which}. Name one (${command} --recheck --check <name>), or recheck every one that did not pass: ${command} --recheck.`;
+}
+
 function modeRefusal(c: Judged) {
   const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
   if (landsOnCheck(step, run) && status === 'failed (check)') {
-    const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name].check.taskId) : 'unknown', verdictOf(name))
+    const why = refusedCheck(run.steps[name]?.check ? checksPhase(run.steps[name].check, phaseOf) : 'unknown', verdictOf(name))
       ? 'refused it'
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;

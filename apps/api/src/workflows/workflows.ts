@@ -152,6 +152,7 @@ function keyValue(step: StepSpec, key: StepKey) {
   const value = key === 'output' ? step.output?.file : key === 'agent' ? step.agent?.name : step[key];
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
+  if (key === 'checks') return objectLine(step, key);
   if (Array.isArray(value)) return value.length ? value.join(', ') : null;
   if (typeof value === 'object') return objectLine(step, key);
   return String(value);
@@ -429,9 +430,14 @@ export const specOf = (step: StepSpec) => ({
   ...routingOf(step),
 });
 
-/** A step's check and what it asks, its tries and which of its exits a person answers, each null where the step does not say it. */
+/**
+ * A step's checks and what they ask, its tries and which of its exits a person answers, and a command node's line, each null where the
+ * step does not say it.
+ */
 const checkingOf = (step: StepSpec) => ({
   check: step.check ?? null,
+  checks: step.checks ? checksLine(step.checks) : null,
+  run: step.run ?? null,
   checkMemory: step.checkMemory ?? null,
   retries: step.retries ?? null,
   checkFailurePolicy: step.checkFailurePolicy ? checkFailurePolicyLine(step.checkFailurePolicy) : null,
@@ -448,8 +454,15 @@ const routingOf = (step: StepSpec) => ({
   unlabel: step.unlabel ?? null,
 });
 
-/** A key whose value is an object, as its line writes it in YAML flow: `route:` and `checkFailurePolicy:`; null for any other. */
+/** A step's `checks:` as its line writes it, in YAML flow (JSON, which YAML reads): each check's name, line and waits. */
+const checksLine = (checks: NonNullable<StepSpec['checks']>) =>
+  JSON.stringify(checks.map((c) => ({ name: c.name, run: c.run, after: [...c.after] })));
+
+/**
+ * A key whose value is an object, as its line writes it in YAML flow: `route:`, `checkFailurePolicy:` and `checks:`; null for any other.
+ */
 const objectLine = (step: StepSpec, key: StepKey) => {
+  if (key === 'checks' && step.checks) return checksLine(step.checks);
   if (key === 'route' && step.route) return routeLine(step.route);
   if (key === 'checkFailurePolicy' && step.checkFailurePolicy) return checkFailurePolicyLine(step.checkFailurePolicy);
   return null;

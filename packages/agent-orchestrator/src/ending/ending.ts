@@ -33,6 +33,7 @@ import type { CheckoutHold } from '../cap/cap.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { ClaimedAt } from '../../contracts/checkout-claim.contract.ts';
+import { checksPhase } from '../check/index.ts';
 
 /**
  * The deny list a step is filed with, each try and each round: its own, and `landingDenied` — what its place denies a landing session
@@ -177,7 +178,7 @@ const landingSettled = (step: StepSpec, run: Run, phaseOf: (taskId: string) => T
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return undefined;
   const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
   const session = phaseOf(record.taskId);
-  const check = record.check ? phaseOf(record.check.taskId) : undefined;
+  const check = record.check ? checksPhase(record.check, phaseOf) : undefined;
   return busy(session) || busy(check) ? undefined : { session, check };
 };
 
@@ -209,7 +210,9 @@ export const landingOpen = (
   const record = run.steps[step.name];
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return false;
   const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
-  return busy(phaseOf(record.taskId)) || busy(record.check && phaseOf(record.check.taskId)) || own === 'checking' || merging() === 'ours';
+  return (
+    busy(phaseOf(record.taskId)) || busy(record.check && checksPhase(record.check, phaseOf)) || own === 'checking' || merging() === 'ours'
+  );
 };
 
 /**

@@ -756,7 +756,7 @@ async function landedThrough(e: Engine, id: string, place: Place) {
     closeoutReader(views, r),
     closeoutAsked(views),
     spendReader(views),
-    exitVerdicts(views, r),
+    exitVerdicts(views, r, stepsOf(r, ROOT)),
     memo,
   );
 }

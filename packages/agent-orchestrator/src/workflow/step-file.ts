@@ -20,11 +20,12 @@ import {
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeOf, routeWritten, routingOf } from '../route/index.ts';
-import { checkFailurePolicyOf, checkFailurePolicyWritten } from '../check/index.ts';
+import { checkFailurePolicyOf, checkFailurePolicyWritten, checksOf, checksWritten } from '../check/index.ts';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
   checkOf,
+  commandRunOf,
   bareSkillOf,
   composedRefusal,
   ONE_BARE_NAME,
@@ -380,7 +381,7 @@ export function stepFrom(
     after,
     resume: meta.resume,
     place: placeNamed(name, meta.place),
-    workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.retries, harness),
+    workspace: workspaceOf(name, meta.workspace, meta.check ?? meta.checks, meta.resume, meta.retries, harness),
     writable: writableNamesOf(name, meta.writable),
     reads: readsNamesOf(name, meta.reads),
     slot: slotOf(name, meta.slot),
@@ -402,9 +403,11 @@ export function stepFrom(
     memory: memoryOf(name, meta.memory),
     budget: budgetOf(name, meta.budget),
     check: checkOf(name, meta.check),
-    checkMemory: checkMemoryOf(name, meta.checkMemory, meta.check),
+    checks: checksOf(name, meta.check, meta.checks),
+    run: commandRunOf(name, meta.run),
+    checkMemory: checkMemoryOf(name, meta.checkMemory, meta.check ?? meta.checks),
     retries: countOf(name, 'retries', meta.retries),
-    checkFailurePolicy: checkPolicyOf(name, meta.checkFailurePolicy, meta.check),
+    checkFailurePolicy: checkPolicyOf(name, meta.checkFailurePolicy, meta.check ?? meta.checks ?? meta.run),
     gate: gateOf(name, meta.gate),
     input: meta.input
       ?.split(',')
@@ -521,6 +524,10 @@ export function renderStep(step: StepDraft) {
     if (key === 'route') {
       const route = routeDrafted(step.name, step.route);
       return (route === undefined ? [] : [['route', routeWritten(route)]]) satisfies FrontmatterPair[];
+    }
+    if (key === 'checks') {
+      const checks = checksDrafted(step.name, step.checks);
+      return (checks === undefined ? [] : [['checks', checksWritten(checks)]]) satisfies FrontmatterPair[];
     }
     if (key === 'checkFailurePolicy') {
       const policy = policyDrafted(step.name, step.checkFailurePolicy);
@@ -647,9 +654,24 @@ function routeDrafted(step: string, drafted: unknown) {
 }
 
 /**
+ * A draft's `checks:`, read and refused as a file's lines would be (`checksOf`): the resolved plan, the list a step's frontmatter reads as,
+ * or its YAML flow as the api's builder sends it.
+ */
+function checksDrafted(step: string, drafted: unknown) {
+  if (drafted == null) return undefined;
+  if (typeof drafted !== 'string') return checksOf(step, undefined, JSON.stringify(drafted));
+  let read: unknown;
+  try {
+    read = readFrontmatter(step, `checks: ${drafted}`).entries[0]?.value;
+  } catch {
+    read = drafted;
+  }
+  return checksOf(step, undefined, typeof read === 'string' ? read : JSON.stringify(read));
+}
+
+/**
  * A draft's `checkFailurePolicy:`, read and refused as a file's line would be: the parsed policy, the map a step's frontmatter reads as
  * (a Workflow proposal's keys, each exit code a number), or its line as the api's builder sends it (YAML flow, `checkFailurePolicyLine`).
- * Undefined for none.
  */
 function policyDrafted(step: string, drafted: unknown) {
   if (drafted == null) return undefined;

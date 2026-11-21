@@ -49,6 +49,8 @@ export const STEP_KEYS = [
   'memory',
   'budget',
   'check',
+  'checks',
+  'run',
   'checkMemory',
   'retries',
   'checkFailurePolicy',
@@ -126,6 +128,8 @@ export const STEP_KEY_FORM = {
   memory: 'text',
   budget: 'dollars',
   check: 'text',
+  checks: 'text',
+  run: 'text',
   checkMemory: 'text',
   retries: 'count',
   checkFailurePolicy: 'text',
@@ -256,6 +260,18 @@ const stepKeyFields = {
   check: Schema.optionalKey(
     Text.annotate({
       description: "A shell command the run executes in the step's workspace after it hands off; exit 0 makes the step verified.",
+    }),
+  ),
+  checks: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "The step's named checks, each a name, a shell line (run) and the checks it waits on (after), written as a YAML list; exit 0 of every one makes the step verified.",
+    }),
+  ),
+  run: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "A command node's shell line: the node runs it as a workload of its own, with no agent session, and signs off by its exit code.",
     }),
   ),
   checkMemory: Schema.optionalKey(

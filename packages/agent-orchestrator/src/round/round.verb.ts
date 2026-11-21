@@ -48,7 +48,7 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
       asks,
       spendReader(views),
       budget,
-      exitVerdicts(views, run),
+      exitVerdicts(views, run, steps),
     );
 
   const first = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
@@ -115,7 +115,7 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
       closeoutAsked(views),
       rounds,
       spendReader(views),
-      exitVerdicts(views, now),
+      exitVerdicts(views, now, steps),
     );
 
   const first = answer(run, (yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);

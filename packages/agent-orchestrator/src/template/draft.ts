@@ -15,7 +15,7 @@ import { FACTORY_RULES_FILE } from '../factory/rules/rules.ts';
 import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
 import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS } from './layout.ts';
-import { checkFailurePolicyOf } from '../check/index.ts';
+import { checkFailurePolicyOf, checksOf, checksWritten } from '../check/index.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
 export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
@@ -74,7 +74,7 @@ export type Draft = { files: DraftFile[]; from: Array<{ part: string; from: stri
 const BLOCK_KEYS = ['model', 'effort', 'context'] as const;
 
 /** The step keys copied as they are, as strings. */
-const WORDS = ['place', 'workspace', 'check', 'checkMemory', 'loop', 'memory'] as const;
+const WORDS = ['place', 'workspace', 'check', 'run', 'checkMemory', 'loop', 'memory'] as const;
 
 /** The step keys of a route read as lists: a condition's routes and those it ends on, and the routes a node runs on. */
 const ROUTE_LISTS = ['routes', 'ends', 'when', 'unlabel'] as const;
@@ -97,6 +97,7 @@ const PLACED = new Set<string>([
   'tally',
   'route',
   'checkFailurePolicy',
+  'checks',
   'workflow',
   'card',
   ...ROUTE_LISTS,
@@ -166,6 +167,7 @@ function routingOf(keys: Readonly<Partial<Record<string, unknown>>>) {
   if (keys.route !== undefined) wired.route = templateRoute(keys.route) ?? keys.route;
   if (typeof keys.checkFailurePolicy === 'string')
     wired.checkFailurePolicy = checkFailurePolicyOf('checkFailurePolicy', JSON.stringify(flowOf(keys.checkFailurePolicy)));
+  if (typeof keys.checks === 'string') wired.checks = checksWritten(checksOf('checks', undefined, keys.checks) ?? []);
   if (typeof keys.workflow === 'string') wired.workflow = keys.workflow;
   if (typeof keys.card === 'string') wired.card = keys.card;
   return wired;

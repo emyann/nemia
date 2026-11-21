@@ -10,6 +10,7 @@ export {
   CHECK_TAIL_LINES,
   checkArgv,
   checkContract,
+  checksContract,
   type CheckEnv,
   type CheckFirst,
   checkEnvOf,
@@ -37,6 +38,7 @@ export {
   REFUSAL_LINES,
   type RefusalKept,
   refusalSection,
+  refusalsSection,
   REPORTED_LINES,
   reportedLines,
   UNPROVISIONED,
@@ -53,3 +55,17 @@ export {
   type CheckFailureRule,
   type ExitCodesRequirement,
 } from './check-policy.ts';
+export {
+  checkNodes,
+  checksDue,
+  checksPhase,
+  currentCheckTask,
+  decidingCheckTask,
+  standingOf,
+  stepChecksDue,
+  type CheckNode,
+  type CheckStanding,
+  type ChecksDue,
+  type ChecksVerdict,
+} from './checks-due.ts';
+export { CHECK_NAME, checksOf, checksWritten } from './checks-plan.ts';

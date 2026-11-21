@@ -14,6 +14,7 @@ import { askedAgain, notHandedOn, overBudget, ownStatus, type SpendOf } from '..
 import { loopSpan } from '../src/workflow/validate.ts';
 import { declaredOutput } from '../src/closeout/closeout.ts';
 import { closeoutRefusals } from '../src/question/question.ts';
+import { checksPhase } from '../src/check/checks-due.ts';
 import { approved, gated } from './laws.ts';
 
 /** Where a step stands, as `standing` takes and answers it: its own status, and the one a person reads. */
@@ -28,12 +29,19 @@ type Stands = (
   verdictOf?: (step: string) => Verdict | undefined,
 ) => { status: StepStatus; own: StepStatus };
 
+/**
+ * Whether a step is judged by an exit the run reads for itself: its `check:` line, a `checks:` list that holds one check at least,
+ * or, for a command node, its own `run:` line.
+ */
+const judgedByAnExit = (step: StepSpec) => !!step.check || (step.checks?.length ?? 0) > 0 || step.run !== undefined;
+
 export const overItsCap = assume(overBudget, { pure: true });
 export const notYetHandedOn = assume(notHandedOn, { pure: true });
 export const askedForARound = assume(askedAgain, { pure: true });
 export const theLoopsSteps = assume(loopSpan, { pure: true });
 export const whatItDeclared = assume(declaredOutput, { pure: true });
 export const whatItRefuses = assume(closeoutRefusals, { pure: true });
+export const whereItsChecksStand = assume(checksPhase, { pure: true });
 
 const standingSpec = spec<Stands>({
   /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */
@@ -209,13 +217,13 @@ const ownStatusSpec = spec<
       condition: ({ input: [step, run], output }) => (output === 'pending') === !run.steps[step.name]?.taskId,
     },
     unverifiedOnlyWithNoCheck: {
-      description: 'Unverified only of a step with no check: a step with one is verified, checking, or its check failed',
-      condition: ({ input: [step], output }) => output !== 'unverified' || !step.check,
+      description: 'Unverified only of a step with no check nor command: a step with one is verified, checking, or its check failed',
+      condition: ({ input: [step], output }) => output !== 'unverified' || !judgedByAnExit(step),
     },
     aCheckIsReadOnlyOfAStepWithOne: {
-      description: 'Verified, checking, or failed at its check only of a step that has a check',
+      description: 'Verified, checking, or failed at its check only of a step that has a check, or of a command node',
       condition: ({ input: [step], output }) =>
-        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || !!step.check,
+        (output !== 'verified' && output !== 'checking' && output !== 'failed (check)') || judgedByAnExit(step),
     },
     deniedOnlyUnderDenialsFail: {
       description: 'Denied only of a step whose denials fail it',

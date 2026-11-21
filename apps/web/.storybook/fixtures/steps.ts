@@ -101,7 +101,7 @@ export const tryOf = (n: number, codes: Codes, ended: boolean, closeout: StepClo
   on: codes.on,
   via: codes.via,
   message: codes.message,
-  check: codes.verdict === null ? null : { command: 'npm test', taskId: `t-design-${n}-check`, verdict: codes.verdict, refused: null },
+  check: codes.verdict === null ? null : { name: 'check', command: 'npm test', started: null, ended: null, taskId: `t-design-${n}-check`, verdict: codes.verdict, refused: null },
   closeout,
   unreadable: null,
   answer: null,

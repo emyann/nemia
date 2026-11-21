@@ -20,7 +20,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import type { Run } from '../record/record.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import type { StepSpec } from '../step/step.ts';
-import { type CheckStderr, checksOf, refusedStderr, type StepCheck } from '../resource/checks.verb.ts';
+import { type CheckStderr, checksOf, decidingCheck, refusedStderr, severalChecks, type StepCheck } from '../resource/checks.verb.ts';
 import { attemptsIn, closeoutIn, type StepTry, triesOf, unreadableIn } from '../resource/tries.verb.ts';
 
 /**
@@ -50,7 +50,7 @@ export type StepsReading = Judgement & {
   readonly folder: ReturnType<typeof workflowsOf>;
   /** The steps a page shows the workflow of: the frozen workflow, else the folder (`shownWorkflow`). */
   readonly source: readonly StepSpec[] | null;
-  readonly checks: ReadonlyMap<string, StepCheck>;
+  readonly checks: ReadonlyMap<string, readonly StepCheck[]>;
   readonly stderr: CheckStderr;
   /** The store's real releases folder, which a step's attempt is placed under to say the release it ran on (`realReleasesDir`). */
   readonly releases: string;
@@ -111,7 +111,8 @@ export const stepsReadingOf = Effect.fnUntraced(function* (
  * on such a read is served once and never kept, since the run's inputs may not move until it reads.
  */
 export const readFailed = ({ checks, stderr }: StepsReading) =>
-  [...stderr.values()].some((said) => typeof said === 'string') || [...checks.values()].some((check) => check.refused?.unreadable != null);
+  [...stderr.values()].some((said) => typeof said === 'string') ||
+  [...checks.values()].some((list) => list.some((check) => check.refused?.unreadable != null));
 
 /**
  * The run read once (`RunReading`): its steps (`stepsReading`), then its timeline off their views; or why it is not judged
@@ -145,7 +146,7 @@ export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]) =
     phaseOf: (taskId) => phaseOfView(views.get(taskId)),
     closeoutOf: closeoutReader(views, run, steps),
     askedCloseout: closeoutAsked(views),
-    verdictOf: exitVerdicts(views, run),
+    verdictOf: exitVerdicts(views, run, steps),
   }) satisfies RaiseReads;
 
 /**
@@ -158,7 +159,8 @@ export const currentOf = (home: string, { run, source, steps, views, judged, che
   const step = source?.find((s) => s.name === name);
   return {
     ...stepSaid(judged, name),
-    check: checks.get(name) ?? null,
+    check: decidingCheck(checks.get(name) ?? []),
+    ...severalChecks(checks.get(name) ?? []),
     closeout: closeoutIn(home, run, name, step ?? bare(name), taskId, views, steps),
     unreadable: unreadableIn(taskId, views),
     attempts: attemptsIn(taskId, views, releases),

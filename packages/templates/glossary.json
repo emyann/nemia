@@ -8,7 +8,17 @@
   "terms": [
     {
       "term": "Front door",
-      "meaning": "sdlc's workflow that routes a raw card to the workflow it needs, with no gate: the factory's `front-door` trigger, made where its `frontDoorLabel` parameter names a label key, queues each card carrying it that names no workflow; Iris, as a read-only judge, sends the card as given to intake, build or quick, answers it, or files it back to the inbox without the label, and asks a person only where she cannot tell (`packages/templates/sdlc/workflows/front-door/README.md`)."
+      "meaning": "sdlc's workflow that routes a raw card to the workflow it needs, with no gate: the factory's `front-door` trigger, which sdlc ships, queues each card in the sprint and ready to work (`sdlc/stage=sprint,sdlc/state=ready-to-work`) that names no workflow; Iris, as a read-only judge, sends the card as given to intake, build or quick, answers it, or files it back to the backlog (`relabel: [sdlc/stage=backlog]`), and asks a person only where she cannot tell (`packages/templates/sdlc/workflows/front-door/README.md`).",
+      "retired": [
+        {
+          "spelling": "frontDoorLabel",
+          "card": "front-door: sdlc ships its own labels and the trigger that reads them"
+        }
+      ]
+    },
+    {
+      "term": "sdlc labels",
+      "meaning": "the labels sdlc gives its own machinery, prefixed `sdlc/` so a person tells them from their own: `sdlc/stage` (`backlog` or `sprint`, where the card sits in the person's planning) and `sdlc/state` (`refine` or `ready-to-work`, how ready it is), both read by the `front-door` trigger, and `sdlc/sprint` (a week, such as `w48`), a planning mark nothing reads. A card with no `sdlc/stage` is in the backlog, and is never queued (`packages/templates/sdlc/nemia.yaml`, `packages/templates/sdlc/workflows/front-door/README.md`)."
     }
   ]
 }

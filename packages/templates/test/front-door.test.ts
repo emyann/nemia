@@ -1,23 +1,19 @@
 /**
- * sdlc's front door as a factory gets it: its manifest asks `frontDoorLabel` of a person applying it (`ask: true`); applied with
- * `frontDoorLabel` set, its tree's wiring holds the `front-door` trigger selecting cards by that key, and with it left empty, none;
- * `front-door` loads with Iris hired into its door and its answer — the door a judge whose fence writes nothing, since a judge that writes
+ * sdlc's front door as a factory gets it: applied with no parameter set, its tree's wiring holds the `front-door` trigger selecting the
+ * cards in the sprint and ready to work by sdlc's own labels (`sdlc/stage=sprint,sdlc/state=ready-to-work`), whatever else a card
+ * carries — what that selector selects is `src/watch/selector.test.ts`'s, in the orchestrator; `front-door` loads with Iris hired into its door and its answer — the door a judge whose fence writes nothing, since a judge that writes
  * is refused at load — routing to intake, build and quick by card nodes that file the card as given, to an answer, and to a backlog node
- * that files it back without the label; every hire of the template names an agent of the team.
+ * that files it back to the backlog by `sdlc/stage=backlog`; every hire of the template names an agent of the team.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
 import { parseAgent, parseFolder } from 'agent-orchestrator/workflow';
 import { copyOf, rendered, SDLC } from './template.ts';
 
 const COPY = copyOf(SDLC);
-const TREES = await rendered([
-  { name: 'door', template: COPY, sets: ['frontDoorLabel=ready'] },
-  { name: 'none', template: COPY },
-]);
+const TREES = await rendered([{ name: 'door', template: COPY }]);
 
 /** The tree of the factory `name`, which the controller seeded. */
 const treeOf = (name: string) => {
@@ -51,23 +47,14 @@ const frontDoorOf = (name: string) => {
   });
 };
 
-test('sdlc asks frontDoorLabel of a person applying it, and no volume sets it', () => {
-  const manifest = yaml.load(fs.readFileSync(path.join(SDLC, 'nemia.yaml'), 'utf8')) as {
-    spec: { parameters: Record<string, { ask?: boolean; whenOrigin?: string }> };
-  };
-  const label = manifest.spec.parameters.frontDoorLabel;
-  assert.equal(label?.ask, true);
-  assert.equal(label?.whenOrigin, undefined);
-});
-
-test('with frontDoorLabel set, the factory has the front-door trigger, selecting cards that carry that key, to front-door', () => {
+test('with no parameter set, the factory has the front-door trigger, selecting the cards in the sprint and ready to work, to front-door', () => {
   assert.deepEqual(wiringOf('door').triggers, {
-    'front-door': { selector: 'ready', target: { kind: 'Workflow', name: 'front-door' }, since: '' },
+    'front-door': {
+      selector: 'sdlc/stage=sprint,sdlc/state=ready-to-work',
+      target: { kind: 'Workflow', name: 'front-door' },
+      since: '',
+    },
   });
-});
-
-test('with frontDoorLabel left empty, the factory has no trigger', () => {
-  assert.equal(wiringOf('none').triggers, undefined);
 });
 
 test("every hire of sdlc names an agent of the team, the front door's among them", () => {
@@ -80,7 +67,7 @@ test("every hire of sdlc names an agent of the team, the front door's among them
   );
 });
 
-test('front-door loads with Iris as its judge, routing by card nodes, an answer, and a backlog that files the card back unlabelled', () => {
+test('front-door loads with Iris as its judge, routing by card nodes, an answer, and a backlog that files the card back to the backlog', () => {
   const steps = frontDoorOf('door');
   const of = (step: string) => steps.find((s) => s.name === step);
   assert.deepEqual(steps.map((s) => s.name).sort(), ['answer', 'backlog', 'door', 'to-build', 'to-intake', 'to-quick']);
@@ -88,10 +75,8 @@ test('front-door loads with Iris as its judge, routing by card nodes, an answer,
   assert.deepEqual(of('door')?.routes, ['intake', 'build', 'quick', 'answer', 'backlog']);
   for (const workflow of ['intake', 'build', 'quick'])
     assert.deepEqual([of(`to-${workflow}`)?.workflow, of(`to-${workflow}`)?.card], [workflow, 'given']);
-  assert.deepEqual([of('backlog')?.card, of('backlog')?.workflow, of('backlog')?.unlabel], ['backlog', undefined, ['ready']]);
-});
-
-test('with frontDoorLabel left empty, front-door still loads, its backlog removing no label', () => {
-  const backlog = frontDoorOf('none').find((s) => s.name === 'backlog');
-  assert.deepEqual([backlog?.card, backlog?.unlabel], ['backlog', undefined]);
+  assert.deepEqual(
+    [of('backlog')?.card, of('backlog')?.workflow, of('backlog')?.relabel],
+    ['backlog', undefined, ['sdlc/stage=backlog']],
+  );
 });

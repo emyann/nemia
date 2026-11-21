@@ -1080,13 +1080,7 @@
       "retired": [
         {
           "spelling": "unlabel",
-          "card": "front-door: sdlc ships its own labels and the trigger that reads them",
-          "kept": [
-            {
-              "path": "packages/agent-orchestrator/src/route/route.test.ts",
-              "why": "the row that holds a step still writing the retired key refused at load"
-            }
-          ]
+          "card": "front-door: sdlc ships its own labels and the trigger that reads them"
         }
       ]
     }

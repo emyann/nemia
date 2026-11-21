@@ -14,8 +14,8 @@
   is not what your workflow is for — an idea still loose in build or quick, a decision left open in quick, a question that asks no
   change — signs off `blocked`, saying which workflow it needs and why, so the person cancels the run and files the idea again: a card
   is started once, so the routed card is neither queued again nor read again by the door, and the idea is filed under a name of its own
-  on the workflow it needs (`nemia inbox add <file> --workflow <workflow>`), or with the door's label for the door to route it again
-  (`--label <key=value>`).
+  on the workflow it needs (`nemia inbox add <file> --workflow <workflow>`), or labelled `sdlc/stage=sprint` and
+  `sdlc/state=ready-to-work` for the door to route it again (`--label sdlc/stage=sprint --label sdlc/state=ready-to-work`).
 
 ## Routing
 

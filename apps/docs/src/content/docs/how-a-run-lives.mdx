@@ -62,6 +62,23 @@ sequenceDiagram
    merged tree, then commits the merge on exit 0, or aborts it on anything else (`landEnding`, in
    `packages/agent-orchestrator/src/ending/ending.verb.ts`).
 
+### A card a trigger starts
+
+A card need not be started by hand. A factory's **card trigger** selects its cards by their labels (`nemia factory trigger <factory>
+<name> --selector <key>=<value> --to <workflow>`, or its template's `triggers`), and each card of the factory it selects, not queued
+by hand and not started, is queued: on the workflow the card names, or on the trigger's target where it names none, ordered with the
+cards queued by hand by when it was filed. Nothing is written on the card: each pass reads it again, so taking its label off takes
+it out of the queue. Where two triggers would send a card that names no workflow to two workflows, it **clashes**: it waits, and the
+inbox and the factory's settings name the triggers, until a selector or its labels change.
+
+A trigger can spend quota only where something its target can reach runs an agent: a session or a judge, in the target or in a
+workflow one of its card nodes files a card for. A target that reaches only scripts, table or script conditions and card nodes costs
+nothing, however many cards the trigger queues. The factory's settings say which, apart from what the trigger queues now.
+
+A routing workflow sends a card on with a **card node** (`card: given`): the run's own card as it was given, its body and labels, on
+the workflow the node names, with the route taken and the reason its condition gave; or back to the inbox, unqueued, without the
+label keys its `unlabel:` names (`card: backlog`). sdlc's [front door](/sdlc/#its-workflows) is one.
+
 ## Who writes what
 
 Each file has one writer, so two loops never fight over it:

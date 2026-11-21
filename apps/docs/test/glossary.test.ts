@@ -165,6 +165,7 @@ test('the repository’s page lists every table in the map’s order, and every 
     'nemia',
     'feed',
     'operations',
+    'templates',
   ]);
   const tables = tablesIn(ROOT);
   assert.deepEqual(facts(fenceFaults(tables, order)), [], 'add each context to the fence, and take off an id with no table');

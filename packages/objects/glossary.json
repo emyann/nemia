@@ -123,7 +123,7 @@
     },
     {
       "term": "Schedule",
-      "meaning": "a factory's schedule of one of its workflows, served as an object in the factory's namespace and named by its workflow: its spec the cron, brief, repository and time zone, its status since when, its next fire, its last run and a refused fire (`Schedule`, `packages/objects/src/schedule.ts`).",
+      "meaning": "a factory's schedule of one of its workflows, served as an object in the factory's namespace and named by its workflow: its spec the cron, brief, repository and time zone, its status since when, its next fire, its last run and a refused fire (`Schedule`, `packages/objects/src/schedule.ts`). It is served too as a Trigger of the time kind, by the same name.",
       "type": "Schedule"
     },
     {
@@ -415,6 +415,16 @@
       "term": "Milestones",
       "meaning": "where a store stands on the way to its first landed change, four milestones in order, each `done`, `next` or `later` (`Milestones`, `packages/objects/src/milestones.ts`; `MILESTONES`, `MILESTONE_STATES`, `packages/objects/src/words.ts`), served by `GET /api/readiness/milestones`.",
       "type": "Milestones"
+    },
+    {
+      "term": "Trigger",
+      "meaning": "what starts a factory's work on its own, served as an object in the factory's namespace: its spec when it fires — at each fire of a cron (`time`, a schedule, named by its workflow) or on each card of the factory its label selector selects (`cards`) — and its target, a workflow the factory offers; its status whether it can spend quota, where it is defined (the factory's file or its template's), the cards it queues now and those that wait on a clash, or its next fire (`Trigger`, `packages/objects/src/trigger.ts`).",
+      "type": "Trigger"
+    },
+    {
+      "term": "Trigger quota",
+      "meaning": "whether a trigger can spend quota: `spends` where something its target can reach runs an agent (a session or a judge), `free` where nothing it reaches does, however many cards it queues, `unknown` where a workflow it reaches cannot be read; read off the steps of the target and of the workflows its card nodes file for, never off whether it fires or matches now (`TriggerQuota`, `packages/objects/src/trigger.ts`).",
+      "type": "TriggerQuota"
     }
   ]
 }

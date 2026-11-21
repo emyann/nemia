@@ -2199,6 +2199,14 @@ card queued like any other, started from the base branch and handed its caller a
 its condition's producer signed off on (a table's `from:` step, else the condition itself), where that step's `output:` declares one
 and it says one, else with the run's own title, and carries the run's labels as its `labels:` (`sentCardTitle`, `sendCards`).
 
+**What card a node files is its `card:`** (`NODE_CARDS`, `sentCardText`): `routed`, the default, the card just said; `given`, the
+run's own card as it was given — its body and its labels, read through the Card door from the card the run was started from, else the
+run's brief — with the route taken and the reason the condition's producer signed off with (`Its reason:`), so a routing workflow
+hands a raw card on as it came; and `backlog`, which names no `workflow:` and files the run's card back to the inbox naming none and
+unqueued, without the label keys its `unlabel:` lists (an empty list, as a template parameter left empty renders it, removes none). A
+card node runs no agent, a check, a gate or a workspace, as a workflow node does not; load refuses `card: backlog` with a `workflow:`,
+`given` or `routed` without one, and `unlabel:` off a backlog node. A judge's brief says a backlog node files the card back.
+
 On a route not taken, a node that was never filed reads **`skipped`**, and so does a node whose parents are all skipped; it is worked
 out on every pass from the conditions' answers and carries nothing between passes. `skipped` neither satisfies `after` nor stops a
 follower: a join runs once every parent is satisfied or skipped and at least one is satisfied, and a fan-in merges only the parents that
@@ -3386,6 +3394,16 @@ run 'wf tick' (or 'wf up') to start it
     names none for it, as `wf start --factory` refuses each;
   - an empty `--brief`, and `--brief` on anything but an inbox card.
 
+### Cards a trigger queues, and clashes
+
+A factory's card trigger (*Triggers*, below) queues the cards of its factory its selector selects, as each pass reads them: each card
+whose labels it selects, not queued by hand and not started, is listed `queued` with the triggers that queue it (`queued.by`), on the
+workflow it names, or on the trigger's target where it names none, ordered with the cards queued by hand by when it was filed (the
+Card door's `filedAt`), and the tick starts it as any queued card, the run's `from.trigger` naming the first trigger. Nothing is
+written on the card: a label taken off takes it out of the queue on the next pass. A card naming no workflow that two triggers would
+send to two workflows clashes: listed `filed` with `clash`, the triggers' names, it waits until a selector or its labels change
+(`cardTriggered`, proved by `contracts/card-trigger.contract.ts`; `triggeredOf`, `inbox.ts`).
+
 ## Factories: a named grouping in the store — `wf factory`
 
 A factory names its volumes, the writable ones the repositories a body of work is on, the workflows it offers, and the agents it
@@ -3488,6 +3506,19 @@ be (the workflow's `agents/`, the repository's, the store's).
   does not have (`Missing`), or whose file does not read.
 - **In the default factory** — a run recorded before every run had a factory, and an agent's try — nothing is read, and a step that
   names no agent runs as a plain session, as it always has. The default factory is never written, so it hires no one: `hire` and `fire` refuse it.
+
+### Triggers: what starts a factory's work on its own
+
+A factory's triggers are served as one object, `Trigger`, of two kinds: its schedules, the `time` kind, each named by its workflow,
+and its card triggers, the `cards` kind, each a label selector over its cards and the workflow it targets, kept under `triggers` in
+the factory's own file (`nemia factory trigger <factory> <name> --selector <selector> --to <workflow>`, `nemia factory untrigger`) or
+rendered from its template's `triggers` into its tree, where one whose selector renders empty is left out; the factory's own wins on a
+shared name. Both are judged with the factory's wiring (`wiringRefusal`): a trigger targets only a workflow the factory offers and is
+never named as a workflow it schedules, and a workflow a trigger targets is not detached. Each says whether it can spend quota: `spends`
+where something its target can reach runs an agent — a session or a judge, in the target or in a workflow one of its card nodes files
+for, each workflow walked once — `free` where nothing does, however many cards it queues, and `unknown` where a workflow it reaches
+does not read (`reachedWorkflows`, `triggerQuota`, proved by `contracts/trigger-quota.contract.ts`). That is apart from what it does
+now: the cards it queues and those that clash, or a time trigger's next fire.
 
 ### A run names its factory and its repository
 

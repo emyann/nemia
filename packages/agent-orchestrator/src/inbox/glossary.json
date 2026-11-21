@@ -88,6 +88,15 @@
       "term": "Card door",
       "meaning": "the one way a card of the inbox and the tick's tries of a queued one are read and written: `CardDoor` in `packages/agent-orchestrator/src/cards/cards.store.ts`, by `CardName`, its files layer at the store's root a program is given and a memory one, each refusing a card filed under a name that is no card's, at a name taken, or whose text does not read as a card. One run per card is the Run door's to hold.",
       "type": "CardDoorShape"
+    },
+    {
+      "term": "Triggered queue",
+      "meaning": "the cards a card trigger of their factory queues: each card whose labels its selector selects, not queued by hand and not started, listed `queued` with the triggers that queue it (`queued.by`), on the workflow it names, or on the trigger's target where it names none, ordered with the cards queued by hand by when it was filed. Read on every pass and never written on the card: taking the label off takes it out of the queue (`Triggering`, `packages/agent-orchestrator/src/inbox/inbox.ts`).",
+      "type": "Triggering"
+    },
+    {
+      "term": "Clash",
+      "meaning": "a card naming no workflow that two or more triggers of its factory would send to two workflows: it is listed `filed` with the triggers that clash (`clash`) and waits until a selector or its labels change (`cardTriggered`, `packages/agent-orchestrator/src/inbox/triggered.ts`)."
     }
   ]
 }

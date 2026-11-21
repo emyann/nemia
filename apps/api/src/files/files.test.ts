@@ -225,27 +225,12 @@ test('REFUSED: an input with no name and no file is a 422, nothing started', asy
   assert.equal(runCount(), before);
 });
 
-/** `bytes` written at the id `id` of `acme`'s files, under `name`, as an upload target of MCP's file extension is answered. */
-const putAt = (id: string, bytes: Buffer, name: string, type = 'image/png') =>
-  app().request(`/api/namespaces/acme/files/${id}?name=${encodeURIComponent(name)}`, {
-    method: 'PUT',
-    headers: { ...BEARER, 'content-type': type },
-    body: new Uint8Array(bytes),
-  });
-
-test('a file written at a fresh id is read back, its picture streamed inline as its own type, and an SVG only as an attachment', async () => {
-  const id = `file_${crypto.randomBytes(16).toString('hex')}`;
+test('an uploaded picture is streamed inline as its own type, and an SVG only as an attachment', async () => {
   const bytes = crypto.randomBytes(2000);
-  const put = await putAt(id, bytes, 'shot.png');
+  const put = await upload(formOf('shot.png', bytes));
   assert.equal(put.status, 201, await put.clone().text());
-  const got = await app().request(`/api/namespaces/acme/files/${id}`);
-  assert.equal(got.status, 200);
-  assert.deepEqual((({ name, mediaType, size }: FileObject) => ({ name, mediaType, size }))((await got.json()) as FileObject), {
-    name: 'shot.png',
-    mediaType: 'image/png',
-    size: bytes.length,
-  });
-  const content = await app().request(`/api/namespaces/acme/files/${id}/content`);
+  const file = (await put.json()) as FileObject;
+  const content = await app().request(`/api/namespaces/acme/files/${file.id}/content`);
   assert.equal(content.status, 200);
   assert.equal(content.headers.get('content-type'), 'image/png');
   assert.equal(content.headers.get('x-content-type-options'), 'nosniff');
@@ -257,12 +242,8 @@ test('a file written at a fresh id is read back, its picture streamed inline as 
   assert.match(served.headers.get('content-disposition') ?? '', /^attachment/);
 });
 
-test('REFUSED: a file written at an id kept already is a Conflict, at a malformed id Invalid, and an id never kept is Missing', async () => {
-  const id = `file_${crypto.randomBytes(16).toString('hex')}`;
-  assert.equal((await putAt(id, Buffer.from('a'), 'a.png')).status, 201);
-  assert.equal((await putAt(id, Buffer.from('b'), 'b.png')).status, 409);
-  assert.equal((await putAt('file_nope', Buffer.from('b'), 'b.png')).status, 422);
-  assert.equal((await app().request(`/api/namespaces/acme/files/file_${'0'.repeat(32)}`)).status, 404);
+test('REFUSED: the content of an id never kept is Missing', async () => {
+  assert.equal((await app().request(`/api/namespaces/acme/files/file_${'0'.repeat(32)}/content`)).status, 404);
 });
 
 test('a card filed with a kept file says it in its status, attaches another and takes it off; an unknown id is refused', async () => {
@@ -289,7 +270,11 @@ test('a card filed with a kept file says it in its status, attaches another and 
       ['run.log', false],
     ],
   );
-  const detached = await app().request(`/api/namespaces/acme/cards/${name}/files/run.log`, { method: 'DELETE' });
+  const detached = await app().request(`/api/namespaces/acme/cards/${name}/files/run.log`, {
+    method: 'DELETE',
+    headers: { ...BEARER, 'content-type': 'application/json' },
+    body: '{}',
+  });
   assert.equal(detached.status, 200, await detached.clone().text());
   assert.deepEqual(
     ((await detached.json()) as typeof card).status.files?.map((f) => f.name),

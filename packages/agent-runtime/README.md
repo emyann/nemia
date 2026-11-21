@@ -2242,6 +2242,7 @@ of pure code sits beside it.
 | `src/harness/claude/admission.ts` | admission as Claude Code runs it: a `PreToolUse` hook merged into `--settings` (`admittedFlags`), and the adapter `ae admission` runs (`admitCall`, `admissionHook`), which `bin/ae.ts` loads alone, before any engine |
 | `src/harness/claude/memory.ts` | auto-memory off in every session the runtime starts: the setting (`AUTO_MEMORY_OFF`) merged into the settings a task gives, for the SDK (`memorylessSettings`) |
 | `src/harness/claude/telemetry.ts` | a session's telemetry as Claude Code reads it: its variables, its tools' details only when asked, in every session's environment on the Agent SDK (`claudeTelemetryEnv`) |
+| `src/harness/claude/pictures.ts` | the pictures a session is shown in its first message (`config.pictures`): each read into an image block beside the brief (`pictureBlocks`, `openingOf`), none on a resumed session, and one that does not read a refusal before the attempt starts (`PictureUnread`) |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
 | `src/harness/claude/rules.ts` | Claude Code's permission matching (`bashCovers`, `denyingRule`, deny before ask before allow) and the tool sets measured on it, as `CLAUDE_RULES`, `CLAUDE_DECLARATION.rules` |

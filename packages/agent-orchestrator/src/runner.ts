@@ -472,12 +472,11 @@ export {
   fileAt,
   fileBegun,
   fileDropped,
+  fileBytes,
   fileKept,
-  filePut,
   filesDir,
   filesPruned,
   type FileBegun,
-  type FilePutRefused,
 } from './start/files.store.ts';
 export { INBOX, INBOX_ADD, INBOX_EDIT, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';

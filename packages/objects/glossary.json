@@ -408,7 +408,7 @@
     },
     {
       "term": "File",
-      "meaning": "a file a factory keeps for a start to hand its run's steps, as the model APIs' Files API keeps one: uploaded once, its own request, as a form of one part (`POST /api/namespaces/<namespace>/files`), 64 MiB at most (`FILE_LIMIT`) and kept a day from its last write (`FILE_KEPT_FOR`), or while an inbox card names it, and answered as its file object, whose id (`file_…`) a start in the same namespace names as an input's `file` (`FileObject`, `packages/objects/src/file.ts`); read again at `GET /api/namespaces/<namespace>/files/<id>` and its `/content`.",
+      "meaning": "a file a factory keeps for a start to hand its run's steps, as the model APIs' Files API keeps one: uploaded once, its own request, as a form of one part (`POST /api/namespaces/<namespace>/files`), 64 MiB at most (`FILE_LIMIT`) and kept a day from its last write (`FILE_KEPT_FOR`), or while an inbox card names it, and answered as its file object, whose id (`file_…`) a start in the same namespace names as an input's `file` (`FileObject`, `packages/objects/src/file.ts`); its bytes streamed again at `GET /api/namespaces/<namespace>/files/<id>/content`.",
       "type": "FileObject"
     },
     {

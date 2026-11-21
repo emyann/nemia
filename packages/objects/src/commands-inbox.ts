@@ -340,7 +340,7 @@ export const INBOX_DETACH_WORDS = {
 /** `nemia inbox files`: the files a card carries, as the card's read says them, and one of them written out with `--get`. */
 export const INBOX_FILES_WORDS = {
   name: 'inbox files',
-  served: [{ endpoint: 'cards.getAll' }, { endpoint: 'files.get', as: 'inbox_file' }],
+  served: [{ endpoint: 'cards.getAll' }],
   usage: '<name> [--get <file> [--out <path>]]',
   help: [
     'list the files a card carries; --get writes one of them out,',
@@ -371,7 +371,7 @@ export const INBOX_FILES_WORDS = {
   class: 'read',
   only: {
     side: 'cli',
-    why: "the client reads the card (the Card's `getAll`) and a file's bytes (the files' `content`) and writes them where it is typed: no route of its own",
+    why: "the client reads the card (the Card's `getAll`) and a file's bytes (the files' `content`, a stream no tool answers), and writes them where it is typed: no route of its own",
   },
 } as const satisfies CommandWords;
 

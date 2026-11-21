@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { FILE_KEPT_FOR } from 'objects';
-import { fileAt, fileBegun, fileDropped, fileKept, filePut, filesDir, filesPruned } from './files.store.ts';
+import { fileAt, fileBegun, fileDropped, fileKept, filesDir, filesPruned } from './files.store.ts';
 
 const NOW = Date.parse('2026-11-16T00:00:00.000Z');
 
@@ -113,18 +113,4 @@ test('a File an inbox card names is kept past its day, a card that does not read
   fs.rmSync(path.join(home, 'inbox', 'look.md'));
   assert.deepEqual(filesPruned(home, NOW).sort(), [`acme/${named.id}`, `acme/${named.id}.json`].sort());
   assert.ok(fileAt(home, 'acme', strayNamed.id), 'the card that does not read still keeps its File');
-});
-
-test('a file put at a fresh id is kept there, and an id taken or malformed is refused by its kind', () => {
-  const home = scratch('nemia-files-');
-  const id = `file_${'c'.repeat(32)}`;
-  const begun = filePut(home, 'acme', id, NOW);
-  assert.ok(!('refused' in begun));
-  begun.write(Buffer.from('bytes'));
-  begun.close();
-  fileKept(home, 'acme', { id, name: 'a.txt', mediaType: 'text/plain', size: 5, createdAt: new Date(NOW).toISOString() });
-  assert.equal(fs.readFileSync(fileAt(home, 'acme', id)?.path ?? '', 'utf8'), 'bytes');
-  assert.deepEqual(filePut(home, 'acme', id, NOW), { refused: 'taken' });
-  assert.deepEqual(filePut(home, 'acme', 'file_nope', NOW), { refused: 'id' });
-  assert.deepEqual(filePut(home, '..', id, NOW), { refused: 'namespace' });
 });

@@ -100,7 +100,7 @@
     },
     {
       "term": "Card files",
-      "meaning": "the files a card carries under its `files:` key, a map of the name its text and its run find each by to the File it names: written only while no run was started from it (`cardFilesRefusal`, `packages/agent-orchestrator/src/inbox/card-files.ts`), kept by the files' prune while any inbox entry names them, and copied into the `inputs/` of every run started from it.",
+      "meaning": "the files a card carries under its `files:` key, a map of the name its text and its run find each by to the File it names: written only while no run was started from it (`cardFilesRefusal`, `packages/agent-orchestrator/src/inbox/card-files.ts`), kept by the files' prune while any inbox entry names them, and copied into the inputs folder of every run started from it.",
       "type": "CardFiles"
     }
   ]

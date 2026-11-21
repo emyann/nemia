@@ -76,7 +76,6 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'steps.log': { shape: 'part', narrow: ['tail'] },
   'steps.artifact': { shape: 'bytes', why: 'a file a step wrote, served as its bytes, never as JSON' },
   'steps.file': { shape: 'bytes', why: 'a file a step wrote, served as its bytes, never as JSON' },
-  'files.get': ONE,
   'files.content': { shape: 'bytes', why: 'a kept file, served as its bytes, never as JSON' },
   'steps.path': ONE,
   'steps.transcript': { shape: 'cursor', narrow: ['after', 'limit', 'last', 'kinds'] },

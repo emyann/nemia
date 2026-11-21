@@ -38,7 +38,7 @@ const refuses = (words: CommandWords, argv: readonly string[], ...named: string[
   for (const n of named) assert.ok(String(said).includes(n), `${n} is not named in: ${String(said)}`);
 };
 
-test('the group is the seven writes, in the order the help lists them, each linking the endpoint its runner calls', () => {
+test("the group is the nine writes and the card's files' read, in the order the help lists them, each linking the endpoint its runner calls", () => {
   assert.deepEqual(
     INBOX_WORDS.map((w) => [w.name, w.served.map((l) => l.endpoint)]),
     [
@@ -47,6 +47,9 @@ test('the group is the seven writes, in the order the help lists them, each link
       ['inbox from', ['cards.update']],
       ['inbox edit', ['cards.edit']],
       ['inbox rm', ['cards.delete']],
+      ['inbox attach', ['cards.attach']],
+      ['inbox detach', ['cards.detach']],
+      ['inbox files', ['cards.getAll']],
       ['label run', ['runs.labels']],
       ['label inbox', ['cards.labels']],
     ],
@@ -59,6 +62,9 @@ test('the group is the seven writes, in the order the help lists them, each link
       ['act', true, false],
       ['act', true, false],
       ['ask', true, false],
+      ['act', true, false],
+      ['act', true, false],
+      ['read', false, false],
       ['act', true, false],
       ['act', true, false],
     ],

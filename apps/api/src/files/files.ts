@@ -6,11 +6,10 @@
  * cap is `TooLarge`, a 413 naming it; a form with no file part, a second part or a file with no name, `Invalid`; one that does not parse,
  * `BadRequest`. What was written of a file refused is let go of (`fileDropped`).
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { ByteSize, Cause, Effect, Exit, Stream } from 'effect';
 import { HttpServerRequest, HttpServerResponse, Multipart } from 'effect/http';
-import { type FileBegun, fileAt, fileBegun, fileDropped, fileKept, filePut } from 'agent-orchestrator';
+import { type FileBegun, fileAt, fileBegun, fileBytes, fileDropped, fileKept } from 'agent-orchestrator';
 import {
   Api,
   BadRequest,
@@ -139,7 +138,7 @@ const isPicture = (mediaType: string): mediaType is PictureMediaType => (PICTURE
 const contentOf = (namespace: string, id: string) =>
   Effect.map(keptAt(namespace, id), ({ file, path: at }) => {
     const picture = isPicture(file.mediaType);
-    const body = Stream.fromAsyncIterable(fs.createReadStream(at) as AsyncIterable<Uint8Array>, (cause) => cause);
+    const body = Stream.fromAsyncIterable(fileBytes(at), (cause) => cause);
     return HttpServerResponse.stream(body, {
       contentType: picture ? file.mediaType : 'application/octet-stream',
       headers: {
@@ -152,76 +151,9 @@ const contentOf = (namespace: string, id: string) =>
     });
   });
 
-/** The route of a file written at an id, as a refusal names it. */
-const PUT_ROUTE = 'PUT /api/namespaces/<namespace>/files/<id>';
-
-/**
- * The bytes `body` kept in `namespace` at the id `id` a client was given, under the name and media type the query sends (else the id and
- * the request's Content-Type): `Invalid` for an id that is no File's or a name with a folder in it, `Conflict` for an id already kept,
- * `TooLarge` past `FILE_LIMIT`, what was written of it let go of.
- * @param namespace The namespace it is written to.
- * @param id The id it is written at.
- * @param query Its own name and media type, where the query sends them.
- * @param body The request's body, as it is read.
- */
-const putAt = (
-  namespace: string,
-  id: string,
-  query: { readonly name?: string; readonly mediaType?: string },
-  body: Stream.Stream<Uint8Array, unknown>,
-) =>
-  Effect.gen(function* () {
-    const name = query.name ?? id;
-    if (name === '' || name.includes('/') || name.includes('\\') || name === '.' || name === '..')
-      return yield* Effect.fail(new Invalid({ error: `${PUT_ROUTE} takes the file's own name as ?name=, with no folder in it.` }));
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const mediaType = query.mediaType ?? request.headers['content-type']?.split(';')[0]?.trim() ?? 'application/octet-stream';
-    const now = Date.now();
-    const begun = yield* answeredWriteIn(namespace, async (s) => ({ home: s.home, at: filePut(s.home, namespace, id, now) }));
-    const { at } = begun;
-    if ('refused' in at) {
-      if (at.refused === 'taken')
-        return yield* Effect.fail(
-          new Conflict({ error: `${PUT_ROUTE}: a file is kept at ${id} already. Ask for a new upload target, or read that file.` }),
-        );
-      return yield* Effect.fail(
-        new Invalid({
-          error:
-            at.refused === 'id'
-              ? `${PUT_ROUTE} writes at an id of file_ and 32 hexadecimal digits, and ${id} is not one.`
-              : `${PUT_ROUTE} keeps files for a factory, and \`${namespace}\` names none: write to a namespace nemia factory ls lists, or to default.`,
-        }),
-      );
-    }
-    let size = 0;
-    const exit = yield* Effect.exit(
-      Stream.runForEach(body, (chunk) => {
-        size += chunk.length;
-        if (size > Number(FILE_LIMIT)) return Effect.fail(new PastCap());
-        return Effect.sync(() => at.write(chunk));
-      }).pipe(Effect.ensuring(Effect.sync(() => at.close()))),
-    );
-    if (Exit.isFailure(exit)) {
-      fileDropped(begun.home, namespace, id);
-      const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');
-      if (failure === undefined) return yield* Effect.die(Cause.squash(exit.cause));
-      return yield* Effect.fail(
-        failure.error instanceof PastCap
-          ? new TooLarge({
-              error: `${PUT_ROUTE} keeps a file of ${ByteSize.format(FILE_LIMIT)} at most, and this one is larger. Nothing was kept.`,
-            })
-          : new BadRequest({ error: `${PUT_ROUTE} could not read the body to its end. Send the file's bytes again.` }),
-      );
-    }
-    const file: FileObject = { id, name, mediaType, size, createdAt: new Date(now).toISOString() };
-    return fileKept(begun.home, namespace, file);
-  });
-
-/** The files group's handlers: a file uploaded, read, its bytes streamed, and one written at an id. */
+/** The files group's handlers: a file uploaded, and a kept one's bytes streamed. */
 export const filesHandlers = readsBounded(Api, 'files', (handlers) =>
   handlers
     .handle('upload', ({ params: { namespace }, payload }) => uploaded(namespace, payload))
-    .handle('get', ({ params: { namespace, id } }) => Effect.map(keptAt(namespace, id), ({ file }) => file))
-    .handle('content', ({ params: { namespace, id } }) => contentOf(namespace, id))
-    .handle('put', ({ params: { namespace, id }, query, payload }) => putAt(namespace, id, query, payload)),
+    .handle('content', ({ params: { namespace, id } }) => contentOf(namespace, id)),
 );

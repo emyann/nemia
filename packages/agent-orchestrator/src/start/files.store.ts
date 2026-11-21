@@ -2,7 +2,7 @@
  * The files a factory keeps for a start to hand its run's steps (`objects`' `FileObject`, uploaded by `POST
  * /api/namespaces/<namespace>/files`): each under the store's `files/<namespace>/`, its bytes as `<id>` and what it was sent as beside
  * them, `<id>.json`. A file is written first as `<id>.part`, as its bytes come (`fileBegun`, its `write`), then kept whole (`fileKept`)
- * or let go of (`fileDropped`), or written whole at an id the client was given (`filePut`); a start finds one by its id in its own
+ * or let go of (`fileDropped`); a start finds one by its id in its own
  * namespace (`fileAt`). Every file no inbox card names is let go of `FILE_KEPT_FOR` after it was last written (`filesPruned`, which
  * each upload and each card's removal asks first, as `fileLetGo` decides): a run copies what it is handed into its own `inputs/`, so a
  * file let go of takes nothing from a run, and a card keeps its files while its text names their ids.
@@ -156,51 +156,8 @@ export function fileAt(home: string, namespace: string, id: string) {
   return fs.statSync(bytes, { throwIfNoEntry: false })?.isFile() ? { file, path: bytes } : undefined;
 }
 
-/** Why a file was not written at an id: the id is no File's, the namespace keeps none, or a File is kept under it already. */
-export type FilePutRefused = 'id' | 'namespace' | 'taken';
-
-/** A file begun at an id, or why not. */
-type PutOrRefused = FileBegun | { readonly refused: FilePutRefused };
-
-/** A put refused for `refused`. */
-const putRefused = (refused: FilePutRefused) => {
-  const out: PutOrRefused = { refused };
-  return out;
-};
-
 /**
- * A new file of `namespace` begun at the id `id` a client was given (MCP's file extension's upload target), the files kept past their day
- * let go of first: its part, `<id>.part`, open for its bytes as they come, made exclusively, which `fileKept` makes the file once closed.
- * Why not, where the id is no File's id, the namespace keeps no files, or a file or a part is there under it already.
- * @param home The store's root.
- * @param namespace The namespace it is written to.
- * @param id The id it is written at.
- * @param now The time it is now, in milliseconds.
+ * The bytes of a kept file, read from disk as they are asked for, never held whole: what the api streams of a file's content.
+ * @param at The path of its bytes, as `fileAt` answers it.
  */
-export function filePut(home: string, namespace: string, id: string, now: number) {
-  if (!FILE_ID.test(id)) return putRefused('id');
-  if (!namespaceKept(namespace)) return putRefused('namespace');
-  filesPruned(home, now);
-  const dir = filesDir(home, namespace);
-  fs.mkdirSync(dir, { recursive: true });
-  if (fs.existsSync(path.join(dir, id)) || fs.existsSync(path.join(dir, `${id}.json`))) return putRefused('taken');
-  let fd: number;
-  try {
-    fd = fs.openSync(path.join(dir, `${id}.part`), 'wx');
-  } catch {
-    return putRefused('taken');
-  }
-  let open = true;
-  const begun: FileBegun = {
-    id,
-    write: (chunk) => {
-      fs.writeSync(fd, chunk);
-    },
-    close: () => {
-      if (open) fs.closeSync(fd);
-      open = false;
-    },
-  };
-  const put: PutOrRefused = begun;
-  return put;
-}
+export const fileBytes = (at: string) => fs.createReadStream(at) as AsyncIterable<Uint8Array>;

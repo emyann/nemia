@@ -18,15 +18,15 @@ export default meta;
 /** A client that asks the api nothing: a story draws what its run holds, and a read it would make waits. */
 const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
 
-/** A check of the step's first try by `name`, its task and its verdict: passed, refused with exit 1, or not run. */
+/** A check of the step's first try by `name`, its task and its verdict: passed, refused with exit 1, or never filed, with neither. */
 const named = (name: string, verdict: 'passed' | 'failed' | null) =>
   ({
     name,
     command: `npm run ${name}`,
     started: verdict === null ? null : '2026-10-12T17:02:00.000Z',
     ended: verdict === null ? null : '2026-10-12T17:04:00.000Z',
-    taskId: `t-design-1-check-${name}`,
-    verdict: verdict === null ? { result: 'unfinished', exit: null } : { result: verdict, exit: verdict === 'passed' ? 0 : 1 },
+    taskId: verdict === null ? null : `t-design-1-check-${name}`,
+    verdict: verdict === null ? null : { result: verdict, exit: verdict === 'passed' ? 0 : 1 },
     refused: null,
   }) as const;
 
@@ -138,8 +138,8 @@ export const Done: StoryObj = {
 export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> };
 
 /**
- * A step judged by three named checks, its detail open: each check under its own name with its result, the one that refused beside the
- * one that passed and the one never run.
+ * A step judged by three named checks, its detail open: each check under its own name with its result, its exit and how long it ran,
+ * the one that refused beside the one that passed and the one never filed.
  */
 export const Checked: StoryObj<{ step: string }> = {
   args: { step: 'design' },
@@ -154,6 +154,9 @@ export const Checked: StoryObj<{ step: string }> = {
     await userEvent.click(within(canvasElement).getByRole('button', { name: /Detail/ }));
     for (const name of ['lint', 'types', 'tests'])
       await expect(within(canvasElement).getByRole('heading', { name: `Check ${name}` })).toBeTruthy();
+    const tests = within(canvasElement).getByRole('region', { name: 'Check tests' });
+    await expect(within(tests).getByText('not filed')).toBeTruthy();
+    await expect(within(within(canvasElement).getByRole('region', { name: 'Check types' })).getByText('2m 00s')).toBeTruthy();
   },
 };
 

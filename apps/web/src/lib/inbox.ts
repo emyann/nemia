@@ -86,7 +86,7 @@ export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: reado
  * A start, a drop, a queue or its taking back, or a `from:` set, the api refused: the card as the page listed it, what was asked, and the
  * api's words.
  */
-export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue' | 'from'; message: string };
+export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue' | 'from' | 'resend'; message: string };
 
 /**
  * The inbox page's lines, newest first (`newestCardsFirst`): each card listed, with its refusal; and each card refused that the inbox, read

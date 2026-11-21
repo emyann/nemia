@@ -91,6 +91,13 @@ test("inbox_edit PUTs a card's text to its source, the card's path and its text 
   assert.ok('resourceVersion' in edit.inputSchema.properties, 'the payload key resourceVersion');
 });
 
+test("inbox_resend POSTs a started card to resend, the card's path required and the workflow left to choose", () => {
+  const resend = tool('inbox_resend');
+  assert.equal(resend.method, 'POST');
+  assert.deepEqual([...(resend.inputSchema.required ?? [])].sort(), ['name', 'namespace']);
+  assert.ok('workflow' in resend.inputSchema.properties, 'the payload key workflow');
+});
+
 test('wait takes the query of GET /api/feed/wait', () => {
   const wait = tool('wait');
   for (const key of ['labelSelector', 'from', 'for']) assert.ok(key in wait.inputSchema.properties, key);

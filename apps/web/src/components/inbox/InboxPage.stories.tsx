@@ -21,8 +21,8 @@ const drawn = (cards: readonly InboxEntry[]) => (
 );
 
 /**
- * The inbox page, one story a state: two cards in play, one filed and one queued; cards a trigger queues and one two triggers clash on;
- * and an empty inbox. Axe's
+ * The inbox page, one story a state: two cards in play, one filed and one queued; a started card waiting on its person beside one not
+ * started; cards a trigger queues and one two triggers clash on; and an empty inbox. Axe's
  * `label-content-name-mismatch` alone is off, for the box's Factory list: the ds kit's `Select` draws its value before its floating
  * label and is named by the label first, which axe reads as visible text left out of its name, an ask of the kit.
  */
@@ -44,6 +44,21 @@ export const TwoInPlay: Story = {
     await expect(page.getByRole('textbox', { name: 'An idea' })).toBeVisible();
     await expect(page.getAllByRole('button', { name: 'Start' })[0]).toHaveAttribute('data-slot', 'button');
     await expect(page.getByRole('button', { name: 'Unqueue' })).toBeVisible();
+  },
+};
+
+/** A started card whose run waits on its person: Send on and Remove, beside a card not started, which offers no Send on. */
+export const StartedWaiting: Story = {
+  render: () =>
+    drawn([
+      { ...unstartedCard('ship-it', FACTORY), workflow: 'quick', startedAs: ['ship-it-k2rq'], state: 'waiting' },
+      unstartedCard('decode-the-reads', FACTORY),
+    ]),
+  play: async ({ canvasElement }) => {
+    const started = within(canvasElement).getByRole('listitem', { name: 'Card ship-it' });
+    await expect(within(started).getByRole('button', { name: 'Send on' })).toHaveAttribute('aria-expanded', 'false');
+    const filed = within(canvasElement).getByRole('listitem', { name: 'Card decode-the-reads' });
+    await expect(within(filed).queryByRole('button', { name: 'Send on' })).toBeNull();
   },
 };
 

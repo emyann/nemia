@@ -279,6 +279,16 @@ export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}
   off ? cards.unqueue(namespaceOf(card.factory), card.name) : cards.queue(namespaceOf(card.factory), card.name);
 
 /**
+ * Send a started card on, as the CLI's `inbox resend` does (the Card's `resend`): filed again as `<run>-resent`, handed its run, queued on
+ * `workflow` or, for none, left for its factory's card triggers; the run it came from called off when it waits on a person. Resolves with
+ * what the api answers; rejects with its refusal in full — a card never started, sent on already, or whose run is still at work.
+ * @param card The started card: its name and its factory.
+ * @param workflow The workflow to send it on to, by its name; none for its factory's card triggers.
+ */
+export const resendCard = (card: CardRef, workflow?: string) =>
+  cards.resend(namespaceOf(card.factory), card.name, workflow === undefined ? {} : { workflow });
+
+/**
  * Start a card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does (the Card's `start`): its run on `workflow`, by its name,
  * waiting on `after` and reading `context` when given, the card kept in the inbox and listed as started. `factory` starts it in that
  * factory, for a card that names none: none for the default factory. Never a repository nor an origin: the factory places the run by its

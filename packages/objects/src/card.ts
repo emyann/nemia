@@ -278,3 +278,37 @@ export const CardQueue = Schema.Struct({
   ),
 });
 export type CardQueue = typeof CardQueue.Type;
+
+/**
+ * A started card sent on (resend): the workflow its new card is queued on, by its name; absent, the new card names none and is left
+ * unqueued, for its factory's card triggers to take. In the body, as a filing takes one.
+ */
+export const CardResend = Schema.Struct({
+  workflow: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The workflow the card sent on is queued on, by name; absent, it names none, for its factory's card triggers.",
+    }),
+  ),
+});
+export type CardResend = typeof CardResend.Type;
+
+/**
+ * What a started card sent on answers (resend): the card filed, the card and the run it was sent on from, and the run cancelled, or why
+ * it was not, when that run waited on a person.
+ */
+export const CardResent = Schema.Struct({
+  card: Card.annotate({ description: 'The card filed, `<run>-resent`, in the namespace of the card it was sent on from.' }),
+  from: Schema.Struct({
+    card: Schema.String.annotate({ description: 'The card sent on, by name.' }),
+    run: Schema.String.annotate({ description: 'The run it was sent on from, by id: what the card filed is named after.' }),
+  }).annotate({ description: 'The card sent on, and the run it was sent on from.' }),
+  cancelled: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The run it was sent on from, by id, cancelled since it waited on a person.' }),
+  ),
+  cancelLeft: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'Why the run it was sent on from, which waited on a person, was not cancelled, and the command that cancels it.',
+    }),
+  ),
+}).annotate({ identifier: 'CardResent' });
+export type CardResent = typeof CardResent.Type;

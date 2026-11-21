@@ -2,7 +2,8 @@
  * The cards group's handlers (`objects`' `Api`): the inbox's cards as objects, over the package's entries the inbox's routes and the card
  * start run — a page of them (`cardList`, or `cardTable` as a table), one (`cardObject`) in its namespace or found in any (`getAll`), each
  * with its file as written, written whole (`replaceCard`), written from its text (`nemia inbox edit`), filed (`nemia inbox add`),
- * dropped (`inbox rm`), started (`nemia start <card>`), queued and taken off (`inbox queue`), and its labels edited (`label inbox`).
+ * dropped (`inbox rm`), started (`nemia start <card>`), queued and taken off (`inbox queue`), sent on once started (`inbox resend`), and
+ * its labels edited (`label inbox`).
  *
  * A card started under a factory's namespace is placed in that factory (`placedIn`), as `nemia start <card> --factory <namespace>` is: its
  * workflow, by its name, found in the factory's tree first, and the card's own `workflow:` where the start names none, on the repository
@@ -17,13 +18,16 @@
  */
 import { Effect } from 'effect';
 import {
+  actorOf,
   cardList,
   cardObject,
   cardTable,
   INBOX_ADD,
   INBOX_EDIT,
   INBOX_QUEUE,
+  INBOX_RESEND,
   INBOX_RM,
+  dropInformed,
   LABEL_CARD,
   Missing,
   noCardLine,
@@ -114,6 +118,35 @@ const queued = (namespace: string, name: string, off: boolean, workflow?: string
     return { ...card, status: { ...card.status, ...extra } };
   });
 
+/**
+ * The started card `name` of `namespace` sent on (`nemia inbox resend`) to the workflow sent by name, or naming none for its factory's card
+ * triggers, by the request's caller, who the cancel of the run it came from keeps; the card filed is answered as read in the same
+ * namespace, and the run it came from is taken out of the app's informer, so the next read judges it cancelled. A workflow sent as a path,
+ * or as no text, is refused before the card is read, as a queue's is.
+ */
+const resent = (namespace: string, name: string, workflow?: string) =>
+  answered(async (s) => {
+    if (workflow !== undefined && (workflow === '' || /[\\/]/.test(workflow)))
+      throw new Refused({
+        message: `\`workflow\` is a workflow's name, with no \`/\`: send the card on to one by name — nemia inbox resend ${name} --workflow <name> — or leave it out for its factory's card triggers. Nothing was filed.`,
+      });
+    await cardIn(s, namespace, name);
+    const done = await s.inRequest(
+      INBOX_RESEND.handler(
+        { name, ...(workflow === undefined ? {} : { workflow }), actor: actorOf(s.caller) },
+        s.informer ? { runs: s.informer } : undefined,
+      ),
+    );
+    if (s.informer) dropInformed(s.informer, done.from.run);
+    const card = await cardIn(s, namespace, done.card.name);
+    return {
+      card,
+      from: done.from,
+      ...(done.cancelled === undefined ? {} : { cancelled: done.cancelled }),
+      ...(done.cancelLeft === undefined ? {} : { cancelLeft: done.cancelLeft }),
+    };
+  });
+
 export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => page(undefined, query))
@@ -170,6 +203,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
     )
     .handle('queue', ({ params: { namespace, name }, query }) => queued(namespace, name, false, query.workflow))
     .handle('unqueue', ({ params: { namespace, name } }) => queued(namespace, name, true))
+    .handle('resend', ({ params: { namespace, name }, payload }) => resent(namespace, name, payload.workflow))
     .handle('labels', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         await cardIn(s, namespace, name);

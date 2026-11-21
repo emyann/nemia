@@ -11,6 +11,7 @@ import {
   INBOX_EDIT_WORDS,
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
+  INBOX_RESEND_WORDS,
   INBOX_RM_WORDS,
   INBOX_WORDS,
   LABEL_INBOX_WORDS,
@@ -38,12 +39,13 @@ const refuses = (words: CommandWords, argv: readonly string[], ...named: string[
   for (const n of named) assert.ok(String(said).includes(n), `${n} is not named in: ${String(said)}`);
 };
 
-test('the group is the seven writes, in the order the help lists them, each linking the endpoint its runner calls', () => {
+test('the group is the eight writes, in the order the help lists them, each linking the endpoint its runner calls', () => {
   assert.deepEqual(
     INBOX_WORDS.map((w) => [w.name, w.served.map((l) => l.endpoint)]),
     [
       ['inbox add', ['cards.create']],
       ['inbox queue', ['cards.queue', 'cards.unqueue']],
+      ['inbox resend', ['cards.resend']],
       ['inbox from', ['cards.update']],
       ['inbox edit', ['cards.edit']],
       ['inbox rm', ['cards.delete']],
@@ -55,6 +57,7 @@ test('the group is the seven writes, in the order the help lists them, each link
     INBOX_WORDS.map((w) => [w.class, w.writes, 'ticks' in w]),
     [
       ['act', true, false],
+      ['act', true, true],
       ['act', true, true],
       ['act', true, false],
       ['act', true, false],
@@ -85,6 +88,15 @@ test('REFUSED by `nemia inbox add`: no idea, two, a flag it does not take, --rep
   refuses(INBOX_ADD_WORDS, ['an idea', '--factory', 'a', '--factory', 'b'], 'nemia inbox add takes --factory once');
   refuses(INBOX_ADD_WORDS, ['an idea', '--workflows', 'dev'], 'does not take --workflows', '--workflow <name>', '--factory <name>');
   refuses(INBOX_ADD_WORDS, ['an', 'idea'], 'idea is a second', 'nemia inbox add "<idea>"');
+});
+
+test('`nemia inbox resend` takes the card, then --workflow <name> once or none', () => {
+  assert.deepEqual(read(INBOX_RESEND_WORDS, ['card', '--workflow', 'intake']), { name: 'card', workflow: 'intake' });
+  assert.deepEqual(read(INBOX_RESEND_WORDS, ['card']), { name: 'card' });
+  refuses(INBOX_RESEND_WORDS, ['card', '--workflow', 'a', '--workflow', 'b'], '--workflow');
+  refuses(INBOX_RESEND_WORDS, ['card', 'another'], 'another');
+  refuses(INBOX_RESEND_WORDS, ['card', '--off'], '--off');
+  refuses(INBOX_RESEND_WORDS, [], 'nemia inbox resend <name>');
 });
 
 test('`nemia inbox queue` takes the card, then --workflow <name> or --off, never both', () => {

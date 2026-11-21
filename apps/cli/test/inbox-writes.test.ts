@@ -1,9 +1,9 @@
 /**
- * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox from`, `inbox edit`, `inbox rm`,
- * `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
- * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines
- * it prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow
- * given as a path are refused, exit 2, before anything is asked.
+ * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox resend`, `inbox from`, `inbox edit`, `inbox
+ * rm`, `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
+ * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines it
+ * prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow given
+ * as a path are refused, exit 2, before anything is asked.
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
@@ -167,6 +167,22 @@ test('`nemia label run` edits a run of the store, a line per key, then its label
   assert.equal(changed.out.split('\n')[0], 'run r-ctx  team=infra changed (was core)');
 });
 
+test('`nemia inbox resend` files a started card again as <run>-resent, queued on the workflow named and handed its run', async () => {
+  write(path.join(store.root, 'inbox', 'sent-card.md'), 'Cache the engine views\n');
+  write(path.join(store.root, 'runs', 'r-sent.json'), JSON.stringify({ ...JSON.parse(RUN), id: 'r-sent', from: { inbox: 'sent-card' } }));
+  write(path.join(store.root, 'runs', 'r-sent.cancelled'), '2026-11-05T01:00:00.000Z');
+  const sent = await store.nemia(['inbox', 'resend', 'sent-card', '--workflow', 'dev']);
+  ok(sent, 'inbox resend');
+  assert.match(sent.out, /^r-sent-resent {2}filed from sent-card, handed run r-sent$/m);
+  assert.match(sent.out, /^r-sent-resent {2}queued at \S+ on dev/m);
+  assert.doesNotMatch(sent.out, /cancelled/, 'a run that has ended is not cancelled');
+  assert.match(cardOn(store.root, 'r-sent-resent') ?? '', /\nworkflow: dev\n/);
+  assert.match(cardOn(store.root, 'r-sent-resent') ?? '', /\nfrom: r-sent\n/);
+  const again = await store.nemia(['inbox', 'resend', 'sent-card']);
+  assert.equal(again.code, 1, `sent on once, a Conflict, which the client exits 1 as every Conflict: ${again.err}`);
+  assert.ok(again.err.includes('r-sent-resent'), again.err);
+});
+
 test("REFUSED, exit 2, before anything is asked: a folder as the idea or a card's text, a workflow given as a path, a label edit missing", async () => {
   const before = fs.existsSync(path.join(store.root, 'inbox')) ? fs.readdirSync(path.join(store.root, 'inbox')) : [];
   for (const [argv, named] of [
@@ -174,6 +190,7 @@ test("REFUSED, exit 2, before anything is asked: a folder as the idea or a card'
     [['inbox', 'add', 'An idea', '--workflow', './workflows/dev'], /--workflow <name>/],
     [['inbox', 'queue', 'some-card', '--workflow', '/abs/dev'], /--workflow <name>/],
     [['inbox', 'queue', 'some-card', '--workflow', 'dev', '--off'], /--off/],
+    [['inbox', 'resend', 'some-card', '--workflow', '/abs/dev'], /--workflow <name>/],
     [['inbox', 'from', 'some-card'], /nemia inbox from/],
     [['inbox', 'edit', 'some-card', IDEAS], /nemia inbox edit/],
     [['label', 'inbox', 'some-card'], /key=value/],

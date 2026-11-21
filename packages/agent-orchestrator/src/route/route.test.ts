@@ -241,7 +241,7 @@ describe('a step file with the routing keys renders to a file that reads back as
     'routes: [web, docs]\nroute: judge',
     'after: triage\nwhen: [web]\nworkflow: build',
     'after: triage\nwhen: [web]\nworkflow: build\ncard: given',
-    'after: triage\nwhen: [web]\ncard: backlog\nunlabel: [ready]',
+    'after: triage\nwhen: [web]\ncard: backlog\nrelabel: [team.example/stage=backlog, ready-]',
   ]) {
     test(keys.split('\n').join('; '), () => {
       const read = parseWorkflow('triage', file(keys));

@@ -255,12 +255,20 @@ const CLAUDE_CODE_REFUSED: Record<string, string> = {
 };
 
 /**
+ * Why an agent file may not set the step's key `key`: it is wiring, which belongs on the step.
+ * @param file The agent's file, named in the refusal.
+ * @param key The step's key the agent file sets.
+ */
+const stepKeyRefusal = (file: string, key: string) =>
+  `${file}: \`${key}\` is wiring, and belongs on the step: an agent says who does the work and how — ${AGENT_KEYS.join(', ')} — and a step says where it sits in its workflow, what it reads and how it is judged. Move the line to each step that names this agent.`;
+
+/**
  * Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. `name` is
  * one it may: Claude Code's own agent files say their name, and `parseAgent` holds it to the file's.
  */
 function agentKeyRefusal(file: string, key: string) {
   if (isAgentKey(key) || key === 'name' || Object.hasOwn(FORMER_OWN_KEYS, key) || CLAUDE_CODE_IGNORED.includes(key)) return undefined;
-  if (key === 'card') return cardRetired(file, 'card');
+  if (key === 'card') return `${stepKeyRefusal(file, key)} ${cardRetired(file, 'card')}`;
   if (Object.hasOwn(CLAUDE_CODE_REFUSED, key)) {
     return `${file}: \`${key}\` is Claude Code's own subagent key, and a run does not carry it to its sessions — ${CLAUDE_CODE_REFUSED[key]}. Delete the line to use this agent in a run: a key the run does not read is a constraint nobody enforces.`;
   }
@@ -268,9 +276,7 @@ function agentKeyRefusal(file: string, key: string) {
     return `${file}: \`agent\` is a step's key, which attaches an agent to the step, and an agent does not name another. Write here what this agent is told and runs with, or give the step the other agent.`;
   }
   const roles = AGENT_KEYS.join(', ');
-  if (isStepKey(key)) {
-    return `${file}: \`${key}\` is wiring, and belongs on the step: an agent says who does the work and how — ${roles} — and a step says where it sits in its workflow, what it reads and how it is judged. Move the line to each step that names this agent.`;
-  }
+  if (isStepKey(key)) return stepKeyRefusal(file, key);
   if (Object.hasOwn(REFUSED, key)) return `${file}: an agent may not set \`${key}\` — ${REFUSED[key]}.`;
   return `${file}: \`${key}\` is not a key an agent has. An agent's keys are: ${roles}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`;
 }

@@ -110,6 +110,7 @@ test("the Api's commands answer the old route's lines, with unschedule by workfl
     schedule: 'nemia factory schedule mill <workflow> --cron <expr> --brief <text>',
     trust: 'nemia factory trust mill',
     volume: 'nemia factory volume add mill <path|url>:ro|:rw',
+    trigger: 'nemia factory trigger mill <name> --labels <key>=<value> --to <workflow>',
     unschedule: { build: 'nemia factory unschedule mill build' },
     volumeRm: { data: 'nemia factory volume rm mill /a/data' },
   };

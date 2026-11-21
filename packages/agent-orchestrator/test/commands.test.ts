@@ -83,6 +83,8 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['factory fire', 'cli'],
       ['factory schedule', 'cli'],
       ['factory unschedule', 'cli'],
+      ['factory trigger', 'cli'],
+      ['factory untrigger', 'cli'],
       ['factory servers', 'cli'],
       ['factory server add', 'cli'],
       ['factory server rm', 'cli'],

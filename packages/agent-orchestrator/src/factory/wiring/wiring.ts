@@ -7,7 +7,7 @@
  * and what each accepted change does; that the factory written after it keeps the invariant is the door's model decode
  * (`factoryChecked`, `factories.store.ts`), on every create and rewrite.
  */
-import type { ReposRewired, Rewired, WiringRefusal } from '../../../contracts/wiring.contract.ts';
+import type { ReposRewired, Rewired, TriggerRefusal, TriggersRewired, WiringRefusal } from '../../../contracts/wiring.contract.ts';
 import {
   costLinedDetachRefusal,
   hiredDetachRefusal,
@@ -25,6 +25,7 @@ import {
   triggerNameTakenRefusal,
   unofferedTriggerRefusal,
   untriggeredRefusal,
+  type CardTrigger,
 } from '../factory.ts';
 import type { WiringRefused } from '../../../contracts/wiring.contract.ts';
 import { withName, hiresInto, triggersOn, withHire, withEntry, withoutEntry } from './dictionaries.ts';
@@ -65,9 +66,9 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
   if (change.verb === 'hire') return hireRefused(factory, change.step, change.agent);
   if (change.verb === 'fire')
     return !holds(factory.hires, change.step) ? missing(unhiredFireRefusal(factory.name, change.step, factory.hires)) : null;
-  const badName = workflowNameRefusal(change.verb === 'trigger' || change.verb === 'untrigger' ? change.name : change.workflow);
+  if (change.verb === 'trigger' || change.verb === 'untrigger') return triggerRefusal(factory, change);
+  const badName = workflowNameRefusal(change.workflow);
   if (badName !== undefined) return invalid(`${badName} Nothing was ${DONE[change.verb]}.`);
-  if (change.verb === 'trigger' || change.verb === 'untrigger') return triggerRefused(factory, change);
   if (change.verb === 'attach') return attachRefused(factory, change.workflow, change.repo);
   if (change.verb === 'schedule')
     return factory.workflows.includes(change.workflow) ? null : invalid(unofferedScheduleRefusal(factory.name, change.workflow));
@@ -79,25 +80,24 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
 };
 
 /**
- * Why `factory` cannot take a trigger or an untrigger whose name is one: a trigger to a workflow it does not offer, or named as a workflow
- * it schedules (`Invalid`); an untrigger of a trigger it does not hold (`Missing`).
+ * Why `factory` cannot take a trigger or an untrigger: a name that is not one (`Invalid`); a trigger to a workflow it does not offer, or
+ * named as a workflow it schedules (`Invalid`); an untrigger of a trigger it does not hold (`Missing`). Its own contract, which
+ * `wiringRefusal` leans on for these two verbs.
+ * @param factory The factory as it is: its name, workflows, schedules and own card triggers.
+ * @param change The trigger written, or the untrigger, and the name it carries.
  */
-function triggerRefused(
-  factory: Parameters<WiringRefusal>[0],
-  change: Extract<Parameters<WiringRefusal>[1], { verb: 'trigger' | 'untrigger' }>,
-) {
+export const triggerRefusal: TriggerRefusal = (factory, change) => {
+  const badName = workflowNameRefusal(change.name);
+  if (badName !== undefined) return invalid(`${badName} Nothing was ${DONE[change.verb]}.`);
   if (change.verb === 'untrigger')
-    return (
-      factory.triggers !== undefined && holds(factory.triggers, change.name)
-        ? null
-        : missing(untriggeredRefusal(factory.name, change.name, Object.keys(factory.triggers ?? {})))
-    ) satisfies WiringRefused | null;
+    return factory.triggers !== undefined && holds(factory.triggers, change.name)
+      ? null
+      : missing(untriggeredRefusal(factory.name, change.name, Object.keys(factory.triggers ?? {})));
   if (!factory.workflows.includes(change.trigger.target.name))
-    return invalid(unofferedTriggerRefusal(factory.name, change.trigger.target.name)) satisfies WiringRefused | null;
-  if (holds(factory.schedules, change.name))
-    return invalid(triggerNameTakenRefusal(factory.name, change.name)) satisfies WiringRefused | null;
-  return null satisfies WiringRefused | null;
-}
+    return invalid(unofferedTriggerRefusal(factory.name, change.trigger.target.name));
+  if (holds(factory.schedules, change.name)) return invalid(triggerNameTakenRefusal(factory.name, change.name));
+  return null;
+};
 
 /** Why `factory` cannot hire `agent` into `step`: a step or an agent that is not one, or a workflow it does not offer (`Invalid`). */
 function hireRefused(factory: Parameters<WiringRefusal>[0], step: string, agent: string) {
@@ -148,6 +148,21 @@ export const reposRewired: ReposRewired = (wired, change) => {
 };
 
 /**
+ * A factory's own card triggers after `change`: a trigger written by its name, an earlier one of that name replaced, an untrigger taking
+ * it back, and any other change keeping them; none where none is left.
+ * @param triggers Each card trigger of the factory's own by its name, or undefined where it holds none.
+ * @param change The change the person's verb asks, and what it names.
+ */
+export const triggersRewired: TriggersRewired = (triggers, change) => {
+  if (change.verb !== 'trigger' && change.verb !== 'untrigger') return triggers;
+  // oxlint-disable-next-line unicorn/no-useless-fallback-in-spread -- tsverify reads a built map only from a dictionary's spread
+  const out: Record<string, CardTrigger> = { ...(triggers ?? {}) };
+  if (change.verb === 'trigger') out[change.name] = change.trigger;
+  if (change.verb === 'untrigger') delete out[change.name];
+  return Object.keys(out).length ? out : undefined;
+};
+
+/**
  * `factory` after `change`, which `wiringRefusal` accepted: its workflows kept sorted and each named once, an attach that names a
  * repository wiring the workflow to it, a detach taking its repository off, a hire replacing the step's earlier one, a schedule the
  * workflow's earlier one; everything else as it was.
@@ -172,17 +187,6 @@ export const rewired: Rewired = (factory, change) => {
   if (change.verb === 'hire') return { ...factory, hires: withHire(factory.hires, change.step, change.agent) };
   if (change.verb === 'fire') return { ...factory, hires: withoutEntry(factory.hires, change.step) };
   if (change.verb === 'schedule') return { ...factory, schedules: withEntry(factory.schedules, change.workflow, change.schedule) };
-  if (change.verb === 'trigger')
-    // oxlint-disable-next-line unicorn/no-useless-fallback-in-spread -- tsverify reads a built map only from a dictionary's spread
-    return { ...factory, triggers: withEntry(factory.triggers ?? {}, change.name, change.trigger) };
-  if (change.verb === 'untrigger') return untriggered(factory, change.name);
+  if (change.verb === 'trigger' || change.verb === 'untrigger') return { ...factory, triggers: triggersRewired(factory.triggers, change) };
   return { ...factory, schedules: withoutEntry(factory.schedules, change.workflow) };
 };
-
-/** `factory` relieved of its trigger `name`: no `triggers` where none is left. */
-function untriggered(factory: Parameters<Rewired>[0], name: string) {
-  const left = withoutEntry(factory.triggers ?? {}, name);
-  if (Object.keys(left).length) return { ...factory, triggers: left } satisfies Parameters<Rewired>[0];
-  const { triggers: _, ...rest } = factory;
-  return rest satisfies Parameters<Rewired>[0];
-}

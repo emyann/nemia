@@ -32,12 +32,12 @@ const nodeOf = (name: string, keys: string) => parseWorkflow(name, `---\nplace: 
 
 /** The card `node` files, read back as the inbox reads it. */
 const filed = (keys: string, given = GIVEN) =>
-  parseInboxCard('sent.md', sentCardText(RUN, nodeOf('to', keys), WHY, AT, 'A title', { run: 'label' }, given));
+  parseInboxCard('sent.md', sentCardText(RUN, nodeOf('to', keys), WHY, AT, 'A title', { team: 'core' }, given));
 
 describe('what card a node files, by its card:', () => {
   test('routed, the default: titled and labelled by the run, queued on its workflow, with no reason', () => {
     const card = filed('workflow: quick');
-    assert.deepEqual([card.workflow, card.queued, card.labels, card.from], ['quick', AT, { run: 'label' }, ['r-door']]);
+    assert.deepEqual([card.workflow, card.queued, card.labels, card.from], ['quick', AT, { team: 'core' }, ['r-door']]);
     assert.ok(card.body.startsWith('A title'));
     assert.ok(!card.body.includes(WHY.reason));
   });
@@ -48,10 +48,10 @@ describe('what card a node files, by its card:', () => {
     assert.ok(card.body.includes(WHY.reason));
   });
   test("given, with no card the run was started from: the run's brief, the run's labels", () => {
-    const text = sentCardText(RUN, nodeOf('to', 'workflow: quick\ncard: given'), WHY, AT, 'A title', { run: 'label' }, undefined);
+    const text = sentCardText(RUN, nodeOf('to', 'workflow: quick\ncard: given'), WHY, AT, 'A title', { team: 'core' }, undefined);
     const card = parseInboxCard('sent.md', text);
     assert.ok(card.body.startsWith(RUN.brief));
-    assert.deepEqual(card.labels, { run: 'label' });
+    assert.deepEqual(card.labels, { team: 'core' });
   });
   test('backlog: the card back to the inbox, naming no workflow and unqueued, without the label keys unlabel: names', () => {
     const card = filed('card: backlog\nunlabel: [ready]');

@@ -48,8 +48,8 @@ describe('a card trigger queues the cards of its factory it selects', () => {
     assert.deepEqual(said([card('a', 'f', 'other: yes')], READY), [{ name: 'a', state: 'filed' }]);
   });
   test('two triggers to two targets leave a card naming no workflow waiting on a clash', () => {
-    const two = triggering(AT, ['f', 'bugs', 'kind=bug', 'quick'], ['f', 'ready', 'ready', 'door']);
-    assert.deepEqual(said([card('a', 'f', 'ready: yes, kind: bug')], two), [{ name: 'a', state: 'filed', clash: ['bugs', 'ready'] }]);
+    const two = triggering(AT, ['f', 'bugs', 'area=bug', 'quick'], ['f', 'ready', 'ready', 'door']);
+    assert.deepEqual(said([card('a', 'f', 'ready: yes, area: bug')], two), [{ name: 'a', state: 'filed', clash: ['bugs', 'ready'] }]);
   });
   test('a card naming its workflow is queued on that one', () => {
     assert.deepEqual(said([card('a', 'f', 'ready: yes', 'workflow: make\n')], READY)[0]?.queued, {

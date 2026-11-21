@@ -272,8 +272,12 @@ describe('reasonOf names a reason for every word the package writes, only of a k
         `${runCodes('waiting', null, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 54, "the table the owner named has 54 entries, a factory's library adds two of them");
-    assert.equal(REASON_CODES.length, 43, 'of 43 distinct codes');
+    assert.equal(
+      entries.length,
+      56,
+      "the table the owner named has 56 entries: a factory's library adds two of them, and a card its triggers clash on two more (TriggersClash, ClashSettled)",
+    );
+    assert.equal(REASON_CODES.length, 45, 'of 45 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

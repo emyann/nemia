@@ -240,6 +240,52 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
 });
 export type WiringRefusal = Implementation<typeof wiringRefusalSpec>;
 
+/** A change of a factory's own card triggers: one written by its name, or one taken back. */
+export type TriggerChange = Extract<WiringChange, { readonly verb: 'trigger' | 'untrigger' }>;
+
+/**
+ * Why a factory cannot take a trigger or an untrigger (`triggerRefusal`), the part of `wiringRefusal` for those two verbs, which
+ * `wiringRefusal`'s laws of them lean on: its own contract, so a proof of the whole reads these laws rather than this path's body.
+ */
+const triggerRefusalSpec = spec<(factory: Factory, change: TriggerChange) => WiringRefused | null>({
+  open: ['output'],
+  ensures: {
+    aBadNameIsInvalid: {
+      description: 'A trigger or an untrigger whose name is not one is refused as Invalid, whatever the factory holds',
+      condition: ({ input: [, change], output }) => workflowNameRefusal(change.name) === undefined || output?.kind === 'Invalid',
+    },
+    triggerOnlyToOffered: {
+      description: 'A trigger whose target is a workflow the factory does not offer is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'trigger' || factory.workflows.includes(change.trigger.target.name) || output !== null,
+    },
+    triggerNameIsFree: {
+      description: 'A trigger named as a workflow the factory schedules, its trigger of the time kind, is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'trigger' || !Object.hasOwn(factory.schedules, change.name) || output !== null,
+    },
+    untriggerOnlyTriggered: {
+      description: 'An untrigger of a well-named trigger the factory does not hold is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'untrigger' ||
+        workflowNameRefusal(change.name) !== undefined ||
+        triggerHeld(factory, change.name) ||
+        output?.kind === 'Missing',
+    },
+    missingOnlyOfWhatIsNotThere: {
+      description: 'Missing only for an untrigger of a trigger the factory does not hold',
+      condition: ({ input: [factory, change], output }) =>
+        output?.kind !== 'Missing' || (change.verb === 'untrigger' && !triggerHeld(factory, change.name)),
+    },
+    takesWhatItCan: {
+      description: 'A well-named trigger or untrigger the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        workflowNameRefusal(change.name) !== undefined || !accepted(factory, change) || output === null,
+    },
+  },
+});
+export type TriggerRefusal = Implementation<typeof triggerRefusalSpec>;
+
 const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
   /**
    * Its callers rewire only by a change `wiringRefusal` accepts (`accepted`). That the factory after it still keeps the invariant is
@@ -264,6 +310,7 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     'output.harnessSettings',
     'output.costLines',
     'output.workflowRepos',
+    'output.triggers',
   ],
   ensures: {
     detachWithdraws: {
@@ -305,17 +352,35 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
       description: 'After an attach the factory offers the workflow',
       condition: ({ input: [, change], output }) => change.verb !== 'attach' || output.workflows.includes(change.workflow),
     },
-    triggerHolds: {
-      description: 'After a trigger the factory holds it by its name',
-      condition: ({ input: [, change], output }) => change.verb !== 'trigger' || triggerHeld(output, change.name),
-    },
-    untriggerLeaves: {
-      description: 'After an untrigger the factory holds no trigger by that name',
-      condition: ({ input: [, change], output }) => change.verb !== 'untrigger' || !triggerHeld(output, change.name),
-    },
   },
 });
 export type Rewired = Implementation<typeof rewiredSpec>;
+
+/**
+ * A factory's own card triggers after a change of the wiring (`triggersRewired`), which `rewired` writes as the factory's `triggers`: its
+ * own function, as `reposRewired` is, since the verifier reads no optional field of the factory through the spread `rewired` copies the
+ * rest by (tsverify's `docs/reads.md`), so `rewired` leaves `output.triggers` open to these laws. A trigger named `__proto__` is left out
+ * of `triggerHolds`, as a workflow so named is of `attachWiresRepo`: a record holds no key of that name.
+ */
+const triggersRewiredSpec = spec<
+  (triggers: Readonly<Record<string, CardTrigger>> | undefined, change: WiringChange) => Readonly<Record<string, CardTrigger>> | undefined
+>({
+  /** Whether a factory that holds no trigger is said by an empty record or by none is the code's: its file writes neither. */
+  open: ['output'],
+  ensures: {
+    triggerHolds: {
+      description: 'After a trigger the factory holds it by its name',
+      condition: ({ input: [, change], output }) =>
+        change.verb !== 'trigger' || change.name === '__proto__' || (output !== undefined && Object.hasOwn(output, change.name)),
+    },
+    untriggerLeaves: {
+      description: 'After an untrigger the factory holds no trigger by that name',
+      condition: ({ input: [, change], output }) =>
+        change.verb !== 'untrigger' || output === undefined || !Object.hasOwn(output, change.name),
+    },
+  },
+});
+export type TriggersRewired = Implementation<typeof triggersRewiredSpec>;
 
 /**
  * The workflows' repositories after a change of the wiring (`reposRewired`), which `rewired` writes as the factory's `workflowRepos`

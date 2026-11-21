@@ -40,7 +40,7 @@ import { inboxDir } from '../record/files.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
-import { filedNames, inboxCards, readableFactories, readInbox, triggeringOf } from './inbox.store.ts';
+import { filedNames, inboxCards, readableFactories, triggeringOf } from './inbox.store.ts';
 import { startRun, startedSteps, type StartedRun } from '../start/start.verb.ts';
 import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
@@ -389,10 +389,17 @@ const triggeredStart = (card: Pick<InboxListing, 'workflow' | 'queued'>) => {
 
 /**
  * Each card of a factory that the card triggers of its factory would send to two workflows, as the inbox lists it now (`clash`): its
- * factory, its name and the triggers that clash — what the feed says a clash begun and ended by.
+ * factory, its name and the triggers that clash — what the feed says a clash begun and ended by. It reads no run record of its own: a
+ * card's runs are the pass's `runs`, so a pass costs what is in flight; and nothing at all where no factory has a card trigger.
+ * @param runs The runs the pass read, which say which cards were started.
  */
-export const clashesNow = Effect.fn('clashesNow')(function* () {
-  const listed = yield* readInbox();
+export const clashesNow = Effect.fn('clashesNow')(function* (runs: readonly Pick<Run, 'id' | 'from'>[]) {
+  const door = yield* CardDoor;
+  const files = yield* door.cards.entries();
+  const factories = yield* readableFactories();
+  const triggering = yield* triggeringOf(files, factories.values());
+  if (triggering === undefined) return [];
+  const listed = cardsListed(files, runs, yield* door.tries.list(), factories, triggering);
   return listed.flatMap((l) =>
     l.clash !== undefined && l.factory !== null ? [{ factory: l.factory, card: l.name, by: [...l.clash] }] : [],
   ) satisfies Array<{ factory: string; card: string; by: string[] }>;

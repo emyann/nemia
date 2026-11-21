@@ -196,12 +196,12 @@ describe('a step file reads route: in its three shapes, and refuses any other', 
     const c = parseWorkflow('triage', file('routes: [web, docs]\nroute: judge\nends: [docs]'));
     assert.deepEqual(c.ends, ['docs']);
   });
-  test('card: and unlabel:, a given card for a workflow and a backlog node that removes labels; an unlabel: that lists none removes none', () => {
+  test('card: and unlabel:, a given card for a workflow and a backlog node that removes labels; a blank unlabel: is refused as any blank key, since a template renders an empty parameter as no line', () => {
     const given = parseWorkflow('w', file('after: triage\nwhen: [web]\nworkflow: build\ncard: given'));
     assert.deepEqual([given.workflow, given.card], ['build', 'given']);
     const back = parseWorkflow('b', file('after: triage\nwhen: [docs]\ncard: backlog\nunlabel: [ready, door]'));
     assert.deepEqual([back.card, back.workflow, back.unlabel], ['backlog', undefined, ['ready', 'door']]);
-    assert.equal(parseWorkflow('b', file("after: triage\nwhen: [docs]\ncard: backlog\nunlabel: ''")).unlabel, undefined);
+    assert.throws(() => parseWorkflow('b', file("after: triage\nwhen: [docs]\ncard: backlog\nunlabel: ''")), WorkflowError);
   });
   const refused: Array<[string, string]> = [
     ['a word that is no eval', 'routes: [web, docs]\nroute: table'],

@@ -64,6 +64,7 @@ spec:
               - Glob
               - WebFetch
               - WebSearch
+              - Skill
     - name: backlog
       after:
         - door

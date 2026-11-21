@@ -16,6 +16,7 @@
   "type": "module",
   "dependencies": {
     "agent-runtime": "*",
+    "ajv": "8.20.0",
     "effect": "4.1.2",
     "objects": "*",
     "yaml": "2.9.1"
@@ -25,7 +26,6 @@
     "@types/express": "^5.0.6",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.19.2",
-    "ajv": "^8.20.0",
     "express": "^5.2.1",
     "js-yaml": "^4.3.2",
     "test-kit": "*",

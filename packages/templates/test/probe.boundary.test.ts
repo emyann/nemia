@@ -31,6 +31,13 @@ const SCRIPT = path.join(CARRIED, 'probe.ts');
 type Rendered = { tree: string; store: string };
 
 /** The steps of the rendered tree's `workflow`, read as a start of it in the factory reads them: with the factory's hires. */
+/**
+ * A step's checks as one shell line, each joined to the one before it by `&&`: the order the pass runs sdlc's chained checks in, each
+ * filed only once the one above it passed, so the line refuses where the first refusing check would; the step's `check:` where it has one.
+ */
+const chainOf = (step: { check?: string; checks?: readonly { run: string }[] } | undefined) =>
+  step?.checks ? step.checks.map((c) => c.run).join(' && ') : step?.check;
+
 function stepsOf(at: Rendered, workflow: string) {
   const { hires } = JSON.parse(fs.readFileSync(path.join(at.tree, 'factory.json'), 'utf8')) as { hires: Record<string, string> };
   const agents = Object.fromEntries(
@@ -262,7 +269,7 @@ function based(files: Record<string, string>) {
 
 test("REFUSED at shipped defaults: implement's check, rendered, refuses a live probe of its run and passes once it is stopped; with no frozen carried files it refuses, never skips", async () => {
   const rendering = await renderedSdlc(['roundCheck=round-check', 'localCheck=round-check']);
-  const check = stepsOf(rendering, 'build').find((step) => step.name === 'implement')?.check;
+  const check = chainOf(stepsOf(rendering, 'build').find((step) => step.name === 'implement'));
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const scripts = Object.fromEntries(
     fs.readdirSync(CARRIED).flatMap((name) => {

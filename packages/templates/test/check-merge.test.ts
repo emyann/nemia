@@ -1,8 +1,8 @@
 /**
  * An upgrade of sdlc that changes implement's check, merged into a factory's tree by `nemia factory diff` on a scratch store, as an
- * operator previews it, run on its entry's handler. The template's next version adds a script to the check line of `build` and of
- * `quick` and names it in the sentence of build's implement note that lists the check's scripts. A factory that spliced a check of its
- * own into that line and that sentence, by hand, conflicts on both; a factory that set its own check by the `implementCheck` parameter,
+ * operator previews it, run on its entry's handler. The template's next version adds a check after `parts` to the checks of `build` and
+ * of `quick` and names it in the sentence of build's implement note that lists the check's scripts. A factory that spliced a check of its
+ * own into those checks and that sentence, by hand, conflicts on both; a factory that set its own check by the `implementCheck` parameter,
  * and changed only a line of its own elsewhere, merges with no conflict.
  */
 import { test } from 'vitest';
@@ -15,11 +15,11 @@ import { copyOf, handled, rendered, SDLC, storeEnv } from './template.ts';
 /** The template the factories are applied from, which the test then moves to its next version in place. */
 const TEMPLATE = copyOf(SDLC);
 
-/** The end of the parts.ts clause in a workflow.yaml's check line, its quotes escaped as the YAML string writes them. */
-const PARTS_END = '/parts.ts\\" check && ';
+/** The end of the parts check in a workflow.yaml's checks, its quotes escaped as the YAML string writes them, up to the next check. */
+const PARTS_END = '/parts.ts\\" check"\n';
 
-/** The end of the probe.ts clause in a rendered step file's check. */
-const PROBE_END = '/probe.ts" check && ';
+/** The end of the probe check in a rendered step file's checks, which it writes as one flow list. */
+const PROBE_END = `/probe.ts" check', after: [] }, `;
 
 /** The sentence of build's implement note that lists the check's scripts on GitHub, as sdlc writes it. */
 const LISTED = 'Your check runs `probe.ts`, `parts.ts` and the factory';
@@ -47,7 +47,7 @@ function rewrite(folder: string, file: string, from: string, to: string) {
 function leftByOperators() {
   const spliced = factory('spliced').tree;
   for (const workflow of ['build', 'quick'])
-    rewrite(spliced, `workflows/${workflow}/implement.md`, PROBE_END, `${PROBE_END}{ own-check; } && `);
+    rewrite(spliced, `workflows/${workflow}/implement.md`, PROBE_END, `${PROBE_END}{ name: mine, run: "{ own-check; }", after: [ probe ] }, `);
   rewrite(spliced, 'workflows/build/implement.md', LISTED, LISTED.replace('`probe.ts`', '`own-check`, `probe.ts`'));
   fs.appendFileSync(path.join(factory('parameter').tree, 'RULES.md'), '\nA rule of our own.\n');
 }
@@ -62,7 +62,7 @@ const NEXT = (() => {
   const next = `${version[1]}.${version[2]}.${Number(version[3]) + 1}`;
   rewrite(TEMPLATE, 'nemia.yaml', version[0], `  version: ${next}`);
   for (const workflow of ['build', 'quick'])
-    rewrite(TEMPLATE, `workflows/${workflow}/workflow.yaml`, PARTS_END, `${PARTS_END}{ echo added; } && `);
+    rewrite(TEMPLATE, `workflows/${workflow}/workflow.yaml`, PARTS_END, `${PARTS_END}        - name: added\n          run: "{ echo added; }"\n`);
   rewrite(TEMPLATE, 'workflows/build/implement.md', LISTED, LISTED.replace('`parts.ts`', '`parts.ts`, `added.ts`'));
   return next;
 })();
@@ -82,7 +82,7 @@ async function diffOf(name: string) {
 
 test("REFUSED: a check of its own spliced into sdlc's check line and sentence conflicts where the next version changes them", async () => {
   const diff = await diffOf('spliced');
-  for (const at of ['workflows/build/implement.md#check', 'workflows/quick/implement.md#check'])
+  for (const at of ['workflows/build/implement.md#checks', 'workflows/quick/implement.md#checks'])
     assert.ok(diff.at.includes(at), `${at} conflicts:\n${diff.said}`);
   assert.ok(
     diff.at.some((at) => at.startsWith('workflows/build/implement.md:')),

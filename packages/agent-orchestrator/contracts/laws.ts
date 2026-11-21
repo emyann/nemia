@@ -23,7 +23,8 @@ export const approved = (run: Run, name: string) => (run.approvals ?? []).some((
  * it offers, a detach only of one it offers and no longer hires into, schedules nor sets a cost line for, a fire only of a step it hires
  * into, an unschedule only of a workflow it schedules, an attach that names a repository only by a folder name one of its repositories
  * alone has; a trigger only to a workflow it offers and under a name no schedule of it holds, a detach only of a workflow no trigger
- * targets, an untrigger only of a trigger it holds.
+ * targets, an untrigger only of a trigger it holds. Composed of `triggerAccepted` and `workflowAccepted`, which `wiringRefusal`'s laws
+ * of a trigger (`takesWhatItCanOfATrigger`) and of a workflow (`takesWhatItCanOfAWorkflow`) state, as its parts' laws do.
  */
 export const accepted = (
   factory: Pick<Factory, 'volumes' | 'workflows' | 'hires' | 'schedules' | 'costLines' | 'triggers'>,
@@ -71,14 +72,3 @@ export const triggerHeld = (factory: Pick<Factory, 'triggers'>, name: string) =>
 
 /** Whether a trigger of the factory targets `workflow`: one of its triggers is on it (`triggersOn`). */
 export const targets = (factory: Pick<Factory, 'triggers'>, workflow: string) => triggersOn(factory.triggers, workflow).length !== 0;
-
-/**
- * The name a change of a workflow or a trigger carries: the trigger's for a trigger or an untrigger, else the workflow's; a hire's
- * step.
- */
-export const changeNamed = (change: WiringChange) =>
-  change.verb === 'hire' || change.verb === 'fire'
-    ? change.step
-    : change.verb === 'trigger' || change.verb === 'untrigger'
-      ? change.name
-      : change.workflow;

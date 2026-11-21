@@ -29,7 +29,7 @@ import {
   type Schedule,
 } from '../src/factory/factory.ts';
 import { hiresInto, triggersOn, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
-import { accepted, changeNamed, targets, triggerAccepted, triggerHeld, workflowAccepted } from './laws.ts';
+import { accepted, targets, triggerAccepted, triggerHeld, workflowAccepted } from './laws.ts';
 
 /**
  * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired
@@ -210,20 +210,40 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
       condition: ({ input: [factory, change], output }) =>
         change.verb !== 'detach' || !targets(factory, change.workflow) || output !== null,
     },
-    takesWhatItCan: {
-      description: 'A change but a hire, well named, that the factory can take is never refused',
+    takesWhatItCanOfAWorkflow: {
+      description: 'An attach, a detach, a schedule or an unschedule, well named, that the factory can take is never refused',
       condition: ({ input: [factory, change], output }) =>
-        change.verb === 'hire' ||
-        (change.verb !== 'fire' && workflowNameRefusal(changeNamed(change)) !== undefined) ||
-        !accepted(factory, change) ||
+        (change.verb !== 'attach' && change.verb !== 'detach' && change.verb !== 'schedule' && change.verb !== 'unschedule') ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        !workflowAccepted(factory, change) ||
         output === null,
     },
-    aBadNameIsInvalid: {
-      description: 'A change of a workflow or a trigger whose name is not one is refused as Invalid, whatever the factory holds',
+    takesWhatItCanOfATrigger: {
+      description: 'A trigger or an untrigger, well named, that the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        (change.verb !== 'trigger' && change.verb !== 'untrigger') ||
+        workflowNameRefusal(change.name) !== undefined ||
+        !triggerAccepted(factory, change) ||
+        output === null,
+    },
+    takesWhatItCanOfAFire: {
+      description: 'A fire of a step the factory hires into is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'fire' || !Object.hasOwn(factory.hires, change.step) || output === null,
+    },
+    aBadNameIsInvalidOfAWorkflow: {
+      description:
+        'An attach, a detach, a schedule or an unschedule whose workflow name is not one is refused as Invalid, whatever the factory holds',
       condition: ({ input: [, change], output }) =>
-        change.verb === 'hire' ||
-        change.verb === 'fire' ||
-        workflowNameRefusal(changeNamed(change)) === undefined ||
+        (change.verb !== 'attach' && change.verb !== 'detach' && change.verb !== 'schedule' && change.verb !== 'unschedule') ||
+        workflowNameRefusal(change.workflow) === undefined ||
+        output?.kind === 'Invalid',
+    },
+    aBadNameIsInvalidOfATrigger: {
+      description: 'A trigger or an untrigger whose name is not one is refused as Invalid, whatever the factory holds',
+      condition: ({ input: [, change], output }) =>
+        (change.verb !== 'trigger' && change.verb !== 'untrigger') ||
+        workflowNameRefusal(change.name) === undefined ||
         output?.kind === 'Invalid',
     },
     missingOnlyOfWhatIsNotThere: {

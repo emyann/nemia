@@ -1,9 +1,9 @@
 /**
- * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox resend`, `inbox from`, `inbox edit`, `inbox rm`,
- * `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
- * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines
- * it prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow
- * given as a path are refused, exit 2, before anything is asked.
+ * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox resend`, `inbox from`, `inbox edit`, `inbox
+ * rm`, `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
+ * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines it
+ * prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow given
+ * as a path are refused, exit 2, before anything is asked.
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */

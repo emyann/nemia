@@ -42,7 +42,8 @@ const resendRefusalSpec = spec<(ask: ResendAsk) => ResendRefusal | null>({
       condition: ({ input: [ask], output }) => !started(ask.state) || !ask.taken || output === 'sent',
     },
     waitsForItsRun: {
-      description: 'A started card not yet sent on, whose run is pending or running, is refused as in flight: the idea never runs twice at once',
+      description:
+        'A started card not yet sent on, whose run is pending or running, is refused as in flight: the idea never runs twice at once',
       condition: ({ input: [ask], output }) => !started(ask.state) || ask.taken || !atWork(ask.state) || output === 'in-flight',
     },
     sentOnOtherwise: {

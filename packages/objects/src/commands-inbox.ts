@@ -1,7 +1,7 @@
 /**
- * The words of the inbox's writes and the labels: inbox add, queue, resend, from and rm; label run and label inbox. Each is in `INBOX_WORDS`,
- * the client's to parse, word and run (`apps/cli/src/commands/inbox/`), and the orchestrator's entry spreads its words beside its handler,
- * which the api's Card and Run verbs call. Pure.
+ * The words of the inbox's writes and the labels: inbox add, queue, resend, from and rm; label run and label inbox. Each is in
+ * `INBOX_WORDS`, the client's to parse, word and run (`apps/cli/src/commands/inbox/`), and the orchestrator's entry spreads its words
+ * beside its handler, which the api's Card and Run verbs call. Pure.
  */
 import { CLI, type Args, type CommandWords, type Flag, type Spec } from './command.ts';
 import { leftOut } from './commands-flags.ts';

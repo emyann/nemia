@@ -1,7 +1,8 @@
 /**
  * Group `cards`: the inbox's cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one
  * that names none), read in its namespace and across all by its name (each read of one carrying the card's file as written), filed,
- * written whole, dropped, started, queued and taken off the queue, sent on once started, and their labels edited. Cut from `api.ts`, which adds it to `Api`.
+ * written whole, dropped, started, queued and taken off the queue, sent on once started, and their labels edited. Cut from `api.ts`,
+ * which adds it to `Api`.
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';

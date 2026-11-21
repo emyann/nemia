@@ -18,7 +18,7 @@ import { CardName } from './inbox.model.ts';
 import { inboxCards } from './inbox.store.ts';
 import { resendRefusal, resendRefusalMessage, resentCardName, resentFrom, resentText } from './resend.ts';
 
-/** What `nemia inbox resend` is asked: the card, the workflow it is sent to by name (none for its factory's card triggers), and who asks. */
+/** What `nemia inbox resend` is asked: the card, the workflow it is sent to by name (none for its factory's triggers), and who asks. */
 export type ResendAsked = { readonly name: string; readonly workflow?: string; readonly actor?: Actor };
 
 /**

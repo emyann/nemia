@@ -65,8 +65,7 @@ export function resendRefusalMessage(refusal: ResendRefusal, card: string, run: 
  * @param at The time it is queued at, as an ISO time: read only with a workflow.
  */
 export function resentText(card: InboxCard, run: string, runs: readonly string[], workflow: string | undefined, at: string) {
-  const to =
-    workflow === undefined ? "naming no workflow, for its factory's card triggers to route" : `to the workflow \`${workflow}\``;
+  const to = workflow === undefined ? "naming no workflow, for its factory's card triggers to route" : `to the workflow \`${workflow}\``;
   const line = `Sent on from run ${run} (card ${card.name}) with nemia inbox resend, ${to}.`;
   const from = [...new Set([...(card.from ?? []), ...runs])];
   const same = workflow !== undefined && workflow === card.workflow;

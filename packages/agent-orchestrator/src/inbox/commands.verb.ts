@@ -1,11 +1,11 @@
 /**
  * `nemia inbox`, each of its forms an entry of the command table: the cards listed, an idea filed as one, a card queued to start on its own
- * or taken off the queue, its `from:` set, and a card dropped. None is routed by the table: the Card's verbs are declared in `objects`'
- * Api, and the api's handlers (apps/api/src/objects/cards.ts) call the handlers of `inbox add`, `inbox queue` and `inbox rm` by their
- * `input`, and the Card's `resend` that of `inbox resend`. The writes' words are the client's (`objects`' `INBOX_WORDS`): it parses, words and prints them, and the entries here spread
- * those words beside their handlers. A card's `from:` (`nemia inbox from`) the api writes as part of the Card's whole write (`update`,
- * `replaceCard`), and reads one card with its file as written (`get`); a card's text (`nemia inbox edit`) it writes through the Card's
- * `edit`, which calls the handler of `inbox edit` (`editCard`).
+ * or taken off the queue, a started card sent on, its `from:` set, and a card dropped. None is routed by the table: the Card's verbs are
+ * declared in `objects`' Api, and the api's handlers (apps/api/src/objects/cards.ts) call the handlers of `inbox add`, `inbox queue`,
+ * `inbox resend` and `inbox rm` by their `input`. The writes' words are the client's (`objects`' `INBOX_WORDS`): it parses, words and
+ * prints them, and the entries here spread those words beside their handlers. A card's `from:` (`nemia inbox from`) the api writes as part
+ * of the Card's whole write (`update`, `replaceCard`), and reads one card with its file as written (`get`); a card's text (`nemia inbox
+ * edit`) it writes through the Card's `edit`, which calls the handler of `inbox edit` (`editCard`).
  */
 import {
   INBOX_READ_WORDS,

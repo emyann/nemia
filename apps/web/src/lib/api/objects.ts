@@ -36,6 +36,7 @@ import {
   AgentTried,
   type AgentWrite,
   Card,
+  CardResent,
   CheckOutput,
   Delegation,
   DelegationList,
@@ -542,6 +543,15 @@ export const cards = {
     call(
       (c) => c.cards.unqueue({ params: { namespace, name } }),
       write(Card, 'The card may be queued, or not: look in the inbox before asking again.'),
+    ),
+  /**
+   * A started card sent on as a card of its own, to the workflow named or none for its factory's card triggers, the run it came from
+   * cancelled when it waits on a person: answers the card filed and what was cancelled.
+   */
+  resend: (namespace: string, name: string, payload: { workflow?: string }) =>
+    call(
+      (c) => c.cards.resend({ params: { namespace, name }, payload }),
+      write(CardResent, 'The card may be sent on, or not: look in the inbox before asking again.'),
     ),
   /** A card's labels edited (`key=value`, `key-`); a changed value needs `overwrite`. */
   labels: (namespace: string, name: string, edit: LabelEdit) =>

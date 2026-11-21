@@ -2,7 +2,7 @@
  * `nemia inbox`, each of its forms an entry of the command table: the cards listed, an idea filed as one, a card queued to start on its own
  * or taken off the queue, its `from:` set, and a card dropped. None is routed by the table: the Card's verbs are declared in `objects`'
  * Api, and the api's handlers (apps/api/src/objects/cards.ts) call the handlers of `inbox add`, `inbox queue` and `inbox rm` by their
- * `input`. The writes' words are the client's (`objects`' `INBOX_WORDS`): it parses, words and prints them, and the entries here spread
+ * `input`, and the Card's `resend` that of `inbox resend`. The writes' words are the client's (`objects`' `INBOX_WORDS`): it parses, words and prints them, and the entries here spread
  * those words beside their handlers. A card's `from:` (`nemia inbox from`) the api writes as part of the Card's whole write (`update`,
  * `replaceCard`), and reads one card with its file as written (`get`); a card's text (`nemia inbox edit`) it writes through the Card's
  * `edit`, which calls the handler of `inbox edit` (`editCard`).
@@ -13,7 +13,9 @@ import {
   INBOX_EDIT_WORDS,
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
+  INBOX_RESEND_WORDS,
   INBOX_RM_WORDS,
+  Actor,
   runsNamed,
 } from 'objects';
 import { Effect, Schema } from 'effect';
@@ -30,6 +32,7 @@ import { howOf } from '../summary/how.verb.ts';
 import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 import { editCard } from '../card-write/card-edit.verb.ts';
 import type { CardReplaced } from '../card-write/card-write.verb.ts';
+import { resendCard, type Resent } from './resend.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string) => {
@@ -134,6 +137,31 @@ export const INBOX_QUEUE: Served<Queued, InboxQueueInput> = {
 };
 
 /**
+ * What `nemia inbox resend`'s handler takes: the started card, the workflow it is sent on to by name (none for its factory's card
+ * triggers), and who sends it (`actor`, objects' `Actor`), which the api hands of its caller and the cancel of the run it came from keeps.
+ */
+export const InboxResendInput = Schema.Struct({
+  name: Schema.String,
+  workflow: Schema.optionalKey(Schema.String),
+  actor: Schema.optionalKey(Actor),
+});
+export type InboxResendInput = typeof InboxResendInput.Type;
+
+/**
+ * `nemia inbox resend`: a started card sent on as a card of its own, `<run>-resent`, and the run it came from cancelled when it waits on
+ * a person (`resendCard`), its words the client's (`objects`' `INBOX_RESEND_WORDS`). Its runs are judged through the informer the caller
+ * keeps (`kept.runs`).
+ */
+export const INBOX_RESEND: Served<Resent, InboxResendInput> = {
+  ...INBOX_RESEND_WORDS,
+  input: InboxResendInput,
+  handler: (input, kept) =>
+    Effect.gen(function* () {
+      return yield* resendCard(input, yield* howOf(kept));
+    }),
+};
+
+/**
  * `nemia inbox from`: the runs a card's run is handed as context (its `from:`), set, or with `--off` taken off, its words the client's
  * (`objects`' `INBOX_FROM_WORDS`), which writes the card whole through the Card's `update`. Context is no wait: the run reads what each
  * concluded when its steps are filed, landed or in flight, and waits on none (`setFrom`).
@@ -186,6 +214,7 @@ export const INBOXES: readonly (Command | Served)[] = [
   INBOX,
   tableEntry(INBOX_ADD),
   tableEntry(INBOX_QUEUE),
+  tableEntry(INBOX_RESEND),
   INBOX_FROM,
   tableEntry(INBOX_EDIT),
   tableEntry(INBOX_RM),

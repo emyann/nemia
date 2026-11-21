@@ -1,5 +1,5 @@
 /**
- * The words of the inbox's writes and the labels: inbox add, queue, from and rm; label run and label inbox. Each is in `INBOX_WORDS`,
+ * The words of the inbox's writes and the labels: inbox add, queue, resend, from and rm; label run and label inbox. Each is in `INBOX_WORDS`,
  * the client's to parse, word and run (`apps/cli/src/commands/inbox/`), and the orchestrator's entry spreads its words beside its handler,
  * which the api's Card and Run verbs call. Pure.
  */
@@ -106,6 +106,53 @@ export const INBOX_QUEUE_WORDS = {
   only: {
     side: 'cli',
     why: "the api serves it as the Card's `queue` and `unqueue` of `objects`' Api, which call this entry's handler: no route of its own",
+  },
+} as const satisfies CommandWords;
+
+/** What `--workflow` of `nemia inbox resend` takes, said where it is missing and where it stands apart from its value. */
+const RESEND_WORKFLOW_TAKES = `--workflow takes the workflow the card is sent on to, by its name: ${CLI} inbox resend <name> --workflow <name>`;
+
+/** `nemia inbox resend`'s spec: the card's name, then `--workflow <name>` once. */
+const RESEND_SPEC: Spec = {
+  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+  flags: [
+    {
+      flag: '--workflow',
+      kind: 'text',
+      key: 'workflow',
+      takes: RESEND_WORKFLOW_TAKES,
+      twice: `${CLI} inbox resend takes --workflow once: a card is sent on to one workflow.`,
+    },
+  ],
+  unknown: (arg) =>
+    arg.startsWith('-')
+      ? `${CLI} inbox resend does not take ${arg}. It takes the card's name, then --workflow <name>, or none for its factory's card triggers.`
+      : `${CLI} inbox resend sends one card on, and ${arg} is a second: ${CLI} inbox resend <name>, once per card.`,
+  apart: () => RESEND_WORKFLOW_TAKES,
+  missing: `${CLI} inbox resend takes the name of the started card to send on, as ${CLI} inbox lists it: ${CLI} inbox resend <name> [--workflow <name>].`,
+};
+
+/**
+ * `nemia inbox resend`: a started card sent on, filed again as a card of its own (`<run>-resent`) handed the runs it was started as, to
+ * the workflow named or naming none for its factory's card triggers, and the run it came from cancelled when that run waits on a person.
+ */
+export const INBOX_RESEND_WORDS = {
+  name: 'inbox resend',
+  served: [{ endpoint: 'cards.resend' }],
+  usage: '<name> [--workflow <w>]',
+  help: [
+    'send a started card on: file it again as <run>-resent, handed its run,',
+    "queued on --workflow or, with none, for its factory's card triggers;",
+    'the run it came from is cancelled when it waits on you',
+  ],
+  spec: RESEND_SPEC,
+  check: (args) => leftOut(RESEND_SPEC, args),
+  writes: true,
+  ticks: true,
+  class: 'act',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `resend` of `objects`' Api, which calls this entry's handler: no route of its own",
   },
 } as const satisfies CommandWords;
 
@@ -266,6 +313,7 @@ export const LABEL_INBOX_WORDS = {
 export const INBOX_WORDS = [
   INBOX_ADD_WORDS,
   INBOX_QUEUE_WORDS,
+  INBOX_RESEND_WORDS,
   INBOX_FROM_WORDS,
   INBOX_EDIT_WORDS,
   INBOX_RM_WORDS,

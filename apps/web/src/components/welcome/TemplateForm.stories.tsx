@@ -86,7 +86,7 @@ export const Asked: Story = {
     const asked = canvasElement.querySelector<HTMLElement>('[data-template-param="frontDoorLabel"]')!;
     await expect(asked).toBeVisible();
     await expect(within(asked).getByRole('textbox', { name: 'frontDoorLabel' })).toHaveValue('');
-    await expect(within(asked).getByText(SDLC.spec.parameters.frontDoorLabel!.description)).toBeVisible();
+    await expect(within(asked).getByText(SDLC.spec.parameters.frontDoorLabel.description)).toBeVisible();
     await expect(canvasElement.querySelector('[data-template-param="github"]')).toBeNull();
     await expect(canvasElement.querySelector('[data-template-param="ciCheck"]')).toBeNull();
     await expect(within(canvasElement).getByRole('button', { name: 'More parameters' })).toHaveAttribute('aria-expanded', 'false');

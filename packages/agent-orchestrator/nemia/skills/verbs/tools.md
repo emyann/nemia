@@ -1318,6 +1318,32 @@ Its arguments:
 
 - On the port: Sends fields= where the call gives no fields: give it to ask otherwise.
 
+## check-output
+
+```text
+  nemia check-output <runId> <step> [--try <n>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]
+    what a step's try's check printed, its latest try or --try <n>:
+    stdout whole, or --stderr; --from <n> or --before <n> with --limit <n>,
+    or --last <n>: one page; --match <text>: the lines containing it, any
+    case, numbered
+```
+
+Reads a page of what one try of a run's step's check printed on stdout or stderr, read whole from the runtime while the check runs and after it ended: the lines from a line number, before one or the last ones, or only those containing a text, each under its number in the stream. Answers CheckOutput, with the lines to read on from and to read before.
+
+Calls `GET /api/runs/:runId/steps/:step/tries/:try/check/output`.
+
+Its arguments:
+
+- runId (<runId> at a shell): The run's id, found among the runs the store lists in any namespace.
+- step (<step> at a shell): The step's name.
+- try (--try at a shell): The try's number, from 1.
+- stream (--stderr at a shell): The stream to read, stdout or stderr; stdout where not given.
+- from (--from at a shell): The line number to read on from, from 1, as a page's next says it; never with before or last.
+- before (--before at a shell): The line number the lines answered end before, from 1, as a page's before says it: the limit lines held just before it; never with from or last.
+- limit (--limit at a shell): How many lines to answer from there, or before it; never with last.
+- last (--last at a shell): How many of the last lines to answer; never with from, before or limit.
+- match (--match at a shell): A text the lines answered contain, as it is, compared case-insensitively; every line where not given.
+
 ## tries
 
 ```text

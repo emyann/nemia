@@ -33,13 +33,19 @@ function OfStep({ name, mark, children }: { name: string; mark: string; children
   );
 }
 
+/** The current try of the step `step`, whose check its receipt reads; none for a step with no try. */
+function currentTry(run: RunDetail, step: string, tries: RunDetail['steps'][number]['tries']) {
+  const current = tries.find((t) => t.current)?.try;
+  return current === undefined ? null : { runId: run.id, step, try: current };
+}
+
 /** Each step's check: the command the run judges it by, and what refused it where one did. */
 function Checks({ run }: { run: RunDetail }) {
   const checked = run.steps.filter((s) => s.check);
   if (!checked.length) return <Nothing>No step of it has a check.</Nothing>;
   return checked.map((s) => (
     <OfStep key={s.name} name={s.name} mark="check">
-      {s.check && <Check check={s.check} />}
+      {s.check && <Check check={s.check} read={currentTry(run, s.name, s.tries)} />}
     </OfStep>
   ));
 }

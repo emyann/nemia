@@ -414,7 +414,7 @@ export { HOLD } from './wait/commands.verb.ts';
 export { WAIT, type WaitInput } from './await/commands.verb.ts';
 export type { WaitAnswer, Waited } from './await/await.verb.ts';
 export { PRUNE, RM } from './forget/commands.verb.ts';
-export { CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from './object/commands.verb.ts';
+export { CHECK_OUTPUT, CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from './object/commands.verb.ts';
 export { STATS } from './stats/commands.verb.ts';
 export { STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT } from './steps/commands.verb.ts';
 export {

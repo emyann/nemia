@@ -1,20 +1,20 @@
 /**
- * A run's step's reads, the `Api`'s `steps` group (`StepsGroup`): its tries, one try, a try's closeout and what it was told — the run
- * object's sub-resources — and the board's reads of it: the end of its session output (`StepLog`), a file it wrote, by its path (its
- * files directory's, `artifacts/:file`, and a folder step's own folder's, `files/:file`, each a path under it encoded whole), its
- * task's path through the runtime's lifecycle (`StepPath`), and its conversation read once from a cursor (`StepTranscript`) or followed
- * as server-sent events (`StepStreamEvent`).
- * Each under `/api/runs/:runId/steps/:step/`, found among the runs the store lists, in any namespace. Served by the api's step handlers
+ * A run's step's reads, the `Api`'s `steps` group (`StepsGroup`): its tries, one try, a try's closeout, a page of what a try's check
+ * printed (`CheckOutput`) and what it was told — the run object's sub-resources — and the board's reads of it: the end of its session
+ * output (`StepLog`), a file it wrote, by its path (its files directory's, `artifacts/:file`, and a folder step's own folder's,
+ * `files/:file`, each a path under it encoded whole), its task's path through the runtime's lifecycle (`StepPath`), and its conversation
+ * read once from a cursor (`StepTranscript`) or followed as server-sent events (`StepStreamEvent`). Each under
+ * `/api/runs/:runId/steps/:step/`, found among the runs the store lists, in any namespace. Served by the api's step handlers
  * (`apps/api/src/steps/steps.ts`).
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { BadRequest, Gone, Invalid, Missing, ReadFailed, Unjudged } from './api-errors.ts';
-import { StepLog } from './run.ts';
+import { CheckOutput, StepLog } from './run.ts';
 import { StepTries, StepTry, TryCloseout } from './run-tries.ts';
 import { StepTold } from './run-told.ts';
 import { describedNumber, describedOne } from './meta.ts';
-import { LIFECYCLE_STATES, SAID_AFTER, TRANSCRIPT_ORIGINS, TRANSCRIPT_ROLES } from './words.ts';
+import { LIFECYCLE_STATES, OUTPUT_STREAMS, SAID_AFTER, TRANSCRIPT_ORIGINS, TRANSCRIPT_ROLES } from './words.ts';
 
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
 const State = Schema.Literals(LIFECYCLE_STATES);
@@ -234,6 +234,38 @@ const transcriptQuery = {
   ),
 };
 
+/**
+ * The query of a read of a try's check's output: `stream`, the stream to read (stdout where not given); `from`, the line number to read on
+ * from, `before`, the line the lines answered end before, or `last`, the last lines, one of the three; `limit`, how many lines from there
+ * or before it (`CHECK_OUTPUT_PAGE`), never with `last`; and `match`, a text the lines answered contain, compared case-insensitively,
+ * each line kept under its number in the stream, so a page before a line holds the matched lines just before it.
+ */
+const checkOutputQuery = {
+  stream: Schema.optionalKey(
+    Schema.Literals(OUTPUT_STREAMS).annotate({ description: 'The stream to read, stdout or stderr; stdout where not given.' }),
+  ),
+  from: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The line number to read on from, from 1, as a page's next says it; never with before or last.",
+    }),
+  ),
+  before: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The line number the lines answered end before, from 1, as a page's before says it: the limit lines held just before it; never with from or last.",
+    }),
+  ),
+  limit: Schema.optionalKey(Schema.String.annotate({ description: 'How many lines to answer from there, or before it; never with last.' })),
+  last: Schema.optionalKey(
+    Schema.String.annotate({ description: 'How many of the last lines to answer; never with from, before or limit.' }),
+  ),
+  match: Schema.optionalKey(
+    Schema.String.annotate({
+      description: 'A text the lines answered contain, as it is, compared case-insensitively; every line where not given.',
+    }),
+  ),
+};
+
 /** What a sub-resource of the run object refuses with: none by that name, a try the package refuses, a run not judged. */
 const subResourceErrors = [Missing, Invalid, Unjudged];
 
@@ -273,6 +305,15 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
   }).annotate(
     OpenApi.Description,
     "Reads what one try of a run's step signed off with, its output narrowed to the fields asked and its body a page at a time, or why it does not read. Answers TryCloseout.",
+  ),
+  HttpApiEndpoint.get('checkOutput', '/api/runs/:runId/steps/:step/tries/:try/check/output', {
+    params: tryParams,
+    query: checkOutputQuery,
+    success: CheckOutput,
+    error: [...subResourceErrors, ReadFailed],
+  }).annotate(
+    OpenApi.Description,
+    "Reads a page of what one try of a run's step's check printed on stdout or stderr, read whole from the runtime while the check runs and after it ended: the lines from a line number, before one or the last ones, or only those containing a text, each under its number in the stream. Answers CheckOutput, with the lines to read on from and to read before.",
   ),
   HttpApiEndpoint.get('told', '/api/runs/:runId/steps/:step/told', {
     params: stepParams,

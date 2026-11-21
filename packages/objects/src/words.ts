@@ -212,6 +212,12 @@ export const SAID_AFTER = ['text', 'thinking', 'tool_use', 'tool_result', 'syste
 /** One of `SAID_AFTER`. */
 export type SaidAfter = (typeof SAID_AFTER)[number];
 
+/** The streams a check's command printed on, each kept on its own and read on its own (`CheckOutput`). */
+export const OUTPUT_STREAMS = ['stdout', 'stderr'] as const;
+
+/** One of `OUTPUT_STREAMS`. */
+export type OutputStream = (typeof OUTPUT_STREAMS)[number];
+
 /** Where a session's peak stands against its step's cap. */
 export const PEAK_MARKS = ['cap', 'large'] as const;
 

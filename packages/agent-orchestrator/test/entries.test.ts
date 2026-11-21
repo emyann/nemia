@@ -143,6 +143,7 @@ const PINNED: Record<string, string[]> = {
     'LESSON',
     'LOGS',
     'CLOSEOUT',
+    'CHECK_OUTPUT',
     'TOLD',
     'TRIES',
     'TRY',

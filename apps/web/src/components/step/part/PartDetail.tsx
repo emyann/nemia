@@ -201,6 +201,12 @@ function NowFacts({ step }: { step: StepView }) {
   );
 }
 
+/** The try whose check the part's Check reads: the try it shows, else the step's current one; none for a step with no try. */
+function checkRead(run: RunDetail, step: StepView) {
+  const shown = step.shown ?? step.tries.find((t) => t.current)?.try;
+  return shown === undefined ? null : { runId: run.id, step: step.name, try: shown };
+}
+
 /** The step's detail, folded unless `open`, its folds within it too: what `PartDetail` says, of the try its part shows (`detail.shown`). */
 export function PartDetail({ run, step, detail, open = false }: { run: RunDetail; step: StepView; detail: Detail; open?: boolean }) {
   const ends = endsTheRun(step);
@@ -212,7 +218,7 @@ export function PartDetail({ run, step, detail, open = false }: { run: RunDetail
         <NowFacts step={step} />
         <StepFacts run={run} step={step} />
         {run.place === 'folder' && step.taskId !== null && <FolderFiles step={step} />}
-        {step.check && <Check check={step.check} />}
+        {step.check && <Check check={step.check} read={checkRead(run, step)} />}
         {step.gate?.approval && <Approved step={step.name} approval={step.gate.approval} ends={ends} budgets={step.gate.budgets} />}
         <Fold name="spec" title="Its spec" open={open}>
           {detail.spec ? (

@@ -123,7 +123,7 @@
     },
     {
       "term": "Check",
-      "meaning": "a command the run executes after a step signs off; its exit code, not the agent's word, decides whether the run goes on.",
+      "meaning": "a command the run executes after a step signs off; its exit code, not the agent's word, decides whether the run goes on. `nemia check-output <run> <step> [--try n]` prints what a try's check printed, a page at a time, and the api serves the same on `GET /api/runs/:runId/steps/:step/tries/:try/check/output`.",
       "see": {
         "label": "The check",
         "href": "/workflows/#the-check"

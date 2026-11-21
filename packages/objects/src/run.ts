@@ -26,7 +26,7 @@ import {
   TimelineTotal,
   TimelineTry,
 } from './run-step.ts';
-export { SessionReleaseSchema, StepLog, StepUsed } from './run-step.ts';
+export { CheckOutput, SessionReleaseSchema, StepLog, StepUsed } from './run-step.ts';
 import { API_VERSION, listOf } from './meta.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';

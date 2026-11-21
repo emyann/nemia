@@ -10,6 +10,8 @@ import { steps } from '@/lib/api/objects';
 import { PATH_POLL_MS } from '@/lib/lifecyclePath';
 import { Reading, ReadingLines } from '@/components/look';
 import { Button, SearchBar, Segment, SegmentedButton } from '@/components/ui/ds';
+import { focusRing } from '@/components/ui/ds/utils';
+import { cn } from '@/lib/utils';
 
 /** How many lines a page of the reader holds. */
 const PAGE = 200;
@@ -77,7 +79,7 @@ function Lines({ lines, atEnd }: { lines: Printed['lines']; atEnd: boolean }) {
       aria-label="Its lines"
       // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
       tabIndex={0}
-      className="max-h-96 overflow-auto rounded bg-muted p-2 font-mono text-body-small leading-snug"
+      className={cn('max-h-96 overflow-auto rounded bg-muted p-2 font-mono text-body-small leading-snug', focusRing())}
     >
       {lines.map((line) => (
         <span key={line.n} data-line={line.n} className="flex gap-3">

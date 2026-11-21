@@ -65,6 +65,7 @@ const FILES = [
   'components/nav/Trail.tsx',
   'components/run/Artifacts.tsx',
   'components/run/FolderTree.tsx',
+  'components/step/CheckOutput.tsx',
   'components/step/Closeout.tsx',
   'components/step/DebugPanel.tsx',
   'components/step/Enough.tsx',
@@ -127,7 +128,12 @@ test('every file that draws the Runs page is on the list: each part the route an
 const handRings = (text: string) => text.match(/(?<![\w-])(?:data-)?focus(?:-visible|-within)?:(?:ring|outline)-[\w-]+/g) ?? [];
 
 /** The parts of the Runs page that take the focus as a box, each ringed by the kit. */
-const RINGED = ['components/look/StatTile.tsx', 'components/look/Pager.tsx', 'components/look/TextLink.tsx'];
+const RINGED = [
+  'components/look/StatTile.tsx',
+  'components/look/Pager.tsx',
+  'components/look/TextLink.tsx',
+  'components/step/CheckOutput.tsx',
+];
 
 test("REFUSED: a focus ring written by hand in a file that draws the Runs page: a box that takes the focus takes the kit's ring", () => {
   for (const file of FILES)

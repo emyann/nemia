@@ -179,7 +179,7 @@ test('`nemia inbox resend` files a started card again as <run>-resent, queued on
   assert.match(cardOn(store.root, 'r-sent-resent') ?? '', /\nworkflow: dev\n/);
   assert.match(cardOn(store.root, 'r-sent-resent') ?? '', /\nfrom: r-sent\n/);
   const again = await store.nemia(['inbox', 'resend', 'sent-card']);
-  assert.equal(again.code, 2, `sent on once: ${again.err}`);
+  assert.equal(again.code, 1, `sent on once, a Conflict, which the client exits 1 as every Conflict: ${again.err}`);
   assert.ok(again.err.includes('r-sent-resent'), again.err);
 });
 

@@ -225,6 +225,11 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (nemia decide --help)
                                on the port: decide
+  nemia quota [--json]
+                               the subscription's quota: each window's used share and when it
+                               resets, or the api's sentence why there is none; --json: the whole
+                               answer
+                               on the port: quota
 ```
 
 ## Yours

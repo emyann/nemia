@@ -2533,8 +2533,9 @@ stateDiagram-v2
   narrowest allow that would have let the call through, or says the deny stands. The denials `nemia stats` counts are its own read of the
   same views, each ended attempt's calls one by one (`deniedCallsOf` in `src/stats/discipline.ts`, read by `src/stats/stats.verb.ts`),
   null, not measured, where an ended attempt's record does not say its denials.
-- **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
-  (`quotaUrl` in `keep.verb.ts`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
+- **Her quota and her spend**: she reads the quota with `nemia quota`, told it in her first message, a read of her fence derived from
+  the verbs the api serves beside the table (`CLI_VERBS`), which sends her session token as every `nemia` she runs does; no call of
+  hers reaches the api but through a verb. `nemia level` says what her ended sessions
   cost (`spend`), counted as a step's are (`taskSpend`).
 - **The board shows her** on a frame Settings page (`/settings`, the rail's last place): her level as a Semi-auto switch (`PUT
   /api/level`, a refusal in the api's words), her session's state judged from the orchestrator's facts alone (`sessionOf`,

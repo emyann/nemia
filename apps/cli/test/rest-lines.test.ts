@@ -1,14 +1,15 @@
 /**
  * The words the client prints of the api's answers, on answers built by hand: `nemia passes`' (`passesLines`), `nemia series`'
- * (`seriesLines`), `nemia stats`' (`statsLines`, `statsLine`, `healthLines`), whose numbers the orchestrator's stats tests hold on a
- * store, and `nemia level`'s (`levelLines`), whose data the orchestrator's `nemia-keeper.test.ts` holds. A number nothing measured reads
- * `—`, never 0.
+ * (`seriesLines`), `nemia quota`'s (`quotaLines`), `nemia stats`' (`statsLines`, `statsLine`, `healthLines`), whose numbers the
+ * orchestrator's stats tests hold on a store, and `nemia level`'s (`levelLines`), whose data the orchestrator's `nemia-keeper.test.ts`
+ * holds. A number nothing measured reads `—`, never 0.
  */
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import type { NemiaLevel, PassesRead, StatsGroup, StatsHeadline, StatsHealth, StatsStepRow } from 'objects';
+import type { NemiaLevel, PassesRead, Quota, QuotaWindow, StatsGroup, StatsHeadline, StatsHealth, StatsStepRow } from 'objects';
 import { passesLines, seriesLines } from '../src/commands/rest/meters.ts';
 import { levelLines } from '../src/commands/rest/nemia.ts';
+import { quotaLines } from '../src/commands/rest/quota.ts';
 import { healthLines, statsLine, statsLines, type StatsRead } from '../src/commands/rest/stats-lines.ts';
 
 /** A headline with nothing measured, `more` over it. */
@@ -171,6 +172,81 @@ test("`nemia series`' lines: the range, then a series and its labels a line, its
     '  pass.ms phase=place: 2 points, latest 120, highest 250',
   ]);
   assert.match(seriesLines({ range: '7d', span: 'hour', from: '', to: '', series: [] })[0] ?? '', /^nothing is kept for 7d yet/);
+});
+
+/** A window of the quota as the api answers it, `over` what the row means. */
+const quotaWindow = (over: Partial<QuotaWindow>) =>
+  ({
+    key: 'five_hour',
+    label: '5-hour',
+    usedPercentage: 38.4,
+    resetsAt: '2026-11-20T14:00:00.000Z',
+    reset: false,
+    marked: false,
+    ...over,
+  }) satisfies QuotaWindow;
+
+/** The quota as the api answers it, `over` what the row means. */
+const quota = (over: Partial<Quota>) =>
+  ({
+    state: 'fresh',
+    askedAt: '2026-11-20T10:00:00.000Z',
+    ageMs: 1000,
+    againAt: '2026-11-20T10:05:00.000Z',
+    subscription: 'max',
+    windows: [],
+    last: null,
+    keepMs: 300000,
+    markAt: 80,
+    said: null,
+    ...over,
+  }) satisfies Quota;
+
+describe("`nemia quota`'s lines", () => {
+  const windows = [quotaWindow({}), quotaWindow({ key: 'seven_day', label: 'week', usedPercentage: 86, resetsAt: null, marked: true })];
+
+  test('fresh: a line a window, its label, its used share and its reset, the mark on the marked one alone', () => {
+    const lines = quotaLines(quota({ windows }));
+    const five = lines.find((l) => l.includes('5-hour'));
+    const week = lines.find((l) => l.includes('week'));
+    assert.ok(five !== undefined && week !== undefined, lines.join('\n'));
+    assert.match(five, /38%/);
+    assert.match(five, /2026-11-20T14:00:00\.000Z/);
+    assert.match(week, /86%/);
+    assert.ok(!week.includes('null'), week);
+    assert.ok(week.includes('80%') && !five.includes('80%'), lines.join('\n'));
+    assert.ok(!lines.some((l) => l.includes('38.4')), 'the share is whole');
+  });
+
+  test("a window that reset since the reading is said not read since, its share the window before's, and is not marked", () => {
+    const lines = quotaLines(
+      quota({
+        windows: [quotaWindow({ label: 'week', usedPercentage: 86, resetsAt: '2026-11-19T09:00:00.000Z', reset: true, marked: true })],
+      }),
+    );
+    const week = lines.find((l) => l.includes('week'));
+    assert.ok(week !== undefined, lines.join('\n'));
+    assert.match(week, /not read since/);
+    assert.match(week, /2026-11-19T09:00:00\.000Z/);
+    assert.ok(!week.includes('80%'), week);
+    assert.ok(!/^ {2}week: 86% used/.test(week), week);
+  });
+
+  test("not fresh: the api's own sentence first, and no window line where it held none", () => {
+    const lines = quotaLines(quota({ state: 'no-claude', windows: [], said: 'PLANTED SAID', askedAt: null, ageMs: null }));
+    assert.equal(lines[0], 'PLANTED SAID');
+    assert.equal(lines.length, 1, lines.join('\n'));
+  });
+
+  test('not fresh with a last reading: its windows after the sentence, under the time it was asked', () => {
+    const lines = quotaLines(
+      quota({ state: 'timeout', said: 'PLANTED SAID', windows: [], last: { askedAt: '2026-11-19T09:00:00.000Z', windows } }),
+    );
+    assert.equal(lines[0], 'PLANTED SAID');
+    assert.ok(lines[1]?.includes('2026-11-19T09:00:00.000Z'), lines.join('\n'));
+    assert.ok(!lines.slice(1).some((l) => l.includes('2026-11-20T10:00:00.000Z')), 'the last reading is not said as now');
+    assert.equal(lines.filter((l) => l.includes('5-hour') || l.includes('week')).length, 2, lines.join('\n'));
+  });
 });
 
 describe('`statsLines` and `statsLine`: the stats in words, — where nothing was measured', () => {

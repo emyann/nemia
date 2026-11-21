@@ -1,6 +1,6 @@
 /**
- * The words of the rest of the store's reads: `concluded`, `logs`, `passes`, `series` and `memory`, each a read of one endpoint the client
- * prints. Pure.
+ * The words of the rest of the store's reads: `concluded`, `logs`, `passes`, `series`, `quota` and `memory`, each a read of one
+ * endpoint the client prints. Pure.
  */
 import type { CommandWords } from './command.ts';
 import { SERIES_RANGES } from './words.ts';
@@ -96,6 +96,28 @@ export const SERIES_WORDS = {
   class: 'read',
 } as const satisfies CommandWords;
 
+/**
+ * `nemia quota`: the subscription's quota as the api reads it, each window's used share and when it resets, or the api's sentence why
+ * there is none. The api answers every state with a 200 (`Quota`), so the read is the api's own (its keep and its backoff).
+ */
+export const QUOTA_WORDS = {
+  name: 'quota',
+  served: [{ endpoint: 'server.quota' }],
+  usage: '[--json]',
+  help: [
+    "the subscription's quota: each window's used share and when it",
+    "resets, or the api's sentence why there is none; --json: the whole",
+    'answer',
+  ],
+  spec: {
+    positionals: [],
+    flags: [{ flag: '--json', kind: 'switch', key: 'json', only: { side: 'cli', why: 'the api answers the whole answer, as JSON' } }],
+    unknown: (arg) => `nemia quota does not take ${arg}. It takes --json: nemia quota [--json].`,
+  },
+  writes: false,
+  class: 'read',
+} as const satisfies CommandWords;
+
 /** `nemia memory [<fact>]`: the facts Nemia keeps, or one fact's words. */
 export const MEMORY_WORDS = {
   name: 'memory',
@@ -118,5 +140,6 @@ export const REST_READ_WORDS = [
   LOGS_WORDS,
   PASSES_WORDS,
   SERIES_WORDS,
+  QUOTA_WORDS,
   MEMORY_WORDS,
 ] as const satisfies readonly CommandWords[];

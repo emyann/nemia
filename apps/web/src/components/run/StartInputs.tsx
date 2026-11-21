@@ -74,10 +74,7 @@ export function StartInputs({
         </FileTrigger>
       </DropZone>
       {files.length > 0 && (
-        <ul
-          aria-label={`${label}, listed`}
-          className="divide-y divide-outline-variant rounded-shape-small border border-outline-variant"
-        >
+        <ul aria-label={`${label}, listed`} className="divide-y divide-outline-variant rounded-shape-small border border-outline-variant">
           {files.map((file, index) => {
             const past = pastLimit(file);
             const mark = uploading ? markOf(index, sent) : null;

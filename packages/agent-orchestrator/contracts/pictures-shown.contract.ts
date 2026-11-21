@@ -51,9 +51,6 @@ const fits = (p: HandedPicture, bounds: PictureBounds) =>
 const handedBefore = (handed: readonly HandedPicture[], a: string, b: string) =>
   handed.some((p, j) => p.name === a && handed.some((q, k) => k > j && q.name === b));
 
-/** The reason `name` is held for, or undefined where it is not held. */
-const heldFor = (out: PicturesShown, name: string) => out.held.find((h) => h.name === name)?.reason;
-
 const picturesShownSpec = spec<(handed: readonly HandedPicture[], shows: boolean, bounds: PictureBounds) => PicturesShown>({
   requires: ({ input: [handed, , bounds] }) =>
     handed.every((p, i) => handed.every((o, j) => j <= i || o.name !== p.name)) &&

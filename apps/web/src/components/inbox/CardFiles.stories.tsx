@@ -67,7 +67,8 @@ export const Started: Story = {
 /** The api refused the last change: its words in full. */
 export const Refused: Story = {
   args: {
-    refused: 'The card fix-header names two files `shot.png`: a run keeps its inputs by name, in one folder. Give one of them another name.',
+    refused:
+      'The card fix-header names two files `shot.png`: a run keeps its inputs by name, in one folder. Give one of them another name.',
   },
 };
 

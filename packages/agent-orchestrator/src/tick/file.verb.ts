@@ -750,8 +750,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       say: landing.say,
       targets: landing.targets,
     };
-    const resumes = step.resume !== undefined && sessionOf(f, step.resume) !== undefined;
-    const pictured = picturesFiled(step, resumes, inputsDir(home, run), run.inputs);
+    const pictured = picturesFor(home, f, step);
     const taskId = yield* asked('file', e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said, pictured))).pipe(
       forStep(run, step),
     );
@@ -761,12 +760,23 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       workspace: place.workspace,
       branch: place.branch,
       ...filedOn(f, step),
-      ...(pictured ? { pictures: { shown: pictured.shown, held: pictured.held } } : {}),
+      ...picturesRecorded(pictured),
     };
     filed.push(name);
   }
   return filed;
 });
+
+/**
+ * The pictures among the run's inputs `step` is shown in its first message, and those held back (`picturesFiled`): none for a step that
+ * resumes a session, which saw them.
+ */
+const picturesFor = (home: string, f: Filing, step: StepSpec) =>
+  picturesFiled(step, step.resume !== undefined && sessionOf(f, step.resume) !== undefined, inputsDir(home, f.run), f.run.inputs);
+
+/** What a step's record keeps of the pictures it was shown and held back, where it was handed any. */
+const picturesRecorded = (pictured: ReturnType<typeof picturesFor>) =>
+  pictured ? { pictures: { shown: pictured.shown, held: pictured.held } } : {};
 
 /** The session of the step a step resumes, off its current task: undefined for a step with none. */
 const sessionOf = (f: Filing, stepName: string) => {

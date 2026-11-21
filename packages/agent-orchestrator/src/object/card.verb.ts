@@ -80,6 +80,17 @@ const queueStatusOf = (l: InboxListing) => ({
   ...(l.clash !== undefined ? { clash: [...l.clash] } : {}),
 });
 
+/** The keys of the listed card `l` its spec says, each where the card sets it. */
+const specKeysOf = (l: InboxListing) => ({
+  ...(l.workflow !== null ? { workflow: l.workflow } : {}),
+  ...(l.repo !== null ? { repo: l.repo } : {}),
+  ...(l.gate !== undefined ? { gate: l.gate } : {}),
+  ...(l.model !== undefined ? { model: { ...l.model } } : {}),
+  ...(l.from.length ? { from: [...l.from] } : {}),
+  ...(l.queued !== undefined && l.queued.by === undefined ? { queued: l.queued.at } : {}),
+  ...(l.files !== undefined && l.files.length ? { files: l.files.map((f) => ({ ...f })) } : {}),
+});
+
 /** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
 const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, files?: Card['status']['files']) => {
   const { body, error } = bodyOf(l, text);
@@ -93,16 +104,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false, 
       creationTimestamp: filedAt,
       resourceVersion: cardVersion(text),
     },
-    spec: {
-      ...(l.workflow !== null ? { workflow: l.workflow } : {}),
-      ...(l.repo !== null ? { repo: l.repo } : {}),
-      ...(l.gate !== undefined ? { gate: l.gate } : {}),
-      ...(l.model !== undefined ? { model: { ...l.model } } : {}),
-      ...(l.from.length ? { from: [...l.from] } : {}),
-      ...(l.queued !== undefined && l.queued.by === undefined ? { queued: l.queued.at } : {}),
-      ...(l.files !== undefined && l.files.length ? { files: l.files.map((f) => ({ ...f })) } : {}),
-      ...(body !== undefined ? { body } : {}),
-    },
+    spec: { ...specKeysOf(l), ...(body !== undefined ? { body } : {}) },
     status: {
       state: l.state,
       runs: [...l.startedAs],

@@ -180,6 +180,17 @@ const cardFactory = Effect.fn('cardFactory')(function* (
 });
 
 /**
+ * The files `card` carries, each by its name in the card and the path of the File it names in its factory's files: a File no longer kept
+ * at the path it would have, which the start refuses as missing.
+ * @param home The store's root.
+ * @param card The card, its factory and its files.
+ */
+const cardFilesAt = (home: string, card: InboxCard) => {
+  const at = card.factory ?? DEFAULT_NAMESPACE;
+  return (card.files ?? []).map((f) => ({ name: f.name, path: fileAt(home, at, f.file)?.path ?? path.join(filesDir(home, at), f.file) }));
+};
+
+/**
  * `nemia start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name>
  * }` on its record. The card is kept, and lists as `started` while that record stands; a queued one has its `queued:` line taken off, so
  * that the tick never starts it again, even once the run is forgotten.
@@ -235,12 +246,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const ids = new Set(yield* runs.runs.ids());
   const context = cardContext(card, opts, (id) => ids.has(id));
 
-  const home = yield* StoreRoot;
-  const filesAt = card.factory ?? DEFAULT_NAMESPACE;
-  const cardFiles = (card.files ?? []).map((f) => ({
-    name: f.name,
-    path: fileAt(home, filesAt, f.file)?.path ?? path.join(filesDir(home, filesAt), f.file),
-  }));
+  const cardFiles = cardFilesAt(yield* StoreRoot, card);
 
   const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,

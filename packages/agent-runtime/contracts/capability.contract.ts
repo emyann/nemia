@@ -15,8 +15,9 @@ import { type Implementation, spec } from '@emyann/tsverify';
  * A word a harness's declaration lists: a key of a task's config it takes, a kind of session it keeps, or an Engine verb it answers.
  *
  * - `contextTokens`, `claudeFlags` (a task's `config.claude`, carried whole), `codexArgs` (`config.codex`), `commandArgs` (`command`,
- *   `niceness`, `terminationMessagePath`), `env`, `readOnlyMount`, `writableMount`, `callAdmission`, `projectMcp`, `enabledSkills`, `pictures` (shown in a session's first message),
- *   `memoryLimit`, `bridge` (a session bridged to a remote control): a task's config it takes;
+ *   `niceness`, `terminationMessagePath`), `env`, `readOnlyMount`, `writableMount`, `callAdmission`, `projectMcp`, `enabledSkills`,
+ *   `pictures` (shown in a session's first message), `memoryLimit`, `bridge` (a session bridged to a remote control): a task's config
+ *   it takes;
  * - `keepsOpen`: a session kept open until stopped (`restartPolicy: 'Always'`); `holdsCalls`: a call held open for a person (`mayAsk`);
  * - `interrupt`, `answerAsk`, `quota`, `mcp` (`mcpState`, `mcpSignIn`, `mcpSignInState`, `mcpSignOut`), `hold`, `drain` (its sessions'
  *   calls held, and their deadlines paused, while the store's drain stands): an Engine verb it answers.

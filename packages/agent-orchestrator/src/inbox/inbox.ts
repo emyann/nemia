@@ -832,6 +832,12 @@ function splitOrProse(from: string, text: string) {
   }
 }
 
+/** The labels and the files given beside an idea, each where given, as its card writes them over the text's own. */
+const givenMaps = (labels: Labels | undefined, files: CardFiles | undefined) => ({
+  ...(labels !== undefined ? { labels } : {}),
+  ...(files !== undefined ? { files } : {}),
+});
+
 /**
  * The file `nemia inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
  * (`parseInboxCard`).
@@ -888,8 +894,7 @@ export function ideaCard(
   const written = {
     ...keys,
     ...definedOf(given),
-    ...(givenLabels !== undefined ? { labels: givenLabels } : {}),
-    ...(givenFiles !== undefined ? { files: givenFiles } : {}),
+    ...givenMaps(givenLabels, givenFiles),
   };
   const refusedWorkflow =
     written.workflow === undefined ? undefined : cardWorkflowRefusal(`${from}: workflow`, written.workflow, 'Nothing was filed.');

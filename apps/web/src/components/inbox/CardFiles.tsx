@@ -52,10 +52,7 @@ export function CardFiles({
           The card carries no file. Every run started from it is handed the files it carries.
         </p>
       ) : (
-        <ul
-          aria-label="Files of the card"
-          className="divide-y divide-outline-variant rounded-shape-small border border-outline-variant"
-        >
+        <ul aria-label="Files of the card" className="divide-y divide-outline-variant rounded-shape-small border border-outline-variant">
           {files.map((file) => (
             <li
               key={file.name}
@@ -104,12 +101,17 @@ export function CardFiles({
           </FileTrigger>
         </DropZone>
       )}
-      {refused !== null && (
-        <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-body-medium font-medium text-on-failure-container">Not changed. The api refused it:</p>
-          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refused}</p>
-        </div>
-      )}
+      {refused !== null && <NotChanged message={refused} />}
     </section>
+  );
+}
+
+/** The api's refusal of the last change to the card's files, in full. */
+function NotChanged({ message }: { message: string }) {
+  return (
+    <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-body-medium font-medium text-on-failure-container">Not changed. The api refused it:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
+    </div>
   );
 }

@@ -17,6 +17,12 @@ const HEAD_BYTES = 256 * 1024;
 /** A header's format and sides, or what of them did not read. */
 type HeaderRead = { readonly type: PictureType | null; readonly width: number | null; readonly height: number | null };
 
+/** A header read: its format and its sides. */
+const read = (type: HeaderRead['type'], width: number | null, height: number | null) => {
+  const out: HeaderRead = { type, width, height };
+  return out;
+};
+
 /** No format a model takes, and no sides. */
 const NONE: HeaderRead = { type: null, width: null, height: null };
 
@@ -24,47 +30,43 @@ const NONE: HeaderRead = { type: null, width: null, height: null };
 const has = (b: Buffer, sig: readonly number[], at = 0) => b.length >= at + sig.length && sig.every((x, i) => b[at + i] === x);
 
 /** A PNG's sides, off its IHDR, the first chunk. */
-const png = (b: Buffer): HeaderRead =>
+const png = (b: Buffer) =>
   b.length >= 24 && b.toString('latin1', 12, 16) === 'IHDR'
-    ? { type: 'image/png', width: b.readUInt32BE(16), height: b.readUInt32BE(20) }
-    : { type: 'image/png', width: null, height: null };
+    ? read('image/png', b.readUInt32BE(16), b.readUInt32BE(20))
+    : read('image/png', null, null);
 
 /** A GIF's sides, off its logical screen descriptor. */
-const gif = (b: Buffer): HeaderRead =>
-  b.length >= 10
-    ? { type: 'image/gif', width: b.readUInt16LE(6), height: b.readUInt16LE(8) }
-    : { type: 'image/gif', width: null, height: null };
+const gif = (b: Buffer) => (b.length >= 10 ? read('image/gif', b.readUInt16LE(6), b.readUInt16LE(8)) : read('image/gif', null, null));
 
 /** A WebP's sides, off its first chunk: VP8 (lossy), VP8L (lossless) or VP8X (extended). */
-const webp = (b: Buffer): HeaderRead => {
+const webp = (b: Buffer) => {
   const chunk = b.toString('latin1', 12, 16);
-  if (chunk === 'VP8 ' && b.length >= 30)
-    return { type: 'image/webp', width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff };
+  if (chunk === 'VP8 ' && b.length >= 30) return read('image/webp', b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff);
   if (chunk === 'VP8L' && b.length >= 25) {
     const bits = b.readUInt32LE(21);
-    return { type: 'image/webp', width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+    return read('image/webp', (bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1);
   }
-  if (chunk === 'VP8X' && b.length >= 30) return { type: 'image/webp', width: b.readUIntLE(24, 3) + 1, height: b.readUIntLE(27, 3) + 1 };
-  return { type: 'image/webp', width: null, height: null };
+  if (chunk === 'VP8X' && b.length >= 30) return read('image/webp', b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1);
+  return read('image/webp', null, null);
 };
 
 /** The JPEG markers that start a frame and say its sides: SOF0 to SOF15, but DHT (C4), JPG (C8) and DAC (CC). */
 const SOF = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
 
 /** A JPEG's sides, off its first SOFn marker, walking the segments before it. */
-const jpeg = (b: Buffer): HeaderRead => {
+const jpeg = (b: Buffer) => {
   let at = 2;
   while (at + 9 < b.length) {
-    if (b[at] !== 0xff) return { type: 'image/jpeg', width: null, height: null };
+    if (b[at] !== 0xff) return read('image/jpeg', null, null);
     const marker = b[at + 1] ?? 0;
     if (marker === 0xff) {
       at += 1;
       continue;
     }
-    if (SOF.has(marker)) return { type: 'image/jpeg', width: b.readUInt16BE(at + 7), height: b.readUInt16BE(at + 5) };
+    if (SOF.has(marker)) return read('image/jpeg', b.readUInt16BE(at + 7), b.readUInt16BE(at + 5));
     at += 2 + b.readUInt16BE(at + 2);
   }
-  return { type: 'image/jpeg', width: null, height: null };
+  return read('image/jpeg', null, null);
 };
 
 /**

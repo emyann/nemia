@@ -132,7 +132,8 @@ const cardFilesRefusalSpec = spec<
     },
     acceptedOtherwise: {
       description: 'A change to the files of a card no run was started from, with none of those wrongs, is written',
-      condition: ({ input: [given, , started, most, bytes], output }) => started || wrongAsGiven(given, most, bytes) || output === undefined,
+      condition: ({ input: [given, , started, most, bytes], output }) =>
+        started || wrongAsGiven(given, most, bytes) || output === undefined,
     },
   },
   /** Which of several wrongs is said, where files have more than one beside a started card's change, is the code's: each is true. */

@@ -169,11 +169,6 @@ export {
   CARD_STATES,
   Card,
   CardFile,
-  CardFileNamed,
-  CARD_FILE_REF,
-  CardFileRef,
-  CardFileStatus,
-  CardAttach,
   CardLastStart,
   CardList,
   CardSpec,
@@ -184,6 +179,7 @@ export {
   type CardKey,
   type CardState,
 } from './card.ts';
+export { CARD_FILE_REF, CardAttach, CardFileNamed, CardFileRef, CardFileStatus } from './card.ts';
 export {
   Factory,
   FactoryCommands,
@@ -384,16 +380,8 @@ export {
 export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked } from './table.ts';
 export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
 export { Gone, ReadFailed, TooLarge, UnsupportedMediaType } from './api-errors.ts';
-export {
-  CARD_FILES_BYTES_MOST,
-  CARD_FILES_MOST,
-  FILE_ID_PREFIX,
-  FILE_KEPT_FOR,
-  FILE_LIMIT,
-  FileObject,
-  PICTURE_TYPES,
-  type PictureMediaType,
-} from './file.ts';
+export { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, PICTURE_TYPES, type PictureMediaType } from './file.ts';
+export { FILE_ID_PREFIX, FILE_KEPT_FOR, FILE_LIMIT, FileObject } from './file.ts';
 export {
   LifecycleEdge,
   LifecycleGraph,

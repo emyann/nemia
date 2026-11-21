@@ -23,7 +23,15 @@ export const picturesShown: PicturesShownOf = (handed, shows, bounds) => {
   const sidesFit = (p: HandedPicture) => p.width !== null && p.height !== null && p.width <= bounds.side && p.height <= bounds.side;
   const fits = (p: HandedPicture) => shows && p.type !== null && p.bytes <= bounds.bytes && sidesFit(p);
   const reasonOf = (p: HandedPicture) => {
-    const reason: HeldReason = !shows ? 'harness' : p.type === null ? 'format' : p.bytes > bounds.bytes ? 'size' : !sidesFit(p) ? 'sides' : 'count';
+    const reason: HeldReason = !shows
+      ? 'harness'
+      : p.type === null
+        ? 'format'
+        : p.bytes > bounds.bytes
+          ? 'size'
+          : !sidesFit(p)
+            ? 'sides'
+            : 'count';
     return reason;
   };
   const shown = handed

@@ -3,7 +3,8 @@
  * once in `objects` for both of Nemia's seats (`toolWordsOf`: the name, the input, the endpoint's method and path, which keys fill the path
  * and the query, whether it answers a `Table`, the defaults its link sends, what the endpoint and each key say) and described as
  * `toolDescriptionOf` joins them, which Nemia's verbs skill says to her shell seat too. What is the port's own is added here: the hints of
- * its verb's class and its endpoint's method (`toolHints`), and a card's files given inline (`inlineInput`, files.ts). What `toolWordsOf` throws is thrown as the tools are built.
+ * its verb's class and its endpoint's method (`toolHints`), and a card's files given inline (`inlineInput`, files.ts). What `toolWordsOf`
+ * throws is thrown as the tools are built.
  */
 import { type CommandSpec } from 'agent-orchestrator';
 import { type DescribedApi, toolDescriptionOf, toolWordsOf, type ToolWords } from 'objects';

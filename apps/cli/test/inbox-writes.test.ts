@@ -155,7 +155,7 @@ test("under this machine's context: a card filed from a file, queued, taken back
   await lifeOfACard((argv) => store.nemia(argv), store.root, ideaFile('here.md'));
 });
 
-test("a card carries the picture its idea file names beside it and a --file; attach, files, --get and detach", async () => {
+test('a card carries the picture its idea file names beside it and a --file; attach, files, --get and detach', async () => {
   const dir = scratch('nemia-inbox-files-');
   const shot = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
   fs.writeFileSync(path.join(dir, 'shot.png'), shot);
@@ -168,7 +168,10 @@ test("a card carries the picture its idea file names beside it and a --file; att
   const listed = await store.nemia(['inbox', 'files', name]);
   ok(listed, 'inbox files');
   assert.deepEqual(
-    listed.out.trim().split('\n').map((l) => l.split('  ')[1]),
+    listed.out
+      .trim()
+      .split('\n')
+      .map((l) => l.split('  ')[1]),
     ['notes.txt', 'shot.png'],
   );
   assert.match(listed.out, /shot\.png {2}file_[0-9a-f]{32} {2}11 bytes {2}image\/png {2}in its text$/m);
@@ -182,7 +185,10 @@ test("a card carries the picture its idea file names beside it and a --file; att
   const detached = await store.nemia(['inbox', 'detach', name, 'run.log', 'notes.txt']);
   ok(detached, 'inbox detach');
   assert.deepEqual(
-    detached.out.trim().split('\n').map((l) => l.split('  ')[1]),
+    detached.out
+      .trim()
+      .split('\n')
+      .map((l) => l.split('  ')[1]),
     ['shot.png'],
   );
   assert.match(cardOn(store.root, name) ?? '', /\nfiles:\n {2}['"]?shot\.png['"]?: ['"]?file_[0-9a-f]{32}/);

@@ -15,9 +15,6 @@ export const MAX_INLINE_BYTES = 1_048_576;
 /** The reference a key's items take where they name a card's files. */
 const FILE_REF = `#/$defs/${CARD_FILE_REF}`;
 
-/** A JSON Schema, as a tool's input holds it. */
-type Json = Readonly<Record<string, unknown>>;
-
 /** A tool's input, as `objects` reads it off its endpoint. */
 type ToolInput = ToolWords['inputSchema'];
 
@@ -96,6 +93,14 @@ async function uploaded(namespace: string, name: string, data: string, mediaType
   return { refused: `the file ${name} was not uploaded: ${said}` };
 }
 
+/** One item of a key naming a card's files, sent on: as it is, or, given inline, uploaded and named by its File's id; or why not. */
+async function itemSent(namespace: string, item: unknown, via: Uploading) {
+  if (!Predicate.isObject(item) || typeof item.data !== 'string' || typeof item.name !== 'string') return { item };
+  const mediaType = typeof item.mediaType === 'string' && item.mediaType !== '' ? item.mediaType : 'application/octet-stream';
+  const up = await uploaded(namespace, item.name, item.data, mediaType, via);
+  return up.id === undefined ? { refused: up.refused } : { item: { name: item.name, file: up.id } };
+}
+
 /**
  * The arguments of a call with each file given inline uploaded and named by its File's id; an item naming a File by `file` is sent as it
  * is. The words of why not where a file's data is not base64, is past `MAX_INLINE_BYTES`, or its upload is refused.
@@ -111,17 +116,12 @@ export async function inlined(keys: readonly string[], args: Readonly<Record<str
     if (!Array.isArray(given)) continue;
     const items: unknown[] = [];
     for (const item of given) {
-      if (!Predicate.isObject(item) || typeof item.data !== 'string' || typeof item.name !== 'string') {
-        items.push(item);
-        continue;
-      }
-      const mediaType = typeof item.mediaType === 'string' && item.mediaType !== '' ? item.mediaType : 'application/octet-stream';
-      const up = await uploaded(namespace, item.name, item.data, mediaType, via);
-      if (up.id === undefined) {
-        const out: Inlined = { refused: up.refused };
+      const one = await itemSent(namespace, item, via);
+      if (one.refused !== undefined) {
+        const out: Inlined = { refused: one.refused };
         return out;
       }
-      items.push({ name: item.name, file: up.id });
+      items.push(one.item);
     }
     sent[key] = items;
   }

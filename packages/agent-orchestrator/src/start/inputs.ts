@@ -39,6 +39,19 @@ export const inputName = (f: Pick<InputFile, 'resolved' | 'name'>) => f.name ?? 
  */
 const inputSaid = (f: Pick<InputFile, 'given' | 'name'>) => (f.name !== undefined ? f.given : `--input ${f.given}`);
 
+/** Why the one input `f` cannot be read, naming the fix, or null where it is a regular file. */
+const unreadInput = (f: InputFile) => {
+  if (f.name !== undefined && f.kind === 'missing')
+    return `${f.given} is no longer kept: its File was let go of. Attach it to the card again — nemia inbox attach <card> <path> — and start it again.`;
+  if (f.kind === 'missing')
+    return `--input ${f.given}: there is no file at ${f.resolved}. Give the path to a file to hand the run's steps, from where nemia start is typed or absolute.`;
+  if (f.kind === 'directory')
+    return `--input ${f.given}: ${f.resolved} is a directory, and --input copies one file. Give each file its own --input.`;
+  if (f.kind === 'other')
+    return `--input ${f.given}: ${f.resolved} is not a regular file, so there is nothing to copy. Give the path to a file.`;
+  return null;
+};
+
 /**
  * Why `nemia start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything
  * is written: a file that is not there, a directory, anything else that is not a regular file, and two inputs that would take one name in
@@ -47,14 +60,8 @@ const inputSaid = (f: Pick<InputFile, 'given' | 'name'>) => (f.name !== undefine
  */
 export function inputRefusal(inputs: readonly InputFile[]) {
   for (const f of inputs) {
-    if (f.name !== undefined && f.kind === 'missing')
-      return `${f.given} is no longer kept: its File was let go of. Attach it to the card again — nemia inbox attach <card> <path> — and start it again.`;
-    if (f.kind === 'missing')
-      return `--input ${f.given}: there is no file at ${f.resolved}. Give the path to a file to hand the run's steps, from where nemia start is typed or absolute.`;
-    if (f.kind === 'directory')
-      return `--input ${f.given}: ${f.resolved} is a directory, and --input copies one file. Give each file its own --input.`;
-    if (f.kind === 'other')
-      return `--input ${f.given}: ${f.resolved} is not a regular file, so there is nothing to copy. Give the path to a file.`;
+    const unread = unreadInput(f);
+    if (unread !== null) return unread;
   }
   const named = new Map<string, InputFile>();
   for (const f of inputs) {

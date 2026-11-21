@@ -64,6 +64,30 @@ const workflowWriteRefusal = (sent: string | undefined, now: string | undefined)
   sent === undefined || sent === now ? undefined : cardWorkflowRefusal('spec.workflow', sent, 'Nothing was written.');
 
 /**
+ * The card `name` of `namespace`, read for a write, with its file, its text and the runs started from it: refused `Invalid` for a name no
+ * card may have, and `Missing` where no card of that name is in the namespace.
+ * @param name The card's name.
+ * @param namespace Its namespace, its factory or `default`.
+ */
+const cardToWrite = Effect.fn('cardToWrite')(function* (name: string, namespace: string) {
+  const refused = inboxNameRefusal(name);
+  if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
+  const door = yield* CardDoor;
+  const card$ = CardName.read(name);
+  const file = yield* door.cards.where(card$);
+  const text = yield* door.cards.read(card$);
+  const card = text === null ? null : yield* tried(() => parseInboxCard(`${name}.md`, text));
+  if (text === null || card === null || (card.factory ?? DEFAULT_NAMESPACE) !== namespace)
+    return yield* Effect.fail(
+      new Missing({
+        message: `no card ${name} in the namespace ${namespace}: list the cards with nemia get cards, a card's namespace being its factory, default for one that names none; file a new one with nemia inbox add "<idea>"`,
+      }),
+    );
+  const started = (yield* (yield* RunDoor).runs.list()).filter((r) => r.from?.inbox === card.name).map((r) => r.id);
+  return { card, card$, file, started, text };
+});
+
+/**
  * The card `name` of the namespace `namespace` (its factory, `default` for a card that names none) written whole from `write` (the Card's
  * update): its `workflow:`, `gate:`, `model:`, `from:`, `files:` and body as `write.spec` says — a key it leaves out taken off — its labels
  * as `write.metadata.labels` says where it says (`{}` takes them all off; absent keeps them), its `queued:` and `factory:` kept, and an old
@@ -79,21 +103,9 @@ const workflowWriteRefusal = (sent: string | undefined, now: string | undefined)
  * what `parseInboxCard` refuses of the card it would write (`Invalid`): a bad label, say.
  */
 export const replaceCard = Effect.fn('replaceCard')(function* (name: string, namespace: string, write: CardWrite) {
-  const refused = inboxNameRefusal(name);
-  if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
+  const { card, card$, file, started, text } = yield* cardToWrite(name, namespace);
   const door = yield* CardDoor;
   const runDoor = yield* RunDoor;
-  const card$ = CardName.read(name);
-  const file = yield* door.cards.where(card$);
-  const text = yield* door.cards.read(card$);
-  const card = text === null ? null : yield* tried(() => parseInboxCard(`${name}.md`, text));
-  if (text === null || card === null || (card.factory ?? DEFAULT_NAMESPACE) !== namespace)
-    return yield* Effect.fail(
-      new Missing({
-        message: `no card ${name} in the namespace ${namespace}: list the cards with nemia get cards, a card's namespace being its factory, default for one that names none; file a new one with nemia inbox add "<idea>"`,
-      }),
-    );
-  const started = (yield* runDoor.runs.list()).filter((r) => r.from?.inbox === card.name).map((r) => r.id);
   const { spec, metadata } = write;
   const refusal = cardWriteRefusal({
     started: started.length > 0,
@@ -134,29 +146,6 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
 });
 
 /**
- * The card `name` of `namespace`, read for a write of its files: refused `Missing` where no card of that name is in the namespace.
- * @param name The card's name.
- * @param namespace Its namespace, its factory or `default`.
- */
-const cardForFiles = Effect.fn('cardForFiles')(function* (name: string, namespace: string) {
-  const refused = inboxNameRefusal(name);
-  if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
-  const door = yield* CardDoor;
-  const card$ = CardName.read(name);
-  const file = yield* door.cards.where(card$);
-  const text = yield* door.cards.read(card$);
-  const card = text === null ? null : yield* tried(() => parseInboxCard(`${name}.md`, text));
-  if (card === null || (card.factory ?? DEFAULT_NAMESPACE) !== namespace)
-    return yield* Effect.fail(
-      new Missing({
-        message: `no card ${name} in the namespace ${namespace}: list the cards with nemia get cards, a card's namespace being its factory, default for one that names none; file a new one with nemia inbox add "<idea>"`,
-      }),
-    );
-  const started = (yield* (yield* RunDoor).runs.list()).filter((r) => r.from?.inbox === card.name).map((r) => r.id);
-  return { card, card$, file, started };
-});
-
-/**
  * The card `name` of `namespace` with `files` attached beside those it carries, through the Card door: refused as `cardFilesJudged`
  * judges the whole (a started card, `Conflict`; a name given twice or an unkept File, `Invalid`), nothing written then.
  * @param name The card's name.
@@ -164,7 +153,7 @@ const cardForFiles = Effect.fn('cardForFiles')(function* (name: string, namespac
  * @param files The files to attach, each a File's id and the name it takes, the File's own where none is given.
  */
 export const attachToCard = Effect.fn('attachToCard')(function* (name: string, namespace: string, files: readonly CardFileRef[]) {
-  const { card, card$, file, started } = yield* cardForFiles(name, namespace);
+  const { card, card$, file, started } = yield* cardToWrite(name, namespace);
   const held = card.files ?? [];
   const judged = yield* cardFilesJudged(card.name, namespace, [...held, ...files], held, started.length > 0);
   const written = yield* tried(() => cardText(card, { files: judged }));
@@ -181,7 +170,7 @@ export const attachToCard = Effect.fn('attachToCard')(function* (name: string, n
  * @param names The names of the files to take off, as the card carries them.
  */
 export const detachFromCard = Effect.fn('detachFromCard')(function* (name: string, namespace: string, names: readonly string[]) {
-  const { card, card$, file, started } = yield* cardForFiles(name, namespace);
+  const { card, card$, file, started } = yield* cardToWrite(name, namespace);
   const held = card.files ?? [];
   const unknown = names.find((n) => !held.some((f) => f.name === n));
   if (unknown !== undefined)

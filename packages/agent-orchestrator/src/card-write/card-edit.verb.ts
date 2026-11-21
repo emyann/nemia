@@ -50,8 +50,9 @@ const specOf = (read: InboxCard, queued: string | undefined) => {
 /**
  * The card `name` of the namespace `namespace` (its factory, `default` for a card that names none) written from `edit.source`, its file
  * as it is to be: read as the card's own file is read (`parseInboxCard`, which takes a byte order mark and CRLF line ends), its
- * `workflow:`, `gate:`, `model:`, `from:`, `files:` and body written as the text says them — a key it leaves out taken off — and its name, labels,
- * factory and `queued:` kept, a `queued:` left out read as the card's own. Written whole by the Card's whole write (`replaceCard`) at
+ * `workflow:`, `gate:`, `model:`, `from:`, `files:` and body written as the text says them — a key it leaves out taken off — and its name,
+ * labels, factory and `queued:` kept, a `queued:` left out read as the card's own. Written whole by the Card's whole write (`replaceCard`)
+ * at
  * `edit.resourceVersion` where it is sent, and not written at all where the file would read the same.
  *
  * Refused before anything is written, exit 2: a name that is not a card's, no card of that name in the namespace (`Missing`), then what

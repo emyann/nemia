@@ -12,7 +12,7 @@ const WAY_TITLES: Readonly<Record<FactoryWay, string>> = {
 /** Each way's one line, saying what happens next. */
 export const WAY_LINES: Readonly<Record<FactoryWay, string>> = {
   nemia: 'Her chat opens beside this page: tell her what you build, and she makes the factory with you.',
-  template: 'Pick a team built into Nemia, give it a name, and it is made with every setting at its default.',
+  template: 'Pick a team built into Nemia, give it a name and what it asks, and every other setting keeps its default.',
   scratch: 'Give it a name: an empty factory is made, and a short guide says what to put in it.',
 };
 

@@ -1,8 +1,8 @@
 /**
  * What the welcome's template form asks of a template's parameters, off `Template.spec.parameters` as the api serves it: where each is
  * drawn (`parameterFieldOf`) and the `--set` word each field sends (`setWordOf`), both proved by
- * `contracts/template-parameters.contract.ts`; and each of a template's parameters as the form reads it (`parameterReadsOf`). Pure: the
- * drawing is components/welcome/TemplateParameters.tsx.
+ * `contracts/template-parameters.contract.ts`; each of a template's parameters as the form reads it (`parameterReadsOf`), and the words
+ * a form sends (`setsOf`). Pure: the drawing is components/welcome/TemplateParameters.tsx.
  */
 import type { TemplateParameter } from 'objects';
 import type { ParameterFieldOf, ParameterRead, SetWordOf } from '../../contracts/template-parameters.contract.ts';
@@ -54,3 +54,15 @@ export const parameterReadsOf = (parameters: Readonly<Record<string, TemplatePar
  * @param read The parameter as the form reads it.
  */
 export const startWordOf = (read: ParameterRead) => read.defaultWord ?? (read.type === 'boolean' ? 'false' : '');
+
+/**
+ * The `--set` words a form sends, in the order the template declares its parameters: the word `setWordOf` gives each declared
+ * parameter's field, a field not given taken at its start; a key no parameter declares never sends one.
+ * @param reads The template's parameters as the form reads them.
+ * @param given Each field's value as text, by the parameter's name.
+ */
+export const setsOf = (reads: readonly ParameterRead[], given: Readonly<Record<string, string>>) =>
+  reads.flatMap((read) => {
+    const word = setWordOf(read, given[read.name] ?? startWordOf(read));
+    return word === null ? [] : [word];
+  });

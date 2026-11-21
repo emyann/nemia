@@ -8,6 +8,8 @@ import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardFileRef, type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import { cardFilesJudged } from '../inbox/inbox.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { fileAt } from '../start/files.store.ts';
 import type { CardWriteRefusal } from '../../contracts/card-write.contract.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -62,6 +64,21 @@ const refusalOf = (refusal: CardWriteRefusal, card: InboxCard, file: string, sta
  */
 const workflowWriteRefusal = (sent: string | undefined, now: string | undefined) =>
   sent === undefined || sent === now ? undefined : cardWorkflowRefusal('spec.workflow', sent, 'Nothing was written.');
+
+/**
+ * The files `refs` names, each with the name it takes — the one given, else its File's own — and the size of the File its id names in
+ * `namespace`'s files, null where none is kept there: what `cardFilesJudged` judges. A program given no store's root (`StoreRoot`) finds
+ * no File kept.
+ * @param namespace The card's namespace, its factory or `default`, whose Files the ids name.
+ * @param refs The files, each a File's id and the name it takes where one is given.
+ */
+export const filesKept = Effect.fn('filesKept')(function* (namespace: string, refs: readonly CardFileRef[]) {
+  const root = yield* Effect.serviceOption(StoreRoot);
+  return refs.map((ref) => {
+    const at = root._tag === 'Some' ? fileAt(root.value, namespace, ref.file) : undefined;
+    return { name: ref.name ?? at?.file.name ?? ref.file, file: ref.file, size: at?.file.size ?? null };
+  });
+});
 
 /**
  * The card `name` of `namespace`, read for a write, with its file, its text and the runs started from it: refused `Invalid` for a name no
@@ -123,7 +140,7 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
   const ids = new Set(yield* runDoor.runs.ids());
   const refusedRuns = contextRefusal(spec.from ?? [], [], (id) => ids.has(id), undefined, 'spec.from');
   if (refusedRuns) return yield* Effect.fail(refusedRuns);
-  const files = yield* cardFilesJudged(card.name, namespace, spec.files ?? [], card.files ?? [], started.length > 0);
+  const files = yield* cardFilesJudged(card.name, yield* filesKept(namespace, spec.files ?? []), card.files ?? [], started.length > 0);
   const labels = metadata.labels ?? card.labels ?? {};
   const written = yield* tried(() =>
     cardText(
@@ -155,7 +172,7 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
 export const attachToCard = Effect.fn('attachToCard')(function* (name: string, namespace: string, files: readonly CardFileRef[]) {
   const { card, card$, file, started } = yield* cardToWrite(name, namespace);
   const held = card.files ?? [];
-  const judged = yield* cardFilesJudged(card.name, namespace, [...held, ...files], held, started.length > 0);
+  const judged = yield* cardFilesJudged(card.name, yield* filesKept(namespace, [...held, ...files]), held, started.length > 0);
   const written = yield* tried(() => cardText(card, { files: judged }));
   yield* (yield* CardDoor).cards.rewrite(card$, written);
   const out: CardReplaced = { card: parseInboxCard(`${name}.md`, written), file, written: true };
@@ -180,7 +197,7 @@ export const detachFromCard = Effect.fn('detachFromCard')(function* (name: strin
       }),
     );
   const left = held.filter((f) => !names.includes(f.name));
-  const judged = yield* cardFilesJudged(card.name, namespace, left, held, started.length > 0);
+  const judged = yield* cardFilesJudged(card.name, yield* filesKept(namespace, left), held, started.length > 0);
   const written = yield* tried(() => cardText(card, { files: judged }));
   yield* (yield* CardDoor).cards.rewrite(card$, written);
   const out: CardReplaced = { card: parseInboxCard(`${name}.md`, written), file, written: true };

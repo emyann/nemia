@@ -2,7 +2,7 @@
  * Run-core's model: a run, its steps, their tries and rounds, and its landing, as Schemas at the context's door (decisions Q3–Q6).
  * A declaration in S1: no read path decodes through it yet; the Run door (S2) will.
  */
-import type { HeldReason } from '../../contracts/pictures-shown.contract.ts';
+import type { HeldReason } from '../filed/pictures/pictures.ts';
 import { Schema } from 'effect';
 import { Actor } from 'objects';
 import { foreignId, brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';

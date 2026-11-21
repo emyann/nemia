@@ -15,6 +15,7 @@ import {
   INBOX_QUEUE_WORDS,
   INBOX_RM_WORDS,
   CardFileRef,
+  DEFAULT_NAMESPACE,
   runsNamed,
 } from 'objects';
 import { Effect, Schema } from 'effect';
@@ -30,7 +31,9 @@ import { EngineService } from '../runtime-client.ts';
 import { howOf } from '../summary/how.verb.ts';
 import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 import { editCard } from '../card-write/card-edit.verb.ts';
-import type { CardReplaced } from '../card-write/card-write.verb.ts';
+import { type CardReplaced, filesKept } from '../card-write/card-write.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { filesPruned } from '../start/files.store.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string) => {
@@ -90,7 +93,10 @@ export const INBOX_ADD: Served<{ card: InboxCard; file: string; labelsLeftOut?: 
   ...INBOX_ADD_WORDS,
   input: InboxAddInput,
   handler: ({ idea, label, files, ...keys }) =>
-    Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])], ...(files !== undefined ? { files } : {}) })),
+    Effect.gen(function* () {
+      const kept = files === undefined ? undefined : yield* filesKept(keys.factory ?? DEFAULT_NAMESPACE, files);
+      return yield* addToInbox({ text: idea, ...keys, labels: [...(label ?? [])], ...(kept !== undefined ? { files: kept } : {}) });
+    }),
 };
 
 /** What `nemia inbox queue` did, and the card as it now reads. */
@@ -181,7 +187,10 @@ export type InboxRmInput = typeof InboxRmInput.Type;
 export const INBOX_RM: Served<InboxDropped, InboxRmInput> = {
   ...INBOX_RM_WORDS,
   input: InboxRmInput,
-  handler: ({ name }) => dropFromInbox(name),
+  handler: ({ name }) =>
+    dropFromInbox(name).pipe(
+      Effect.tap((dropped) => (dropped.removed ? Effect.map(StoreRoot, (home) => filesPruned(home, Date.now())) : Effect.void)),
+    ),
 };
 
 /** `nemia inbox`'s entries, in the order `nemia`'s help lists them. */

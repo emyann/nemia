@@ -2,10 +2,10 @@
  * Which of the pictures handed to a run its first step is shown in its session's first message, and why each other is held back
  * (`picturesShown`), pure, proved by `contracts/pictures-shown.contract.ts`; and the bounds a picture is shown within (`PICTURE_BOUNDS`).
  */
-import type { HandedPicture, HeldReason, PictureBounds, PicturesShownOf } from '../../../contracts/pictures-shown.contract.ts';
+import type { HandedPicture, HeldReason, PictureBounds, PictureHeld, PicturesShownOf } from '../../../contracts/pictures-shown.contract.ts';
 
 /**
- * The bounds a first message shows pictures within, under what the model takes in one request (platform.claude.com, Vision, *Request
+ * The bounds a first message shows pictures within, under what the model takes in one request (its API's Vision page, *Request
  * limits*): 20 pictures, the stricter count past which every picture of a request is held to smaller sides; 5 MiB a picture, raw bytes,
  * whose base64 stays under the API's 10 MB a picture; 8000 pixels a side, the API's largest.
  */
@@ -41,3 +41,5 @@ export const picturesShown: PicturesShownOf = (handed, shows, bounds) => {
   const held = handed.filter((p) => !shown.includes(p.name)).map((p) => ({ name: p.name, reason: reasonOf(p) }));
   return { shown, held };
 };
+
+export type { HeldReason, PictureHeld };

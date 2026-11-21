@@ -3,8 +3,8 @@
  * `CARD_FILE_REF` in its `$defs`) takes, besides `{ name?, file }` naming a File uploaded first, `{ name, data, mediaType? }`, the file's
  * bytes in base64 — of `MAX_INLINE_BYTES` at most — which the port uploads to the call's namespace (`POST
  * /api/namespaces/<namespace>/files`, through the app's own fetch, with the caller's `Authorization`) and sends on by the id it is
- * answered. The SDK this port is served by has no result that asks a client to upload a file and call again (MCP's files extension's
- * `upload_required`), so inline bytes are a host's one way to hand a file through the port; a larger file is uploaded over HTTP first.
+ * answered. The SDK this port is served by has no result that asks a client to upload a file and call again, as MCP's files extension
+ * has, so inline bytes are a host's one way to hand a file through the port; a larger file is uploaded over HTTP first.
  */
 import { Predicate } from 'effect';
 import { CARD_FILE_REF, type ToolWords } from 'objects';

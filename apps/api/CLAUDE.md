@@ -69,7 +69,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   and 2025-11-25), a fresh `portServer` per request: a call reads the caller's Request off `ctx.http.req`, and its tool list carries
   `PORT_LIST_TTL_MS` on 2026-07-28. It calls the `Api`'s own endpoints through the app's `fetch`
   with the caller's `Authorization`, so every middleware, refusal and memo applies as to any client (a call logs two request lines). A
-  tool is a link of the command table (`served` on the entry, `toolsOf`), never added here; a non-GET call always sends a JSON body, which
+  tool is a link of the command table (`served` on the entry, `toolsOf`), never added here, its words and input read once in `objects`
+  for both of Nemia's seats (`toolWordsOf`, `toolDescriptionOf`), the hints alone the port's; a non-GET call always sends a JSON body, which
   the write guard asks for. An answer fits what a host reads (`src/mcp/bound.ts`): a link's `query` gives the defaults a call is sent
   with, a list is asked a page of `PORT_PAGE`, a `Table` endpoint is asked for its Table and answered as its lines (`objects`'
   `tableLines`), and no answer passes `ANSWER_BOUND` (`answerFit`), a page past it asked again shorter and any other refused, never
@@ -82,7 +83,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   and closed with its streams when the api refuses it. A read answers the view's newest `PORT_PAGE` events within `ANSWER_BOUND`, and
   an empty page at the feed's end for a URI no listen holds. A test waits for `liveViews()` to fall with `until`.
   It says what Nemia is on `initialize` and `server/discover`, and which tools come first, for a host that defers its tools (`PORT_INSTRUCTIONS`,
-  `src/mcp/instructions.ts`), every tool it names one the port lists. Every store, marked exposed (`WF_EXPOSED=1`) or not, loopback
+  `src/mcp/instructions.ts`, each paragraph's port form of `objects`' `GUIDANCE`), every tool it names one the port lists. Every store, marked exposed (`WF_EXPOSED=1`) or not, loopback
   included, refuses a request with no token on every route of the api (`/api`, `/openapi`) but its three open routes (a pairing asked
   or claimed, a first-visit link claimed, each by method and path); `/mcp` takes a standing token, the person's or an agent's, never a
   session's; a page of the board needs none (`needOf`, `src/caller/caller.ts`).

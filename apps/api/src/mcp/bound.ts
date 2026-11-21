@@ -2,19 +2,18 @@
  * What an answer of the MCP port may be for a host to read it (`answerFit`, proved by `contracts/answer-fit.contract.ts`): the bound on
  * an answer's characters (`ANSWER_BOUND`), the text and any `structuredContent`'s JSON counted together, under the 50,000 characters
  * past which a host saves a tool's result to a file in place of reading it; the page a list is asked for where its call gives none
- * (`PORT_PAGE`); and what the port says of an answer past the bound that no smaller page can bring under it (`pastTheBound`), which
+ * (`PORT_PAGE`, `objects`', whose tools' words say it); and what the port says of an answer past the bound that no smaller page can bring under it (`pastTheBound`), which
  * names the narrowings the read takes (`narrowingOf`, its keys in `objects`' `READS`), never a cut answer. Pure.
  */
 import type { AnswerFitOf } from '../../contracts/answer-fit.contract.ts';
 
 export type { AnswerFit } from '../../contracts/answer-fit.contract.ts';
 export { PAGE_MOST } from './page.ts';
+export { PORT_PAGE } from 'objects';
 
 /** The most characters an answer of the port holds: under the 50,000 past which a host saves a result to a file, with margin. */
 export const ANSWER_BOUND = 40_000;
 
-/** The page a list tool asks for where its call gives no `limit`. */
-export const PORT_PAGE = 20;
 
 /**
  * What the port does with an answer of `size` characters against `bound`, asked as a page of `limit` (null where it is no page): answer

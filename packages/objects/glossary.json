@@ -7,6 +7,16 @@
   ],
   "terms": [
     {
+      "term": "Tool words",
+      "meaning": "what a tool of the MCP port says, read once off the command table's links and the `Api` for both of Nemia's seats: its name, input, method and path, whether it answers a `Table`, the defaults its link sends, its endpoint's description and each key's (`toolWordsOf`); the port describes each tool by them (`toolDescriptionOf`) and Nemia's verbs skill says them to her shell seat (`packages/objects/src/tool-words.ts`).",
+      "type": "ToolWords"
+    },
+    {
+      "term": "Guidance",
+      "meaning": "what Nemia tells a session of itself, a paragraph at a time, each with its port form, which the MCP port answers on `initialize` (`portInstructions`), and its shell form, which Nemia's verbs skill opens with, null where the paragraph is the port's seat's alone (`GUIDANCE`, `packages/objects/src/guidance.ts`).",
+      "type": "Guidance"
+    },
+    {
       "term": "MCP server type",
       "meaning": "the transport an MCP server of a factory's `.mcp.json` declares, as a harness loads one (`stdio`, `http`, `sse`), or `unknown` for any other word, the word as written quoted in the server's not-asked sentence; a server with a command and no type is `stdio` (`CapabilityServer`, `packages/objects/src/capabilities.ts`).",
       "type": "CapabilityServer"

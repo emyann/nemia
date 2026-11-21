@@ -38,9 +38,16 @@ export type Text = string | { path: string } | ParamRef;
 
 /**
  * A value the person gives when the template is applied: its type, what it is for, the value taken when they give none, and, for a
- * boolean, the host whose clones set it true when it is a factory's first writable volume (`whenOrigin`, `originParams`).
+ * boolean, the host whose clones set it true when it is a factory's first writable volume (`whenOrigin`, `originParams`), and whether
+ * the template asks it of a person applying it (`ask`), never with `whenOrigin`.
  */
-export type Parameter = { type: TemplateParameterType; description: string; default?: string | number | boolean; whenOrigin?: string };
+export type Parameter = {
+  type: TemplateParameterType;
+  description: string;
+  default?: string | number | boolean;
+  whenOrigin?: string;
+  ask?: boolean;
+};
 
 /**
  * What a harness's block fences: the word of its fence key, and the tool lists of a harness that takes them, a `{ path }` in one naming
@@ -400,7 +407,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
       parameters: {
         fields: {},
         rest: {
-          fields: { type: 'string', description: 'string', default: 'any', whenOrigin: 'string' },
+          fields: { type: 'string', description: 'string', default: 'any', whenOrigin: 'string', ask: 'boolean' },
           required: ['type', 'description'],
         },
       },

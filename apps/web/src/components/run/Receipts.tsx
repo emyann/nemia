@@ -9,7 +9,7 @@ import { waitedMs } from '@/lib/factory';
 import type { RunDetail } from '@/lib/runView';
 import { ENDED } from '@/lib/words';
 import { bytesWord } from './Artifacts';
-import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, when } from '../step/Facts';
+import { Checks as TryChecks, code, Facts, pathRow, Read, readRows, specRows, spentRows, when } from '../step/Facts';
 import { Fold } from '../step/part/Fold';
 import { Timeline } from './Timeline';
 import { StartedFrom } from './TryTag';
@@ -45,7 +45,7 @@ function Checks({ run }: { run: RunDetail }) {
   if (!checked.length) return <Nothing>No step of it has a check.</Nothing>;
   return checked.map((s) => (
     <OfStep key={s.name} name={s.name} mark="check">
-      {s.check && <Check check={s.check} read={currentTry(run, s.name, s.tries)} />}
+      {s.check && <TryChecks check={s.check} checks={s.checks} read={currentTry(run, s.name, s.tries)} />}
     </OfStep>
   ));
 }

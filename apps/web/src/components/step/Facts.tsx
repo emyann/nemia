@@ -410,12 +410,22 @@ const REBUILT_TITLE =
  * each stream: its output first, where a test runner says what failed, then its stderr. Where the check was filed and `read` names its
  * try, a fold that reads all it printed (`CheckOutput`).
  */
-export function Check({ check: { command, refused, taskId }, read }: { check: Frozen<StepCheck>; read: CheckRead | null }) {
+export function Check({
+  check: { name, command, refused, taskId, verdict },
+  read,
+  named = false,
+}: {
+  check: Frozen<StepCheck>;
+  read: CheckRead | null;
+  named?: boolean;
+}) {
+  const title = named ? `Check ${name}` : 'Check';
   return (
-    <section aria-label="Check" className="space-y-2">
-      <h3 className="text-label-medium text-muted-foreground">Check</h3>
+    <section aria-label={title} className="space-y-2">
+      <h3 className="text-label-medium text-muted-foreground">{title}</h3>
       <Facts
         rows={[
+          ...(named ? [['result', verdict?.result ?? 'not filed'] as [string, ReactNode]] : []),
           ['command', code(command)],
           ...(refused
             ? [
@@ -439,6 +449,23 @@ export function Check({ check: { command, refused, taskId }, read }: { check: Fr
       )}
     </section>
   );
+}
+
+/**
+ * A try's checks: the one it is judged by (`check`), as `Check` draws it, or for a step with several, each under its name with its result,
+ * and a fold that reads all it printed by its name.
+ */
+export function Checks({
+  check,
+  checks,
+  read,
+}: {
+  check: Frozen<StepCheck>;
+  checks: readonly Frozen<StepCheck>[] | undefined;
+  read: CheckRead | null;
+}) {
+  if (!checks || checks.length < 2) return <Check check={check} read={read} />;
+  return checks.map((c) => <Check key={c.name} check={c} read={read && { ...read, check: c.name }} named />);
 }
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */

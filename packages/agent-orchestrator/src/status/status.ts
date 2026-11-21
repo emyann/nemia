@@ -574,6 +574,10 @@ export function triedFrom(
  * from (a step signed off blocked, once its session has settled; a check that refused, and not one that did not finish, whose way on is the
  * check again), or a round its loop asks for (`roundWanted`). A looping step that asked for a round is held by any step of its loop over
  * budget, itself included: the round would file each of them again.
+ *
+ * The four statuses a try is taken from with no check read — `denied`, `stopped`, `failed` and `unsigned`, each of `TRIED_FROM` and none
+ * `blocked` nor `failed (check)` — are answered first, as the lines below would answer them, so a status that reads no check never walks
+ * the several-checks verdict (`checkRefused`): what the contract `standing` proves of them costs what it costs with one check.
  */
 function held(
   step: StepSpec,
@@ -589,6 +593,7 @@ function held(
   const record = run.steps[step.name];
   const taskId = record?.taskId;
   if (!taskId) return false;
+  if (own === 'denied' || own === 'stopped' || own === 'failed' || own === 'unsigned') return Boolean(overBudget(step, run, spendOf));
   if (own === 'failed (check)' && !(record.check && checkRefused(record.check, phaseOf, verdictOf(step.name)))) return false;
   if (TRIED_FROM.has(own)) return (own !== 'blocked' || SETTLED.has(phaseOf(taskId))) && Boolean(overBudget(step, run, spendOf));
   if (!satisfiesAfter(own)) return false;

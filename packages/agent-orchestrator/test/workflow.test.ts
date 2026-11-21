@@ -223,7 +223,6 @@ describe('REFUSED: a command node or a named check the run could not file as wri
       'land:',
     ],
   ];
-  /** A workflow of `files` beside the tests' team's agents and skills, so an `agent:` it names is one the load finds. */
   const inTeam = (files: Record<string, string>) => {
     const dir = path.join(teamCopy(), 'rows');
     fs.mkdirSync(dir);

@@ -22,6 +22,7 @@ import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, StepRecord } from '../src/run.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import { scratch } from 'test-kit/scratch';
+import { teamCopy } from './team.ts';
 import { staged, story } from './story.ts';
 import { decidedOn } from './screens.ts';
 import { askedQuestions, closeoutRefusals, questionLines } from '../src/question/index.ts';
@@ -1058,6 +1059,40 @@ describe("`nemia retry --recheck --check <name>` runs that refused check alone, 
     assert.deepEqual([tasks.a, tasks.b], [checkTask('a'), checkTask('b', '-try2')]);
     assert.equal(b.tasks.has(checkTask('b', '-try2')), true);
     assert.equal(b.tasks.has(checkTask('a', '-try2')), false);
+  });
+});
+
+describe('a command node takes `retries:`, a failure policy by exit code and `gate:` as a step does', () => {
+  const nodeRun = async (lines: string[]) => {
+    const dir = path.join(teamCopy(), 'notes');
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nagent: implementer\n---\nimplement it\n');
+    const front = ['after: implement', 'place: git', 'agent: implementer', 'run: node notes.ts', ...lines].join('\n');
+    fs.writeFileSync(path.join(dir, 'file-notes.md'), `---\n${front}\n---\n`);
+    const run = await startedRun(dir);
+    await tick(run.id);
+    ended(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
+    await tick(run.id);
+    return run;
+  };
+  const POLICY = 'checkFailurePolicy: { rules: [ { action: FailStep, onExitCodes: { operator: In, values: [1] } } ] }';
+
+  test('with `retries: 1`, an exit 1 is tried again by the run, fresh', async () => {
+    const run = await nodeRun(['retries: 1']);
+    ended(`${run.id}-file-notes`, 'failed', { exitCode: 1 });
+    assert.deepEqual((await tick(run.id)).tried, ['file-notes']);
+  });
+
+  test("with a policy that names exit 1 a person's, the same exit is tried by nobody but a person", async () => {
+    const run = await nodeRun(['retries: 1', POLICY]);
+    ended(`${run.id}-file-notes`, 'failed', { exitCode: 1 });
+    assert.deepEqual((await tick(run.id)).tried, []);
+    assert.equal(stage.board().tasks.has(`${run.id}-file-notes-try2`), false);
+  });
+
+  test('with `gate: true`, the node is held once its parent signed off, and nothing of it is filed', async () => {
+    const run = await nodeRun(['gate: true']);
+    assert.equal(stage.board().tasks.has(`${run.id}-file-notes`), false);
   });
 });
 

@@ -255,25 +255,9 @@ export { GUIDANCE, type Guidance, portInstructions, shellGuidance } from './guid
 export { headline } from './headline.ts';
 export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut, uploadBoundMs } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
-export {
-  TRIGGER_ORIGINS,
-  TRIGGER_QUOTAS,
-  TRIGGER_TARGET_KINDS,
-  TRIGGER_WHEN_KINDS,
-  Trigger,
-  TriggerAtTime,
-  TriggerClash,
-  TriggerList,
-  TriggerOnCards,
-  TriggerSpec,
-  TriggerStatus,
-  TriggerTarget,
-  TriggerWrite,
-  type TriggerOrigin,
-  type TriggerQuota,
-  type TriggerTargetKind,
-  type TriggerWhenKind,
-} from './trigger.ts';
+export { TRIGGER_ORIGINS, TRIGGER_QUOTAS, TRIGGER_TARGET_KINDS, TRIGGER_WHEN_KINDS, Trigger, TriggerAtTime } from './trigger.ts';
+export { TriggerClash, TriggerList, TriggerOnCards, TriggerSpec, TriggerStatus, TriggerTarget, TriggerWrite } from './trigger.ts';
+export type { TriggerOrigin, TriggerQuota, TriggerTargetKind, TriggerWhenKind } from './trigger.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { LibraryAdd, LibraryAddList, LibraryAddSpec, LibraryAddStatus } from './library.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus, VolumeSwitchesWrite } from './volume.ts';

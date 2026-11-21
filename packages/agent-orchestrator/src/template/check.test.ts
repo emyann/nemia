@@ -310,7 +310,11 @@ describe('the check of a template folder: the whole folder passes, and each rule
       refusalsOf((d) => (d['nemia.yaml'].spec.triggers = { door: { selector, target: { kind, name } } }));
     const at = ['spec', 'triggers', 'door'];
     assert.deepEqual(trigger('ready', 'dev'), []);
-    assert.deepEqual(trigger('${{ parameters.check }}', 'dev'), [], 'a selector a parameter writes is read rendered, an empty one no trigger');
+    assert.deepEqual(
+      trigger('${{ parameters.check }}', 'dev'),
+      [],
+      'a selector a parameter writes is read rendered, an empty one no trigger',
+    );
     assertRefused(trigger('ready', 'nope'), 'nemia.yaml', at, 'no workflow of workflows/');
     assertRefused(trigger('ready', 'dev', 'Job'), 'nemia.yaml', at, 'targets a Workflow');
     assertRefused(trigger('a in (b', 'dev'), 'nemia.yaml', at, 'selector');

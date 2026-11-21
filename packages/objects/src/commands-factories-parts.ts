@@ -1,8 +1,8 @@
 /**
- * The words of a factory's parts in its namespace, each its own object of the `Api`: an agent hired into a step and fired from it
- * (`nemia factory hire|fire`, the Hire), a workflow's runs scheduled and taken back (`nemia factory schedule|unschedule`, the Schedule), a card trigger set and taken back
- * (`nemia factory trigger|untrigger`, the Trigger),
- * and its MCP servers listed, recorded and taken off (`nemia factory servers`, `server add|rm`, the McpServer). Pure.
+ * The words of a factory's parts in its namespace, each its own object of the `Api`: an agent hired into a step and fired from it (`nemia
+ * factory hire|fire`, the Hire), a workflow's runs scheduled and taken back (`nemia factory schedule|unschedule`, the Schedule), a card
+ * trigger set and taken back (`nemia factory trigger|untrigger`, the Trigger), and its MCP servers listed, recorded and taken off (`nemia
+ * factory servers`, `server add|rm`, the McpServer). Pure.
  */
 import { type Args, type CommandWords, type Flag, type Spec } from './command.ts';
 import { leftOut } from './commands-flags.ts';

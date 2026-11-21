@@ -12,7 +12,19 @@ const CLASH = { factory: 'mill', card: 'both-ways', by: ['bugs', 'ready'] };
 
 /** A pass over `fold` handed `clashes`: the lines it owes, folded in as the feed would read them back. */
 const pass = (fold: FeedFold, clashes: FeedClashes | undefined) => {
-  const lines: FeedLine[] = feedChanges(fold, new Map(), AT, new Set(), undefined, undefined, undefined, undefined, undefined, undefined, clashes);
+  const lines: FeedLine[] = feedChanges(
+    fold,
+    new Map(),
+    AT,
+    new Set(),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    clashes,
+  );
   foldFeed(fold, lines);
   return lines;
 };

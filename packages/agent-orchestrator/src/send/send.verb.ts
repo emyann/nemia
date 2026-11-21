@@ -149,6 +149,38 @@ const storedLabels = Effect.fnUntraced(function* (run: Run) {
   return (stored._tag === 'Success' ? stored.success?.labels : undefined) ?? run.labels ?? {};
 });
 
+/** What a pass notes of the card `card` the node `node` filed. */
+const filedNote = (node: StepSpec, card: string) =>
+  node.card === 'backlog'
+    ? `${node.name}: filed the card ${card} back to the inbox, unqueued.`
+    : `${node.name}: filed the card ${card}, queued for ${node.workflow ?? ''}.`;
+
+/**
+ * The text of the card the node `node` of `run` files now (`sentCardText`): titled by its condition's producer, why it was filed by the
+ * route its condition answered and the producer's reason, the run's labels as the store holds them, and the run's own card where the node
+ * files it given or back to the backlog.
+ */
+const nodeCardText = Effect.fnUntraced(function* (
+  door: CardDoorShape,
+  run: Run,
+  reads: SendReads,
+  node: StepSpec,
+  wordOf: ReturnType<typeof wordReader>,
+  now: string,
+) {
+  const condition = conditionOf(node, reads.steps);
+  const answer = condition ? answeredRoute(condition, run, reads.signedOff, wordOf, reads.steps) : undefined;
+  const producer = condition ? reads.signedOff(routeProducer(condition)) : undefined;
+  const labels = yield* storedLabels(run);
+  const given = node.card === 'given' || node.card === 'backlog' ? yield* givenCard(door, run) : undefined;
+  const why = {
+    condition: condition?.name ?? '',
+    route: answer?.kind === 'route' ? answer.route : undefined,
+    reason: producer?.summary,
+  };
+  return sentCardText(run, node, why, now, sentCardTitle(run, producer), labels, given);
+});
+
 /**
  * File the card of each workflow node in `send`, exclusively, titled by its condition's producer (`sentCardTitle`) and labelled by the
  * run's labels as the store holds them now, whichever way the pass read the run (those it read where the store answers none), and write
@@ -167,20 +199,9 @@ export const sendCards = Effect.fn('sendCards')(function* (f: { run: Run; reads:
       `the workflow node ${name}`,
     );
     if ((node.workflow === undefined && node.card !== 'backlog') || run.steps[name]?.sent) continue;
-    const condition = conditionOf(node, reads.steps);
-    const answer = condition ? answeredRoute(condition, run, reads.signedOff, wordOf, reads.steps) : undefined;
     const card = sentCardName(run.id, name);
     const now = new Date().toISOString();
-    const producer = condition ? reads.signedOff(routeProducer(condition)) : undefined;
-    const title = sentCardTitle(run, producer);
-    const labels = yield* storedLabels(run);
-    const given = node.card === 'given' || node.card === 'backlog' ? yield* givenCard(door, run) : undefined;
-    const why = {
-      condition: condition?.name ?? '',
-      route: answer?.kind === 'route' ? answer.route : undefined,
-      reason: producer?.summary,
-    };
-    const text = sentCardText(run, node, why, now, title, labels, given);
+    const text = yield* nodeCardText(door, run, reads, node, wordOf, now);
     const filed = yield* Effect.result(door.cards.add(CardName.read(card), text));
     if (filed._tag === 'Failure' && filed.failure._tag !== 'Conflict') {
       f.notes.push(`${name}: its card ${card} could not be filed — ${filed.failure.message}. The next pass files it again.`);
@@ -188,11 +209,7 @@ export const sendCards = Effect.fn('sendCards')(function* (f: { run: Run; reads:
     }
     const at = filed._tag === 'Failure' ? ((yield* door.cards.filedAt(CardName.read(card))) ?? now) : now;
     run.steps[name] = { ...(run.steps[name] ?? { taskId: null }), sent: { card, at } };
-    f.notes.push(
-      node.card === 'backlog'
-        ? `${name}: filed the card ${card} back to the inbox, unqueued.`
-        : `${name}: filed the card ${card}, queued for ${node.workflow ?? ''}.`,
-    );
+    f.notes.push(filedNote(node, card));
     sent.push(name);
   }
   return sent;

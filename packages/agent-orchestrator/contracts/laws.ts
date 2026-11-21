@@ -54,7 +54,10 @@ export const triggerHeld = (factory: Pick<Factory, 'triggers'>, name: string) =>
 export const targets = (factory: Pick<Factory, 'triggers'>, workflow: string) =>
   factory.triggers !== undefined && Object.values(factory.triggers).some((t) => t.target.name === workflow);
 
-/** The name a change of a workflow or a trigger carries: the trigger's for a trigger or an untrigger, else the workflow's; a hire's step. */
+/**
+ * The name a change of a workflow or a trigger carries: the trigger's for a trigger or an untrigger, else the workflow's; a hire's
+ * step.
+ */
 export const changeNamed = (change: WiringChange) =>
   change.verb === 'hire' || change.verb === 'fire'
     ? change.step

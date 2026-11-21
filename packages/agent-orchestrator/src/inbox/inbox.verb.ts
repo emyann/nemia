@@ -377,6 +377,17 @@ const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon
   fromDaemon && (card.factory !== null || defaultStarts) ? { on } : {};
 
 /**
+ * What a card a trigger queued starts with: the trigger's target where the card names no workflow, and the first trigger that queued it,
+ * which its run records; nothing for a card queued by hand.
+ */
+const triggeredStart = (card: Pick<InboxListing, 'workflow' | 'queued'>) => {
+  const by = card.queued?.by?.[0];
+  if (by === undefined) return {};
+  const target = card.workflow === null ? card.queued?.workflow : undefined;
+  return { trigger: by, ...(target === undefined ? {} : { workflow: target }) };
+};
+
+/**
  * Each card of a factory that the card triggers of its factory would send to two workflows, as the inbox lists it now (`clash`): its
  * factory, its name and the triggers that clash — what the feed says a clash begun and ended by.
  */
@@ -417,11 +428,7 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   if (!next) return undefined;
   const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
   const where = daemonsRepo(next, on, fromDaemon, yield* setting('defaultFactoryStarts'));
-  const by = next.queued?.by?.[0];
-  const onTarget = by !== undefined && next.workflow === null && next.queued?.workflow ? { workflow: next.queued.workflow } : {};
-  const tried = yield* Effect.exit(
-    startFromInbox({ name: next.name, callerRepo: repo, ...onTarget, ...(by === undefined ? {} : { trigger: by }) }),
-  );
+  const tried = yield* Effect.exit(startFromInbox({ name: next.name, callerRepo: repo, ...triggeredStart(next) }));
   if (Exit.isSuccess(tried)) {
     const started = tried.value;
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};

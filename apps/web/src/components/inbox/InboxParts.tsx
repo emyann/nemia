@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf } from '../../lib/api/workflows.ts';
 import { type CardState, type InboxEntry } from '../../lib/api/inbox.ts';
-import { hasPage, queueable, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../../lib/inbox';
+import { clashWords, hasPage, queueable, queuedWord, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../../lib/inbox';
 import { instantWords } from '../../lib/instant';
 import { container } from '../../lib/meaning';
 import { CARD_WORDS } from '../../lib/words';
@@ -206,5 +206,34 @@ export function Refused({ refusal }: { refusal: CardRefusal }) {
       <p className="text-body-medium font-medium text-on-failure-container">{NOT_DONE[refusal.action]}. The api refused it:</p>
       <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</p>
     </div>
+  );
+}
+
+/**
+ * A card's place in the queue — its word, by whom where triggers queue it, and since when — and, on a card two triggers of its factory
+ * would send to two workflows, the clash and what to change.
+ */
+export function CardQueue({ entry }: { entry: InboxEntry }) {
+  return (
+    <>
+      {entry.queued && (
+        <p className="flex flex-wrap items-baseline gap-x-2 text-body-small text-muted-foreground">
+          <span
+            data-queued={entry.queued.place ?? ''}
+            className="rounded-full border border-outline-variant bg-surface-container-highest px-2 py-0.5 font-medium text-on-surface-variant"
+          >
+            {queuedWord(entry.queued)}
+          </span>
+          <span>
+            since <Instant data-queued-at at={entry.queued.at} about="When it was queued, which orders the queue" />
+          </span>
+        </p>
+      )}
+      {entry.clash && (
+        <p data-card-clash={entry.clash.join(' ')} className="text-body-small text-on-surface-variant">
+          {clashWords(entry.clash)}
+        </p>
+      )}
+    </>
   );
 }

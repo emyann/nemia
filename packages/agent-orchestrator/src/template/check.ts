@@ -1,9 +1,9 @@
 /**
  * `nemia template lint`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
- * what the folder's parts say of each other — a hire, a trigger's target or its selector, a skill, a sibling step, a parameter or a file named that the folder lacks, a step's
- * own schema outside its workflow's folder, a `${{ parameters.<name> }}` naming no declared parameter in a document's string or in a
- * text the render writes (`renderedTexts`) — and each harness's block against the words the runtime gives that harness
- * (`HARNESS_KNOBS`). Pure: every problem comes back at once, the texts read through the function the store hands in.
+ * what the folder's parts say of each other — a hire, a trigger's target or its selector, a skill, a sibling step, a parameter or a file
+ * named that the folder lacks, a step's own schema outside its workflow's folder, a `${{ parameters.<name> }}` naming no declared parameter
+ * in a document's string or in a text the render writes (`renderedTexts`) — and each harness's block against the words the runtime gives
+ * that harness (`HARNESS_KNOBS`). Pure: every problem comes back at once, the texts read through the function the store hands in.
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';

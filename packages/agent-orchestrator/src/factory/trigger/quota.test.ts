@@ -12,7 +12,7 @@ const TABLE: ReachStep = { route: { kind: 'table', from: 'a.b', table: { x: 'x' 
 const JUDGE: ReachStep = { route: { kind: 'judge' } };
 const SESSION: ReachStep = {};
 /** A card node that files a card, as given, for `workflow`. */
-const node = (workflow: string): ReachStep => ({ workflow, card: 'given' });
+const node = (workflow: string) => ({ workflow, card: 'given' }) satisfies ReachStep;
 const BACKLOG: ReachStep = { card: 'backlog' };
 
 /** The quota of a trigger to `target` over the workflows `offered`, and the workflow that settles it. */

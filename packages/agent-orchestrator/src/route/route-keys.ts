@@ -1,7 +1,8 @@
 /**
  * The routing keys of a step file, read and written: `routes:`, `when:` and `ends:` as lists of route words, `workflow:` as a workflow's
- * name, `card:` and `unlabel:` as what card a node files, and `route:` as a condition's eval (`RouteEval`) from its map — `{ from, table }`, `{ script }` — or `judge`, each refused in the
- * file's words where it cannot be read (`routingOf`), and written back as the parser reads it (`routeWritten`).
+ * name, `card:` and `unlabel:` as what card a node files, and `route:` as a condition's eval (`RouteEval`) from its map — `{ from, table
+ * }`, `{ script }` — or `judge`, each refused in the file's words where it cannot be read (`routingOf`), and written back as the parser
+ * reads it (`routeWritten`).
  */
 import { NODE_CARDS, refuse, type NodeCard, type RouteEval, type StepKey, type StepSpec } from '../step/step.ts';
 import type { FrontmatterValue } from '../frontmatter/frontmatter.ts';

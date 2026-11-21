@@ -65,6 +65,7 @@ sequenceDiagram
 ### A card a trigger starts
 
 A card need not be started by hand. A factory's **card trigger** selects its cards by their labels (`nemia factory trigger <factory>
+
 <name> --selector <key>=<value> --to <workflow>`, or its template's `triggers`), and each card of the factory it selects, not queued
 by hand and not started, is queued: on the workflow the card names, or on the trigger's target where it names none, ordered with the
 cards queued by hand by when it was filed. Nothing is written on the card: each pass reads it again, so taking its label off takes

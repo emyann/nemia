@@ -54,7 +54,11 @@ export const TwoInPlay: Story = {
 export const Triggered: Story = {
   render: () =>
     drawn([
-      { ...queuedCard('route-the-idea', FACTORY, 1), workflow: null, queued: { at: '2026-11-19T00:00:00.000Z', place: 1, by: ['front-door'] } },
+      {
+        ...queuedCard('route-the-idea', FACTORY, 1),
+        workflow: null,
+        queued: { at: '2026-11-19T00:00:00.000Z', place: 1, by: ['front-door'] },
+      },
       { ...unstartedCard('both-ways', FACTORY), workflow: null, clash: ['bugs', 'ready'] },
     ]),
   play: async ({ canvasElement }) => {

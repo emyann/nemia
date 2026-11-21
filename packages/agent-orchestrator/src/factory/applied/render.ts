@@ -360,10 +360,10 @@ function renderRules(rules: string | undefined, out: Rendered) {
 /**
  * The template `read`, which passes its check, rendered with `params` into the files of a factory's tree: each workflow's steps, each
  * agent, each skill carried whole (a `skill.yaml` left behind: what it fetches is refused by the check), `factory.json` holding every
- * workflow, the manifest's hires, its revisions policy and its card triggers whose selector renders non-empty, the template's `home/` carried whole into the tree's `home/` (`HOME_FOLDER`),
- * `NEMIA.md` from the manifest's instruction or the template's own, and `RULES.md` from its rules, as `renderRules` writes them. Refused,
- * each by name, nothing to write: what `renderStep`, `renderAgent` or `renderRules` refuses, a harness block's `options`, and a block of a
- * harness the step or agent does not run on.
+ * workflow, the manifest's hires, its revisions policy and its card triggers whose selector renders non-empty, the template's `home/`
+ * carried whole into the tree's `home/` (`HOME_FOLDER`), `NEMIA.md` from the manifest's instruction or the template's own, and `RULES.md`
+ * from its rules, as `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`, `renderAgent` or `renderRules`
+ * refuses, a harness block's `options`, and a block of a harness the step or agent does not run on.
  * @param read The template as read, which passes its check.
  * @param params The parameters' values to render with, by name.
  */

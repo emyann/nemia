@@ -3,9 +3,8 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { Link, useNavigate } from '@tanstack/react-router';
 import { FactoryCardStart, UnassignedStart } from '../factory/FactoryCardStart';
 import { FileCard } from './FileCard';
-import { CardMeta, GoneItem, NoQueue, PageLink, QueueButtons, Refused, StartedAs, Tried } from './InboxParts';
+import { CardMeta, CardQueue, GoneItem, NoQueue, PageLink, QueueButtons, Refused, StartedAs, Tried } from './InboxParts';
 import { CardFrom } from './CardFrom';
-import { Instant } from '../time/Instant';
 import { SelectorField } from '../field/SelectorField';
 import { Segment, SegmentedButton } from '../ui/ds/components/SegmentedButton';
 import { dropCard, inboxAllQuery, queueCard, type InboxEntry } from '@/lib/api/inbox';
@@ -19,8 +18,6 @@ import {
   factoryRepoOf,
   inPlay,
   newestCardsFirst,
-  queuedWord,
-  clashWords,
   queueOf,
   startedCard,
   triedShown,
@@ -275,24 +272,7 @@ function CardItem({
           <CardMeta entry={entry} />
           <CardFrom entry={entry} editable={startable} onRefused={onRefused} />
           <NoQueue entry={entry} />
-          {entry.queued && (
-            <p className="flex flex-wrap items-baseline gap-x-2 text-body-small text-muted-foreground">
-              <span
-                data-queued={entry.queued.place ?? ''}
-                className="rounded-full border border-outline-variant bg-surface-container-highest px-2 py-0.5 font-medium text-on-surface-variant"
-              >
-                {queuedWord(entry.queued)}
-              </span>
-              <span>
-                since <Instant data-queued-at at={entry.queued.at} about="When it was queued, which orders the queue" />
-              </span>
-            </p>
-          )}
-          {entry.clash && (
-            <p data-card-clash={entry.clash.join(' ')} className="text-body-small text-on-surface-variant">
-              {clashWords(entry.clash)}
-            </p>
-          )}
+          <CardQueue entry={entry} />
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           {startable && (

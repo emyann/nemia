@@ -908,7 +908,20 @@ describe('the former names a file may still say: read under the names they have 
 const EVERY: Record<
   Exclude<
     StepKey,
-    'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox' | 'routes' | 'route' | 'when' | 'ends' | 'workflow' | 'card' | 'unlabel' | 'checkFailurePolicy'
+    | 'workspace'
+    | 'slot'
+    | 'agent'
+    | 'skills'
+    | 'mcp'
+    | 'sandbox'
+    | 'routes'
+    | 'route'
+    | 'when'
+    | 'ends'
+    | 'workflow'
+    | 'card'
+    | 'unlabel'
+    | 'checkFailurePolicy'
   >,
   string
 > = {

@@ -226,7 +226,8 @@ export function ordinal(n: number) {
 }
 
 /**
- * What a queued card says of its place and, where triggers queue it, of them: `queued · 2nd`, `queued by ready · 1st` — or `queued` alone for one a record says was started, which has no place.
+ * What a queued card says of its place and, where triggers queue it, of them: `queued · 2nd`, `queued by ready · 1st` — or `queued` alone
+ * for one a record says was started, which has no place.
  * @param queued The card's queue record, with its place where it has one.
  */
 export const queuedWord = (queued: NonNullable<InboxEntry['queued']>) => {

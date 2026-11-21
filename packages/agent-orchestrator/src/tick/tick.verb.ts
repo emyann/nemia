@@ -321,7 +321,13 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness, clashes })),
+    ...passOf(
+      report,
+      runs,
+      judging,
+      queue,
+      yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness, clashes }),
+    ),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause

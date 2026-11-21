@@ -31,7 +31,10 @@ const onCards = (name: string, selector: string, to: string, status: Omit<Trigge
 
 const NIGHTLY = trigger(
   'janitor',
-  { when: { kind: 'time', cron: '0 3 * * *', brief: 'Sweep the stats', tz: 'Europe/Paris' }, target: { kind: 'Workflow', name: 'janitor' } },
+  {
+    when: { kind: 'time', cron: '0 3 * * *', brief: 'Sweep the stats', tz: 'Europe/Paris' },
+    target: { kind: 'Workflow', name: 'janitor' },
+  },
   { since: '2026-11-19T00:00:00.000Z', from: 'factory', quota: 'spends', quotaBy: 'janitor', next: '2026-11-22T02:00:00.000Z' },
 );
 
@@ -56,8 +59,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** `items` served as the factory's triggers, in the settings page's width. */
-const served = (items: readonly Trigger[]): Story['render'] =>
-  function ServedTriggers(args) {
+const served = (items: readonly Trigger[]) =>
+  function ServedTriggers(args: { name: string }) {
     return (
       <Served items={items}>
         <div style={{ width: 640 }}>
@@ -65,7 +68,7 @@ const served = (items: readonly Trigger[]): Story['render'] =>
         </div>
       </Served>
     );
-  };
+  } satisfies Story['render'];
 
 /** The triggers still read. */
 export const Reading: Story = {
@@ -127,9 +130,7 @@ export const Clash: Story = {
   ]),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelectorAll('[data-trigger-clash="both"]')).toHaveLength(2);
-    await expect(canvasElement.querySelector('[data-factory-trigger="bugs"] [data-trigger-now]')).toHaveTextContent(
-      '1 waiting on a clash',
-    );
+    await expect(canvasElement.querySelector('[data-factory-trigger="bugs"] [data-trigger-now]')).toHaveTextContent('1 waiting on a clash');
   },
 };
 

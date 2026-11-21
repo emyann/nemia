@@ -32,11 +32,7 @@ function TriggerRow({ trigger: t, now, onRemove, pending }: { trigger: Trigger; 
         {quotaWords(t)}
       </p>
       <p data-trigger-now className="text-body-medium">
-        {cards
-          ? queuesWords(t)
-          : t.status.next
-            ? `Next fire ${fireWord(new Date(t.status.next), now)}`
-            : 'Its cron never fires'}
+        {cards ? queuesWords(t) : t.status.next ? `Next fire ${fireWord(new Date(t.status.next), now)}` : 'Its cron never fires'}
       </p>
       {clashes.map((c) => (
         <p key={c.card} data-trigger-clash={c.card} className="text-body-medium text-muted-foreground">

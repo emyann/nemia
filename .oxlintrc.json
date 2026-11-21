@@ -778,12 +778,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/inbox/InboxPage.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 83, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/agents/agents.store.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 124, "skipBlankLines": true, "skipComments": true }],

@@ -11,7 +11,8 @@
  * `routes.test.ts`'s, `prune.test.ts`'s and `workflows.test.ts`'s, on the same paths.
  *
  * Last, who acted: each write keeps the actor of the token its request presented — the person under its name, an agent by its standing
- * token or by its session — and the run serves it where the write is read.
+ * token or by its session — and the run serves it where the write is read; a card sent on (the Card's `resend`) calls off the run that
+ * waited on it as who sent it.
  */
 import { root } from '../../test/harness.ts';
 import { beforeAll, describe, test } from 'vitest';
@@ -53,8 +54,11 @@ const FLOW = path.join(root, 'ra-flow');
 for (const name of ['plan', 'implement', 'nudged', 'talk', 'review'])
   write(path.join(FLOW, `${name}.md`), `---\nplace: git\n---\n${name} it.\n`);
 
-/** A run's record: its steps, each its task or none, `gate: true` on `gated`'s, in `factory` where one is named. */
-const record = (id: string, steps: Record<string, string | null>, more: { gated?: string; factory?: string } = {}) =>
+/**
+ * A run's record: its steps, each its task or none, `gate: true` on `gated`'s, in `factory` where one is named, started from the inbox card
+ * `card` where one is named.
+ */
+const record = (id: string, steps: Record<string, string | null>, more: { gated?: string; factory?: string; card?: string } = {}) =>
   write(
     path.join(root, 'runs', `${id}.json`),
     JSON.stringify({
@@ -75,6 +79,7 @@ const record = (id: string, steps: Record<string, string | null>, more: { gated?
       })),
       steps: Object.fromEntries(Object.entries(steps).map(([name, taskId]) => [name, { taskId }])),
       ...(more.factory ? { factory: more.factory } : {}),
+      ...(more.card ? { from: { inbox: more.card } } : {}),
     }),
   );
 
@@ -324,6 +329,18 @@ describe('each write keeps who acted, by the token its request presented, and th
     assert.deepEqual([hold.by, hold.actor], ['ann', session], 'the hold answered with both');
     assert.deepEqual((await status(OTHER)).holding?.actor, session, "and served on the run's holding");
     assert.equal((await send('DELETE', `${run(OTHER)}/hold`)).status, 200);
+  });
+  test('a card sent on calls off the run that waited on it, as who sent it, answered and served on the run', async () => {
+    task('t-by-resent', 'succeeded', BLOCKED);
+    record('ra-by-resent', { implement: 't-by-resent' }, { card: 'resend-me' });
+    write(path.join(root, 'inbox', 'resend-me.md'), 'Do it elsewhere.\n');
+    const sent = await answered(await send('POST', '/api/namespaces/default/cards/resend-me/resend', { workflow: 'deliver' }));
+    assert.equal(sent.status, 201, JSON.stringify(sent.body));
+    assert.equal(sent.body.cancelled, 'ra-by-resent', 'the run that waited is called off');
+    assert.ok(fs.existsSync(path.join(root, 'inbox', 'ra-by-resent-resent.md')), 'the card is filed');
+    const called = await status('ra-by-resent');
+    assert.equal(typeof called.cancelledAt, 'string', 'the next read judges it called off');
+    assert.deepEqual(called.cancelledBy, person, 'kept as who sent the card on');
   });
   test("a cancel keeps who called the run off, answered and served on the run's status", async () => {
     task('t-by-called', 'working');

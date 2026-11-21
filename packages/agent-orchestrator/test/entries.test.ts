@@ -135,6 +135,7 @@ const PINNED: Record<string, string[]> = {
     'INBOX_ADD',
     'INBOX_EDIT',
     'INBOX_QUEUE',
+    'INBOX_RESEND',
     'INBOX_RM',
     'INBOX_KEYS',
     'INBOX_KEY_MEANINGS',

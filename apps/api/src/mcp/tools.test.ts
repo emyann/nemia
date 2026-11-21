@@ -10,8 +10,9 @@ import assert from 'node:assert/strict';
 import { Context, Option, Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/http-api';
 import { CLI_VERBS, TABLE, toolsOf } from 'agent-orchestrator';
-import { Api, type ApiEndpointName } from 'objects';
+import { Api, type ApiEndpointName, portInstructions, toolDescriptionOf, toolWordsOf } from 'objects';
 import { classWordOf, toolHints } from './hints.ts';
+import { PORT_INSTRUCTIONS } from './instructions.ts';
 import { portTools } from './tools.ts';
 
 /** Every endpoint of the `Api` by its `<group>.<endpoint>` name. */
@@ -263,4 +264,13 @@ const UNSAID = HttpApi.make('unsaid').add(
 test('REFUSED: a link to an endpoint with no description, naming the endpoint', () => {
   const entry = { name: 'mute', usage: '', help: ['a probe'], class: 'read' as const };
   assert.throws(() => portTools([], [{ ...entry, served: [{ endpoint: 'probe.mute' as ApiEndpointName }] }], UNSAID), /probe\.mute/);
+});
+
+test("the port says nothing of a tool, nor of itself, beyond the words objects writes once for both of Nemia's seats", () => {
+  const words = toolWordsOf(TABLE, CLI_VERBS, Api);
+  assert.deepEqual(
+    TOOLS.map((t) => [t.name, t.description]),
+    words.map(({ verb, words: w }) => [w.name, toolDescriptionOf(verb, w)]),
+  );
+  assert.equal(PORT_INSTRUCTIONS, portInstructions());
 });

@@ -2,9 +2,10 @@
  * What ships with Nemia (`nemia/`) is any factory's, never this repository's: her instruction and her skills name no agent of this
  * repository's team, no file of its own, no playbook of its operator and none of its owner's settings, and each skill her instruction and
  * her skills name is one she ships, under `nemia/skills/`, its `name:` its folder's, read as Claude Code reads her plugin. "Gate" names a
- * step's gate alone (`gateWordsIn`), but in her generated verbs skill, whose words are the command table's. Her skills and her instruction
- * keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in each file that writes or reads them
- * (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that line shows her (`feedLineWords`)
+ * step's gate alone (`gateWordsIn`), but in her generated verbs skill and its tools.md, whose words are the command table's and the
+ * Api's. Her skills and her instruction keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in
+ * each file that writes or reads them (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that
+ * line shows her (`feedLineWords`)
  * beside the reason her selector asks for. Her plugin's agent is the file the keeper reads (`nemiaDefinition`), and its one server is the
  * store's MCP port, read from the person's environment (`serverBreaks`). Nothing of it hands her a way to the api but a verb: no shell's
  * HTTP client and no fetch (`aroundVerbsIn`). Its wording is judged by a person at the landing step; this
@@ -48,12 +49,18 @@ const OWNER = ['Montreal', 'America/Montreal', 'EDT', '$80'];
 /** The words of this repository that what ships must not say: its team, its operator's playbook, its docs, its owner's settings. */
 const OURS = [...TEAM, 'playbook-operator', 'architecture.md', 'CLAUDE.md', 'features.md', ...OWNER];
 
-/** Where `files` say one of `OURS`, whole and in any case: a line each, `<file>: <word>`. */
+/**
+ * The words of `OURS` a shipped file says in another sense, each by its file, with why: her verbs skill's `tools.md` says the Api's own
+ * words, and the Api names a volume's `CLAUDE.md` files, the harness's instruction files in any repository, never this one's doc.
+ */
+const ANOTHER_SENSE: Readonly<Record<string, readonly string[]>> = { 'skills/verbs/tools.md': ['CLAUDE.md'] };
+
+/** Where `files` say one of `OURS`, whole and in any case, but a word `ANOTHER_SENSE` gives its file: a line each, `<file>: <word>`. */
 const oursIn = (files: Map<string, string>) =>
   [...files].flatMap(([file, text]) =>
-    OURS.filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`, 'i').test(text)).map(
-      (word) => `${file}: ${word}`,
-    ),
+    OURS.filter((word) => !(ANOTHER_SENSE[file] ?? []).includes(word))
+      .filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`, 'i').test(text))
+      .map((word) => `${file}: ${word}`),
   );
 
 /** The skills `files` name, as "the `<name>` skill" says one: a line each, `<file>: <name>`. */
@@ -128,6 +135,7 @@ const gateWordsIn = (files: Map<string, string>) =>
 test('what ships with Nemia, and this factory\'s instruction to her, say "gate" only for a step\'s gate, but in her generated verbs skill', () => {
   const files = shipped();
   files.delete('skills/verbs/SKILL.md');
+  files.delete('skills/verbs/tools.md');
   assert.ok(files.has('agents/nemia.md') && files.has('skills/bring-what-waits/SKILL.md'), 'her instruction and her skills are read');
   files.set('NEMIA.md', fs.readFileSync(path.join(REPO, 'NEMIA.md'), 'utf8'));
   assert.deepEqual(gateWordsIn(files), []);

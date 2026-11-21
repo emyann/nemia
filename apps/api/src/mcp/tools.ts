@@ -1,308 +1,36 @@
 /**
- * The tools of the MCP port, generated, never listed by hand: one for each endpoint a verb of the command table links (`served`, read by
- * the package's `toolsOf`, which names it), described by the verb's help, its endpoint's own description and its CLI usage, its input
- * the JSON Schema of the endpoint's path, query and payload joined into one object (`objects`' `Api`, read by reflection), its hints its
- * verb's class and its endpoint's method (`toolHints`), and what the port needs to call it: the endpoint's method and path, which keys of
- * the input fill the path and the query, whether the endpoint answers a `Table` (`objects`' server-side printing, which the port asks for
- * and answers as its lines), and the query values its link sends where a call gives none (`defaults`, the link's `query`). A link to a
- * stream, a method that is not a call, a key two of the three say, a default for a key the query has not, or an endpoint that says
- * nothing of what it does is thrown as the tools are built.
+ * The tools of the MCP port, generated, never listed by hand: one for each endpoint a verb of the command table links, their words read
+ * once in `objects` for both of Nemia's seats (`toolWordsOf`: the name, the input, the endpoint's method and path, which keys fill the path
+ * and the query, whether it answers a `Table`, the defaults its link sends, what the endpoint and each key say) and described as
+ * `toolDescriptionOf` joins them, which Nemia's verbs skill says to her shell seat too. What is the port's own is added here: the hints of
+ * its verb's class and its endpoint's method (`toolHints`). What `toolWordsOf` throws is thrown as the tools are built.
  */
-import { Context, Option, Schema } from 'effect';
-import { OpenApi } from 'effect/http-api';
-import { type CommandSpec, toolsOf } from 'agent-orchestrator';
-import { type ApiEndpointName, Table, keysOfEndpoint, streamsOf } from 'objects';
-import type { ToolHints, ToolMethod } from '../../contracts/tool-hints.contract.ts';
-import { PORT_PAGE } from './bound.ts';
+import { type CommandSpec } from 'agent-orchestrator';
+import { type DescribedApi, toolDescriptionOf, toolWordsOf, type ToolWords } from 'objects';
+import type { ToolHints } from '../../contracts/tool-hints.contract.ts';
 import { classWordOf, toolHints } from './hints.ts';
 
 /** A verb of a table as the port reads it: its name, its usage and help, its class, and the endpoints it links. */
 export type PortVerb = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'>;
 
-/** An endpoint of an `Api`, as the port reads it off by reflection: its annotations carry what it does (`OpenApi.Description`). */
-type EndpointRead = {
-  readonly identifier: string;
-  readonly annotations: Context.Context<never>;
-  readonly method: string;
-  readonly path: string;
-  readonly params: Schema.Top | undefined;
-  readonly query: Schema.Top | undefined;
-  readonly payload: ReadonlyMap<string, { readonly schemas: readonly Schema.Top[] }>;
-  readonly success: ReadonlySet<Schema.Top>;
-};
-
-/** An `Api`, as the port reads it: its groups, each its endpoints. */
-export type ApiRead = {
-  readonly groups: Readonly<Record<string, { readonly identifier: string; readonly endpoints: Readonly<Record<string, EndpointRead>> }>>;
-};
-
-/** A JSON Schema, as `Schema.toJsonSchemaDocument` writes it. */
-type JsonSchema = Readonly<Record<string, unknown>>;
-
-/** A tool's input: a JSON Schema object, its keys, those it requires, and the definitions its keys refer to. */
-export type ToolInput = {
-  readonly type: 'object';
-  readonly properties: Readonly<Record<string, JsonSchema>>;
-  readonly required?: readonly string[];
-  readonly anyOf?: readonly JsonSchema[];
-  readonly $defs?: Readonly<Record<string, JsonSchema>>;
-};
-
 /** A tool of the port: what `tools/list` says of it, and what a call of it asks of the api. */
-export type PortTool = {
-  readonly name: string;
-  readonly entry: string;
-  readonly description: string;
-  readonly inputSchema: ToolInput;
-  readonly annotations: ToolHints;
-  readonly endpoint: ApiEndpointName;
-  readonly method: ToolMethod;
-  readonly path: string;
-  readonly pathKeys: readonly string[];
-  readonly queryKeys: readonly string[];
-  readonly table: boolean;
-  readonly defaults: Readonly<Record<string, string>>;
-};
-
-/** The methods a tool calls by: every one but those that answer no body to read. */
-const METHODS: readonly ToolMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-
-/** `method` as a tool's, or thrown where it is none: the port reads an answer's body. */
-const methodOf = (endpoint: string, method: string) => {
-  const found = METHODS.find((m) => m === method);
-  if (found === undefined)
-    throw new Error(`${endpoint} answers ${method}, which no tool calls: link a GET, POST, PUT, PATCH or DELETE endpoint`);
-  return found;
-};
-
-/**
- * Whether a success of an endpoint is `objects`' `Table`, or a union holding it among its members: read through the schema the endpoint
- * carries it on (its status or headers), as `HttpApiEndpoint` keeps each success.
- */
-const printsTable = (success: Schema.Top) => {
-  const schema: unknown = 'schema' in success ? success.schema : success;
-  return (
-    schema === Table ||
-    ((typeof schema === 'object' || typeof schema === 'function') &&
-      schema !== null &&
-      'members' in schema &&
-      Array.isArray(schema.members) &&
-      schema.members.includes(Table))
-  );
-};
-
-/** A JSON Schema's object part: its keys and those it requires, resolved through a root `$ref` into `definitions`. */
-type ObjectPart = { readonly properties: Record<string, JsonSchema>; readonly required: readonly string[] };
-
-/** Whether `value` is a record of JSON Schemas, as a document writes one. */
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null;
-
-/** `schema` with a root `$ref` into `definitions` taken to what it refers to. */
-function resolved(schema: JsonSchema, definitions: Readonly<Record<string, unknown>>) {
-  const ref = schema.$ref;
-  if (typeof ref !== 'string' || !ref.startsWith('#/$defs/')) return schema;
-  const target = definitions[ref.slice('#/$defs/'.length)];
-  return isRecord(target) ? target : schema;
-}
-
-/** The object part of `schema`, or none where it is no object of named keys (a union, a scalar). */
-function objectPart(schema: JsonSchema) {
-  const properties = schema.properties;
-  if (schema.type !== 'object' || !isRecord(properties)) return undefined;
-  const required = Array.isArray(schema.required) ? schema.required.filter((k): k is string => typeof k === 'string') : [];
-  return { properties: Object.fromEntries(Object.entries(properties).filter((e): e is [string, JsonSchema] => isRecord(e[1]))), required };
-}
-
-/** One document of `schema`: its root schema, and its definitions merged into `defs`, thrown where one name means two schemas. */
-function documentOf(schema: Schema.Top, defs: Record<string, JsonSchema>, endpoint: string) {
-  const doc = Schema.toJsonSchemaDocument(schema);
-  for (const [name, definition] of Object.entries(doc.definitions)) {
-    const had = defs[name];
-    if (had !== undefined && JSON.stringify(had) !== JSON.stringify(definition))
-      throw new Error(`${endpoint} defines ${name} twice, as two schemas: give one of them another identifier in objects`);
-    defs[name] = definition;
-  }
-  return resolved(doc.schema, doc.definitions);
-}
-
-/**
- * The input of `endpoint`: the keys of its path and its query (but `watch`) and its JSON payload's, in one object, each required as its
- * part requires it; a payload that is a union of objects is the input's `anyOf`, each member's keys beside the path's and the query's.
- * Thrown where a key is said by two parts, since a call could not tell where it goes.
- */
-function inputOf(endpoint: EndpointRead, name: string) {
-  const defs: Record<string, JsonSchema> = {};
-  const partOf = (schema: Schema.Top | undefined, what: string) => {
-    if (schema === undefined) return { properties: {}, required: [] };
-    const part = objectPart(documentOf(schema, defs, name));
-    if (part === undefined) throw new Error(`${name}'s ${what} is no object of named keys: declare it a Struct in objects`);
-    return part;
-  };
-  const path = partOf(endpoint.params, 'path');
-  const query = partOf(endpoint.query, 'query');
-  const { pathKeys, queryKeys } = keysOfEndpoint(endpoint);
-  const payloads = [...endpoint.payload.values()].flatMap((p) => p.schemas).map((s) => documentOf(s, defs, name));
-  const members = payloads.flatMap((p) => {
-    const anyOf = p.anyOf ?? p.oneOf;
-    return Array.isArray(anyOf) ? anyOf.filter(isRecord).map((m) => resolved(m, defs)) : [p];
-  });
-  const parts = members.map((m) => {
-    const part = objectPart(m);
-    if (part === undefined)
-      throw new Error(`${name}'s payload is no object of named keys: declare it a Struct, or a union of them, in objects`);
-    return part;
-  });
-  const said = new Map<string, string>();
-  const say = (keys: readonly string[], where: string) => {
-    for (const key of keys) {
-      const before = said.get(key);
-      if (before !== undefined && before !== where)
-        throw new Error(`${name}'s input says ${key} in its ${before} and its ${where}: rename one of them in objects' Api`);
-      said.set(key, where);
-    }
-  };
-  say(Object.keys(path.properties), 'path');
-  say(queryKeys, 'query');
-  for (const part of parts) say(Object.keys(part.properties), 'payload');
-  const own = (part: ObjectPart, keys: readonly string[]) =>
-    Object.fromEntries(
-      keys.flatMap((k) => {
-        const value = part.properties[k];
-        return value === undefined ? [] : [[k, value] as const];
-      }),
-    );
-  const single = parts.length === 1 ? parts[0] : undefined;
-  const required = [...path.required, ...query.required.filter((k) => queryKeys.includes(k)), ...(single?.required ?? [])];
-  return {
-    inputSchema: {
-      type: 'object',
-      properties: { ...path.properties, ...own(query, queryKeys), ...single?.properties },
-      ...(required.length > 0 ? { required } : {}),
-      ...(parts.length > 1 ? { anyOf: members } : {}),
-      ...(Object.keys(defs).length > 0 ? { $defs: defs } : {}),
-    },
-    pathKeys,
-    queryKeys,
-  } satisfies Pick<PortTool, 'inputSchema' | 'pathKeys' | 'queryKeys'>;
-}
-
-/** What `schema` says it takes: its own `description`, or, where it is a definition whole (a bare `$ref` into `$defs`), that one's. */
-const saidOf = (schema: JsonSchema, defs: Readonly<Record<string, JsonSchema>>) => {
-  const own = schema.description;
-  if (typeof own === 'string' && own.trim()) return own;
-  const ref = schema.$ref;
-  const referred = typeof ref === 'string' ? defs[ref.split('/').at(-1) ?? '']?.description : undefined;
-  return typeof referred === 'string' && referred.trim() ? referred : undefined;
-};
-
-/**
- * Each key of `input` whose schema says what it takes (its JSON Schema `description`, as `objects` annotates it, or that of the
- * definition it is whole), with that: its own keys, then each key of a member of its `anyOf` it has not, the first member that says it.
- */
-const keysSaid = (input: ToolInput) => {
-  const defs = input.$defs ?? {};
-  const members = (input.anyOf ?? []).flatMap((member) => {
-    const properties = member.properties;
-    return typeof properties === 'object' && properties !== null ? Object.entries(properties as Record<string, JsonSchema>) : [];
-  });
-  const said = new Map<string, string>();
-  for (const [key, schema] of [...Object.entries(input.properties), ...members]) {
-    const words = said.has(key) ? undefined : saidOf(schema, defs);
-    if (words !== undefined) said.set(key, words);
-  }
-  return [...said].map(([key, words]) => `${key}: ${words}`);
-};
-
-/** What `endpoint` says it does (`OpenApi.Description`, as `objects` annotates it), thrown where it says nothing. */
-const endpointSaid = (name: string, endpoint: EndpointRead) => {
-  const said = Context.getOption(endpoint.annotations, OpenApi.Description).pipe(Option.filter((words) => words.trim().length > 0));
-  if (Option.isNone(said))
-    throw new Error(
-      `${name} says nothing of what it does: describe it in objects, \`.annotate(OpenApi.Description, '…')\` where its group defines it`,
-    );
-  return said.value;
-};
-
-/**
- * A tool's description: its verb's help, then what its endpoint says it does (`endpointSaid`) as a paragraph of its own, how the CLI
- * says it, and the endpoint it calls; then what each key of its input says it takes where its schema says so (`keysSaid`), since the
- * help is the command line's and its forms are not the input's; then how the port answers it — a `Table` as its lines, a page of
- * `PORT_PAGE` where a call gives no `limit`, and each default its link sends where the call gives none.
- */
-const describe = (
-  verb: PortVerb,
-  said: string,
-  method: string,
-  path: string,
-  how: Pick<PortTool, 'table' | 'defaults' | 'queryKeys' | 'inputSchema'>,
-) => {
-  const usage = `nemia ${[verb.name, verb.usage].filter(Boolean).join(' ')}`;
-  return [
-    ...verb.help,
-    '',
-    said,
-    '',
-    usage,
-    `${method} ${path}`,
-    ...keysSaid(how.inputSchema),
-    ...(how.table ? [`Answers a line per item, as \`${verb.name} -o wide\` prints them.`] : []),
-    ...(how.queryKeys.includes('limit')
-      ? [`Answers ${PORT_PAGE} at most unless limit is given; a last line or metadata.continue names the token for the next page.`]
-      : []),
-    ...Object.entries(how.defaults).map(
-      ([key, value]) => `Sends ${key}=${value} where the call gives no ${key}: give it to ask otherwise.`,
-    ),
-  ].join('\n');
-};
-
-/** The defaults `link` sends, thrown where one names a key `queryKeys` has not: a call could never send it. */
-const defaultsOf = (tool: string, query: Readonly<Record<string, string>>, queryKeys: readonly string[]) => {
-  for (const key of Object.keys(query))
-    if (!queryKeys.includes(key))
-      throw new Error(`${tool}'s link sends ${key} by default, which its endpoint's query does not take: drop it from the link's query`);
-  return { ...query };
-};
+export type PortTool = Omit<ToolWords, 'said' | 'keys'> & { readonly description: string; readonly annotations: ToolHints };
 
 /**
  * The port's tools: one per link of `table`'s verbs then of `verbs`' (the verbs the CLI runs by hand, `CLI_VERBS`), in their order, each
- * its endpoint of `api` read by reflection. Thrown where a link names no endpoint of `api`, one that streams, or one
- * that says nothing of what it does.
+ * its endpoint of `api` read by reflection (`toolWordsOf`). Thrown where a link names no endpoint of `api`, one that streams, or one that
+ * says nothing of what it does.
  * @param table The command table's verbs, each with its links.
  * @param verbs The verbs the CLI runs by hand, listed after the table's.
  * @param api The Api whose endpoints the links name.
  */
-export function portTools(table: readonly PortVerb[], verbs: readonly PortVerb[], api: ApiRead) {
-  const endpoints = new Map(
-    Object.values(api.groups).flatMap((group) =>
-      Object.values(group.endpoints).map((endpoint) => [`${group.identifier}.${endpoint.identifier}`, endpoint] as const),
-    ),
-  );
-  return [...table, ...verbs].flatMap((verb) =>
-    toolsOf(verb).map((link) => {
-      const endpoint = endpoints.get(link.endpoint);
-      if (endpoint === undefined) throw new Error(`${link.tool} links ${link.endpoint}, no endpoint of the Api: link one it declares`);
-      if ([...endpoint.success].some(streamsOf))
-        throw new Error(`${link.tool} links ${link.endpoint}, which answers a stream: a tool answers once, so link an endpoint that does`);
-      const method = methodOf(link.endpoint, endpoint.method);
-      const input = inputOf(endpoint, link.tool);
-      const how = {
-        table: [...endpoint.success].some(printsTable),
-        defaults: defaultsOf(link.tool, link.query, input.queryKeys),
-        queryKeys: input.queryKeys,
-        inputSchema: input.inputSchema,
-      };
-      return {
-        name: link.tool,
-        entry: verb.name,
-        description: describe(verb, endpointSaid(link.endpoint, endpoint), method, endpoint.path, how),
-        annotations: toolHints(classWordOf(verb.class), method),
-        endpoint: link.endpoint,
-        method,
-        path: endpoint.path,
-        ...input,
-        table: how.table,
-        defaults: how.defaults,
-      } satisfies PortTool;
-    }),
-  ) satisfies PortTool[];
+export function portTools(table: readonly PortVerb[], verbs: readonly PortVerb[], api: DescribedApi) {
+  return toolWordsOf(table, verbs, api).map(({ verb, words }) => {
+    const { said: _said, keys: _keys, ...tool } = words;
+    return {
+      ...tool,
+      description: toolDescriptionOf(verb, words),
+      annotations: toolHints(classWordOf(verb.class), words.method),
+    } satisfies PortTool;
+  }) satisfies PortTool[];
 }

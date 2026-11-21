@@ -15,11 +15,16 @@ import {
   RENAMED,
   STREAM_COMMANDS,
   parseArgv as parseArgvOf,
+  toolsOf,
   type Args,
-  type CommandLink,
   type CommandWords,
   type Spec,
 } from 'objects';
+
+export { toolsOf } from 'objects';
+
+/** A tool of the MCP port, as `objects`' `toolsOf` names it: the endpoint it calls, its name, its entry and its link's default query. */
+export type LinkedTool = ReturnType<typeof toolsOf>[number];
 
 export {
   CLI,
@@ -129,9 +134,10 @@ export const amountIn = (args: Args, key: string) => {
  * The verbs outside the table the api serves, each with its usage and help as `nemia`'s help prints them, its class, and the endpoint
  * that serves it: `nemia decide`, a read, which the client prints off the run's decision (`decisionRead`), served as data
  * (`runs.decision`); and `nemia quota`, a read whose words the client holds (`objects`' `QUOTA_WORDS`), the subscription's quota the api
- * reads itself (`server.quota`, its keep and its backoff the api's). This CLI runs none of them, and answers each with its help.
+ * reads itself (`server.quota`, its keep and its backoff the api's), with its spec, by which her verbs skill spells each key at a shell.
+ * This CLI runs none of them, and answers each with its help.
  */
-export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'>[] = [
+export const CLI_VERBS: readonly (Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'> & { readonly spec?: Spec })[] = [
   {
     name: 'decide',
     usage: '<runId> [--sensitive <globs>]',
@@ -181,25 +187,6 @@ function sideBreaks(c: Entry) {
       breaks.push(`${c.name}'s ${f.flag} is taken on the ${f.only.side} alone and says no why: say why`);
   return breaks;
 }
-
-/** A tool of the MCP port: the endpoint it calls, its name, the entry whose link it is, and the query its link sends by default. */
-export type LinkedTool = {
-  readonly endpoint: CommandLink['endpoint'];
-  readonly tool: string;
-  readonly entry: string;
-  readonly query: Readonly<Record<string, string>>;
-};
-
-/**
- * The tools of `entry`'s links (`served`), in order: the first named by the verb, each space `_` (`factory ls` is the tool
- * factory_ls), every other by its `as`; a later link with no `as` gives no tool, which `commandBreaks` refuses.
- * @param entry The entry: its name and its links.
- */
-export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>) =>
-  (entry.served ?? []).flatMap((link, i) => {
-    const tool = i === 0 ? entry.name.replaceAll(' ', '_') : link.as;
-    return tool === undefined ? [] : [{ endpoint: link.endpoint, tool, entry: entry.name, query: link.query ?? {} }];
-  });
 
 /** Whether `name` is a command the client holds (`COMMAND_WORDS`) that answers once, no stream (`STREAM_COMMANDS`). */
 const heldOnce = (name: string) => COMMAND_WORDS.some((w) => w.name === name) && !(STREAM_COMMANDS as readonly string[]).includes(name);

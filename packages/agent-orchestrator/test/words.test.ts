@@ -8,7 +8,7 @@
  * - **A harness's words stay in the runtime** (`HARNESS`): the names Claude Code, Codex and Anthropic, and the runtime's own permission
  *   modes and sandboxes, imported from its public entry, but the plain English ones (`PLAIN_HARNESS`). Refused in the orchestrator's `src`
  *   and `bin`, `apps/api/src` and `apps/web/src`, but in the files `HARNESS_KEPT` names, each held to its count with why: a file that
- *   points a client at what only one harness offers (the MCP port's instructions, at the channel that harness starts).
+ *   points a client at what only one harness offers (none today: the MCP port's instructions moved to `objects`' `GUIDANCE`).
  * - **A workflow's words stay above the runtime** (`WORKFLOW`): a workflow, a step, a gate, a factory, a closeout, the orchestrator,
  *   `nemia` and Nemia. Refused in the runtime's `src` and `bin`.
  * - **The layer above's words for what the runtime has its own for stay above it** (`LAYER_ABOVE`): a session that signs for one that
@@ -346,14 +346,11 @@ type Kept = { count: number; why: string };
 
 /**
  * The files outside the runtime that may say a harness's word, not as a debt but because they point a client at what only that harness
- * offers, each held to its count. Its words stay in these files: any other file of the layer is refused them as before.
+ * offers, each held to its count. Its words stay in these files: any other file of the layer is refused them as before. None today: the
+ * MCP port's instructions, which point a session at the channel one harness starts, are written in `objects` (`GUIDANCE`), outside the
+ * rule's folders, beside the shell form Nemia's verbs skill tells her.
  */
-const HARNESS_KEPT: Readonly<Record<string, Kept>> = {
-  'apps/api/src/mcp/instructions.ts': {
-    count: 1,
-    why: "the MCP port's instructions point a session at nemia channel, which Claude Code starts over stdio and a remote port cannot be",
-  },
-};
+const HARNESS_KEPT: Readonly<Record<string, Kept>> = {};
 
 /** What a kept file and its measure disagree on, each a sentence naming the fix: a file gone, a count changed, or no why. */
 function keptBreaks(rule: Rule, counts: Record<string, number>, kept: Readonly<Record<string, Kept>>) {
@@ -614,11 +611,16 @@ type Texts = {
 };
 
 /** Every breach of the six rules over `texts` of each, against their baselines; the layer above's words read where a workflow's are. */
-function breaches(texts: Texts, team: string[], folders: readonly string[] = TEAM_FOLDERS) {
+function breaches(
+  texts: Texts,
+  team: string[],
+  folders: readonly string[] = TEAM_FOLDERS,
+  harnessKept: Readonly<Record<string, Kept>> = HARNESS_KEPT,
+) {
   return [
     ...ratchetBreaks(FENCE_RULE, measured(texts.fence, FENCE), FENCE_WORDS, onDisk),
-    ...ratchetBreaks(HARNESS_RULE, unkept(measured(texts.harness, HARNESS), HARNESS_KEPT), HARNESS_WORDS, onDisk),
-    ...keptBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_KEPT),
+    ...ratchetBreaks(HARNESS_RULE, unkept(measured(texts.harness, HARNESS), harnessKept), HARNESS_WORDS, onDisk),
+    ...keptBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), harnessKept),
     ...ratchetBreaks(WORKFLOW_RULE, measured(texts.workflow, WORKFLOW), WORKFLOW_WORDS, onDisk),
     ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, kept('layer above', layerAboveIn)), LAYER_ABOVE_WORDS, onDisk),
     ...ratchetBreaks(TEAM_RULE, measured(texts.team, [...team, ...FORMER_TEAM, ...FACTORY_NAMES], PLAIN_NAMES), TEAM_NAMES, onDisk),
@@ -717,11 +719,17 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
     `apps/web/src/lib/x.ts holds 1 harness words: ${harness}; never add them here`,
   ]);
   const kept = 'apps/api/src/mcp/instructions.ts';
-  const keptBroken = (text: string) => planted('harness', kept, text).filter((b) => b.startsWith(`${kept} `));
-  assert.equal(keptBroken(`${texts.harness.get(kept) ?? ''}\n/** Or through Codex. */\n`).length, 1, 'a kept file is held to its count');
+  const keptText = '/** In Claude Code, a channel. */\nexport const x = 1;\n';
+  const keeping = { [kept]: { count: 1, why: 'it points a session at what one harness alone offers' } };
+  const keptBroken = (text: string) =>
+    breaches({ ...texts, harness: new Map([...texts.harness, [kept, text]]) }, TEAM, TEAM_FOLDERS, keeping).filter((b) =>
+      b.startsWith(`${kept} `),
+    );
+  assert.equal(keptBroken(`${keptText}\n/** Or through Codex. */\n`).length, 1, 'a kept file is held to its count');
   assert.equal(keptBroken('export const x = 1;\n').length, 1, 'a kept file that no longer says the word is taken off');
-  assert.deepEqual(planted('harness', kept, texts.harness.get(kept) ?? ''), [], 'a kept file at its count is let through');
-  const harnessCounts = measured(texts.harness, HARNESS);
+  assert.deepEqual(keptBroken(keptText), [], 'a kept file at its count is let through');
+  assert.equal(planted('harness', kept, keptText).length, 1, 'a file no entry keeps is refused the word');
+  const harnessCounts = measured(new Map([...texts.harness, [kept, keptText]]), HARNESS);
   assert.equal(
     keptBreaks(HARNESS_RULE, harnessCounts, { [kept]: { count: harnessCounts[kept] ?? 0, why: ' ' } }).length,
     1,

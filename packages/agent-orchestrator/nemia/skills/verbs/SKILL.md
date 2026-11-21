@@ -877,11 +877,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
 Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose, at a shell with their words as `--message`, or its tool on the port with them as its message: its prompt is their decision, asked once. `retry` asks only of a step that waits on the person, or with `--budget`.
 
 ```text
-  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
                                try a step waiting on you again, once, on the next tick:
                                --continue (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
                                --recheck runs its check again, and files no session;
+                               --check <name>, with --recheck: that refused check alone, the others kept;
                                --round: once more — a loop out of rounds goes round again, once,
                                the step it loops to continued, then a new reviewer; the step is the
                                one that closes the loop, left out where the run has one loop;

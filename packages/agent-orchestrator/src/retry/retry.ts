@@ -543,9 +543,7 @@ export function retriesDue(
       due.push({
         step: step.name,
         try: next,
-        mode: ask.mode,
-        ...(ask.model ? { model: ask.model } : {}),
-        ...(ask.message !== undefined ? { message: ask.message } : {}),
+        ...askedHow(ask),
         ...raisedBy(ask, raise),
         by: askedBy(ask),
         ...(unsettled ? { stopFirst: true as const, ...(via === 'session' ? {} : { runsOn: true as const }) } : {}),
@@ -598,6 +596,14 @@ function ownRetry(
 /** Whether the run refuses a closeout's envelope or its questions (`closeoutRefusals`): a closeout not given is not. */
 const refusedOf = (step: StepSpec, said: Closeout | undefined, steps: readonly StepSpec[]) =>
   Boolean(said && closeoutRefusals(step, said, steps).length);
+
+/** How a person's ask has its try taken: its way, and the model, the words and the one check to run again it names. */
+const askedHow = (ask: RetryAsk) => ({
+  mode: ask.mode,
+  ...(ask.model ? { model: ask.model } : {}),
+  ...(ask.message !== undefined ? { message: ask.message } : {}),
+  ...(ask.check !== undefined ? { check: ask.check } : {}),
+});
 
 /** Who asked for a try by its ask: `nemia pause --now`, where the ask names the task it stopped, else a person. */
 const askedBy = (ask: RetryAsk) => (ask.interrupted === undefined ? 'ask' : 'pause');

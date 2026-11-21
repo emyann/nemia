@@ -272,7 +272,8 @@ export const RETRY_ASKED_MODES = [...RETRY_MODES, 'nudge'] as const;
 
 /**
  * Another try of a step, as `nemia retry` asks for one: its way (`mode`), the model a fresh one runs on, the words it is told, a raise of
- * its cap (`budget`), a person's `answers` to its questions; or, with `round`, another round of the loop it closes.
+ * its cap (`budget`), a person's `answers` to its questions, the one refused check a recheck runs again (`check`); or, with `round`,
+ * another round of the loop it closes.
  */
 export const RunRetry = Schema.Struct({
   mode: Schema.Literals(RETRY_ASKED_MODES).annotate({
@@ -290,6 +291,12 @@ export const RunRetry = Schema.Struct({
     Schema.Finite.annotate({ description: "A raise of the step's cap in dollars (--budget), above what its tries have cost." }),
   ),
   answers: Schema.optionalKey(Answers),
+  check: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "With mode recheck, the one refused check of the step to run again (--check), by its name under checks:, every other check's task kept; left out, every check that did not pass runs again.",
+    }),
+  ),
 }).annotate({ identifier: 'RunRetry' });
 export type RunRetry = typeof RunRetry.Type;
 

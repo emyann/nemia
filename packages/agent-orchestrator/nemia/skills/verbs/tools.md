@@ -1057,11 +1057,12 @@ Its arguments:
 ## retry
 
 ```text
-  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
     try a step waiting on you again, once, on the next tick:
     --continue (default) continues its session, told what happened;
     --fresh a new session on its branch; --model <m> the same, on m;
     --recheck runs its check again, and files no session;
+    --check <name>, with --recheck: that refused check alone, the others kept;
     --round: once more — a loop out of rounds goes round again, once,
     the step it loops to continued, then a new reviewer; the step is the
     one that closes the loop, left out where the run has one loop;
@@ -1095,6 +1096,7 @@ Its arguments:
 - message (--message at a shell): The words the try is told: an answer to its needs, or what to do differently.
 - budget (--budget at a shell): A raise of the step's cap in dollars (--budget), above what its tries have cost.
 - answers: One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where the question takes several (multiple); own your own words, beside a choice or instead of one.
+- check (--check at a shell): With mode recheck, the one refused check of the step to run again (--check), by its name under checks:, every other check's task kept; left out, every check that did not pass runs again.
 
 ## approve
 

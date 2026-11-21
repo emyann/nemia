@@ -152,16 +152,18 @@ export type RetryAsk = {
   model?: string;
   message?: string;
   budget?: number;
+  /** The one refused check a recheck runs again (`--check`), every other check's task kept; absent, all that did not pass. */
+  check?: string;
   interrupted?: string;
   at: string;
   actor?: Actor;
 };
 
 /**
- * How a person asks for a try with `nemia retry`: one way, the model a `--model` names, what they said with it — and `budget`, the cap
- * `--budget` raises a step over its budget, or ended at it, to.
+ * How a person asks for a try with `nemia retry`: one way, the model a `--model` names, what they said with it — `budget`, the cap
+ * `--budget` raises a step over its budget, or ended at it, to — and `check`, the one refused check a recheck runs again (`--check`).
  */
-export type RetryHow = { mode: RetryMode; model?: string; message?: string; budget?: number };
+export type RetryHow = { mode: RetryMode; model?: string; message?: string; budget?: number; check?: string };
 
 /**
  * A try to file on this pass: of which step, its number, how, on whose word — `retries:`, a person's `ask`, `signoff`, the run's one
@@ -182,6 +184,8 @@ export type Retry = {
   budget?: number;
   /** The try's `budget` raises a cap the step's tries had already cost, or been ended at (`Raise`): what its brief says. */
   pastCap?: true;
+  /** The one refused check a person's recheck runs again (`--check`), every other check's task kept. */
+  check?: string;
   by: 'retries' | 'signoff' | 'ask' | 'pause';
   stopFirst?: true;
   runsOn?: true;

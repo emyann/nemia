@@ -244,7 +244,9 @@ export const tryFiled = (
 
 /**
  * File one try due, or stop its session first, and put it on the record with its note: nothing once the pass may file no more, and
- * nothing but the note where the engine refuses the close or the answer it needs.
+ * nothing but the note where the engine refuses the close or the answer it needs. A person's recheck of one check (`--check`) files that
+ * check itself: the others' tasks are kept, a refused one among them, and the pass files no check of a step one of whose checks stands
+ * refused (`checksDue`).
  */
 const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   const { run, notes } = f;
@@ -256,8 +258,10 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   if (r.mode === 'recheck') {
     out.tried.push(r.step);
     notes.push(said);
-    run.steps[r.step] = keptChecks(f, step, nextTry(record, r), record.check);
+    run.steps[r.step] = keptChecks(f, step, nextTry(record, r), record.check, r.check);
     out.rechecked.push(r.step);
+    const only = r.check === undefined ? undefined : stepChecks(step).find((c) => c.name === r.check);
+    if (only) yield* fileOneCheck(f, r.step, only);
     return;
   }
   const landing = placeTold(run, f.reads.steps, step, yield* PlaceService, f.heads?.());
@@ -613,14 +617,16 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
 
 /**
  * A recheck's record of a step with several checks (`checks:`): each check that passed on the try behind keeps its task, and every other
- * is named under the new try's id (`checkTaskId`), to be filed by `fileChecks` as its waits allow. A step with one check keeps none: its
- * check runs again whole, as it always has.
+ * is named under the new try's id (`checkTaskId`), to be filed by `fileChecks` as its waits allow. A person's `--check <name>` names that
+ * one alone anew and keeps every other's task, whatever it ended in: one never filed is filed under its kept id once its waits allow. A
+ * step with one check keeps none: its check runs again whole, as it always has.
  * @param f The pass's filing: the run and the phases of its tasks.
  * @param step The step rechecked.
  * @param record The step's record on the new try (`nextTry`).
  * @param behind The check of the try behind it.
+ * @param only The one check a person's recheck runs again (`--check`); absent, every one that did not pass.
  */
-const keptChecks = (f: Filing, step: StepSpec, record: StepRecord, behind: StepRecord['check']) => {
+const keptChecks = (f: Filing, step: StepSpec, record: StepRecord, behind: StepRecord['check'], only?: string) => {
   const plan = stepChecks(step);
   const first = plan[0];
   if (!behind?.tasks || plan.length < 2 || !first) return record;
@@ -628,7 +634,8 @@ const keptChecks = (f: Filing, step: StepSpec, record: StepRecord, behind: StepR
   const tasks = Object.fromEntries(
     plan.map((c) => {
       const was = behind.tasks?.[c.name];
-      return [c.name, was && f.reads.phaseOf(was) === 'succeeded' ? was : checkTaskId(f.run, step.name, n, c.name)];
+      const kept = only === undefined ? was && f.reads.phaseOf(was) === 'succeeded' : c.name !== only;
+      return [c.name, kept && was ? was : checkTaskId(f.run, step.name, n, c.name)];
     }),
   );
   return { ...record, check: { taskId: tasks[first.name] ?? checkTaskId(f.run, step.name, n, first.name), tasks } } satisfies StepRecord;

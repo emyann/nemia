@@ -1022,6 +1022,45 @@ describe('a step judged by named checks: the pass files them in their order, eac
   });
 });
 
+describe("`nemia retry --recheck --check <name>` runs that refused check alone, on the same tree, every other check's task kept", () => {
+  let b!: import('./story.ts').Board;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const checkTask = (name: string, at = '') => `${run.id}-implement${at}-check-${name}`;
+  const s = story(test);
+  s.test('a and b, side by side, both refuse: the step waits on a person', async () => {
+    run = await startedRun(
+      implementThenReview(['checks:', '  - { name: a, run: npm run a, after: [] }', '  - { name: b, run: npm run b, after: [] }']),
+    );
+    await tick(run.id);
+    ended(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
+    await tick(run.id);
+    ended(checkTask('a'), 'failed', { exitCode: 1 });
+    ended(checkTask('b'), 'failed', { exitCode: 1 });
+    await tick(run.id);
+    assert.deepEqual(retryAsks(run.id), []);
+  });
+  s.test('REFUSED: a name that is no refused check of the step, writing no ask', async () => {
+    await assert.rejects(
+      stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck', check: 'c' })),
+      refusedAs('Conflict', '--check'),
+    );
+    assert.deepEqual(retryAsks(run.id), []);
+  });
+  s.test("--check b: the next pass files b's task alone, a's kept on the record", async () => {
+    await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck', check: 'b' }));
+    await tick(run.id);
+    const tasks = runRecord(ROOT, run.id).steps.implement?.check?.tasks ?? {};
+    assert.deepEqual([tasks.a, tasks.b], [checkTask('a'), checkTask('b', '-try2')]);
+    assert.equal(b.tasks.has(checkTask('b', '-try2')), true);
+    assert.equal(b.tasks.has(checkTask('a', '-try2')), false);
+  });
+});
+
 describe('`nemia retry --model` on a Claude Code step in `auto` (F21): a model that drops it refused, by name, writing no ask; anything that keeps the step as it asked is asked', () => {
   const refusedModel = async (lines: string[], model: string, ...facts: string[]) => {
     const run = await throughCheck(['check: npm test', ...lines], 'failed', { exitCode: 1 });

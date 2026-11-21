@@ -700,6 +700,7 @@ const RetryAskFileSchema = Kept({
   model: Schema.optionalKey(Schema.NonEmptyString),
   message: Schema.optionalKey(Said),
   budget: Schema.optionalKey(Dollars),
+  check: Schema.optionalKey(Schema.NonEmptyString),
   interrupted: Schema.optionalKey(Schema.NonEmptyString),
   at: Schema.optionalKey(Schema.Unknown),
 });
@@ -897,7 +898,9 @@ export function askIn(file: string, step: string, n: number) {
   if ('unreadable' in held) return held.unreadable satisfies RetryAsk | string as RetryAsk | string;
   const read = readAs(RetryAskFileSchema, upgradeAsk(held.read));
   if ('refused' in read) return askRefusal(read.refused, held.read) satisfies RetryAsk | string as RetryAsk | string;
-  const { mode, model, message, budget, interrupted, at } = read.read;
+  const { mode, model, message, budget, check, interrupted, at } = read.read;
+  if (check !== undefined && mode !== 'recheck')
+    return 'it names a check and asks for no recheck: only a recheck runs one check again' satisfies RetryAsk | string as RetryAsk | string;
   if (message !== undefined && mode === 'recheck')
     return 'it carries a message and asks for a recheck, which files no session to read it' satisfies RetryAsk | string as
       | RetryAsk
@@ -913,6 +916,7 @@ export function askIn(file: string, step: string, n: number) {
     ...(model === undefined ? {} : { model }),
     ...(message === undefined ? {} : { message }),
     ...(budget === undefined ? {} : { budget }),
+    ...(check === undefined ? {} : { check }),
     ...(interrupted === undefined ? {} : { interrupted }),
     at: isText(at) ? at : '',
     ...actorIn(fieldOf(held.read, 'actor')),

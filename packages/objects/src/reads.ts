@@ -71,7 +71,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'steps.tries': CLOSEOUT,
   'steps.try': CLOSEOUT,
   'steps.closeout': CLOSEOUT,
-  'steps.checkOutput': { shape: 'part', narrow: ['from', 'limit', 'last', 'match'] },
+  'steps.checkOutput': { shape: 'part', narrow: ['from', 'before', 'limit', 'last', 'match'] },
   'steps.told': { shape: 'one', why: 'what a step was told once, its instructions as they were written' },
   'steps.log': { shape: 'part', narrow: ['tail'] },
   'steps.artifact': { shape: 'bytes', why: 'a file a step wrote, served as its bytes, never as JSON' },

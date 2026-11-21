@@ -4,15 +4,15 @@
  * numbered and matched the orchestrator's: here, only the wiring of each key.
  *
  * On the stand-ins: the runtime's test engine, the step's task and its check's filed and settled by hand, and the test place, under the
- * record this file seeds.
+ * records this file seeds: one whose check's task is filed, and one whose check's task the engine never held.
  */
 import { root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
-import type { CheckOutput } from 'objects';
+import { Effect, Schema } from 'effect';
+import { type CheckOutput, ReadFailed } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
@@ -23,23 +23,28 @@ const engine = () => engineFor(standIn());
 const app = eachTest(() => appOver(standIn(), stand()));
 
 const R = 'r-check-output';
+const GONE = 'r-check-output-gone';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${R}.json`),
-  JSON.stringify({
-    id: R,
-    repo: '/code/app',
-    workspace: '/code/app',
-    baseRef: 'abc123',
-    branch: 'main',
-    isolate: true,
-    brief: 'Check output',
-    workflowDir: path.join(root, 'no-such-workflow'),
-    createdAt: '2026-11-21T06:00:00.000Z',
-    workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude', check: 'npm test' }],
-    steps: { implement: { taskId: 't-co', check: { taskId: 'c-co' } } },
-  }),
-);
+/** The record of the run `id`, its one step's task `t-co` and its check's task `check`. */
+const seeded = (id: string, check: string) =>
+  fs.writeFileSync(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo: '/code/app',
+      workspace: '/code/app',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'Check output',
+      workflowDir: path.join(root, 'no-such-workflow'),
+      createdAt: '2026-11-21T06:00:00.000Z',
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude', check: 'npm test' }],
+      steps: { implement: { taskId: 't-co', check: { taskId: check } } },
+    }),
+  );
+seeded(R, 'c-co');
+seeded(GONE, 'c-gone');
 beforeEachTest(() => {
   Effect.runSync(engine().file({ id: 't-co', brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle('t-co', 'succeeded', {
@@ -82,6 +87,19 @@ describe("a try's check's output answers on its route, its query bound to the re
   test('match answers how many lines it found, each under its number', async () => {
     const { body } = await get(`${at}/1/check/output?match=fail`);
     assert.deepEqual([numbers(body), body.matched, body.total], [[4], 1, 5]);
+  });
+  test('before reads the page back from a line, and answers the line lines are held before', async () => {
+    const back = await get(`${at}/1/check/output?before=5&limit=2`);
+    assert.deepEqual([numbers(back.body), back.body.before, back.body.next], [[3, 4], 3, 5]);
+  });
+  test('REFUSED: before with from is a 422', async () => {
+    assert.equal((await get(`${at}/1/check/output?before=3&from=1`)).status, 422);
+  });
+  test('REFUSED: a check whose task the engine cannot read is a 502, ReadFailed', async () => {
+    const res = await app().request(`/api/runs/${GONE}/steps/implement/tries/1/check/output`);
+    assert.equal(res.status, 502);
+    const body = Schema.decodeUnknownSync(ReadFailed)(await res.json());
+    assert.ok(body.error.length > 0, 'it says what to do next');
   });
   test('REFUSED: last with limit is a 422, a stream that is none a 400, a try the step lacks a 404', async () => {
     assert.equal((await get(`${at}/1/check/output?last=2&limit=2`)).status, 422);

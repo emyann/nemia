@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { credentialKept } from 'agent-orchestrator';
-import { type CheckOutput, LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
+import { CHECK_OUTPUT_PAGE, type CheckOutput, LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
 import { checkOutputPrinted } from '../src/reads/check-output.ts';
@@ -653,6 +653,80 @@ test('`nemia check-output` says on stderr the --from to read on from where lines
     stderr.join('\n'),
   );
   assert.equal(stderr.length, 2, stderr.join('\n'));
+});
+
+test('`nemia check-output` says on stderr the --before to read back from where lines are held before the page', () => {
+  const { stderr } = checkOutputPrinted({ ...page, matched: 40, before: 4 }, AGAIN);
+  assert.ok(
+    stderr.some((line) => line.includes(`${AGAIN} --before 4`)),
+    stderr.join('\n'),
+  );
+  assert.equal(stderr.length, 1, stderr.join('\n'));
+});
+
+test('`nemia check-output` asked no page prints the stream whole, reading on from each next in pages of the most', async (t) => {
+  const asks: Array<{ from: string | null; limit: string | null }> = [];
+  const LINES = CHECK_OUTPUT_PAGE.most * 2 + 7;
+  const paging = http.createServer((req, res) => {
+    const url = new URL(req.url ?? '/', api.url);
+    if (!url.pathname.endsWith('/check/output')) {
+      const headers = Object.fromEntries(
+        Object.entries(req.headers).flatMap(([key, value]) =>
+          typeof value === 'string' && (key === 'accept' || key === 'authorization') ? [[key, value]] : [],
+        ),
+      );
+      void fetch(url, { headers }).then(async (answered) => {
+        res.writeHead(answered.status, { 'content-type': answered.headers.get('content-type') ?? 'application/json' });
+        res.end(await answered.text());
+      });
+      return;
+    }
+    const from = url.searchParams.get('from');
+    const limit = url.searchParams.get('limit');
+    asks.push({ from, limit });
+    const start = Number(from ?? 1);
+    const end = Math.min(LINES + 1, start + Number(limit ?? CHECK_OUTPUT_PAGE.byDefault));
+    const lines = Array.from({ length: end - start }, (_, i) => ({ n: start + i, text: `line ${start + i}` }));
+    const read = {
+      try: 2,
+      taskId: 'c-long',
+      stream: 'stdout',
+      running: false,
+      partial: false,
+      lines,
+      total: LINES,
+      ...(end <= LINES ? { next: end } : {}),
+    } satisfies CheckOutput;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(read));
+  });
+  await new Promise<void>((resolve) => paging.listen(0, '127.0.0.1', resolve));
+  const address = paging.address();
+  assert.ok(address !== null && typeof address === 'object');
+  lease(`http://127.0.0.1:${address.port}`);
+  t.onTestFinished(async () => {
+    lease(api.url);
+    paging.closeAllConnections();
+    await new Promise((resolve) => paging.close(resolve));
+  });
+  const read = await nemia(['check-output', 'r-long', 'implement', '--try', '2']);
+  assert.equal(read.code, 0, read.err);
+  assert.deepEqual(
+    read.out.split('\n').filter((line) => line !== ''),
+    Array.from({ length: LINES }, (_, i) => `line ${i + 1}`),
+    'every line printed once, in order',
+  );
+  assert.deepEqual(
+    asks.map((ask) => ask.limit),
+    asks.map(() => String(CHECK_OUTPUT_PAGE.most)),
+    'each page asked for the most a page holds',
+  );
+  assert.deepEqual(
+    asks.map((ask) => ask.from),
+    [null, String(CHECK_OUTPUT_PAGE.most + 1), String(CHECK_OUTPUT_PAGE.most * 2 + 1)],
+    'each page after the first read on from the next the page before answered',
+  );
+  assert.doesNotMatch(read.err, /--from/, 'a stream read whole leaves nothing to read on from');
 });
 
 /** The lines the in-process `nemia ls <run>` printed of each seeded run, between the pause and the standing line, before it was deleted. */

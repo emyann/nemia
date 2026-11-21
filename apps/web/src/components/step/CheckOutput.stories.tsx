@@ -12,24 +12,34 @@ const STDOUT = Array.from({ length: 450 }, (_, i) =>
 );
 const STDERR = ['npm error Test failed.'];
 
-/** What the api answers for `url`, cut of `streams` as the orchestrator cuts it, the check `running`, its stdout kept or not. */
-const answered = (url: URL, over: Partial<Printed> = {}) => {
+/** A longer check's stdout of 1,500 lines, every third failing: 500 lines a search for fail finds, more than a page holds. */
+const MANY = Array.from({ length: 1500 }, (_, i) => ((i + 1) % 3 === 0 ? `FAIL ${i + 1} - times out` : `ok ${i + 1} - builds`));
+
+/** Where a page starts among `held` and where it ends, as the orchestrator cuts it for the query `q`. */
+const cutOf = (held: Printed['lines'], q: URLSearchParams) => {
+  const last = q.get('last');
+  const limit = Number(q.get('limit') ?? '200');
+  const at = (n: number) => {
+    const i = held.findIndex((l) => l.n >= n);
+    return i === -1 ? held.length : i;
+  };
+  if (last) return { start: Math.max(0, held.length - Number(last)), end: held.length };
+  const before = q.get('before');
+  if (before) return { start: Math.max(0, at(Number(before)) - limit), end: at(Number(before)) };
+  const start = at(Number(q.get('from') ?? '1'));
+  return { start, end: Math.min(held.length, start + limit) };
+};
+
+/** What the api answers for `url`, cut of the stdout `stdout` or the stderr as the orchestrator cuts it, with `over` laid on it. */
+const answered = (url: URL, over: Partial<Printed> = {}, stdout = STDOUT) => {
   const q = url.searchParams;
   const stream = q.get('stream') === 'stderr' ? 'stderr' : 'stdout';
-  const all = (stream === 'stderr' ? STDERR : STDOUT).map((text, i) => ({ n: i + 1, text }));
+  const all = (stream === 'stderr' ? STDERR : stdout).map((text, i) => ({ n: i + 1, text }));
   const match = q.get('match');
   const held = match ? all.filter((l) => l.text.toLowerCase().includes(match.toLowerCase())) : all;
-  const last = q.get('last');
-  const from = Number(q.get('from') ?? '1');
-  const limit = Number(q.get('limit') ?? '200');
-  const start = last
-    ? Math.max(0, held.length - Number(last))
-    : Math.max(
-        0,
-        held.findIndex((l) => l.n >= from),
-      );
-  const end = last ? held.length : Math.min(held.length, start + limit);
+  const { start, end } = cutOf(held, q);
   const next = held[end]?.n;
+  const before = start > 0 ? held[start]?.n : undefined;
   const answer: Printed = {
     try: 2,
     taskId: 'r-1-implement-try2-check',
@@ -40,6 +50,7 @@ const answered = (url: URL, over: Partial<Printed> = {}) => {
     total: all.length,
     ...(match ? { matched: held.length } : {}),
     ...(next === undefined ? {} : { next }),
+    ...(before === undefined ? {} : { before }),
     ...over,
   };
   return HttpResponse.json(answer);
@@ -47,7 +58,8 @@ const answered = (url: URL, over: Partial<Printed> = {}) => {
 
 /**
  * The reader of what a try's check printed, one story a state: its stdout's last lines, with earlier ones to read; a search that keeps the
- * failing lines under their numbers; its stderr; a check still running; a stdout the runtime did not keep; a check not filed yet.
+ * failing lines under their numbers, and one that finds more than a page holds, read back a page of matches at a time; its stderr; a
+ * check still running; a stdout the runtime did not keep; a check not filed yet.
  */
 const meta: Meta<typeof CheckOutput> = {
   title: 'Run/CheckOutput',
@@ -90,6 +102,29 @@ export const Searched: Story = {
     await waitFor(() => expect(canvasElement.querySelectorAll('[data-line]').length).toBe(3));
     for (const n of [117, 302, 449]) await expect(canvasElement.querySelector(`[data-line="${n}"]`)).not.toBeNull();
     await expect(canvasElement.querySelector('[data-check-output-said]')).toHaveTextContent('3 of its 450');
+  },
+};
+
+/**
+ * A search that finds more than a page holds: its last 200 matches, then Earlier pressed twice, each page back holding the 200 matches
+ * before the page, down to the first match.
+ */
+export const SearchedMany: Story = {
+  parameters: { msw: [http.get(OUTPUT, ({ request }) => answered(new URL(request.url), {}, MANY))] },
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement);
+    const lines = () => [...canvasElement.querySelectorAll('[data-line]')].map((l) => Number(l.getAttribute('data-line')));
+    await userEvent.type(page.getByRole('searchbox', { name: 'Search its lines' }), 'fail{Enter}');
+    await waitFor(() => expect(lines()[0]).toBe(903));
+    await expect(lines().length).toBe(200);
+    await userEvent.click(page.getByRole('button', { name: 'Earlier lines' }));
+    await waitFor(() => expect(lines()[0]).toBe(303));
+    await expect([lines().length, lines().at(-1)]).toEqual([200, 900]);
+    await userEvent.click(page.getByRole('button', { name: 'Earlier lines' }));
+    await waitFor(() => expect(lines()[0]).toBe(3));
+    await expect([lines().length, lines().at(-1)]).toEqual([100, 300]);
+    await expect(page.getByRole('button', { name: 'Earlier lines' })).toBeDisabled();
+    await expect(canvasElement.querySelector('[data-check-output-said]')).toHaveTextContent('500 of its 1500');
   },
 };
 

@@ -211,8 +211,9 @@ export type StepCheck = typeof StepCheck.Type;
 
 /**
  * A page of what one try's check printed on one stream (`CheckOutput`, agent-orchestrator's check-output.verb.ts): its lines numbered from
- * 1 in the stream, the stream's count of them, those `match` found where it was asked, and the line to read on from where any is left. A
- * check still running answers what it printed so far, under the same numbers a later read gives.
+ * 1 in the stream, the stream's count of them, those `match` found where it was asked, the line to read on from where any is left, and
+ * the line to read back from where any is held before the page. A check still running answers what it printed so far, under the same
+ * numbers a later read gives.
  */
 export const CheckOutput = Schema.Struct({
   try: Schema.Finite.annotate({ description: 'The try whose check printed it, counted from 1.' }),
@@ -236,6 +237,12 @@ export const CheckOutput = Schema.Struct({
   next: Schema.optionalKey(
     Schema.Finite.annotate({
       description: 'The line number to read on from, as from, where lines are left after this page; absent where none is.',
+    }),
+  ),
+  before: Schema.optionalKey(
+    Schema.Finite.annotate({
+      description:
+        'The line number to read the lines before this page before, as before, where lines are held before it; absent where none is.',
     }),
   ),
 }).annotate({ identifier: 'CheckOutput' });

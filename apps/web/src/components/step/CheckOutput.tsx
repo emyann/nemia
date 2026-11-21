@@ -16,14 +16,19 @@ import { cn } from '@/lib/utils';
 /** How many lines a page of the reader holds. */
 const PAGE = 200;
 
-/** Where the reader reads: the last lines, or on from a line. */
-type At = { readonly last: true } | { readonly from: number };
+/** Where the reader reads: the last lines, on from a line, or back from one. */
+type At = { readonly last: true } | { readonly from: number } | { readonly before: number };
 
 /** The try whose check is read: its run, its step and its number. */
 export type CheckRead = { readonly runId: string; readonly step: string; readonly try: number };
 
 /** The page `at` asks, as the api's query spells it. */
-const pageOf = (at: At) => ('last' in at ? { last: String(PAGE) } : { from: String(at.from), limit: String(PAGE) });
+const pageOf = (at: At) =>
+  'last' in at
+    ? { last: String(PAGE) }
+    : 'from' in at
+      ? { from: String(at.from), limit: String(PAGE) }
+      : { before: String(at.before), limit: String(PAGE) };
 
 /** The stream read and the search over its lines, each a choice that reads the stream's end again. */
 function Controls({
@@ -94,25 +99,17 @@ function Lines({ lines, atEnd }: { lines: Printed['lines']; atEnd: boolean }) {
 }
 
 /**
- * Whether lines are held before the page: of the whole stream, where it starts after line 1; under a search, where the end it reads holds
- * fewer than were found, or the page it reads starts after line 1.
+ * The presses that read the page before this one, back from the line the api says lines are held before (`before`), held lines and not
+ * line numbers, so a page back under a search holds as many matches as one forward; the one after it; and the stream's end again. None
+ * where the page is all there is.
  */
-const earlierIn = (data: Printed, at: At) => {
-  const first = data.lines[0]?.n;
-  if (first === undefined) return false;
-  if (data.matched === undefined) return first > 1;
-  return 'last' in at ? data.matched > data.lines.length : at.from > 1;
-};
-
-/** The presses that read the page before this one, the one after it, and the stream's end again; none where the page is all there is. */
 function Pages({ data, at, onAt }: { data: Printed; at: At; onAt: (at: At) => void }) {
-  const first = data.lines[0]?.n;
-  const earlier = earlierIn(data, at);
+  const before = data.before;
   const next = data.next;
-  if (!earlier && next === undefined && 'last' in at) return null;
+  if (before === undefined && next === undefined && 'last' in at) return null;
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="text" isDisabled={!earlier} onPress={() => onAt({ from: Math.max(1, (first ?? 1) - PAGE) })}>
+      <Button variant="text" isDisabled={before === undefined} onPress={() => before !== undefined && onAt({ before })}>
         Earlier lines
       </Button>
       <Button variant="text" isDisabled={next === undefined} onPress={() => next !== undefined && onAt({ from: next })}>
@@ -161,7 +158,7 @@ export function CheckOutput({ read }: { read: CheckRead }) {
           <p data-check-output-said className="text-body-small text-on-surface-variant">
             {said(data, match)}
           </p>
-          <Lines lines={data.lines} atEnd={'last' in at} />
+          <Lines lines={data.lines} atEnd={!('from' in at)} />
           <Pages data={data} at={at} onAt={setAt} />
         </>
       )}

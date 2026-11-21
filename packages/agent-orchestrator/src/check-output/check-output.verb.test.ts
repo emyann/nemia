@@ -119,6 +119,30 @@ test('a page reads on from its next, the last lines end the stream, and a match 
   assert.deepEqual([found.lines, found.matched, found.total], [[{ n: 2, text: 'not ok 2 - two' }], 1, 3]);
 });
 
+test('a page back from a line holds as many held lines as one forward, matches and not line numbers under a match', async () => {
+  const id = await started(['check: npm test']);
+  engine().settle(`${id}-work`, 'succeeded', { closeout: SIGNED });
+  await advanced(id);
+  const stdout = Array.from({ length: 10 }, (_, i) => (i % 2 === 1 ? `FAIL ${i + 1}` : `ok ${i + 1}`)).join('\n');
+  engine().settle(`${id}-work-check`, 'failed', { exitCode: 1, printed: { stdout: `${stdout}\n` } });
+  const pages: number[][] = [];
+  const befores: (number | undefined)[] = [];
+  let at = await read({ runId: id, step: 'work', match: 'fail', last: '2' });
+  pages.push(at.lines.map((l) => l.n));
+  befores.push(at.before);
+  while (at.before !== undefined) {
+    at = await read({ runId: id, step: 'work', match: 'fail', before: String(at.before), limit: '2' });
+    pages.push(at.lines.map((l) => l.n));
+    befores.push(at.before);
+  }
+  assert.deepEqual(pages, [[8, 10], [4, 6], [2]], 'each page back holds two matches, down to the first');
+  assert.deepEqual(befores, [8, 4, undefined]);
+  const first = await read({ runId: id, step: 'work', match: 'fail', before: '2' });
+  assert.deepEqual([first.lines, first.next, first.before], [[], 2, undefined], 'nothing is held before the first match');
+  const whole = await read({ runId: id, step: 'work', before: '4', limit: '2' });
+  assert.deepEqual([whole.lines.map((l) => l.n), whole.before, whole.next], [[2, 3], 2, 4]);
+});
+
 test('a check still running answers what it printed so far, running', async () => {
   const id = await twoTries('running');
   const answer = await read({ runId: id, step: 'work' });
@@ -148,6 +172,17 @@ test('a try whose check is not filed answers no line, and a step with no check: 
 
 test('a page asked wrong is refused as invalid, before the engine is read', async () => {
   const id = await twoTries('failed');
-  for (const asked of [{ from: '0' }, { from: 'x' }, { last: '2', from: '1' }, { last: '2', limit: '2' }, { limit: '0' }, { last: '-1' }])
+  for (const asked of [
+    { from: '0' },
+    { from: 'x' },
+    { last: '2', from: '1' },
+    { last: '2', limit: '2' },
+    { limit: '0' },
+    { last: '-1' },
+    { before: '0' },
+    { before: 'x' },
+    { before: '3', from: '1' },
+    { before: '3', last: '2' },
+  ])
     assert.ok((await refusal(read({ runId: id, step: 'work', ...asked }))) instanceof Invalid, JSON.stringify(asked));
 });

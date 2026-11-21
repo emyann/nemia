@@ -102,6 +102,17 @@ describe('check-output: a try, a stream, a page and a match read; REFUSED: the l
   test('--last beside --from', () => refused(CHECK_OUTPUT_WORDS, ['r', 's', '--last', '9', '--from', '2'], 'nemia check-output', '--last'));
   test('--last beside --limit', () =>
     refused(CHECK_OUTPUT_WORDS, ['r', 's', '--last', '9', '--limit', '2'], 'nemia check-output', '--limit'));
+  test('the lines before a line', () =>
+    assert.deepEqual(argsOf(CHECK_OUTPUT_WORDS, ['r', 's', '--before', '230', '--limit', '5']), {
+      runId: 'r',
+      step: 's',
+      before: '230',
+      limit: '5',
+    }));
+  test('--before beside --from', () =>
+    refused(CHECK_OUTPUT_WORDS, ['r', 's', '--before', '9', '--from', '2'], 'nemia check-output', '--before'));
+  test('--last beside --before', () =>
+    refused(CHECK_OUTPUT_WORDS, ['r', 's', '--last', '9', '--before', '2'], 'nemia check-output', '--last'));
   test('--match twice', () =>
     refused(CHECK_OUTPUT_WORDS, ['r', 's', '--match', 'a', '--match', 'b'], 'nemia check-output takes --match once'));
 });

@@ -92,25 +92,30 @@ export const CLOSEOUT_WORDS = {
 const checkOutputFlag = (flag: string, key: string, takes: string) =>
   ({ flag, kind: 'text', key, takes, twice: `${CLI} check-output takes ${flag} once.` }) as const satisfies Flag;
 
-/** The refusal of `--last` beside `--from` or `--limit`, which read from the other end. */
-const checkOutputRefused = (args: Args) =>
-  textOf(args, 'last') !== undefined && (textOf(args, 'from') !== undefined || textOf(args, 'limit') !== undefined)
-    ? `${CLI} check-output reads the last lines with --last, or from a line with --from and --limit, not both: drop --last, or --from and --limit`
-    : null;
+/** The refusal of `--last` beside `--from`, `--before` or `--limit`, which read from elsewhere, and of `--from` beside `--before`. */
+const checkOutputRefused = (args: Args) => {
+  const given = (key: string) => textOf(args, key) !== undefined;
+  if (given('last') && (given('from') || given('before') || given('limit')))
+    return `${CLI} check-output reads the last lines with --last, or a page from or before a line with --from or --before and --limit, not both: drop --last, or the others`;
+  if (given('from') && given('before'))
+    return `${CLI} check-output reads on from a line with --from, or the lines before one with --before, not both: drop one of them`;
+  return null;
+};
 
 /**
  * `nemia check-output <run> <step> [--try n]`: what a try's check printed, its latest try's by default, read from the runtime whole, a
- * page at a time: stdout, or stderr with `--stderr`; every line, or the page `--from`, `--limit` and `--last` cut; only the lines
- * containing `--match`'s text, case-insensitively, each under its number.
+ * page at a time: stdout, or stderr with `--stderr`; every line, or the page `--from`, `--before`, `--limit` and `--last` cut; only the
+ * lines containing `--match`'s text, case-insensitively, each under its number.
  */
 export const CHECK_OUTPUT_WORDS = {
   name: 'check-output',
   served: [{ endpoint: 'steps.checkOutput' }],
-  usage: '<runId> <step> [--try <n>] [--stderr] [--from <n>] [--limit <n>] [--last <n>] [--match <text>]',
+  usage: '<runId> <step> [--try <n>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]',
   help: [
     "what a step's try's check printed, its latest try or --try <n>:",
-    'stdout whole, or --stderr; --from <n> --limit <n> or --last <n>: one',
-    'page; --match <text>: the lines containing it, any case, numbered',
+    'stdout whole, or --stderr; --from <n> or --before <n> with --limit <n>,',
+    'or --last <n>: one page; --match <text>: the lines containing it, any',
+    'case, numbered',
   ],
   spec: {
     positionals: [
@@ -121,13 +126,14 @@ export const CHECK_OUTPUT_WORDS = {
       checkOutputFlag('--try', 'try', "a try's number"),
       { flag: '--stderr', kind: 'switch', sets: { stream: 'stderr' } },
       checkOutputFlag('--from', 'from', 'the line number to read on from, from 1'),
+      checkOutputFlag('--before', 'before', 'the line number the lines printed end before, from 1'),
       checkOutputFlag('--limit', 'limit', 'how many lines to print from there'),
       checkOutputFlag('--last', 'last', 'how many of the last lines to print'),
       checkOutputFlag('--match', 'match', 'the text the lines printed contain'),
     ],
     unknown: takesNo(
       'check-output',
-      "one run's id, one step's name, --try <n>, --stderr, --from <n>, --limit <n>, --last <n> and --match <text>",
+      "one run's id, one step's name, --try <n>, --stderr, --from <n>, --before <n>, --limit <n>, --last <n> and --match <text>",
     ),
   },
   check: checkOutputRefused,

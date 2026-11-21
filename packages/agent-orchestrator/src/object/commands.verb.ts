@@ -128,6 +128,7 @@ export const CheckOutputInput = Schema.Struct({
   try: Schema.optionalKey(Schema.String),
   stream: Schema.optionalKey(Schema.Literals(OUTPUT_STREAMS)),
   from: Schema.optionalKey(Schema.String),
+  before: Schema.optionalKey(Schema.String),
   limit: Schema.optionalKey(Schema.String),
   last: Schema.optionalKey(Schema.String),
   match: Schema.optionalKey(Schema.String),

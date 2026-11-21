@@ -236,18 +236,29 @@ const transcriptQuery = {
 
 /**
  * The query of a read of a try's check's output: `stream`, the stream to read (stdout where not given); `from`, the line number to read on
- * from, or `last`, the last lines, never both; `limit`, how many lines from there (`CHECK_OUTPUT_PAGE`), never with `last`; and `match`,
- * a text the lines answered contain, compared case-insensitively, each line kept under its number in the stream.
+ * from, `before`, the line the lines answered end before, or `last`, the last lines, one of the three; `limit`, how many lines from there
+ * or before it (`CHECK_OUTPUT_PAGE`), never with `last`; and `match`, a text the lines answered contain, compared case-insensitively,
+ * each line kept under its number in the stream, so a page before a line holds the matched lines just before it.
  */
 const checkOutputQuery = {
   stream: Schema.optionalKey(
     Schema.Literals(OUTPUT_STREAMS).annotate({ description: 'The stream to read, stdout or stderr; stdout where not given.' }),
   ),
   from: Schema.optionalKey(
-    Schema.String.annotate({ description: "The line number to read on from, from 1, as a page's next says it; never with last." }),
+    Schema.String.annotate({
+      description: "The line number to read on from, from 1, as a page's next says it; never with before or last.",
+    }),
   ),
-  limit: Schema.optionalKey(Schema.String.annotate({ description: 'How many lines to answer from there; never with last.' })),
-  last: Schema.optionalKey(Schema.String.annotate({ description: 'How many of the last lines to answer; never with from or limit.' })),
+  before: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The line number the lines answered end before, from 1, as a page's before says it: the limit lines held just before it; never with from or last.",
+    }),
+  ),
+  limit: Schema.optionalKey(Schema.String.annotate({ description: 'How many lines to answer from there, or before it; never with last.' })),
+  last: Schema.optionalKey(
+    Schema.String.annotate({ description: 'How many of the last lines to answer; never with from, before or limit.' }),
+  ),
   match: Schema.optionalKey(
     Schema.String.annotate({
       description: 'A text the lines answered contain, as it is, compared case-insensitively; every line where not given.',
@@ -302,7 +313,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
     error: [...subResourceErrors, ReadFailed],
   }).annotate(
     OpenApi.Description,
-    "Reads a page of what one try of a run's step's check printed on stdout or stderr, read whole from the runtime while the check runs and after it ended: the lines from a line number or the last ones, or only those containing a text, each under its number in the stream. Answers CheckOutput, with the line to read on from.",
+    "Reads a page of what one try of a run's step's check printed on stdout or stderr, read whole from the runtime while the check runs and after it ended: the lines from a line number, before one or the last ones, or only those containing a text, each under its number in the stream. Answers CheckOutput, with the lines to read on from and to read before.",
   ),
   HttpApiEndpoint.get('told', '/api/runs/:runId/steps/:step/told', {
     params: stepParams,

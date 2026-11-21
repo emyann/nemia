@@ -405,6 +405,7 @@ export const CLAUDE_DECLARATION: HarnessDeclaration = {
     'callAdmission',
     'projectMcp',
     'enabledSkills',
+    'pictures',
     'memoryLimit',
     'bridge',
     'keepsOpen',

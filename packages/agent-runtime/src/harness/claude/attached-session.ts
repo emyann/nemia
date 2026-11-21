@@ -40,6 +40,7 @@ import { claudeStreamKept, initLineKept } from '../detached/output.ts';
 import type { InitRead } from '../../../contracts/capture.contract.ts';
 import { ASK_CUT, permissionAnswered, permissionAskOf } from './permission.ts';
 import type { SpawnRequest } from '../seam.ts';
+import { type Block, PictureUnread, openingOf, pictureBlocks } from './pictures.ts';
 import type { AskQuestion } from '../../core/index.ts';
 import { own } from '../../core/own.ts';
 import { cutWords } from '../../core/restart.ts';
@@ -58,7 +59,7 @@ export type Held = (live: Live) => boolean;
 type UserLine = {
   type: 'user';
   uuid: ReturnType<typeof randomUUID>;
-  message: { role: 'user'; content: string };
+  message: { role: 'user'; content: string | Block[] };
   parent_tool_use_id: null;
   session_id: string;
 };
@@ -73,7 +74,7 @@ const inputOf = () => {
     wake = undefined;
   };
   return {
-    push: (content: string) => {
+    push: (content: string | Block[]) => {
       const uuid = randomUUID();
       items.push({ type: 'user', uuid, message: { role: 'user', content }, parent_tool_use_id: null, session_id: '' });
       ring();
@@ -673,7 +674,8 @@ const spawnerOf = (root: string, live: Live, scope: { memoryLimit?: number; argv
  * @param run The session's run file, as first written.
  * @param first The first words on the session's input.
  * @param options Whether a call is held and how often that is read, the Claude Code to run, the session to resume, who is pushed
- *   each message, and the scope to run in.
+ *   each message, the scope to run in, and whether its first message shows the task's `config.pictures` (`shows`: a fresh start alone,
+ *   never an adopted session, which saw them).
  */
 export const startSession = (
   root: string,
@@ -687,6 +689,7 @@ export const startSession = (
     resume?: string;
     pushed?: (m: SDKMessage) => void;
     scope?: ScopeAt;
+    shows?: boolean;
   },
 ) => {
   const abort = new AbortController();
@@ -710,8 +713,15 @@ export const startSession = (
   if (scope !== undefined && 'refused' in scope) throw new Refusal(scope.refused);
   if (scope) live.scoped = true;
   if (scope?.memoryLimit !== undefined) live.limited = true;
+  let opening: string | Block[] = first;
+  try {
+    if (options.shows === true) opening = openingOf(first, pictureBlocks(r));
+  } catch (err) {
+    if (err instanceof PictureUnread) throw new Refusal(err.message);
+    throw err;
+  }
   writeRun(root, run);
-  live.unanswered.add(live.input.push(first));
+  live.unanswered.add(live.input.push(opening));
   const q = query({
     prompt: live.input,
     options: {

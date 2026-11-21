@@ -436,9 +436,9 @@ export const attachedSessions = (
   const held: Held = (l) => (draining || drainsThis(root) || sessionsDrain() !== null) && l.calls.size === 0;
   const pushes = pushesOf({ root, holds: (name) => live.has(name) });
   const given = { held, holdPollMs, scope: options };
-  const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => {
+  const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string, shows = false) => {
     const found = claudeExecutableOf(executable, options.harnessBin);
-    const how = { ...given, ...(found ? { executable: found } : {}), ...(resume ? { resume } : {}) };
+    const how = { ...given, ...(found ? { executable: found } : {}), ...(resume ? { resume } : {}), shows };
     live.set(run.name, startSession(root, r, run, first, { ...how, pushed: (m) => pushes.push(run.name, m) }));
   };
 
@@ -579,7 +579,7 @@ const noTurnToEnd = (name: string, run: AttachedRun | undefined) =>
 const opsOf = (
   root: string,
   live: Map<string, Live>,
-  start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => void,
+  start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string, shows?: boolean) => void,
   runs: (names?: readonly string[]) => Map<string, Sighting>,
   pushes: Pushes,
 ) =>
@@ -597,7 +597,7 @@ const opsOf = (
             ...(r.resumeFrom ? { carried: carriedFrom(root, r.resumeFrom) } : {}),
             request: keptRequest(r),
           };
-          start(r, run, r.brief, r.resumeFrom);
+          start(r, run, r.brief, r.resumeFrom, r.resumeFrom === undefined);
         },
         catch: failed('spawn'),
       }),

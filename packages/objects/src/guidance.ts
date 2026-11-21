@@ -104,5 +104,4 @@ export const GUIDANCE: readonly Guidance[] = [
 export const portInstructions = () => GUIDANCE.map((g) => g.port).join('\n\n');
 
 /** What a shell seat is told: every paragraph's shell form but the port's seat's alone, a blank line between. */
-export const shellGuidance = () =>
-  GUIDANCE.flatMap((g) => (g.shell === null ? [] : [g.shell])).join('\n\n');
+export const shellGuidance = () => GUIDANCE.flatMap((g) => (g.shell === null ? [] : [g.shell])).join('\n\n');

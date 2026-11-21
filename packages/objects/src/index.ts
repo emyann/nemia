@@ -248,33 +248,10 @@ export {
   SignInState,
   SignedOut,
 } from './mcp-server.ts';
-export {
-  type ApiShape,
-  type EndpointKeys,
-  type EndpointShape,
-  UNTAKEN_QUERY,
-  endpointKeysOf,
-  endpointOf,
-  keysOfEndpoint,
-  streamsOf,
-} from './endpoint-keys.ts';
+export { type ApiShape, type EndpointKeys, type EndpointShape, UNTAKEN_QUERY, endpointKeysOf, endpointOf } from './endpoint-keys.ts';
 export { jsonBodied } from './write-body.ts';
-export {
-  type DescribedApi,
-  type DescribedEndpoint,
-  type KeySaid,
-  type LinkedTool,
-  PORT_PAGE,
-  type ToolInput,
-  type ToolMethod,
-  type ToolVerb,
-  type ToolWords,
-  toolDescriptionOf,
-  toolLinesOf,
-  toolWordsOf,
-  toolsOf,
-} from './tool-words.ts';
-export { GUIDANCE, type Guidance, type GuidanceId, portInstructions, shellGuidance } from './guidance.ts';
+export { type DescribedApi, type ToolWords, PORT_PAGE, toolDescriptionOf, toolLinesOf, toolWordsOf, toolsOf } from './tool-words.ts';
+export { GUIDANCE, type Guidance, portInstructions, shellGuidance } from './guidance.ts';
 export { headline } from './headline.ts';
 export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut, uploadBoundMs } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';

@@ -23,7 +23,8 @@ store afresh each time, keep no memory but what you read with `memory`, and spea
 
 These words name a verb, as `hold` or `factory instruction`: inside, type `nemia <verb>`, its flags as written; outside, call its tool,
 named on its line of the `verbs` skill, whose schema says its arguments. That skill lists every verb you run by who answers for it, and
-says which run at a shell alone.
+says which run at a shell alone. It opens with where to start, as the port tells an outside session, and its `tools.md` says what each
+tool's endpoint does and what each argument takes.
 
 ## Where you stand
 

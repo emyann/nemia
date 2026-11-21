@@ -2,9 +2,10 @@
  * What ships with Nemia (`nemia/`) is any factory's, never this repository's: her instruction and her skills name no agent of this
  * repository's team, no file of its own, no playbook of its operator and none of its owner's settings, and each skill her instruction and
  * her skills name is one she ships, under `nemia/skills/`, its `name:` its folder's, read as Claude Code reads her plugin. "Gate" names a
- * step's gate alone (`gateWordsIn`), but in her generated verbs skill, whose words are the command table's. Her skills and her instruction
- * keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in each file that writes or reads them
- * (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that line shows her (`feedLineWords`)
+ * step's gate alone (`gateWordsIn`), but in her generated verbs skill and its tools.md, whose words are the command table's and the
+ * Api's. Her skills and her instruction keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in
+ * each file that writes or reads them (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that
+ * line shows her (`feedLineWords`)
  * beside the reason her selector asks for. Her plugin's agent is the file the keeper reads (`nemiaDefinition`), and its one server is the
  * store's MCP port, read from the person's environment (`serverBreaks`). Nothing of it hands her a way to the api but a verb: no shell's
  * HTTP client and no fetch (`aroundVerbsIn`). Its wording is judged by a person at the landing step; this
@@ -128,6 +129,7 @@ const gateWordsIn = (files: Map<string, string>) =>
 test('what ships with Nemia, and this factory\'s instruction to her, say "gate" only for a step\'s gate, but in her generated verbs skill', () => {
   const files = shipped();
   files.delete('skills/verbs/SKILL.md');
+  files.delete('skills/verbs/tools.md');
   assert.ok(files.has('agents/nemia.md') && files.has('skills/bring-what-waits/SKILL.md'), 'her instruction and her skills are read');
   files.set('NEMIA.md', fs.readFileSync(path.join(REPO, 'NEMIA.md'), 'utf8'));
   assert.deepEqual(gateWordsIn(files), []);

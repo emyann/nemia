@@ -318,7 +318,9 @@ export function toolLinesOf(verb: Pick<ToolVerb, 'name' | 'usage' | 'help'>, too
       ...(tool.queryKeys.includes('limit')
         ? [`Answers ${PORT_PAGE} at most unless limit is given; a last line or metadata.continue names the token for the next page.`]
         : []),
-      ...Object.entries(tool.defaults).map(([key, value]) => `Sends ${key}=${value} where the call gives no ${key}: give it to ask otherwise.`),
+      ...Object.entries(tool.defaults).map(
+        ([key, value]) => `Sends ${key}=${value} where the call gives no ${key}: give it to ask otherwise.`,
+      ),
     ],
   };
 }

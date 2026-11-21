@@ -1,14 +1,23 @@
 /**
  * Which reads of the `Api` a verb links, so that her shell and the MCP port reach each one a person or she would ask for. A read is
  * linked by a verb's `served` link, is a stream (`READS` shape `stream`), which no tool can serve, or is named in `UNLINKED_READS` with
- * the reason it has no verb. `readsUnlinked` (proved by contracts/reads-unlinked.contract.ts) judges the rule on plain data, and
- * `unlinkedReadsOf` applies it to an `Api` and a table's entries, each break a sentence naming its fix. Pure.
+ * the reason it has no verb. `readsUnlinked` judges the rule on plain data, and `unlinkedReadsOf` applies it to an `Api` and a table's
+ * entries, each break a sentence naming its fix. Pure.
  */
-import type { GetRead, ReadReason, ReadsUnlinked, UnlinkedBreak, UnlinkedBreakReason } from '../contracts/reads-unlinked.contract.ts';
 import type { ApiGetName } from './api.ts';
 import { READS } from './reads.ts';
 
-export type { GetRead, ReadReason, UnlinkedBreak, UnlinkedBreakReason } from '../contracts/reads-unlinked.contract.ts';
+/** A GET endpoint of the `Api`, as `<group>.<endpoint>`, and whether it answers a stream (`READS` shape `stream`). */
+export type GetRead = { readonly read: string; readonly stream: boolean };
+
+/** Why a read has no verb, in a sentence a person reads, by the read it names. */
+export type ReadReason = { readonly read: string; readonly why: string };
+
+/** Why a read or a reason breaks the rule. */
+export type UnlinkedBreakReason = 'unlinked' | 'linked' | 'stream' | 'none' | 'unsaid';
+
+/** A break of the rule: the read it names, and why. */
+export type UnlinkedBreak = { readonly read: string; readonly reason: UnlinkedBreakReason };
 
 /**
  * Each break of the rule, in the reads' order and then the reasons': a read no stream, no verb links and no reason names (`unlinked`);
@@ -18,7 +27,7 @@ export type { GetRead, ReadReason, UnlinkedBreak, UnlinkedBreakReason } from '..
  * @param linked The endpoints the verbs link, by their `served` links.
  * @param reasons Why each read with no verb has none.
  */
-export const readsUnlinked: ReadsUnlinked = (reads, linked, reasons) => {
+export const readsUnlinked = (reads: readonly GetRead[], linked: readonly string[], reasons: readonly ReadReason[]) => {
   const named = new Set(reasons.map((x) => x.read));
   const links = new Set(linked);
   const unlinked: UnlinkedBreak[] = reads

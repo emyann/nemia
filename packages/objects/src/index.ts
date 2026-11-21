@@ -255,6 +255,25 @@ export { GUIDANCE, type Guidance, portInstructions, shellGuidance } from './guid
 export { headline } from './headline.ts';
 export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut, uploadBoundMs } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
+export {
+  TRIGGER_ORIGINS,
+  TRIGGER_QUOTAS,
+  TRIGGER_TARGET_KINDS,
+  TRIGGER_WHEN_KINDS,
+  Trigger,
+  TriggerAtTime,
+  TriggerClash,
+  TriggerList,
+  TriggerOnCards,
+  TriggerSpec,
+  TriggerStatus,
+  TriggerTarget,
+  TriggerWrite,
+  type TriggerOrigin,
+  type TriggerQuota,
+  type TriggerTargetKind,
+  type TriggerWhenKind,
+} from './trigger.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { LibraryAdd, LibraryAddList, LibraryAddSpec, LibraryAddStatus } from './library.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus, VolumeSwitchesWrite } from './volume.ts';
@@ -737,6 +756,8 @@ export {
   FACTORY_SERVER_RM_WORDS,
   FACTORY_SERVERS_WORDS,
   FACTORY_UNSCHEDULE_WORDS,
+  FACTORY_TRIGGER_WORDS,
+  FACTORY_UNTRIGGER_WORDS,
 } from './commands-factories-parts.ts';
 export {
   FACTORY_COST_LINE_RM_WORDS,

@@ -99,6 +99,8 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'mcpservers.getLibrary': ONE,
   'schedules.list': LIST,
   'schedules.get': ONE,
+  'triggers.list': LIST,
+  'triggers.get': ONE,
   'hires.list': LIST,
   'hires.get': ONE,
   'libraryadds.list': LIST,

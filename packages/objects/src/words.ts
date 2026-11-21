@@ -687,6 +687,7 @@ export const KINDS = [
   'Factory',
   'McpServer',
   'Schedule',
+  'Trigger',
   'Hire',
   'LibraryAdd',
   'Volume',

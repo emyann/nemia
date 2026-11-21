@@ -48,7 +48,7 @@ export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
     'what runs the card when it is started: the name of a workflow its factory offers; else the start names one. A path an older card holds is not read',
   repo: "retired: an older card's repository, read and not used, since the card's factory places its run (`nemia factory attach <factory> <workflow> --repo <name>`); a new or changed value is refused",
   queued:
-    'the time `nemia inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
+    'the time `nemia inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it, or a card trigger of its factory whose selector selects its labels queues it without writing this',
   gate: 'a step of its workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, in the run it starts: none when unset',
   model:
     "the model a step of its workflow runs on in the run it starts, and in no other run, as `<step>=<model>`, comma-separated: `implement=fable`; its other steps run on their agents' models, and none when unset",
@@ -132,6 +132,18 @@ export const CardStatus = Schema.Struct({
     Schema.Array(CardLabelLeftOut).annotate({
       description:
         'The label keys the card was filed without, as the runs of its `from:` disagree on them: on the answer of a filing alone.',
+    }),
+  ),
+  queuedBy: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description:
+        'The card triggers of its factory that queue it, by name, where its labels are selected and it is not queued by hand: read on every pass, never written on the card.',
+    }),
+  ),
+  clash: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description:
+        'The card triggers of its factory that would send it, naming no workflow, to two workflows: it waits until a selector or its labels change.',
     }),
   ),
   queueLength: Schema.optionalKey(

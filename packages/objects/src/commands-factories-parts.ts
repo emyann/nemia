@@ -1,6 +1,7 @@
 /**
  * The words of a factory's parts in its namespace, each its own object of the `Api`: an agent hired into a step and fired from it
- * (`nemia factory hire|fire`, the Hire), a workflow's runs scheduled and taken back (`nemia factory schedule|unschedule`, the Schedule),
+ * (`nemia factory hire|fire`, the Hire), a workflow's runs scheduled and taken back (`nemia factory schedule|unschedule`, the Schedule), a card trigger set and taken back
+ * (`nemia factory trigger|untrigger`, the Trigger),
  * and its MCP servers listed, recorded and taken off (`nemia factory servers`, `server add|rm`, the McpServer). Pure.
  */
 import { type Args, type CommandWords, type Flag, type Spec } from './command.ts';
@@ -167,6 +168,87 @@ export const FACTORY_UNSCHEDULE_WORDS = {
   only: {
     side: 'cli',
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Schedule's `delete`, whose handler calls this one by its `input`",
+  },
+} as const satisfies CommandWords;
+
+/** A value flag of `nemia factory trigger`, named in its refusals as `takes` says. */
+const triggerFlag = (flag: string, key: string, takes: string) =>
+  ({
+    flag,
+    kind: 'text',
+    key,
+    takes: `${flag} takes ${takes}: nemia factory trigger <factory> <name> --selector ready=yes --to <workflow>`,
+    twice: `nemia factory trigger takes ${flag} once: a trigger has one selector and one target.`,
+  }) satisfies Flag;
+
+const TRIGGER_USAGE = '<factory> <name> --selector <selector> --to <workflow>';
+
+const TRIGGER_SPEC: Spec = {
+  positionals: [
+    { key: 'factory', takes: 'required', kind: 'name' },
+    { key: 'name', takes: 'required', kind: 'name' },
+  ],
+  flags: [
+    triggerFlag('--selector', 'selector', "a label selector in Kubernetes' spelling, over a card's labels"),
+    triggerFlag('--to', 'to', 'the workflow a card naming none is queued on, one the factory offers'),
+  ],
+  unknown: (arg) =>
+    arg.startsWith('-')
+      ? `nemia factory trigger does not take ${arg}: nemia factory trigger ${TRIGGER_USAGE}.`
+      : `nemia factory trigger takes one name, and ${arg} is a second: nemia factory trigger ${TRIGGER_USAGE}, once per trigger.`,
+  apart: (_value, flag) => `${flag} is given no value: nemia factory trigger ${TRIGGER_USAGE}.`,
+  missing: `nemia factory trigger takes the factory, then the trigger's name: nemia factory trigger ${TRIGGER_USAGE}. Nothing was triggered.`,
+};
+
+/** Why `nemia factory trigger`'s arguments are refused before anything is read: a `--selector` or a `--to` left out, or a value empty. */
+function triggerCheck(args: Args) {
+  for (const key of ['selector', 'to'])
+    if (!textOf(args, key)) return `nemia factory trigger takes --${key}: nemia factory trigger ${TRIGGER_USAGE}. Nothing was triggered.`;
+  return leftOut(TRIGGER_SPEC, args);
+}
+
+/** `nemia factory trigger`: a card trigger, which queues each card of the factory its selector selects. */
+export const FACTORY_TRIGGER_WORDS = {
+  name: 'factory trigger',
+  served: [{ endpoint: 'triggers.put' }],
+  usage: TRIGGER_USAGE,
+  help: [
+    'queue each card of the factory whose labels the selector selects, in',
+    "the order filed: on the card's own workflow, else on --to; a second replaces the first",
+  ],
+  spec: TRIGGER_SPEC,
+  check: triggerCheck,
+  writes: true,
+  class: 'ask',
+  only: {
+    side: 'cli',
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Trigger's `put`, whose handler calls this one by its `input`",
+  },
+} as const satisfies CommandWords;
+
+const UNTRIGGER_USAGE = '<factory> <name>';
+
+/** `nemia factory untrigger`: a factory's own card trigger taken back. */
+export const FACTORY_UNTRIGGER_WORDS = {
+  name: 'factory untrigger',
+  served: [{ endpoint: 'triggers.delete' }],
+  usage: UNTRIGGER_USAGE,
+  help: ["take a factory's own card trigger back: the cards it queued wait unqueued"],
+  spec: {
+    positionals: TRIGGER_SPEC.positionals,
+    flags: [],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `nemia factory untrigger does not take ${arg}: nemia factory untrigger ${UNTRIGGER_USAGE}.`
+        : `nemia factory untrigger takes one trigger, and ${arg} is a second: nemia factory untrigger ${UNTRIGGER_USAGE}, once per trigger.`,
+    missing: `nemia factory untrigger takes the factory, then the trigger's name: nemia factory untrigger ${UNTRIGGER_USAGE}. Nothing was untriggered.`,
+    flagFirst: true,
+  },
+  writes: true,
+  class: 'ask',
+  only: {
+    side: 'cli',
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Trigger's `delete`, whose handler calls this one by its `input`",
   },
 } as const satisfies CommandWords;
 

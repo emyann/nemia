@@ -42,6 +42,7 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { LibraryAdd, LibraryAddList } from './library.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
+import { Trigger, TriggerList, TriggerWrite } from './trigger.ts';
 import { Volume, VolumeList, VolumeSwitchesWrite } from './volume.ts';
 import {
   cardParams,
@@ -65,6 +66,8 @@ const McpServerObject = McpServer.annotate({ identifier: 'McpServer' });
 const McpServerListObject = McpServerList.annotate({ identifier: 'McpServerList' });
 const ScheduleObject = Schedule.annotate({ identifier: 'Schedule' });
 const ScheduleListObject = ScheduleList.annotate({ identifier: 'ScheduleList' });
+const TriggerObject = Trigger.annotate({ identifier: 'Trigger' });
+const TriggerListObject = TriggerList.annotate({ identifier: 'TriggerList' });
 const HireObject = Hire.annotate({ identifier: 'Hire' });
 const HireListObject = HireList.annotate({ identifier: 'HireList' });
 const LibraryAddObject = LibraryAdd.annotate({ identifier: 'LibraryAdd' });
@@ -449,6 +452,47 @@ export class SchedulesGroup extends HttpApiGroup.make('schedules').add(
   }).annotate(
     OpenApi.Description,
     "Takes back a factory's schedule of the workflow named in the path. Answers the Schedule as it was, with the file written.",
+  ),
+) {}
+
+/**
+ * A factory's triggers, in its namespace: its schedules as the time kind, each named by its workflow, and its card triggers, each by its
+ * own name, defined in its file or by its template.
+ */
+export class TriggersGroup extends HttpApiGroup.make('triggers').add(
+  HttpApiEndpoint.get('list', '/api/namespaces/:namespace/triggers', {
+    params: namespaceParams,
+    query: listQuery,
+    success: TriggerListObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Lists a factory's triggers in its namespace, a page at a time, each with whether it can spend quota and what it does now: the cards it queues, or its next fire. Answers a TriggerList.",
+  ),
+  HttpApiEndpoint.get('get', '/api/namespaces/:namespace/triggers/:name', {
+    params: cardParams,
+    success: TriggerObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Reads one of a factory's triggers by its name, with whether it can spend quota and what it does now. Answers the Trigger.",
+  ),
+  HttpApiEndpoint.put('put', '/api/namespaces/:namespace/triggers/:name', {
+    params: cardParams,
+    payload: TriggerWrite,
+    success: TriggerObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Writes a factory's trigger named in the path: a card selector and its target, or a cron, named by its workflow, which writes the schedule. Answers the Trigger as it reads after, with the file written.",
+  ),
+  HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/triggers/:name', {
+    params: cardParams,
+    success: TriggerObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Takes back a factory's own trigger named in the path, a schedule of the time kind. Answers the Trigger as it was, with the file written.",
   ),
 ) {}
 

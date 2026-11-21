@@ -470,6 +470,22 @@ describe('the check of a template folder: the whole folder passes, and each rule
     assertRefused(declared({ type: 'string', whenOrigin: 'example.org' }), 'nemia.yaml', at, 'boolean');
     assertRefused(declared({ type: 'boolean', whenOrigin: 'https://Example.org/' }), 'nemia.yaml', at, 'host');
   });
+  test('a parameter the template asks (ask: true) passes, refused with whenOrigin at its ask and by the layout where ask is no boolean', () => {
+    const declared = (parameter: Record<string, unknown>) =>
+      refusalsOf((d) => (d['nemia.yaml'].spec.parameters.follow = { description: 'Asked of the person.', ...parameter }));
+    assert.deepEqual(declared({ type: 'string', default: '', ask: true }), []);
+    assert.deepEqual(declared({ type: 'boolean', default: false, whenOrigin: 'example.org', ask: false }), []);
+    assertRefused(
+      declared({ type: 'boolean', default: false, whenOrigin: 'example.org', ask: true }),
+      'nemia.yaml',
+      ['spec', 'parameters', 'follow', 'ask'],
+      'whenOrigin',
+    );
+    assert.ok(
+      declared({ type: 'string', default: '', ask: 'yes' }).some((r) => r.file === 'nemia.yaml' && r.at.includes('ask')),
+      'ask: yes is refused by the layout at the parameter',
+    );
+  });
   test('a ${{ parameters.<name> }} nemia.yaml does not declare is refused, in a check at its key and in a text the render writes at its file, and a declared one passes', () => {
     const workflow = 'workflows/dev/workflow.yaml';
     const named = (d: Record<string, any>) => (d[workflow].spec.steps[1].check = 'go --check ${{ parameters.nope }}');

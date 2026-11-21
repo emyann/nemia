@@ -31,6 +31,11 @@ export const TemplateParameter = Schema.Struct({
       description: "The host whose clones set this boolean true when it is a factory's first writable volume, and any other volume false.",
     }),
   ),
+  ask: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: 'Whether the template asks this parameter of a person applying it, drawn open rather than folded; never with whenOrigin.',
+    }),
+  ),
 });
 export type TemplateParameter = typeof TemplateParameter.Type;
 

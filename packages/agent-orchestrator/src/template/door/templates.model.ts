@@ -26,6 +26,7 @@ const Parameter = Schema.Struct({
   description: Schema.String,
   default: Schema.optional(Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
   whenOrigin: Schema.optional(Schema.String),
+  ask: Schema.optional(Schema.Boolean),
 });
 
 /**

@@ -24,7 +24,8 @@ const ROOT = scratch('wf-template-object-');
 const { exportTemplate } = templated(ROOT);
 
 /**
- * A builtin folder holding `mill`, the tests' team exported; `asks`, the same with a parameter that has no default; `odd`, the same with
+ * A builtin folder holding `mill`, the tests' team exported; `asks`, the same with a parameter that has no default and one it asks
+ * (`ask: true`); `odd`, the same with
  * a revisions policy that is none; and `torn`, whose manifest does not parse.
  */
 function builtins() {
@@ -35,7 +36,10 @@ function builtins() {
   exportTemplate({ dir: path.join(folder, 'asks'), from: repo });
   const manifest = path.join(folder, 'asks', 'nemia.yaml');
   const doc = parse(fs.readFileSync(manifest, 'utf8'));
-  doc.spec.parameters = { budget: { type: 'number', description: 'dollars for a review' } };
+  doc.spec.parameters = {
+    budget: { type: 'number', description: 'dollars for a review' },
+    label: { type: 'string', description: 'the label a card is routed by', default: '', ask: true },
+  };
   fs.writeFileSync(manifest, stringify(doc, { lineWidth: 0 }));
   exportTemplate({ dir: path.join(folder, 'odd'), from: repo });
   const odd = path.join(folder, 'odd', 'nemia.yaml');
@@ -114,7 +118,9 @@ describe('the builtin templates as objects, and their renders', () => {
     assert.ok(torn.status.problems && torn.status.problems.length > 0);
     assert.deepEqual(torn.spec, { parameters: {}, hires: {} });
     const asks = Schema.decodeUnknownSync(Template)(run(templateObject('asks'), folder));
-    assert.deepEqual(Object.keys(asks.spec.parameters), ['budget']);
+    assert.deepEqual(Object.keys(asks.spec.parameters), ['budget', 'label']);
+    assert.equal(asks.spec.parameters.label?.ask, true, 'a parameter the template asks is served with ask');
+    assert.equal(Object.hasOwn(asks.spec.parameters.budget ?? {}, 'ask'), false);
     const odd = Schema.decodeUnknownSync(Template)(run(templateObject('odd'), folder));
     assert.equal(Object.hasOwn(odd.spec, 'revisions'), false, 'a key of the wrong shape is left out');
     assert.ok(odd.status.problems?.some((p) => p.includes('spec.revisions')));

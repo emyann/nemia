@@ -8,7 +8,8 @@ import { TemplateForm } from './TemplateForm';
 type Args = { templates: readonly Template[]; onMade: (name: string) => void };
 
 /**
- * The template way's form: the templates Nemia builds in, what the chosen one gives, a name and nothing else. Its apply is answered by MSW
+ * The template way's form: the templates Nemia builds in, what the chosen one gives, the parameters it asks open and the rest folded, and
+ * a name. Its apply is answered by MSW
  * (`.storybook/fixtures/templates.ts`), which keeps what it was sent.
  */
 const meta: Meta<Args> = {
@@ -38,7 +39,10 @@ export const Offered: Story = {
   },
 };
 
-/** A name typed and pressed: sdlc applied by its name alone, no volume and no parameter sent, and the factory told made. */
+/**
+ * A name typed and pressed, no parameter's field touched: sdlc applied by its name alone, no volume and no `sets`, so every parameter
+ * keeps its default, and the factory told made.
+ */
 export const Made: Story = {
   play: async ({ args, canvasElement, userEvent }) => {
     const form = within(canvasElement);
@@ -73,5 +77,52 @@ export const OneBroken: Story = {
     await expect(within(broken).getByRole('radio')).toBeDisabled();
     await expect(within(broken).getByText(BROKEN.status.problems![0])).toBeVisible();
     await expect(canvasElement.querySelector('[data-template-offer="sdlc"]')).toHaveAttribute('data-selected', 'true');
+  },
+};
+
+/** sdlc's asked parameter drawn open, empty, with what it is for; the one a volume sets drawn nowhere; the rest folded away. */
+export const Asked: Story = {
+  play: async ({ canvasElement }) => {
+    const asked = canvasElement.querySelector<HTMLElement>('[data-template-param="frontDoorLabel"]')!;
+    await expect(asked).toBeVisible();
+    await expect(within(asked).getByRole('textbox', { name: 'frontDoorLabel' })).toHaveValue('');
+    await expect(within(asked).getByText(SDLC.spec.parameters.frontDoorLabel.description)).toBeVisible();
+    await expect(canvasElement.querySelector('[data-template-param="github"]')).toBeNull();
+    await expect(canvasElement.querySelector('[data-template-param="ciCheck"]')).toBeNull();
+    await expect(within(canvasElement).getByRole('button', { name: 'More parameters' })).toHaveAttribute('aria-expanded', 'false');
+  },
+};
+
+/** The asked label filled and a folded switch turned off: each sent as a `--set` word, in the order sdlc declares them. */
+export const Filled: Story = {
+  play: async ({ args, canvasElement, userEvent }) => {
+    const form = within(canvasElement);
+    sent.length = 0;
+    await userEvent.type(form.getByRole('textbox', { name: 'frontDoorLabel' }), 'route');
+    await userEvent.click(form.getByRole('button', { name: 'More parameters' }));
+    await userEvent.click(form.getByRole('switch', { name: /landingWaitsOnCi/ }));
+    await userEvent.type(form.getByRole('textbox', { name: /Name/ }), 'my-app');
+    await userEvent.click(form.getByRole('button', { name: 'Make the factory' }));
+    await waitFor(() => expect(args.onMade).toHaveBeenCalledWith('my-app'), { timeout: 5000 });
+    await expect(sent).toEqual([
+      {
+        route: 'POST /api/factories/my-app/apply',
+        body: { template: { name: 'sdlc' }, sets: ['frontDoorLabel=route', 'landingWaitsOnCi=false'] },
+      },
+    ]);
+  },
+};
+
+/** More parameters pressed: the folded fields drawn at their defaults; pressed again, taken away. */
+export const MoreFolded: Story = {
+  play: async ({ canvasElement, userEvent }) => {
+    const form = within(canvasElement);
+    const more = form.getByRole('button', { name: 'More parameters' });
+    await userEvent.click(more);
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    await expect(form.getByRole('textbox', { name: 'ciCheck' })).toHaveValue('ci');
+    await expect(form.getByRole('switch', { name: /landingWaitsOnCi/ })).toBeChecked();
+    await userEvent.click(more);
+    await waitFor(() => expect(canvasElement.querySelector('[data-template-param="ciCheck"]')).toBeNull());
   },
 };

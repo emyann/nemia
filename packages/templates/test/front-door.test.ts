@@ -1,14 +1,15 @@
 /**
- * sdlc's front door as a factory gets it: applied with `frontDoorLabel` set, its tree's wiring holds the `front-door` trigger selecting
- * cards by that key, and with it left empty, none; `front-door` loads with Iris hired into its door and its answer — the door a judge
- * whose fence writes nothing, since a judge that writes is refused at load — routing to intake, build and quick by card nodes that file the
- * card as given, to an answer, and to a backlog node that files it back without the label; every hire of the template names an agent of
- * the team.
+ * sdlc's front door as a factory gets it: its manifest asks `frontDoorLabel` of a person applying it (`ask: true`); applied with
+ * `frontDoorLabel` set, its tree's wiring holds the `front-door` trigger selecting cards by that key, and with it left empty, none;
+ * `front-door` loads with Iris hired into its door and its answer — the door a judge whose fence writes nothing, since a judge that writes
+ * is refused at load — routing to intake, build and quick by card nodes that file the card as given, to an answer, and to a backlog node
+ * that files it back without the label; every hire of the template names an agent of the team.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import yaml from 'js-yaml';
 import { parseAgent, parseFolder } from 'agent-orchestrator/workflow';
 import { copyOf, rendered, SDLC } from './template.ts';
 
@@ -49,6 +50,15 @@ const frontDoorOf = (name: string) => {
     agents: { door: 'iris', answer: 'iris' },
   });
 };
+
+test('sdlc asks frontDoorLabel of a person applying it, and no volume sets it', () => {
+  const manifest = yaml.load(fs.readFileSync(path.join(SDLC, 'nemia.yaml'), 'utf8')) as {
+    spec: { parameters: Record<string, { ask?: boolean; whenOrigin?: string }> };
+  };
+  const label = manifest.spec.parameters.frontDoorLabel;
+  assert.equal(label?.ask, true);
+  assert.equal(label?.whenOrigin, undefined);
+});
 
 test('with frontDoorLabel set, the factory has the front-door trigger, selecting cards that carry that key, to front-door', () => {
   assert.deepEqual(wiringOf('door').triggers, {

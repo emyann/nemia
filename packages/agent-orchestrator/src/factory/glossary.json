@@ -313,6 +313,11 @@
       "type": "OriginParams"
     },
     {
+      "term": "Asked parameter",
+      "meaning": "a template's parameter declared with `ask: true`: the template asks it of a person applying it, so the board's welcome draws its field open, where every other parameter no volume sets is folded under More parameters; never a followed parameter, which the volume sets (`Parameter`, `packages/agent-orchestrator/src/template/layout.ts`, served as `objects`' `TemplateParameter`, `packages/objects/src/template.ts`, refused with `whenOrigin` by `packages/agent-orchestrator/src/template/check.ts`, drawn by `apps/web/src/lib/templateParameters.ts`).",
+      "type": "Parameter"
+    },
+    {
       "term": "Card trigger",
       "meaning": "a trigger of the cards kind a factory holds by name: a label selector over its cards and the workflow it targets, written by `nemia factory trigger` and taken back by `nemia factory untrigger` in the factory's own file, or rendered from its template's `triggers` into its tree, the factory's own winning on a shared name. Judged with the factory's wiring: it targets only a workflow the factory offers, is never named as a workflow it schedules, and a workflow it targets is not detached (`CardTrigger`, `packages/agent-orchestrator/src/factory/factory.ts`).",
       "type": "CardTrigger"

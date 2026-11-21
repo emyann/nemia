@@ -149,6 +149,7 @@ test("a factory's commands are the lines a person types for it, with each schedu
     schedule: 'nemia factory schedule acme <workflow> --cron <expr> --brief <text>',
     trust: 'nemia factory trust acme',
     volume: 'nemia factory volume add acme <path|url>:ro|:rw',
+    trigger: 'nemia factory trigger acme <name> --labels <key>=<value> --to <workflow>',
     unschedule: { nightly: 'nemia factory unschedule acme nightly' },
     volumeRm: { a: 'nemia factory volume rm acme /data/a', [volumeBase(repo)]: `nemia factory volume rm acme ${repo}` },
   });

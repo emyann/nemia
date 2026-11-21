@@ -20,7 +20,7 @@ export const quotaWords = (trigger: Pick<Trigger, 'spec' | 'status'>) => {
  */
 export const firesWhen = (trigger: Pick<Trigger, 'spec'>) => {
   const when = trigger.spec.when;
-  return when.kind === 'cards' ? `cards labelled ${when.selector}` : `at ${when.cron}${when.tz ? ` (${when.tz})` : ''}`;
+  return when.kind === 'cards' ? `cards labelled ${when.labelSelector}` : `at ${when.cron}${when.tz ? ` (${when.tz})` : ''}`;
 };
 
 /**

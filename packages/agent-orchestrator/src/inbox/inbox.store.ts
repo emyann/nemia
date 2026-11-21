@@ -43,7 +43,7 @@ import { unattachedRefusal, type Factory } from '../factory/factory.ts';
 import { runId } from '../record/record.store.ts';
 import { keptRuns } from '../record/files.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { everyCardTrigger } from '../factory/trigger/listed.store.ts';
+import { everyCardTrigger } from '../factory/applied/applied.store.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = Effect.fn('inboxCards')(function* () {

@@ -177,11 +177,11 @@ const triggerFlag = (flag: string, key: string, takes: string) =>
     flag,
     kind: 'text',
     key,
-    takes: `${flag} takes ${takes}: nemia factory trigger <factory> <name> --selector ready=yes --to <workflow>`,
-    twice: `nemia factory trigger takes ${flag} once: a trigger has one selector and one target.`,
+    takes: `${flag} takes ${takes}: nemia factory trigger <factory> <name> --labels ready=yes --to <workflow>`,
+    twice: `nemia factory trigger takes ${flag} once: a trigger has one labelSelector and one target.`,
   }) satisfies Flag;
 
-const TRIGGER_USAGE = '<factory> <name> --selector <selector> --to <workflow>';
+const TRIGGER_USAGE = '<factory> <name> --labels <labelSelector> --to <workflow>';
 
 const TRIGGER_SPEC: Spec = {
   positionals: [
@@ -189,7 +189,7 @@ const TRIGGER_SPEC: Spec = {
     { key: 'name', takes: 'required', kind: 'name' },
   ],
   flags: [
-    triggerFlag('--selector', 'selector', "a label selector in Kubernetes' spelling, over a card's labels"),
+    triggerFlag('--labels', 'labelSelector', "a labelSelector in Kubernetes' spelling, over a card's labels"),
     triggerFlag('--to', 'to', 'the workflow a card naming none is queued on, one the factory offers'),
   ],
   unknown: (arg) =>
@@ -200,20 +200,23 @@ const TRIGGER_SPEC: Spec = {
   missing: `nemia factory trigger takes the factory, then the trigger's name: nemia factory trigger ${TRIGGER_USAGE}. Nothing was triggered.`,
 };
 
-/** Why `nemia factory trigger`'s arguments are refused before anything is read: a `--selector` or a `--to` left out, or a value empty. */
+/** Why `nemia factory trigger`'s arguments are refused before anything is read: a `--labels` or a `--to` left out, or a value empty. */
 function triggerCheck(args: Args) {
-  for (const key of ['selector', 'to'])
-    if (!textOf(args, key)) return `nemia factory trigger takes --${key}: nemia factory trigger ${TRIGGER_USAGE}. Nothing was triggered.`;
+  for (const [key, flag] of [
+    ['labelSelector', '--labels'],
+    ['to', '--to'],
+  ] as const)
+    if (!textOf(args, key)) return `nemia factory trigger takes ${flag}: nemia factory trigger ${TRIGGER_USAGE}. Nothing was triggered.`;
   return leftOut(TRIGGER_SPEC, args);
 }
 
-/** `nemia factory trigger`: a card trigger, which queues each card of the factory its selector selects. */
+/** `nemia factory trigger`: a card trigger, which queues each card of the factory its labelSelector matches. */
 export const FACTORY_TRIGGER_WORDS = {
   name: 'factory trigger',
   served: [{ endpoint: 'triggers.put' }],
   usage: TRIGGER_USAGE,
   help: [
-    'queue each card of the factory whose labels the selector selects, in',
+    'queue each card of the factory whose labels its labelSelector matches, in',
     "the order filed: on the card's own workflow, else on --to; a second replaces the first",
   ],
   spec: TRIGGER_SPEC,

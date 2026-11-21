@@ -47,20 +47,20 @@ export async function factoryUnschedule(args: Args) {
 }
 
 /**
- * `nemia factory trigger`: a card trigger, which queues each card of the factory its selector selects, and whether it can spend quota.
+ * `nemia factory trigger`: a card trigger, which queues each card of the factory its labelSelector matches, and whether it can spend quota.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function factoryTrigger(args: Args) {
   const [factory, name] = [textOf(args, 'factory'), textOf(args, 'name')];
   const payload = {
-    when: { kind: 'cards' as const, selector: textOf(args, 'selector') },
+    when: { kind: 'cards' as const, labelSelector: textOf(args, 'labelSelector') },
     target: { kind: 'Workflow' as const, name: textOf(args, 'to') },
   };
   const answer = await asked('factory trigger', (c) => c.triggers.put({ params: { namespace: factory, name }, payload }));
   const { file, was } = writtenOf(answer, 'factory trigger');
   const queued = answer.status.queued ?? [];
   said([
-    `${factory}  ${name}: ${payload.when.selector} to ${payload.target.name}${was ? ` (was ${was})` : ''}`,
+    `${factory}  ${name}: ${payload.when.labelSelector} to ${payload.target.name}${was ? ` (was ${was})` : ''}`,
     `${QUOTA_SAID[answer.status.quota]}${answer.status.quotaBy ? `: ${answer.status.quotaBy}` : ''}; queues ${queued.length} card${queued.length === 1 ? '' : 's'} now`,
     `triggered: ${file}`,
   ]);

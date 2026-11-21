@@ -2,7 +2,7 @@
  * A factory's triggers on its settings page: what starts its work on its own, at a time (its schedules) or on the cards its selector
  * selects. Each says, in a tag of its own, whether it can spend quota — whether anything its target reaches runs an agent — apart from what
  * it does now: the cards it queues and those that wait on a clash, or its next fire. A card trigger of the factory's own is taken back with
- * Remove; one its template defines is said as the template's; a new one is written on the command line.
+ * Remove; one its template defines is said as the template's; a new one is written by the line the api answers for it.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Trigger } from 'objects';
@@ -50,8 +50,8 @@ function TriggerRow({ trigger: t, now, onRemove, pending }: { trigger: Trigger; 
   );
 }
 
-/** The triggers of the factory `name`, read now, and the line that writes a card trigger. */
-export function FactoryTriggers({ name }: { name: string }) {
+/** The triggers of the factory `name`, read now, and `line`, the line that writes a card trigger of it, as the api answered it. */
+export function FactoryTriggers({ name, line }: { name: string; line: string }) {
   const queryClient = useQueryClient();
   const now = new Date(useNow(60_000));
   const { data } = useQuery(factoryTriggersQuery(name));
@@ -89,7 +89,7 @@ export function FactoryTriggers({ name }: { name: string }) {
           ))}
         </ul>
       )}
-      <CommandText text={`nemia factory trigger ${name} <name> --selector <key>=<value> --to <workflow>`} />
+      <CommandText text={line} />
     </section>
   );
 }

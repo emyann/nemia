@@ -15,7 +15,7 @@ import { factoryFiled } from './factory.verb.ts';
 import { schedulesOf } from './schedule.verb.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 import type { ScheduleRuns } from '../schedule/listed.store.ts';
-import { cardTriggersOf, type TriggerDefined } from '../trigger/listed.store.ts';
+import { cardTriggersOf, type TriggerDefined } from '../applied/applied.store.ts';
 import { quotaSettledBy, reachedWorkflows, triggerQuota, type ReachStep } from '../trigger/quota.ts';
 import { readInbox } from '../../inbox/inbox.store.ts';
 import type { CardListing } from '../../inbox/inbox.ts';
@@ -81,7 +81,7 @@ const cardTriggerOf = (t: TriggerDefined, cards: readonly CardListing[], quota: 
   const own = cards.filter((c) => c.factory === t.factory);
   const queued = own.filter((c) => c.queued?.by?.includes(t.name) && !c.startedAs.length).map((c) => c.name);
   const clashes = own.flatMap((c) => (c.clash?.includes(t.name) ? [{ card: c.name, with: [...c.clash] }] : []));
-  const spec: Trigger['spec'] = { when: { kind: 'cards', selector: t.selector }, target: { ...t.target } };
+  const spec: Trigger['spec'] = { when: { kind: 'cards', labelSelector: t.selector }, target: { ...t.target } };
   const status: Trigger['status'] = { since: t.since, from: t.from, ...quota, queued, ...(clashes.length ? { clashes } : {}) };
   return {
     apiVersion: API_VERSION,
@@ -154,7 +154,7 @@ export const triggerObject = Effect.fn('triggerObject')(function* (
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({
-        message: `the factory ${namespace} has no trigger ${name}: set one with nemia factory trigger ${namespace} ${name} --selector <selector> --to <workflow>`,
+        message: `the factory ${namespace} has no trigger ${name}: set one with nemia factory trigger ${namespace} ${name} --labels <labelSelector> --to <workflow>`,
       }),
     );
   return found;

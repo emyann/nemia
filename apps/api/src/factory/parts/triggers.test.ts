@@ -59,8 +59,8 @@ async function refusedWith(res: () => Response | Promise<Response>, status: numb
   assert.equal(fs.readFileSync(RECORD, 'utf8'), before, 'a refused request leaves the factory as it was');
 }
 
-const onCards = (selector: string, to: string) => ({
-  when: { kind: 'cards', selector },
+const onCards = (labelSelector: string, to: string) => ({
+  when: { kind: 'cards', labelSelector },
   target: { kind: 'Workflow', name: to },
 });
 
@@ -101,7 +101,7 @@ describe('what a trigger write refuses', () => {
   test('a card trigger to a workflow the factory does not offer is a 422', async () => {
     await refusedWith(() => send('PUT', '/api/namespaces/mill/triggers/x', onCards('a=b', 'nowhere')), 422);
   });
-  test('a selector that does not read is a 422', async () => {
+  test('a labelSelector that does not read is a 422', async () => {
     await refusedWith(() => send('PUT', '/api/namespaces/mill/triggers/x', onCards('a in (b', 'sort')), 422);
   });
   test('taking back a trigger the factory does not have is a 404', async () => {

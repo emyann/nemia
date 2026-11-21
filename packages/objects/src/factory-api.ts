@@ -484,7 +484,7 @@ export class TriggersGroup extends HttpApiGroup.make('triggers').add(
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Writes a factory's trigger named in the path: a card selector and its target, or a cron, named by its workflow, which writes the schedule. Answers the Trigger as it reads after, with the file written.",
+    "Writes a factory's trigger named in the path: a card labelSelector and its target, or a cron, named by its workflow, which writes the schedule. Answers the Trigger as it reads after, with the file written.",
   ),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/triggers/:name', {
     params: cardParams,

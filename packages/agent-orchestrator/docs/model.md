@@ -221,6 +221,7 @@ erDiagram
     object harnessSettings "optional"
     object costLines "optional"
     object workflowRepos "optional"
+    object triggers "optional"
     number generation "optional"
   }
   AppliedTemplate {

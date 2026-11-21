@@ -852,7 +852,7 @@ function clashLines(fold: FeedFold, at: string, clashes: FeedClashes) {
         factory,
         card,
         'TriggersClash',
-        `card ${card} waits: triggers ${by.join(', ')} would send it to two workflows. Change a selector (nemia factory trigger ${factory} <name> --selector …), or the card's labels.`,
+        `card ${card} waits: triggers ${by.join(', ')} would send it to two workflows. Change a labelSelector (nemia factory trigger ${factory} <name> --labels …), or the card's labels.`,
       ),
     );
   const ended = [...fold.said.entries()].flatMap(([key, said]) => {

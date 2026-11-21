@@ -6,7 +6,7 @@ import { settled } from '../../../.storybook/play';
 import { FactoryTrust } from './FactoryTrust';
 
 /** The lines a person types for `acme`, as the api answers them. */
-const { attach, rm, add, schedule, trust, volume } = ACME_COMMANDS;
+const { attach, rm, add, schedule, trust, volume, trigger } = ACME_COMMANDS;
 
 /** A factory one of whose places a harness does not trust: its name, the place, and the lines it types. */
 const UNTRUSTED: Pick<Factory, 'name' | 'untrusted' | 'commands'> = {
@@ -14,7 +14,7 @@ const UNTRUSTED: Pick<Factory, 'name' | 'untrusted' | 'commands'> = {
   untrusted: [
     { place: '/home/you/code/acme', harness: 'the harness', withheld: "the folder's own settings, hooks and MCP servers", never: null },
   ],
-  commands: { attach, rm, add, schedule, trust, volume, home: null },
+  commands: { attach, rm, add, schedule, trust, volume, trigger, home: null },
 };
 
 /** What a story of the caution draws: the factory, and the presses where the page asks the trust itself. */

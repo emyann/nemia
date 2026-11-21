@@ -91,9 +91,18 @@ export type Factory = {
   schedules: FactorySchedule[];
   /**
    * The lines a person types for it: a workflow attached, its file removed, filed again, a workflow scheduled, its places trusted, a
-   * volume mounted, and its home opened in a person's own session (`home`, null where it has no home).
+   * volume mounted, a card trigger written, and its home opened in a person's own session (`home`, null where it has no home).
    */
-  commands: { attach: string; rm: string; add: string; schedule: string; trust: string; volume: string; home: string | null };
+  commands: {
+    attach: string;
+    rm: string;
+    add: string;
+    schedule: string;
+    trust: string;
+    volume: string;
+    trigger: string;
+    home: string | null;
+  };
   template: FactoryTemplate | null;
   untrusted: FactoryUntrusted[];
   volumes: FactoryVolume[];
@@ -144,6 +153,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
       schedule: commands.schedule,
       trust: commands.trust,
       volume: commands.volume,
+      trigger: commands.trigger,
       home: commands.home ?? null,
     },
     template: spec.template ? { ...spec.template, applied: status.applied ?? null, conditions: status.conditions } : null,

@@ -11,11 +11,11 @@ import { triggerSelectorRefusal, untriggeredRefusal, type CardTrigger } from '..
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import { selectorsRefusal } from '../../watch/selector.ts';
 
-/** What `nemia factory trigger` takes: the factory, the trigger's name, its selector, and the workflow a card naming none is queued on. */
+/** What `nemia factory trigger` takes: the factory, the trigger's name, its labelSelector, and the workflow a card naming none goes to. */
 export const TriggerInput = Schema.Struct({
   factory: Schema.String,
   name: Schema.String,
-  selector: Schema.String,
+  labelSelector: Schema.String,
   to: Schema.String,
 });
 export type TriggerInput = typeof TriggerInput.Type;
@@ -31,11 +31,15 @@ type Triggered = { file: string; trigger: CardTrigger; replaced: CardTrigger | n
 export const FACTORY_TRIGGER: Served<Triggered, TriggerInput> = {
   ...FACTORY_TRIGGER_WORDS,
   input: TriggerInput,
-  handler: ({ factory, name, selector, to }) =>
+  handler: ({ factory, name, labelSelector, to }) =>
     Effect.gen(function* () {
-      const bad = selectorsRefusal([selector]);
+      const bad = selectorsRefusal([labelSelector]);
       if (bad !== undefined) return yield* Effect.fail(new Invalid({ message: triggerSelectorRefusal(bad) }));
-      const trigger: CardTrigger = { selector: selector.trim(), target: { kind: 'Workflow', name: to }, since: new Date().toISOString() };
+      const trigger: CardTrigger = {
+        selector: labelSelector.trim(),
+        target: { kind: 'Workflow', name: to },
+        since: new Date().toISOString(),
+      };
       const { was, file } = yield* wire(factory, { verb: 'trigger', name, trigger });
       return { file, trigger, replaced: was.triggers?.[name] ?? null } satisfies Triggered;
     }),

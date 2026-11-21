@@ -185,6 +185,7 @@ const millView: Factory = {
     schedule: 'nemia schedule mill <workflow> <cron>',
     trust: 'nemia factory trust mill',
     volume: 'nemia factory volume mill <path>',
+    trigger: 'nemia factory trigger mill <name> --labels <key>=<value> --to <workflow>',
     home: null,
   },
   template: null,

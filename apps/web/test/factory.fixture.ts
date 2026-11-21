@@ -338,6 +338,7 @@ export const factoryCommands = (name = 'mill', over: Partial<FactoryCommands> = 
     schedule: `nemia schedule ${name} <workflow> <cron>`,
     trust: `nemia factory trust ${name}`,
     volume: `nemia factory volume ${name} <path>`,
+    trigger: `nemia factory trigger ${name} <name> --labels <key>=<value> --to <workflow>`,
     unschedule: { build: `nemia unschedule ${name} build` },
     volumeRm: { notes: `nemia factory volume rm ${name} notes`, mill: `nemia factory volume rm ${name} mill` },
     ...over,

@@ -7,6 +7,7 @@ import type { Trigger } from 'objects';
 import { factoryTriggersQuery } from '@/lib/api/factories';
 import { FactoryTriggers } from './FactoryTriggers';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
+import { triggerLine } from '../../../.storybook/fixtures/factories';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
 const TRIGGER = '/api/namespaces/:namespace/triggers/:name';
@@ -21,11 +22,11 @@ const trigger = (name: string, spec: Trigger['spec'], status: Trigger['status'])
     status,
   }) satisfies Trigger;
 
-/** A card trigger `name` of the factory's own, selecting `selector` and sending to `to`. */
-const onCards = (name: string, selector: string, to: string, status: Omit<Trigger['status'], 'since' | 'from'>) =>
+/** A card trigger `name` of the factory's own, selecting `labelSelector` and sending to `to`. */
+const onCards = (name: string, labelSelector: string, to: string, status: Omit<Trigger['status'], 'since' | 'from'>) =>
   trigger(
     name,
-    { when: { kind: 'cards', selector }, target: { kind: 'Workflow', name: to } },
+    { when: { kind: 'cards', labelSelector }, target: { kind: 'Workflow', name: to } },
     { since: '2026-11-19T00:00:00.000Z', from: 'factory', ...status },
   );
 
@@ -52,7 +53,7 @@ function Served({ items, children }: { items: readonly Trigger[]; children: Reac
 const meta: Meta<typeof FactoryTriggers> = {
   title: 'Factory/FactoryTriggers',
   component: FactoryTriggers,
-  args: { name: FACTORY },
+  args: { name: FACTORY, line: triggerLine },
 };
 export default meta;
 
@@ -60,7 +61,7 @@ type Story = StoryObj<typeof meta>;
 
 /** `items` served as the factory's triggers, in the settings page's width. */
 const served = (items: readonly Trigger[]) =>
-  function ServedTriggers(args: { name: string }) {
+  function ServedTriggers(args: { name: string; line: string }) {
     return (
       <Served items={items}>
         <div style={{ width: 640 }}>
@@ -139,7 +140,7 @@ export const FromTemplate: Story = {
   render: served([
     trigger(
       'front-door',
-      { when: { kind: 'cards', selector: 'front-door=yes' }, target: { kind: 'Workflow', name: 'front-door' } },
+      { when: { kind: 'cards', labelSelector: 'front-door=yes' }, target: { kind: 'Workflow', name: 'front-door' } },
       { since: '', from: 'template', quota: 'spends', quotaBy: 'front-door', queued: [] },
     ),
   ]),

@@ -3396,7 +3396,7 @@ run 'wf tick' (or 'wf up') to start it
 
 ### Cards a trigger queues, and clashes
 
-A factory's card trigger (*Triggers*, below) queues the cards of its factory its selector selects, as each pass reads them: each card
+A factory's card trigger (*Triggers*, below) queues the cards of its factory its labelSelector matches, as each pass reads them: each card
 whose labels it selects, not queued by hand and not started, is listed `queued` with the triggers that queue it (`queued.by`), on the
 workflow it names, or on the trigger's target where it names none, ordered with the cards queued by hand by when it was filed (the
 Card door's `filedAt`), and the tick starts it as any queued card, the run's `from.trigger` naming the first trigger. Nothing is
@@ -3511,7 +3511,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 
 A factory's triggers are served as one object, `Trigger`, of two kinds: its schedules, the `time` kind, each named by its workflow,
 and its card triggers, the `cards` kind, each a label selector over its cards and the workflow it targets, kept under `triggers` in
-the factory's own file (`nemia factory trigger <factory> <name> --selector <selector> --to <workflow>`, `nemia factory untrigger`) or
+the factory's own file (`nemia factory trigger <factory> <name> --labels <labelSelector> --to <workflow>`, `nemia factory untrigger`) or
 rendered from its template's `triggers` into its tree, where one whose selector renders empty is left out; the factory's own wins on a
 shared name. Both are judged with the factory's wiring (`wiringRefusal`): a trigger targets only a workflow the factory offers and is
 never named as a workflow it schedules, and a workflow a trigger targets is not detached. Each says whether it can spend quota: `spends`

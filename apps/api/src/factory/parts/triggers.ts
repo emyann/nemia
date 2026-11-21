@@ -60,7 +60,7 @@ export const triggersHandlers = readsBounded(Api, 'triggers', (handlers) =>
           return { ...(await triggerIn(s, namespace, name)), written: { file, was: replaced?.cron ?? null } };
         }
         const { file, replaced } = await s.inRequest(
-          FACTORY_TRIGGER.handler({ factory: namespace, name, selector: when.selector, to: target.name }),
+          FACTORY_TRIGGER.handler({ factory: namespace, name, labelSelector: when.labelSelector, to: target.name }),
         );
         return { ...(await triggerIn(s, namespace, name)), written: { file, was: replaced?.selector ?? null } };
       }),

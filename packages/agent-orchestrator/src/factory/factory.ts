@@ -1077,13 +1077,13 @@ export const triggeredDetachRefusal = (factory: string, workflow: string, trigge
  * @param name The trigger's name.
  */
 export const triggerNameTakenRefusal = (factory: string, name: string) =>
-  `${factory} schedules the workflow ${name}, which is its trigger of the time kind by that name: name the card trigger otherwise — nemia factory trigger ${factory} <another> --selector <selector> --to <workflow>. Nothing was triggered.`;
+  `${factory} schedules the workflow ${name}, which is its trigger of the time kind by that name: name the card trigger otherwise — nemia factory trigger ${factory} <another> --labels <labelSelector> --to <workflow>. Nothing was triggered.`;
 
 /**
  * Why a trigger's selector is refused: what the selector's grammar says of it, then that nothing was triggered.
  * @param refusal What the selector's grammar refused (`selectorsRefusal`).
  */
-export const triggerSelectorRefusal = (refusal: string) => `--selector: ${refusal}. Nothing was triggered.`;
+export const triggerSelectorRefusal = (refusal: string) => `--labels: ${refusal}. Nothing was triggered.`;
 
 /**
  * Why a factory `name` is not filed: there is one already, at `file`, left as it was.

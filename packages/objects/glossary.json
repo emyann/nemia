@@ -418,7 +418,7 @@
     },
     {
       "term": "Trigger",
-      "meaning": "what starts a factory's work on its own, served as an object in the factory's namespace: its spec when it fires — at each fire of a cron (`time`, a schedule, named by its workflow) or on each card of the factory its label selector selects (`cards`) — and its target, a workflow the factory offers; its status whether it can spend quota, where it is defined (the factory's file or its template's), the cards it queues now and those that wait on a clash, or its next fire (`Trigger`, `packages/objects/src/trigger.ts`).",
+      "meaning": "what starts a factory's work on its own, served as an object in the factory's namespace: its spec when it fires — at each fire of a cron (`time`, a schedule, named by its workflow) or on each card of the factory its labelSelector matches (`cards`) — and its target, a workflow the factory offers; its status whether it can spend quota, where it is defined (the factory's file or its template's), the cards it queues now and those that wait on a clash, or its next fire (`Trigger`, `packages/objects/src/trigger.ts`).",
       "type": "Trigger"
     },
     {

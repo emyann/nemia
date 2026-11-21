@@ -370,8 +370,8 @@ export type FactoryInstructionWords = typeof FactoryInstructionWords.Type;
 
 /**
  * The lines a person types for a factory, built off the command table: a workflow attached, its file removed and filed again, a workflow
- * scheduled, its places trusted again, a volume mounted; and, by name, the line that takes back each schedule (by its workflow) and each
- * volume (by its stored name).
+ * scheduled, its places trusted again, a volume mounted, a card trigger written; and, by name, the line that takes back each schedule (by
+ * its workflow) and each volume (by its stored name).
  */
 export const FactoryCommands = Schema.Struct({
   attach: Schema.String.annotate({ description: 'The line that attaches a workflow to the factory.' }),
@@ -380,6 +380,7 @@ export const FactoryCommands = Schema.Struct({
   schedule: Schema.String.annotate({ description: 'The line that schedules one of its workflows.' }),
   trust: Schema.String.annotate({ description: "The line that asks its places' trust again." }),
   volume: Schema.String.annotate({ description: 'The line that mounts a volume for its local steps.' }),
+  trigger: Schema.String.annotate({ description: 'The line that writes a card trigger of the factory, by its name.' }),
   unschedule: Schema.Record(Schema.String, Schema.String).annotate({
     description: 'The line that takes back each schedule, by its workflow.',
   }),

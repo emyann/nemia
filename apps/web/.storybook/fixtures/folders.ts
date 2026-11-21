@@ -49,6 +49,7 @@ export const ACME_COMMANDS: FactoryCommands = {
   schedule: `nemia schedule add <workflow> -n ${ACME}`,
   trust: `nemia factory trust ${ACME}`,
   volume: `nemia factory volume add ${ACME} <path>:rw`,
+  trigger: `nemia factory trigger ${ACME} <name> --labels <key>=<value> --to <workflow>`,
   unschedule: {},
   volumeRm: {},
 };

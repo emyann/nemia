@@ -1,9 +1,10 @@
 /**
  * The Trigger: what starts a factory's work on its own, served as an object in the factory's namespace. Its `spec` says when it fires and
  * what it sends there: at each fire of a cron (`when.kind: 'time'`, a Schedule, which is still served as one and named by its workflow), or
- * on each card of its factory whose labels its selector selects (`when.kind: 'cards'`), queued in the order filed on the workflow the card
- * names, else on the trigger's target. Its `status` is what Nemia read of it now: whether it can spend quota — whether anything its target
- * can reach runs an agent — and, apart from that, what it is doing: the cards it queues and those it clashes on, or its next fire.
+ * on each card of its factory whose labels its `labelSelector` matches (`when.kind: 'cards'`), queued in the order filed on the workflow
+ * the card names, else on the trigger's target. Its `status` is what Nemia read of it now: whether it can spend quota — whether anything
+ * its target can reach runs an agent — and, apart from that, what it is doing: the cards it queues and those it clashes on, or its next
+ * fire.
  *
  * Beside it, the body a write is sent (`TriggerWrite`). Plain Schemas of JSON, as every object of this package is.
  */
@@ -12,7 +13,7 @@ import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { FactoryWritten } from './written.ts';
 import { ScheduleFired } from './schedule.ts';
 
-/** When a trigger fires: at each fire of a cron, or on each card its selector selects. */
+/** When a trigger fires: at each fire of a cron, or on each card its `labelSelector` matches. */
 export const TRIGGER_WHEN_KINDS = ['time', 'cards'] as const;
 /** One of `TRIGGER_WHEN_KINDS`. */
 export type TriggerWhenKind = (typeof TRIGGER_WHEN_KINDS)[number];
@@ -45,15 +46,15 @@ export const TriggerAtTime = Schema.Struct({
 }).annotate({ description: 'A trigger that fires at each fire of a cron: a Schedule.' });
 export type TriggerAtTime = typeof TriggerAtTime.Type;
 
-/** A trigger of the cards kind: a label selector in Kubernetes' spelling, over a card's labels. */
+/** A trigger of the cards kind: a `labelSelector` in Kubernetes' spelling, over a card's labels. */
 export const TriggerOnCards = Schema.Struct({
   kind: Schema.Literal('cards').annotate({
-    description: 'The cards kind: the trigger queues each card of its factory whose labels its selector selects.',
+    description: 'The cards kind: the trigger queues each card of its factory whose labels its labelSelector matches.',
   }),
-  selector: Schema.String.annotate({
-    description: "A label selector in Kubernetes' spelling (`ready=yes`, `area in (cli,api)`), over a card's labels.",
+  labelSelector: Schema.String.annotate({
+    description: "A labelSelector in Kubernetes' spelling (`ready=yes`, `area in (cli,api)`), over a card's labels.",
   }),
-}).annotate({ description: 'A trigger that queues each card of its factory whose labels its selector selects, in the order filed.' });
+}).annotate({ description: 'A trigger that queues each card of its factory whose labels its labelSelector matches, in the order filed.' });
 export type TriggerOnCards = typeof TriggerOnCards.Type;
 
 /** What a trigger sends what it matches to: a kind and a name of that kind. */
@@ -66,13 +67,13 @@ export type TriggerTarget = typeof TriggerTarget.Type;
 /** What a person set: when it fires, and what it sends there. */
 export const TriggerSpec = Schema.Struct({
   when: Schema.Union([TriggerAtTime, TriggerOnCards]).annotate({
-    description: 'When the trigger fires: at each fire of a cron (time), or on each card its selector selects (cards).',
+    description: 'When the trigger fires: at each fire of a cron (time), or on each card its labelSelector matches (cards).',
   }),
   target: TriggerTarget,
 }).annotate({ description: 'What the person set: when the trigger fires, and the workflow it sends what it matches to.' });
 export type TriggerSpec = typeof TriggerSpec.Type;
 
-/** A card two or more of a factory's triggers would send to two workflows: it waits until a selector or its labels change. */
+/** A card two or more of a factory's triggers would send to two workflows: it waits until a labelSelector or its labels change. */
 export const TriggerClash = Schema.Struct({
   card: Schema.String.annotate({ description: 'The name of the card left waiting.' }),
   with: Schema.Array(Schema.String).annotate({ description: 'Every trigger of the factory that selects it, this one among them.' }),

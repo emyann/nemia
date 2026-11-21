@@ -12,7 +12,7 @@ const onCards = {
   apiVersion: API_VERSION,
   kind: 'Trigger',
   metadata: { name: 'ready', namespace: 'mill', creationTimestamp: '', resourceVersion: 't1' },
-  spec: { when: { kind: 'cards', selector: 'ready=yes' }, target: { kind: 'Workflow', name: 'door' } },
+  spec: { when: { kind: 'cards', labelSelector: 'ready=yes' }, target: { kind: 'Workflow', name: 'door' } },
   status: {
     since: '',
     from: 'template',
@@ -45,8 +45,8 @@ test("the Api's get answers a trigger of either kind and its list a page of them
   assert.equal(answered('triggers', 'get', { ...atTime, kind: 'Schedule' }), undefined);
 });
 
-test("the Api's put takes a card trigger's selector and target, and a cron's write; it refuses one with no target", () => {
-  const cards = { when: { kind: 'cards', selector: 'ready=yes' }, target: { kind: 'Workflow', name: 'door' } };
+test("the Api's put takes a card trigger's labelSelector and target, and a cron's write; it refuses one with no target", () => {
+  const cards = { when: { kind: 'cards', labelSelector: 'ready=yes' }, target: { kind: 'Workflow', name: 'door' } };
   assert.deepEqual(taken('triggers', 'put', cards), cards);
   const time = { when: { kind: 'time', cron: '0 3 * * *', brief: 'b' }, target: { kind: 'Workflow', name: 'janitor' } };
   assert.deepEqual(taken('triggers', 'put', time), time);
@@ -56,7 +56,7 @@ test("the Api's put takes a card trigger's selector and target, and a cron's wri
 test('REFUSED: a when, a target kind or a quota that is none of their words', () => {
   const decode = Schema.decodeUnknownSync(Trigger);
   assert.deepEqual([...TRIGGER_QUOTAS], ['spends', 'free', 'unknown']);
-  assert.throws(() => decode({ ...onCards, spec: { ...onCards.spec, when: { kind: 'label', selector: 'a=b' } } }));
+  assert.throws(() => decode({ ...onCards, spec: { ...onCards.spec, when: { kind: 'label', labelSelector: 'a=b' } } }));
   assert.throws(() => decode({ ...onCards, spec: { ...onCards.spec, target: { kind: 'Node', name: 'x' } } }));
   assert.throws(() => decode({ ...onCards, status: { ...onCards.status, quota: 'maybe' } }));
 });

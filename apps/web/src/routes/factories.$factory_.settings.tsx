@@ -101,7 +101,7 @@ function SettingsPage() {
           <FactoryInstruction name={name} />
           <FactoryServers name={name} />
           <LibraryAdds name={name} />
-          <FactoryTriggers name={name} />
+          <FactoryTriggers name={name} line={factory.commands.trigger} />
           <FactorySchedules factory={factory} />
         </>
       )}

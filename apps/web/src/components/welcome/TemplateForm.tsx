@@ -3,7 +3,7 @@ import type { Template } from 'objects';
 import { Pending, RadioTile, RadioTileGroup } from '@/components/look';
 import { Button, TextField } from '@/components/ui/ds';
 import { applyTemplate } from '@/lib/api/factories';
-import { parameterReadsOf, setsOf, startWordOf } from '@/lib/templateParameters';
+import { parameterReadsOf, setWordOf, startWordOf } from '@/lib/templateParameters';
 import { useFactoryWrite } from '@/lib/useFactoryWrite';
 import { TemplateParameters } from './TemplateParameters';
 
@@ -29,7 +29,11 @@ export function TemplateForm({ templates, onMade }: { templates: readonly Templa
   const values = Object.fromEntries(
     reads.map((read) => [read.name, (given.template === chosen?.metadata.name ? given.values[read.name] : undefined) ?? startWordOf(read)]),
   );
-  const form = useFactoryWrite((name) => applyTemplate(name, chosen?.metadata.name ?? '', setsOf(reads, values)), onMade);
+  const sets = reads.flatMap((read) => {
+    const word = setWordOf(read, values[read.name] ?? '');
+    return word === null ? [] : [word];
+  });
+  const form = useFactoryWrite((name) => applyTemplate(name, chosen?.metadata.name ?? '', sets), onMade);
   return (
     <form
       data-template-form

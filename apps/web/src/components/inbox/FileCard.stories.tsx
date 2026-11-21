@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { http, HttpResponse } from 'msw';
 import { API_VERSION, DEFAULT_NAMESPACE, type Card } from 'objects';
-import { SnackbarRegion } from '@/components/ui/ds';
+import { SnackbarRegion, snackbarQueue } from '@/components/ui/ds';
 import { factoriesQuery } from '../../lib/api/factories.ts';
 import { FileCard } from './FileCard';
 import { seeded } from '../../../.storybook/fixtures/proposals';
@@ -15,12 +15,20 @@ import { saysReading, Unread } from '../../../.storybook/unread';
  * frame's snackbar that names the card and offers Open, to its page. Axe's
  * `label-content-name-mismatch` alone is off, for the Factory list: the ds kit's `Select` draws its value before its floating label and
  * is named by the label first, which axe reads as visible text left out of its name, an ask of the kit.
+ *
+ * The kit's snackbar queue lives outside React, one for the page, and a snackbar with an action stays until it is pressed: each story
+ * starts on an empty queue and leaves one, so none reads the snackbar the story before it left, whose Open would follow that story's
+ * router, unmounted.
  */
 const meta: Meta<typeof FileCard> = {
   title: 'Store/FileCard',
   component: FileCard,
   args: { shown: 'solo' },
   parameters: { a11y: { config: { rules: [{ id: 'label-content-name-mismatch', enabled: false }] } } },
+  beforeEach: () => {
+    snackbarQueue.clear();
+    return () => snackbarQueue.clear();
+  },
   render: (args) => (
     <Unread>
       <div style={{ width: 640 }}>
@@ -50,11 +58,16 @@ const FILED: Card = {
   status: { state: 'filed', runs: [], inPlay: true, title: 'Write the release notes', file: 'write-the-release-notes.md' },
 };
 
-/** The idea typed and File pressed in the story drawn in `canvasElement`: the snackbar that names the card filed. */
+/**
+ * The idea typed and File pressed in the story drawn in `canvasElement`: the snackbar that names the card filed, read once the api's
+ * answer has emptied the idea, which the same success says it in.
+ */
 async function filedIn(canvasElement: HTMLElement) {
   const box = within(canvasElement);
-  await userEvent.type(await box.findByRole('textbox', { name: 'An idea' }), 'Write the release notes');
+  const idea = await box.findByRole('textbox', { name: 'An idea' });
+  await userEvent.type(idea, 'Write the release notes');
   await userEvent.click(box.getByRole('button', { name: 'File' }));
+  await waitFor(() => expect(idea).toHaveValue(''));
   const said = await snackbarShown(canvasElement.ownerDocument.body);
   await expect(said).toHaveTextContent(FILED.metadata.name);
   return said;

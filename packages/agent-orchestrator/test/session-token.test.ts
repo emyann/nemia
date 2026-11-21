@@ -141,7 +141,7 @@ describe("a step's check is filed a token of its own, which names the step's age
   const s = story(test);
   let id = '';
   let token = '';
-  s.test('the check filed once its step signed off carries a token of its own, not its session\'s', async () => {
+  s.test("the check filed once its step signed off carries a token of its own, not its session's", async () => {
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: npm test\n---\nimplement it\n');
     id = (await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }))).id;
@@ -162,7 +162,7 @@ describe("a step's check is filed a token of its own, which names the step's age
   });
 });
 
-describe("a command node is filed once its parent signed off, its line run on the command harness under a token of the agent it names", () => {
+describe('a command node is filed once its parent signed off, its line run on the command harness under a token of the agent it names', () => {
   const s = story(test);
   let id = '';
   const node = () => `${id}-file-notes`;

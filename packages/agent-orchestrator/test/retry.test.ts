@@ -981,7 +981,7 @@ describe("`nemia retry` writes a person's ask, and the tick honours it once, con
   });
 });
 
-describe("a step judged by named checks: the pass files them in their order, each under its own task, none after a refusal, and `retries:` tries the step again", () => {
+describe('a step judged by named checks: the pass files them in their order, each under its own task, none after a refusal, and `retries:` tries the step again', () => {
   let b!: import('./story.ts').Board;
   let run!: Run;
   beforeAll(() => {

@@ -406,7 +406,8 @@ const REBUILT_TITLE =
   'A resumed session should read its context from the cache. It wrote it again instead, at twenty times the price of a read: the cache was rebuilt.';
 
 /**
- * The command a step is judged by, and of a step with several, its name, result, exit and how long it ran (`namedRows`); once it failed its check, what it exited with and the last lines of
+ * The command a step is judged by, and of a step with several, its name, result, exit and how long it ran (`namedRows`); once it
+ * failed its check, what it exited with and the last lines of
  * each stream: its output first, where a test runner says what failed, then its stderr. Where the check was filed and `read` names its
  * try, a fold that reads all it printed (`CheckOutput`).
  */

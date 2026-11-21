@@ -198,8 +198,16 @@ test('REFUSED: a folder with a README and no step, as a folder with no step is â
 describe('REFUSED: a command node or a named check the run could not file as written, as a WorkflowError with exit 2 opening on the step', () => {
   const IMPLEMENT = '---\nplace: git\n---\nImplement it.\n';
   const rows: [string, Record<string, string>, string][] = [
-    ['a command node with an instruction of its own', { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\n---\nFile them.\n' }, 'file-notes:'],
-    ['a command node with a workspace of its own', { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\nworkspace: base\n---\n' }, 'file-notes:'],
+    [
+      'a command node with an instruction of its own',
+      { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\n---\nFile them.\n' },
+      'file-notes:',
+    ],
+    [
+      'a command node with a workspace of its own',
+      { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\nworkspace: base\n---\n' },
+      'file-notes:',
+    ],
     ['a command node that names no agent', { 'file-notes.md': '---\nafter: implement\nrun: node notes.ts\n---\n' }, 'file-notes:'],
     [
       'an ending on the base branch with two checks',

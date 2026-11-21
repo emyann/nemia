@@ -81,7 +81,10 @@ const chained = (at: string, checks: readonly { name?: unknown; run?: unknown; a
 const checkOf = (tree: string, workflow: string, step: string) => {
   const { front } = stepIn(tree, workflow, step);
   const checks = typeof front.checks === 'string' ? (JSON.parse(front.checks) as unknown) : front.checks;
-  if (Array.isArray(checks)) return chained(`${workflow}/${step}`, checks).map((c) => String(c.run ?? '')).join(' && ');
+  if (Array.isArray(checks))
+    return chained(`${workflow}/${step}`, checks)
+      .map((c) => String(c.run ?? ''))
+      .join(' && ');
   return String(front.check ?? front.run ?? '');
 };
 

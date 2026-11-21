@@ -244,7 +244,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   if (r.mode === 'recheck') {
     out.tried.push(r.step);
     notes.push(said);
-    run.steps[r.step] = nextTry(record, r);
+    run.steps[r.step] = keptChecks(f, step, nextTry(record, r), record.check);
     out.rechecked.push(r.step);
     return;
   }
@@ -577,6 +577,29 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
     check: { taskId: tasks[first.name] ?? checkTaskId(run, name), ...(tip ? { tip } : {}), ...(shorthand ? {} : { tasks }) },
   };
 });
+
+/**
+ * A recheck's record of a step with several checks (`checks:`): each check that passed on the try behind keeps its task, and every other
+ * is named under the new try's id (`checkTaskId`), to be filed by `fileChecks` as its waits allow. A step with one check keeps none: its
+ * check runs again whole, as it always has.
+ * @param f The pass's filing: the run and the phases of its tasks.
+ * @param step The step rechecked.
+ * @param record The step's record on the new try (`nextTry`).
+ * @param behind The check of the try behind it.
+ */
+const keptChecks = (f: Filing, step: StepSpec, record: StepRecord, behind: StepRecord['check']) => {
+  const plan = stepChecks(step);
+  const first = plan[0];
+  if (!behind?.tasks || plan.length < 2 || !first) return record;
+  const n = (record.tries?.length ?? 0) + 1;
+  const tasks = Object.fromEntries(
+    plan.map((c) => {
+      const was = behind.tasks?.[c.name];
+      return [c.name, was && f.reads.phaseOf(was) === 'succeeded' ? was : checkTaskId(f.run, step.name, n, c.name)];
+    }),
+  );
+  return { ...record, check: { taskId: tasks[first.name] ?? checkTaskId(f.run, step.name, n, first.name), tasks } } satisfies StepRecord;
+};
 
 /**
  * File one of a step's checks where the engine does not hold it, as its own task (`currentCheckTask`), its environment naming it

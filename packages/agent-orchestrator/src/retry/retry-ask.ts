@@ -123,7 +123,7 @@ const upgradeTry = (t: unknown) => {
  */
 export type EarlierTry = {
   taskId: string;
-  check?: { taskId: string; tip?: string };
+  check?: { taskId: string; tip?: string; tasks?: Readonly<Record<string, string>> };
   cause: TryCause;
   model?: string;
   /** The pause filed the try after this one (`nemia pause --now` stopped it, and the resume tried it again): `cause` stays its mode. */

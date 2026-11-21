@@ -10,6 +10,7 @@ import { level } from './nemia.ts';
 import { boardLink, boardOpen, pairingsApprove, pairingsLs } from './pairing.ts';
 import { quota } from './quota.ts';
 import { concluded, logs, memory } from './reads.ts';
+import { capabilities, milestones, repository, serverUpgrades, serverVersion, store } from './server.ts';
 import { stats } from './stats.ts';
 import { subscribe, unsubscribe } from './subscriptions.ts';
 import { tokenAdd, tokenLs, tokenRm } from './tokens.ts';
@@ -22,6 +23,12 @@ export const REST_RUNNERS: Readonly<Record<RestCommand, Runner>> = {
   passes,
   series,
   quota,
+  'server version': serverVersion,
+  'server upgrades': serverUpgrades,
+  capabilities,
+  repository,
+  store,
+  milestones,
   subscribe,
   unsubscribe,
   level,

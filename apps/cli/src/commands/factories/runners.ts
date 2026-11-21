@@ -2,7 +2,7 @@
  * The runners of the group's commands (`objects`' `FACTORY_WORDS`), by name: each takes its words parsed against its spec, asks the api
  * through `asked`, prints what it answers, and answers its exit code. The table is total over the group's names, so one left out does not
  * compile: the listing (`listing.ts`), a factory's own writes (`writes.ts`), its parts in its namespace (`parts.ts`), what it gives its
- * runs (`settings.ts`), what it says in words (`words.ts`), what a template makes of it (`templated.ts`), its move to another
+ * runs (`settings.ts`), what it says in words (`words.ts`), the reads printed as the api answers them (`reads.ts`), what a template makes of it (`templated.ts`), its move to another
  * store (`move.ts`) and a person's own session in its home (`home.ts`).
  */
 import type { FactoryCommand } from 'objects';
@@ -10,6 +10,7 @@ import type { Runner } from '../runner.ts';
 import { factoryHome } from './home.ts';
 import { factoryListed } from './listing.ts';
 import { factoryMove } from './move.ts';
+import { factoryCommands, factoryServerSignIn } from './reads.ts';
 import { factoryServerAdd, factoryServerRm, factoryServers, factorySchedule, factoryUnschedule } from './parts.ts';
 import {
   factoryCostLineRm,
@@ -41,6 +42,7 @@ export const FACTORY_RUNNERS: Readonly<Record<FactoryCommand, Runner>> = {
   'factory schedule': factorySchedule,
   'factory unschedule': factoryUnschedule,
   'factory servers': factoryServers,
+  'factory server sign-in': factoryServerSignIn,
   'factory server add': factoryServerAdd,
   'factory server rm': factoryServerRm,
   'factory volume add': factoryVolumeAdd,
@@ -51,6 +53,7 @@ export const FACTORY_RUNNERS: Readonly<Record<FactoryCommand, Runner>> = {
   'factory cost-line set': factoryCostLineSet,
   'factory cost-line rm': factoryCostLineRm,
   'factory rules': factoryRules,
+  'factory commands': factoryCommands,
   'factory instruction': factoryInstruction,
   'factory instruct': factoryInstruct,
   'factory revisions': factoryRevisions,

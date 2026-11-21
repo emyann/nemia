@@ -5,6 +5,7 @@
  * (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
  * Pure: `record.store.ts` reads and writes the record.
  */
+import type { PictureHeld } from '../../contracts/pictures-shown.contract.ts';
 import type { Verdict } from '../check/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
@@ -398,6 +399,12 @@ export type StepRecord = {
    * again owes what its new definition declares. Absent on a record written before it, which falls back on `closeoutHash`.
    */
   declared?: readonly string[];
+  /**
+   * The pictures handed to the run its first filing showed the step in its first message, by name, and each held back with why
+   * (`picturesFiled`): written when a step that waits on no other step is filed a session of its own, read by the stats (`nemia stats`).
+   * Absent on any other step, and on a run handed no picture.
+   */
+  pictures?: { readonly shown: readonly string[]; readonly held: readonly PictureHeld[] };
 };
 
 /**

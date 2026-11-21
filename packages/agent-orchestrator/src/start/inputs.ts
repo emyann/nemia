@@ -102,7 +102,8 @@ export const cardsRefusal: CardsRefusal = (cards, unnamed, found, inputs) => {
  */
 export const namedTwice: NamedTwice = (names) => names.find((name, at) => names.slice(0, at).includes(name));
 
-const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
+/** The extensions a handed file is a picture by: what a brief calls it, and what a first step is shown of (`handedPictures`). */
+export const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
 const TEXTS = new Set(['.md', '.txt', '.json', '.yaml', '.yml', '.csv', '.log', '.html', '.xml', '.toml']);
 
 /** What a given file is, read off its name alone: a picture, a text file, or a file. */

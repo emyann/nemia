@@ -2,6 +2,7 @@
  * Run-core's model: a run, its steps, their tries and rounds, and its landing, as Schemas at the context's door (decisions Q3–Q6).
  * A declaration in S1: no read path decodes through it yet; the Run door (S2) will.
  */
+import type { HeldReason } from '../../contracts/pictures-shown.contract.ts';
 import { Schema } from 'effect';
 import { Actor } from 'objects';
 import { foreignId, brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
@@ -127,6 +128,17 @@ export const Step = Schema.Struct({
   filesRead: Schema.optional(Schema.Struct({ taskId: TaskId.OnRead, lacked: Schema.Record(Schema.String, Schema.String) })),
   closeoutHash: Schema.optional(Schema.String),
   declared: Schema.optional(Schema.Array(Schema.String)),
+  pictures: Schema.optional(
+    Schema.Struct({
+      shown: Schema.Array(Schema.String),
+      held: Schema.Array(
+        Schema.Struct({
+          name: Schema.String,
+          reason: Schema.Literals(['harness', 'format', 'size', 'sides', 'count'] as const satisfies readonly HeldReason[]),
+        }),
+      ),
+    }),
+  ),
 }).annotate({ identifier: 'Step' });
 export type Step = typeof Step.Type;
 

@@ -48,6 +48,7 @@ import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, SESSION_TOKEN, tryModel } from '../filed/filed.ts';
 import { filedOn, resumeOn } from '../pinned/pinned.ts';
+import { heldLine, picturesFiled, type PicturesFiled } from '../filed/pictures/pictures.store.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
@@ -749,10 +750,19 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       say: landing.say,
       targets: landing.targets,
     };
-    const taskId = yield* asked('file', e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said))).pipe(
+    const resumes = step.resume !== undefined && sessionOf(f, step.resume) !== undefined;
+    const pictured = picturesFiled(step, resumes, inputsDir(home, run), run.inputs);
+    const taskId = yield* asked('file', e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said, pictured))).pipe(
       forStep(run, step),
     );
-    run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch, ...filedOn(f, step) };
+    run.steps[name] = {
+      ...run.steps[name],
+      taskId,
+      workspace: place.workspace,
+      branch: place.branch,
+      ...filedOn(f, step),
+      ...(pictured ? { pictures: { shown: pictured.shown, held: pictured.held } } : {}),
+    };
     filed.push(name);
   }
   return filed;
@@ -781,8 +791,10 @@ function readySpec(
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
   },
+  pictured?: PicturesFiled,
 ) {
   const { parents, closeoutOf } = said;
+  const held = pictured ? heldLine(pictured.held) : undefined;
   const { run, reads } = f;
   return {
     /**
@@ -813,7 +825,7 @@ function readySpec(
           { words: said.words, say: said.say, targets: said.targets, workspace: place.workspace },
           place.merge,
           reads.answers,
-        ),
+        ) + (held ? `\n\n${held}\n` : ''),
     cwd: sessionCwd(step, run, f.home, place.workspace),
     harness: step.harness,
     priority: stepMomentum(step),
@@ -827,6 +839,7 @@ function readySpec(
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],
+        ...(pictured?.pictures.length ? { pictures: pictured.pictures } : {}),
       }),
       resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), step, f, run.steps[step.name]) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),

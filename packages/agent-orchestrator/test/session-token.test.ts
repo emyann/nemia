@@ -135,6 +135,31 @@ describe('a step is filed a session token, which names its agent while its try i
   });
 });
 
+describe("a step's check is filed a token of its own, which names the step's agent while the check runs and is refused once it ends", () => {
+  const s = story(test);
+  let id = '';
+  let token = '';
+  s.test('the check filed once its step signed off carries a token of its own, not its session\'s', async () => {
+    const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: npm test\n---\nimplement it\n');
+    id = (await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }))).id;
+    await pass(id);
+    stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'done', artifacts: [], needs: null });
+    await pass(id);
+    token = tokenOf(`${id}-implement-check`) ?? '';
+    assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+    assert.notEqual(token, tokenOf(`${id}-implement`));
+  });
+  s.test("a request presenting it is the step's agent, in its run", async () => {
+    const caller = await callerBy(token);
+    assert.deepEqual(caller.kind === 'agent' ? [caller.agent, caller.run, caller.step] : caller, ['implement', id, 'implement']);
+  });
+  s.test('once the check settled, its token is refused session-ended', async () => {
+    stage.board().settle(`${id}-implement-check`, 'succeeded', undefined, 0);
+    assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
+  });
+});
+
 describe("a session that is no run's is live while its task has not settled, in no factory", () => {
   test('live while filed and unsettled, ended once settled', async () => {
     const task = 'nemia-session-token';

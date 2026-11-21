@@ -40,7 +40,10 @@ import { headsNow } from '../standing/standing.verb.ts';
  */
 export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };
 
-/** The ask `nemia retry` writes for the next try of `stepName`: its way, model, words and cap as asked, now, and who asked (`actor`). */
+/**
+ * The ask `nemia retry` writes for the next try of `stepName`: its way, model, words, cap and the one check a recheck runs again as asked,
+ * now, and who asked (`actor`).
+ */
 const askOf = (run: Run, stepName: string, how: RetryHow, actor: Actor | undefined) => ({
   step: stepName,
   try: tryOf(run, stepName) + 1,
@@ -48,6 +51,7 @@ const askOf = (run: Run, stepName: string, how: RetryHow, actor: Actor | undefin
   ...(how.model ? { model: how.model } : {}),
   ...(how.message !== undefined ? { message: how.message } : {}),
   ...(how.budget !== undefined ? { budget: how.budget } : {}),
+  ...(how.check !== undefined ? { check: how.check } : {}),
   at: new Date().toISOString(),
   ...(actor ? { actor } : {}),
 });
@@ -93,11 +97,11 @@ export const retryRun = Effect.fn('retry')(function* (
       phaseOf,
       closeoutReader(views, run, steps),
       closeoutAsked(views),
-      exitVerdicts(views, run),
+      exitVerdicts(views, run, steps),
       asks,
       blocked,
       spendOf,
-      checkKills(views, run),
+      checkKills(views, run, steps),
       tipOf,
     );
 

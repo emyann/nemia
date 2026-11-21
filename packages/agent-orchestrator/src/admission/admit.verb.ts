@@ -73,7 +73,7 @@ export const waitRead = Effect.fnUntraced(function* (runId: string, stepName: st
       steps,
       harnessBlocked(views),
       spendReader(views),
-      exitVerdicts(views, run),
+      exitVerdicts(views, run, steps),
     ),
   );
 });

@@ -18,6 +18,24 @@ export default meta;
 /** A client that asks the api nothing: a story draws what its run holds, and a read it would make waits. */
 const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
 
+/** A check of the step's first try by `name`, its task and its verdict: passed, refused with exit 1, or never filed, with neither. */
+const named = (name: string, verdict: 'passed' | 'failed' | null) =>
+  ({
+    name,
+    command: `npm run ${name}`,
+    started: verdict === null ? null : '2026-10-12T17:02:00.000Z',
+    ended: verdict === null ? null : '2026-10-12T17:04:00.000Z',
+    taskId: verdict === null ? null : `t-design-1-check-${name}`,
+    verdict: verdict === null ? null : { result: verdict, exit: verdict === 'passed' ? 0 : 1 },
+    refused: null,
+  }) as const;
+
+/** The step `step` judged by three named checks: lint passed, types refused, and tests, which waited on types, never run. */
+const checkedBy = <S extends { tries: readonly object[] }>(step: S) => {
+  const checks = [named('lint', 'passed'), named('types', 'failed'), named('tests', null)];
+  return { ...step, check: checks[1], checks, tries: step.tries.map((t) => ({ ...t, check: checks[1], checks })) };
+};
+
 const RUNS = {
   toCome: runOf(stepOf(CODES.come, [])),
   atWork: runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)])),
@@ -28,6 +46,7 @@ const RUNS = {
   tryAgain: runOf(
     stepOf(CODES.work, [tryOf(1, CODES.refused, true, { ...PLAN, summary: 'A first plan.' }, false), tryOf(2, CODES.work, false, null)]),
   ),
+  checked: runOf(checkedBy(stepOf(CODES.refused, [tryOf(1, CODES.refused, true, PLAN)]))),
 } as const;
 
 const ROW: CSSProperties = { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 32 };
@@ -117,6 +136,29 @@ export const Done: StoryObj = {
 
 /** A step tried again after its check failed the first try: the picker of its tries, the second at work. */
 export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> };
+
+/**
+ * A step judged by three named checks, its detail open: each check under its own name with its result, its exit and how long it ran,
+ * the one that refused beside the one that passed and the one never filed.
+ */
+export const Checked: StoryObj<{ step: string }> = {
+  args: { step: 'design' },
+  render: ({ step }) => (
+    <QueryClientProvider client={client}>
+      <div style={WHOLE}>
+        <StepPart view={RUNS.checked} step={step} size="L" now={NOW} />
+      </div>
+    </QueryClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: /Detail/ }));
+    for (const name of ['lint', 'types', 'tests'])
+      await expect(within(canvasElement).getByRole('heading', { name: `Check ${name}` })).toBeTruthy();
+    const tests = within(canvasElement).getByRole('region', { name: 'Check tests' });
+    await expect(within(tests).getByText('not filed')).toBeTruthy();
+    await expect(within(within(canvasElement).getByRole('region', { name: 'Check types' })).getByText('2m 00s')).toBeTruthy();
+  },
+};
 
 /**
  * A step's detail opened on what it was told: each layer an h4 under the part's h3s, the words of each at the level under it whatever

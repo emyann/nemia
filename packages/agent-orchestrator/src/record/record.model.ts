@@ -43,8 +43,16 @@ const CardName = foreignId('CardName');
  * A check of a step's work, a task of its own (`checkTaskId`, record.ts:397), and `tip`: the commit the step's branch was at when the run
  * filed it, as the pass read it (`fileCheck`) — what a recheck of a blocked step compares against (`blockedRecheck`). Absent on a record
  * written before the field, on a folder run, and where the pass read no heads.
+ *
+ * `tasks`, a step with several named checks (`checks:`): each check's task by its name, every check of the step's plan listed from the
+ * pass that files the first, a check not filed yet among them (`checkTaskId`); `taskId` is then the first check's. Absent on a step with
+ * one check named `check` — `check: <line>` — whose record keeps the shape it always had.
  */
-const CheckTask = Schema.Struct({ taskId: TaskId.OnRead, tip: Schema.optional(Schema.String) });
+const CheckTask = Schema.Struct({
+  taskId: TaskId.OnRead,
+  tip: Schema.optional(Schema.String),
+  tasks: Schema.optional(Schema.Record(Schema.String, TaskId.OnRead)),
+});
 
 /** Words said to a step before it was filed (`SaidBefore`, record.ts): when, and the words as said. */
 const SaidBefore = Schema.Struct({ at: Schema.String, text: Schema.String });

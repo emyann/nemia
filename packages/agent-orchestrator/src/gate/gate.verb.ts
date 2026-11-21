@@ -76,7 +76,7 @@ export const approveRun = Effect.fn('approve')(function* (
       phaseOf,
       closeoutReader(views, now, steps),
       closeoutAsked(views),
-      exitVerdicts(views, now),
+      exitVerdicts(views, now, steps),
       runsAtOnce(home).asks.read(id).asks,
       spendReader(views),
       standings,

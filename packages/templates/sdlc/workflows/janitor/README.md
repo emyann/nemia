@@ -7,21 +7,23 @@ the base that landed it), replaced (the decision or card that did), stale (each 
 standing. Argus proposes and never acts.
 
 ```
-argus
+argus → file-cards
 ```
 
-The step's check files the cards (`cards.ts`, read from the run's frozen workflow files, `$WF_WORKFLOW_FILES`, never from the tree;
-where that is not set, the check says so on stderr and fails): each through `nemia inbox add`, with its factory and workflow (its
+Argus's first check, `cards`, holds the closeout to what the filing needs and files nothing (`cards.ts check`), so a closeout that
+cannot be filed goes back to Argus. Then the command node `file-cards`, after Argus, acting as Argus, with no session and no gate,
+files the cards (`cards.ts file`, read from the run's frozen workflow files, `$WF_WORKFLOW_FILES`, never from the tree; where that is
+not set, it says so on stderr and fails): each through `nemia inbox add`, with its factory and workflow (its
 repository is the one the factory wires to the workflow), so it is ready to start, and with its labels, so the run it starts can open
-its pull request: the check line hands it the factory's `pullRequestLabels` rules (`--labels`), and a card of the run's own factory is
+its pull request: both lines hand it the factory's `pullRequestLabels` rules (`--labels`), and a card of the run's own factory is
 filed with the labels Argus gave it, one `--label` each, which at least one rule reads. Where the factory names no rules, or a card is
 for another factory, whose rules are not these, the card is filed with no labels, and its line says why. It refuses the whole
 closeout, filing nothing, when a card names no factory or workflow, when two cards share a title, when a label of a card it labels is
 not `<key>=<value>`, gives a key twice or no rule reads its labels, or when the period compared with is not as long as the period read
-and does not end the day before it. A card whose title the inbox already has is not filed again, so the check run again files only what is missing. Nothing is
+and does not end the day before it. A card whose title the inbox already has is not filed again, so the node run again files only what is missing. Nothing is
 started: the inbox is where a person decides.
 
-The check then grooms the inbox (`groom.ts`, from the same frozen files): the cards of the run's own factory alone, the namespace
+Argus's second check, `groom`, grooms the inbox (`groom.ts`, from the same frozen files): the cards of the run's own factory alone, the namespace
 `nemia get runs/<run> -o json` serves the run in, read through `nemia get cards -n <that factory> -o json`, up to 64 MiB of it, which a listing reaches only when the cards done or
 replaced are long left in the inbox, and the refusal past it says to remove them; another factory's cards
 are its own janitor's. It checks the verdicts whole before it writes anything, refusing, exit 1, a verdict word not of the four, two verdicts on one card, a done

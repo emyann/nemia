@@ -1,7 +1,12 @@
-/** A script condition's answer file, decoded (`scriptAnswerOf`): a route or `unsure`, exactly one of them, or nothing the run can use. */
+/**
+ * A script condition's answer file, decoded (`scriptAnswerOf`), and a command node's answer held to its output schema
+ * (`scriptCloseouts`).
+ */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { scriptAnswerOf } from './script.store.ts';
+import { scriptAnswerOf, scriptCloseouts } from './script.store.ts';
+import type { StepSpec } from '../step/step.ts';
+import { run } from '../../test/assessed.ts';
 
 test('an answer file decodes to a route or to unsure, and to nothing with both, neither, a wrong type or text that is not JSON', () => {
   const rows: [string | undefined, ReturnType<typeof scriptAnswerOf>][] = [
@@ -25,4 +30,24 @@ test('an answer file decodes to a route or to unsure, and to nothing with both, 
     [undefined, undefined],
   ];
   for (const [text, want] of rows) assert.deepEqual(scriptAnswerOf(text), want, String(text));
+});
+
+test("a command node's answer is held to its output schema: one it refuses signs nothing, one it takes is the node's output", () => {
+  const node = {
+    name: 'file-notes',
+    after: [],
+    body: '',
+    run: 'node notes.ts file',
+    output: { schema: { type: 'object', properties: { filed: { type: 'integer' } }, required: ['filed'] } },
+  } as unknown as StepSpec;
+  const closeoutOn = (answer: string) =>
+    scriptCloseouts(
+      [node],
+      () => ({ exitCode: 0, terminationMessage: answer }),
+      run({ 'file-notes': 'r-1-file-notes' }),
+      () => undefined,
+    )('file-notes');
+  assert.deepEqual(closeoutOn('{"filed":2}')?.output, { filed: 2 });
+  assert.equal(closeoutOn('{"filed":"two"}'), undefined);
+  assert.equal(closeoutOn('{}'), undefined);
 });

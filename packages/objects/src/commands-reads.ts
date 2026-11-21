@@ -110,9 +110,10 @@ const checkOutputRefused = (args: Args) => {
 export const CHECK_OUTPUT_WORDS = {
   name: 'check-output',
   served: [{ endpoint: 'steps.checkOutput' }],
-  usage: '<runId> <step> [--try <n>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]',
+  usage: '<runId> <step> [--try <n>] [--check <name>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]',
   help: [
-    "what a step's try's check printed, its latest try or --try <n>:",
+    "what a step's try's check printed, its latest try or --try <n>, the check",
+    'named by --check <name> where the step has several:',
     'stdout whole, or --stderr; --from <n> or --before <n> with --limit <n>,',
     'or --last <n>: one page; --match <text>: the lines containing it, any',
     'case, numbered',
@@ -124,6 +125,7 @@ export const CHECK_OUTPUT_WORDS = {
     ],
     flags: [
       checkOutputFlag('--try', 'try', "a try's number"),
+      checkOutputFlag('--check', 'check', "one of the step's checks, by its name"),
       { flag: '--stderr', kind: 'switch', sets: { stream: 'stderr' } },
       checkOutputFlag('--from', 'from', 'the line number to read on from, from 1'),
       checkOutputFlag('--before', 'before', 'the line number the lines printed end before, from 1'),
@@ -133,7 +135,7 @@ export const CHECK_OUTPUT_WORDS = {
     ],
     unknown: takesNo(
       'check-output',
-      "one run's id, one step's name, --try <n>, --stderr, --from <n>, --before <n>, --limit <n>, --last <n> and --match <text>",
+      "one run's id, one step's name, --try <n>, --check <name>, --stderr, --from <n>, --before <n>, --limit <n>, --last <n> and --match <text>",
     ),
   },
   check: checkOutputRefused,

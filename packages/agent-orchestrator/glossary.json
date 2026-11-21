@@ -139,6 +139,15 @@
       }
     },
     {
+      "term": "Checks",
+      "meaning": "a step's `checks:`, a list of named checks, each `{ name, run, after?, enabled? }` and each a task of its own on the `check` harness: one with no `after:` waits on the one above it, `after: []` on none, and `enabled: false` takes one out and hands its waits on. `check: <line>` is read as one check named `check`. Which are filed is decided on every pass by `checksDue` (`packages/agent-orchestrator/src/check/checks-due.ts`).",
+      "type": "CheckSpec"
+    },
+    {
+      "term": "Command node",
+      "meaning": "a node with `run:` and no session: its shell line run on the `command` harness, signed off by its exit and the answer it leaves in `WF_ANSWER` (`commandCloseout`, `packages/agent-orchestrator/src/command-node/command-node.ts`), acting as the agent it names. Its kind is `command`."
+    },
+    {
       "term": "Check failure policy",
       "meaning": "a step's `checkFailurePolicy:`, read against the pod failure policy of a Kubernetes Job: rules read in order, each an action (`FailStep` or `Count`) and the exit codes of its check it holds of (`In` or `NotIn`). The first that holds decides; on `FailStep` the run files no `retries:` try and the step waits on a person.",
       "type": "CheckFailurePolicy",

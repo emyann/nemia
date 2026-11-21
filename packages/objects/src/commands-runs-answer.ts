@@ -66,23 +66,35 @@ function recheckAnswerRefusal(args: Args) {
 }
 
 /**
+ * The refusal of `--check` on a try that is no recheck: it names the one check a recheck runs again, and a session runs none of its own.
+ */
+function checkRefusal(args: Args) {
+  if (typeof args.check !== 'string' || args.mode === 'recheck') return null;
+  const command = commandLine(RETRY_WORDS, args);
+  return `--check names the one refused check a recheck runs again, and this try is no recheck. Add --recheck (nemia retry <runId> <step> --recheck --check ${args.check}), or leave --check out: ${command}.`;
+}
+
+/**
  * The refusal of `nemia retry`'s arguments before anything is read, of what needs nothing of the orchestrator: a round given answers,
- * words or a model; no step and no round; answers beside a recheck. A message or a budget a try does not take is the handler's to refuse.
+ * words or a model; no step and no round; answers beside a recheck; `--check` on a try that is no recheck. A message or a budget a try
+ * does not take, and a `--check` that names no refused check of the step, is the handler's to refuse.
  * @param args The command line's arguments, by key.
  */
-export const retryRefusal = (args: Args) => (args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args)));
+export const retryRefusal = (args: Args) =>
+  args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args) ?? checkRefusal(args));
 
 /** `nemia retry`: another try of a step, or with `--round` another round of a loop out of rounds. */
 export const RETRY_WORDS = {
   name: 'retry',
   served: [{ endpoint: 'runs.retry' }],
   usage:
-    '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
+    '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
   help: [
     'try a step waiting on you again, once, on the next tick:',
     '--continue (default) continues its session, told what happened;',
     '--fresh a new session on its branch; --model <m> the same, on m;',
     '--recheck runs its check again, and files no session;',
+    '--check <name>, with --recheck: that refused check alone, the others kept;',
     '--round: once more — a loop out of rounds goes round again, once,',
     'the step it loops to continued, then a new reviewer; the step is the',
     'one that closes the loop, left out where the run has one loop;',
@@ -113,6 +125,12 @@ export const RETRY_WORDS = {
         way: true,
         takes: '--model takes the model to run the new session on: nemia retry <runId> <step> --model <m>',
       },
+      {
+        flag: '--check',
+        kind: 'name',
+        key: 'check',
+        takes: '--check takes the refused check to run again, by its name: nemia retry <runId> <step> --recheck --check <name>',
+      },
       { flag: '--round', kind: 'switch', key: 'round', way: true },
       {
         flag: '--message',
@@ -133,7 +151,7 @@ export const RETRY_WORDS = {
     ],
     defaults: { mode: 'continue' },
     unknown: (arg) =>
-      `nemia retry does not take ${arg}. It takes one of --continue, --fresh, --model <m>, --recheck, --round, and --message "<answer>" and --budget <amount>.`,
+      `nemia retry does not take ${arg}. It takes one of --continue, --fresh, --model <m>, --recheck, --round, and --check <name>, --message "<answer>" and --budget <amount>.`,
     oneWay: 'nemia retry asks for one try, one way: pick one of --continue, --fresh, --model <m>, --recheck, --round.',
     apart: (flag) =>
       `--message takes what to tell the step, and ${flag} is one of nemia retry's own flags, so the answer was left out: nemia retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,

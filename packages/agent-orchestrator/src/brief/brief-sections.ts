@@ -36,7 +36,7 @@ import {
 } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
 import { modeWord, retriesDue, type CheckKillOf, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
-import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/index.ts';
+import { refusalSection, refusalsSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/index.ts';
 import { saidBy, type Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { downstreamOf } from '../workspace/workspace.ts';
@@ -65,6 +65,7 @@ export const TASK_HEADINGS = {
   'From <step>': 'step',
   'Replies from <step>': 'step',
   "What <step>'s check said on the merged tree": 'check',
+  "What <step>'s check <check> said": 'check',
   "What <step>'s check said": 'check',
   'What the check said': 'check',
   'What <step> said': 'step',
@@ -143,6 +144,11 @@ export type RetryBriefing = {
   status: StepStatus;
   /** What the last try's check said, when it did not pass. */
   refusal?: CheckRefusal;
+  /**
+   * What each check said that did not pass on the last try, of a step judged by several (`checks:`), with the names of those that passed
+   * (`refusalsSection`): in place of `refusal`.
+   */
+  refusals?: { readonly refused: readonly CheckRefusal[]; readonly passed: readonly string[] };
   /**
    * The files the last try's closeout named that the run did not have, when that is why it is tried again: each a line that names the
    * file, says why and gives a near name that is there (`lackLines`).
@@ -299,6 +305,12 @@ const whyEnded = (r: RetryBriefing) =>
 const CHECK_AGAIN =
   "Where what failed is not your work's — the machine, a test that varies run to run — change nothing and sign off as before, saying why: signing off again files the check again, as far as this step's `retries:` allow, and after them a person can run it again.";
 
+/** What a try is told of the checks that refused the one before it: the one check's refusal, or each refusal and the checks that passed. */
+const refusedSections = (r: RetryBriefing) => [
+  ...(r.refusal ? [refusalSection(r.refusal)] : []),
+  ...(r.refusals ? [refusalsSection(r.refusals.refused, r.refusals.passed)] : []),
+];
+
 /**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
  * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
@@ -359,7 +371,7 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false)
     ...answer,
     ...denied,
     ...(r.ending ? endingSection(step, r.ending) : []),
-    ...(r.refusal ? [refusalSection(r.refusal)] : []),
+    ...refusedSections(r),
   ].join('\n');
 }
 

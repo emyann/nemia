@@ -20,7 +20,7 @@ const PAGE = 200;
 type At = { readonly last: true } | { readonly from: number } | { readonly before: number };
 
 /** The try whose check is read: its run, its step and its number. */
-export type CheckRead = { readonly runId: string; readonly step: string; readonly try: number };
+export type CheckRead = { readonly runId: string; readonly step: string; readonly try: number; readonly check?: string };
 
 /** The page `at` asks, as the api's query spells it. */
 const pageOf = (at: At) =>
@@ -127,7 +127,7 @@ export function CheckOutput({ read }: { read: CheckRead }) {
   const [stream, setStream] = useState<OutputStream>('stdout');
   const [at, setAt] = useState<At>({ last: true });
   const [match, setMatch] = useState('');
-  const asked = { stream, ...pageOf(at), ...(match === '' ? {} : { match }) };
+  const asked = { stream, ...pageOf(at), ...(match === '' ? {} : { match }), ...(read.check === undefined ? {} : { check: read.check }) };
   const output = useQuery({
     queryKey: ['check-output', read.runId, read.step, read.try, asked],
     queryFn: () => steps.checkOutput(read.runId, read.step, read.try, asked),

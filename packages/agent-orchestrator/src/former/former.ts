@@ -235,9 +235,12 @@ export function readKeys<K extends string>(
   return { meta, spelled, ...(fenced && { block: fenced }) };
 }
 
+/** The keys in `maps` whose value is a list of maps, kept as its JSON text too: `checks:`. */
+const LIST_OF_MAPS: readonly string[] = ['checks'];
+
 /** A key's value as a line holds it (`flatValue`), or the JSON text of a map on a key in `maps`, left to its own reader. */
 const keyValue = (step: string, entry: FrontmatterEntry, maps: readonly string[]) =>
-  maps.includes(entry.key) && typeof entry.value === 'object' && !Array.isArray(entry.value)
+  maps.includes(entry.key) && typeof entry.value === 'object' && (!Array.isArray(entry.value) || LIST_OF_MAPS.includes(entry.key))
     ? JSON.stringify(entry.value)
     : flatValue(step, entry, LIST_KEYS.includes(entry.key));
 

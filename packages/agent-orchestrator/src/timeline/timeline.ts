@@ -5,7 +5,7 @@
  * Pure, as `tick/assess.ts` is: data in, a timeline and its lines out. `views.verb.ts` reads the views and hands them here, `cli/main.ts`
  * prints the lines `nemia decide` shows, and nothing here reads a disk or calls the engine.
  */
-import type { Run } from '../record/record.ts';
+import { checkTasksOf, type Run } from '../record/record.ts';
 import { roundIn } from '../status/status.ts';
 import { dollars } from '../money/money.ts';
 import { durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../usage/usage.ts';
@@ -135,6 +135,8 @@ export type TimelineTry = {
   session: TaskSpan | null;
   sessionOf: number | null;
   check: TaskSpan | null;
+  /** Each of its checks by name, where its step has several (`checks:`), a check not filed yet left out; absent for one check. */
+  checks?: Array<{ name: string; span: TaskSpan }>;
   used?: Consumed;
   turn?: TurnSpan;
 };
@@ -202,19 +204,31 @@ export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps:
       ...earlier.map((t, i) => ({
         taskId: t.taskId,
         check: t.check?.taskId,
+        named: t.check?.tasks ? checkTasksOf(t.check) : [],
         round: roundIn({ taskId: null, tries: earlier.slice(0, i) }),
         cause: t.cause,
       })),
-      ...(record.taskId ? [{ taskId: record.taskId, check: record.check?.taskId, round: roundIn(record) }] : []),
+      ...(record.taskId
+        ? [
+            {
+              taskId: record.taskId,
+              check: record.check?.taskId,
+              named: record.check?.tasks ? checkTasksOf(record.check) : [],
+              round: roundIn(record),
+            },
+          ]
+        : []),
     ];
     byStep[name] = tries.map((t, i) => {
       const first = tries.findIndex((u) => u.taskId === t.taskId);
       const session = first === i ? spanOf(t.taskId, views.get(t.taskId)) : null;
       const check = t.check ? spanOf(t.check, views.get(t.check)) : null;
-      for (const span of [session, check]) if (span) counted.push({ loop: loopOf.get(name) ?? null, round: t.round, span });
+      const named = t.named.flatMap(([checkName, id]) => (views.has(id) ? [{ name: checkName, span: spanOf(id, views.get(id)) }] : []));
+      const others = named.filter((c) => c.span.taskId !== t.check).map((c) => c.span);
+      for (const span of [session, check, ...others]) if (span) counted.push({ loop: loopOf.get(name) ?? null, round: t.round, span });
       const used = session ? taskUsage(views.get(t.taskId)) : undefined;
       const turn = turnIn(tries, i, views.get(t.taskId));
-      const shared = { ...(used ? { used } : {}), ...(turn ? { turn } : {}) };
+      const shared = { ...(used ? { used } : {}), ...(turn ? { turn } : {}), ...(t.named.length ? { checks: named } : {}) };
       return { try: i + 1, round: t.round, session, sessionOf: first === i ? null : first + 1, check, ...shared };
     });
   }

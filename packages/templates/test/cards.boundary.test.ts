@@ -1,10 +1,10 @@
 /**
- * sdlc's janitor's filing script (`workflows/janitor/cards.ts`), driven as Argus's check drives it: `node cards.ts <closeout>`, with a
- * scratch store as `WF_ROOT`, a bounded subprocess, and `nemia` on the PATH as a factory has it: the client (`apps/cli`), asking the
- * api served on the scratch store, in whose factories each card is filed, since the subject is the card really filed in the inbox. It
- * files each card through `nemia inbox add`, ready to start, never a card whose title the inbox already has, and starts nothing; each
- * refusal has a fixture that breaks its rule, and files nothing at all. A refusal is held by its exit and by what it filed, never by its
- * words.
+ * sdlc's janitor's filing script (`workflows/janitor/cards.ts`), driven as Argus's check and the janitor's `file-cards` node drive it:
+ * `node cards.ts check|file <closeout>` (a bare `node cards.ts <closeout>` read as `file`), with a scratch store as `WF_ROOT`, a bounded
+ * subprocess, and `nemia` on the PATH as a factory has it: the client (`apps/cli`), asking the api served on the scratch store, in whose
+ * factories each card is filed, since the subject is the card really filed in the inbox. It files each card through `nemia inbox add`,
+ * ready to start, never a card whose title the inbox already has, and starts nothing; `check` files none. Each refusal has a fixture that
+ * breaks its rule, and files nothing at all. A refusal is held by its exit and by what it filed, never by its words.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -89,6 +89,24 @@ test('each card is filed through nemia inbox add, ready to start, with its numbe
   }
   assert.ok(ran.out.includes('Allow agora the log it reads'), ran.out);
   assert.deepEqual(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : [], [], 'no run started');
+});
+
+test("Argus's check, cards.ts check, files nothing; the command node after it, cards.ts file, files what it passed", async (t) => {
+  const { env, root } = await world(t);
+  const closeout = closeoutFile({ cards: [card('Allow agora the log it reads')] });
+  const checked = run(env, ['check', closeout]);
+  assert.equal(checked.code, 0, checked.err);
+  assert.deepEqual(inbox(root), {}, 'the check files no card');
+  const filed = run(env, ['file', closeout]);
+  assert.equal(filed.code, 0, filed.err);
+  assert.equal(Object.keys(inbox(root)).length, 1, 'the filing files it');
+});
+
+test('REFUSED: cards.ts check refuses a closeout the filing would refuse, by the same exit', async (t) => {
+  const { env, root } = await world(t);
+  const ran = run(env, ['check', closeoutFile({ cards: [card('A card half said', { factory: ' ' })] })]);
+  assert.equal(ran.code, 1);
+  assert.deepEqual(inbox(root), {});
 });
 
 test('REFUSED: a card whose title the inbox has, in other case and spacing, is not filed again, and a second check files nothing', async (t) => {

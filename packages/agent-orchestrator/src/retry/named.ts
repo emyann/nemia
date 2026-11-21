@@ -12,7 +12,7 @@ export type RetryNamed = { step: string; how: RetryHow };
 const COMMAND = /\bnemia retry ([\w.-]+) ([\w-]+)([^\n`]*)/g;
 
 /** A flag of `nemia retry` and its value where it takes one: a word, or a quoted text. */
-const FLAG = /--(recheck|fresh|continue|model|budget|message)\b(?:[ =]("[^"]*"|'[^']*'|(?!--)\S+))?/g;
+const FLAG = /--(recheck|fresh|continue|model|budget|message|check)\b(?:[ =]("[^"]*"|'[^']*'|(?!--)\S+))?/g;
 
 /** Whether a value is a placeholder a person fills (`<answer>`), which names no message. */
 const placeholder = (value: string) => /^<[^>]*>$/.test(value);
@@ -29,6 +29,7 @@ function howOf(flags: string) {
     else if (flag === 'model' && value !== undefined) how = { ...how, model: value };
     else if (flag === 'budget' && value !== undefined && Number.isFinite(Number(value))) how = { ...how, budget: Number(value) };
     else if (flag === 'message' && value !== undefined && !placeholder(value)) how = { ...how, message: value };
+    else if (flag === 'check' && value !== undefined && !placeholder(value)) how = { ...how, check: value };
   }
   return how;
 }

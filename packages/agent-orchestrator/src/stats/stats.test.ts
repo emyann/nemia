@@ -18,11 +18,13 @@ import {
   factsOf,
   headlineOf,
   keysOf,
+  checkRowsOf,
   slowLandingsOf,
   statsOf,
   statsQueryOf,
   type CheckVerdict,
   type Facts,
+  type TryFact,
 } from './stats.ts';
 import type { SkillRule } from '../skills/skills.ts';
 import { deniedCallsOf } from './discipline.ts';
@@ -794,6 +796,34 @@ describe('`headlineOf`: the headline numbers of a set of facts, each mean over w
 });
 
 const landingOf = (r: ReturnType<typeof readOf>) => slowLandingsOf(factsOf(r).tries);
+
+describe('`checkRowsOf`: a row per named check of a step, its median and p90 over the tries that ran it to a verdict, and the share it refused', () => {
+  const tryOf = (n: number, checks: TryFact['checks']) => ({ workflow: 'build', step: 'implement', try: n, checks }) as TryFact;
+  test('own ran 1, 2 and 10 s and refused once: median 2 s, p90 10 s, a third refused; probe, beside it, is a row of its own', () => {
+    const rows = checkRowsOf([
+      tryOf(1, [
+        { name: 'probe', ms: 500, verdict: 'passed' },
+        { name: 'own', ms: 1000, verdict: 'passed' },
+      ]),
+      tryOf(2, [
+        { name: 'probe', ms: 500, verdict: 'passed' },
+        { name: 'own', ms: 2000, verdict: 'refused' },
+      ]),
+      tryOf(3, [
+        { name: 'probe', ms: 500, verdict: 'passed' },
+        { name: 'own', ms: 10_000, verdict: 'passed' },
+      ]),
+      tryOf(4, [{ name: 'probe', ms: null, verdict: null }]),
+    ]);
+    assert.deepEqual(
+      rows.map((r) => [r.check, r.count, r.medianMs, r.p90Ms, r.refused]),
+      [
+        ['probe', 3, 500, 500, 0],
+        ['own', 3, 2000, 10_000, 1 / 3],
+      ],
+    );
+  });
+});
 
 describe('`slowLandingsOf`: each landing check that passed in more than half the deadline its task was filed with', () => {
   rowsOf([

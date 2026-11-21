@@ -1,6 +1,8 @@
 /**
- * `node cards.ts <closeout.json> --labels "<rules>"` — the janitor's cards filed in the inbox, each through `nemia inbox add` with its
- * labels, never one already there.
+ * `node cards.ts file <closeout.json> --labels "<rules>"` — the janitor's cards filed in the inbox, each through `nemia inbox add` with its
+ * labels, never one already there; `node cards.ts check <closeout.json> --labels "<rules>"` checks the same closeout and files nothing,
+ * which is Argus's check, so a closeout that cannot be filed is sent back to Argus before the command node after it (`file-cards`) files
+ * it. A first word that is neither reads as `file`, the form before the two.
  *
  * Takes the path of Argus's closeout, flat (`WF_CLOSEOUT`): its `period` and `against`, each a `from` and a `to` day, and its `cards`,
  * each a `title`, a `kind`, a `correction`, its `evidence`, the `agent` it is about, the `factory` and `workflow` it is started with
@@ -303,14 +305,17 @@ function file(card: Card, labels: readonly string[], text: string, dir: string, 
   console.log(`nemia janitor: filed ${ran.stdout.split('\n')[0].trim()}`);
 }
 
-/** Checks the closeout, then files each card the inbox has no title of. */
+/** Checks the closeout, then, unless asked only to check, files each card the inbox has no title of. */
 function main() {
-  const closeout = readCloseout(process.argv[2]);
-  const rules = rulesOf(process.argv.slice(3));
+  const asked = process.argv[2] === 'check' || process.argv[2] === 'file' ? process.argv[2] : null;
+  const args = asked ? process.argv.slice(3) : process.argv.slice(2);
+  const closeout = readCloseout(args[0]);
+  const rules = rulesOf(args.slice(1));
   const periods = checkPeriods(closeout);
   const cards = cardsOf(closeout);
   if (!cards.length) return console.log('nemia janitor: Argus proposed no correction, so no card is filed');
   const labelled = labelsOf(cards, rules);
+  if (asked === 'check') return console.log(`nemia janitor: ${cards.length} card(s) checked, each fit to file`);
   const there = inboxTitles();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-janitor-'));
   try {

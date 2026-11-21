@@ -84,7 +84,8 @@ export const retryLines = (
 };
 
 /**
- * `nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer]... [--message] [--budget]`.
+ * `nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer]... [--message]
+ * [--budget]`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function retry(args: Args) {
@@ -98,6 +99,7 @@ export async function retry(args: Args) {
   const model = textArg(args, 'model');
   const message = textArg(args, 'message');
   const budget = amountArg(args, 'budget');
+  const check = textArg(args, 'check');
   const way: RunRetry['mode'] = mode === 'fresh' || mode === 'recheck' ? mode : 'continue';
   const payload = {
     mode: way,
@@ -105,6 +107,7 @@ export async function retry(args: Args) {
     ...(round ? { round } : {}),
     ...(message !== undefined ? { message } : {}),
     ...(budget !== undefined ? { budget } : {}),
+    ...(check !== undefined ? { check } : {}),
     ...(round ? {} : await answersOf(command, runId, step, typedAnswers)),
   };
   const answer = await asked(command, (c) => c.runs.retry({ params: { namespace, name: runId, step }, payload }));

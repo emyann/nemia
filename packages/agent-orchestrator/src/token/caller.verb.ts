@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 import { EngineService, asked } from '../runtime-client.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { checkTasksOf } from '../record/record.ts';
 import { callerOf, type CallerOf, type TokenNeed } from './token.ts';
 import { TokenDoor, standingOf, tokenDigest, type TokenFiled } from './token.store.ts';
 
@@ -32,14 +33,18 @@ const unsettled = Effect.fnUntraced(function* (task: string) {
 
 /**
  * Whether the session a token was minted for is still the live one: for a step's, its run is there and not called off, the step's
- * current task is the token's (a later try or round files another), and that task has not settled; for a session that is no run's
+ * current task is the token's (a later try or round files another) or one of its current check tasks (a check acts as the step's agent),
+ * and that task has not settled; for a session that is no run's
  * (Nemia's), its task has not settled, the keeper filing her anew under another once she was stopped.
  */
 export const liveSession = Effect.fn('liveSession')(function* (record: TokenFiled) {
   if (record.run === null) return yield* unsettled(record.task);
   const run = yield* (yield* RunDoor).runs.find(RunId.read(record.run), () => {});
   if (run === undefined || run.cancelledAt !== undefined) return false;
-  if (record.step === null || run.steps[record.step]?.taskId !== record.task) return false;
+  const step = record.step === null ? undefined : run.steps[record.step];
+  if (step === undefined) return false;
+  const checks = step.check ? checkTasksOf(step.check).map(([, id]) => id) : [];
+  if (step.taskId !== record.task && !checks.includes(record.task)) return false;
   return yield* unsettled(record.task);
 });
 

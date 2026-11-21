@@ -22,11 +22,14 @@ import {
   type CheckHanded,
   type CheckRefusal,
   type LandingSaid,
+  checksPhase,
+  checkFailureAction,
+  decidingCheckTask,
 } from '../check/index.ts';
-import type { StepSpec } from '../step/step.ts';
+import { stepChecks, type StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
-import { isRepositoryRun, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, checkTasksOf, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { taskSpend, type SpendOf } from '../status/status.ts';
 import { type Consumed } from '../usage/usage.ts';
 import { waitedOn, type ParentRun } from '../wait/wait.ts';
@@ -223,9 +226,11 @@ export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { ear
   const e = yield* EngineService;
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
-    const behind = tries?.at(-1)?.check?.taskId;
+    const last = tries?.at(-1)?.check;
+    const behind = last ? checkTasksOf(last).map(([, id]) => id) : [];
     const earlier = earlierTries ? (tries ?? []).map((t) => t.taskId) : [];
-    for (const id of [taskId, check?.taskId, behind, ...earlier]) if (id && !views.has(id)) views.set(id, yield* asked('view', e.view(id)));
+    const checks = check ? checkTasksOf(check).map(([, id]) => id) : [];
+    for (const id of [taskId, ...checks, ...behind, ...earlier]) if (id && !views.has(id)) views.set(id, yield* asked('view', e.view(id)));
   }
   return {
     views,
@@ -238,7 +243,7 @@ export const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run
   const everyTry = new Map(views);
   for (const record of Object.values(run.steps)) {
     for (const t of record.tries ?? []) {
-      for (const taskId of [t.taskId, t.check?.taskId]) {
+      for (const taskId of [t.taskId, ...(t.check ? checkTasksOf(t.check).map(([, id]) => id) : [])]) {
         if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, yield* asked('view', e.view(taskId)));
       }
     }
@@ -372,10 +377,31 @@ export const spendReader = (views: ReadonlyMap<string, TaskView>) =>
  * Exported for a consumer that words a check as `nemia ls` does.
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name their checks' tasks.
+ * @param steps The workflow's steps, whose `checkFailurePolicy:` picks the deciding check of several (`decidingCheckTask`).
  */
-export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string) => {
-  const taskId = run.steps[step]?.check?.taskId;
+export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly StepSpec[]) => (step: string) => {
+  const taskId = decidingTaskOf(views, run, step, steps);
   return taskId ? attemptVerdict(views.get(taskId)?.state.attempts.at(-1)) : undefined;
+};
+
+/**
+ * The task of a step's current checks whose end its verdict is read off (`decidingCheckTask`): its one check's, or of several, the first
+ * whose refusal the step's `checkFailurePolicy:` hands a person, else the first that refused with an exit code; a command node's own
+ * task, run on the command harness, whose exit is its verdict; undefined for a step with no check filed.
+ */
+const decidingTaskOf = (views: ReadonlyMap<string, TaskView>, run: Run, step: string, steps: readonly StepSpec[]) => {
+  const check = run.steps[step]?.check;
+  const own = run.steps[step]?.taskId;
+  if (!check) return own && views.get(own)?.state.harness === 'command' ? own : undefined;
+  const phaseOf = (id: string) => phaseOfView(views.get(id));
+  const verdictOf = (id: string) => attemptVerdict(views.get(id)?.state.attempts.at(-1));
+  const policy = steps.find((s) => s.name === step)?.checkFailurePolicy;
+  return decidingCheckTask(
+    check,
+    phaseOf,
+    (id) => typeof verdictOf(id) === 'number',
+    (id) => checkFailureAction(policy, verdictOf(id)) === 'FailStep',
+  );
 };
 
 /**
@@ -384,10 +410,11 @@ export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => 
  * the machine killed again (`CheckKillOf`).
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name their checks' tasks.
+ * @param steps The workflow's steps, whose `checkFailurePolicy:` picks the deciding check of several (`decidingCheckTask`).
  */
-export const checkKills = (views: ReadonlyMap<string, TaskView>, run: Run) =>
+export const checkKills = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly StepSpec[]) =>
   ((step) => {
-    const taskId = run.steps[step]?.check?.taskId;
+    const taskId = decidingTaskOf(views, run, step, steps);
     return taskId ? outOfMemory(killedMemoryOf(views.get(taskId)), undefined) : undefined;
   }) satisfies CheckKillOf;
 
@@ -456,9 +483,15 @@ export const checkReportsRead = Effect.fn('checkReports')(function* (
 ) {
   const reports = new Map<string, CheckReport>();
   for (const step of steps) {
-    const taskId = run.steps[step.name]?.check?.taskId;
-    if (!taskId || !step.check || !want(phaseOf(taskId))) continue;
-    reports.set(step.name, { passed: phaseOf(taskId) === 'succeeded', ...(yield* refusalRead(step.check, taskId)) });
+    const check = run.steps[step.name]?.check;
+    const plan = stepChecks(step);
+    const first = plan[0];
+    if (!check || !first || !want(checksPhase(check, phaseOf))) continue;
+    const tasks = checkTasksOf(check);
+    const [name, taskId] = tasks.find(([, id]) => phaseOf(id) === 'failed') ??
+      tasks.find(([, id]) => phaseOf(id) === 'stopped') ?? [first.name, check.taskId];
+    const command = plan.find((c) => c.name === name)?.run ?? first.run;
+    reports.set(step.name, { passed: checksPhase(check, phaseOf) === 'succeeded', ...(yield* refusalRead(command, taskId)) });
   }
   return reports;
 });
@@ -537,14 +570,23 @@ const unreadWords = (taskId: string, cause: Cause.Cause<unknown>) => {
 
 /**
  * What a step is told its checked steps' checks said (`checkHandedRead`): for each step it waits on (`after:`) that has a `check:` whose
- * task is on the record, the check of its current try or round, read on the pass that files the step and never carried from another.
+ * task is on the record, the check of its current try or round, read on the pass that files the step and never carried from another; of a
+ * step with several checks, each that was filed, under its name.
  */
 export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, steps: readonly StepSpec[], step: StepSpec) {
   const out: CheckHanded[] = [];
   for (const name of step.after) {
-    const command = steps.find((s) => s.name === name)?.check;
-    const taskId = run.steps[name]?.check?.taskId;
-    if (command && taskId) out.push(yield* checkHandedRead(name, command, taskId));
+    const parent = steps.find((s) => s.name === name);
+    const check = run.steps[name]?.check;
+    if (!parent || !check) continue;
+    const plan = stepChecks(parent);
+    const tasks = Object.fromEntries(checkTasksOf(check));
+    for (const c of plan) {
+      const taskId = tasks[c.name];
+      if (!taskId || (plan.length > 1 && !(yield* asked('view', (yield* EngineService).view(taskId))).state.brief)) continue;
+      const handed = yield* checkHandedRead(name, c.run, taskId);
+      out.push(plan.length > 1 ? { ...handed, check: c.name } : handed);
+    }
   }
   return out;
 });
@@ -684,8 +726,8 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
     phaseOf,
     signedOff: closeoutReader(views, record, steps),
     asked: closeoutAsked(views),
-    verdictOf: exitVerdicts(views, record),
-    checkKillOf: checkKills(views, record),
+    verdictOf: exitVerdicts(views, record, steps),
+    checkKillOf: checkKills(views, record, steps),
     sessionBlocked: harnessBlocked(views),
     spendOf: spendReader(views),
     asks,

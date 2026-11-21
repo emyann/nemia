@@ -2226,6 +2226,52 @@ The tests' team draws one: `test/fixtures/team/triage/` (plan → triage → bui
 graph `docs/model.md` holds between its `diagram:workflow` markers. The graph every client draws (`graphOf`) carries a `route` edge from
 a condition to each node that runs on one of its routes, in place of the `after` edge, and each node with its kind.
 
+## A step's checks: `checks:`
+
+One `check:` line holds every fact a step is judged by, and a refusal says only that the line failed. `checks:` names them, each a
+task of its own on the `check` harness, after the step signs off:
+
+```yaml
+checks:
+  - name: lint
+    run: npm run lint
+  - name: types
+    run: npm run typecheck
+    after: []
+  - name: tests
+    run: npm test
+    after: [lint, types]
+  - name: e2e
+    run: npm run e2e
+    enabled: false
+```
+
+- **Each entry is `{ name, run, after?, enabled? }`.** `run:` is a shell line, as a GitHub Actions step's; a `name` is lower-case
+  words joined by `-`. A check with no `after:` waits on the one above it, so a plain list is a chain; `after: []` waits on nothing, and
+  two such run side by side; `after: [a, b]` waits on both. `enabled: false` takes a check out and hands its waits on to the checks
+  that waited on it. Load refuses a repeated name, an `after:` naming no check or itself, a cycle, an unknown key, every check turned
+  off, and `check:` beside `checks:`.
+- **`check: <line>` is one check named `check`**, filed under the task id it always had, so a run started before `checks:` reads as it
+  did.
+- **What runs is decided on every pass from the tasks alone** (`checksDue`, proved by `contracts/checks-due.contract.ts`): a check is
+  filed once every check it waits on passed, none is filed after one refused, and the step is `verified` when all passed. Each check
+  runs in the step's workspace with `WF_CHECK` set to its name, and acts as the step's agent, under a token bound to the try.
+- **The next try is told every refusal**, each under its check's name with the end of its output, and the names of those that passed.
+  A recheck (`nemia retry --recheck`) keeps the tasks of the checks that passed and runs the rest.
+- **Each is served by name**: the run's step and each try carry `checks` (name, verdict, exit, start and end) beside `check`, the one
+  the step is judged by; `nemia check-output <run> <step> --check <name>` reads one's output; `nemia stats` gives each check's tries,
+  median and p90 time, and how often it refused.
+
+## A command node: `run:`
+
+A node with `run:` and no session runs its shell line as a workload of its own on the `command` harness, in its first parent's
+workspace, told its parent's closeout (`WF_CLOSEOUT`) and the file it may answer in (`WF_ANSWER`). Every node signs off with a closeout:
+a session's own, a condition's answer, a command's exit. Exit 0 signs it off `done`, its output the JSON object it left in `WF_ANSWER`
+(decoded by `output:`); any other exit fails it, and an answer that is not one JSON object leaves it unsigned. It takes `retries:`
+(each try runs the line afresh), a failure policy by exit code, `nemia retry` and `gate:` as a step does, and nothing a session or a
+check needs (`check:`, `checks:`, `workspace:`, `resume:`, a route, an instruction). It acts as the agent it names, under a token
+bound to its try, and load refuses one that names none.
+
 ## Files a person gives the run: `wf start --input`
 
 A brief is text, and a step can read a screenshot or a spec from disk, but nothing told it where one was. For one run the

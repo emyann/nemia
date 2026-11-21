@@ -22,6 +22,7 @@ import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, StepRecord } from '../src/run.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import { scratch } from 'test-kit/scratch';
+import { teamCopy } from './team.ts';
 import { staged, story } from './story.ts';
 import { decidedOn } from './screens.ts';
 import { askedQuestions, closeoutRefusals, questionLines } from '../src/question/index.ts';
@@ -44,6 +45,7 @@ import {
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { artifactsDir, askFile, asksDir, listRuns, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
 import { checkOutputFile } from '../src/check/check.store.ts';
+import { readToken } from '../src/token/token.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import { isRepositoryRun, LINE_NAME, shownNote, shownStatus } from '../src/run.ts';
@@ -583,20 +585,30 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
         [{ requests: { memory: '64Mi' } }, 1],
         "the check asks its step's `checkMemory:` alone, the step's `memory:` binding its session alone, at a step's momentum",
       );
-      assert.deepEqual(spec.config, {
-        command: ['sh', '-c', 'npm test && npm run typecheck'],
-        env: {
-          WF_RUN: id(),
-          WF_STEP: 'implement',
-          WF_BASE_REF: run.baseRef,
-          WF_WORKSPACE: run.repo,
-          WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
-          WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
-          WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(runRecord(ROOT, id()).workflowFiles)),
-          WF_LABELS: '{"work":"fix"}',
+      const { WF_SESSION_TOKEN: token, ...env } = spec.config?.env ?? {};
+      assert.deepEqual(
+        { ...spec.config, env },
+        {
+          command: ['sh', '-c', 'npm test && npm run typecheck'],
+          env: {
+            WF_RUN: id(),
+            WF_STEP: 'implement',
+            WF_CHECK: 'check',
+            WF_BASE_REF: run.baseRef,
+            WF_WORKSPACE: run.repo,
+            WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
+            WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
+            WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(runRecord(ROOT, id()).workflowFiles)),
+            WF_LABELS: '{"work":"fix"}',
+          },
+          niceness: 10,
         },
-        niceness: 10,
-      });
+      );
+      assert.equal(
+        readToken(ROOT, token ?? '')?.task,
+        check1(),
+        "the check acts as its step's agent, under a token minted for its own task",
+      );
       assert.ok(fs.statSync(path.join(ROOT, 'runs', id(), 'artifacts', 'implement')).isDirectory(), 'its files have somewhere to go');
     },
   );
@@ -967,6 +979,123 @@ describe("`nemia retry` writes a person's ask, and the tick honours it once, con
       runRecord(ROOT, run.id).steps.implement?.tries?.map((x) => [x.cause, x.model]),
       [['fresh', 'opus']],
     );
+  });
+});
+
+describe('a step judged by named checks: the pass files them in their order, each under its own task, none after a refusal, and `retries:` tries the step again', () => {
+  let b!: import('./story.ts').Board;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const checkTask = (name: string) => `${run.id}-implement-check-${name}`;
+  const s = story(test);
+  s.test('implement signs off: the pass files its first check alone, told its name', async () => {
+    run = await startedRun(
+      implementThenReview([
+        'retries: 1',
+        'checks:',
+        '  - { name: probe, run: npm run probe }',
+        '  - { name: own, run: npm test, after: [probe] }',
+        '  - { name: ci, run: npm run ci, after: [own] }',
+      ]),
+    );
+    await tick(run.id);
+    ended(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
+    await tick(run.id);
+    assert.equal(b.tasks.get(checkTask('probe'))?.spec.config?.env?.WF_CHECK, 'probe');
+    assert.deepEqual([b.tasks.has(checkTask('own')), b.tasks.has(checkTask('ci'))], [false, false]);
+  });
+  s.test('the first passes: the next pass files the second, and the record names both', async () => {
+    ended(checkTask('probe'), 'succeeded', { exitCode: 0 });
+    await tick(run.id);
+    assert.equal(b.tasks.get(checkTask('own'))?.spec.config?.env?.WF_CHECK, 'own');
+    assert.equal(b.tasks.has(checkTask('ci')), false);
+    const tasks = runRecord(ROOT, run.id).steps.implement?.check?.tasks ?? {};
+    assert.deepEqual([tasks.probe, tasks.own], [checkTask('probe'), checkTask('own')]);
+  });
+  s.test('the second refuses: the third is never filed, and `retries:` files try 2 of the step', async () => {
+    ended(checkTask('own'), 'failed', { exitCode: 1 });
+    assert.deepEqual((await tick(run.id)).tried, ['implement']);
+    assert.equal(b.tasks.has(checkTask('ci')), false);
+  });
+});
+
+describe("`nemia retry --recheck --check <name>` runs that refused check alone, on the same tree, every other check's task kept", () => {
+  let b!: import('./story.ts').Board;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const checkTask = (name: string, at = '') => `${run.id}-implement${at}-check-${name}`;
+  const s = story(test);
+  s.test('a and b, side by side, both refuse: the step waits on a person', async () => {
+    run = await startedRun(
+      implementThenReview(['checks:', '  - { name: a, run: npm run a, after: [] }', '  - { name: b, run: npm run b, after: [] }']),
+    );
+    await tick(run.id);
+    ended(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
+    await tick(run.id);
+    ended(checkTask('a'), 'failed', { exitCode: 1 });
+    ended(checkTask('b'), 'failed', { exitCode: 1 });
+    await tick(run.id);
+    assert.deepEqual(retryAsks(run.id), []);
+  });
+  s.test('REFUSED: a name that is no refused check of the step, writing no ask', async () => {
+    await assert.rejects(
+      stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck', check: 'c' })),
+      refusedAs('Conflict', '--check'),
+    );
+    assert.deepEqual(retryAsks(run.id), []);
+  });
+  s.test("--check b: the next pass files b's task alone, a's kept on the record", async () => {
+    await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck', check: 'b' }));
+    await tick(run.id);
+    const tasks = runRecord(ROOT, run.id).steps.implement?.check?.tasks ?? {};
+    assert.deepEqual([tasks.a, tasks.b], [checkTask('a'), checkTask('b', '-try2')]);
+    assert.equal(b.tasks.has(checkTask('b', '-try2')), true);
+    assert.equal(b.tasks.has(checkTask('a', '-try2')), false);
+  });
+});
+
+describe('a command node takes `retries:`, a failure policy by exit code and `gate:` as a step does', () => {
+  const nodeRun = async (lines: string[]) => {
+    const dir = path.join(teamCopy(), 'notes');
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nagent: implementer\n---\nimplement it\n');
+    const front = ['after: implement', 'place: git', 'agent: implementer', 'run: node notes.ts', ...lines].join('\n');
+    fs.writeFileSync(path.join(dir, 'file-notes.md'), `---\n${front}\n---\n`);
+    fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: file-notes\nplace: git\n---\nreview it\n');
+    const run = await startedRun(dir);
+    await tick(run.id);
+    ended(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
+    await tick(run.id);
+    return run;
+  };
+  const POLICY = 'checkFailurePolicy: { rules: [ { action: FailStep, onExitCodes: { operator: In, values: [1] } } ] }';
+
+  test('with `retries: 1`, an exit 1 is tried again by the run, fresh', async () => {
+    const run = await nodeRun(['retries: 1']);
+    ended(`${run.id}-file-notes`, 'failed', { exitCode: 1 });
+    assert.deepEqual((await tick(run.id)).tried, ['file-notes']);
+  });
+
+  test("with a policy that names exit 1 a person's, the same exit is tried by nobody but a person", async () => {
+    const run = await nodeRun(['retries: 1', POLICY]);
+    ended(`${run.id}-file-notes`, 'failed', { exitCode: 1 });
+    assert.deepEqual((await tick(run.id)).tried, []);
+    assert.equal(stage.board().tasks.has(`${run.id}-file-notes-try2`), false);
+  });
+
+  test('with `gate: true`, the node runs, and once it exits 0 what comes after it waits on a person', async () => {
+    const run = await nodeRun(['gate: true']);
+    ended(`${run.id}-file-notes`, 'succeeded', { exitCode: 0 });
+    await tick(run.id);
+    assert.equal(stage.board().tasks.has(`${run.id}-review`), false);
   });
 });
 
@@ -1945,7 +2074,7 @@ describe("exitVerdicts: a check's verdict is its attempt's exit code, `unfinishe
     test(name, async () => {
       const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', end);
       const run = runRecord(ROOT, id);
-      const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
+      const verdictOf = exitVerdicts(await viewsOf(b.e, run), run, []);
       assert.equal(verdictOf('implement'), verdict);
       assert.equal(verdictOf('review'), undefined, 'a step with no check filed has no verdict at all');
       assert.equal((await stage.runWith(b.e, list(b.e, run))).steps[0].message, `failed ✗ check (${verdictWord(verdict!)})`);

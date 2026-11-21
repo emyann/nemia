@@ -2,7 +2,7 @@
  * What a step is told: its brief (`composeBrief`) or, on a remote A2A agent, its remote brief (`remoteBrief`), with what the runs it waited
  * on or was handed as context concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
-import { endsOnBase, type StepSpec } from '../step/step.ts';
+import { endsOnBase, hasChecks, stepChecks, type StepSpec } from '../step/step.ts';
 import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/index.ts';
@@ -26,7 +26,7 @@ import {
 import { landsOnCheck, merged, owesReplies } from '../status/status.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { mergeReviewSection, mergeSection } from '../merge/merge.ts';
-import { checkContract, checkHandedSection, landingContract, type CheckHanded, type LandingWords } from '../check/index.ts';
+import { checkContract, checkHandedSection, checksContract, landingContract, type CheckHanded, type LandingWords } from '../check/index.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
@@ -88,6 +88,17 @@ export const PRECEDENCE =
   "Of what you are told, your instructions are layer 1, the custom instructions 2, the files of the folder you work in 3, this factory's rules 4 and this step's policy 5: where two of them say different things, the higher number wins, and what is asked of you below is above them all.";
 
 /**
+ * What a step is told of what judges it before it signs off: an ending that lands on its check, the landing (`landingContract`); a step
+ * with one check, its line (`checkContract`); a step with several, each by its name (`checksContract`). Nothing for a step with none.
+ */
+const checksTold = (step: StepSpec, run: Run, words: LandingWords | undefined) => {
+  const plan = stepChecks(step);
+  const only = plan.length === 1 ? plan[0] : undefined;
+  if (only) return [landsOnCheck(step, run) ? landingContract(only.run, words) : checkContract(only.run)];
+  return plan.length ? [checksContract(plan)] : [];
+};
+
+/**
  * What every brief ends on: the check the step is judged by, as a landing's or a step's (`landingContract`, `checkContract`), where its
  * files go (`artifactsContract`), and the closeout, last (`closeoutContract`).
  */
@@ -98,7 +109,7 @@ const contractsOf = (
   at: { artifactsDir?: string; round?: RoundBriefing; words?: LandingWords; inFolder: boolean },
 ) =>
   [
-    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, at.words) : checkContract(step.check)] : []),
+    ...checksTold(step, run, at.words),
     ...(at.artifactsDir ? [artifactsContract(at.artifactsDir, endsOnBase(step), at.inFolder)] : []),
     closeoutContract(step, repliesOf(step, run, steps, at.round), at.inFolder),
   ].join('\n');
@@ -339,7 +350,10 @@ function endingLook(step: StepSpec, run: RepositoryRun, steps: readonly StepSpec
           `This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`,
           '',
         ]),
-    ...(step.check ? [] : workChecks(steps)).flatMap((check) => [`This workflow's check, which its work was judged by: \`${check}\``, '']),
+    ...(hasChecks(step) ? [] : workChecks(steps)).flatMap((check) => [
+      `This workflow's check, which its work was judged by: \`${check}\``,
+      '',
+    ]),
     'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
     'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',
   ];

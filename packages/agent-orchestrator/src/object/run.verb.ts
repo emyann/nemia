@@ -294,6 +294,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     said: taskId ? (views.get(taskId)?.state.said ?? []).map(saidOf) : [],
     asked: askedOf(judged.asked.get(name)),
     check: current.check,
+    ...(current.checks === undefined ? {} : { checks: current.checks }),
     attempts: current.attempts,
     used: taskId ? usedOf(used[name], judgedContext) : null,
     ...costOf(run, name, at),

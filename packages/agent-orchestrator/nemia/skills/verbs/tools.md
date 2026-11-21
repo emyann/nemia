@@ -1057,11 +1057,12 @@ Its arguments:
 ## retry
 
 ```text
-  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
     try a step waiting on you again, once, on the next tick:
     --continue (default) continues its session, told what happened;
     --fresh a new session on its branch; --model <m> the same, on m;
     --recheck runs its check again, and files no session;
+    --check <name>, with --recheck: that refused check alone, the others kept;
     --round: once more — a loop out of rounds goes round again, once,
     the step it loops to continued, then a new reviewer; the step is the
     one that closes the loop, left out where the run has one loop;
@@ -1095,6 +1096,7 @@ Its arguments:
 - message (--message at a shell): The words the try is told: an answer to its needs, or what to do differently.
 - budget (--budget at a shell): A raise of the step's cap in dollars (--budget), above what its tries have cost.
 - answers: One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where the question takes several (multiple); own your own words, beside a choice or instead of one.
+- check (--check at a shell): With mode recheck, the one refused check of the step to run again (--check), by its name under checks:, every other check's task kept; left out, every check that did not pass runs again.
 
 ## approve
 
@@ -1321,8 +1323,9 @@ Its arguments:
 ## check-output
 
 ```text
-  nemia check-output <runId> <step> [--try <n>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]
-    what a step's try's check printed, its latest try or --try <n>:
+  nemia check-output <runId> <step> [--try <n>] [--check <name>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]
+    what a step's try's check printed, its latest try or --try <n>, the check
+    named by --check <name> where the step has several:
     stdout whole, or --stderr; --from <n> or --before <n> with --limit <n>,
     or --last <n>: one page; --match <text>: the lines containing it, any
     case, numbered
@@ -1337,6 +1340,7 @@ Its arguments:
 - runId (<runId> at a shell): The run's id, found among the runs the store lists in any namespace.
 - step (<step> at a shell): The step's name.
 - try (--try at a shell): The try's number, from 1.
+- check (--check at a shell): The check to read, by its name in the step's checks; the step's only check where not given, refused where it has several.
 - stream (--stderr at a shell): The stream to read, stdout or stderr; stdout where not given.
 - from (--from at a shell): The line number to read on from, from 1, as a page's next says it; never with before or last.
 - before (--before at a shell): The line number the lines answered end before, from 1, as a page's before says it: the limit lines held just before it; never with from or last.

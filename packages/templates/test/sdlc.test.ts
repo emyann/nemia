@@ -60,8 +60,33 @@ function stepIn(tree: string, workflow: string, step: string) {
   return { front: (yaml.load(block ?? '') ?? {}) as Record<string, unknown>, body };
 }
 
-/** The check of the step `workflow/step` of `tree`. */
-const checkOf = (tree: string, workflow: string, step: string) => String(stepIn(tree, workflow, step).front.check ?? '');
+/**
+ * `checks`, held to the chain `checkOf` joins them as: each after the one above it, by naming no `after:` (the default) or naming that
+ * one alone, and the first after none.
+ * @param at The step, for the failure's words.
+ * @param checks The step's `checks:`, as its frontmatter holds them.
+ */
+const chained = (at: string, checks: readonly { name?: unknown; run?: unknown; after?: unknown }[]) => {
+  checks.forEach((c, i) => {
+    const above = i === 0 ? [] : [checks[i - 1].name];
+    if (c.after !== undefined) assert.deepEqual([c.after].flat(), above, `${at}'s check ${String(c.name)} runs after the one above it`);
+  });
+  return checks;
+};
+
+/**
+ * The check of the step `workflow/step` of `tree`: its `check:`; or its `checks:` as one line, each joined to the one before it by `&&`,
+ * the order the pass runs sdlc's chained checks in; or a command node's `run:`, which runs with the same frozen folders.
+ */
+const checkOf = (tree: string, workflow: string, step: string) => {
+  const { front } = stepIn(tree, workflow, step);
+  const checks = typeof front.checks === 'string' ? (JSON.parse(front.checks) as unknown) : front.checks;
+  if (Array.isArray(checks))
+    return chained(`${workflow}/${step}`, checks)
+      .map((c) => String(c.run ?? ''))
+      .join(' && ');
+  return String(front.check ?? front.run ?? '');
+};
 
 /**
  * The one expression an applied tree keeps: a step's workspace, which a rule names and the filing writes (`${{ workspace }}`), where a
@@ -101,7 +126,7 @@ test('applied with every parameter set, each is written where the template says,
   assert.match(checkOf(tree, 'quick', 'implement'), ciCheck('gate'));
   for (const workflow of ['build', 'quick'])
     assert.ok(
-      checkOf(tree, workflow, 'implement').includes('push --labels "work=fix:fix" && '),
+      checkOf(tree, workflow, 'implement').includes('push --labels "work=fix:fix"; fi && '),
       `${workflow}/implement labels by the rules set`,
     );
   for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('gate'), `${workflow}/land`);
@@ -128,7 +153,7 @@ test('applied with no --set, each parameter takes its default', () => {
   assert.ok(build.includes('{ npm run --if-present lint && npm run --if-present typecheck; }'), build);
   assert.match(build, ciCheck('ci'));
   for (const workflow of ['build', 'quick'])
-    assert.ok(checkOf(tree, workflow, 'implement').includes('push --labels "" && '), `${workflow}/implement labels nothing by default`);
+    assert.ok(checkOf(tree, workflow, 'implement').includes('push --labels ""; fi && '), `${workflow}/implement labels nothing by default`);
   for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('ci'), `${workflow}/land`);
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);
@@ -143,15 +168,20 @@ test('applied with no --set, each parameter takes its default', () => {
   assert.ok(fs.readFileSync(path.join(tree, 'workflows/agents/otto.md'), 'utf8').includes('Edit(~/.agent-workflows/inbox/**)'));
 });
 
-test("the factory's label rules reach the janitor's filing as its flag, and Argus's note, either way", () => {
+test("the factory's label rules reach the janitor's check and its filing as their flag, and Argus's note, either way", () => {
   for (const [name, rules] of [
     ['set', 'work=fix:fix'],
     ['plain', ''],
   ] as const) {
     const check = checkOf(treeOf(name), 'janitor', 'argus');
     assert.ok(
-      check.includes(`/cards.ts" "\${WF_CLOSEOUT:-}" --labels "${rules}" && `),
-      `${name}: the janitor files by the rules:\n${check}`,
+      check.includes(`/cards.ts" check "\${WF_CLOSEOUT:-}" --labels "${rules}" && `),
+      `${name}: Argus's check holds the cards to the rules:\n${check}`,
+    );
+    const filing = checkOf(treeOf(name), 'janitor', 'file-cards');
+    assert.ok(
+      filing.endsWith(`/cards.ts" file "\${WF_CLOSEOUT:-}" --labels "${rules}"`),
+      `${name}: the command node after Argus files them by the rules:\n${filing}`,
     );
   }
   assert.ok(stepIn(treeOf('set'), 'janitor', 'argus').body.includes('\nwork=fix:fix\n'), "Argus's note quotes the rules");

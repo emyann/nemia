@@ -6,7 +6,7 @@
  * run's judgement; it reads the record alone.
  */
 import { onItsCheck, type Verdict } from '../check/index.ts';
-import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
+import { DEFAULT_ROUNDS, endsOnBase, hasChecks, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
 import { budgetWord, dollars } from '../money/money.ts';
@@ -401,7 +401,7 @@ export const sendBackTo = (step: StepSpec, run: Run) => (run.steps[step.name]?.t
  * @param _run The run the step belongs to, which it no longer reads.
  */
 export const landsOnCheck = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>) =>
-  endsOnBase(step) && step.check !== undefined;
+  endsOnBase(step) && hasChecks(step);
 
 /**
  * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: base`), and another run's
@@ -574,6 +574,10 @@ export function triedFrom(
  * from (a step signed off blocked, once its session has settled; a check that refused, and not one that did not finish, whose way on is the
  * check again), or a round its loop asks for (`roundWanted`). A looping step that asked for a round is held by any step of its loop over
  * budget, itself included: the round would file each of them again.
+ *
+ * The four statuses a try is taken from with no check read — `denied`, `stopped`, `failed` and `unsigned`, each of `TRIED_FROM` and none
+ * `blocked` nor `failed (check)` — are answered first, as the lines below would answer them, so a status that reads no check never walks
+ * the several-checks verdict (`checkRefused`): what the contract `standing` proves of them costs what it costs with one check.
  */
 function held(
   step: StepSpec,
@@ -589,7 +593,8 @@ function held(
   const record = run.steps[step.name];
   const taskId = record?.taskId;
   if (!taskId) return false;
-  if (own === 'failed (check)' && !(record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name)))) return false;
+  if (own === 'denied' || own === 'stopped' || own === 'failed' || own === 'unsigned') return Boolean(overBudget(step, run, spendOf));
+  if (own === 'failed (check)' && !(record.check && checkRefused(record.check, phaseOf, verdictOf(step.name)))) return false;
   if (TRIED_FROM.has(own)) return (own !== 'blocked' || SETTLED.has(phaseOf(taskId))) && Boolean(overBudget(step, run, spendOf));
   if (!satisfiesAfter(own)) return false;
   const looping = loopOf(steps, step.name);
@@ -649,11 +654,9 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const said = closeoutOf(step.name);
   if (standsBlocked(step, st, said, steps)) return 'blocked';
 
-  const signed = (s: StepStatus) =>
-    s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
   const phase = phaseOf(st.taskId);
   if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded)
-    return step.check && st.check ? signed(onItsCheck(step, st, phaseOf)) : 'budget exhausted';
+    return hasChecks(step) && st.check ? checkedStatus(step, run, st, phaseOf, closeoutOf) : 'budget exhausted';
   const asked = askedCloseout(st.taskId);
   if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
   if (phase === 'failed' || phase === 'stopped') return phase;
@@ -661,13 +664,70 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (!said && (asked || step.output)) return 'unsigned';
   if (said && unaccepted(step, run, steps, said)) return 'unsigned';
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
-  if (!step.check) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
-  return signed(onItsCheck(step, st, phaseOf));
+  return judgedStatus(step, run, st, said, phaseOf, closeoutOf);
 };
+
+/**
+ * Where a step stands on its checks (`onItsCheck`), `exhausted` where they passed but its loop asked another round past its cap.
+ * @param step The step.
+ * @param run The run.
+ * @param st The step's record.
+ * @param phaseOf The phase of a task, by its id.
+ * @param closeoutOf The closeout a step signed off, by the step's name.
+ */
+function checkedStatus(
+  step: StepSpec,
+  run: Run,
+  st: StepRecord,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+) {
+  const s = onItsCheck(step, st, phaseOf);
+  return (
+    s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s
+  ) satisfies StepStatus;
+}
+
+/**
+ * Where a step whose task succeeded, signed and accepted, stands on what judges it: a command node on its closeout alone, a step with no
+ * check `unverified` (or `exhausted` past its rounds), and one with checks on them.
+ * @param step The step.
+ * @param run The run.
+ * @param st The step's record.
+ * @param said The closeout it signed off, if any.
+ * @param phaseOf The phase of a task, by its id.
+ * @param closeoutOf The closeout a step signed off, by the step's name.
+ */
+function judgedStatus(
+  step: StepSpec,
+  run: Run,
+  st: StepRecord,
+  said: Closeout | undefined,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+) {
+  if (step.run !== undefined) return (said ? 'verified' : 'unsigned') satisfies StepStatus;
+  if (!hasChecks(step))
+    return (askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified') satisfies StepStatus;
+  return checkedStatus(step, run, st, phaseOf, closeoutOf);
+}
+
+/**
+ * Whether a step's check refused it, an exit code rather than an end with none: its one check's task failed with a code; for several, the
+ * verdict, read off the check that decided (`decidingCheckTask`), is a code, which only a check that failed with one gives.
+ * @param check The check on the step's record: its first task, and each task by name where it has several.
+ * @param phaseOf The phase of a task, by its id.
+ * @param verdict The step's check verdict.
+ */
+const checkRefused = (
+  check: { readonly taskId: string; readonly tasks?: unknown },
+  phaseOf: (taskId: string) => TaskPhase,
+  verdict: Verdict | undefined,
+) => (check.tasks === undefined ? refusedCheck(phaseOf(check.taskId), verdict) : typeof verdict === 'number');
 
 /** Whether a step stands `blocked`: its closeout accepted as blocked, and its check not run again on that very task (`rechecked`). */
 const standsBlocked = (step: StepSpec, st: StepRecord, said: Closeout | undefined, steps: readonly StepSpec[]) =>
-  blockedAccepted(step, said, steps) && !(step.check && rechecked(st));
+  blockedAccepted(step, said, steps) && !(hasChecks(step) && rechecked(st));
 
 /** Whether the try just behind a step's current one is a recheck of that very task: its current task's check was run again. */
 const rechecked = (st: StepRecord) => {

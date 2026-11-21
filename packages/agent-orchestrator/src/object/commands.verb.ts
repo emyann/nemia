@@ -132,6 +132,7 @@ export const CheckOutputInput = Schema.Struct({
   limit: Schema.optionalKey(Schema.String),
   last: Schema.optionalKey(Schema.String),
   match: Schema.optionalKey(Schema.String),
+  check: Schema.optionalKey(Schema.String),
 });
 export type CheckOutputInput = typeof CheckOutputInput.Type;
 

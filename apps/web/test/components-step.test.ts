@@ -739,9 +739,15 @@ test('a thought rides as a line of a turn of work, its words behind the line, an
 test('a turn still at work is drawn open, each line in the state its call is in', () => {
   const events: TranscriptEvent[] = [
     { id: 'u-1:0', at, role: 'user', kind: 'text', text: 'Run the checks.' },
-    { id: 'toolu_test', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
+    { id: 'toolu_test', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { name: 'check', command: 'npm test' } } },
     { id: 'toolu_test', at, role: 'user', kind: 'tool_result', result: { text: 'pass 233', isError: true } },
-    { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm run typecheck' } } },
+    {
+      id: 'toolu_types',
+      at,
+      role: 'assistant',
+      kind: 'tool_use',
+      tool: { name: 'Bash', input: { name: 'check', command: 'npm run typecheck' } },
+    },
   ];
   assert.equal(tailStart(foldTranscript(events)), 1, 'the turn is in the tail');
   const live = talk(events, true);
@@ -807,9 +813,9 @@ test('a line the harness wrote on its own is a quiet note; one between two calls
   assert.match(alone, /Background session idle/);
 
   const between = foldTranscript([
-    { id: 'toolu_a', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
+    { id: 'toolu_a', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { name: 'check', command: 'npm test' } } },
     { id: 's-2:0', at, role: 'assistant', kind: 'system', text: 'Hook ran' },
-    { id: 'toolu_b', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm run lint' } } },
+    { id: 'toolu_b', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { name: 'check', command: 'npm run lint' } } },
   ]);
   const lines = sessionItems(between, 'implement', false).flatMap((item) => (item.kind === 'work' ? item.lines : []));
   assert.deepEqual(
@@ -945,6 +951,8 @@ const unset: WorkflowStepSpec = {
   memory: null,
   budget: null,
   check: null,
+  checks: null,
+  run: null,
   checkMemory: null,
   retries: null,
   checkFailurePolicy: null,
@@ -3548,7 +3556,15 @@ test("a step's part draws its slots by its size: on the node its head, what it a
 
 test('Check offers a fold that reads all its check printed where the check was filed, and none where it was not', async () => {
   const { Check } = await import('../src/components/step/Facts.tsx');
-  const check = { command: 'npm test', taskId: 'r-1-implement-check', verdict: null, refused: null };
+  const check = {
+    name: 'check',
+    command: 'npm test',
+    started: null,
+    ended: null,
+    taskId: 'r-1-implement-check',
+    verdict: null,
+    refused: null,
+  };
   const read = { runId: 'r-1', step: 'implement', try: 1 };
   const filedMarkup = renderToStaticMarkup(createElement(Check, { check, read }));
   assert.ok(filedMarkup.includes('data-fold="check-output"'), filedMarkup);

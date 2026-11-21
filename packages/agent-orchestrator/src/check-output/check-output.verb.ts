@@ -19,6 +19,8 @@ export type CheckOutputAsked = {
   readonly limit?: string | undefined;
   readonly last?: string | undefined;
   readonly match?: string | undefined;
+  /** The check to read, by its name: the step's only check where absent. */
+  readonly check?: string | undefined;
 };
 
 /** A count as a query carries it: null where none is given; the number a whole decimal spells; NaN, which no read takes, otherwise. */
@@ -129,6 +131,22 @@ const pageOf = (text: string, match: string | undefined, page: PageAsked, ask: C
 };
 
 /**
+ * The check of a try a read names (`check`), or undefined to read the try's one check: refused `Invalid` where the try has no check of
+ * that name, and where it names none and the try has several, either refusal naming the try's checks.
+ */
+const namedCheck = <C extends { readonly name: string }>(checks: readonly C[], name: string | undefined) => {
+  const names = checks.map((c) => c.name).join(', ');
+  if (name === undefined)
+    return checks.length > 1
+      ? new Invalid({ message: `This step has ${checks.length} checks (${names}): name one with --check <name>, or ?check=<name>.` })
+      : undefined;
+  return (
+    checks.find((c) => c.name === name) ??
+    new Invalid({ message: `This step has no check named ${name}: name one of ${names || 'none'} with --check <name>.` })
+  );
+};
+
+/**
  * A page of what the check of the try `tryNo` of the step `step` of the run `runId` printed (`CheckOutput`), its latest try where none is
  * asked: the lines of the stream asked, stdout by default, numbered from 1, those containing `match` where it is asked, from the line
  * `from`, back from the line `before` or the last `last`, `limit` of them or `CHECK_OUTPUT_PAGE`'s default, and the lines to read on
@@ -138,7 +156,7 @@ const pageOf = (text: string, match: string | undefined, page: PageAsked, ask: C
  * @param runId The run's id.
  * @param step The step's name.
  * @param tryNo The try's number as the path or the command line says it; undefined for the latest.
- * @param ask The stream, the page and the text to match asked.
+ * @param ask The check (by its name), the stream, the page and the text to match asked.
  */
 export const stepCheckOutput = Effect.fn('stepCheckOutput')(function* (
   runId: string,
@@ -147,7 +165,9 @@ export const stepCheckOutput = Effect.fn('stepCheckOutput')(function* (
   ask: CheckOutputAsked,
 ) {
   const one = yield* stepTry(runId, step, tryNo);
-  const check = one.check;
+  const named = namedCheck(one.checks ?? [], ask.check);
+  if (named instanceof Invalid) return yield* Effect.fail(named);
+  const check = named ?? one.check;
   if (check === null)
     return yield* Effect.fail(
       new Missing({

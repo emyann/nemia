@@ -24,6 +24,7 @@ import { resultSteps } from '../branches/index.ts';
 import { runWords } from '../route/routed/index.ts';
 import { merges, unrunEnding } from '../ending/ending.ts';
 import type { DecideLabel, RunStatusWord } from 'objects';
+import { checksPhase } from '../check/index.ts';
 
 /**
  * What is left for a person to do about this run.
@@ -110,7 +111,7 @@ function liveTask(taskId: string | null | undefined, phaseOf: (taskId: string) =
 /** Whether a step's current check exited refusing the work (`refusedCheck`): never for a step with no check on its record. */
 function refusedOwnCheck(run: Run, name: string, phaseOf: (taskId: string) => TaskPhase, verdictOf: (step: string) => Verdict | undefined) {
   const check = run.steps[name]?.check;
-  return check !== undefined && refusedCheck(phaseOf(check.taskId), verdictOf(name));
+  return check !== undefined && refusedCheck(checksPhase(check, phaseOf), verdictOf(name));
 }
 
 /** `landed`, asked once per branch: a second call for the same branch returns what the first read. */

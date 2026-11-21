@@ -192,7 +192,12 @@ export type StepLog = typeof StepLog.Type;
 
 /** A step's check: its command, its task, its verdict and, refused, what it said (`StepCheck`, checks.verb.ts). */
 export const StepCheck = Schema.Struct({
-  command: Schema.String.annotate({ description: "The check's command, as the step's check: line says it." }),
+  name: Schema.String.annotate({
+    description: "The check's name: check for a step's check: line, else its name in the step's checks: list.",
+  }),
+  command: Schema.String.annotate({ description: "The check's command, as the step's check: line or its checks: entry's run: says it." }),
+  started: NullString.annotate({ description: 'When its latest attempt started; null while it has not.' }),
+  ended: NullString.annotate({ description: 'When its latest attempt ended; null while it has not.' }),
   taskId: NullString.annotate({ description: "The check's task; null while none was filed." }),
   verdict: Schema.NullOr(CheckVerdict).annotate({ description: 'Its verdict, a result and the exit; null while it has none.' }),
   refused: Schema.NullOr(

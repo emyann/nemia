@@ -18,8 +18,12 @@ import {
   type CheckHanded,
   type CheckRefusal,
   type LandingSaid,
+  checksDue,
+  currentCheckTask,
+  stepChecksDue,
 } from '../check/index.ts';
 import { isRemoteHarness, type StepSpec } from '../workflow.ts';
+import { SHORTHAND_CHECK, stepChecks, type CheckSpec } from '../step/step.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
 import {
@@ -42,7 +46,7 @@ import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
-import { filedConfig, tryModel } from '../filed/filed.ts';
+import { filedConfig, SESSION_TOKEN, tryModel } from '../filed/filed.ts';
 import { filedOn, resumeOn } from '../pinned/pinned.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry } from '../retry/index.ts';
@@ -74,6 +78,8 @@ import { localFields } from './assess.ts';
 import { stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
+import { fileCommand, fileCommands } from '../command-node/command-node.verb.ts';
+import { isCommandNode } from '../command-node/index.ts';
 import {
   filedAt,
   sessionCwd,
@@ -238,7 +244,9 @@ export const tryFiled = (
 
 /**
  * File one try due, or stop its session first, and put it on the record with its note: nothing once the pass may file no more, and
- * nothing but the note where the engine refuses the close or the answer it needs.
+ * nothing but the note where the engine refuses the close or the answer it needs. A person's recheck of one check (`--check`) files that
+ * check itself: the others' tasks are kept, a refused one among them, and the pass files no check of a step one of whose checks stands
+ * refused (`checksDue`).
  */
 const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   const { run, notes } = f;
@@ -250,8 +258,10 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   if (r.mode === 'recheck') {
     out.tried.push(r.step);
     notes.push(said);
-    run.steps[r.step] = nextTry(record, r);
+    run.steps[r.step] = keptChecks(f, step, nextTry(record, r), record.check, r.check);
     out.rechecked.push(r.step);
+    const only = r.check === undefined ? undefined : stepChecks(step).find((c) => c.name === r.check);
+    if (only) yield* fileOneCheck(f, r.step, only);
     return;
   }
   const landing = placeTold(run, f.reads.steps, step, yield* PlaceService, f.heads?.());
@@ -297,6 +307,22 @@ const remoteTry = (r: Retry, status: StepStatus) =>
   }) satisfies RetryBriefing as RetryBriefing;
 
 /**
+ * What a try is handed of its step's checks that refused it: the one check's refusal (`refusalHanded`) where the step has one, and each
+ * check's where it has several (`refusalsHanded`); nothing before its checks ran.
+ * @param f The pass's filing.
+ * @param files The try's files folder, where the outputs are written.
+ * @param step The step.
+ * @param record The step's record, whose check names the tasks.
+ */
+const checkRefusalsHanded = Effect.fnUntraced(function* (f: Filing, files: string, step: StepSpec, record: StepRecord) {
+  const plan = stepChecks(step);
+  const only = plan.length === 1 ? plan[0] : undefined;
+  if (!record.check) return {};
+  if (only) return { refusal: yield* refusalHanded(f, files, only.run, record.check.taskId) };
+  return { refusals: yield* refusalsHanded(f, files, plan, (name) => currentCheckTask(f.run, step.name, name)) };
+});
+
+/**
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined. A try filed as a task of its own on a local
  * harness is filed on a tree brought to its lockfile (`depsBefore`), and told where that failed; a held session keeps the tree it has.
@@ -304,13 +330,14 @@ const remoteTry = (r: Retry, status: StepStatus) =>
 const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec, taskId: string, answers: boolean, landing: PlaceTold) {
   const home = yield* StoreRoot;
   const { e, run, reads } = f;
+  if (isCommandNode(step)) return yield* fileCommand(f, step, taskId).pipe(Effect.as(undefined));
   const record = recordNamed(run, r.step);
   const files = artifactsDir(home, run, r.step);
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
   const continued = r.mode === 'continue' && !remote && record.taskId !== null ? sessionIn(reads.views, record.taskId) : undefined;
   const resumeFrom = resumeOn(continued, step, f, record);
-  const refusal = record.check && step.check && !remote ? yield* refusalHanded(f, files, step.check, record.check.taskId) : undefined;
+  const { refusal, refusals } = remote ? {} : yield* checkRefusalsHanded(f, files, step, record);
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
@@ -325,7 +352,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
         closeouts,
         files,
         deps,
-        tryTold(home, f, r, record, { status, resumeFrom, refusal }),
+        tryTold(home, f, r, record, { status, resumeFrom, refusal, refusals }),
         undefined,
         undefined,
         inputsDir(home, run),
@@ -349,6 +376,28 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
 const refusalHanded = Effect.fnUntraced(function* (f: Filing, files: string, command: string, taskId: string) {
   const { refusal, whole } = yield* refusalWholeRead(command, taskId).pipe(over(asRead(f)));
   return { ...refusal, kept: writeCheckOutputs(files, taskId, whole) } satisfies CheckRefusal;
+});
+
+/**
+ * What a try is handed of a step's several checks (`refusalsHanded`): each check that refused or did not finish, as `refusalHanded` hands
+ * one, under its name, and the names of those that passed; a check never filed, behind a refusal, is neither. Undefined where every check
+ * passed.
+ */
+const refusalsHanded = Effect.fnUntraced(function* (
+  f: Filing,
+  files: string,
+  plan: readonly CheckSpec[],
+  taskOf: (name: string) => string,
+) {
+  const refused: CheckRefusal[] = [];
+  const passed: string[] = [];
+  for (const check of plan) {
+    const phase = f.reads.phaseOf(taskOf(check.name));
+    if (phase === 'succeeded') passed.push(check.name);
+    else if (phase === 'failed' || phase === 'stopped')
+      refused.push({ name: check.name, ...(yield* refusalHanded(f, files, check.run, taskOf(check.name))) });
+  }
+  return refused.length ? { refused, passed } : undefined;
 });
 
 /**
@@ -548,45 +597,96 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
  * branch was at as the pass read it (`CheckTask.tip`), which a recheck of a blocked step compares against (`blockedRecheck`).
  */
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
+  const { run } = f;
+  const step = stepNamed(f, name);
+  const record = recordNamed(run, name);
+  const plan = stepChecks(step);
+  const first = found(plan[0], `a check of step ${name}`);
+  const due = record.check
+    ? stepChecksDue(run, step, f.reads.phaseOf).file
+    : checksDue(plan.map((c) => ({ ...c, standing: 'waiting' as const }))).file;
+  for (const check of plan.filter((c) => due.includes(c.name))) yield* fileOneCheck(f, name, check);
+  const tasks = Object.fromEntries(plan.map((c) => [c.name, currentCheckTask(run, name, c.name)]));
+  const shorthand = plan.length === 1 && first.name === SHORTHAND_CHECK;
+  const tip = record.check?.tip ?? (record.branch ? f.heads?.()?.[record.branch] : undefined);
+  run.steps[name] = {
+    ...record,
+    check: { taskId: tasks[first.name] ?? checkTaskId(run, name), ...(tip ? { tip } : {}), ...(shorthand ? {} : { tasks }) },
+  };
+});
+
+/**
+ * A recheck's record of a step with several checks (`checks:`): each check that passed on the try behind keeps its task, and every other
+ * is named under the new try's id (`checkTaskId`), to be filed by `fileChecks` as its waits allow. A person's `--check <name>` names that
+ * one alone anew and keeps every other's task, whatever it ended in: one never filed is filed under its kept id once its waits allow. A
+ * step with one check keeps none: its check runs again whole, as it always has.
+ * @param f The pass's filing: the run and the phases of its tasks.
+ * @param step The step rechecked.
+ * @param record The step's record on the new try (`nextTry`).
+ * @param behind The check of the try behind it.
+ * @param only The one check a person's recheck runs again (`--check`); absent, every one that did not pass.
+ */
+const keptChecks = (f: Filing, step: StepSpec, record: StepRecord, behind: StepRecord['check'], only?: string) => {
+  const plan = stepChecks(step);
+  const first = plan[0];
+  if (!behind?.tasks || plan.length < 2 || !first) return record;
+  const n = (record.tries?.length ?? 0) + 1;
+  const tasks = Object.fromEntries(
+    plan.map((c) => {
+      const was = behind.tasks?.[c.name];
+      const kept = only === undefined ? was && f.reads.phaseOf(was) === 'succeeded' : c.name !== only;
+      return [c.name, kept && was ? was : checkTaskId(f.run, step.name, n, c.name)];
+    }),
+  );
+  return { ...record, check: { taskId: tasks[first.name] ?? checkTaskId(f.run, step.name, n, first.name), tasks } } satisfies StepRecord;
+};
+
+/**
+ * File one of a step's checks where the engine does not hold it, as its own task (`currentCheckTask`), its environment naming it
+ * (`WF_CHECK`) and carrying a token minted for its task under the step's agent (`stepToken`), so a `nemia` it calls acts as the step's
+ * agent while the check runs and is refused once it settles.
+ */
+const fileOneCheck = Effect.fnUntraced(function* (f: Filing, name: string, check: CheckSpec) {
   const home = yield* StoreRoot;
   const { e, run } = f;
   const step = stepNamed(f, name);
   const record = recordNamed(run, name);
   const workspace = record.workspace ?? run.workspace;
-  const taskId = checkTaskId(run, name);
-  if (!(yield* asked('view', e.view(taskId))).state.brief) {
-    const command = found(step.check, `a check of step ${name}`);
-    fs.mkdirSync(path.dirname(checkCloseout(home, taskId)), { recursive: true });
-    const files = artifactsDir(home, run, name);
-    fs.mkdirSync(files, { recursive: true });
-    const lands = isRepositoryRun(run) && landsOnCheck(step, run);
-    const first = yield* checkFirst(f, name, lands, workspace);
-    const closeout = f.reads.signedOff(name);
-    const env = checkEnvOf(run, step, {
+  const taskId = currentCheckTask(run, name, check.name);
+  if ((yield* asked('view', e.view(taskId))).state.brief) return;
+  const command = check.run;
+  fs.mkdirSync(path.dirname(checkCloseout(home, taskId)), { recursive: true });
+  const files = artifactsDir(home, run, name);
+  fs.mkdirSync(files, { recursive: true });
+  const lands = isRepositoryRun(run) && landsOnCheck(step, run);
+  const firstThing = yield* checkFirst(f, name, lands, workspace);
+  const closeout = f.reads.signedOff(name);
+  const env = {
+    ...checkEnvOf(run, step, {
       workspace,
       files,
       closeout: closeout && writeCheckCloseout(home, taskId, closeout),
       ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(home, run, run.workflowFiles) }),
       ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
-    });
-    yield* asked(
-      'file',
-      e.file({
-        id: taskId,
-        harness: 'check',
-        priority: lands ? LANDING_MOMENTUM : MOMENTUM,
-        brief: command,
-        cwd: workspace,
-        deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
-        ...checkRequestOf(step),
-        config: { command: checkArgv(command, first), env, niceness: CHECK_NICENESS },
-      }),
-    );
-    const { factory, workflow } = keysOf(run);
-    noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
-  }
-  const tip = record.branch ? f.heads?.()?.[record.branch] : undefined;
-  run.steps[name] = { ...record, check: { taskId, ...(tip ? { tip } : {}) } };
+    }),
+    WF_CHECK: check.name,
+    [SESSION_TOKEN]: stepToken(home, run, step, taskId, tryOf(run, name)).sessionToken,
+  };
+  yield* asked(
+    'file',
+    e.file({
+      id: taskId,
+      harness: 'check',
+      priority: lands ? LANDING_MOMENTUM : MOMENTUM,
+      brief: command,
+      cwd: workspace,
+      deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
+      ...checkRequestOf(step),
+      config: { command: checkArgv(command, firstThing), env, niceness: CHECK_NICENESS },
+    }),
+  );
+  const { factory, workflow } = keysOf(run);
+  noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
 });
 
 /**
@@ -623,7 +723,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   const ready = due.ready;
   if (ready.length && starting && run.after?.length && isRepositoryRun(run)) run.baseRef = f.heads?.()?.[run.branch] || run.baseRef;
   const parents = ready.length && starting ? yield* handedOf(e, run, git) : undefined;
-  const scripts: string[] = yield* fileScripts(f, ready);
+  const scripts: string[] = [...(yield* fileScripts(f, ready)), ...(yield* fileCommands(f, ready))];
   const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
   const servers = yield* serversFiling(run.factory ?? DEFAULT_NAMESPACE, f.home, ready, f.notes);

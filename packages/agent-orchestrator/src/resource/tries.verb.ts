@@ -32,7 +32,7 @@ import type { SpendOf } from '../status/status.ts';
 import { filedOwed } from '../pinned/pinned.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, workFolderOf, type StepArtifact, type StepValue } from './files.store.ts';
-import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
+import { checksIn, decidingCheck, severalChecks, type CheckStderr, type StepCheck } from './checks.verb.ts';
 import type { Actor, FieldShape, Outcome } from 'objects';
 
 /**
@@ -137,6 +137,8 @@ export type StepTry = {
   message: string;
   attempts: StepAttempts;
   check: StepCheck | null;
+  /** Every check of the try, in the step's order (`checksIn`); `check` is the one it is judged by (`decidingCheck`). */
+  checks?: readonly StepCheck[];
   closeout: StepCloseout | null;
   /**
    * A statement the try gave that could not be read — why, and the statement as the engine recorded it — or null. `closeout` is null
@@ -305,7 +307,7 @@ export function triesOf(
   name: string,
   steps: readonly StepSpec[],
   views: Views,
-  current: Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
+  current: Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'check' | 'checks' | 'closeout' | 'unreadable' | 'attempts'> & {
     verdict?: unknown;
   },
   answers: readonly RetryAsk[],
@@ -345,7 +347,8 @@ export function triesOf(
           note: noteOf(i + 1),
           ...earlierSaid(t, i),
           attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
-          check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
+          check: decidingCheck(checksIn(step, t.check, views, stderr)),
+          ...severalChecks(checksIn(step, t.check, views, stderr)),
           closeout: closeoutIn(home, run, name, step, t.taskId, views, steps, turnAt(t, i)),
           unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
           answer: answerAt(i + 1),

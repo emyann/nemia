@@ -60,15 +60,18 @@ export const nodeFate: NodeFate = (when, answered, parents) => {
   return parents.length === 0 || parents.some(satisfied) ? 'ready' : 'waits';
 };
 
-/** What kind of node a step is: a condition (`routes:`), a card node (`workflow:` or `card:`), or a step. */
+/** What kind of node a step is: a condition (`routes:`), a card node (`workflow:` or `card:`), a command (`run:`), or a step. */
 export type { NodeKind };
 
 /**
- * What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), or a step.
- * @param step The step read: its `routes` and its `workflow`.
+ * What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), a command (`run:`), or a step.
+ * @param step The step read: its `routes`, its `workflow` and `card`, and its `run`.
  */
-export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow' | 'card'>) =>
-  step.routes !== undefined ? 'condition' : isCardNode(step) ? 'workflow' : 'step';
+export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow' | 'card' | 'run'>) => {
+  const kind: NodeKind =
+    step.routes !== undefined ? 'condition' : isCardNode(step) ? 'workflow' : step.run !== undefined ? 'command' : 'step';
+  return kind;
+};
 
 /**
  * Whether a step is a node that files a card and runs nothing: a `workflow:` node, or a `card: backlog` node, which names no workflow.

@@ -14,6 +14,9 @@ export type { GetRead, ReadReason, UnlinkedBreak, UnlinkedBreakReason } from '..
  * Each break of the rule, in the reads' order and then the reasons': a read no stream, no verb links and no reason names (`unlinked`);
  * and of each reason, one naming no GET endpoint (`none`), a stream (`stream`), a read a verb links (`linked`), and one that says
  * nothing (`unsaid`).
+ * @param reads Every GET endpoint of the `Api`, each with whether it is a stream.
+ * @param linked The endpoints the verbs link, by their `served` links.
+ * @param reasons Why each read with no verb has none.
  */
 export const readsUnlinked: ReadsUnlinked = (reads, linked, reasons) => {
   const named = new Set(reasons.map((x) => x.read));

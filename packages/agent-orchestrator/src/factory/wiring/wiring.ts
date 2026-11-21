@@ -7,7 +7,14 @@
  * and what each accepted change does; that the factory written after it keeps the invariant is the door's model decode
  * (`factoryChecked`, `factories.store.ts`), on every create and rewrite.
  */
-import type { ReposRewired, Rewired, TriggerRefusal, TriggersRewired, WiringRefusal } from '../../../contracts/wiring.contract.ts';
+import type {
+  ReposRewired,
+  Rewired,
+  TriggerRefusal,
+  TriggersRewired,
+  WiringRefusal,
+  WorkflowChangeRefusal,
+} from '../../../contracts/wiring.contract.ts';
 import {
   costLinedDetachRefusal,
   hiredDetachRefusal,
@@ -25,7 +32,6 @@ import {
   triggerNameTakenRefusal,
   unofferedTriggerRefusal,
   untriggeredRefusal,
-  type CardTrigger,
 } from '../factory.ts';
 import type { WiringRefused } from '../../../contracts/wiring.contract.ts';
 import { withName, hiresInto, triggersOn, withHire, withEntry, withoutEntry } from './dictionaries.ts';
@@ -67,6 +73,16 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
   if (change.verb === 'fire')
     return !holds(factory.hires, change.step) ? missing(unhiredFireRefusal(factory.name, change.step, factory.hires)) : null;
   if (change.verb === 'trigger' || change.verb === 'untrigger') return triggerRefusal(factory, change);
+  return workflowChangeRefusal(factory, change);
+};
+
+/**
+ * Why `factory` cannot take an attach, a detach, a schedule or an unschedule of a workflow: a name that is not one (`Invalid`), then what
+ * each verb asks of what the factory offers, schedules and holds. Its own contract, which `wiringRefusal` leans on for these four verbs.
+ * @param factory The factory as it is: its name, workflows, hires, schedules, cost lines, repositories and own card triggers.
+ * @param change The attach, detach, schedule or unschedule, and the workflow it names.
+ */
+export const workflowChangeRefusal: WorkflowChangeRefusal = (factory, change) => {
   const badName = workflowNameRefusal(change.workflow);
   if (badName !== undefined) return invalid(`${badName} Nothing was ${DONE[change.verb]}.`);
   if (change.verb === 'attach') return attachRefused(factory, change.workflow, change.repo);
@@ -154,11 +170,9 @@ export const reposRewired: ReposRewired = (wired, change) => {
  * @param change The change the person's verb asks, and what it names.
  */
 export const triggersRewired: TriggersRewired = (triggers, change) => {
-  if (change.verb !== 'trigger' && change.verb !== 'untrigger') return triggers;
-  // oxlint-disable-next-line unicorn/no-useless-fallback-in-spread -- tsverify reads a built map only from a dictionary's spread
-  const out: Record<string, CardTrigger> = { ...(triggers ?? {}) };
-  if (change.verb === 'trigger') out[change.name] = change.trigger;
-  if (change.verb === 'untrigger') delete out[change.name];
+  if (change.verb === 'trigger') return withEntry(triggers ?? {}, change.name, change.trigger);
+  if (change.verb !== 'untrigger' || triggers === undefined) return triggers;
+  const out = withoutEntry(triggers, change.name);
   return Object.keys(out).length ? out : undefined;
 };
 

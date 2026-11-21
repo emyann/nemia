@@ -240,6 +240,97 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
 });
 export type WiringRefusal = Implementation<typeof wiringRefusalSpec>;
 
+/** A change of a workflow the factory offers or schedules: an attach, a detach, a schedule or an unschedule. */
+export type WorkflowChange = Extract<WiringChange, { readonly verb: 'attach' | 'detach' | 'schedule' | 'unschedule' }>;
+
+/**
+ * Why a factory cannot take an attach, a detach, a schedule or an unschedule (`workflowChangeRefusal`), the part of `wiringRefusal` for
+ * those four verbs, which `wiringRefusal`'s laws of them lean on: its own contract, as `triggerRefusal` is for the triggers, so a proof
+ * of the whole reads these laws rather than this path's body.
+ */
+const workflowChangeRefusalSpec = spec<(factory: Factory, change: WorkflowChange) => WiringRefused | null>({
+  open: ['output'],
+  ensures: {
+    detachOnlyOffered: {
+      description: 'A detach of a well-named workflow it does not offer is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        factory.workflows.includes(change.workflow) ||
+        output?.kind === 'Missing',
+    },
+    detachLeavesNoHire: {
+      description: 'A detach of a workflow it still hires into is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !hiresInto(factory.hires, change.workflow) || output !== null,
+    },
+    detachLeavesNoSchedule: {
+      description: 'A detach of a workflow it schedules is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !Object.hasOwn(factory.schedules, change.workflow) || output !== null,
+    },
+    detachLeavesNoCostLine: {
+      description: 'A detach of a workflow it sets a cost line for is refused, as Invalid',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' ||
+        !factory.workflows.includes(change.workflow) ||
+        factory.costLines === undefined ||
+        !Object.hasOwn(factory.costLines, change.workflow) ||
+        output?.kind === 'Invalid',
+    },
+    detachLeavesNoTrigger: {
+      description: 'A detach of a workflow a trigger of the factory targets is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' || !targets(factory, change.workflow) || output !== null,
+    },
+    scheduleOnlyOffered: {
+      description: 'A schedule of a workflow it does not offer is refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'schedule' || factory.workflows.includes(change.workflow) || output !== null,
+    },
+    unscheduleOnlyScheduled: {
+      description: 'An unschedule of a well-named workflow it does not schedule is refused, as Missing',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'unschedule' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        Object.hasOwn(factory.schedules, change.workflow) ||
+        output?.kind === 'Missing',
+    },
+    attachAccepted: {
+      description:
+        'An attach of a well-named workflow that names no repository, or one by a folder name one repository alone has, is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'attach' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        (change.repo !== undefined && reposNamed(factory, change.repo) !== 1) ||
+        output === null,
+    },
+    attachRepoKnown: {
+      description:
+        'An attach that names a repository by a folder name none of its repositories has, or several share, is refused, as Invalid',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'attach' || change.repo === undefined || reposNamed(factory, change.repo) === 1 || output?.kind === 'Invalid',
+    },
+    aBadNameIsInvalid: {
+      description: 'A change of a workflow whose name is not one is refused as Invalid, whatever the factory holds',
+      condition: ({ input: [, change], output }) => workflowNameRefusal(change.workflow) === undefined || output?.kind === 'Invalid',
+    },
+    missingOnlyOfWhatIsNotThere: {
+      description: 'Missing only for a detach of a workflow it does not offer, or an unschedule of one it does not schedule',
+      condition: ({ input: [factory, change], output }) =>
+        output?.kind !== 'Missing' ||
+        (change.verb === 'detach' && !factory.workflows.includes(change.workflow)) ||
+        (change.verb === 'unschedule' && !Object.hasOwn(factory.schedules, change.workflow)),
+    },
+    takesWhatItCan: {
+      description: 'A well-named change of a workflow the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        workflowNameRefusal(change.workflow) !== undefined || !accepted(factory, change) || output === null,
+    },
+  },
+});
+export type WorkflowChangeRefusal = Implementation<typeof workflowChangeRefusalSpec>;
+
 /** A change of a factory's own card triggers: one written by its name, or one taken back. */
 export type TriggerChange = Extract<WiringChange, { readonly verb: 'trigger' | 'untrigger' }>;
 

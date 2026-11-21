@@ -23,6 +23,7 @@ spec:
               - Read
               - Grep
               - Glob
+              - Skill
     - name: to-intake
       after:
         - door

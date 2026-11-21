@@ -268,7 +268,7 @@ const stepKeyRefusal = (file: string, key: string) =>
  */
 function agentKeyRefusal(file: string, key: string) {
   if (isAgentKey(key) || key === 'name' || Object.hasOwn(FORMER_OWN_KEYS, key) || CLAUDE_CODE_IGNORED.includes(key)) return undefined;
-  if (key === 'card') return `${stepKeyRefusal(file, key)} ${cardRetired(file, 'card')}`;
+  if (key === 'card') return `${cardRetired(file, 'card')} ${stepKeyRefusal(file, key)}`;
   if (Object.hasOwn(CLAUDE_CODE_REFUSED, key)) {
     return `${file}: \`${key}\` is Claude Code's own subagent key, and a run does not carry it to its sessions — ${CLAUDE_CODE_REFUSED[key]}. Delete the line to use this agent in a run: a key the run does not read is a constraint nobody enforces.`;
   }

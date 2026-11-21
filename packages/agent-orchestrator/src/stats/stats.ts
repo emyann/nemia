@@ -14,9 +14,10 @@
 import { runNamespace } from '../run-list/index.ts';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
-import { isRepositoryRun, tryOf, type Run } from '../record/record.ts';
+import { checkTasksOf, isRepositoryRun, tryOf, type Run } from '../record/record.ts';
+import { medianOf, p90Of } from '../costs/index.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { endsOnBase, type StepSpec } from '../step/step.ts';
+import { endsOnBase, hasChecks, type StepSpec } from '../step/step.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
 import { healthOf, type Health } from '../series/series.ts';
@@ -87,7 +88,60 @@ export type TryFact = RunKeys & {
   rules: RuleFact[] | null;
   tallies: TallyFact[];
   landingDeadlineMs: number | null;
+  /** Each of its checks, by name: how long it ran, null while not ended, and its verdict; absent on a fact read before checks were named. */
+  checks?: CheckFact[];
 };
+
+/** One check of a try (`TryFact.checks`): its name (`check` for a step's `check: <line>`), the ms it ran, and its verdict. */
+export type CheckFact = { name: string; ms: number | null; verdict: CheckVerdict | null };
+
+/**
+ * One check of a step over the facts kept (`checkRowsOf`): its workflow, step and name, how many tries ran it to a verdict, the median and
+ * p90 of the ms those ran (nearest rank, null where none was measured), and the share of them it refused.
+ */
+export type CheckRow = {
+  workflow: string;
+  step: string;
+  check: string;
+  count: number;
+  medianMs: number | null;
+  p90Ms: number | null;
+  refused: number;
+};
+
+/**
+ * A row per check of each step the tries ran (`CheckRow`), in the order met: what a person reads of which check takes the time and
+ * which refuses. A try's check with no verdict yet is not counted.
+ * @param tries The facts of the tries, in their order.
+ */
+export function checkRowsOf(tries: readonly TryFact[]) {
+  const rows = new Map<string, { workflow: string; step: string; check: string; of: CheckFact[] }>();
+  for (const t of tries) {
+    for (const c of t.checks ?? []) {
+      if (c.verdict === null) continue;
+      const key = JSON.stringify([t.workflow, t.step, c.name]);
+      const row = rows.get(key) ?? { workflow: t.workflow, step: t.step, check: c.name, of: [] };
+      row.of.push(c);
+      rows.set(key, row);
+    }
+  }
+  return [...rows.values()].map(({ of, ...row }) => {
+    const ms = of.flatMap((c) => (c.ms === null ? [] : [c.ms]));
+    return {
+      ...row,
+      count: of.length,
+      medianMs: medianOf(ms),
+      p90Ms: p90Of(ms),
+      refused: of.filter((c) => c.verdict === 'refused').length / of.length,
+    } satisfies CheckRow;
+  });
+}
+
+/** Each check of a try on the clock, by name (`TimelineTry.checks`, or its one check as `check`), as its fact holds it (`CheckFact`). */
+const checkFactsOf = (r: RunRead, t: TimelineTry) =>
+  (t.checks ?? (t.check ? [{ name: 'check', span: t.check }] : [])).map(
+    ({ name, span }) => ({ name, ms: span.ranMs, verdict: r.verdictOf(span.taskId) }) satisfies CheckFact,
+  );
 
 /**
  * One run that finished, on the UTC day its ending step's last task ended, or its last task, with no ending step. `rounds` holds, for each
@@ -193,6 +247,7 @@ function tryFactsOf(r: RunRead) {
             value: t.session ? tallyIn(tally, r.closeoutOfTask(t.session.taskId)?.output) : null,
           })),
           landingDeadlineMs: landingDeadlineOf(r, step, t),
+          checks: checkFactsOf(r, t),
         },
       ];
     }),
@@ -228,7 +283,7 @@ function doneStep(r: RunRead, step: StepSpec) {
   const record = r.run.steps[step.name];
   if (!record?.taskId || !r.succeeded(record.taskId) || r.closeoutOf(step.name)?.outcome === 'blocked') return false;
   if (askedAgain(step, r.run, r.closeoutOf)) return false;
-  return record.check ? r.verdictOf(record.check.taskId) === 'passed' : step.check === undefined;
+  return record.check ? checkTasksOf(record.check).every(([, id]) => r.verdictOf(id) === 'passed') : !hasChecks(step);
 }
 
 /**
@@ -367,6 +422,7 @@ export type Group = {
   marks: Mark[];
   tallies: TallyRow[];
   slowLandings: SlowLanding[];
+  checks: CheckRow[];
 };
 
 /**
@@ -490,6 +546,7 @@ function groupOf(f: Kept, from: string | null, to: string, today: string) {
     marks: kept.marks,
     tallies: tallyRowsOf(kept.tries, from ? daysBetween(from, to) : []),
     slowLandings: slowLandingsOf(kept.tries),
+    checks: checkRowsOf(kept.tries),
   };
 }
 

@@ -138,7 +138,7 @@ export type StepTry = {
   attempts: StepAttempts;
   check: StepCheck | null;
   /** Every check of the try, in the step's order (`checksIn`); `check` is the one it is judged by (`decidingCheck`). */
-  checks: readonly StepCheck[];
+  checks?: readonly StepCheck[];
   closeout: StepCloseout | null;
   /**
    * A statement the try gave that could not be read — why, and the statement as the engine recorded it — or null. `closeout` is null

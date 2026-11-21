@@ -4,7 +4,7 @@
  * cut by concept into the files beside it (`commands-factories-<concept>.ts`). Pure.
  */
 import { type Args, type CommandWords, type Flag, type Spec } from './command.ts';
-import { leftOut } from './commands-flags.ts';
+import { answerSpec, leftOut } from './commands-flags.ts';
 import { FACTORY_HOME_WORDS } from './commands-factories-home.ts';
 import { FACTORY_MANUAL } from './commands-factories-manual.ts';
 import { FACTORY_MOVE_WORDS } from './commands-factories-move.ts';
@@ -14,6 +14,7 @@ import {
   FACTORY_SCHEDULE_WORDS,
   FACTORY_SERVER_ADD_WORDS,
   FACTORY_SERVER_RM_WORDS,
+  FACTORY_SERVER_SIGN_IN_WORDS,
   FACTORY_SERVERS_WORDS,
   FACTORY_UNSCHEDULE_WORDS,
 } from './commands-factories-parts.ts';
@@ -241,6 +242,20 @@ export const FACTORY_RM_WORDS = {
   class: 'ask',
 } as const satisfies CommandWords;
 
+/** What `factory commands` takes. */
+const COMMANDS_USAGE = '<factory> [--json]';
+
+/** `nemia factory commands <factory>`: the commands a factory's steps run, as the factory says them. */
+export const FACTORY_COMMANDS_WORDS = {
+  name: 'factory commands',
+  served: [{ endpoint: 'factories.commands' }],
+  usage: COMMANDS_USAGE,
+  help: ["the commands a factory's steps run, its checks among them, as YAML;", '--json: as JSON'],
+  spec: answerSpec('factory commands', COMMANDS_USAGE, ['factory']),
+  writes: false,
+  class: 'read',
+} as const satisfies CommandWords;
+
 /** The group's words, in the order the help lists them. */
 export const FACTORY_WORDS = [
   FACTORY_LIST_WORDS,
@@ -258,6 +273,7 @@ export const FACTORY_WORDS = [
   FACTORY_SCHEDULE_WORDS,
   FACTORY_UNSCHEDULE_WORDS,
   FACTORY_SERVERS_WORDS,
+  FACTORY_SERVER_SIGN_IN_WORDS,
   FACTORY_SERVER_ADD_WORDS,
   FACTORY_SERVER_RM_WORDS,
   FACTORY_VOLUME_ADD_WORDS,
@@ -268,6 +284,7 @@ export const FACTORY_WORDS = [
   FACTORY_COST_LINE_SET_WORDS,
   FACTORY_COST_LINE_RM_WORDS,
   FACTORY_RULES_WORDS,
+  FACTORY_COMMANDS_WORDS,
   FACTORY_INSTRUCTION_WORDS,
   FACTORY_INSTRUCT_WORDS,
   FACTORY_REVISIONS_WORDS,

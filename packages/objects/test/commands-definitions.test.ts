@@ -108,6 +108,7 @@ test('each command of the group says its class, and only an ask is asked of the 
     'policy confirm': 'ask',
     'policy rm': 'ask',
     'policy reach': 'read',
+    'workflows keys': 'read',
     'workflows rm': 'ask',
   });
   assert.deepEqual(

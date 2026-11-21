@@ -1,5 +1,6 @@
 /**
- * The words of the rest of the store's verbs: logs, concluded, stats, level, memory, passes, series, quota, subscribe, unsubscribe,
+ * The words of the rest of the store's verbs: logs, concluded, stats, level, memory, passes, series, quota, the server's and the
+ * store's own reads (server version, server upgrades, capabilities, repository, store, milestones), subscribe, unsubscribe,
  * the chat's speakers, the pairings and board link, and the person's tokens. Cut by concept into the files beside this one
  * (`commands-rest-<concept>.ts`), which this file lists. Pure.
  */
@@ -7,6 +8,7 @@ import type { CommandWords } from './command.ts';
 import { REST_NEMIA_WORDS } from './commands-rest-nemia.ts';
 import { REST_PAIRING_WORDS } from './commands-rest-pairing.ts';
 import { CONCLUDED_WORDS, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, QUOTA_WORDS, SERIES_WORDS } from './commands-rest-reads.ts';
+import { SERVER_READ_WORDS } from './commands-rest-server.ts';
 import { STATS_WORDS } from './commands-rest-stats.ts';
 import { REST_TOKEN_WORDS } from './commands-rest-tokens.ts';
 
@@ -18,6 +20,7 @@ export const REST_WORDS = [
   PASSES_WORDS,
   SERIES_WORDS,
   QUOTA_WORDS,
+  ...SERVER_READ_WORDS,
   ...REST_NEMIA_WORDS,
   MEMORY_WORDS,
   ...REST_PAIRING_WORDS,

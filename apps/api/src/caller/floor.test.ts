@@ -162,7 +162,8 @@ describe('floorEntryOf: an endpoint is the entry that links it; one no entry lin
   for (const [endpoint, method, name, cls] of [
     ['runs.approve', 'POST', 'approve', 'answer'],
     ['tokens.mint', 'POST', 'token add', 'none'],
-    ['runs.lines', 'GET', 'runs.lines', 'read'],
+    ['runs.lines', 'GET', 'lines', 'read'],
+    ['server.health', 'GET', 'server.health', 'read'],
     ['session.signIn', 'POST', 'session.signIn', 'none'],
     ['nemia.chatSend', 'POST', 'nemia.chatSend', 'act'],
   ] as const)

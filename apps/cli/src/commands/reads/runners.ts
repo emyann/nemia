@@ -10,12 +10,14 @@ import { inbox } from '../../reads/inbox.ts';
 import { ls } from '../../reads/ls.ts';
 import { show } from '../../reads/show.ts';
 import { watch } from '../../watch/watch.ts';
+import { lines } from './lines.ts';
 
 /** Each of the group's commands' runner. */
 export const READ_RUNNERS: Readonly<Record<ReadCommand, Runner>> = {
   inbox,
   ls,
   show,
+  lines,
   closeout,
   watch,
 };

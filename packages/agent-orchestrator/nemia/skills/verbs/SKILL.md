@@ -281,12 +281,76 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                what the run produced, and the choice it leaves you (nemia decide --help)
                                each tool's words: tools.md#decide
                                on the port: decide
+  nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]
+                               the objects of a resource the api serves, or one by its name (nemia get --help)
+                               CLI only: generic over every kind discovery lists, where a port tool calls one endpoint: each kind's read is said in objects' UNLINKED_READS
+  nemia explain <resource>[.<field>]...
+                               what a resource the api serves is, and each of its fields (nemia explain --help)
+                               each tool's words: tools.md#explain
+                               on the port: explain
   nemia quota [--json]
                                the subscription's quota: each window's used share and when it
                                resets, or the api's sentence why there is none; --json: the whole
                                answer
                                each tool's words: tools.md#quota
                                on the port: quota
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+                               the store's library: the user library's skills, agents, MCP servers and
+                               workflows beside the builtins, each with the factories that add it;
+                               --factory: that factory's adds, each with its state and the fix of a missing one;
+                               given a kind and a name, that item whole, as YAML (--json: as JSON)
+                               each tool's words: tools.md#library, tools.md#library_agents, tools.md#library_mcpservers, tools.md#library_workflows, tools.md#library_adds, tools.md#library_skill, tools.md#library_agent, tools.md#library_mcpserver, tools.md#library_workflow
+                               on the port: library, library_agents, library_mcpservers, library_workflows, library_adds, library_skill, library_agent, library_mcpserver, library_workflow
+  nemia lines <runId> [--json]
+                               the lines a run keeps: its decide and refresh lines, each step's,
+                               the card it came from, as YAML; --json: as JSON
+                               each tool's words: tools.md#lines
+                               on the port: lines
+  nemia server version [--json]
+                               the release the server runs and the newest it knows of, as YAML;
+                               --json: as JSON. nemia version is this machine's
+                               each tool's words: tools.md#server_version
+                               on the port: server_version
+  nemia server upgrades [--json]
+                               the server's last upgrade and the release going back goes to, as
+                               YAML; --json: as JSON
+                               each tool's words: tools.md#server_upgrades
+                               on the port: server_upgrades
+  nemia capabilities [--factory <factory>] [--repo <path>] [--json]
+                               the harnesses, models, skills and servers a step may be given, as
+                               YAML, in a factory or a repository of it; --json: as JSON
+                               each tool's words: tools.md#capabilities
+                               on the port: capabilities
+  nemia repository [--factory <factory>] [--repo <path>] [--json]
+                               the repository a factory works in, as the server reads it, as YAML;
+                               --json: as JSON
+                               each tool's words: tools.md#repository
+                               on the port: repository
+  nemia store [--json]
+                               where the store keeps its workflows, agents and skills, with the
+                               commands that file a factory and turn Nemia on, as YAML; --json: as JSON
+                               each tool's words: tools.md#store
+                               on the port: store
+  nemia milestones [--json]
+                               how far the store is towards its first landed change, each milestone
+                               done or not, as YAML; --json: as JSON
+                               each tool's words: tools.md#milestones
+                               on the port: milestones
+  nemia factory commands <factory> [--json]
+                               the commands a factory's steps run, its checks among them, as YAML;
+                               --json: as JSON
+                               each tool's words: tools.md#factory_commands
+                               on the port: factory_commands
+  nemia factory server sign-in <factory> <server> [--json]
+                               where the sign-in of a factory's MCP server stands, as YAML;
+                               --json: as JSON
+                               each tool's words: tools.md#factory_server_sign-in
+                               on the port: factory_server_sign-in
+  nemia workflows keys [--json]
+                               every key a workflow's step takes, its kind and what it means, as
+                               YAML; --json: as JSON
+                               each tool's words: tools.md#workflows_keys
+                               on the port: workflows_keys
 ```
 
 ## Yours

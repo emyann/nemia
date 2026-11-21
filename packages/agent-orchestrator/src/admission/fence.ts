@@ -25,7 +25,8 @@ const any = (name: string) => `Bash(nemia ${name}:*)`;
  * - a command that reads bare runs unasked, and asks with each word or flag that sets: a word right after its name, a flag anywhere;
  * - a command out of her reach is denied, a factory's definition written by hand among them (`agentClassOf`, and the `factory` form of a
  *   definition's write by itself, `proposedForms`), which she proposes;
- * - the client's own verbs (`CLIENT_CLASSES`), `nemia propose` and `nemia proposals approve|decline`, run unasked;
+ * - the client's own verbs (`CLIENT_CLASSES`), `nemia propose` and `nemia proposals approve|decline`, run unasked, and the library's
+ *   writes, `nemia library add|rm`, ask;
  * - and any assignment before `nemia` is denied (`ASSIGNED`).
  *
  * An allow on a name covers the commands that extend it (`agents`, `agents write`), and their ask or deny stands over it: a harness asks

@@ -5,6 +5,7 @@
 import { Effect } from 'effect';
 import { LIBRARY_ADD_WORDS, LIBRARY_RM_WORDS, LIBRARY_WORDS, type Args, type LibraryAdd } from 'objects';
 import { asked, everyPage, pageOf, type ObjectsClient } from '../../objects.ts';
+import { answered } from '../answer.ts';
 import { said, textArg } from '../requests.ts';
 
 /** What a line of the library says of an item: its name, its origin and the factories that add it. */
@@ -41,13 +42,16 @@ const heldLine = (kind: string, item: Held) => {
 };
 
 /**
- * `nemia library [<kind>] [--factory <factory>]`'s runner: each kind's items, or the one kind's; with a factory, its adds.
+ * `nemia library [<kind> [<name>]] [--factory <factory>]`'s runner: each kind's items, or the one kind's, or one item whole; with a
+ * factory, its adds.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function libraryListed(args: Args) {
   const factory = textArg(args, 'factory');
   if (factory !== undefined) return factoryAddsListed(factory);
   const asked1 = textArg(args, 'kind');
+  const name = textArg(args, 'name');
+  if (asked1 !== undefined && name !== undefined) return libraryItem(asked1, name, args);
   const kinds = KINDS.filter((k) => asked1 === undefined || k === asked1);
   const lines: string[] = [];
   for (const kind of kinds) {
@@ -57,6 +61,16 @@ export async function libraryListed(args: Args) {
   said(lines.length === 0 ? ['the library holds nothing yet'] : lines);
   return 0;
 }
+
+/** `nemia library <kind> <name>`: the one item, read whole (`<kind>.getLibrary`), printed as YAML, or JSON with `--json`. */
+const libraryItem = (kind: string, name: string, args: Args) => {
+  const params = { name };
+  const verb = LIBRARY_WORDS.name;
+  if (kind === 'skills') return answered(verb, args, (c) => c.skills.getLibrary({ params, query: {} }));
+  if (kind === 'agents') return answered(verb, args, (c) => c.agents.getLibrary({ params, query: {} }));
+  if (kind === 'workflows') return answered(verb, args, (c) => c.workflows.getLibrary({ params, query: {} }));
+  return answered(verb, args, (c) => c.mcpservers.getLibrary({ params }));
+};
 
 /** `nemia library --factory <factory>`: each add of the factory, with its state. */
 async function factoryAddsListed(namespace: string) {

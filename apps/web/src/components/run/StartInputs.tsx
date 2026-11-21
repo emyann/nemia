@@ -11,6 +11,9 @@ const KEPT = FILE_KEPT_FOR === 24 * 60 * 60 * 1000 ? 'a day' : `${Math.round(FIL
 const MOST = Number(FILE_LIMIT);
 const MOST_WORDS = ByteSize.format(FILE_LIMIT);
 
+/** What a start's files may be, as its drop zone says it. */
+const START_NOTE = `Each file up to ${MOST_WORDS}, kept ${KEPT} for the start.`;
+
 /** `bytes` in words, in the units the limit is said in. */
 const sizeWords = (bytes: number) => ByteSize.format(ByteSize.bytes(bytes));
 
@@ -39,7 +42,7 @@ export function StartInputs({
   uploading = false,
   isDisabled = false,
   label = 'Files for the run',
-  note = `Each file up to ${MOST_WORDS}, kept ${KEPT} for the start.`,
+  note = START_NOTE,
 }: {
   label?: string;
   note?: string;

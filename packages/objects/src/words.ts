@@ -510,6 +510,8 @@ export const EVENT_REASONS = [
   'ConflictsSettled',
   'AddsMissing',
   'AddsResolved',
+  'TriggersClash',
+  'ClashSettled',
   'LeftEnded',
 ] as const;
 

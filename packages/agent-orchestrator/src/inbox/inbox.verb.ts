@@ -40,7 +40,7 @@ import { inboxDir } from '../record/files.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { CardName } from './inbox.model.ts';
-import { filedNames, inboxCards, readableFactories, triggeringOf } from './inbox.store.ts';
+import { filedNames, inboxCards, readableFactories, readInbox, triggeringOf } from './inbox.store.ts';
 import { startRun, startedSteps, type StartedRun } from '../start/start.verb.ts';
 import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
@@ -375,6 +375,17 @@ const dropStaleTries = (names: Iterable<string>, listing: readonly CardListing[]
  */
 const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon: boolean, defaultStarts: boolean) =>
   fromDaemon && (card.factory !== null || defaultStarts) ? { on } : {};
+
+/**
+ * Each card of a factory that the card triggers of its factory would send to two workflows, as the inbox lists it now (`clash`): its
+ * factory, its name and the triggers that clash — what the feed says a clash begun and ended by.
+ */
+export const clashesNow = Effect.fn('clashesNow')(function* () {
+  const listed = yield* readInbox();
+  return listed.flatMap((l) =>
+    l.clash !== undefined && l.factory !== null ? [{ factory: l.factory, card: l.name, by: [...l.clash] }] : [],
+  ) satisfies Array<{ factory: string; card: string; by: string[] }>;
+});
 
 /**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and `factory:`, on the

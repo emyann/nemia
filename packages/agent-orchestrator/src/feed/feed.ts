@@ -347,6 +347,9 @@ const conflictsKey = (factory: string) => `Conflicts/${factory}`;
 /** Where the fold keeps what was last said of the factory `factory`'s library adds: no `Run/` or `Step/` key, as `conflictsKey`. */
 const addsKey = (factory: string) => `Adds/${factory}`;
 
+/** Where the fold keeps what was last said of the card `card` of the factory `factory` clashing: no `Run/` or `Step/` key, as `addsKey`. */
+const clashKey = (factory: string, card: string) => `Clash/${factory}/${card}`;
+
 /** Where the fold keeps the store's readiness last said: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets it. */
 const READINESS_KEY = 'Readiness/store';
 
@@ -434,13 +437,16 @@ function foldStore(fold: FeedFold, l: StoreLine) {
 }
 
 /**
- * A factory's line `l` folded: its conflicts pending or settled, and its library adds missing or resolved, each kept as the last word said
- * of them, with its reason; any other passed.
+ * A factory's line `l` folded: its conflicts pending or settled, its library adds missing or resolved, and a card of it clashing or
+ * settled (by the card its labels name), each kept as the last word said of them, with its reason; any other passed.
  */
 function foldFactory(fold: FeedFold, l: FactoryLine) {
   const reason = reasonOfLine(l, involvedOf(l));
   if (reason === 'ConflictsPending' || reason === 'ConflictsSettled') fold.said.set(conflictsKey(l.factory), { ...saidOf(l), reason });
   if (reason === 'AddsMissing' || reason === 'AddsResolved') fold.said.set(addsKey(l.factory), { ...saidOf(l), reason });
+  const card = l.labels?.card;
+  if ((reason === 'TriggersClash' || reason === 'ClashSettled') && card !== undefined)
+    fold.said.set(clashKey(l.factory, card), { ...saidOf(l), reason });
 }
 
 /** The word and the note `line` says, as the fold keeps them. */
@@ -812,6 +818,52 @@ function addsLines(fold: FeedFold, at: string, adds: FeedMissing) {
   });
 }
 
+/**
+ * Each card that the card triggers of its factory would send to two workflows, as a pass read the inbox (`clash`, `cardsListed`): its
+ * factory, its name and the triggers that clash. A caller that did not read the inbox passes nothing, and the feed says nothing of any.
+ */
+export type FeedClashes = readonly { factory: string; card: string; by: readonly string[] }[];
+
+/** A factory's line of the card `card`, its reason `reason` and its note `note`. */
+const clashLine = (at: string, factory: string, card: string, reason: 'TriggersClash' | 'ClashSettled', note: string) =>
+  upgraded({
+    at,
+    factory,
+    word: LINE_WORDS[reason],
+    note,
+    involved: { kind: 'Factory', name: factory },
+    labels: { factory, card },
+    reason,
+  }) as FactoryLine;
+
+/**
+ * The lines the cards' clashes owe the feed: `TriggersClash` for each card that clashes now and the feed did not last say so, its note the
+ * card, the triggers and the fix; `ClashSettled` for each card the feed last said clashes that clashes no more, edited, unlabelled or
+ * removed. Compared by the reason the fold keeps under `clashKey`, never its note, so a third trigger joining a clash writes no line, and a
+ * restarted daemon, whose fold is the whole feed, says none again. Pure.
+ */
+function clashLines(fold: FeedFold, at: string, clashes: FeedClashes) {
+  const now = new Set(clashes.map(({ factory, card }) => clashKey(factory, card)));
+  const begun = clashes
+    .filter(({ factory, card }) => fold.said.get(clashKey(factory, card))?.reason !== 'TriggersClash')
+    .map(({ factory, card, by }) =>
+      clashLine(
+        at,
+        factory,
+        card,
+        'TriggersClash',
+        `card ${card} waits: triggers ${by.join(', ')} would send it to two workflows. Change a selector (nemia factory trigger ${factory} <name> --selector …), or the card's labels.`,
+      ),
+    );
+  const ended = [...fold.said.entries()].flatMap(([key, said]) => {
+    if (!key.startsWith('Clash/') || said.reason !== 'TriggersClash' || now.has(key)) return [];
+    const [factory = '', ...rest] = key.slice('Clash/'.length).split('/');
+    const card = rest.join('/');
+    return [clashLine(at, factory, card, 'ClashSettled', `card ${card} clashes no more`)];
+  });
+  return [...begun, ...ended];
+}
+
 /** One call a step's sessions were denied, as the one-shot the feed writes of it: the call in its word and as a field of its own. */
 const denialOnce = (d: FeedDenial) => ({
   step: d.step,
@@ -888,6 +940,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords) {
  * @param readiness The store's readiness as the daemon last read it, or undefined where none was handed.
  * @param resumed Who last lifted the store's pause by hand, and the pause it lifted; undefined where none was left.
  * @param missing Each recorded factory's library adds, or undefined where the pass read none.
+ * @param clashes Each card the triggers of its factory clash on, or undefined where the pass read no inbox.
  */
 export function feedChanges(
   fold: FeedFold,
@@ -900,6 +953,7 @@ export function feedChanges(
   readiness?: FeedReadiness,
   resumed?: FeedResumed,
   missing?: FeedMissing,
+  clashes?: FeedClashes,
 ) {
   const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels) =>
     upgraded({
@@ -927,7 +981,12 @@ export function feedChanges(
     const id = key.startsWith('Run/') ? key.slice('Run/'.length) : undefined;
     if (id !== undefined && !now.has(id) && !unjudged.has(id)) out.push(line(id, undefined, { word: REMOVED }, { run: id }));
   }
-  return [...out, ...storeChanges(fold, at, pause, levels, readiness, resumed), ...factoryChanges(fold, at, conflicts, missing)];
+  return [
+    ...out,
+    ...storeChanges(fold, at, pause, levels, readiness, resumed),
+    ...factoryChanges(fold, at, conflicts, missing),
+    ...(clashes === undefined ? [] : clashLines(fold, at, clashes)),
+  ];
 }
 
 /** The factories' lines a pass owes: their conflicts' where it read them (`conflictLines`), their adds' where it read them. Pure. */

@@ -2,11 +2,15 @@
  * `nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...`: an idea filed as a card through the
  * Card's `create`, in the namespace of `--factory` (`default` for none). A file is read here and its text sent (Q8); a folder is refused,
  * naming the command. `--workflow` is sent by its name, a path refused; `--label` each edit as typed. A card names no repository: its
- * words refuse `--repo`, the factory's wiring placing its run.
+ * words refuse `--repo`, the factory's wiring placing its run. Each `--file`, and each file beside an idea file that its text names as a
+ * markdown image's or link's target (`besideIdea`), is uploaded first to the namespace's files and carried by the card by its id.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { DEFAULT_NAMESPACE, INBOX_ADD_WORDS, type Args, type Card } from 'objects';
 import { asked } from '../../objects.ts';
 import { listArg, said, textArg } from '../requests.ts';
+import { inputsOf, uploaded } from '../runs/start.ts';
 import { factoryLine, fileOf, labelsText, textOrFile, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_ADD_WORDS;
@@ -33,20 +37,47 @@ export const filedLines = (card: Card) => {
   ];
 };
 
+/** A markdown image's or link's target, up to its closing parenthesis or a title after a space: `](<target>`. */
+const TARGET = /\]\(\s*<?([^)\s>]+)>?/g;
+
+/**
+ * The files beside the idea file `idea` that its text names as a markdown image's or link's target, `name` or `./name`, with no folder
+ * in it: each a file there, in the order the text names them, once.
+ * @param idea The idea as typed: a file's path, or words, which name none.
+ * @param body The idea's text.
+ */
+export function besideIdea(idea: string, body: string) {
+  if (!fs.statSync(idea, { throwIfNoEntry: false })?.isFile()) return [];
+  const dir = path.dirname(idea);
+  const named = new Set<string>();
+  for (const match of body.matchAll(TARGET)) {
+    const target = (match[1] ?? '').replace(/^\.\//, '');
+    if (target === '' || target.includes('/') || target.includes(':')) continue;
+    if (fs.statSync(path.join(dir, target), { throwIfNoEntry: false })?.isFile()) named.add(path.join(dir, target));
+  }
+  return [...named];
+}
+
 /**
  * `nemia inbox add`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function inboxAdd(args: Args) {
-  const body = textOrFile(textArg(args, 'idea') ?? '', COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
+  const idea = textArg(args, 'idea') ?? '';
+  const body = textOrFile(idea, COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');
   const factory = textArg(args, 'factory');
   const label = listArg(args, 'label');
   const namespace = factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
+  const typed = listArg(args, 'file');
+  const beside = besideIdea(idea, body).filter((f) => !typed.some((t) => path.resolve(t) === path.resolve(f)));
+  const given = inputsOf([...typed, ...beside], 'nemia inbox add', '--file');
+  const files = given.length ? await uploaded(namespace, given, COMMAND) : [];
   const payload = {
     body,
     ...(workflow === undefined ? {} : { workflow }),
     ...(label.length ? { label } : {}),
+    ...(files.length ? { files } : {}),
   };
   said(filedLines(await asked(COMMAND, (c) => c.cards.create({ params: { namespace }, payload }))));
   return 0;

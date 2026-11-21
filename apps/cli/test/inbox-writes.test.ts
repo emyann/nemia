@@ -3,7 +3,8 @@
  * `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
  * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines
  * it prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow
- * given as a path are refused, exit 2, before anything is asked.
+ * given as a path are refused, exit 2, before anything is asked. A card's files: an idea file's picture beside it and a `--file` uploaded
+ * and carried, another attached, listed, one written out byte for byte, and one taken off.
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
@@ -152,6 +153,41 @@ const ideaFile = (name: string) => {
 
 test("under this machine's context: a card filed from a file, queued, taken back, handed a run, edited, labelled and dropped", async () => {
   await lifeOfACard((argv) => store.nemia(argv), store.root, ideaFile('here.md'));
+});
+
+test("a card carries the picture its idea file names beside it and a --file; attach, files, --get and detach", async () => {
+  const dir = scratch('nemia-inbox-files-');
+  const shot = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  fs.writeFileSync(path.join(dir, 'shot.png'), shot);
+  fs.writeFileSync(path.join(dir, 'idea.md'), 'Fix the header\n\nSee ![it](./shot.png).\n');
+  fs.writeFileSync(path.join(dir, 'notes.txt'), 'notes\n');
+  fs.writeFileSync(path.join(dir, 'run.log'), 'a log\n');
+  const added = await store.nemia(['inbox', 'add', path.join(dir, 'idea.md'), '--file', path.join(dir, 'notes.txt')]);
+  ok(added, 'inbox add --file');
+  const name = nameIn(added.out);
+  const listed = await store.nemia(['inbox', 'files', name]);
+  ok(listed, 'inbox files');
+  assert.deepEqual(
+    listed.out.trim().split('\n').map((l) => l.split('  ')[1]),
+    ['notes.txt', 'shot.png'],
+  );
+  assert.match(listed.out, /shot\.png {2}file_[0-9a-f]{32} {2}11 bytes {2}image\/png {2}in its text$/m);
+  const attached = await store.nemia(['inbox', 'attach', name, path.join(dir, 'run.log')]);
+  ok(attached, 'inbox attach');
+  assert.match(attached.out, /run\.log/);
+  const out = path.join(dir, 'got.png');
+  const got = await store.nemia(['inbox', 'files', name, '--get', 'shot.png', '--out', out]);
+  ok(got, 'inbox files --get');
+  assert.deepEqual(fs.readFileSync(out), shot);
+  const detached = await store.nemia(['inbox', 'detach', name, 'run.log', 'notes.txt']);
+  ok(detached, 'inbox detach');
+  assert.deepEqual(
+    detached.out.trim().split('\n').map((l) => l.split('  ')[1]),
+    ['shot.png'],
+  );
+  assert.match(cardOn(store.root, name) ?? '', /\nfiles:\n {2}['"]?shot\.png['"]?: ['"]?file_[0-9a-f]{32}/);
+  const none = await store.nemia(['inbox', 'files', name, '--get', 'nope.png']);
+  assert.equal(none.code, 2, none.err);
 });
 
 test('`nemia label run` edits a run of the store, a line per key, then its labels; a change without --overwrite is refused', async () => {

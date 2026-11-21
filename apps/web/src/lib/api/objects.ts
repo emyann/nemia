@@ -36,6 +36,7 @@ import {
   AgentTried,
   type AgentWrite,
   Card,
+  CheckOutput,
   Delegation,
   DelegationList,
   type DelegationWrite,
@@ -82,6 +83,7 @@ import {
   RunRemoved,
   type RunRetry,
   RunSaid,
+  type OutputStream,
   type RunStart,
   RunStarted,
   Schedule,
@@ -401,6 +403,18 @@ export const steps = {
   },
   /** What a step was told. */
   told: (runId: string, step: string) => call((c) => c.steps.told({ params: { runId, step } }), read(StepTold)),
+  /** A page of what the check of a step's try printed on one stream, as `query` cuts it: from a line, the last lines, a match. */
+  checkOutput: (runId: string, step: string, tryNo: number, query: CheckOutputQuery) =>
+    call((c) => c.steps.checkOutput({ params: { runId, step, try: String(tryNo) }, query }), read(CheckOutput)),
+};
+
+/** What a read of a check's output asks: the stream, the line to read on from or the last lines, how many, and the text to match. */
+type CheckOutputQuery = {
+  readonly stream?: OutputStream;
+  readonly from?: string;
+  readonly limit?: string;
+  readonly last?: string;
+  readonly match?: string;
 };
 
 /**

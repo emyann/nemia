@@ -5,6 +5,7 @@
  */
 import type { ReadCommand } from 'objects';
 import type { Runner } from '../runner.ts';
+import { checkOutput } from '../../reads/check-output.ts';
 import { closeout } from '../../reads/closeout.ts';
 import { inbox } from '../../reads/inbox.ts';
 import { ls } from '../../reads/ls.ts';
@@ -19,5 +20,6 @@ export const READ_RUNNERS: Readonly<Record<ReadCommand, Runner>> = {
   show,
   lines,
   closeout,
+  'check-output': checkOutput,
   watch,
 };

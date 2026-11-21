@@ -1,8 +1,8 @@
 /**
- * The words of the moved reads: show, lines, closeout, ls, inbox and watch, each parsed, helped and printed by the client from these
- * words and read through the `Api`. A check that needs the grammar of a label query is the api's to make: it refuses one in the
- * grammar's own words. The inbox's bare read is `INBOX_READ_WORDS`, apart from the inbox's writes (`INBOX_WORDS`); `nemia watch`'s
- * words are cut into `commands-reads-watch.ts`, and the inbox's manual into `commands-reads-inbox.ts`. Pure.
+ * The words of the moved reads: show, lines, closeout, check-output, ls, inbox and watch, each parsed, helped and printed by the client
+ * from these words and read through the `Api`. A check that needs the grammar of a label query is the api's to make: it refuses one in the
+ * grammar's own words. The inbox's bare read is `INBOX_READ_WORDS`, apart from the inbox's writes (`INBOX_WORDS`); `nemia watch`'s words
+ * are cut into `commands-reads-watch.ts`, and the inbox's manual into `commands-reads-inbox.ts`. Pure.
  */
 import { CLI, type Args, type CommandWords, type Flag } from './command.ts';
 import { answerSpec, labelFlags, SELECTOR_FLAG_FORM, selectorFlag } from './commands-flags.ts';
@@ -86,6 +86,60 @@ export const CLOSEOUT_WORDS = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the `closeout` of `objects`' steps group, calling this handler" },
+} as const satisfies CommandWords;
+
+/** A text flag of `nemia check-output` given once, under the key it names, as its refusal of none says what it takes. */
+const checkOutputFlag = (flag: string, key: string, takes: string) =>
+  ({ flag, kind: 'text', key, takes, twice: `${CLI} check-output takes ${flag} once.` }) as const satisfies Flag;
+
+/** The refusal of `--last` beside `--from`, `--before` or `--limit`, which read from elsewhere, and of `--from` beside `--before`. */
+const checkOutputRefused = (args: Args) => {
+  const given = (key: string) => textOf(args, key) !== undefined;
+  if (given('last') && (given('from') || given('before') || given('limit')))
+    return `${CLI} check-output reads the last lines with --last, or a page from or before a line with --from or --before and --limit, not both: drop --last, or the others`;
+  if (given('from') && given('before'))
+    return `${CLI} check-output reads on from a line with --from, or the lines before one with --before, not both: drop one of them`;
+  return null;
+};
+
+/**
+ * `nemia check-output <run> <step> [--try n]`: what a try's check printed, its latest try's by default, read from the runtime whole, a
+ * page at a time: stdout, or stderr with `--stderr`; every line, or the page `--from`, `--before`, `--limit` and `--last` cut; only the
+ * lines containing `--match`'s text, case-insensitively, each under its number.
+ */
+export const CHECK_OUTPUT_WORDS = {
+  name: 'check-output',
+  served: [{ endpoint: 'steps.checkOutput' }],
+  usage: '<runId> <step> [--try <n>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]',
+  help: [
+    "what a step's try's check printed, its latest try or --try <n>:",
+    'stdout whole, or --stderr; --from <n> or --before <n> with --limit <n>,',
+    'or --last <n>: one page; --match <text>: the lines containing it, any',
+    'case, numbered',
+  ],
+  spec: {
+    positionals: [
+      { key: 'runId', takes: 'required', kind: 'name' },
+      { key: 'step', takes: 'required', kind: 'name' },
+    ],
+    flags: [
+      checkOutputFlag('--try', 'try', "a try's number"),
+      { flag: '--stderr', kind: 'switch', sets: { stream: 'stderr' } },
+      checkOutputFlag('--from', 'from', 'the line number to read on from, from 1'),
+      checkOutputFlag('--before', 'before', 'the line number the lines printed end before, from 1'),
+      checkOutputFlag('--limit', 'limit', 'how many lines to print from there'),
+      checkOutputFlag('--last', 'last', 'how many of the last lines to print'),
+      checkOutputFlag('--match', 'match', 'the text the lines printed contain'),
+    ],
+    unknown: takesNo(
+      'check-output',
+      "one run's id, one step's name, --try <n>, --stderr, --from <n>, --before <n>, --limit <n>, --last <n> and --match <text>",
+    ),
+  },
+  check: checkOutputRefused,
+  writes: false,
+  class: 'read',
+  only: { side: 'cli', why: "the api serves it as the `checkOutput` of `objects`' steps group, calling this handler" },
 } as const satisfies CommandWords;
 
 /** The key `-l` fills, as its builder names it. */
@@ -187,5 +241,6 @@ export const READ_WORDS = [
   SHOW_WORDS,
   LINES_WORDS,
   CLOSEOUT_WORDS,
+  CHECK_OUTPUT_WORDS,
   WATCH_WORDS,
 ] as const satisfies readonly CommandWords[];

@@ -1,14 +1,16 @@
 /**
- * The `steps` group's handlers (`objects`' `Api`, `StepsGroup`): a run's step's reads — its tries, one try, a try's closeout and what it
- * was told, the run object's sub-resources; the end of its session output, the files it wrote, its conversation read once from a cursor
- * or followed, and its task's path through the runtime's lifecycle. Each calls the orchestrator's entry by its name (`TRIES`, `LOGS`,
- * `STEP_TRANSCRIPT`, …) with its typed input, through the request's services (`inRequest`).
+ * The `steps` group's handlers (`objects`' `Api`, `StepsGroup`): a run's step's reads — its tries, one try, a try's closeout, a page of
+ * what a try's check printed and what it was told, the run object's sub-resources; the end of its session output, the files it wrote, its
+ * conversation read once from a cursor or followed, and its task's path through the runtime's lifecycle. Each calls the orchestrator's
+ * entry by its name (`TRIES`, `LOGS`, `STEP_TRANSCRIPT`, …) with its typed input, through the request's services (`inRequest`).
  */
 import { type Context, Effect, Queue, Stream } from 'effect';
 import { HttpApiSchema } from 'effect/http-api';
 import {
+  CHECK_OUTPUT,
   CLOSEOUT,
   type EngineService,
+  isRefusal,
   LOGS,
   lifecycleGraph,
   phaseOfView,
@@ -427,6 +429,28 @@ const logOf = (runId: string, step: string, tail: string | undefined) =>
   });
 
 /**
+ * A page of what the check of the try `tryNo` of the step `step` printed (`CHECK_OUTPUT`), as `query` asks it: the orchestrator's refusals
+ * as they are, and a read the engine failed `ReadFailed`, naming the command that reads the same check's verdict and tails.
+ */
+const checkOutputOf = (
+  runId: string,
+  step: string,
+  tryNo: string,
+  query: Omit<Parameters<typeof CHECK_OUTPUT.handler>[0], 'runId' | 'step' | 'try'>,
+) =>
+  answered(async (s) => {
+    try {
+      return await s.inRequest(CHECK_OUTPUT.handler({ runId, step, try: tryNo, ...query }));
+    } catch (err) {
+      if (isRefusal(err)) throw err;
+      const why = err instanceof Error ? err.message : String(err);
+      throw new ReadFailed({
+        error: `Could not read what the check of step '${step}', try ${tryNo}, printed: ${why}. \`nemia decide ${runId}\` reads its verdict and the end of its output from the command line.`,
+      });
+    }
+  });
+
+/**
  * The file at the path `name` under the step's files directory (`STEP_ARTIFACT`): `BadRequest` for a path that climbs out, is absolute
  * or is no path (`refusedPath`), `Gone` once pruned, `Missing` where none, or where a link stands on the way.
  */
@@ -608,6 +632,7 @@ export const stepsHandlers = readsBounded(Api, 'steps', (handlers) =>
         return { ...read, closeout: narrowed(read.closeout) };
       }),
     )
+    .handle('checkOutput', ({ params: { runId, step, try: tryNo }, query }) => checkOutputOf(runId, step, tryNo, query))
     .handle('told', ({ params: { runId, step } }) => answered((s) => s.inRequest(TOLD.handler({ runId, step }))))
     .handle('log', ({ params: { runId, step }, query }) => logOf(runId, step, query.tail))
     .handle('artifact', ({ params: { runId, step, file } }) => artifactOf(runId, step, file))

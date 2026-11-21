@@ -1,11 +1,11 @@
 /**
  * How each read the api serves is bounded, so that no request makes the daemon build an answer it cannot hold. The numbers: a list's page
- * (`LIST_PAGE`), a conversation's (`TRANSCRIPT_PAGE`), a closeout's body's (`BODY_PAGE`), a log's tail (`LOG_TAIL`), the output field a
- * closeout keeps when none is named (`SHORT_FIELD`), and the most any answer is, its JSON's length, before the api refuses to build it
- * (`ANSWER_MOST`). And `READS`, one entry for every GET endpoint of the `Api`: the shape of its read — a list's page (`page`), a read
- * from a cursor (`cursor`), a whole read by part (`part`), one object (`one`), a stream (`stream`), a file's bytes (`bytes`) — and the
- * query keys that narrow it, which the api's refusal of an answer past its bound names. Typed over every GET name, so a read the `Api`
- * gains with no entry does not compile, and held to each endpoint's query by `readsUnbounded`.
+ * (`LIST_PAGE`), a conversation's (`TRANSCRIPT_PAGE`), a closeout's body's (`BODY_PAGE`), a log's tail (`LOG_TAIL`), a check's output's
+ * page (`CHECK_OUTPUT_PAGE`), the output field a closeout keeps when none is named (`SHORT_FIELD`), and the most any answer is, its JSON's
+ * length, before the api refuses to build it (`ANSWER_MOST`). And `READS`, one entry for every GET endpoint of the `Api`: the shape of its
+ * read — a list's page (`page`), a read from a cursor (`cursor`), a whole read by part (`part`), one object (`one`), a stream (`stream`), a
+ * file's bytes (`bytes`) — and the query keys that narrow it, which the api's refusal of an answer past its bound names. Typed over every
+ * GET name, so a read the `Api` gains with no entry does not compile, and held to each endpoint's query by `readsUnbounded`.
  */
 import type { ApiGetName } from './api.ts';
 import type { READ_SHAPES } from './words.ts';
@@ -24,6 +24,9 @@ export const BODY_PAGE: PageBounds = { byDefault: 40_000, most: 400_000 };
 
 /** A step's session output's last lines: 200 where no `tail` is asked, and never more than 2,000. */
 export const LOG_TAIL: PageBounds = { byDefault: 200, most: 2000 };
+
+/** A page of a check's output, in lines: 200 where neither `limit` nor `last` is asked, and never more than 2,000. */
+export const CHECK_OUTPUT_PAGE: PageBounds = { byDefault: 200, most: 2000 };
 
 /** The JSON length, in characters, of a closeout's output field kept where no `fields` is named: a longer one is named, to be asked. */
 export const SHORT_FIELD = 2000;
@@ -68,6 +71,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'steps.tries': CLOSEOUT,
   'steps.try': CLOSEOUT,
   'steps.closeout': CLOSEOUT,
+  'steps.checkOutput': { shape: 'part', narrow: ['from', 'before', 'limit', 'last', 'match'] },
   'steps.told': { shape: 'one', why: 'what a step was told once, its instructions as they were written' },
   'steps.log': { shape: 'part', narrow: ['tail'] },
   'steps.artifact': { shape: 'bytes', why: 'a file a step wrote, served as its bytes, never as JSON' },

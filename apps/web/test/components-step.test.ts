@@ -3543,3 +3543,15 @@ test("a step's part draws its slots by its size: on the node its head, what it a
   assert.deepEqual(slots(whole), ['step-head', 'part-asks', 'part-said', 'part-gave', 'part-detail']);
   assert.doesNotMatch(whole, /data-step-card/);
 });
+
+test('Check offers a fold that reads all its check printed where the check was filed, and none where it was not', async () => {
+  const { Check } = await import('../src/components/step/Facts.tsx');
+  const check = { command: 'npm test', taskId: 'r-1-implement-check', verdict: null, refused: null };
+  const read = { runId: 'r-1', step: 'implement', try: 1 };
+  const filedMarkup = renderToStaticMarkup(createElement(Check, { check, read }));
+  assert.ok(filedMarkup.includes('data-fold="check-output"'), filedMarkup);
+  const notFiled = renderToStaticMarkup(createElement(Check, { check: { ...check, taskId: null }, read }));
+  assert.ok(!notFiled.includes('data-fold="check-output"'), notFiled);
+  const noTry = renderToStaticMarkup(createElement(Check, { check, read: null }));
+  assert.ok(!noTry.includes('data-fold="check-output"'), noTry);
+});

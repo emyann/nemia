@@ -10,7 +10,7 @@ import { SAY } from '../say/commands.verb.ts';
 import { LS } from '../list/commands.verb.ts';
 import { CEILINGS } from '../cap/commands.verb.ts';
 import { AGENTS, AGENT_CARD } from '../roster/commands.verb.ts';
-import { CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from '../object/commands.verb.ts';
+import { CHECK_OUTPUT, CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from '../object/commands.verb.ts';
 import { STATS } from '../stats/commands.verb.ts';
 import { SERIES } from '../series/commands.verb.ts';
 import { PAGES } from '../steps/commands.verb.ts';
@@ -49,7 +49,16 @@ import { POLICY_ENTRIES } from '../auto/auto.verb.ts';
 import { POLICY_REACH } from '../reach/reach.verb.ts';
 
 /** The reads of the store, in the order `nemia`'s help lists them. */
-const READS: readonly (Command | Served)[] = [tableEntry(SHOW), tableEntry(CLOSEOUT), TRIES, TRY, TOLD, LOGS, STATS];
+const READS: readonly (Command | Served)[] = [
+  tableEntry(SHOW),
+  tableEntry(CLOSEOUT),
+  tableEntry(CHECK_OUTPUT),
+  TRIES,
+  TRY,
+  TOLD,
+  LOGS,
+  STATS,
+];
 
 /** The commands the CLI serves alone and runs itself, in the order `nemia`'s help lists them. */
 export const RAN: readonly Ran[] = [TICK, UP];

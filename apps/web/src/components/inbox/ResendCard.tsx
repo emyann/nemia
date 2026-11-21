@@ -9,7 +9,7 @@ const NONE = '';
 
 /**
  * A started card sent on, as the CLI's `inbox resend` does: one choice among the workflows its factory offers (`workflows`), or none,
- * which leaves the card for its factory's card triggers, and Send on, which says that the run the card waits on is cancelled. The inbox is
+ * which leaves the card for its factory's card triggers, and Send on, which says that the run the card waits on is called off. The inbox is
  * read again whatever the answer, so the card filed lists at once; a refusal is `onRefused`'s to show, in the api's words.
  */
 export function ResendCard({
@@ -33,7 +33,7 @@ export function ResendCard({
   return (
     <div data-resend={entry.name} className="space-y-2 rounded border border-outline-variant px-3 py-2">
       <p className="text-body-medium">
-        Send this card on as a card of its own, handed the run it was started as. Where that run is held for your word, it is cancelled.
+        Send this card on as a card of its own, handed the run it was started as. Where that run waits on you, it is called off.
       </p>
       <RadioGroup
         aria-label={`Where ${entry.name} is sent on to`}

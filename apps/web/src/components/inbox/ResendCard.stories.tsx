@@ -27,7 +27,7 @@ const filedCard = (workflow?: string) =>
     },
   }) satisfies Card;
 
-/** The api taking the send on: the body kept in `sent`, and the card filed answered with the run cancelled. */
+/** The api taking the send on: the body kept in `sent`, and the card filed answered with the run called off. */
 const takes = http.post(RESEND, async ({ request }) => {
   const body = (await request.json()) as { workflow?: string };
   sent.push(body);

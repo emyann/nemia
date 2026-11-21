@@ -280,7 +280,7 @@ export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}
 
 /**
  * Send a started card on, as the CLI's `inbox resend` does (the Card's `resend`): filed again as `<run>-resent`, handed its run, queued on
- * `workflow` or, for none, left for its factory's card triggers; the run it came from cancelled when it waits on a person. Resolves with
+ * `workflow` or, for none, left for its factory's card triggers; the run it came from called off when it waits on a person. Resolves with
  * what the api answers; rejects with its refusal in full — a card never started, sent on already, or whose run is still at work.
  * @param card The started card: its name and its factory.
  * @param workflow The workflow to send it on to, by its name; none for its factory's card triggers.

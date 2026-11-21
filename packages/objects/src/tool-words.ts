@@ -301,8 +301,8 @@ export function toolWordsOf<V extends ToolVerb>(table: readonly V[], verbs: read
 }
 
 /**
- * Whether the port asks a page of `PORT_PAGE` of the endpoint `endpoint` where a call gives no `limit`: a list's, or a read from a cursor's,
- * or a read `READS` does not bound; never a read by part, whose `limit` is its own.
+ * Whether the port asks a page of `PORT_PAGE` of the endpoint `endpoint` where a call gives no `limit`: a list's, or a read from a
+ * cursor's, or a read `READS` does not bound; never a read by part, whose `limit` is its own.
  */
 const portPaged = (endpoint: ApiEndpointName) => {
   const shape = Object.entries(READS).find(([name]) => name === endpoint)?.[1].shape;
@@ -310,9 +310,10 @@ const portPaged = (endpoint: ApiEndpointName) => {
 };
 
 /**
- * A tool's description in its parts: its verb's help, what its endpoint says it does, how the CLI says it, the endpoint it calls, what
- * each key of its input says it takes (since the help is the command line's and its forms are not the input's), and how the port
- * answers it — a `Table` as its lines, a page of `PORT_PAGE` where a call gives no `limit` of a read the port pages (`portPaged`), and each default its link sends.
+ * A tool's description in its parts: its verb's help, what its endpoint says it does, how the CLI says it, the endpoint it calls, what each
+ * key of its input says it takes (since the help is the command line's and its forms are not the input's), and how the port answers it — a
+ * `Table` as its lines, a page of `PORT_PAGE` where a call gives no `limit` of a read the port pages (`portPaged`), and each default its
+ * link sends.
  * @param verb The verb the tool is a link of.
  * @param tool The tool's words (`toolWordsOf`).
  */

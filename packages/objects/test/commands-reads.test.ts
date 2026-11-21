@@ -7,6 +7,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
+  CHECK_OUTPUT_WORDS,
   CLOSEOUT_WORDS,
   CommandRefused,
   INBOX_READ_WORDS,
@@ -62,7 +63,7 @@ function argsOf(words: CommandWords, argv: readonly string[]) {
 test('the group lists each read once, in the order the help lists them', () => {
   assert.deepEqual(
     READ_WORDS.map((w) => w.name),
-    ['inbox', 'ls', 'show', 'lines', 'closeout', 'watch'],
+    ['inbox', 'ls', 'show', 'lines', 'closeout', 'check-output', 'watch'],
   );
 });
 
@@ -83,6 +84,26 @@ describe('show and closeout: a run, a step and a try read; REFUSED: a word or a 
   test('closeout, a try', () => assert.deepEqual(argsOf(CLOSEOUT_WORDS, ['r', 's', '--try', '2']), { runId: 'r', step: 's', try: '2' }));
   test('closeout, a word more', () => refused(CLOSEOUT_WORDS, ['r', 's', 'extra'], 'nemia closeout', 'not extra.'));
   test('closeout, --try twice', () => refused(CLOSEOUT_WORDS, ['r', 's', '--try', '1', '--try', '2'], 'nemia closeout takes --try once'));
+});
+
+describe('check-output: a try, a stream, a page and a match read; REFUSED: the last lines beside a start or a limit, a flag twice', () => {
+  test('every flag', () =>
+    assert.deepEqual(argsOf(CHECK_OUTPUT_WORDS, ['r', 's', '--try', '2', '--stderr', '--from', '3', '--limit', '4', '--match', 'fail']), {
+      runId: 'r',
+      step: 's',
+      try: '2',
+      stream: 'stderr',
+      from: '3',
+      limit: '4',
+      match: 'fail',
+    }));
+  test('the last lines', () =>
+    assert.deepEqual(argsOf(CHECK_OUTPUT_WORDS, ['r', 's', '--last', '9']), { runId: 'r', step: 's', last: '9' }));
+  test('--last beside --from', () => refused(CHECK_OUTPUT_WORDS, ['r', 's', '--last', '9', '--from', '2'], 'nemia check-output', '--last'));
+  test('--last beside --limit', () =>
+    refused(CHECK_OUTPUT_WORDS, ['r', 's', '--last', '9', '--limit', '2'], 'nemia check-output', '--limit'));
+  test('--match twice', () =>
+    refused(CHECK_OUTPUT_WORDS, ['r', 's', '--match', 'a', '--match', 'b'], 'nemia check-output takes --match once'));
 });
 
 describe('ls: one run, or the runs a label query takes; REFUSED: a run beside -l, an output it does not print, a flag it does not take', () => {

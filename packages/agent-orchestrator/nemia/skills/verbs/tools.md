@@ -265,6 +265,25 @@ Its arguments:
 - namespace: The namespace the object is in: the name of its factory, default for one that names none.
 - name (<name> at a shell): The object's name, unique in its namespace for its kind.
 
+## inbox_resend
+
+```text
+  nemia inbox resend <name> [--workflow <w>]
+    send a started card on: file it again as <run>-resent, handed its run,
+    queued on --workflow or, with none, for its factory's card triggers;
+    the run it came from is cancelled when it waits on you
+```
+
+Sends a started card on: files it again as a card of its own, <run>-resent, handed the runs it was started as, queued on the workflow the body names or, naming none, left for its factory's card triggers; then cancels the run it came from when that run waits on a person. Answers CardResent with a 201; a card never started, sent on already, or whose run is still at work is refused.
+
+Calls `POST /api/namespaces/:namespace/cards/:name/resend`.
+
+Its arguments:
+
+- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- name (<name> at a shell): The object's name, unique in its namespace for its kind.
+- workflow (--workflow at a shell): The workflow the card sent on is queued on, by name; absent, it names none, for its factory's card triggers.
+
 ## inbox_from
 
 ```text

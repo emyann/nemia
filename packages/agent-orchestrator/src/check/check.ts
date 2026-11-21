@@ -24,7 +24,7 @@
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
 import { isRepositoryRun, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
-import { endsOnBase, type StepSpec } from '../step/step.ts';
+import { endsOnBase, type CheckSpec, type StepSpec } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { firstPiece } from '../piece/piece.ts';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
@@ -322,6 +322,27 @@ export const checkContract = (command: string) =>
   ].join('\n');
 
 /**
+ * A step's several checks (`checks:`), told to it before it is judged by them, as `checkContract` tells one: each by its name, its line
+ * and what it waits on, every one to exit 0, a check starting once those it waits on passed and none after a refusal.
+ * @param checks The step's checks, as the run froze them, in its order.
+ */
+export const checksContract = (checks: readonly CheckSpec[]) =>
+  [
+    '',
+    '## Before you sign off',
+    '',
+    'Each of these must exit 0 in this workspace. The run executes them afterwards, where the work is: a check starts once those it waits on',
+    'have passed, checks that wait on nothing between them run side by side, and none starts after one refuses.',
+    '',
+    ...checks.map(
+      (c) => `- ${codeSpan(c.name)}${c.after.length ? ` (after ${c.after.map(codeSpan).join(', ')})` : ''}: ${codeSpan(c.run)}`,
+    ),
+    '',
+    'Nothing that waits on this step starts until every one has passed. Do not weaken them to pass them: the commands come from the run, not',
+    'from this checkout.',
+  ].join('\n');
+
+/**
  * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step lands the
  * run's result the way its own step says, and the run judges it and records what landed. Appended to its brief, so the shipper's recipe
  * and the run's mechanism cannot say two things: the run executes the command in the checkout once the step signs off, and on its exit 0
@@ -565,7 +586,7 @@ function jsonFenced(value: object) {
  * of each stream and the lines it marked (`reportedLines`) — `partial` when those are read from the end of the log the engine keeps,
  * with no whole stdout to read them from — or why they cannot be read.
  */
-export type CheckHanded =
+export type CheckHanded = (
   | {
       step: string;
       command: string;
@@ -576,7 +597,11 @@ export type CheckHanded =
       cut: number;
       partial: boolean;
     }
-  | { step: string; command: string; unreadable: string };
+  | { step: string; command: string; unreadable: string }
+) & {
+  /** The check's name, of a step judged by several (`checks:`); absent for its one check. */
+  check?: string;
+};
 
 /**
  * `## What <step>'s check said`: a checked step's check, told to the step filed after it — a reviewer, which judges the work with what
@@ -588,7 +613,7 @@ export type CheckHanded =
  * @param said What the step's check said, or why it cannot be read.
  */
 export function checkHandedSection(said: CheckHanded) {
-  const head = ['', `## What ${said.step}'s check said`, ''];
+  const head = ['', `## What ${said.step}'s check ${said.check === undefined ? '' : `${codeSpan(said.check)} `}said`, ''];
   if ('unreadable' in said)
     return [
       ...head,

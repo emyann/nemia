@@ -546,14 +546,23 @@ const unreadWords = (taskId: string, cause: Cause.Cause<unknown>) => {
 
 /**
  * What a step is told its checked steps' checks said (`checkHandedRead`): for each step it waits on (`after:`) that has a `check:` whose
- * task is on the record, the check of its current try or round, read on the pass that files the step and never carried from another.
+ * task is on the record, the check of its current try or round, read on the pass that files the step and never carried from another; of a
+ * step with several checks, each that was filed, under its name.
  */
 export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, steps: readonly StepSpec[], step: StepSpec) {
   const out: CheckHanded[] = [];
   for (const name of step.after) {
-    const command = steps.find((s) => s.name === name)?.check;
-    const taskId = run.steps[name]?.check?.taskId;
-    if (command && taskId) out.push(yield* checkHandedRead(name, command, taskId));
+    const parent = steps.find((s) => s.name === name);
+    const check = run.steps[name]?.check;
+    if (!parent || !check) continue;
+    const plan = stepChecks(parent);
+    const tasks = Object.fromEntries(checkTasksOf(check));
+    for (const c of plan) {
+      const taskId = tasks[c.name];
+      if (!taskId || (plan.length > 1 && !(yield* asked('view', (yield* EngineService).view(taskId))).state.brief)) continue;
+      const handed = yield* checkHandedRead(name, c.run, taskId);
+      out.push(plan.length > 1 ? { ...handed, check: c.name } : handed);
+    }
   }
   return out;
 });

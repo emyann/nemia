@@ -10,6 +10,7 @@ export {
   CHECK_TAIL_LINES,
   checkArgv,
   checkContract,
+  checksContract,
   type CheckEnv,
   type CheckFirst,
   checkEnvOf,

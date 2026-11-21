@@ -32,7 +32,7 @@ Start with:
 
 How you are told of the feed without polling: inside, while some factory is above `manual`, your subscription to the feed wakes you
 with each line that waits on a person, the rest folded into a digest. At a shell, `nemia watch` follows the feed, and
-`nemia wait --from <cursor>` waits for its next line a selector takes: the fallback, which polls.
+`nemia wait --from <cursor>` waits for its next line, or the next its `-l` takes: the fallback, which polls.
 
 Each verb below names its tool on the port. That tool's section in `tools.md`, beside this file, says the endpoint it calls, what
 the endpoint does and what each argument takes. On the port a list answers a page at a time, its last line naming the continue

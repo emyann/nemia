@@ -62,6 +62,10 @@
             {
               "path": "packages/objects/src/commands-flags.ts",
               "why": "another sense: what a command line's `-l` takes, kubectl's word for it, and the key its words parse it under; the query key a client sends it as is `labelSelector`"
+            },
+            {
+              "path": "packages/objects/src/guidance.ts",
+              "why": "another sense: the MCP port's instructions name the value of `labelSelector=<selector>` so, kept byte for byte as the port has always said them"
             }
           ]
         }

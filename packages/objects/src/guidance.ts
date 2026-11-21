@@ -83,7 +83,7 @@ export const GUIDANCE: readonly Guidance[] = [
     shell: [
       'How you are told of the feed without polling: inside, while some factory is above `manual`, your subscription to the feed wakes you',
       'with each line that waits on a person, the rest folded into a digest. At a shell, `nemia watch` follows the feed, and',
-      '`nemia wait --from <cursor>` waits for its next line a selector takes: the fallback, which polls.',
+      '`nemia wait --from <cursor>` waits for its next line, or the next its `-l` takes: the fallback, which polls.',
     ].join('\n'),
   },
   {

@@ -21,7 +21,7 @@ test("every read of objects' Api is linked by a verb her shell and the port reac
   assert.deepEqual(unlinkedReadsOf(Api, [...TABLE, ...CLI_VERBS]), []);
 });
 
-test('REFUSED: a read whose verb is taken out is named unlinked, and a reason for a linked read or a stream is named', () => {
+test('REFUSED: a read whose verb is taken out is named unlinked, and a reason for a linked read, a stream, no read, or that says nothing is named', () => {
   const entries = [...TABLE, ...CLI_VERBS];
   assert.deepEqual(
     namedReads(
@@ -34,6 +34,8 @@ test('REFUSED: a read whose verb is taken out is named unlinked, and a reason fo
   );
   assert.deepEqual(namedReads(unlinkedReadsOf(Api, entries, { ...UNLINKED_READS, 'server.quota': 'x' })), ['server.quota']);
   assert.deepEqual(namedReads(unlinkedReadsOf(Api, entries, { ...UNLINKED_READS, 'server.feed': 'x' })), ['server.feed']);
+  assert.deepEqual(namedReads(unlinkedReadsOf(Api, entries, { ...UNLINKED_READS, 'server.gone': 'x' })), ['server.gone']);
+  assert.deepEqual(namedReads(unlinkedReadsOf(Api, entries, { ...UNLINKED_READS, 'server.health': '' })), ['server.health']);
 });
 
 test('the store verbs this CLI still serves only shrink: each one held is an entry it serves whose words the client does not hold yet', () => {

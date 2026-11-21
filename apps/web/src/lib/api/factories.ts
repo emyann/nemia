@@ -228,13 +228,16 @@ export const factoryViewQuery = (name: string) =>
 export const createFactory = (name: string) => factories.create({ name });
 
 /**
- * Make the factory `name` from the builtin template `template`, with no volume and every parameter at its default: what the apply
- * answered. Rejects with a `WriteRefusal` in the package's words: a name it does not take, a factory of that name already filed, a
- * template it cannot read.
+ * Make the factory `name` from the builtin template `template`, with no volume, each parameter `sets` gives and every other at its
+ * default: what the apply answered. `sets` is sent only where it holds a word, so an apply that gives none sends the template alone.
+ * Rejects with a `WriteRefusal` in the package's words: a name it does not take, a factory of that name already filed, a template it
+ * cannot read, a parameter's value it refuses.
  * @param name The factory's name.
  * @param template The builtin template's name.
+ * @param sets The template's parameters as `--set` words, `<key>=<value>`.
  */
-export const applyTemplate = (name: string, template: string) => factories.apply(name, { template: { name: template } });
+export const applyTemplate = (name: string, template: string, sets: readonly string[] = []) =>
+  factories.apply(name, sets.length === 0 ? { template: { name: template } } : { template: { name: template }, sets: [...sets] });
 
 /**
  * The names of the factories a person made, the default factory left out, in the order the api lists them: what the welcome's factory

@@ -22,9 +22,10 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { credentialKept } from 'agent-orchestrator';
-import { LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
+import { type CheckOutput, LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
+import { checkOutputPrinted } from '../src/reads/check-output.ts';
 import { closeoutPrinted } from '../src/reads/closeout.ts';
 import { scratch } from 'test-kit/scratch';
 
@@ -621,6 +622,38 @@ for (const { what, read, said, under = [], lines } of CLOSEOUT_PRINTED) {
     if (lines !== undefined) assert.equal(printed.length, lines, printed.join('\n'));
   });
 }
+
+/** A page of a check's output as the api's Schema types it: two lines of stdout of a check that ended, the whole stream. */
+const page: CheckOutput = {
+  try: 2,
+  taskId: 'c-1',
+  stream: 'stdout',
+  running: false,
+  partial: false,
+  lines: [
+    { n: 4, text: 'not ok 4 - parses' },
+    { n: 9, text: 'FAIL 9' },
+  ],
+  total: 12,
+};
+const AGAIN = 'nemia check-output r s --try 2';
+
+test('`nemia check-output` prints a page with no match as its lines are, and says nothing more where none is left', () => {
+  assert.deepEqual(checkOutputPrinted(page, AGAIN), { stdout: ['not ok 4 - parses', 'FAIL 9'], stderr: [] });
+});
+
+test('`nemia check-output --match` prints each line after its number in the stream', () => {
+  assert.deepEqual(checkOutputPrinted({ ...page, matched: 2 }, AGAIN).stdout, ['4:not ok 4 - parses', '9:FAIL 9']);
+});
+
+test('`nemia check-output` says on stderr the --from to read on from where lines are left, and that a check still runs', () => {
+  const { stderr } = checkOutputPrinted({ ...page, running: true, next: 10 }, AGAIN);
+  assert.ok(
+    stderr.some((line) => line.includes(`${AGAIN} --from 10`)),
+    stderr.join('\n'),
+  );
+  assert.equal(stderr.length, 2, stderr.join('\n'));
+});
 
 /** The lines the in-process `nemia ls <run>` printed of each seeded run, between the pause and the standing line, before it was deleted. */
 const ONE_RUN: Readonly<Record<string, readonly string[]>> = {

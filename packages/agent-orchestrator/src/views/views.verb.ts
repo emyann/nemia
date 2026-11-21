@@ -23,10 +23,10 @@ import {
   type CheckRefusal,
   type LandingSaid,
 } from '../check/index.ts';
-import type { StepSpec } from '../step/step.ts';
+import { stepChecks, type StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
-import { isRepositoryRun, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, checkTasksOf, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { taskSpend, type SpendOf } from '../status/status.ts';
 import { type Consumed } from '../usage/usage.ts';
 import { waitedOn, type ParentRun } from '../wait/wait.ts';
@@ -45,6 +45,7 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ranOnWords, sessionRanOn } from '../release/index.ts';
 import { RunId } from '../record/record.model.ts';
+import { checksPhase, decidingCheckTask } from '../check/checks-due.ts';
 
 /**
  * How many answers a task held open has been given (`answer`): the turns after its first. Zero for any other task, and for one nobody read.
@@ -223,9 +224,11 @@ export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { ear
   const e = yield* EngineService;
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
-    const behind = tries?.at(-1)?.check?.taskId;
+    const last = tries?.at(-1)?.check;
+    const behind = last ? checkTasksOf(last).map(([, id]) => id) : [];
     const earlier = earlierTries ? (tries ?? []).map((t) => t.taskId) : [];
-    for (const id of [taskId, check?.taskId, behind, ...earlier]) if (id && !views.has(id)) views.set(id, yield* asked('view', e.view(id)));
+    const checks = check ? checkTasksOf(check).map(([, id]) => id) : [];
+    for (const id of [taskId, ...checks, ...behind, ...earlier]) if (id && !views.has(id)) views.set(id, yield* asked('view', e.view(id)));
   }
   return {
     views,
@@ -238,7 +241,7 @@ export const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run
   const everyTry = new Map(views);
   for (const record of Object.values(run.steps)) {
     for (const t of record.tries ?? []) {
-      for (const taskId of [t.taskId, t.check?.taskId]) {
+      for (const taskId of [t.taskId, ...(t.check ? checkTasksOf(t.check).map(([, id]) => id) : [])]) {
         if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, yield* asked('view', e.view(taskId)));
       }
     }
@@ -374,8 +377,19 @@ export const spendReader = (views: ReadonlyMap<string, TaskView>) =>
  * @param run The run whose steps name their checks' tasks.
  */
 export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string) => {
-  const taskId = run.steps[step]?.check?.taskId;
+  const taskId = decidingTaskOf(views, run, step);
   return taskId ? attemptVerdict(views.get(taskId)?.state.attempts.at(-1)) : undefined;
+};
+
+/**
+ * The task of a step's current checks whose end its verdict is read off (`decidingCheckTask`): its one check's, or of several, the first
+ * that refused with an exit code; undefined for a step with no check filed.
+ */
+const decidingTaskOf = (views: ReadonlyMap<string, TaskView>, run: Run, step: string) => {
+  const check = run.steps[step]?.check;
+  if (!check) return undefined;
+  const phaseOf = (id: string) => phaseOfView(views.get(id));
+  return decidingCheckTask(check, phaseOf, (id) => typeof attemptVerdict(views.get(id)?.state.attempts.at(-1)) === 'number');
 };
 
 /**
@@ -387,7 +401,7 @@ export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => 
  */
 export const checkKills = (views: ReadonlyMap<string, TaskView>, run: Run) =>
   ((step) => {
-    const taskId = run.steps[step]?.check?.taskId;
+    const taskId = decidingTaskOf(views, run, step);
     return taskId ? outOfMemory(killedMemoryOf(views.get(taskId)), undefined) : undefined;
   }) satisfies CheckKillOf;
 
@@ -456,9 +470,15 @@ export const checkReportsRead = Effect.fn('checkReports')(function* (
 ) {
   const reports = new Map<string, CheckReport>();
   for (const step of steps) {
-    const taskId = run.steps[step.name]?.check?.taskId;
-    if (!taskId || !step.check || !want(phaseOf(taskId))) continue;
-    reports.set(step.name, { passed: phaseOf(taskId) === 'succeeded', ...(yield* refusalRead(step.check, taskId)) });
+    const check = run.steps[step.name]?.check;
+    const plan = stepChecks(step);
+    const first = plan[0];
+    if (!check || !first || !want(checksPhase(check, phaseOf))) continue;
+    const tasks = checkTasksOf(check);
+    const [name, taskId] = tasks.find(([, id]) => phaseOf(id) === 'failed') ??
+      tasks.find(([, id]) => phaseOf(id) === 'stopped') ?? [first.name, check.taskId];
+    const command = plan.find((c) => c.name === name)?.run ?? first.run;
+    reports.set(step.name, { passed: checksPhase(check, phaseOf) === 'succeeded', ...(yield* refusalRead(command, taskId)) });
   }
   return reports;
 });

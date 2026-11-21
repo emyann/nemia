@@ -37,6 +37,7 @@ export {
   REFUSAL_LINES,
   type RefusalKept,
   refusalSection,
+  refusalsSection,
   REPORTED_LINES,
   reportedLines,
   UNPROVISIONED,

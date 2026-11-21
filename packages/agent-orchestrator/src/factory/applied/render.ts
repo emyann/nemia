@@ -21,6 +21,7 @@ import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
 import { checkFailurePolicyOf } from '../../check/index.ts';
+import { checksOf } from '../../check/checks-plan.ts';
 import { selectorsRefusal } from '../../watch/selector.ts';
 
 /**
@@ -176,6 +177,7 @@ const STEP_WORDS = [
   'workspace',
   'budget',
   'check',
+  'run',
   'checkMemory',
   'loop',
   'rounds',
@@ -218,6 +220,10 @@ const blankAsked = (key: string, value: unknown) =>
 const policyOf = (step: string, policy: unknown) =>
   policy === undefined ? {} : { checkFailurePolicy: checkFailurePolicyOf(step, JSON.stringify(policy)) };
 
+/** A template's `checks:` as the parser reads them, refused as a step's lines would be (`checksOf`); nothing for none. */
+const checksOfTemplate = (step: string, checks: unknown) =>
+  checks === undefined ? {} : { checks: checksOf(step, undefined, JSON.stringify(checks)) };
+
 /**
  * The step `step` of `workflow` as its file: its wiring, a former `workspace: main` written as `base` (`baseSpelled`), its overrides on
  * the harness it runs on (`harness`), and its instruction.
@@ -244,7 +250,14 @@ function stepFile(workflow: string, step: Spec, harness: string, read: TemplateR
   const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read, params) ?? '';
   const route = routeEvalOf(step.route);
   try {
-    return renderStep({ name, body, ...keys, ...(route ? { route } : {}), ...policyOf(name, step.checkFailurePolicy) } as never);
+    return renderStep({
+      name,
+      body,
+      ...keys,
+      ...(route ? { route } : {}),
+      ...policyOf(name, step.checkFailurePolicy),
+      ...checksOfTemplate(name, step.checks),
+    } as never);
   } catch (err) {
     refusals.push(`${where}: ${(err as Error).message}`);
     return undefined;

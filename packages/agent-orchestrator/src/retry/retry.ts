@@ -57,6 +57,7 @@ import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.t
 import type { RaiseBy } from 'objects';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-recheck.ts';
+import { checksPhase } from '../check/checks-due.ts';
 
 /**
  * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory`, read by `checkKills` in
@@ -562,7 +563,7 @@ export function retriesDue(
     } else if (
       status === 'failed (check)' &&
       record.check &&
-      refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name)) &&
+      refusedCheck(checksPhase(record.check, phaseOf), verdictOf(step.name)) &&
       personsRefusal(step, verdictOf(step.name)) === undefined &&
       retriesSpent(record) < (step.retries ?? 0)
     ) {

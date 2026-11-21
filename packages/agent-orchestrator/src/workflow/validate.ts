@@ -3,7 +3,7 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
-import { endsOnBase, LOOP_REPLIES, stepPlace, type StepSpec, WorkflowError } from '../step/step.ts';
+import { endsOnBase, hasChecks, LOOP_REPLIES, stepChecks, stepPlace, type StepSpec, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
@@ -118,6 +118,60 @@ export function validate(steps: readonly StepSpec[]) {
 
   validateLoops(steps);
   validateRoutes(steps);
+  validateCommands(steps);
+  validateBaseChecks(steps);
+}
+
+/**
+ * The keys a command node (`run:`) cannot take, each with why: it runs no session, so it has no instruction of its own and no
+ * workspace or session of its own to resume, it is judged by its own exit rather than by checks, and it is a node that runs, not one that
+ * routes or files a card.
+ */
+const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
+  ['workspace', 'it runs in its first parent\'s workspace'],
+  ['check', 'its own exit code judges it'],
+  ['checks', 'its own exit code judges it'],
+  ['resume', 'it continues no session'],
+  ['routes', 'a condition is a node of its own'],
+  ['route', 'a condition is a node of its own'],
+  ['workflow', 'a workflow node files a card and runs nothing'],
+  ['card', 'a card node files a card and runs nothing'],
+  ['loop', 'it asks for no round'],
+];
+
+/**
+ * Refused: a command node (`run:`) with a key it cannot take (`COMMAND_REFUSED`), an instruction of its own, or no `agent:`. A command acts
+ * as the agent it names, under a token bound to its try; one with no agent would have no caller but the person's own credential, and a
+ * session's token narrowed to reads is not a token the store mints yet, so it is refused until one is.
+ */
+function validateCommands(steps: readonly StepSpec[]) {
+  for (const s of steps) {
+    if (s.run === undefined) continue;
+    const refused = COMMAND_REFUSED.find(([key]) => s[key] !== undefined);
+    if (refused)
+      throw new WorkflowError(
+        `${s.name}: \`run:\` makes it a command node, which takes no \`${refused[0]}:\` — ${refused[1]}. Delete the \`${refused[0]}:\` line, or the \`run:\` line to make it a step.`,
+      );
+    const own = typeof s.agent === 'object' ? s.agent.body : s.body;
+    if (own.trim())
+      throw new WorkflowError(
+        `${s.name}: a command node (\`run:\`) runs no session, so nothing reads an instruction: empty ${s.name}.md below its frontmatter, or delete \`run:\` to make it a step.`,
+      );
+    if (s.agent === undefined)
+      throw new WorkflowError(
+        `${s.name}: a command node acts as the agent it names, and this one names none. Add \`agent: <name>\`, the agent whose \`nemia\` calls it makes.`,
+      );
+  }
+}
+
+/** Refused: an ending that lands on its check (`workspace: base`) with more than one check: the run lands on one check's exit 0. */
+function validateBaseChecks(steps: readonly StepSpec[]) {
+  for (const s of steps) {
+    if (!endsOnBase(s) || stepChecks(s).length <= 1) continue;
+    throw new WorkflowError(
+      `${s.name}: \`workspace: base\` lands the run on its check's exit 0, and this step has ${stepChecks(s).length} checks. Keep one, as \`check: <line>\`.`,
+    );
+  }
 }
 
 /**
@@ -438,9 +492,13 @@ export function stepSetRefusal(steps: readonly StepSpec[], isolate: boolean) {
       `under that name (\`worktrees/<run>/${LINE_NAME}\`, on the run's branch of that name), so this step's cut and the run's ` +
       `would claim one branch. Rename ${LINE_NAME}.md.`
     );
-  const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
+  const clash = steps.find((s) => hasChecks(s) && steps.some((other) => other.name === `${s.name}-check`));
   if (clash)
     return `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`;
+  const named = steps.flatMap((s) => stepChecks(s).map((c) => ({ s, task: `${s.name}-check-${c.name}` })));
+  const namedClash = named.find(({ task }) => steps.some((other) => other.name === task));
+  if (namedClash)
+    return `${namedClash.task}: a step may not be named for another step's check. ${namedClash.s.name} has a check of that name, which the run files as ${namedClash.task}. Rename ${namedClash.task}.md.`;
   const tryClash = steps
     .map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] }))
     .find(({ of }) => of && steps.some((other) => other.name === of));

@@ -43,6 +43,7 @@ import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
 import { answersOr } from '../question/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
+import { checksPhase } from '../check/checks-due.ts';
 
 /** What `retryRefusal` was asked: its arguments, and the command its refusals name. */
 type Asked = {
@@ -350,7 +351,7 @@ function modeRefusal(c: Judged) {
   const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
   if (landsOnCheck(step, run) && status === 'failed (check)') {
-    const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name].check.taskId) : 'unknown', verdictOf(name))
+    const why = refusedCheck(run.steps[name]?.check ? checksPhase(run.steps[name].check, phaseOf) : 'unknown', verdictOf(name))
       ? 'refused it'
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;

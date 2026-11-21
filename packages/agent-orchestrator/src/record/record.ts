@@ -309,9 +309,20 @@ export const turnTryOf = (run: Run, step: string) => {
  * @param run The run.
  * @param step The step's name.
  * @param n The try, from 1; the try the step is on where absent.
+ * @param name The check's name: `check`, the one check of `check: <line>`, keeps the id above; any other is `…-check-<name>`.
  */
-export const checkTaskId = (run: Run, step: string, n = tryOf(run, step)) =>
-  n <= 1 ? `${run.id}-${step}-check` : `${run.id}-${step}-try${n}-check`;
+export const checkTaskId = (run: Run, step: string, n = tryOf(run, step), name = 'check') => {
+  const base = n <= 1 ? `${run.id}-${step}-check` : `${run.id}-${step}-try${n}-check`;
+  return name === 'check' ? base : `${base}-${name}`;
+};
+
+/**
+ * Each check task a record of a step's check names, by the check's name, in the step's order: its `tasks`, or its one task under the name
+ * `check` where it names no `tasks` (`check: <line>`, and every record written before `checks:`).
+ * @param check The check on a step's or a try's record.
+ */
+export const checkTasksOf = (check: { readonly taskId: string; readonly tasks?: Readonly<Record<string, string>> }) =>
+  Object.entries(check.tasks ?? { check: check.taskId });
 
 /**
  * The id of a step's own task on its n-th try: `<run>-<step>`, then `<run>-<step>-try<n>`. Derived, for the reason a check's is.
@@ -502,8 +513,8 @@ export function dataBlock(value: unknown) {
 /** Every task a step has filed: its current try's and its check's, and each earlier try's and its check's, in that order. */
 export const stepTasks = ({ taskId, check, tries }: StepRecord) => [
   ...(taskId ? [taskId] : []),
-  ...(check ? [check.taskId] : []),
-  ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
+  ...(check ? checkTasksOf(check).map(([, id]) => id) : []),
+  ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? checkTasksOf(t.check).map(([, id]) => id) : [])]),
 ];
 
 /**

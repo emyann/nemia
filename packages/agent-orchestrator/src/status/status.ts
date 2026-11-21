@@ -35,6 +35,7 @@ import {
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
+import { checksPhase } from '../check/checks-due.ts';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -589,7 +590,7 @@ function held(
   const record = run.steps[step.name];
   const taskId = record?.taskId;
   if (!taskId) return false;
-  if (own === 'failed (check)' && !(record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name)))) return false;
+  if (own === 'failed (check)' && !(record.check && refusedCheck(checksPhase(record.check, phaseOf), verdictOf(step.name)))) return false;
   if (TRIED_FROM.has(own)) return (own !== 'blocked' || SETTLED.has(phaseOf(taskId))) && Boolean(overBudget(step, run, spendOf));
   if (!satisfiesAfter(own)) return false;
   const looping = loopOf(steps, step.name);

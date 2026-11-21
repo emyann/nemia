@@ -28,6 +28,7 @@ import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { firstPiece } from '../piece/piece.ts';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
+import { checksPhase } from './checks-due.ts';
 
 /**
  * The seconds a step's check may run before the engine stops it, where the check does not land the run: a round's check. A hung check must
@@ -361,6 +362,8 @@ export type LandingWords = { readonly stage: string; readonly denied: readonly s
  * test.
  */
 export type CheckRefusal = {
+  /** The check's name, on a step judged by several (`checks:`); absent for its one check. */
+  name?: string;
   command: string;
   verdict: Verdict;
   stdout: string;
@@ -400,13 +403,14 @@ function keptLines(kept: RefusalKept | undefined) {
  * is the fence: a step that fails a check again is the step most tempted to make the check easier.
  * @param r What the check said: its command, its verdict, the last lines of each stream, the kill where one ended it, and the files of its
  * whole output where they were kept.
+ * @param heading The line it opens under: `## What the check said`, or a check's own under `## What the checks said` (`refusalsSection`).
  */
-export function refusalSection(r: CheckRefusal) {
+export function refusalSection(r: CheckRefusal, heading = '## What the check said') {
   const json = JSON.stringify({ command: r.command, exit: r.verdict, stdout: r.stdout, stderr: r.stderr }, null, 2);
   const fence = '`'.repeat(Math.max(3, ...(json.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
   return [
     '',
-    '## What the check said',
+    heading,
     '',
     r.verdict === 'unfinished'
       ? 'It did not finish: it was stopped, or killed before it exited with a code. That is no verdict on the work.'
@@ -432,6 +436,25 @@ export function refusalSection(r: CheckRefusal) {
     '',
     'Make the work pass it. Do not weaken the check to pass it — not the command, not a test it runs, not what',
     'it reads. The command comes from the run, not from this checkout, and a person reads the diff.',
+  ].join('\n');
+}
+
+/**
+ * `## What the checks said`: every check of a step judged by several (`checks:`) that refused or did not finish on the last try, each
+ * under its name as `refusalSection` says one, and the names of those that passed, so the try is told every refusal at once. The next
+ * try runs every check again.
+ * @param refusals What each check that did not pass said, in the step's order.
+ * @param passed The names of the checks that passed.
+ */
+export function refusalsSection(refusals: readonly CheckRefusal[], passed: readonly string[]) {
+  return [
+    '',
+    '## What the checks said',
+    '',
+    `${refusals.length === 1 ? 'One check' : `${refusals.length} checks`} did not pass: ${refusals.map((r) => codeSpan(r.name ?? 'check')).join(', ')}.` +
+      (passed.length ? ` Passed: ${passed.map(codeSpan).join(', ')}.` : ''),
+    'The next try runs every check again, those that passed included.',
+    ...refusals.map((r) => refusalSection(r, `### The check ${codeSpan(r.name ?? 'check')}`)),
   ].join('\n');
 }
 
@@ -618,7 +641,7 @@ function codeSpan(text: string) {
  * @param phaseOf The phase of a task the engine holds, by its id.
  */
 export const onItsCheck = (step: StepSpec, record: StepRecord, phaseOf: (taskId: string) => TaskPhase) => {
-  const check = record.check ? phaseOf(record.check.taskId) : undefined;
+  const check = record.check ? checksPhase(record.check, phaseOf) : undefined;
   if (endsOnBase(step)) {
     if (!record.landed) return 'checking';
     if ('commit' in record.landed) return 'verified';

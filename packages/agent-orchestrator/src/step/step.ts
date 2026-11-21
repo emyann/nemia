@@ -10,6 +10,15 @@ import type { HarnessPrompt } from '../agents/agents.ts';
 import type { CheckFailurePolicy } from '../../contracts/check-failure-policy.contract.ts';
 import type { FieldShape, PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEYS } from 'objects';
 
+/**
+ * One of a step's named checks, as the loader resolved it: its name (`[a-z][a-z0-9-]*`), the shell line it runs, and the checks it waits
+ * on, each by name, none where it waits on nothing.
+ */
+export type CheckSpec = { readonly name: string; readonly run: string; readonly after: readonly string[] };
+
+/** The name `check: <line>` is read under: the step's one check, whose task keeps the id it always had (`checkTaskId`). */
+export const SHORTHAND_CHECK = 'check';
+
 export type StepSpec = {
   /** The step's name — the file's, minus `.md`. What `after` refers to. */
   name: string;
@@ -190,6 +199,18 @@ export type StepSpec = {
    * workflow the run froze, never from a checkout the step can edit.
    */
   check?: string;
+  /**
+   * `checks:`, the step's named checks, resolved by the loader (`checksOf`, `src/workflow/step-file.ts`): each a name, its shell line and
+   * the checks it waits on, a check written with no `after:` waiting on the one above it and a check turned off (`enabled: false`) taken
+   * out, its waits handed to those that waited on it. Read with `check:` through `stepChecks`, which gives `check: <line>` as one check
+   * named `check`. Read from the workflow the run froze, as `check:` is.
+   */
+  checks?: readonly CheckSpec[];
+  /**
+   * `run:`, a command node's shell line: the node runs it as a workload of its own on the command harness, with no agent session, and
+   * signs off by its exit code and the answer its script writes (`src/command-node/command-node.ts`).
+   */
+  run?: string;
   /**
    * `checkMemory: 256Mi`: the memory the step's `check:` asks of the machine, a container's `resources.requests.memory` — a Kubernetes
    * quantity the runtime reads, refused at load where it reads none, and refused without a `check:`. Filed as the check's request alone:
@@ -429,6 +450,8 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'memory',
   'budget',
   'check',
+  'checks',
+  'run',
   'checkMemory',
   'retries',
   'checkFailurePolicy',
@@ -537,6 +560,9 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     "the most memory each session of the step may use, a container's limit — `4Gi`, `512Mi`: a process past it is killed in the session's own scope alone; its check keeps the daemon's default limit (`WF_MEMORY_LIMIT`) and asks `checkMemory:`",
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
+  checks:
+    "the step's named checks, a YAML list of `{ name, run, after, enabled }`: each runs once the checks it waits on passed (the one above it where it names none, `after: []` for none), `enabled: false` turns one off, and the step is verified once every one exits 0",
+  run: "a command node's shell line: the node runs it with no agent session, signs off `done` on exit 0 with an answer its `output:` decodes, and `failed` on any other exit",
   checkMemory:
     "the memory the step's check asks of the machine, a container's request — `256Mi`: the check is admitted by it and keeps the daemon's default limit; unset asks the daemon's default (`WF_MEMORY_REQUEST`)",
   retries: COUNTS.retries.counts,
@@ -580,6 +606,20 @@ export const stepPlace = (step: Pick<StepSpec, 'place'>) => step.place ?? 'git';
  * (`validateBaseWorkspace` refuses a second, and refuses anything waiting on it).
  * @param step The step, its `workspace:` among it.
  */
+/**
+ * A step's checks, in its order: its `checks:`, or its `check: <line>` as one check named `check` (`SHORTHAND_CHECK`); none where it has
+ * neither.
+ * @param step The step, whose `checks:` or `check:` is read.
+ */
+export const stepChecks = (step: Pick<StepSpec, 'check' | 'checks'>) =>
+  (step.checks ?? (step.check === undefined ? [] : [{ name: SHORTHAND_CHECK, run: step.check, after: [] }])) satisfies readonly CheckSpec[];
+
+/**
+ * Whether a step is judged by a check: it has a `check:` or a `checks:` list.
+ * @param step The step.
+ */
+export const hasChecks = (step: Pick<StepSpec, 'check' | 'checks'>) => stepChecks(step).length > 0;
+
 export const endsOnBase = (step: Pick<StepSpec, 'workspace'>) => step.workspace === 'base';
 
 /**

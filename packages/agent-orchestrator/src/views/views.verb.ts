@@ -10,7 +10,21 @@
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
 import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
-import { attemptVerdict, CHECK_TAIL_LINES, failingLines, keptOutput, lastLines, REFUSAL_FILE_BYTES, REFUSAL_LINES, reportedLines, type CheckHanded, type CheckRefusal, type LandingSaid, checksPhase, decidingCheckTask } from '../check/index.ts';
+import {
+  attemptVerdict,
+  CHECK_TAIL_LINES,
+  failingLines,
+  keptOutput,
+  lastLines,
+  REFUSAL_FILE_BYTES,
+  REFUSAL_LINES,
+  reportedLines,
+  type CheckHanded,
+  type CheckRefusal,
+  type LandingSaid,
+  checksPhase,
+  decidingCheckTask,
+} from '../check/index.ts';
 import { stepChecks, type StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';

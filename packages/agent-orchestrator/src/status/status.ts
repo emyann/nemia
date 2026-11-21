@@ -661,10 +661,34 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (!said && (asked || step.output)) return 'unsigned';
   if (said && unaccepted(step, run, steps, said)) return 'unsigned';
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
-  if (step.run !== undefined) return said ? 'verified' : 'unsigned';
-  if (!hasChecks(step)) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
-  return signed(onItsCheck(step, st, phaseOf));
+  return judgedStatus(step, run, st, said, phaseOf, closeoutOf, signed);
 };
+
+/**
+ * Where a step whose task succeeded, signed and accepted, stands on what judges it: a command node on its closeout alone, a step with no
+ * check `unverified` (or `exhausted` past its rounds), and one with checks on them.
+ * @param step The step.
+ * @param run The run.
+ * @param st The step's record.
+ * @param said The closeout it signed off, if any.
+ * @param phaseOf The phase of a task, by its id.
+ * @param closeoutOf The closeout a step signed off, by the step's name.
+ * @param signed Its checks' word, read against its rounds.
+ */
+function judgedStatus(
+  step: StepSpec,
+  run: Run,
+  st: StepRecord,
+  said: Closeout | undefined,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  signed: (s: StepStatus) => StepStatus,
+) {
+  if (step.run !== undefined) return (said ? 'verified' : 'unsigned') satisfies StepStatus;
+  if (!hasChecks(step))
+    return (askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified') satisfies StepStatus;
+  return signed(onItsCheck(step, st, phaseOf));
+}
 
 /** Whether a step stands `blocked`: its closeout accepted as blocked, and its check not run again on that very task (`rechecked`). */
 const standsBlocked = (step: StepSpec, st: StepRecord, said: Closeout | undefined, steps: readonly StepSpec[]) =>

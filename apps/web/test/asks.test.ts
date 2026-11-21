@@ -183,7 +183,9 @@ describe('offersOf: what the Decide section offers a step, and nothing on a run 
     const steps = [
       step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' }),
       step('quiet', 'succeeded · BLOCKED'),
-      step('theme', 'failed ✗ check (exit 1)', { check: { name: 'check', command: 'npm test', started: null, ended: null, taskId: 't-c', verdict: EXIT_1, refused: null } }),
+      step('theme', 'failed ✗ check (exit 1)', {
+        check: { name: 'check', command: 'npm test', started: null, ended: null, taskId: 't-c', verdict: EXIT_1, refused: null },
+      }),
       step('lint', 'failed ✗ check (unfinished)', {
         check: { name: 'check', command: 'npm run lint', started: null, ended: null, taskId: 't-l', verdict: UNFINISHED, refused: null },
       }),
@@ -382,7 +384,15 @@ describe('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate o
       step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Warm colours, or cool ones?' }),
       step('types', 'failed ✗ check (unfinished)', {
         raise: unfinished,
-        check: { name: 'check', command: 'npm run typecheck', started: null, ended: null, taskId: 't-t', verdict: UNFINISHED, refused: null },
+        check: {
+          name: 'check',
+          command: 'npm run typecheck',
+          started: null,
+          ended: null,
+          taskId: 't-t',
+          verdict: UNFINISHED,
+          refused: null,
+        },
       }),
     ];
     const worded = steps.map((each) => each.message);

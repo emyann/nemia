@@ -9,7 +9,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkArgv, checkEnvOf, LANDING_CHECK_DEADLINE_SECONDS, type CheckHanded, type CheckRefusal, type LandingSaid, checksDue, currentCheckTask, stepChecksDue } from '../check/index.ts';
+import {
+  CHECK_DEADLINE_SECONDS,
+  CHECK_NICENESS,
+  checkArgv,
+  checkEnvOf,
+  LANDING_CHECK_DEADLINE_SECONDS,
+  type CheckHanded,
+  type CheckRefusal,
+  type LandingSaid,
+  checksDue,
+  currentCheckTask,
+  stepChecksDue,
+} from '../check/index.ts';
 import { isRemoteHarness, type StepSpec } from '../workflow.ts';
 import { SHORTHAND_CHECK, stepChecks, type CheckSpec } from '../step/step.ts';
 import { holdsOpen } from '../gate/gate.ts';
@@ -291,6 +303,22 @@ const remoteTry = (r: Retry, status: StepStatus) =>
   }) satisfies RetryBriefing as RetryBriefing;
 
 /**
+ * What a try is handed of its step's checks that refused it: the one check's refusal (`refusalHanded`) where the step has one, and each
+ * check's where it has several (`refusalsHanded`); nothing before its checks ran.
+ * @param f The pass's filing.
+ * @param files The try's files folder, where the outputs are written.
+ * @param step The step.
+ * @param record The step's record, whose check names the tasks.
+ */
+const checkRefusalsHanded = Effect.fnUntraced(function* (f: Filing, files: string, step: StepSpec, record: StepRecord) {
+  const plan = stepChecks(step);
+  const only = plan.length === 1 ? plan[0] : undefined;
+  if (!record.check) return {};
+  if (only) return { refusal: yield* refusalHanded(f, files, only.run, record.check.taskId) };
+  return { refusals: yield* refusalsHanded(f, files, plan, (name) => currentCheckTask(f.run, step.name, name)) };
+});
+
+/**
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined. A try filed as a task of its own on a local
  * harness is filed on a tree brought to its lockfile (`depsBefore`), and told where that failed; a held session keeps the tree it has.
@@ -305,10 +333,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
   const remote = isRemoteHarness(step.harness);
   const continued = r.mode === 'continue' && !remote && record.taskId !== null ? sessionIn(reads.views, record.taskId) : undefined;
   const resumeFrom = resumeOn(continued, step, f, record);
-  const plan = stepChecks(step);
-  const only = plan.length === 1 ? plan[0] : undefined;
-  const refusal = record.check && only && !remote ? yield* refusalHanded(f, files, only.run, record.check.taskId) : undefined;
-  const refusals = record.check && plan.length > 1 && !remote ? yield* refusalsHanded(f, files, plan, name => currentCheckTask(run, r.step, name)) : undefined;
+  const { refusal, refusals } = remote ? {} : yield* checkRefusalsHanded(f, files, step, record);
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
@@ -354,13 +379,19 @@ const refusalHanded = Effect.fnUntraced(function* (f: Filing, files: string, com
  * one, under its name, and the names of those that passed; a check never filed, behind a refusal, is neither. Undefined where every check
  * passed.
  */
-const refusalsHanded = Effect.fnUntraced(function* (f: Filing, files: string, plan: readonly CheckSpec[], taskOf: (name: string) => string) {
+const refusalsHanded = Effect.fnUntraced(function* (
+  f: Filing,
+  files: string,
+  plan: readonly CheckSpec[],
+  taskOf: (name: string) => string,
+) {
   const refused: CheckRefusal[] = [];
   const passed: string[] = [];
   for (const check of plan) {
     const phase = f.reads.phaseOf(taskOf(check.name));
     if (phase === 'succeeded') passed.push(check.name);
-    else if (phase === 'failed' || phase === 'stopped') refused.push({ name: check.name, ...(yield* refusalHanded(f, files, check.run, taskOf(check.name))) });
+    else if (phase === 'failed' || phase === 'stopped')
+      refused.push({ name: check.name, ...(yield* refusalHanded(f, files, check.run, taskOf(check.name))) });
   }
   return refused.length ? { refused, passed } : undefined;
 });
@@ -567,7 +598,9 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const record = recordNamed(run, name);
   const plan = stepChecks(step);
   const first = found(plan[0], `a check of step ${name}`);
-  const due = record.check ? stepChecksDue(run, step, f.reads.phaseOf).file : checksDue(plan.map((c) => ({ ...c, standing: 'waiting' as const }))).file;
+  const due = record.check
+    ? stepChecksDue(run, step, f.reads.phaseOf).file
+    : checksDue(plan.map((c) => ({ ...c, standing: 'waiting' as const }))).file;
   for (const check of plan.filter((c) => due.includes(c.name))) yield* fileOneCheck(f, name, check);
   const tasks = Object.fromEntries(plan.map((c) => [c.name, currentCheckTask(run, name, c.name)]));
   const shorthand = plan.length === 1 && first.name === SHORTHAND_CHECK;

@@ -243,7 +243,8 @@ const transcriptQuery = {
 const checkOutputQuery = {
   check: Schema.optionalKey(
     Schema.String.annotate({
-      description: "The check to read, by its name in the step's checks; the step's only check where not given, refused where it has several.",
+      description:
+        "The check to read, by its name in the step's checks; the step's only check where not given, refused where it has several.",
     }),
   ),
   stream: Schema.optionalKey(

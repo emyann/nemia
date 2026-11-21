@@ -61,8 +61,8 @@ function stepIn(tree: string, workflow: string, step: string) {
 }
 
 /**
- * The check of the step `workflow/step` of `tree`: its `check:`; or its `checks:` as one line, each joined to the one before it by `&&`, the
- * order the pass runs sdlc's chained checks in; or a command node's `run:`, which runs with the same frozen folders.
+ * The check of the step `workflow/step` of `tree`: its `check:`; or its `checks:` as one line, each joined to the one before it by `&&`,
+ * the order the pass runs sdlc's chained checks in; or a command node's `run:`, which runs with the same frozen folders.
  */
 const checkOf = (tree: string, workflow: string, step: string) => {
   const { front } = stepIn(tree, workflow, step);

@@ -47,7 +47,12 @@ function rewrite(folder: string, file: string, from: string, to: string) {
 function leftByOperators() {
   const spliced = factory('spliced').tree;
   for (const workflow of ['build', 'quick'])
-    rewrite(spliced, `workflows/${workflow}/implement.md`, PROBE_END, `${PROBE_END}{ name: mine, run: "{ own-check; }", after: [ probe ] }, `);
+    rewrite(
+      spliced,
+      `workflows/${workflow}/implement.md`,
+      PROBE_END,
+      `${PROBE_END}{ name: mine, run: "{ own-check; }", after: [ probe ] }, `,
+    );
   rewrite(spliced, 'workflows/build/implement.md', LISTED, LISTED.replace('`probe.ts`', '`own-check`, `probe.ts`'));
   fs.appendFileSync(path.join(factory('parameter').tree, 'RULES.md'), '\nA rule of our own.\n');
 }
@@ -62,7 +67,12 @@ const NEXT = (() => {
   const next = `${version[1]}.${version[2]}.${Number(version[3]) + 1}`;
   rewrite(TEMPLATE, 'nemia.yaml', version[0], `  version: ${next}`);
   for (const workflow of ['build', 'quick'])
-    rewrite(TEMPLATE, `workflows/${workflow}/workflow.yaml`, PARTS_END, `${PARTS_END}        - name: added\n          run: "{ echo added; }"\n`);
+    rewrite(
+      TEMPLATE,
+      `workflows/${workflow}/workflow.yaml`,
+      PARTS_END,
+      `${PARTS_END}        - name: added\n          run: "{ echo added; }"\n`,
+    );
   rewrite(TEMPLATE, 'workflows/build/implement.md', LISTED, LISTED.replace('`parts.ts`', '`parts.ts`, `added.ts`'));
   return next;
 })();

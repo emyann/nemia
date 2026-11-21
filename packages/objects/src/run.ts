@@ -346,7 +346,7 @@ export const RunStepStatus = Schema.Struct({
       'A try asked of the step (nemia retry) and not yet filed: its number, its mode, the model and message it was asked with, and whether its session is stopped first; null where none is asked.',
   }),
   check: Schema.NullOr(StepCheck).annotate({
-    description: "The check its current try is judged by, the first that refused else the first not passed; null for a step with no check.",
+    description: 'The check its current try is judged by, the first that refused else the first not passed; null for a step with no check.',
   }),
   checks: Schema.optionalKey(
     Schema.Array(StepCheck).annotate({

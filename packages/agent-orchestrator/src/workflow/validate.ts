@@ -128,7 +128,7 @@ export function validate(steps: readonly StepSpec[]) {
  * routes or files a card.
  */
 const COMMAND_REFUSED: readonly [key: keyof StepSpec, why: string][] = [
-  ['workspace', 'it runs in its first parent\'s workspace'],
+  ['workspace', "it runs in its first parent's workspace"],
   ['check', 'its own exit code judges it'],
   ['checks', 'its own exit code judges it'],
   ['resume', 'it continues no session'],

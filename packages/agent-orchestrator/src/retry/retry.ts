@@ -551,35 +551,48 @@ export function retriesDue(
         ...(unsettled ? { stopFirst: true as const, ...(via === 'session' ? {} : { runsOn: true as const }) } : {}),
         ...(back && !unsettled ? { back } : {}),
       });
-    } else if (
-      status === 'failed (check)' &&
-      record.check &&
-      modes.includes('recheck') &&
-      machineKilled(checkKillOf, step.name) &&
-      retriesSpent(record) < (step.retries ?? 0)
-    ) {
-      due.push({ step: step.name, try: next, mode: 'recheck', by: 'retries' });
-    } else if (
-      status === 'failed (check)' &&
-      record.check &&
-      refusedCheck(checksPhase(record.check, phaseOf), verdictOf(step.name)) &&
-      personsRefusal(step, verdictOf(step.name)) === undefined &&
-      retriesSpent(record) < (step.retries ?? 0)
-    ) {
-      due.push({ step: step.name, try: next, mode: 'continue', by: 'retries' });
-    } else if (
-      status === 'failed' &&
-      step.run !== undefined &&
-      typeof verdictOf(step.name) === 'number' &&
-      personsRefusal(step, verdictOf(step.name)) === undefined &&
-      retriesSpent(record) < (step.retries ?? 0)
-    ) {
-      due.push({ step: step.name, try: next, mode: 'fresh', by: 'retries' });
-    } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(step, closeoutOf(step.name), steps))) {
-      due.push({ step: step.name, try: next, mode: 'continue', by: 'signoff' });
+    } else {
+      const own = ownRetry({ step, record, status, modes, steps }, { phaseOf, verdictOf, checkKillOf, askedCloseout, closeoutOf });
+      if (own) due.push({ step: step.name, try: next, ...own });
     }
   }
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
+}
+
+/**
+ * The try a step's own `retries:` or its missing sign-off files with no person asking, where one is due: a recheck of a check the machine
+ * killed, a continued session after a check refused it, a fresh run of a command node that exited non-zero, and a sign-off asked of a
+ * session that gave none.
+ * @param at The step, its record, its status and the ways it may be tried, and the run's steps.
+ * @param reads What the pass read: each task's phase, each step's verdict and check kill, what was asked, and each step's closeout.
+ */
+function ownRetry(
+  at: { step: StepSpec; record: StepRecord; status: StepStatus; modes: readonly RetryMode[]; steps: readonly StepSpec[] },
+  reads: {
+    phaseOf: (taskId: string) => TaskPhase;
+    verdictOf: (step: string) => Verdict | undefined;
+    checkKillOf: CheckKillOf;
+    askedCloseout: (taskId: string) => CloseoutAsked;
+    closeoutOf: (step: string) => Closeout | undefined;
+  },
+) {
+  const { step, record, status, modes, steps } = at;
+  const verdict = reads.verdictOf(step.name);
+  const left = retriesSpent(record) < (step.retries ?? 0);
+  const ownRefusal = personsRefusal(step, verdict) === undefined;
+  if (status === 'failed (check)' && record.check && modes.includes('recheck') && machineKilled(reads.checkKillOf, step.name) && left)
+    return { mode: 'recheck', by: 'retries' } satisfies Pick<Retry, 'mode' | 'by'>;
+  if (status === 'failed (check)' && record.check && refusedCheck(checksPhase(record.check, reads.phaseOf), verdict) && ownRefusal && left)
+    return { mode: 'continue', by: 'retries' } satisfies Pick<Retry, 'mode' | 'by'>;
+  if (status === 'failed' && step.run !== undefined && typeof verdict === 'number' && ownRefusal && left)
+    return { mode: 'fresh', by: 'retries' } satisfies Pick<Retry, 'mode' | 'by'>;
+  if (
+    status === 'unsigned' &&
+    record.taskId &&
+    signoffDue(record, reads.askedCloseout(record.taskId), refusedOf(step, reads.closeoutOf(step.name), steps))
+  )
+    return { mode: 'continue', by: 'signoff' } satisfies Pick<Retry, 'mode' | 'by'>;
+  return undefined;
 }
 
 /** Whether the run refuses a closeout's envelope or its questions (`closeoutRefusals`): a closeout not given is not. */

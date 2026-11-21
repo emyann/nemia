@@ -350,7 +350,10 @@ function endingLook(step: StepSpec, run: RepositoryRun, steps: readonly StepSpec
           `This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`,
           '',
         ]),
-    ...(hasChecks(step) ? [] : workChecks(steps)).flatMap((check) => [`This workflow's check, which its work was judged by: \`${check}\``, '']),
+    ...(hasChecks(step) ? [] : workChecks(steps)).flatMap((check) => [
+      `This workflow's check, which its work was judged by: \`${check}\``,
+      '',
+    ]),
     'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
     'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',
   ];

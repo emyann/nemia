@@ -105,10 +105,14 @@ export const StatsGroup = Schema.Struct({
         check: Schema.String.annotate({ description: "The check's name: check for a step's check: line." }),
         count: Schema.Number.annotate({ description: 'How many tries ran it to a verdict.' }),
         medianMs: Schema.NullOr(Schema.Number).annotate({ description: 'The median ms it ran; null where none was measured.' }),
-        p90Ms: Schema.NullOr(Schema.Number).annotate({ description: 'The 90th percentile of the ms it ran, nearest rank; null where none was measured.' }),
+        p90Ms: Schema.NullOr(Schema.Number).annotate({
+          description: 'The 90th percentile of the ms it ran, nearest rank; null where none was measured.',
+        }),
         refused: Schema.Number.annotate({ description: 'The share of those tries it refused, from 0 to 1.' }),
       }),
-    ).annotate({ description: "Each check of each step the tries ran, by name: its count, its median and p90 time, and how often it refused." }),
+    ).annotate({
+      description: 'Each check of each step the tries ran, by name: its count, its median and p90 time, and how often it refused.',
+    }),
   ),
 });
 export type StatsGroup = typeof StatsGroup.Type;

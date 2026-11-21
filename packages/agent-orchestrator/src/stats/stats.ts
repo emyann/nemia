@@ -88,7 +88,7 @@ export type TryFact = RunKeys & {
   rules: RuleFact[] | null;
   tallies: TallyFact[];
   landingDeadlineMs: number | null;
-  /** Each of its checks, by name: how long it ran, null while not ended, and its verdict; absent on a fact read before checks were named. */
+  /** Each of its checks, by name: how long it ran, null while not ended, and its verdict; absent on a fact read before checks had names. */
   checks?: CheckFact[];
 };
 

@@ -270,7 +270,8 @@ const stepKeyFields = {
   ),
   run: Schema.optionalKey(
     Text.annotate({
-      description: 'A command node\'s shell line: the node runs it as a workload of its own, with no agent session, and signs off by its exit code.',
+      description:
+        "A command node's shell line: the node runs it as a workload of its own, with no agent session, and signs off by its exit code.",
     }),
   ),
   checkMemory: Schema.optionalKey(

@@ -31,15 +31,20 @@ describe("a step's checks resolve into the plan the pass files by", () => {
   });
 
   test('an explicit after: names the checks waited on', () => {
-    const plan = planOf('checks:\n  - name: a\n    run: one\n  - name: b\n    run: two\n    after: []\n  - name: c\n    run: three\n    after: [a, b]');
+    const plan = planOf(
+      'checks:\n  - name: a\n    run: one\n  - name: b\n    run: two\n    after: []\n  - name: c\n    run: three\n    after: [a, b]',
+    );
     assert.deepEqual(plan.at(-1), { name: 'c', run: 'three', after: ['a', 'b'] });
   });
 
   test('enabled: false on the middle of three takes it out, and the third waits on the first', () => {
-    assert.deepEqual(planOf('checks:\n  - name: a\n    run: one\n  - name: b\n    run: two\n    enabled: false\n  - name: c\n    run: three'), [
-      { name: 'a', run: 'one', after: [] },
-      { name: 'c', run: 'three', after: ['a'] },
-    ]);
+    assert.deepEqual(
+      planOf('checks:\n  - name: a\n    run: one\n  - name: b\n    run: two\n    enabled: false\n  - name: c\n    run: three'),
+      [
+        { name: 'a', run: 'one', after: [] },
+        { name: 'c', run: 'three', after: ['a'] },
+      ],
+    );
   });
 
   test('check: <line> is one check named check, waiting on nothing', () => {

@@ -258,7 +258,8 @@ function dueSteps(
   const wordOf = (name: string) => status.get(name) ?? 'pending';
   for (const step of steps) {
     const own = status.get(step.name);
-    if (own === 'checking' && (!run.steps[step.name]?.check || stepChecksDue(run, step, phaseOf).file.length > 0)) due.check.push(step.name);
+    if (own === 'checking' && (!run.steps[step.name]?.check || stepChecksDue(run, step, phaseOf).file.length > 0))
+      due.check.push(step.name);
     if (own !== 'pending') continue;
     const condition = conditionOf(step, steps);
     const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf, steps) : undefined;

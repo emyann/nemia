@@ -5,6 +5,7 @@
  * on. `check: <line>` is the one-check shorthand, read beside it by `stepChecks` (`src/step/step.ts`). The words follow GitHub Actions,
  * whose step's `run:` is a shell line and whose jobs wait by name.
  */
+import { Option, Schema } from 'effect';
 import { refuse, type CheckSpec } from '../step/step.ts';
 
 /** What a check's name is: a word of lower-case letters, digits and dashes, opening on a letter, as a task id carries it. */
@@ -23,7 +24,9 @@ const isMap = (value: unknown): value is Record<string, unknown> => typeof value
 /** A check's `run:` as written, refused when empty or `none`, which the shell would run as a command it cannot find. */
 function runOf(step: string, name: string, run: unknown) {
   if (typeof run !== 'string' || ['', 'none', '""', "''"].includes(run.trim()))
-    refuse(`${step}: the check \`${name}\` has no \`run:\` line, the shell command it executes. Write one: \`- name: ${name}\` and \`run: <command>\`.`);
+    refuse(
+      `${step}: the check \`${name}\` has no \`run:\` line, the shell command it executes. Write one: \`- name: ${name}\` and \`run: <command>\`.`,
+    );
   return run;
 }
 
@@ -36,7 +39,9 @@ function afterOf(step: string, name: string, after: unknown) {
       .map((s) => s.trim())
       .filter(Boolean);
   if (Array.isArray(after) && after.every((n) => typeof n === 'string')) return after.map((n) => n.trim()).filter(Boolean);
-  return refuse(`${step}: the check \`${name}\`'s \`after:\` is a list of the checks it waits on, by name: \`after: [types]\`, or \`after: []\` for none.`);
+  return refuse(
+    `${step}: the check \`${name}\`'s \`after:\` is a list of the checks it waits on, by name: \`after: [types]\`, or \`after: []\` for none.`,
+  );
 }
 
 /** A check's `enabled:` as written: `true` or `false`, a YAML word read as text or as a boolean; absent, on. */
@@ -56,7 +61,9 @@ function writtenOf(step: string, entry: unknown) {
     );
   const unknown = Object.keys(entry).filter((key) => !(ENTRY_KEYS as readonly string[]).includes(key));
   if (unknown.length)
-    refuse(`${step}: the check \`${name}\` has \`${unknown.join('`, `')}\`, which a check does not take: it takes ${ENTRY_KEYS.map((k) => `\`${k}:\``).join(', ')}.`);
+    refuse(
+      `${step}: the check \`${name}\` has \`${unknown.join('`, `')}\`, which a check does not take: it takes ${ENTRY_KEYS.map((k) => `\`${k}:\``).join(', ')}.`,
+    );
   return {
     name,
     run: runOf(step, name, entry.run),
@@ -64,6 +71,9 @@ function writtenOf(step: string, entry: unknown) {
     enabled: enabledOf(step, name, entry.enabled),
   } satisfies Written;
 }
+
+/** The value of a JSON text, or none where it is not JSON. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /** The checks as written with each `after:` given: absent, the check above it as written, none for the first. */
 const explicitWaits = (written: readonly Written[]) =>
@@ -75,9 +85,16 @@ function waitsRefusal(step: string, checks: readonly { name: string; after: read
     for (const name of c.after) {
       if (name === c.name) refuse(`${step}: the check \`${c.name}\` waits on itself. Delete \`${name}\` from its \`after:\`.`);
       if (!checks.some((d) => d.name === name))
-        refuse(`${step}: the check \`${c.name}\` waits on \`${name}\`, which is no check of this step. Name one of its checks in \`after:\`, or delete it.`);
+        refuse(
+          `${step}: the check \`${c.name}\` waits on \`${name}\`, which is no check of this step. Name one of its checks in \`after:\`, or delete it.`,
+        );
     }
   }
+  cycleRefusal(step, checks);
+}
+
+/** Refused: checks that wait on each other in a cycle, so none could start. */
+function cycleRefusal(step: string, checks: readonly { name: string; after: readonly string[] }[]) {
   const settled = new Set<string>();
   let moved = true;
   while (moved) {
@@ -90,12 +107,15 @@ function waitsRefusal(step: string, checks: readonly { name: string; after: read
   }
   const looped = checks.filter((c) => !settled.has(c.name)).map((c) => c.name);
   if (looped.length)
-    refuse(`${step}: the checks \`${looped.join('`, `')}\` wait on each other in a cycle, so none could start. Take one wait out of their \`after:\`.`);
+    refuse(
+      `${step}: the checks \`${looped.join('`, `')}\` wait on each other in a cycle, so none could start. Take one wait out of their \`after:\`.`,
+    );
 }
 
 /** The waits of the enabled checks, each wait on a check turned off replaced by that check's own waits, in order and once each. */
 function throughDisabled(checks: readonly (Written & { after: readonly string[] })[]) {
   const named = new Map(checks.map((c) => [c.name, c]));
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- resolve calls itself, so its type cannot be inferred
   const resolve = (names: readonly string[], seen: ReadonlySet<string>): string[] =>
     names.flatMap((name) => {
       const c = named.get(name);
@@ -120,13 +140,10 @@ function throughDisabled(checks: readonly (Written & { after: readonly string[] 
 export function checksOf(step: string, check: string | undefined, text: string | undefined) {
   if (text === undefined) return undefined;
   if (check !== undefined)
-    refuse(`${step}: \`check:\` and \`checks:\` both say what judges the step. Keep one: \`check: <line>\` is one check named \`check\`, the same as \`checks: [ { name: check, run: <line> } ]\`.`);
-  let list: unknown;
-  try {
-    list = JSON.parse(text);
-  } catch {
-    list = text;
-  }
+    refuse(
+      `${step}: \`check:\` and \`checks:\` both say what judges the step. Keep one: \`check: <line>\` is one check named \`check\`, the same as \`checks: [ { name: check, run: <line> } ]\`.`,
+    );
+  const list = Option.getOrElse(jsonOf(text), () => text as unknown);
   if (!Array.isArray(list) || list.length === 0) return refuse(`${step}: \`checks:\` is a list of named checks: ${EXAMPLE}.`);
   const written = list.map((entry) => writtenOf(step, entry));
   const twice = written.find((c, i) => written.findIndex((d) => d.name === c.name) !== i);
@@ -135,7 +152,9 @@ export function checksOf(step: string, check: string | undefined, text: string |
   waitsRefusal(step, waits);
   const plan = throughDisabled(waits);
   if (plan.length === 0)
-    refuse(`${step}: every check of \`checks:\` is turned off (\`enabled: false\`), so the step would run none. Turn one on, or delete \`checks:\`.`);
+    refuse(
+      `${step}: every check of \`checks:\` is turned off (\`enabled: false\`), so the step would run none. Turn one on, or delete \`checks:\`.`,
+    );
   return plan satisfies readonly CheckSpec[];
 }
 

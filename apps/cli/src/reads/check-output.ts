@@ -1,7 +1,7 @@
 /**
- * `nemia check-output <run> <step> [--try <n>] [--check <name>]`, its words parsed against `objects`' `CHECK_OUTPUT_WORDS`, read from the api through the
- * objects' client (`…/tries/:try/check/output`): what the check of the try `--try` names printed, else of its latest, the last of its
- * tries (`…/tries`). Its stdout, or its stderr with `--stderr`.
+ * `nemia check-output <run> <step> [--try <n>] [--check <name>]`, its words parsed against `objects`' `CHECK_OUTPUT_WORDS`, read from the
+ * api through the objects' client (`…/tries/:try/check/output`): what the check of the try `--try` names printed, else of its latest, the
+ * last of its tries (`…/tries`); of the check `--check` names where the try has several. Its stdout, or its stderr with `--stderr`.
  *
  * Asked no page (`--from`, `--before`, `--limit`, `--last`), the command prints the stream whole, reading on from each page's `next` in
  * pages of the most the api answers until none is left; asked one, it prints that page and says on stderr the `--from` to read on from

@@ -73,6 +73,9 @@ describe("the step's verdict is read off the check that says why it failed", () 
   });
 
   test('every one passed: the first', () => {
-    assert.equal(decidingCheckTask({ taskId: 't-probe', tasks: TASKS }, phasesOf({}), () => true), 't-probe');
+    assert.equal(
+      decidingCheckTask({ taskId: 't-probe', tasks: TASKS }, phasesOf({}), () => true),
+      't-probe',
+    );
   });
 });

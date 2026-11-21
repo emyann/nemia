@@ -210,7 +210,9 @@ export const landingOpen = (
   const record = run.steps[step.name];
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return false;
   const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
-  return busy(phaseOf(record.taskId)) || busy(record.check && checksPhase(record.check, phaseOf)) || own === 'checking' || merging() === 'ours';
+  return (
+    busy(phaseOf(record.taskId)) || busy(record.check && checksPhase(record.check, phaseOf)) || own === 'checking' || merging() === 'ours'
+  );
 };
 
 /**

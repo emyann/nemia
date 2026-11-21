@@ -37,8 +37,7 @@ export type ChecksDue = { readonly file: readonly string[]; readonly verdict: Ch
 const stopped = (c: CheckNode) => c.standing === 'refused' || c.standing === 'unfinished';
 
 /** Whether the check named `name` passed. */
-const passedNamed = (checks: readonly CheckNode[], name: string) =>
-  checks.some((c) => c.name === name && c.standing === 'passed');
+const passedNamed = (checks: readonly CheckNode[], name: string) => checks.some((c) => c.name === name && c.standing === 'passed');
 
 /** Whether every check `c` waits on passed. */
 const ready = (checks: readonly CheckNode[], c: CheckNode) => c.after.every((name) => passedNamed(checks, name));
@@ -67,20 +66,17 @@ const checksDueSpec = spec<(checks: readonly CheckNode[]) => ChecksDue>({
     },
     filesOnlyWhatIsReady: {
       description: 'A check is filed only once every check it waits on has passed',
-      condition: ({ input: [checks], output }) =>
-        output.file.every((name) => checks.some((c) => c.name === name && ready(checks, c))),
+      condition: ({ input: [checks], output }) => output.file.every((name) => checks.some((c) => c.name === name && ready(checks, c))),
     },
     filesEveryReadyCheck: {
       description:
         'With no refusal, every check whose waits have all passed is filed now, so checks with no wait between them run side by side',
       condition: ({ input: [checks], output }) =>
-        checks.some(stopped) ||
-        checks.every((c) => c.standing !== 'waiting' || !ready(checks, c) || named(output.file, c.name)),
+        checks.some(stopped) || checks.every((c) => c.standing !== 'waiting' || !ready(checks, c) || named(output.file, c.name)),
     },
     passedExactlyWhenEveryCheckPassed: {
       description: 'The step passes its checks exactly when every one of them passed',
-      condition: ({ input: [checks], output }) =>
-        (output.verdict === 'passed') === checks.every((c) => c.standing === 'passed'),
+      condition: ({ input: [checks], output }) => (output.verdict === 'passed') === checks.every((c) => c.standing === 'passed'),
     },
     failedExactlyWhenARefusalSettled: {
       description:

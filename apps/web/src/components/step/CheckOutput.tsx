@@ -3,7 +3,7 @@
  * check says what failed, then earlier or later pages, stdout or stderr, and only the lines containing a text searched for, each line
  * after its number in the stream. While the check runs it is read again on a beat, and says so.
  */
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { CheckOutput as Printed, OutputStream } from 'objects';
 import { steps } from '@/lib/api/objects';
@@ -37,13 +37,18 @@ function Controls({
     <div className="flex flex-wrap items-center gap-3">
       <SegmentedButton
         aria-label="Which stream"
+        className="w-auto flex-none"
         selectionMode="single"
         disallowEmptySelection
         selectedKeys={[stream]}
         onSelectionChange={(keys) => onStream([...keys][0] === 'stderr' ? 'stderr' : 'stdout')}
       >
-        <Segment id="stdout">stdout</Segment>
-        <Segment id="stderr">stderr</Segment>
+        <Segment id="stdout" className="flex-none">
+          stdout
+        </Segment>
+        <Segment id="stderr" className="flex-none">
+          stderr
+        </Segment>
       </SegmentedButton>
       <SearchBar
         data-check-output-search
@@ -56,11 +61,24 @@ function Controls({
   );
 }
 
-/** The lines of a page, each after its number in the stream. */
-function Lines({ lines }: { lines: Printed['lines'] }) {
+/** The lines of a page, each after its number in the stream, the box scrolled to its last line where `atEnd`, else to its first. */
+function Lines({ lines, atEnd }: { lines: Printed['lines']; atEnd: boolean }) {
+  const box = useRef<HTMLPreElement>(null);
+  const last = lines.at(-1)?.n;
+  useLayoutEffect(() => {
+    const at = box.current;
+    if (at) at.scrollTop = atEnd ? at.scrollHeight : 0;
+  }, [atEnd, last]);
   if (!lines.length) return null;
   return (
-    <pre className="max-h-96 overflow-auto rounded bg-muted p-2 font-mono text-body-small leading-snug">
+    <pre
+      ref={box}
+      role="region"
+      aria-label="Its lines"
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
+      tabIndex={0}
+      className="max-h-96 overflow-auto rounded bg-muted p-2 font-mono text-body-small leading-snug"
+    >
       {lines.map((line) => (
         <span key={line.n} data-line={line.n} className="flex gap-3">
           <span aria-hidden className="w-12 flex-none text-end text-on-surface-variant select-none">
@@ -73,10 +91,21 @@ function Lines({ lines }: { lines: Printed['lines'] }) {
   );
 }
 
+/**
+ * Whether lines are held before the page: of the whole stream, where it starts after line 1; under a search, where the end it reads holds
+ * fewer than were found, or the page it reads starts after line 1.
+ */
+const earlierIn = (data: Printed, at: At) => {
+  const first = data.lines[0]?.n;
+  if (first === undefined) return false;
+  if (data.matched === undefined) return first > 1;
+  return 'last' in at ? data.matched > data.lines.length : at.from > 1;
+};
+
 /** The presses that read the page before this one, the one after it, and the stream's end again; none where the page is all there is. */
 function Pages({ data, at, onAt }: { data: Printed; at: At; onAt: (at: At) => void }) {
   const first = data.lines[0]?.n;
-  const earlier = first !== undefined && first > 1;
+  const earlier = earlierIn(data, at);
   const next = data.next;
   if (!earlier && next === undefined && 'last' in at) return null;
   return (
@@ -130,7 +159,7 @@ export function CheckOutput({ read }: { read: CheckRead }) {
           <p data-check-output-said className="text-body-small text-on-surface-variant">
             {said(data, match)}
           </p>
-          <Lines lines={data.lines} />
+          <Lines lines={data.lines} atEnd={'last' in at} />
           <Pages data={data} at={at} onAt={setAt} />
         </>
       )}

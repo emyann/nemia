@@ -43,7 +43,7 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `worktree`, `budgetUsd`, `mounts`, `callAdmission`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
+`contextTokens`, `worktree`, `budgetUsd`, `mounts`, `callAdmission`, `pictures`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
@@ -741,6 +741,7 @@ after a space starts a comment. The keys are a closed list:
 | `permissionMode` | the harness's own words — see below; default `auto` for Claude Code, `workspace-write` for Codex |
 | `deadlineSeconds` | the time the machine was up since the attempt started — the turn's first, when held open, or its last release from a pause (*A job's drain*) — above 0, on the monotonic clock within a boot and the wall clock across a reboot; absent, no deadline |
 | `resumeFrom` | a session id to continue, instead of starting cold |
+| `pictures` | `config` only, never a brief's line: the pictures a session is shown in its first message, each `{ path, mediaType }` (PNG, JPEG, GIF or WebP), 100 at most — `claude`, a local session; none on a resumed one, which saw them; a picture that does not read refuses the attempt before it starts |
 | `worktree` | `true`, `false`, or a name — the harness cuts it |
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
 | `tools` | `Read, Grep, Glob` — the only tools the session has; see below |

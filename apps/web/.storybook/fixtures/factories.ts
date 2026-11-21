@@ -14,6 +14,9 @@ export const homeLine = `nemia factory home ${FACTORY}`;
 /** The line that schedules one of its workflows, as the api answers it on `FactoryCommands.schedule`. */
 export const scheduleLine = `nemia factory schedule ${FACTORY} <workflow> --cron <cron> --brief <brief>`;
 
+/** The line that takes back its schedule of `workflow`, as the api answers it on a schedule's `commands.unschedule`. */
+export const unscheduleLine = (workflow: string) => `nemia factory unschedule ${FACTORY} ${workflow}`;
+
 /** The line that writes a card trigger of the factory, as the api answers it on `FactoryCommands.trigger`. */
 export const triggerLine = `nemia factory trigger ${FACTORY} <name> --labels <key>=<value> --to <workflow>`;
 

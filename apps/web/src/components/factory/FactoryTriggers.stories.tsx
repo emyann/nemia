@@ -7,7 +7,7 @@ import type { Trigger } from 'objects';
 import { factoryTriggersQuery, type FactorySchedule } from '@/lib/api/factories';
 import { FactoryTriggers } from './FactoryTriggers';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
-import { scheduleLine, triggerLine } from '../../../.storybook/fixtures/factories';
+import { scheduleLine, triggerLine, unscheduleLine } from '../../../.storybook/fixtures/factories';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
 const TRIGGER = '/api/namespaces/:namespace/triggers/:name';
@@ -48,7 +48,7 @@ const NIGHTLY_SCHEDULE = {
   next: '2026-11-22T02:00:00.000Z',
   last: null,
   refused: null,
-  commands: { unschedule: `nemia factory unschedule ${FACTORY} janitor` },
+  commands: { unschedule: unscheduleLine('janitor') },
 } satisfies FactorySchedule;
 
 /** `children` over a query client that holds `items` as the factory's triggers, asking the network nothing. */
@@ -117,7 +117,7 @@ export const Spends: Story = {
     await expect(ready?.querySelector('[data-trigger-now]')).toHaveTextContent('queues 1 card now');
     const nightly = canvasElement.querySelector('[data-factory-trigger="janitor"]');
     await expect(nightly?.querySelector('[data-schedule-next]')).not.toBeNull();
-    await expect(nightly?.querySelector('code')).toHaveTextContent(`nemia factory unschedule ${FACTORY} janitor`);
+    await expect(nightly?.querySelector('code')).toHaveTextContent(unscheduleLine('janitor'));
     await expect(nightly).not.toBeNull();
     await expect(within(nightly as HTMLElement).queryByRole('button', { name: 'Remove' })).toBeNull();
   },

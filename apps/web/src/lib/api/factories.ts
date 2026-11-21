@@ -17,7 +17,7 @@ import {
   type McpTransport,
   type Schedule,
 } from 'objects';
-import { factories, library, hireName, hires, mcpServers, schedules } from './objects.ts';
+import { factories, library, hireName, hires, mcpServers, schedules, triggers } from './objects.ts';
 
 export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInStarted, SignInState } from 'objects';
 
@@ -444,3 +444,17 @@ export const completeSignIn = (name: string, server: string, url: string) => mcp
  * @param server The server's name.
  */
 export const signOutServer = (name: string, server: string) => mcpServers.signOut(name, server);
+
+/**
+ * The triggers of the factory `name`, each with whether it can spend quota and what it does now: the cards it queues, or its next fire.
+ * @param name The factory's name.
+ */
+export const factoryTriggersQuery = (name: string) =>
+  queryOptions({ queryKey: ['factory-triggers', name], queryFn: () => triggers.list(name) });
+
+/**
+ * Take back the factory `name`'s own card trigger `trigger`.
+ * @param name The factory's name.
+ * @param trigger The trigger's name.
+ */
+export const deleteTrigger = (name: string, trigger: string) => triggers.delete(name, trigger);

@@ -55,10 +55,13 @@ export type InboxEntry = {
   body: string | null;
   filedAt: string | null;
   /**
-   * On a queued card only (the CLI's `inbox queue`): when it was queued, and its place in the order the tick starts cards in, from 1 — null
-   * for a card a record says was started, which the tick never starts again.
+   * On a queued card only (the CLI's `inbox queue`, or a card trigger of its factory, `by`): when it was queued — a triggered card when it
+   * was filed — and its place in the order the tick starts cards in, from 1, null for a card a record says was started, which the tick
+   * never starts again; and the triggers that queue it, where it is not queued by hand.
    */
-  queued?: { at: string; place: number | null };
+  queued?: { at: string; place: number | null; by?: string[] };
+  /** On a card two triggers of its factory would send to two workflows: their names. It waits until a selector or its labels change. */
+  clash?: string[];
   /**
    * On a queued card only, whose start the tick tried and did not make, as the card stands: when, on which repository, why, and whether the
    * package refused it — which lasts until the card is edited or queued again — or something else failed, which the tick tries again.
@@ -82,7 +85,7 @@ export type InboxEntry = {
  */
 export const entryOf = (card: Card) => {
   const { metadata, spec, status } = card;
-  return {
+  const entry: InboxEntry = {
     name: metadata.name,
     file: status.file ?? `${metadata.name}.md`,
     title: status.title ?? null,
@@ -96,11 +99,17 @@ export const entryOf = (card: Card) => {
     error: status.error ?? null,
     body: spec.body ?? null,
     filedAt: metadata.creationTimestamp,
-    ...(spec.queued !== undefined ? { queued: { at: spec.queued, place: status.place ?? null } } : {}),
+    ...(spec.queued !== undefined
+      ? { queued: { at: spec.queued, place: status.place ?? null } }
+      : status.queuedBy !== undefined
+        ? { queued: { at: metadata.creationTimestamp, place: status.place ?? null, by: [...status.queuedBy] } }
+        : {}),
+    ...(status.clash !== undefined ? { clash: [...status.clash] } : {}),
     ...(status.lastStart !== undefined ? { tried: { ...status.lastStart } } : {}),
     factoryRepo: null,
     labels: { ...metadata.labels },
   };
+  return entry;
 };
 
 /**

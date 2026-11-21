@@ -20,6 +20,7 @@ import {
   inPlay,
   newestCardsFirst,
   queuedWord,
+  clashWords,
   queueOf,
   startedCard,
   triedShown,
@@ -285,6 +286,11 @@ function CardItem({
               <span>
                 since <Instant data-queued-at at={entry.queued.at} about="When it was queued, which orders the queue" />
               </span>
+            </p>
+          )}
+          {entry.clash && (
+            <p data-card-clash={entry.clash.join(' ')} className="text-body-small text-on-surface-variant">
+              {clashWords(entry.clash)}
             </p>
           )}
         </div>

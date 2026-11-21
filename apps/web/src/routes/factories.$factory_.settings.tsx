@@ -8,6 +8,7 @@ import { FactoryRules } from '@/components/factory/FactoryRules';
 import { TemplateCard } from '@/components/factory/TemplateCard';
 import { FactoryTrust } from '@/components/factory/FactoryTrust';
 import { FactorySchedules } from '@/components/factory/FactorySchedules';
+import { FactoryTriggers } from '@/components/factory/FactoryTriggers';
 import { FactoryServers } from '@/components/factory/FactoryServers';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
 import { LibraryAdds } from '@/components/library/LibraryAdds';
@@ -100,6 +101,7 @@ function SettingsPage() {
           <FactoryInstruction name={name} />
           <FactoryServers name={name} />
           <LibraryAdds name={name} />
+          <FactoryTriggers name={name} />
           <FactorySchedules factory={factory} />
         </>
       )}

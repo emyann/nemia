@@ -77,7 +77,7 @@ export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; p
           </Button>
         </span>
       )}
-      {entry.queued && (
+      {entry.queued && entry.queued.by === undefined && (
         <span title="Take it off the queue: it waits on you to start it" className="inline-flex">
           <Button icon={pending ? Pending : undefined} variant="outlined" isDisabled={pending} onPress={() => onQueue(true)}>
             {pending ? 'Unqueueing…' : 'Unqueue'}

@@ -9,7 +9,7 @@
  * changed custom words once, and their chat words once she is live. In conversation, a message on a fresh store files her at manual, she
  * is put to rest once the conversation has been quiet fifteen minutes, never while operating, and the next message files a task that
  * continues her session; an older store's task is adopted. And the table of what `nemia level` refuses, and her task's mounts, from a
- * factory whose volume has its switches set, taken by the runtime's own check of a task's config (`configRefusal`).
+ * factory whose volume has its switches set, taken by the runtime's own check of a filed task's arguments (`argsRefusalOf`).
  *
  * Over the engine's stand-in, its `view` laid over to say each task's spend, and a scratch store of its own, at `ROOT`, given as `ENV`,
  * and a config folder of its own for the harness. Each story mocks `Date` at a moment written as a literal, so her task's id,
@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Fiber } from 'effect';
-import type { TaskView } from 'agent-runtime';
+import { argsRefusalOf, type TaskView } from 'agent-runtime';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { until } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
@@ -62,7 +62,7 @@ import { DEFAULT_HARNESS } from '../src/harness/harness.ts';
 import { nemiaFence } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { CLI_VERBS } from '../src/command/command.ts';
-import { configRefusal, engineOf, over, runWith } from '../src/runtime-client.ts';
+import { engineOf, over, runWith } from '../src/runtime-client.ts';
 import { SESSION_TOKEN } from '../src/filed/filed.ts';
 import { readToken } from '../src/token/token.store.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -846,6 +846,6 @@ describe("Her task's mounts are those the runtime takes, whatever switches a fac
     rewriteFactoryAt(home, { ...factory, volumes: factory.volumes.map((v) => ({ ...v, claudeMd: true, skills: false })) });
     const spec = nemiaSpec('nemia-mounts', undefined, 'token', home);
     assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }]);
-    assert.equal(configRefusal(spec.harness, spec.config), undefined);
+    assert.equal(argsRefusalOf(spec), undefined);
   });
 });

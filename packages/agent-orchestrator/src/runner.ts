@@ -430,7 +430,17 @@ export {
 } from './transcript-page/transcript-page.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
-export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
+export {
+  cardList,
+  cardObject,
+  cardTable,
+  attachToCard,
+  cardWriteRefusal,
+  detachFromCard,
+  replaceCard,
+  type CardQuery,
+  type CardReplaced,
+} from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { RUN_COLUMNS, runCells, runTable } from './run-list/index.ts';
 export {

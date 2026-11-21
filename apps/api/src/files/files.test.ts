@@ -218,3 +218,77 @@ test('REFUSED: an input with no name and no file is a 422, nothing started', asy
   assert.equal(res.status, 422, await res.clone().text());
   assert.equal(runCount(), before);
 });
+
+/** `bytes` written at the id `id` of `acme`'s files, under `name`, as an upload target of MCP's file extension is answered. */
+const putAt = (id: string, bytes: Buffer, name: string, type = 'image/png') =>
+  app().request(`/api/namespaces/acme/files/${id}?name=${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: { ...BEARER, 'content-type': type },
+    body: new Uint8Array(bytes),
+  });
+
+test('a file written at a fresh id is read back, its picture streamed inline as its own type, and an SVG only as an attachment', async () => {
+  const id = `file_${crypto.randomBytes(16).toString('hex')}`;
+  const bytes = crypto.randomBytes(2000);
+  const put = await putAt(id, bytes, 'shot.png');
+  assert.equal(put.status, 201, await put.clone().text());
+  const got = await app().request(`/api/namespaces/acme/files/${id}`);
+  assert.equal(got.status, 200);
+  assert.deepEqual((({ name, mediaType, size }: FileObject) => ({ name, mediaType, size }))((await got.json()) as FileObject), {
+    name: 'shot.png',
+    mediaType: 'image/png',
+    size: bytes.length,
+  });
+  const content = await app().request(`/api/namespaces/acme/files/${id}/content`);
+  assert.equal(content.status, 200);
+  assert.equal(content.headers.get('content-type'), 'image/png');
+  assert.equal(content.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(Buffer.from(await content.arrayBuffer()), bytes);
+  const svg = await upload(formOf('logo.svg', Buffer.from('<svg/>'), 'image/svg+xml'));
+  const svgFile = (await svg.json()) as FileObject;
+  const served = await app().request(`/api/namespaces/acme/files/${svgFile.id}/content`);
+  assert.equal(served.headers.get('content-type'), 'application/octet-stream');
+  assert.match(served.headers.get('content-disposition') ?? '', /^attachment/);
+});
+
+test('REFUSED: a file written at an id kept already is a Conflict, at a malformed id Invalid, and an id never kept is Missing', async () => {
+  const id = `file_${crypto.randomBytes(16).toString('hex')}`;
+  assert.equal((await putAt(id, Buffer.from('a'), 'a.png')).status, 201);
+  assert.equal((await putAt(id, Buffer.from('b'), 'b.png')).status, 409);
+  assert.equal((await putAt('file_nope', Buffer.from('b'), 'b.png')).status, 422);
+  assert.equal((await app().request(`/api/namespaces/acme/files/file_${'0'.repeat(32)}`)).status, 404);
+});
+
+test('a card filed with a kept file says it in its status, attaches another and takes it off; an unknown id is refused', async () => {
+  const shot = (await (await upload(formOf('shot.png', crypto.randomBytes(300)))).json()) as FileObject;
+  const log = (await (await upload(formOf('run.log', Buffer.from('a log\n'), 'text/plain'))).json()) as FileObject;
+  const filed = await post('cards', { body: 'Look at ![it](shot.png).', workflow: 'dev', files: [{ file: shot.id }] });
+  assert.equal(filed.status, 201, await filed.clone().text());
+  const card = (await filed.json()) as {
+    metadata: { name: string };
+    status: { files?: { name: string; inText: boolean; kept: boolean }[] };
+  };
+  assert.deepEqual(
+    card.status.files?.map((f) => [f.name, f.inText, f.kept]),
+    [['shot.png', true, true]],
+  );
+  const name = card.metadata.name;
+  const attached = await post(`cards/${name}/files`, { files: [{ file: log.id }] });
+  assert.equal(attached.status, 200, await attached.clone().text());
+  const after = (await attached.json()) as typeof card;
+  assert.deepEqual(
+    after.status.files?.map((f) => [f.name, f.inText]),
+    [
+      ['shot.png', true],
+      ['run.log', false],
+    ],
+  );
+  const detached = await app().request(`/api/namespaces/acme/cards/${name}/files/run.log`, { method: 'DELETE' });
+  assert.equal(detached.status, 200, await detached.clone().text());
+  assert.deepEqual(
+    ((await detached.json()) as typeof card).status.files?.map((f) => f.name),
+    ['shot.png'],
+  );
+  const unknown = await post('cards', { body: 'Another.', workflow: 'dev', files: [{ file: `file_${'0'.repeat(32)}` }] });
+  assert.equal(unknown.status, 422);
+});

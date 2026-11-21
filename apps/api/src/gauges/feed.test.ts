@@ -484,7 +484,7 @@ describe(
       ['?selector=run%3D%3Da', ['compares with ==']],
       ['?selector=run%20in%20a', ['names a list', '(values)']],
       ['?selector=', ['is no selector']],
-      ['?selector=run%3Dr-1&selector=no%2Fpe%3Dx', ['"no/pe"', '-l <key>=<value>']],
+      ['?selector=run%3Dr-1&selector=No%2Fpe%3Dx', ['"No/pe"', '-l <key>=<value>']],
     ];
     for (const [query, facts] of selectors)
       test(`a selector the grammar refuses is a 422 naming it and how this stream is asked for one: ${query}`, () =>

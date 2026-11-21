@@ -79,7 +79,7 @@ To change a parameter later without a new version of sdlc, preview it at the ver
 
 ## Its labels
 
-sdlc plans its cards with labels of its own, prefixed `sdlc/` so you tell them from yours:
+sdlc plans its cards with labels of its own, prefixed sdlc/ so you tell them from yours:
 
 | Label       | Values                    | What it says                                 | Read by                  |
 | ----------- | ------------------------- | -------------------------------------------- | ------------------------ |
@@ -89,7 +89,7 @@ sdlc plans its cards with labels of its own, prefixed `sdlc/` so you tell them f
 
 Every factory made from sdlc has the card trigger `front-door`, its selector `sdlc/stage=sprint,sdlc/state=ready-to-work`: a card in
 the sprint and ready to work that names no workflow is queued on the front door, and one that names its workflow on that one. A card
-with no `sdlc/stage` is in the backlog, and a card in the backlog is never queued, whatever its state. `refine` starts nothing: it marks
+with no sdlc/stage is in the backlog, and a card in the backlog is never queued, whatever its state. `refine` starts nothing: it marks
 an idea you know is to be refined, and any other state is simply not ready. The door alone routes; no label routes a card past it, and
 when it files a card back it sets `sdlc/stage=backlog`, so the card keeps its sprint and its state and is selected no more.
 

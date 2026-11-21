@@ -908,9 +908,9 @@ describe("a card's labels: filed with them, listed with them, selected by them w
     assert.deepEqual(await asked('/api/cards?labelSelector=team%3Dcore'), [core]);
     assert.deepEqual(await asked('/api/cards?labelSelector=team%3Dcore&labelSelector=tier'), [core, docs].sort(), 'either selector');
     assert.deepEqual(await asked('/api/cards?labelSelector=team%3Dnone'), [], 'none taken');
-    const res = await app.request('/api/cards?labelSelector=no%2Fpe%3Dx');
+    const res = await app.request('/api/cards?labelSelector=No%2Fpe%3Dx');
     assert.equal(res.status, 422);
-    names(((await res.json()) as { error: string }).error, 'no/pe');
+    names(((await res.json()) as { error: string }).error, 'No/pe');
   });
   s.test("a card read alone carries its labels, and the Card's labels verb edits them", async () => {
     const row = async () => ((await (await cardPage(docs)).json()) as Card).metadata.labels;

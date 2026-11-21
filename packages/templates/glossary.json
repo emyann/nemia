@@ -18,7 +18,7 @@
     },
     {
       "term": "sdlc labels",
-      "meaning": "the labels sdlc gives its own machinery, prefixed `sdlc/` so a person tells them from their own: `sdlc/stage` (`backlog` or `sprint`, where the card sits in the person's planning) and `sdlc/state` (`refine` or `ready-to-work`, how ready it is), both read by the `front-door` trigger, and `sdlc/sprint` (a week, such as `w48`), a planning mark nothing reads. A card with no `sdlc/stage` is in the backlog, and is never queued (`packages/templates/sdlc/nemia.yaml`, `packages/templates/sdlc/workflows/front-door/README.md`)."
+      "meaning": "the labels sdlc gives its own machinery, prefixed sdlc/ so a person tells them from their own: sdlc/stage (`backlog` or `sprint`, where the card sits in the person's planning) and sdlc/state (`refine` or `ready-to-work`, how ready it is), both read by the `front-door` trigger, and sdlc/sprint (a week, such as `w48`), a planning mark nothing reads. A card with no sdlc/stage is in the backlog, and is never queued (`packages/templates/sdlc/nemia.yaml`, `packages/templates/sdlc/workflows/front-door/README.md`)."
     }
   ]
 }

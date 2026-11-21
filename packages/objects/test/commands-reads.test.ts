@@ -1,7 +1,7 @@
 /**
  * The words of the moved reads (`src/commands-reads.ts`): `show`, `closeout`, `ls`, the inbox's bare read and `watch`, each line read
  * by its own spec and refused, a `CommandRefused`, by it or by its `check`, naming what to type. A label query the grammar refuses is the
- * api's to refuse, in the grammar's words: `apps/api/src/gauges/feed.test.ts` holds the stream's 422 of `message=hi`, `no/pe=x` and an
+ * api's to refuse, in the grammar's words: `apps/api/src/gauges/feed.test.ts` holds the stream's 422 of `message=hi`, `No/pe=x` and an
  * empty one, which the old command line refused itself.
  */
 import { describe, test } from 'vitest';

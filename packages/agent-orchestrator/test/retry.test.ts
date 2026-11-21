@@ -1069,6 +1069,7 @@ describe('a command node takes `retries:`, a failure policy by exit code and `ga
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nagent: implementer\n---\nimplement it\n');
     const front = ['after: implement', 'place: git', 'agent: implementer', 'run: node notes.ts', ...lines].join('\n');
     fs.writeFileSync(path.join(dir, 'file-notes.md'), `---\n${front}\n---\n`);
+    fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: file-notes\nplace: git\n---\nreview it\n');
     const run = await startedRun(dir);
     await tick(run.id);
     ended(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
@@ -1090,9 +1091,11 @@ describe('a command node takes `retries:`, a failure policy by exit code and `ga
     assert.equal(stage.board().tasks.has(`${run.id}-file-notes-try2`), false);
   });
 
-  test('with `gate: true`, the node is held once its parent signed off, and nothing of it is filed', async () => {
+  test('with `gate: true`, the node runs, and once it exits 0 what comes after it waits on a person', async () => {
     const run = await nodeRun(['gate: true']);
-    assert.equal(stage.board().tasks.has(`${run.id}-file-notes`), false);
+    ended(`${run.id}-file-notes`, 'succeeded', { exitCode: 0 });
+    await tick(run.id);
+    assert.equal(stage.board().tasks.has(`${run.id}-review`), false);
   });
 });
 

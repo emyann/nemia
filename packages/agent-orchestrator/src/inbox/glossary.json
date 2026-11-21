@@ -102,6 +102,11 @@
       "term": "Card files",
       "meaning": "the files a card carries under its `files:` key, a map of the name its text and its run find each by to the File it names: written only while no run was started from it (`cardFilesRefusal`, `packages/agent-orchestrator/src/inbox/card-files.ts`), kept by the files' prune while any inbox entry names them, and copied into the inputs folder of every run started from it.",
       "type": "CardFiles"
+    },
+    {
+      "term": "Card sent on",
+      "meaning": "a started card filed again by a person (`nemia inbox resend`) as a card of its own, `<run>-resent`, its body, factory and labels kept and handed the runs it was started as (`from:`), queued on the workflow named or naming none for its factory's card triggers; the run it came from is cancelled when it waits on a person. A card never started, sent on already, or whose run is still at work is refused (`resendRefusal`, `packages/agent-orchestrator/src/inbox/resend.ts`).",
+      "type": "Resent"
     }
   ]
 }

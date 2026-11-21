@@ -1,11 +1,12 @@
 /**
  * Group `cards`: the inbox's cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one
  * that names none), read in its namespace and across all by its name (each read of one carrying the card's file as written), filed,
- * written whole, dropped, started, queued and taken off the queue, and their labels edited. Cut from `api.ts`, which adds it to `Api`.
+ * written whole, dropped, started, queued and taken off the queue, sent on once started, and their labels edited. Cut from `api.ts`,
+ * which adds it to `Api`.
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
-import { Card, CardAttach, CardFile, CardList, CardQueue, CardStart, CardWrite, CardEdit } from './card.ts';
+import { Card, CardAttach, CardFile, CardList, CardQueue, CardResend, CardResent, CardStart, CardWrite, CardEdit } from './card.ts';
 import { Table } from './table.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { cardParams, cardNameParams, namespaceParams, cardListQuery } from './api-params.ts';
@@ -103,6 +104,15 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
     success: CardObject,
     error: objectErrors,
   }).annotate(OpenApi.Description, 'Takes a card off the queue. Answers the Card as it is now.'),
+  HttpApiEndpoint.post('resend', '/api/namespaces/:namespace/cards/:name/resend', {
+    params: cardParams,
+    payload: CardResend,
+    success: CardResent.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Sends a started card on: files it again as a card of its own, <run>-resent, handed the runs it was started as, queued on the workflow the body names or, naming none, left for its factory's card triggers; then cancels the run it came from when that run waits on a person. Answers CardResent with a 201; a card never started, sent on already, or whose run is still at work is refused.",
+  ),
   HttpApiEndpoint.post('labels', '/api/namespaces/:namespace/cards/:name/labels', {
     params: cardParams,
     payload: LabelEdit,

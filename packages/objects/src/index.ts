@@ -706,6 +706,7 @@ export {
   INBOX_EDIT_WORDS,
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
+  INBOX_RESEND_WORDS,
   INBOX_RM_WORDS,
   INBOX_WORDS,
   LABEL_INBOX_WORDS,
@@ -715,7 +716,7 @@ export {
   noEdits,
   runsNamed,
 } from './commands-inbox.ts';
-export { CardLabelLeftOut, CardQueue } from './card.ts';
+export { CardLabelLeftOut, CardQueue, CardResend, CardResent } from './card.ts';
 export {
   FACTORY_ADD_WORDS,
   FACTORY_ATTACH_WORDS,

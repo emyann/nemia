@@ -108,6 +108,7 @@ const STRAY: ReadonlyArray<readonly [string, readonly string[], 'missing' | 'fla
   ['inbox', [], 'flag'],
   ['inbox add', ['an idea'], 'missing'],
   ['inbox queue', ['card'], 'missing'],
+  ['inbox resend', ['card'], 'missing'],
   ['inbox rm', ['card'], 'missing'],
   ['factory', [], 'flag'],
   ['factory ls', [], 'flag'],

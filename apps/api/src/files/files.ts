@@ -8,20 +8,9 @@
  */
 import path from 'node:path';
 import { ByteSize, Cause, Effect, Exit, Stream } from 'effect';
-import { HttpServerRequest, HttpServerResponse, Multipart } from 'effect/http';
+import { HttpServerResponse, Multipart } from 'effect/http';
 import { type FileBegun, fileAt, fileBegun, fileBytes, fileDropped, fileKept } from 'agent-orchestrator';
-import {
-  Api,
-  BadRequest,
-  Conflict,
-  FILE_LIMIT,
-  type FileObject,
-  Invalid,
-  Missing,
-  PICTURE_TYPES,
-  type PictureMediaType,
-  TooLarge,
-} from 'objects';
+import { Api, BadRequest, FILE_LIMIT, type FileObject, Invalid, Missing, PICTURE_TYPES, type PictureMediaType, TooLarge } from 'objects';
 import { ServedNow } from '../objects/refused.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 import { answeredWriteIn } from '../objects/refused.ts';

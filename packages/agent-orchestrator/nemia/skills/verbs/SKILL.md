@@ -423,6 +423,12 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                card once a run slot is free; --off takes the mark back
                                each tool's words: tools.md#inbox_queue, tools.md#inbox_unqueue
                                on the port: inbox_queue, inbox_unqueue
+  nemia inbox resend <name> [--workflow <w>]
+                               send a started card on: file it again as <run>-resent, handed its run,
+                               queued on --workflow or, with none, for its factory's card triggers;
+                               the run it came from is cancelled when it waits on you
+                               each tool's words: tools.md#inbox_resend
+                               on the port: inbox_resend
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off

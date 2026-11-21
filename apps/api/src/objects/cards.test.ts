@@ -8,7 +8,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TABLE_ACCEPT, type Card, type CardList, type Table } from 'objects';
+import { TABLE_ACCEPT, type Card, type CardList, type CardResent, type Table } from 'objects';
 import { app } from '../app.ts';
 
 const inbox = path.join(root, 'inbox');
@@ -322,4 +322,55 @@ test('a list asked as a Table answers the columns nemia inbox prints and a row p
   assert.equal((table.rows[0]?.object as Card | undefined)?.kind, 'Card');
   const plain = await list('/api/cards');
   assert.equal(plain.body.kind, 'CardList', 'a list asked for no Table is the CardList');
+});
+
+test('POST a started card to resend: filed as <run>-resent in its namespace, handed the run; REFUSED: in flight 409, another namespace 404, a path 422', async (t) => {
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
+  const runs = path.join(root, 'runs');
+  fs.mkdirSync(runs, { recursive: true });
+  const run = (id: string, from: string) =>
+    fs.writeFileSync(
+      path.join(runs, `${id}.json`),
+      JSON.stringify({
+        id,
+        repo: '/code/app',
+        workspace: '/code/app',
+        baseRef: 'abc123',
+        branch: 'main',
+        isolate: true,
+        brief: 'A brief',
+        workflowDir: '/code/app/workflows',
+        createdAt: '2026-11-05T00:00:00.000Z',
+        workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+        steps: { implement: { taskId: null } },
+        from: { inbox: from },
+      }),
+    );
+  card('r-ended', { team: 'core' });
+  card('r-working');
+  run('ended-c3', 'r-ended');
+  fs.writeFileSync(path.join(runs, 'ended-c3.cancelled'), '2026-11-05T01:00:00.000Z');
+  run('working-d4', 'r-working');
+  t.onTestFinished(() => {
+    for (const name of ['r-ended', 'r-working', 'ended-c3-resent']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const file of ['ended-c3.json', 'ended-c3.cancelled', 'working-d4.json']) fs.rmSync(path.join(runs, file), { force: true });
+  });
+  const post = (url: string, body: unknown) => app.request(url, { method: 'POST', headers, body: JSON.stringify(body) });
+
+  const sent = await post('/api/namespaces/default/cards/r-ended/resend', { workflow: 'intake' });
+  assert.equal(sent.status, 201);
+  const answer = (await sent.json()) as typeof CardResent.Type;
+  assert.equal(answer.card.metadata.name, 'ended-c3-resent');
+  assert.equal(answer.card.metadata.namespace, 'default');
+  assert.equal(answer.card.spec.workflow, 'intake');
+  assert.deepEqual(answer.card.spec.from, ['ended-c3']);
+  assert.deepEqual(answer.from, { card: 'r-ended', run: 'ended-c3' });
+  assert.equal(answer.cancelled, undefined, 'a run that has ended is not cancelled again');
+  assert.ok(fs.existsSync(path.join(inbox, 'ended-c3-resent.md')));
+
+  assert.equal((await post('/api/namespaces/default/cards/r-ended/resend', {})).status, 409, 'sent on once');
+  assert.equal((await post('/api/namespaces/default/cards/r-working/resend', {})).status, 409, 'its run is still at work');
+  assert.equal((await post('/api/namespaces/a/cards/r-working/resend', {})).status, 404);
+  assert.equal((await post('/api/namespaces/default/cards/r-working/resend', { workflow: 'a/b' })).status, 422);
+  assert.ok(!fs.existsSync(path.join(inbox, 'working-d4-resent.md')), 'nothing filed for a refused card');
 });

@@ -5,6 +5,7 @@ import { FactoryCardStart, UnassignedStart } from '../factory/FactoryCardStart';
 import { FileCard } from './FileCard';
 import { CardMeta, CardQueue, GoneItem, NoQueue, PageLink, QueueButtons, Refused, StartedAs, Tried } from './InboxParts';
 import { CardFrom } from './CardFrom';
+import { ResendCard } from './ResendCard';
 import { SelectorField } from '../field/SelectorField';
 import { Segment, SegmentedButton } from '../ui/ds/components/SegmentedButton';
 import { dropCard, inboxAllQuery, queueCard, type InboxEntry } from '@/lib/api/inbox';
@@ -31,7 +32,7 @@ import { Pending } from '@/components/look';
 type InboxAt = { factory?: string; l?: string; cards?: 'ended' };
 
 /** What the Inbox says Remove does to a started card, after the runs it was started as. */
-const REMOVE_STARTED = 'Remove drops it; to run the idea again, file it again.';
+const REMOVE_STARTED = 'Remove drops it; to run the idea elsewhere, send it on.';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -204,8 +205,8 @@ function startedOf(entry: InboxEntry, startedNow: string | null) {
  * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a factory and a workflow, and
  * Unqueue on a queued one (`QueueButtons`), with why not on a card that names a workflow alone (`NoQueue`); on a queued card its place
  * and when it was queued; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
- * it. A started card — its state a run's phase (`CARD_KIND`) — links to its run, in rest, beside its phase's chip, and offers Remove
- * only. An entry that does not read as a
+ * it. A started card — its state a run's phase (`CARD_KIND`) — links to its run, in rest, beside its phase's chip, and offers Remove,
+ * and under it Send on, which opens its sending on to another workflow (`SendOn`). An entry that does not read as a
  * card shows why, with its file for a title, and offers Remove when it is a card's file, which the CLI's `inbox rm` can drop.
  *
  * Its page shows the body rendered and its keys explained, and for a file that does not read, the file as written. A folder, a name the api
@@ -214,7 +215,8 @@ function startedOf(entry: InboxEntry, startedNow: string | null) {
  * A start from this page is held (`startedNow`) until the inbox read again says the card started, its state its run's phase: the start
  * form goes, since the card may not start again, and the card says it was started as that run.
  *
- * What its start, drop, queue or unqueue was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot.
+ * What its start, drop, queue, unqueue or sending on was last refused with is the page's (`refusal`, told through `onRefused`), shown at
+ * its foot.
  * Remove, Queue and Unqueue read the inbox again whatever the answer, so a card dropped, queued or started behind the page's back reads as
  * it is; a card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
  */
@@ -247,6 +249,7 @@ function CardItem({
   });
   const { phase, started, startedAs } = startedOf(entry, startedNow);
   const startable = !started && entry.error === null;
+  const sendable = phase !== null && entry.error === null;
 
   return (
     <li
@@ -287,12 +290,7 @@ function CardItem({
 
       {started && <StartedAs startedAs={startedAs} state={phase} after={REMOVE_STARTED} />}
       {triedShown(entry) && <TriedHere entry={entry} />}
-      {entry.error !== null && (
-        <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-          <p className="text-body-medium font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
-          <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{entry.error}</p>
-        </div>
-      )}
+      {entry.error !== null && <NotACard error={entry.error} />}
       {starting && startable && (
         <StartCard
           entry={entry}
@@ -300,6 +298,7 @@ function CardItem({
           onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })}
         />
       )}
+      {sendable && <SendOn entry={entry} onRefused={onRefused} />}
       {refusal && <Refused refusal={refusal} />}
     </li>
   );
@@ -328,6 +327,39 @@ function StartCard({
     <UnassignedStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
   ) : (
     <FactoryCardStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
+  );
+}
+
+/** Why an entry does not read as a card, in the failure's ink: it cannot start. */
+function NotACard({ error }: { error: string }) {
+  return (
+    <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
+      <p className="text-body-medium font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
+      <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{error}</p>
+    </div>
+  );
+}
+
+/**
+ * A started card's Send on: the kit's outlined button, which opens its sending on (`ResendCard`) to a workflow its factory offers, or none
+ * for its factory's card triggers; a refusal is `onRefused`'s to show, as the card's others are.
+ */
+function SendOn({ entry, onRefused }: { entry: InboxEntry; onRefused: (refusal: Omit<CardRefusal, 'entry'> | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const offered = useQuery(factoriesQuery).data?.find((f) => f.name === entry.factory)?.workflows ?? [];
+  return (
+    <div className="space-y-2">
+      <Button variant="outlined" aria-expanded={open} onPress={() => setOpen(!open)}>
+        {open ? 'Close' : 'Send on'}
+      </Button>
+      {open && (
+        <ResendCard
+          entry={entry}
+          workflows={offered}
+          onRefused={(message) => onRefused(message === null ? null : { action: 'resend', message })}
+        />
+      )}
+    </div>
   );
 }
 

@@ -11,12 +11,14 @@ import { inboxEdit } from './edit.ts';
 import { inboxFrom } from './from.ts';
 import { labelInbox, labelRun } from './label.ts';
 import { inboxQueue } from './queue.ts';
+import { inboxResend } from './resend.ts';
 import { inboxRm } from './rm.ts';
 
 /** Each of the group's commands' runner. */
 export const INBOX_RUNNERS: Readonly<Record<InboxCommand, Runner>> = {
   'inbox add': inboxAdd,
   'inbox queue': inboxQueue,
+  'inbox resend': inboxResend,
   'inbox from': inboxFrom,
   'inbox edit': inboxEdit,
   'inbox rm': inboxRm,

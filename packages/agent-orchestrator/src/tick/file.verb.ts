@@ -15,8 +15,8 @@ import {
   checkArgv,
   checkEnvOf,
   LANDING_CHECK_DEADLINE_SECONDS,
-  REFUSAL_LINES,
   type CheckHanded,
+  type CheckRefusal,
   type LandingSaid,
 } from '../check/index.ts';
 import { isRemoteHarness, type StepSpec } from '../workflow.ts';
@@ -48,7 +48,7 @@ import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/inde
 import { modeWord, nextTry, sessionModel, tryWord, type Retry } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
-import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
+import { checkCloseout, writeCheckCloseout, writeCheckOutputs } from '../check/check.store.ts';
 import {
   checkoutParts,
   cutNotes,
@@ -58,7 +58,7 @@ import {
   type Cut,
   type Reinstalled,
 } from '../workspace/worktree.store.ts';
-import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
+import { checksHandedRead, landingSaidRead, refusalWholeRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { noteFiledCheck, withinEffect } from '../meter/tally.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { keysOf } from '../stats/index.ts';
@@ -310,8 +310,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
   const remote = isRemoteHarness(step.harness);
   const continued = r.mode === 'continue' && !remote && record.taskId !== null ? sessionIn(reads.views, record.taskId) : undefined;
   const resumeFrom = resumeOn(continued, step, f, record);
-  const refusal =
-    record.check && step.check ? yield* refusalRead(step.check, record.check.taskId, REFUSAL_LINES).pipe(over(asRead(f))) : undefined;
+  const refusal = record.check && step.check ? yield* refusalHanded(f, files, step.check, record.check.taskId) : undefined;
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
@@ -341,6 +340,15 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
   yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told })));
   return undefined;
+});
+
+/**
+ * What a try is handed of the check that refused it (`refusalWholeRead`): the refusal with its tails, and each stream whole, written into
+ * the try's files folder (`writeCheckOutputs`) — or why they could not be, and the try is filed with the tails alone.
+ */
+const refusalHanded = Effect.fnUntraced(function* (f: Filing, files: string, command: string, taskId: string) {
+  const { refusal, whole } = yield* refusalWholeRead(command, taskId).pipe(over(asRead(f)));
+  return { ...refusal, kept: writeCheckOutputs(files, taskId, whole) } satisfies CheckRefusal;
 });
 
 /**
@@ -438,13 +446,16 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
 
 /**
  * What the ending's check said of the merged tree it refused, for a merge asked on that refusal (`MergeOf.landing`), read off the check's
- * task with the command the run froze (`landingSaidRead`) — or undefined for any other round.
+ * task with the command the run froze (`landingSaidRead`), its streams whole written into the target's files folder (`writeCheckOutputs`)
+ * — or undefined for any other round.
  */
 const landingOf = Effect.fnUntraced(function* (f: Filing, r: Round) {
   const landing = r.merge?.landing;
   const command = landing && f.reads.steps.find((s) => s.name === landing.step)?.check;
   if (!landing || !command) return undefined;
-  return yield* landingSaidRead(landing.step, command, landing.check).pipe(over(asRead(f)));
+  const { said, whole } = yield* landingSaidRead(landing.step, command, landing.check).pipe(over(asRead(f)));
+  if (!whole || 'unreadable' in said) return said;
+  return { ...said, kept: writeCheckOutputs(artifactsDir(yield* StoreRoot, f.run, r.target), landing.check, whole) } satisfies LandingSaid;
 });
 
 /**

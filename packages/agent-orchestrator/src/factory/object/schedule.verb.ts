@@ -48,8 +48,11 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
 /**
  * The schedules of the factory `namespace`, read now, the runs read through `memo` where one is handed; none for the default factory or a
  * file that does not read; `Missing` where no factory has the name.
+ * @param home The store's root.
+ * @param namespace The factory's name.
+ * @param memo The run memo a caller that polls hands in; undefined to read every record.
  */
-const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, namespace: string, memo: ScheduleRuns | undefined) {
+export const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, namespace: string, memo: ScheduleRuns | undefined) {
   const { listing } = yield* factoryFiled(home, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const verify = yield* setting('verifyRest');

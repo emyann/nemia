@@ -49,12 +49,18 @@ const OWNER = ['Montreal', 'America/Montreal', 'EDT', '$80'];
 /** The words of this repository that what ships must not say: its team, its operator's playbook, its docs, its owner's settings. */
 const OURS = [...TEAM, 'playbook-operator', 'architecture.md', 'CLAUDE.md', 'features.md', ...OWNER];
 
-/** Where `files` say one of `OURS`, whole and in any case: a line each, `<file>: <word>`. */
+/**
+ * The words of `OURS` a shipped file says in another sense, each by its file, with why: her verbs skill's `tools.md` says the Api's own
+ * words, and the Api names a volume's `CLAUDE.md` files, the harness's instruction files in any repository, never this one's doc.
+ */
+const ANOTHER_SENSE: Readonly<Record<string, readonly string[]>> = { 'skills/verbs/tools.md': ['CLAUDE.md'] };
+
+/** Where `files` say one of `OURS`, whole and in any case, but a word `ANOTHER_SENSE` gives its file: a line each, `<file>: <word>`. */
 const oursIn = (files: Map<string, string>) =>
   [...files].flatMap(([file, text]) =>
-    OURS.filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`, 'i').test(text)).map(
-      (word) => `${file}: ${word}`,
-    ),
+    OURS.filter((word) => !(ANOTHER_SENSE[file] ?? []).includes(word))
+      .filter((word) => new RegExp(`(?<![\\w$])${word.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`, 'i').test(text))
+      .map((word) => `${file}: ${word}`),
   );
 
 /** The skills `files` name, as "the `<name>` skill" says one: a line each, `<file>: <name>`. */

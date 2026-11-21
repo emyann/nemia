@@ -183,9 +183,9 @@ describe('offersOf: what the Decide section offers a step, and nothing on a run 
     const steps = [
       step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' }),
       step('quiet', 'succeeded · BLOCKED'),
-      step('theme', 'failed ✗ check (exit 1)', { check: { command: 'npm test', taskId: 't-c', verdict: EXIT_1, refused: null } }),
+      step('theme', 'failed ✗ check (exit 1)', { check: { name: 'check', command: 'npm test', started: null, ended: null, taskId: 't-c', verdict: EXIT_1, refused: null } }),
       step('lint', 'failed ✗ check (unfinished)', {
-        check: { command: 'npm run lint', taskId: 't-l', verdict: UNFINISHED, refused: null },
+        check: { name: 'check', command: 'npm run lint', started: null, ended: null, taskId: 't-l', verdict: UNFINISHED, refused: null },
       }),
       step('docs', 'unsigned'),
       step('notes', 'denied', { denied: { words: 'denied: Write(/tmp/w/notes.md)', calls: ['Write(/tmp/w/notes.md)'] } }),
@@ -375,14 +375,14 @@ describe('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate o
     const steps = [
       step('tokens', 'over budget $4.25 of $3', {
         raise: byTry,
-        check: { command: 'npm test', taskId: 't-c', verdict: EXIT_1, refused: null },
+        check: { name: 'check', command: 'npm test', started: null, ended: null, taskId: 't-c', verdict: EXIT_1, refused: null },
       }),
       step('review', 'over budget — implement $2.10 of $2', { raise: byRound }),
       step('lint', 'budget exhausted $3.02 of $3', { raise: ended }),
       step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Warm colours, or cool ones?' }),
       step('types', 'failed ✗ check (unfinished)', {
         raise: unfinished,
-        check: { command: 'npm run typecheck', taskId: 't-t', verdict: UNFINISHED, refused: null },
+        check: { name: 'check', command: 'npm run typecheck', started: null, ended: null, taskId: 't-t', verdict: UNFINISHED, refused: null },
       }),
     ];
     const worded = steps.map((each) => each.message);
@@ -464,7 +464,7 @@ describe('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate o
     );
     const lint = step('lint', 'failed ✗ check (unfinished)', {
       raise: null,
-      check: { command: 'npm run lint', taskId: 't-l', verdict: UNFINISHED, refused: null },
+      check: { name: 'check', command: 'npm run lint', started: null, ended: null, taskId: 't-l', verdict: UNFINISHED, refused: null },
     });
     assert.deepEqual(
       offersOf(run([lint], ['lint'])),

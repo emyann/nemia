@@ -213,6 +213,8 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}) =>
     memory: null,
     budget: null,
     check: null,
+    checks: null,
+    run: null,
     checkMemory: null,
     retries: null,
     checkFailurePolicy: null,

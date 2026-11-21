@@ -238,7 +238,21 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   const values: Record<
     Exclude<
       StepKey,
-      'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox' | 'routes' | 'route' | 'when' | 'ends' | 'workflow' | 'card' | 'unlabel'
+      | 'workspace'
+      | 'slot'
+      | 'agent'
+      | 'skills'
+      | 'mcp'
+      | 'sandbox'
+      | 'routes'
+      | 'route'
+      | 'when'
+      | 'ends'
+      | 'workflow'
+      | 'card'
+      | 'unlabel'
+      | 'checks'
+      | 'run'
     >,
     string
   > = {

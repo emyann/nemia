@@ -198,7 +198,14 @@ export const StepTry = Schema.Struct({
   }),
   message: Schema.String.annotate({ description: 'Where it stands, in the sentence a person reads.' }),
   attempts: StepAttempts,
-  check: Schema.NullOr(StepCheck).annotate({ description: 'Its check; null where none was filed.' }),
+  check: Schema.NullOr(StepCheck).annotate({
+    description: 'The check it is judged by: the first of its checks that refused, else the first not passed; null where it has none.',
+  }),
+  checks: Schema.optionalKey(
+    Schema.Array(StepCheck).annotate({
+      description: "Every check of the try, in the step's order; empty for a step with none, absent from an api older than checks: lists.",
+    }),
+  ),
   closeout: Schema.NullOr(StepCloseout).annotate({
     description: 'What it signed off with; null while it has not, or where its closeout does not read.',
   }),

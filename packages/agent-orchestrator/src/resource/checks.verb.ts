@@ -3,8 +3,8 @@ import { Effect } from 'effect';
 import { attemptVerdict, checkVerdictOf, verdictWord, type CheckVerdict } from '../check/index.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { Views } from '../summary/reads.verb.ts';
-import type { Run } from '../record/record.ts';
-import type { StepSpec } from '../step/step.ts';
+import { checkTasksOf, type Run, type StepRecord } from '../record/record.ts';
+import { hasChecks, stepChecks, type StepSpec } from '../step/step.ts';
 import { asked, type Engine } from '../runtime-client.ts';
 
 /**
@@ -21,7 +21,12 @@ const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>) => Effect.run
  * end of each of its streams, as `nemia decide` shows them.
  */
 export type StepCheck = {
+  /** The check's name: `check` for a step's `check: <line>`, else its name in the step's `checks:`. */
+  name: string;
   command: string;
+  /** When its latest attempt started and ended, null while it has not. */
+  started: string | null;
+  ended: string | null;
   /** The check's task, once the run has filed it. */
   taskId: string | null;
   /**
@@ -123,17 +128,23 @@ const unreadableOutput = (run: Run, taskId: string, err: unknown) =>
  * @param taskId The task of the check, or undefined where it never started.
  * @param views The engine's views of the run's tasks, by task id.
  * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
+ * @param name The check's name: `check` for a step's `check: <line>`; a named check whose task the engine does not hold is not filed yet.
  */
-export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr) {
-  if (!taskId) return { command, taskId: null, verdict: null, refused: null } satisfies StepCheck as StepCheck;
-  const view = views.get(taskId);
+export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr, name = 'check') {
+  const view = taskId === undefined ? undefined : views.get(taskId);
+  if (!taskId || (name !== 'check' && view === undefined))
+    return { name, command, started: null, ended: null, taskId: null, verdict: null, refused: null } satisfies StepCheck as StepCheck;
+  const attempt = view?.state.attempts.at(-1);
   const phase = phaseOfView(view);
   const verdict = attemptVerdict(view?.state.attempts.at(-1));
   const exit = verdictWord(verdict);
   const refused = refusedIn(views)(taskId);
   const said = stderr.get(taskId) ?? NO_LINES;
   return {
+    name,
     command,
+    started: attempt?.startedAt ?? null,
+    ended: attempt?.endedAt ?? null,
     taskId,
     verdict: checkVerdictOf(phase, verdict),
     refused: refused
@@ -159,25 +170,49 @@ export function checkIn(command: string, taskId: string | undefined, views: View
  * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
  */
 export async function checksOf(e: Engine, run: Run, steps: readonly StepSpec[], views: Views, stderr: CheckStderr) {
-  const checks = new Map<string, StepCheck>();
+  const checks = new Map<string, readonly StepCheck[]>();
   for (const step of steps) {
-    if (!step.check) continue;
-    const check = checkIn(step.check, run.steps[step.name]?.check?.taskId, views, stderr);
-    checks.set(step.name, check);
-    const id = check.taskId;
-    if (!check.refused || id === null) continue;
-    try {
-      check.refused.stdout = tailOf(
-        (await engineRead('output', e.output(id, 'stdout', TAIL_BYTES))) ?? (await engineRead('logs', e.logs(id))),
-        CHECK_LINES,
-      );
-    } catch (err) {
-      check.refused.stdout = NO_LINES;
-      check.refused.unreadable ??= unreadableOutput(run, id, err);
+    if (!hasChecks(step)) continue;
+    const list = checksIn(step, run.steps[step.name]?.check, views, stderr);
+    checks.set(step.name, list);
+    for (const check of list) {
+      const id = check.taskId;
+      if (!check.refused || id === null) continue;
+      try {
+        check.refused.stdout = tailOf(
+          (await engineRead('output', e.output(id, 'stdout', TAIL_BYTES))) ?? (await engineRead('logs', e.logs(id))),
+          CHECK_LINES,
+        );
+      } catch (err) {
+        check.refused.stdout = NO_LINES;
+        check.refused.unreadable ??= unreadableOutput(run, id, err);
+      }
     }
   }
   return checks;
 }
+
+/**
+ * Each check of a step on one try (`checkIn`), in the step's order: its `check: <line>` as one named `check`, or each of its `checks:`
+ * by the task its record names; one not filed has no task. None for a step with no check.
+ * @param step The step, whose checks are listed (`stepChecks`).
+ * @param check The check on the try's record, or undefined where none was filed.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
+ */
+export const checksIn = (step: StepSpec, check: StepRecord['check'], views: Views, stderr: CheckStderr) =>
+  stepChecks(step).map((c) => {
+    const taskId = check ? Object.fromEntries(checkTasksOf(check))[c.name] : undefined;
+    return checkIn(c.run, taskId, views, stderr, c.name);
+  });
+
+/**
+ * The check a try is judged by, of its checks (`checksIn`): the first that refused, else the first that did not pass, else the first.
+ * Null for a try with none.
+ * @param checks The try's checks, in the step's order.
+ */
+export const decidingCheck = (checks: readonly StepCheck[]) =>
+  checks.find((c) => c.refused) ?? checks.find((c) => c.verdict?.result !== 'passed') ?? checks[0] ?? null;
 
 /**
  * Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. One for an app,

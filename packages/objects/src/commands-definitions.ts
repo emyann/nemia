@@ -14,6 +14,7 @@ import {
   AGENTS_WORDS,
 } from './commands-definitions-agents.ts';
 import { FROM, versionFlag, writerSpec } from './commands-writers.ts';
+import { answerSpec } from './commands-flags.ts';
 
 /** The text `args` holds under `key`, or the empty text. */
 const textIn = (args: Args, key: string) => {
@@ -184,6 +185,17 @@ export const WORKFLOWS_RM_WORDS = {
   },
 } as const satisfies CommandWords;
 
+/** `nemia workflows keys`: every key a workflow's step takes, with its kind and what it means. */
+export const WORKFLOWS_KEYS_WORDS = {
+  name: 'workflows keys',
+  served: [{ endpoint: 'workflows.keys' }],
+  usage: '[--json]',
+  help: ["every key a workflow's step takes, its kind and what it means, as", 'YAML; --json: as JSON'],
+  spec: answerSpec('workflows keys', '[--json]'),
+  writes: false,
+  class: 'read',
+} as const satisfies CommandWords;
+
 /** The group's words, in the order the help lists them. */
 export const DEFINITION_WORDS = [
   AGENTS_WORDS,
@@ -198,5 +210,6 @@ export const DEFINITION_WORDS = [
   POLICY_CONFIRM_WORDS,
   POLICY_RM_WORDS,
   POLICY_REACH_WORDS,
+  WORKFLOWS_KEYS_WORDS,
   WORKFLOWS_RM_WORDS,
 ] as const satisfies readonly CommandWords[];

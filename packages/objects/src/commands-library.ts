@@ -4,6 +4,7 @@
  */
 import { LIBRARY_KINDS } from './words.ts';
 import type { Args, CommandWords, Flag, Spec } from './command.ts';
+import { ANSWER_JSON } from './commands-flags.ts';
 
 const CLI = 'nemia';
 
@@ -45,8 +46,9 @@ const addCheck = (verb: string) => (args: Args) => {
 };
 
 /**
- * `nemia library [skills|agents|mcpservers|workflows] [--factory <factory>]`: the store's library, the user library's beside the builtins;
- * with a factory, what that factory has added from it, each add with its state.
+ * `nemia library [skills|agents|mcpservers|workflows [<name>]] [--factory <factory>]`: the store's library, the user library's beside the
+ * builtins; with a kind and a name, that item whole (`<kind>.getLibrary`); with a factory, what that factory has added from it, each add
+ * with its state.
  */
 export const LIBRARY_WORDS = {
   name: 'library',
@@ -56,16 +58,25 @@ export const LIBRARY_WORDS = {
     { endpoint: 'mcpservers.listLibrary', as: 'library_mcpservers' },
     { endpoint: 'workflows.listLibrary', as: 'library_workflows' },
     { endpoint: 'libraryadds.list', as: 'library_adds' },
+    { endpoint: 'skills.getLibrary', as: 'library_skill' },
+    { endpoint: 'agents.getLibrary', as: 'library_agent' },
+    { endpoint: 'mcpservers.getLibrary', as: 'library_mcpserver' },
+    { endpoint: 'workflows.getLibrary', as: 'library_workflow' },
   ],
-  usage: '[skills|agents|mcpservers|workflows] [--factory <factory>]',
+  usage: '[skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]',
   help: [
     "the store's library: the user library's skills, agents, MCP servers and",
     'workflows beside the builtins, each with the factories that add it;',
-    "--factory: that factory's adds, each with its state and the fix of a missing one",
+    "--factory: that factory's adds, each with its state and the fix of a missing one;",
+    'given a kind and a name, that item whole, as YAML (--json: as JSON)',
   ],
   spec: {
-    positionals: [{ key: 'kind', takes: 'optional', kind: 'name' }],
+    positionals: [
+      { key: 'kind', takes: 'optional', kind: 'name' },
+      { key: 'name', takes: 'optional', kind: 'name' },
+    ],
     flags: [
+      ANSWER_JSON,
       {
         flag: '--factory',
         kind: 'name',
@@ -74,9 +85,14 @@ export const LIBRARY_WORDS = {
         twice: `${CLI} library takes --factory once: one factory's adds at a time.`,
       },
     ],
-    unknown: (arg) => `${CLI} library takes one kind, skills, agents, mcpservers or workflows, not ${arg}: ${CLI} library [<kind>].`,
+    unknown: (arg) =>
+      `${CLI} library takes one kind, skills, agents, mcpservers or workflows, and one name, not ${arg}: ${CLI} library [<kind> [<name>]].`,
   },
   check: (args) => {
+    if (args.name !== undefined && typeof args.factory === 'string')
+      return `${CLI} library --factory lists every add of the factory, of each kind: ${CLI} library --factory <factory>, with no kind or name.`;
+    if (args.json === true && args.name === undefined)
+      return `${CLI} library --json prints one item whole: ${CLI} library <kind> <name> --json.`;
     if (args.kind !== undefined && typeof args.factory === 'string')
       return `${CLI} library --factory lists every add of the factory, of each kind: ${CLI} library --factory <factory>, with no kind.`;
     return args.kind === undefined || ['skills', 'agents', 'mcpservers', 'workflows'].includes(String(args.kind))
@@ -85,7 +101,7 @@ export const LIBRARY_WORDS = {
   },
   writes: false,
   class: 'read',
-  only: { side: 'cli', why: "the api serves each kind's library list of `objects`' Api, which this command prints" },
+  only: { side: 'cli', why: "the api serves each kind's library list and item of `objects`' Api, which this command prints" },
 } as const satisfies CommandWords;
 
 /** `nemia library add <kind> <name> --factory <factory>`: a library item added to a factory, which resolves it from then on. */

@@ -1,8 +1,9 @@
 /**
  * The flags several commands take, built once: `--why` and `--by` (`saidFlags`, with their refusals), the `-l` selector of labels and the
- * label columns (`labelFlags`), and the refusal of a text flag's value left out (`leftOut`). Pure.
+ * label columns (`labelFlags`), the refusal of a text flag's value left out (`leftOut`), and `--json` with the words of a read that
+ * prints the api's answer (`ANSWER_JSON`, `answerSpec`). Pure.
  */
-import type { Args, Flag, Spec } from './command.ts';
+import type { Args, Flag, Positional, Spec } from './command.ts';
 
 /** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
 export type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
@@ -130,3 +131,27 @@ export const labelFlags = (command: string) =>
       takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
     },
   ] satisfies Flag[];
+
+/** `--json`: a read's answer printed as JSON rather than YAML, a printing of the client's alone. */
+export const ANSWER_JSON = {
+  flag: '--json',
+  kind: 'switch',
+  key: 'json',
+  only: { side: 'cli', why: 'the api answers JSON whatever is asked: the client prints it as YAML, or as it is with --json' },
+} as const satisfies Flag;
+
+/**
+ * The words of a read that prints the api's answer: its positionals, each required, and `--json`, with a refusal of anything else and of
+ * a positional left out, each ending on its form.
+ * @param command The command's name, as typed after `nemia`.
+ * @param usage Its usage after the name, which ends each refusal.
+ * @param positionals The keys of its positionals, in order, each required.
+ * @param flags The flags it takes besides `--json`.
+ */
+export const answerSpec = (command: string, usage: string, positionals: readonly string[] = [], flags: readonly Flag[] = []) =>
+  ({
+    positionals: positionals.map((key) => ({ key, takes: 'required', kind: 'name' }) satisfies Positional),
+    flags: [...flags, ANSWER_JSON],
+    unknown: (arg) => `nemia ${command} does not take ${arg}: nemia ${command} ${usage}.`,
+    ...(positionals.length > 0 ? { missing: `nemia ${command} takes ${positionals.map((key) => `<${key}>`).join(', then ')}: nemia ${command} ${usage}.` } : {}),
+  }) satisfies Spec;

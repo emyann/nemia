@@ -4,7 +4,7 @@
  * and its MCP servers listed, recorded and taken off (`nemia factory servers`, `server add|rm`, the McpServer). Pure.
  */
 import { type Args, type CommandWords, type Flag, type Spec } from './command.ts';
-import { leftOut } from './commands-flags.ts';
+import { answerSpec, leftOut } from './commands-flags.ts';
 
 /** The text under `key`, as the spec read it, or empty. */
 const textOf = (args: Args, key: string) => {
@@ -188,6 +188,20 @@ export const FACTORY_SERVERS_WORDS = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the McpServer's `list` of `objects`' Api, calling this handler" },
+} as const satisfies CommandWords;
+
+/** What `factory server sign-in` takes. */
+const SIGN_IN_USAGE = '<factory> <server> [--json]';
+
+/** `nemia factory server sign-in <factory> <server>`: where the sign-in of a factory's MCP server stands. */
+export const FACTORY_SERVER_SIGN_IN_WORDS = {
+  name: 'factory server sign-in',
+  served: [{ endpoint: 'mcpservers.signInState' }],
+  usage: SIGN_IN_USAGE,
+  help: ["where the sign-in of a factory's MCP server stands, as YAML;", '--json: as JSON'],
+  spec: answerSpec('factory server sign-in', SIGN_IN_USAGE, ['factory', 'server']),
+  writes: false,
+  class: 'read',
 } as const satisfies CommandWords;
 
 /** A value flag of `server add`. */

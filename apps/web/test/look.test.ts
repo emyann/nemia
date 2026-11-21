@@ -184,6 +184,11 @@ describe("the cut and the grain in the board's source: no ring a clip breaks, th
   });
   test("REFUSED: a cut written by hand outside the look's parts: the look draws every cut, its edge and what it holds", () => {
     assert.deepEqual(handCuts('<div style={{ clipPath: cutShape(10) }} />'), ['clipPath', 'cutShape(']);
+    assert.deepEqual(
+      handCuts("'[clip-path:polygon(0_0)]' cutRing(10, 2, 3) cutPoints(10) cutEdge(10, 1) cutHold(10, 2)"),
+      ['clip-path', 'polygon(', 'cutRing(', 'cutPoints(', 'cutEdge(', 'cutHold('],
+      'every other spelling of a cut is found',
+    );
     assert.deepEqual(handCuts("'bg-surface-container-highest px-3.5 py-2.5'"), [], 'a plain class string is none');
     const sources = filesUnder(SRC).filter((file) => !file.startsWith('components/look/') && ours(`src/${file}`));
     assert.ok(sources.includes('components/conversation/Said.tsx'), `the files outside the look are read: ${sources.length}`);

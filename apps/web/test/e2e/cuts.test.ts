@@ -789,3 +789,65 @@ test("REFUSED: a control at a cut field's end stands inside its cut; one laid fl
     }
   }
 });
+
+/**
+ * The focus ring of the control at a cut field's end, with the keyboard on it: whether it is drawn inside the control's own box, read
+ * a page's pixel and a half inside its top edge, closer to `ring` than to the control's ground; and each of the field's straight
+ * edges above and below the control that the ring crosses, read half a page's pixel outside the field, closer to the ring than to
+ * the page's ground. `ring`, the ring's colour, is read inside the control's top edge where it is not given.
+ */
+async function endRing(page: Page, name: string, given?: Rgb) {
+  const field = await scaledBox(page, FIELD);
+  const button = await scaledBox(page, FIELD_END);
+  const midX = (button.left + button.right) / 2;
+  const points: Record<string, readonly [number, number]> = {
+    ground: pixel(field.left - 12 * SCALE, field.top - 12 * SCALE),
+    control: pixel(button.left + 6 * SCALE, (button.top + button.bottom) / 2),
+    inside: pixel(midX, button.top + 1.5 * SCALE),
+    'above the field': pixel(midX, field.top - 0.5 * SCALE),
+    'below the field': pixel(midX, field.bottom + 0.5 * SCALE),
+  };
+  const found = await coloursOf(page, name, points);
+  const { ground, control, inside } = found;
+  const ring = given ?? inside;
+  assert.ok(apart(ring, control) > 12, `the ring is read apart from the control: ${ring.join(' ')} on ${control.join(' ')}`);
+  assert.ok(apart(ring, ground) > 12, `the ring is read apart from the ground: ${ring.join(' ')} on ${ground.join(' ')}`);
+  return {
+    ring,
+    inside: apart(inside, ring) < apart(inside, control),
+    crossed: (['above the field', 'below the field'] as const).filter((where) => apart(found[where], ring) < apart(found[where], ground)),
+  };
+}
+
+/**
+ * The control's own ring put back as the kit draws it, outside its box, in the first of Tailwind's layers so it wins over the field's
+ * important utility that sets it inside: four pixels of room above and below are fewer than the ring reaches.
+ */
+const KIT_END_RING = `@layer theme { [data-cut-end] :focus-visible { outline-offset: 2px !important; } }`;
+
+test(
+  "REFUSED: the focus ring of a control at a cut field's end stands inside the control, clear of the field's edges; the kit's own ring, crossing them, is seen",
+  WAITED,
+  async () => {
+    for (const theme of ['dark', 'light'] as const) {
+      const page = await open(ENDED_FIELD, theme, { scale: SCALE });
+      try {
+        await tabTo(page, 'filterButton');
+        const whole = await endRing(page, `field-end-ring-${theme}`);
+        assert.deepEqual(
+          { inside: whole.inside, crossed: whole.crossed },
+          { inside: true, crossed: [] },
+          `inside the control, in ${theme}`,
+        );
+        await page.addStyleTag({ content: KIT_END_RING });
+        const kit = await endRing(page, `field-end-ring-kit-${theme}`, whole.ring);
+        assert.ok(
+          !kit.inside && kit.crossed.length === 2,
+          `the kit's ring outside the control crosses the field's edges, in ${theme}: seen (${kit.crossed.join('; ')})`,
+        );
+      } finally {
+        await page.context().close();
+      }
+    }
+  },
+);

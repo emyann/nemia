@@ -15,6 +15,14 @@ const FOCUSED_EDGE = 2;
 const END_ROOM = 4;
 
 /**
+ * Where the focus ring of the control at the field's end is drawn: inside the control's own box, its full width within it, rather than
+ * outside it as the kit draws it. The row keeps four pixels above and below the control, fewer than the kit's ring reaches, so a ring
+ * outside the box would cross the field's edge and be cut at its diagonal; inside, it is whole. It wins over the kit's own offset,
+ * a focus state's included.
+ */
+const END_RING = '**:outline-offset-[-3px]!';
+
+/**
  * The look's cut-corner frame for a box that holds a field: a shape of its own under what it holds, its top-right and bottom-left
  * corners cut, and an edge drawn in that shape all the way round the cut corners — never a rectangular ring a clip would take off the
  * diagonals. Quiet it is a pixel of the outline's hue; when something inside it takes the focus, by a click or by the keyboard, the
@@ -22,8 +30,8 @@ const END_ROOM = 4;
  * class of the ground under what it holds, `size` its cut. What it holds is kept inside its two diagonals, two pixels in from each
  * (`cutHold`), its straight sides left open: nothing is drawn past a cut. `end` is a control at the row's right end (a Filter, an
  * Add): the field lays its row itself, what it holds filling it and the control set in from the right by the cut and the row's room
- * beside it, so its corner stands inside the cut (`data-cut-end`). Its ground is read from its own layer, as a cut frame's is
- * (`data-cut-frame`, `test/e2e/contrast.ts`).
+ * beside it, so its corner stands inside the cut (`data-cut-end`), its focus ring drawn inside its own box (`END_RING`). Its ground
+ * is read from its own layer, as a cut frame's is (`data-cut-frame`, `test/e2e/contrast.ts`).
  */
 export function CutField({
   size = 12,
@@ -59,7 +67,7 @@ export function CutField({
         ) : (
           <div className="flex items-center gap-2">
             <div className="flex min-w-0 flex-1">{children}</div>
-            <div data-cut-end className="flex shrink-0" style={{ paddingBlock: END_ROOM, marginRight: size + END_ROOM }}>
+            <div data-cut-end className={`flex shrink-0 ${END_RING}`} style={{ paddingBlock: END_ROOM, marginRight: size + END_ROOM }}>
               {end}
             </div>
           </div>

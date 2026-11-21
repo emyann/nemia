@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect } from 'storybook/test';
 import { Button } from '@/components/ui/ds';
+import { atRest, tabTo } from '../../../.storybook/play';
 import { CutField } from './CutField';
 import { ON_PLAIN } from './stories.fixture';
 
@@ -44,7 +46,8 @@ export const Off: StoryObj = {
 
 /**
  * A list's label filter: a field cut 12 with its Filter at the row's end, set in from the right so the button's corner stands inside
- * the cut, never over it. Tab into it and the whole edge lights, the button still inside the diagonal.
+ * the cut, never over it. Tab into it and the whole edge lights, the button still inside the diagonal; Tab to the Filter and its
+ * focus ring is drawn inside its own box, clear of the field's edge and its cut.
  */
 export const WithEnd: StoryObj<typeof CutField> = {
   args: { size: 12 },
@@ -53,7 +56,7 @@ export const WithEnd: StoryObj<typeof CutField> = {
       <CutField
         {...args}
         end={
-          <Button type="submit" size="xsmall" variant="tonal">
+          <Button type="submit" size="xsmall" variant="tonal" data-filter-button>
             Filter
           </Button>
         }
@@ -67,4 +70,14 @@ export const WithEnd: StoryObj<typeof CutField> = {
       </CutField>
     </div>
   ),
+  play: async ({ canvasElement, userEvent }) => {
+    await tabTo(userEvent, 'filterButton');
+    const button = document.activeElement as HTMLElement;
+    const ring = getComputedStyle(button);
+    await expect(ring.outlineStyle, 'the Filter has its focus ring with the keyboard on it').toBe('solid');
+    const [reach, width] = [parseFloat(ring.outlineOffset), parseFloat(ring.outlineWidth)];
+    await expect(reach + width <= 0, `its ring is drawn inside its own box: offset ${reach}, width ${width}`).toBe(true);
+    await expect(canvasElement.querySelector('[data-cut-end]')?.contains(button)).toBe(true);
+    atRest();
+  },
 };

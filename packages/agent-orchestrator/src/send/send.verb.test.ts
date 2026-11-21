@@ -7,7 +7,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
 import { parseWorkflow } from '../workflow/step-file.ts';
-import { parseInboxCard } from '../inbox/inbox.ts';
+import { parseInboxCard } from '../inbox/index.ts';
 import { sentCardText } from './send.verb.ts';
 
 const RUN: Run = {

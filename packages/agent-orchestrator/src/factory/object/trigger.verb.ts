@@ -18,7 +18,7 @@ import type { ScheduleRuns } from '../schedule/listed.store.ts';
 import { cardTriggersOf, type TriggerDefined } from '../applied/applied.store.ts';
 import { quotaSettledBy, reachedWorkflows, triggerQuota, type ReachStep } from '../trigger/quota.ts';
 import { readInbox } from '../../inbox/inbox.store.ts';
-import type { CardListing } from '../../inbox/inbox.ts';
+import type { CardListing } from '../../inbox/index.ts';
 import { WorkflowDoor } from '../../workflows/workflows.store.ts';
 import { workflowFolder } from '../../folder/folder.store.ts';
 import { fromThrow } from '../../door/door.store.ts';

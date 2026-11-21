@@ -12,7 +12,7 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import type { Labels } from '../labels/labels.ts';
 import { CardName } from '../inbox/inbox.model.ts';
-import { parseInboxCard } from '../inbox/inbox.ts';
+import { parseInboxCard } from '../inbox/index.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { answeredRoute } from '../route/routed/index.ts';
 import { conditionOf } from '../route/index.ts';

@@ -15,7 +15,7 @@ export {
   TryShort,
   RunUnjudged,
 } from './run.ts';
-export { Spent, StepAttempts, StepCheck, StepLog, StepUsed } from './run-step.ts';
+export { CheckOutput, Spent, StepAttempts, StepCheck, StepLog, StepUsed } from './run-step.ts';
 export {
   StepCloseout,
   type BodyPage,
@@ -108,6 +108,8 @@ export {
   RUNS_IN_BY,
   type RunsInBy,
   SAID_AFTER,
+  OUTPUT_STREAMS,
+  type OutputStream,
   READ_SHAPES,
   type SaidAfter,
   SETTING_ORIGINS,
@@ -611,6 +613,7 @@ export {
 export {
   ANSWER_MOST,
   BODY_PAGE,
+  CHECK_OUTPUT_PAGE,
   LIST_PAGE,
   LOG_TAIL,
   type PageBounds,
@@ -782,7 +785,16 @@ export {
   AGENTS_WORDS,
 } from './commands-definitions-agents.ts';
 export { LIBRARY_ADD_WORDS, LIBRARY_RM_WORDS, LIBRARY_WORDS } from './commands-library.ts';
-export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LINES_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
+export {
+  CHECK_OUTPUT_WORDS,
+  CLOSEOUT_WORDS,
+  INBOX_READ_WORDS,
+  LINES_WORDS,
+  LS_WORDS,
+  READ_WORDS,
+  SHOW_WORDS,
+  WATCH_WORDS,
+} from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
 export { QUOTA_WORDS } from './commands-rest-reads.ts';

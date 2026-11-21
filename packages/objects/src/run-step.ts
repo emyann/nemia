@@ -12,6 +12,7 @@ import {
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
   GATE_BUDGETS_FROM,
+  OUTPUT_STREAMS,
   PEAK_MARKS,
   RUNS_IN_BY,
   SAID_AFTER,
@@ -207,6 +208,38 @@ export const StepCheck = Schema.Struct({
   }),
 }).annotate({ identifier: 'StepCheck' });
 export type StepCheck = typeof StepCheck.Type;
+
+/**
+ * A page of what one try's check printed on one stream (`CheckOutput`, agent-orchestrator's check-output.verb.ts): its lines numbered from
+ * 1 in the stream, the stream's count of them, those `match` found where it was asked, and the line to read on from where any is left. A
+ * check still running answers what it printed so far, under the same numbers a later read gives.
+ */
+export const CheckOutput = Schema.Struct({
+  try: Schema.Finite.annotate({ description: 'The try whose check printed it, counted from 1.' }),
+  taskId: NullString.annotate({ description: "The check's task; null while none was filed, when no line is answered." }),
+  stream: Schema.Literals(OUTPUT_STREAMS).annotate({ description: 'The stream read: stdout, or stderr.' }),
+  running: Schema.Boolean.annotate({ description: 'Whether the check still runs, so that its stream may still grow.' }),
+  partial: Schema.Boolean.annotate({
+    description:
+      'Whether the runtime kept no whole stdout for the check, so that the lines are the end of its log, both streams together, and not the whole stream.',
+  }),
+  lines: List(
+    Schema.Struct({
+      n: Schema.Finite.annotate({ description: "The line's number in the stream, from 1, kept under a match." }),
+      text: Schema.String.annotate({ description: 'The line as it was printed, with no line end.' }),
+    }),
+  ).annotate({ description: 'The lines of the page, in the order they were printed.' }),
+  total: Schema.Finite.annotate({ description: 'How many lines the stream holds.' }),
+  matched: Schema.optionalKey(
+    Schema.Finite.annotate({ description: 'How many lines match found, where match was asked; absent where it was not.' }),
+  ),
+  next: Schema.optionalKey(
+    Schema.Finite.annotate({
+      description: 'The line number to read on from, as from, where lines are left after this page; absent where none is.',
+    }),
+  ),
+}).annotate({ identifier: 'CheckOutput' });
+export type CheckOutput = typeof CheckOutput.Type;
 
 /** The release a session ran on (`SessionRelease`, release.ts): an install's tag, or a checkout's folder. */
 export const SessionReleaseSchema = Schema.Union([

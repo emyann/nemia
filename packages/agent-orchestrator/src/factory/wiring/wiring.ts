@@ -8,6 +8,8 @@
  * (`factoryChecked`, `factories.store.ts`), on every create and rewrite.
  */
 import type {
+  FireRefusal,
+  HireChangeRefusal,
   ReposRewired,
   Rewired,
   TriggerRefusal,
@@ -69,9 +71,8 @@ const missing = (message: string) => ({ kind: 'Missing', message }) satisfies Wi
  * @param change The change the person's verb asks: attach, detach, hire, fire, schedule or unschedule, and what it names.
  */
 export const wiringRefusal: WiringRefusal = (factory, change) => {
-  if (change.verb === 'hire') return hireRefused(factory, change.step, change.agent);
-  if (change.verb === 'fire')
-    return !holds(factory.hires, change.step) ? missing(unhiredFireRefusal(factory.name, change.step, factory.hires)) : null;
+  if (change.verb === 'hire') return hireChangeRefusal(factory, change);
+  if (change.verb === 'fire') return fireRefusal(factory, change);
   if (change.verb === 'trigger' || change.verb === 'untrigger') return triggerRefusal(factory, change);
   return workflowChangeRefusal(factory, change);
 };
@@ -115,15 +116,27 @@ export const triggerRefusal: TriggerRefusal = (factory, change) => {
   return null;
 };
 
-/** Why `factory` cannot hire `agent` into `step`: a step or an agent that is not one, or a workflow it does not offer (`Invalid`). */
-function hireRefused(factory: Parameters<WiringRefusal>[0], step: string, agent: string) {
-  const bad = hireRefusal(step, agent);
-  if (bad !== undefined) return invalid(`${bad} Nothing was hired.`) satisfies WiringRefused | null;
-  const workflow = workflowOfStep(step);
-  return (
-    factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`)
-  ) satisfies WiringRefused | null;
-}
+/**
+ * Why `factory` cannot hire an agent into a step: a step or an agent that is not one, or a workflow it does not offer (`Invalid`). Its own
+ * contract, which `wiringRefusal` leans on for a hire.
+ * @param factory The factory as it is: its name and workflows.
+ * @param change The hire, its step `<workflow>/<step>` and its agent.
+ */
+export const hireChangeRefusal: HireChangeRefusal = (factory, change) => {
+  const bad = hireRefusal(change.step, change.agent);
+  if (bad !== undefined) return invalid(`${bad} Nothing was hired.`);
+  const workflow = workflowOfStep(change.step);
+  return factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`);
+};
+
+/**
+ * Why `factory` cannot fire the agent of a step: it hires no one into it (`Missing`). Its own contract, which `wiringRefusal` leans on
+ * for a fire.
+ * @param factory The factory as it is: its name and hires.
+ * @param change The fire, and the step it names.
+ */
+export const fireRefusal: FireRefusal = (factory, change) =>
+  holds(factory.hires, change.step) ? null : missing(unhiredFireRefusal(factory.name, change.step, factory.hires));
 
 /** Why `factory` cannot attach `workflow` on its repository named `repo`: a folder name none or several of its repositories have. */
 function attachRefused(factory: Parameters<WiringRefusal>[0], workflow: string, repo: string | undefined) {

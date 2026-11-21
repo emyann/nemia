@@ -95,6 +95,8 @@ export const UNLINKED_READS: { readonly [K in ApiGetName]?: string } = {
   'mcpservers.get': BY_GET,
   'schedules.list': BY_GET,
   'schedules.get': BY_GET,
+  'triggers.list': BY_GET,
+  'triggers.get': BY_GET,
   'hires.list': BY_GET,
   'hires.get': BY_GET,
   'libraryadds.get': BY_GET,

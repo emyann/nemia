@@ -30,9 +30,28 @@ export const accepted = (
   change: WiringChange,
 ) => {
   if (change.verb === 'hire') return factory.workflows.includes(change.step.slice(0, change.step.indexOf('/')));
-  if (change.verb === 'trigger')
-    return factory.workflows.includes(change.trigger.target.name) && !Object.hasOwn(factory.schedules, change.name);
-  if (change.verb === 'untrigger') return triggerHeld(factory, change.name);
+  if (change.verb === 'fire') return Object.hasOwn(factory.hires, change.step);
+  if (change.verb === 'trigger' || change.verb === 'untrigger') return triggerAccepted(factory, change);
+  return workflowAccepted(factory, change);
+};
+
+/**
+ * `accepted` of a trigger or an untrigger: a trigger only to a workflow offered and under a name no schedule holds, an untrigger only of
+ * a trigger held.
+ */
+export const triggerAccepted = (
+  factory: Pick<Factory, 'workflows' | 'schedules' | 'triggers'>,
+  change: Extract<WiringChange, { readonly verb: 'trigger' | 'untrigger' }>,
+) =>
+  change.verb === 'trigger'
+    ? factory.workflows.includes(change.trigger.target.name) && !Object.hasOwn(factory.schedules, change.name)
+    : triggerHeld(factory, change.name);
+
+/** `accepted` of an attach, a detach, a schedule or an unschedule, as `accepted` says of each. */
+export const workflowAccepted = (
+  factory: Pick<Factory, 'volumes' | 'workflows' | 'hires' | 'schedules' | 'costLines' | 'triggers'>,
+  change: Extract<WiringChange, { readonly verb: 'attach' | 'detach' | 'schedule' | 'unschedule' }>,
+) => {
   if (change.verb === 'schedule') return factory.workflows.includes(change.workflow);
   if (change.verb === 'detach')
     return (
@@ -42,7 +61,6 @@ export const accepted = (
       !(factory.costLines !== undefined && Object.hasOwn(factory.costLines, change.workflow)) &&
       !targets(factory, change.workflow)
     );
-  if (change.verb === 'fire') return Object.hasOwn(factory.hires, change.step);
   if (change.verb === 'unschedule') return Object.hasOwn(factory.schedules, change.workflow);
   return change.repo === undefined || reposNamed(factory, change.repo) === 1;
 };

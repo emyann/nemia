@@ -29,7 +29,7 @@ import {
   type Schedule,
 } from '../src/factory/factory.ts';
 import { hiresInto, triggersOn, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
-import { accepted, changeNamed, targets, triggerHeld } from './laws.ts';
+import { accepted, changeNamed, targets, triggerAccepted, triggerHeld, workflowAccepted } from './laws.ts';
 
 /**
  * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired
@@ -240,6 +240,52 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
 });
 export type WiringRefusal = Implementation<typeof wiringRefusalSpec>;
 
+/** A hire: an agent into a step `<workflow>/<step>`. */
+export type HireChange = Extract<WiringChange, { readonly verb: 'hire' }>;
+
+/**
+ * Why a factory cannot take a hire (`hireChangeRefusal`), the part of `wiringRefusal` for a hire, which its laws of a hire lean on: its
+ * own contract, so a proof of the whole reads these laws rather than this path's body.
+ */
+const hireChangeRefusalSpec = spec<(factory: Factory, change: HireChange) => WiringRefused | null>({
+  /**
+   * Whether a hire into a workflow the factory offers is refused turns on `hireRefusal`, declared not pure (`hireNamed`): left to the
+   * code.
+   */
+  open: ['output'],
+  ensures: {
+    hireOnlyIntoOffered: {
+      description: 'A hire into a step of a workflow the factory does not offer is refused',
+      condition: ({ input: [factory, change], output }) =>
+        factory.workflows.includes(change.step.slice(0, change.step.indexOf('/'))) || output !== null,
+    },
+    neverMissing: {
+      description: 'A hire is never refused as Missing',
+      condition: ({ output }) => output?.kind !== 'Missing',
+    },
+  },
+});
+export type HireChangeRefusal = Implementation<typeof hireChangeRefusalSpec>;
+
+/** A fire: the agent of a step taken off it. */
+export type FireChange = Extract<WiringChange, { readonly verb: 'fire' }>;
+
+/** Why a factory cannot take a fire (`fireRefusal`), the part of `wiringRefusal` for a fire, which its laws of a fire lean on. */
+const fireRefusalSpec = spec<(factory: Factory, change: FireChange) => WiringRefused | null>({
+  open: ['output'],
+  ensures: {
+    fireOnlyHired: {
+      description: 'A fire of a step it hires no one into is refused, as Missing',
+      condition: ({ input: [factory, change], output }) => Object.hasOwn(factory.hires, change.step) || output?.kind === 'Missing',
+    },
+    takesWhatItCan: {
+      description: 'A fire of a step it hires into is never refused',
+      condition: ({ input: [factory, change], output }) => !Object.hasOwn(factory.hires, change.step) || output === null,
+    },
+  },
+});
+export type FireRefusal = Implementation<typeof fireRefusalSpec>;
+
 /** A change of a workflow the factory offers or schedules: an attach, a detach, a schedule or an unschedule. */
 export type WorkflowChange = Extract<WiringChange, { readonly verb: 'attach' | 'detach' | 'schedule' | 'unschedule' }>;
 
@@ -325,7 +371,7 @@ const workflowChangeRefusalSpec = spec<(factory: Factory, change: WorkflowChange
     takesWhatItCan: {
       description: 'A well-named change of a workflow the factory can take is never refused',
       condition: ({ input: [factory, change], output }) =>
-        workflowNameRefusal(change.workflow) !== undefined || !accepted(factory, change) || output === null,
+        workflowNameRefusal(change.workflow) !== undefined || !workflowAccepted(factory, change) || output === null,
     },
   },
 });
@@ -371,7 +417,7 @@ const triggerRefusalSpec = spec<(factory: Factory, change: TriggerChange) => Wir
     takesWhatItCan: {
       description: 'A well-named trigger or untrigger the factory can take is never refused',
       condition: ({ input: [factory, change], output }) =>
-        workflowNameRefusal(change.name) !== undefined || !accepted(factory, change) || output === null,
+        workflowNameRefusal(change.name) !== undefined || !triggerAccepted(factory, change) || output === null,
     },
   },
 });

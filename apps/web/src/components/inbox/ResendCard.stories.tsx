@@ -27,6 +27,9 @@ const filedCard = (workflow?: string) =>
     },
   }) satisfies Card;
 
+/** What a stand-in api says where a run's cancel failed: the board says the api's words as they come, whatever they name. */
+const LEFT = 'the cancellation could not be written: call the run off as its page says.';
+
 /** The api taking the send on: the body kept in `sent`, and the card filed answered with the run called off. */
 const takes = http.post(RESEND, async ({ request }) => {
   const body = (await request.json()) as { workflow?: string };
@@ -41,7 +44,7 @@ const takes = http.post(RESEND, async ({ request }) => {
 
 /**
  * A started card sent on, one story a state: the factory's workflows and none to choose among, a workflow picked and sent and its answer
- * said, none picked and sent with no workflow, a cancel that failed said with its command, and a refusal told in the api's words.
+ * said, none picked and sent with no workflow, a cancel that failed said in the api's words, and a refusal told in the api's words.
  */
 const meta: Meta<typeof ResendCard> = {
   title: 'Store/ResendCard',
@@ -84,7 +87,7 @@ export const ToAWorkflow: Story = {
   },
 };
 
-/** Sent on, its run's cancel failed: the card filed, and why the run was not called off, with the command that does it. */
+/** Sent on, its run's cancel failed: the card filed, and why the run was not called off, in the api's words. */
 export const CancelLeft: Story = {
   parameters: {
     msw: [
@@ -93,7 +96,7 @@ export const CancelLeft: Story = {
           {
             card: filedCard(),
             from: { card: 'ship-it', run: 'ship-it-k2rq' },
-            cancelLeft: 'the cancellation could not be written: call the run off with nemia cancel ship-it-k2rq.',
+            cancelLeft: LEFT,
           } satisfies CardResent,
           { status: 201 },
         ),
@@ -102,7 +105,9 @@ export const CancelLeft: Story = {
   },
   play: async ({ canvasElement, userEvent }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Send on' }));
-    await waitFor(() => expect(canvasElement.querySelector('[data-cancel-left]')).toHaveTextContent('nemia cancel ship-it-k2rq'));
+    await waitFor(() =>
+      expect(canvasElement.querySelector('[data-cancel-left]')).toHaveTextContent(`Run ship-it-k2rq not called off: ${LEFT}`),
+    );
     await expect(canvasElement.querySelector('[data-resent]')).toHaveTextContent("naming no workflow, for its factory's card triggers");
   },
 };

@@ -167,6 +167,20 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
           SOURCE: ${{ github.server_url }}/${{ github.repository }}/releases
         run: node tools/release/archive.ts --platform "$PLATFORM" --tag "$TAG" --source "$SOURCE" --out assets
+      - name: Run the archive as the upgrade does
+        # Unpacks the archive just built, this runner's own platform, and runs its bin/nemia version in its tree on a throwaway store,
+        # the command an upgrade runs before it switches: an archive that cannot start (a package its source imports left out of its
+        # production dependencies) fails here, so its assets are never uploaded and the release is never offered.
+        timeout-minutes: 5
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          tried="$RUNNER_TEMP/tried"
+          mkdir -p "$tried"
+          tar -xzf "assets/nemia-$TAG-$PLATFORM.tar.gz" -C "$tried"
+          cd "$tried"
+          WF_ROOT="$RUNNER_TEMP/trial/workflows" AE_ROOT="$RUNNER_TEMP/trial/engine" ./bin/nemia version
       - uses: actions/upload-artifact@v7
         timeout-minutes: 5
         with:

@@ -104,7 +104,9 @@ packs: the SDK's platform packages taken out of the tree (`node_modules/@anthrop
 platform, wherever npm put one; the SDK itself stays), `node/`, `bin/nemia` (sh: it follows its own symlinks to the release folder and runs `node/bin/node apps/cli/bin/nemia.ts`),
 `release.json` (`tag`, `commit`, `source`, `builtAt`, `from: "archive"`, `platform`), the tar.gz and its `SHA256SUMS` line. A machine
 of another platform is refused: `npm ci` takes the binaries of the machine it runs on. Given `--tree <dir> --node <dir>`, it packs that
-tree with that Node and builds nothing, which is how `tools/guards/test/install.test.ts` makes a release. The `upload` job merges the
+tree with that Node and builds nothing, which is how `tools/guards/test/install.test.ts` makes a release. Each leg then unpacks the
+archive it built and runs its `bin/nemia version` in its tree on a throwaway store, as an upgrade does before it switches: an archive
+that cannot start (a package its source imports installed only as a dev dependency) fails its leg, and nothing is uploaded. The `upload` job merges the
 four `SHA256SUMS`, writes `latest.json`, and attaches every asset with `gh release upload --clobber`, `latest.json` in a call of its
 own after the rest, then publishes the draft and makes it the latest (`gh release edit --draft=false --latest`): a release is never
 published with nothing to download, so neither its page nor `latest/download/latest.json` names one too early. A run cut off before

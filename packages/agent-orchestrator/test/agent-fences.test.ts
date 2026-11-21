@@ -55,6 +55,7 @@ import { scratch } from 'test-kit/scratch';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
 import { admissionOf, agentClassOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
+import { CLI_VERBS } from '../src/command/command.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { REPO, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 import yaml from 'js-yaml';
@@ -1394,12 +1395,12 @@ type Rules = { allow: readonly string[]; ask: readonly string[]; deny: readonly 
 
 /**
  * Her rules as her keeper files them (`nemiaSpec`) in the store `root`: her own allow list and deny, the fence derived from the table
- * (`nemiaFence`) less each prompt `local` allows by its own rule (`widened`) and the store's denies (`storeDenies`), her memory allowed
- * her; with the person's own allows `local` besides, in her folder's local settings.
+ * and the verbs the api serves beside it (`nemiaFence`, `CLI_VERBS`) less each prompt `local` allows by its own rule (`widened`) and
+ * the store's denies (`storeDenies`), her memory allowed her; with the person's own allows `local` besides, in her folder's local settings.
  */
 function herRules(root: string, local: readonly string[] = []) {
   const her = nemia();
-  const fence = widened(nemiaFence(TABLE), local);
+  const fence = widened(nemiaFence([...TABLE, ...CLI_VERBS]), local);
   return {
     allow: [...(her.allowedTools ?? []), ...fence.allow, `Edit(/${path.join(root, 'nemia', 'memory')}/**)`, ...local],
     ask: fence.ask,
@@ -1515,6 +1516,14 @@ test('her fence asks every write that prompts and every write form of a command 
     owed.filter(([command, verdict]) => verdictOf(rules, command) !== verdict).map(([command]) => command),
     [],
   );
+});
+
+test('her fence lets the quota through by its verb, unasked, and no call of the api by any other way', () => {
+  const rules = herRules(herStore());
+  assert.equal(verdictOf(rules, 'nemia quota'), 'allow');
+  assert.equal(verdictOf(rules, 'nemia quota --json'), 'allow');
+  assert.equal(verdictOf(rules, 'nemia decide r-1'), 'allow');
+  assert.notEqual(verdictOf(rules, 'curl -s http://127.0.0.1:8787/api/quota'), 'allow');
 });
 
 test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken away, and a deny taken away are each named', () => {

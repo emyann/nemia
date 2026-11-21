@@ -8,6 +8,7 @@ import type { Runner } from '../runner.ts';
 import { passes, series } from './meters.ts';
 import { level } from './nemia.ts';
 import { boardLink, boardOpen, pairingsApprove, pairingsLs } from './pairing.ts';
+import { quota } from './quota.ts';
 import { concluded, logs, memory } from './reads.ts';
 import { stats } from './stats.ts';
 import { subscribe, unsubscribe } from './subscriptions.ts';
@@ -20,6 +21,7 @@ export const REST_RUNNERS: Readonly<Record<RestCommand, Runner>> = {
   stats,
   passes,
   series,
+  quota,
   subscribe,
   unsubscribe,
   level,

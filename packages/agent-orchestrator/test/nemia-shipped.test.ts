@@ -6,7 +6,8 @@
  * keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in each file that writes or reads them
  * (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that line shows her (`feedLineWords`)
  * beside the reason her selector asks for. Her plugin's agent is the file the keeper reads (`nemiaDefinition`), and its one server is the
- * store's MCP port, read from the person's environment (`serverBreaks`). Its wording is judged by a person at the landing step; this
+ * store's MCP port, read from the person's environment (`serverBreaks`). Nothing of it hands her a way to the api but a verb: no shell's
+ * HTTP client and no fetch (`aroundVerbsIn`). Its wording is judged by a person at the landing step; this
  * holds only what it names.
  */
 import { test } from 'vitest';
@@ -75,6 +76,27 @@ test('REFUSED: a skill of hers that names an agent of the team, or the playbook,
 test("REFUSED: a skill of hers that says the owner's settings is named for each", () => {
   const files = new Map([['skills/x/SKILL.md', 'Say times in Montreal; the line is $80 a card.']]);
   assert.deepEqual(oursIn(files), ['skills/x/SKILL.md: Montreal', 'skills/x/SKILL.md: $80']);
+});
+
+/** The ways to the api but a verb a call of hers could take: a shell's HTTP clients and the harness's own fetch. */
+const AROUND_VERBS = ['curl', 'wget', 'WebFetch'];
+
+/** Where `files` hand her a way to the api but a verb (`AROUND_VERBS`), whole: a line each, `<file>: <word>`. */
+const aroundVerbsIn = (files: Map<string, string>) =>
+  [...files].flatMap(([file, text]) =>
+    AROUND_VERBS.filter((word) => new RegExp(`(?<![\\w-])${word}(?![\\w-])`).test(text)).map((word) => `${file}: ${word}`),
+  );
+
+test('what ships with Nemia hands her no way to the api but a verb: no curl, wget or WebFetch', () => {
+  assert.deepEqual(aroundVerbsIn(shipped()), []);
+});
+
+test('REFUSED: a skill of hers that reads the quota with curl is named', () => {
+  const files = new Map([
+    ['skills/x/SKILL.md', 'Read the pace with `curl -s http://127.0.0.1:8787/api/quota`.'],
+    ['skills/y/SKILL.md', 'Read the pace with `nemia quota`.'],
+  ]);
+  assert.deepEqual(aroundVerbsIn(files), ['skills/x/SKILL.md: curl']);
 });
 
 test('each skill her instruction and her skills name ships under nemia/skills/, with its folder as its name', () => {

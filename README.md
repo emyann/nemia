@@ -87,7 +87,8 @@ the header says so in its own words, with what would make it answer — a `/logi
 To check it:
 
 ```bash
-curl -s localhost:8787/api/quota   # state "fresh", with its windows; the Factory's header shows them
+nemia quota          # each window's used share and its reset; the Factory's header shows them
+nemia quota --json   # the whole answer: state "fresh", with its windows
 ```
 
 Every other state is a sentence on the header saying what to do, and never a number read as the quota:

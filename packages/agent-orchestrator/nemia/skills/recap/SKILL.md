@@ -27,7 +27,7 @@ In this order, a line or two each, and leave out a part with nothing in it:
    how long it has waited; then each run you held, and until what.
 3. **Failed or blocked**: each, with the step and the reason in its own words.
 4. **Spent**: what the runs spent since the last recap (`nemia ls`), your own sessions' spend (`nemia level`), and the quota's pace,
-   read with the command your first message names, when it names one.
+   read with `nemia quota` (its tool on the port: `quota`): each window's used share and when it resets, or why there is none.
 5. **At auto**: for each factory whose level changed to auto since the last recap (a `level changed` line), where your rules can
    approve no step at its gate, or only some (`nemia policy reach nemia --factory <name>`), say so in a line, and offer the rules it
    suggests, in their words.

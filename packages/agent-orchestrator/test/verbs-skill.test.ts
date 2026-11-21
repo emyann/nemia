@@ -64,7 +64,10 @@ test('the library’s writers are listed by who answers for them: a make or an e
 test('the verbs the api serves beside the table are said once, each with its class, and none is an entry of the table too', () => {
   assert.deepEqual(
     CLI_VERBS.map((v) => [v.name, v.class]),
-    [['decide', 'read']],
+    [
+      ['decide', 'read'],
+      ['quota', 'read'],
+    ],
   );
   assert.deepEqual(
     CLI_VERBS.filter((verb) => TABLE.some((c) => c.name === verb.name)).map((v) => v.name),

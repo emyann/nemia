@@ -55,7 +55,7 @@ import {
 import { readAnswers, readOutbox } from '../chat/chat.store.ts';
 import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
-import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
+import { CLI_VERBS } from '../command/command.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { SESSION_TOKEN } from '../filed/filed.ts';
 import { TokenDoor } from '../token/token.store.ts';
@@ -99,35 +99,17 @@ export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds', restAfter: NEMIA
 const NEMIA_PRIORITY = 1_000_000;
 
 /**
- * Where the store's quota is read, `<url>/api/quota` at the address its daemon's api serves (`daemon.json`); undefined with no daemon, one
- * stopped, one serving no board (`nemia up`), or a file that does not read.
- */
-const quotaUrl = (home: string) => {
-  try {
-    const held = parseDaemonFile(fs.readFileSync(daemonFile(home), 'utf8'));
-    return held?.url !== undefined && held.stoppedAt === undefined ? `${held.url}/api/quota` : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-/**
- * The call that reads the quota at `quota`, allowed her unasked: a read of the daemon's own api.
- * @param quota The quota's URL, `<url>/api/quota` at the address the daemon's api serves.
- */
-export const quotaCall = (quota: string) => `curl -s ${quota}`;
-
-/**
  * What her session is told first, once filed: what she does while the person writes to her, and, while a factory is above `manual`
- * (`operating`), that the feed is said to her; and how she reads the quota at `quota`, where the daemon serves one.
+ * (`operating`), that the feed is said to her; and that she reads the quota with `nemia quota`, a verb of her fence, which sends her
+ * session token as every `nemia` she runs does.
  */
-const nemiaBrief = (quota: string | undefined, operating: boolean) =>
+const nemiaBrief = (operating: boolean) =>
   [
     'You are on. Read your memory, then answer what the person wrote in your chat, if anything; then wait for their next words.',
     ...(operating ? ['The feed is said to you when it needs the person.'] : []),
     "At auto, `nemia policy nemia` lists the answers the person's confirmed rules let you give unasked; propose rules from their custom",
     'instruction with `nemia policy propose nemia --file -`.',
-    ...(quota === undefined ? [] : [`The quota and its pace: \`${quotaCall(quota)}\`.`]),
+    'The quota and its pace: `nemia quota`.',
   ].join(' ');
 
 /** Each factory's folders, read-only: what she reads of the work and never writes. A factory that does not read is left out. */
@@ -138,12 +120,13 @@ const factoryFolders = (home: string) => {
 
 /**
  * Her task as the engine is asked to file it under `id`: long-lived (`restartPolicy: 'Always'`), on the Agent SDK, bridged, in her
- * folder, by her definition; with her fence derived from the command table (`nemiaFence`), less each prompt the person allowed in her
- * folder (`widened`, `promptAllows`), the store's denies (`storeDenies`) and the daemon's own bin first on her path (`ownBin`) in the
- * harness's settings, and her admission (`nemia admit`, with her floor and her rules for auto) asked before each of her shell calls. A
- * prompt allowed while she runs is widened the next time she is filed. Her instruction is composed with the person's custom words for
- * her, `custom` (`herCustom`), and her session token, minted as she is filed (`herToken`), is in her environment as `SESSION_TOKEN`. A
- * task that continues her last session (`resumeFrom`) starts with her memory of the conversation.
+ * folder, by her definition; with her fence derived from the command table and the verbs the api serves beside it (`nemiaFence`,
+ * `CLI_VERBS`), less each prompt the person allowed in her folder (`widened`, `promptAllows`), the store's denies (`storeDenies`) and
+ * the daemon's own bin first on her path (`ownBin`) in the harness's settings, and her admission (`nemia admit`, with her floor and
+ * her rules for auto) asked before each of her shell calls. A prompt allowed while she runs is widened the next time she is filed. Her
+ * instruction is composed with the person's custom words for her, `custom` (`herCustom`), and her session token, minted as she is
+ * filed (`herToken`), is in her environment as `SESSION_TOKEN`. A task that continues her last session (`resumeFrom`) starts with her
+ * memory of the conversation.
  * @param id The id her task is filed under.
  * @param custom The person's custom words for her, or undefined where there are none.
  * @param token Her session token, minted as she is filed.
@@ -155,13 +138,12 @@ export function nemiaSpec(id: string, custom: string | undefined, token: string,
   const step = readNemia();
   const prompt = composePrompt(home, step.body, custom);
   const memory = `Edit(/${memoryDir(home)}/**)`;
-  const quota = quotaUrl(home);
-  const fence = widened(nemiaFence(TABLE), promptAllows(home));
+  const fence = widened(nemiaFence([...TABLE, ...CLI_VERBS]), promptAllows(home));
   const bin = ownBin();
   const settings = nemiaSettings({ ask: fence.ask, deny: [...fence.deny, ...storeDenies(home)] }, bin, process.env.PATH ?? '');
   return {
     id,
-    brief: nemiaBrief(quota, operating),
+    brief: nemiaBrief(operating),
     cwd: nemiaDir(home),
     ...(resumeFrom === undefined ? {} : { resumeFrom }),
     harness: step.harness ?? DEFAULT_HARNESS,
@@ -172,7 +154,7 @@ export function nemiaSpec(id: string, custom: string | undefined, token: string,
       permissionMode: step.permissionMode,
       mayAsk: true,
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
-      allowedTools: [...(step.allowedTools ?? []), ...fence.allow, memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
+      allowedTools: [...(step.allowedTools ?? []), ...fence.allow, memory],
       callAdmission: {
         command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit', '--at-least', NEMIA_FLOOR, '--auto', 'nemia'],
         tools: ['Bash'],

@@ -789,6 +789,7 @@ export { LIBRARY_ADD_WORDS, LIBRARY_RM_WORDS, LIBRARY_WORDS } from './commands-l
 export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
+export { QUOTA_WORDS } from './commands-rest-reads.ts';
 export { LEVEL_FORM, LEVEL_WORDS, SUBSCRIBE_FORM, SUBSCRIBE_WORDS, UNSUBSCRIBE_WORDS, levelWritten } from './commands-rest-nemia.ts';
 export { BOARD_LINK_WORDS, OPEN_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from './commands-rest-pairing.ts';
 export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest-tokens.ts';

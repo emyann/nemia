@@ -4,8 +4,8 @@
  * card's `files:` is written — filed, written whole, edited from its text — before anything is written; and whether a kept File is let go
  * of (`fileLetGo`), asked by the files' prune (`filesPruned`, src/start/files.store.ts) of every file it reads.
  *
- * Each spec exports its type under the function's name, and the code takes it. What the store keeps under an id, and which ids a card
- * names, are read by the stores and handed in as data.
+ * Each spec exports its type under the function's name, and the code takes it. What the store keeps under an id, which ids a card
+ * names, and the bytes of the files given together (the sum of their kept Files' sizes), are read by the stores and handed in as data.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -43,8 +43,9 @@ const CARDS = 'cards';
 const ownName = (name: string) =>
   name.length > 0 && !name.includes('/') && !name.includes('\\') && !name.includes('\u0000') && !name.startsWith('.') && name !== CARDS;
 
-/** Whether `name` is given to more than one file of `given`. */
-const givenTwice = (given: readonly CardFileGiven[], name: string) => given.filter((f) => f.name === name).length > 1;
+/** Whether `name` is given to more than one file of `given`: two files at two places both named so. */
+const givenTwice = (given: readonly CardFileGiven[], name: string) =>
+  given.some((f, i) => f.name === name && given.some((o, j) => j !== i && o.name === name));
 
 /** Whether two files name the same File under the same name. */
 const sameFile = (a: CardFileHeld, b: CardFileHeld) => a.name === b.name && a.file === b.file;
@@ -55,19 +56,22 @@ const sameFiles = (given: readonly CardFileGiven[], held: readonly CardFileHeld[
   given.every((g) => held.some((h) => sameFile(g, h))) &&
   held.every((h) => given.some((g) => sameFile(g, h)));
 
-/** The bytes of every kept File of `given`, together. */
-const bytesOf = (given: readonly CardFileGiven[]) => given.reduce((sum, f) => sum + (f.size ?? 0), 0);
-
 /** Whether anything is wrong with `given` beside a started card's change: the cases a refusal other than `started` is about. */
-const wrongAsGiven = (given: readonly CardFileGiven[], most: CardFilesMost) =>
-  given.some((f) => !ownName(f.name) || givenTwice(given, f.name) || f.size === null) ||
-  given.length > most.count ||
-  bytesOf(given) > most.bytes;
+const wrongAsGiven = (given: readonly CardFileGiven[], most: CardFilesMost, bytes: number) =>
+  given.some((f) => !ownName(f.name) || givenTwice(given, f.name) || f.size === null) || given.length > most.count || bytes > most.bytes;
 
 const cardFilesRefusalSpec = spec<
-  (given: readonly CardFileGiven[], held: readonly CardFileHeld[], started: boolean, most: CardFilesMost) => CardFilesRefusal | undefined
+  (
+    given: readonly CardFileGiven[],
+    held: readonly CardFileHeld[],
+    started: boolean,
+    most: CardFilesMost,
+    bytes: number,
+  ) => CardFilesRefusal | undefined
 >({
-  requires: ({ input: [given, , , most] }) =>
+  requires: ({ input: [given, , , most, bytes] }) =>
+    Number.isSafeInteger(bytes) &&
+    bytes >= 0 &&
     Number.isSafeInteger(most.count) &&
     most.count > 0 &&
     Number.isSafeInteger(most.bytes) &&
@@ -113,23 +117,22 @@ const cardFilesRefusalSpec = spec<
     },
     asLargeAsACardHolds: {
       description: 'A change to files whose bytes together pass what a card holds is refused',
-      condition: ({ input: [given, held, , most], output }) =>
-        sameFiles(given, held) || bytesOf(given) <= most.bytes || output !== undefined,
+      condition: ({ input: [given, held, , most, bytes], output }) => sameFiles(given, held) || bytes <= most.bytes || output !== undefined,
     },
     whatIsSaidIsTrue: {
       description: 'A refusal names a wrong the files have: the file it names is given, and is wrong that way',
-      condition: ({ input: [given, , , most], output }) =>
+      condition: ({ input: [given, , , most, bytes], output }) =>
         output === undefined ||
         output.reason === 'started' ||
         (output.reason === 'name' && given.some((f) => f.name === output.name && !ownName(f.name))) ||
         (output.reason === 'twice' && givenTwice(given, output.name)) ||
         (output.reason === 'unkept' && given.some((f) => f.name === output.name && f.size === null)) ||
         (output.reason === 'count' && given.length > most.count) ||
-        (output.reason === 'bytes' && bytesOf(given) > most.bytes),
+        (output.reason === 'bytes' && bytes > most.bytes),
     },
     acceptedOtherwise: {
       description: 'A change to the files of a card no run was started from, with none of those wrongs, is written',
-      condition: ({ input: [given, , started, most], output }) => started || wrongAsGiven(given, most) || output === undefined,
+      condition: ({ input: [given, , started, most, bytes], output }) => started || wrongAsGiven(given, most, bytes) || output === undefined,
     },
   },
   /** Which of several wrongs is said, where files have more than one beside a started card's change, is the code's: each is true. */
@@ -147,7 +150,12 @@ export type KeptFile = { readonly writtenAt: number; readonly named: boolean };
 
 const fileLetGoSpec = spec<(file: KeptFile, now: number, keptFor: number) => boolean>({
   requires: ({ input: [file, now, keptFor] }) =>
-    Number.isSafeInteger(file.writtenAt) && Number.isSafeInteger(now) && Number.isSafeInteger(keptFor) && keptFor > 0,
+    Number.isSafeInteger(file.writtenAt) &&
+    file.writtenAt >= 0 &&
+    Number.isSafeInteger(now) &&
+    now >= 0 &&
+    Number.isSafeInteger(keptFor) &&
+    keptFor > 0,
   ensures: {
     aCardKeepsItsFiles: {
       description: 'A File a card names is kept, however old',

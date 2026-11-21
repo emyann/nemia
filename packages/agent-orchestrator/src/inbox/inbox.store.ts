@@ -185,7 +185,8 @@ export const cardFilesJudged = Effect.fn('cardFilesJudged')(function* (
     const at = root._tag === 'Some' ? fileAt(root.value, namespace, ref.file) : undefined;
     return { name: ref.name ?? at?.file.name ?? ref.file, file: ref.file, size: at?.file.size ?? null };
   });
-  const refusal = cardFilesRefusal(resolved, held, started, CARD_MOST);
+  const bytes = resolved.reduce((sum, f) => sum + (f.size ?? 0), 0);
+  const refusal = cardFilesRefusal(resolved, held, started, CARD_MOST, bytes);
   if (refusal !== undefined) {
     const message = `${cardFilesWords(refusal, card, CARD_MOST)} Nothing was written.`;
     return yield* Effect.fail(refusal.reason === 'started' ? new Conflict({ message }) : new Invalid({ message }));

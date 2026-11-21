@@ -2,7 +2,7 @@
  * Which of the pictures handed to a run its first step is shown in its session's first message, and why each other is held back
  * (`picturesShown`), pure, proved by `contracts/pictures-shown.contract.ts`; and the bounds a picture is shown within (`PICTURE_BOUNDS`).
  */
-import type { PictureBounds, PicturesShownOf, PictureHeld } from '../../../contracts/pictures-shown.contract.ts';
+import type { HandedPicture, HeldReason, PictureBounds, PicturesShownOf } from '../../../contracts/pictures-shown.contract.ts';
 
 /**
  * The bounds a first message shows pictures within, under what the model takes in one request (platform.claude.com, Vision, *Request
@@ -20,16 +20,16 @@ export const PICTURE_BOUNDS: PictureBounds = { count: 20, bytes: 5 * 1024 * 1024
  * @param bounds How many pictures a message shows, and how large one may be.
  */
 export const picturesShown: PicturesShownOf = (handed, shows, bounds) => {
-  const shown: string[] = [];
-  const held: PictureHeld[] = [];
-  for (const p of handed) {
-    if (!shows) held.push({ name: p.name, reason: 'harness' });
-    else if (p.type === null) held.push({ name: p.name, reason: 'format' });
-    else if (p.bytes > bounds.bytes) held.push({ name: p.name, reason: 'size' });
-    else if (p.width === null || p.height === null || p.width > bounds.side || p.height > bounds.side)
-      held.push({ name: p.name, reason: 'sides' });
-    else if (shown.length >= bounds.count) held.push({ name: p.name, reason: 'count' });
-    else shown.push(p.name);
-  }
+  const sidesFit = (p: HandedPicture) => p.width !== null && p.height !== null && p.width <= bounds.side && p.height <= bounds.side;
+  const fits = (p: HandedPicture) => shows && p.type !== null && p.bytes <= bounds.bytes && sidesFit(p);
+  const reasonOf = (p: HandedPicture) => {
+    const reason: HeldReason = !shows ? 'harness' : p.type === null ? 'format' : p.bytes > bounds.bytes ? 'size' : !sidesFit(p) ? 'sides' : 'count';
+    return reason;
+  };
+  const shown = handed
+    .filter(fits)
+    .slice(0, bounds.count)
+    .map((p) => p.name);
+  const held = handed.filter((p) => !shown.includes(p.name)).map((p) => ({ name: p.name, reason: reasonOf(p) }));
   return { shown, held };
 };

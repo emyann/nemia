@@ -47,8 +47,9 @@ export type PictureBounds = { readonly count: number; readonly bytes: number; re
 const fits = (p: HandedPicture, bounds: PictureBounds) =>
   p.type !== null && p.bytes <= bounds.bytes && p.width !== null && p.height !== null && p.width <= bounds.side && p.height <= bounds.side;
 
-/** Where the picture named `name` stands in what was handed. */
-const placeOf = (handed: readonly HandedPicture[], name: string) => handed.findIndex((p) => p.name === name);
+/** Whether the picture named `a` is handed before the one named `b`: `b` at a place after `a`'s (names are each handed once). */
+const handedBefore = (handed: readonly HandedPicture[], a: string, b: string) =>
+  handed.some((p, j) => p.name === a && handed.some((q, k) => k > j && q.name === b));
 
 /** The reason `name` is held for, or undefined where it is not held. */
 const heldFor = (out: PicturesShown, name: string) => out.held.find((h) => h.name === name)?.reason;
@@ -57,6 +58,7 @@ const picturesShownSpec = spec<(handed: readonly HandedPicture[], shows: boolean
   requires: ({ input: [handed, , bounds] }) =>
     handed.every((p, i) => handed.every((o, j) => j <= i || o.name !== p.name)) &&
     handed.every((p) => Number.isSafeInteger(p.bytes) && p.bytes >= 0) &&
+    handed.every((p) => (p.width === null || Number.isSafeInteger(p.width)) && (p.height === null || Number.isSafeInteger(p.height))) &&
     Number.isSafeInteger(bounds.count) &&
     bounds.count > 0 &&
     Number.isSafeInteger(bounds.bytes) &&
@@ -64,11 +66,27 @@ const picturesShownSpec = spec<(handed: readonly HandedPicture[], shows: boolean
     Number.isSafeInteger(bounds.side) &&
     bounds.side > 0,
   ensures: {
-    eachPictureOnce: {
-      description: 'Every picture handed is either shown or held back, and none is both or said twice',
+    noneLost: {
+      description: 'Every picture handed is either shown or held back',
       condition: ({ input: [handed], output }) =>
-        output.shown.length + output.held.length === handed.length &&
-        handed.every((p) => output.shown.includes(p.name) !== (heldFor(output, p.name) !== undefined)),
+        handed.every((p) => output.shown.includes(p.name) || output.held.some((h) => h.name === p.name)),
+    },
+    heldIsNotShown: {
+      description: 'No picture held back is shown',
+      condition: ({ output }) => output.held.every((h) => !output.shown.includes(h.name)),
+    },
+    onlyWhatWasHanded: {
+      description: 'Every picture said, shown or held, was handed',
+      condition: ({ input: [handed], output }) =>
+        output.shown.every((s) => handed.some((p) => p.name === s)) && output.held.every((h) => handed.some((p) => p.name === h.name)),
+    },
+    noneShownTwice: {
+      description: 'No picture is shown twice',
+      condition: ({ output }) => output.shown.every((s, i) => output.shown.every((o, j) => j <= i || o !== s)),
+    },
+    noneHeldTwice: {
+      description: 'No picture is held back twice',
+      condition: ({ output }) => output.held.every((h, i) => output.held.every((o, j) => j <= i || o.name !== h.name)),
     },
     noHarnessShowsNone: {
       description: 'A step whose harness shows no picture is shown none, each held back for its harness',
@@ -113,12 +131,12 @@ const picturesShownSpec = spec<(handed: readonly HandedPicture[], shows: boolean
     theFirstAreShown: {
       description: 'Where more fit than a message shows, the first handed are shown: each held for the count comes after every one shown',
       condition: ({ input: [handed], output }) =>
-        output.held.every((h) => h.reason !== 'count' || output.shown.every((s) => placeOf(handed, s) < placeOf(handed, h.name))),
+        output.held.every((h) => h.reason !== 'count' || output.shown.every((s) => handedBefore(handed, s, h.name))),
     },
     shownInTheOrderHanded: {
       description: 'The pictures shown are in the order they were handed',
       condition: ({ input: [handed], output }) =>
-        output.shown.every((s, i) => i === 0 || placeOf(handed, output.shown[i - 1] ?? '') < placeOf(handed, s)),
+        output.shown.every((s, i) => i === 0 || handedBefore(handed, output.shown[i - 1] ?? '', s)),
     },
   },
 });

@@ -28,17 +28,19 @@ const sameFiles = (given: readonly CardFileGiven[], held: readonly CardFileHeld[
  * @param held The files the card holds now.
  * @param started Whether a run was started from the card.
  * @param most How many files, and how many bytes in all, a card holds.
+ * @param bytes The bytes of every kept File of `given` together, as the store sums their sizes.
  */
-export const cardFilesRefusal: CardFilesRefusalOf = (given, held, started, most) => {
+export const cardFilesRefusal: CardFilesRefusalOf = (given, held, started, most, bytes) => {
   if (sameFiles(given, held)) return undefined;
   if (started) return { reason: 'started' };
-  for (const f of given) {
-    if (!ownName(f.name)) return { reason: 'name', name: f.name };
-    if (given.filter((o) => o.name === f.name).length > 1) return { reason: 'twice', name: f.name };
-    if (f.size === null) return { reason: 'unkept', name: f.name };
-  }
+  const misnamed = given.find((f) => !ownName(f.name));
+  if (misnamed !== undefined) return { reason: 'name', name: misnamed.name };
+  const twice = given.find((f, i) => given.some((o, j) => j !== i && o.name === f.name));
+  if (twice !== undefined) return { reason: 'twice', name: twice.name };
+  const unkept = given.find((f) => f.size === null);
+  if (unkept !== undefined) return { reason: 'unkept', name: unkept.name };
   if (given.length > most.count) return { reason: 'count' };
-  if (given.reduce((sum, f) => sum + (f.size ?? 0), 0) > most.bytes) return { reason: 'bytes' };
+  if (bytes > most.bytes) return { reason: 'bytes' };
   return undefined;
 };
 

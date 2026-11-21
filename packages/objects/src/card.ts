@@ -34,7 +34,7 @@ export type CardState = (typeof CARD_STATES)[number];
  * The keys a card's frontmatter may set, in the order a card's page lists them: six are its `spec`'s, `factory` is its
  * `metadata.namespace` and `labels` its `metadata.labels`.
  */
-export const CARD_KEYS = ['workflow', 'repo', 'queued', 'gate', 'model', 'factory', 'from', 'labels'] as const;
+export const CARD_KEYS = ['workflow', 'repo', 'queued', 'gate', 'model', 'factory', 'from', 'labels', 'files'] as const;
 
 /** A key a card's frontmatter may set. */
 export type CardKey = (typeof CARD_KEYS)[number];
@@ -57,10 +57,48 @@ export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
   from: 'runs whose conclusions its run is handed as context, by id, comma-separated: it does not wait on them; none when unset',
   labels:
     "a person's labels on the card, a map of a key to its value: what `-l key=value` selects it by, copied to the run it starts; none when unset",
+  files:
+    'the files the card carries, a map of the name its text and its run find each by to the File it names (`file_…`, uploaded to its factory first): copied into the `inputs/` of every run started from it; none when unset',
 };
 
 /** A field of the card's spec, described by its key's meaning. */
 const described = <S extends Schema.Top>(schema: S, key: CardKey) => schema.annotate({ description: CARD_KEY_MEANINGS[key] });
+
+/** One file a card carries: the name its text and its run find it by, and the File it names. */
+export const CardFileNamed = Schema.Struct({
+  name: Schema.String.annotate({
+    description: "The file's name in the card: what its text names it by, and its run's `inputs/` keeps it as.",
+  }),
+  file: Schema.String.annotate({ description: "The id of the File it names, file_…, kept in the card's namespace." }),
+}).annotate({ description: 'One file a card carries: its name in the card and the File it names.' });
+export type CardFileNamed = typeof CardFileNamed.Type;
+
+/**
+ * A file named to a card as it is filed or attached: the File by its id, uploaded to the card's namespace first, and the name it takes in
+ * the card, absent for the File's own name.
+ */
+export const CardFileRef = Schema.Struct({
+  name: Schema.optionalKey(
+    Schema.String.annotate({ description: "The name it takes in the card, no folder in it; absent, the File's own name." }),
+  ),
+  file: Schema.String.annotate({ description: "The id of a File uploaded to the card's namespace, file_…." }),
+}).annotate({ description: 'A file named to a card: a File uploaded first, by its id, and the name it takes in the card.' });
+export type CardFileRef = typeof CardFileRef.Type;
+
+/** A file a card carries, as Nemia read it: its name and File, what the File is, whether the text names it, and whether it is kept. */
+export const CardFileStatus = Schema.Struct({
+  name: Schema.String.annotate({ description: "The file's name in the card." }),
+  file: Schema.String.annotate({ description: 'The id of the File it names.' }),
+  mediaType: Schema.optionalKey(Schema.String.annotate({ description: "The File's media type; absent where it is not kept." })),
+  size: Schema.optionalKey(describedNumber("The File's size in bytes; absent where it is not kept.")),
+  inText: Schema.Boolean.annotate({
+    description: "Whether the card's text names it as an image or a link target (`name` or `./name`), where it is shown.",
+  }),
+  kept: Schema.Boolean.annotate({
+    description: 'Whether its namespace still keeps the File: a run started from the card takes it only then.',
+  }),
+}).annotate({ description: 'A file a card carries, as Nemia read it.' });
+export type CardFileStatus = typeof CardFileStatus.Type;
 
 /** What a person wrote on the card: each key absent where the card does not set it; `body` absent on an entry that does not read. */
 export const CardSpec = Schema.Struct({
@@ -70,6 +108,7 @@ export const CardSpec = Schema.Struct({
   model: Schema.optionalKey(described(Schema.Record(Schema.String, Schema.String), 'model')),
   from: Schema.optionalKey(described(Schema.Array(Schema.String), 'from')),
   queued: Schema.optionalKey(described(Schema.String, 'queued')),
+  files: Schema.optionalKey(described(Schema.Array(CardFileNamed), 'files')),
   body: Schema.optionalKey(
     Schema.String.annotate({ description: "the card's idea, in markdown, under its frontmatter: its first line is its title" }),
   ),
@@ -109,6 +148,9 @@ export const CardStatus = Schema.Struct({
   lastStart: Schema.optionalKey(CardLastStart.annotate({ description: "The tick's last start of the card that did not happen." })),
   title: Schema.optionalKey(Schema.String.annotate({ description: "The first line of the card's body; absent where it has none." })),
   error: Schema.optionalKey(Schema.String.annotate({ description: 'Why the entry does not read as a card; absent on a card.' })),
+  files: Schema.optionalKey(
+    Schema.Array(CardFileStatus).annotate({ description: 'The files the card carries, as Nemia read them; absent where it carries none.' }),
+  ),
   inPlay: Schema.Boolean.annotate({
     description: 'Whether the card is still in play: not started, or its run not ended. `nemia inbox` and the board list these by default.',
   }),
@@ -196,8 +238,21 @@ export const CardFile = Schema.Struct({
   label: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({ description: 'The labels the card is filed with, each as `key=value`.' }),
   ),
+  files: Schema.optionalKey(
+    Schema.Array(CardFileRef).annotate({
+      description: "The files the card carries, each a File uploaded to the card's namespace first, by its id.",
+    }),
+  ),
 });
 export type CardFile = typeof CardFile.Type;
+
+/** Files attached to a card not yet started (attach): each a File uploaded to the card's namespace first, by its id. */
+export const CardAttach = Schema.Struct({
+  files: Schema.Array(CardFileRef).annotate({
+    description: "The files to attach, each a File uploaded to the card's namespace first, by its id, and the name it takes in the card.",
+  }),
+});
+export type CardAttach = typeof CardAttach.Type;
 
 /**
  * A card started: the workflow its run is started on, by name — the card's own `workflow:` when it names none, as `nemia start <card>`

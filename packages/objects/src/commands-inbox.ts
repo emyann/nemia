@@ -30,6 +30,13 @@ const ADD_FLAGS: readonly Flag[] = [
     many: true,
     takes: `--label takes a label edit, key=value to set one or key- to drop one its from: runs would give: ${CLI} inbox add "<idea>" --label team=core`,
   },
+  {
+    flag: '--file',
+    kind: 'text',
+    key: 'file',
+    many: true,
+    takes: `--file takes a file for the card to carry, read where the command is typed and uploaded first: ${CLI} inbox add "<idea>" --file ./shot.png`,
+  },
 ];
 
 /** Why `nemia inbox add` takes no `--repo`: a card names its factory and its workflow, and the factory's wiring places its run. */
@@ -43,7 +50,7 @@ const ADD_SPEC: Spec = {
     arg === '--repo' || arg.startsWith('--repo=')
       ? ADD_REPO_REFUSAL
       : arg.startsWith('-')
-        ? `${CLI} inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --factory <name> and --label <key=value> once per label.`
+        ? `${CLI} inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --factory <name>, --label <key=value> once per label and --file <path> once per file.`
         : `${CLI} inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — ${CLI} inbox add "<idea>" — or give it as a file: ${CLI} inbox add ./idea.md.`,
   apart: (_value, flag) => ADD_FLAGS.find((f) => f.flag === flag)?.takes ?? '',
   missing: `${CLI} inbox add takes the idea, first: ${CLI} inbox add "<idea>" [--workflow <name>] [--factory <name>], or a file: ${CLI} inbox add ./idea.md. Nothing was filed.`,
@@ -53,8 +60,12 @@ const ADD_SPEC: Spec = {
 export const INBOX_ADD_WORDS = {
   name: 'inbox add',
   served: [{ endpoint: 'cards.create' }],
-  usage: '"<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...',
-  help: ['park an idea as a card in the inbox, named from its first line'],
+  usage: '"<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]... [--file <path>]...',
+  help: [
+    'park an idea as a card in the inbox, named from its first line;',
+    'each --file is uploaded and carried by the card, as is each file',
+    'beside an idea file that its text names as an image or a link',
+  ],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
@@ -262,6 +273,108 @@ export const LABEL_INBOX_WORDS = {
   },
 } as const satisfies CommandWords;
 
+/**
+ * The paths `nemia inbox attach` uploads, or the names `nemia inbox detach` takes off, in the order given.
+ * @param args The command line's arguments, by key: its files under files.
+ */
+export const filesNamed = (args: Args) => (Array.isArray(args.files) ? args.files.map(String) : []);
+
+/** `nemia inbox attach`: files uploaded, then carried by a card no run was started from. */
+export const INBOX_ATTACH_WORDS = {
+  name: 'inbox attach',
+  served: [{ endpoint: 'cards.attach' }],
+  usage: '<name> <path>...',
+  help: [
+    'upload files and attach them to a card no run was started from,',
+    'each under its own name: every run started from it takes them',
+  ],
+  spec: {
+    positionals: [
+      { key: 'name', takes: 'required', kind: 'name' },
+      { key: 'files', takes: 'many', kind: 'text' },
+    ],
+    flags: [],
+    unknown: (arg) =>
+      `${CLI} inbox attach does not take ${arg}. It takes the card's name, then the files to attach: ${CLI} inbox attach <name> ./shot.png.`,
+    missing: `${CLI} inbox attach takes the name of the card, as ${CLI} inbox lists it, then the files to attach: ${CLI} inbox attach <name> ./shot.png.`,
+  },
+  check: (args) =>
+    filesNamed(args).length
+      ? null
+      : `${CLI} inbox attach takes the files to attach after the card's name: ${CLI} inbox attach <name> ./shot.png.`,
+  writes: true,
+  class: 'act',
+  only: {
+    side: 'cli',
+    why: "the client uploads each file first (the files' `upload`), then the api serves the Card's `attach` of `objects`' Api, which calls this entry's handler",
+  },
+} as const satisfies CommandWords;
+
+/** `nemia inbox detach`: files a card carries taken off it, by their names in the card, before a run is started from it. */
+export const INBOX_DETACH_WORDS = {
+  name: 'inbox detach',
+  served: [{ endpoint: 'cards.detach' }],
+  usage: '<name> <file>...',
+  help: ['take files off a card no run was started from, by their names', `in the card, as ${CLI} inbox files lists them`],
+  spec: {
+    positionals: [
+      { key: 'name', takes: 'required', kind: 'name' },
+      { key: 'files', takes: 'many', kind: 'text' },
+    ],
+    flags: [],
+    unknown: (arg) => `${CLI} inbox detach does not take ${arg}. It takes the card's name, then the names of its files to take off.`,
+    missing: `${CLI} inbox detach takes the name of the card, then the names of its files to take off: ${CLI} inbox detach <name> shot.png.`,
+  },
+  check: (args) =>
+    filesNamed(args).length
+      ? null
+      : `${CLI} inbox detach takes the names of the files to take off after the card's name, as ${CLI} inbox files lists them.`,
+  writes: true,
+  class: 'act',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `detach` of `objects`' Api, which calls this entry's handler: no route of its own",
+  },
+} as const satisfies CommandWords;
+
+/** `nemia inbox files`: the files a card carries, as the card's read says them, and one of them written out with `--get`. */
+export const INBOX_FILES_WORDS = {
+  name: 'inbox files',
+  served: [{ endpoint: 'cards.getAll' }, { endpoint: 'files.content', as: 'inbox_file_content' }],
+  usage: '<name> [--get <file> [--out <path>]]',
+  help: [
+    'list the files a card carries; --get writes one of them out,',
+    'to --out or to a file of its own name where the command is typed',
+  ],
+  spec: {
+    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+    flags: [
+      {
+        flag: '--get',
+        kind: 'text',
+        key: 'get',
+        takes: `--get takes the name of a file of the card: ${CLI} inbox files <name> --get shot.png`,
+      },
+      {
+        flag: '--out',
+        kind: 'text',
+        key: 'out',
+        takes: `--out takes the path to write the file to: ${CLI} inbox files <name> --get shot.png --out ./shot.png`,
+      },
+    ],
+    unknown: (arg) => `${CLI} inbox files does not take ${arg}. It takes the card's name, then --get <file> and --out <path>.`,
+    missing: `${CLI} inbox files takes the name of the card, as ${CLI} inbox lists it: ${CLI} inbox files <name> [--get <file> [--out <path>]].`,
+  },
+  check: (args) =>
+    args.out !== undefined && args.get === undefined ? '--out names where --get writes the file: give --get <file> with it.' : null,
+  writes: false,
+  class: 'read',
+  only: {
+    side: 'cli',
+    why: "the client reads the card (the Card's `getAll`) and a file's bytes (the files' `content`) and writes them where it is typed: no route of its own",
+  },
+} as const satisfies CommandWords;
+
 /** The group's words, in the order the help lists them. */
 export const INBOX_WORDS = [
   INBOX_ADD_WORDS,
@@ -269,6 +382,9 @@ export const INBOX_WORDS = [
   INBOX_FROM_WORDS,
   INBOX_EDIT_WORDS,
   INBOX_RM_WORDS,
+  INBOX_ATTACH_WORDS,
+  INBOX_DETACH_WORDS,
+  INBOX_FILES_WORDS,
   LABEL_RUN_WORDS,
   LABEL_INBOX_WORDS,
 ] as const satisfies readonly CommandWords[];

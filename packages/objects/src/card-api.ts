@@ -5,7 +5,7 @@
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
-import { Card, CardFile, CardList, CardQueue, CardStart, CardWrite, CardEdit } from './card.ts';
+import { Card, CardAttach, CardFile, CardList, CardQueue, CardStart, CardWrite, CardEdit } from './card.ts';
 import { Table } from './table.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { cardParams, cardNameParams, namespaceParams, cardListQuery } from './api-params.ts';
@@ -111,5 +111,22 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   }).annotate(
     OpenApi.Description,
     "Edits a card's labels: sets and removes the keys the LabelEdit body names. Answers Labelled, the labels the card holds after it.",
+  ),
+  HttpApiEndpoint.post('attach', '/api/namespaces/:namespace/cards/:name/files', {
+    params: cardParams,
+    payload: CardAttach,
+    success: CardObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Attaches files to a card no run was started from, each a File uploaded to the card's namespace first, by its id, under the name the body gives or the File's own. Answers the Card as it is now; a started card is a Conflict.",
+  ),
+  HttpApiEndpoint.delete('detach', '/api/namespaces/:namespace/cards/:name/files/:file', {
+    params: { ...cardParams, file: Schema.String.annotate({ description: "The file's name in the card." }) },
+    success: CardObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    'Takes a file off a card no run was started from, by its name in the card. Answers the Card as it is now; a started card is a Conflict.',
   ),
 ) {}

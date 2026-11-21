@@ -54,7 +54,10 @@ const tryOf = (client: ObjectsClient, runId: string, step: string, tryNo: string
     ? Effect.succeed(tryNo)
     : Effect.map(client.steps.tries({ params: { runId, step }, query: {} }), ({ tries }) => tries.at(-1)?.try.toString());
 
-/** The check's output of the try `params` names, whole: each page after the first read on from the `next` the page before answered. */
+/**
+ * The check's output of the try `params` names, whole: each page after the first read on from the `next` the page before answered, and
+ * neither the last page's `next` nor its `before` kept, since every line was read.
+ */
 const whole = (client: ObjectsClient, params: { runId: string; step: string; try: string }, query: Asked) =>
   Effect.gen(function* () {
     const asked = { ...query, limit: String(CHECK_OUTPUT_PAGE.most) };
@@ -66,7 +69,7 @@ const whole = (client: ObjectsClient, params: { runId: string; step: string; try
       lines.push(...page.lines);
       if (page.next !== undefined && page.next <= at) break;
     }
-    const { next: _left, ...rest } = page;
+    const { next: _left, before: _held, ...rest } = page;
     return { ...rest, lines } satisfies CheckOutput;
   });
 

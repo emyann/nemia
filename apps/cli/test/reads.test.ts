@@ -696,6 +696,7 @@ test('`nemia check-output` asked no page prints the stream whole, reading on fro
       lines,
       total: LINES,
       ...(end <= LINES ? { next: end } : {}),
+      ...(start > 1 ? { before: start } : {}),
     } satisfies CheckOutput;
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify(read));
@@ -726,7 +727,7 @@ test('`nemia check-output` asked no page prints the stream whole, reading on fro
     [null, String(CHECK_OUTPUT_PAGE.most + 1), String(CHECK_OUTPUT_PAGE.most * 2 + 1)],
     'each page after the first read on from the next the page before answered',
   );
-  assert.doesNotMatch(read.err, /--from/, 'a stream read whole leaves nothing to read on from');
+  assert.doesNotMatch(read.err, /--from|--before/, 'a stream read whole leaves nothing to read on from or back from');
 });
 
 /** The lines the in-process `nemia ls <run>` printed of each seeded run, between the pause and the standing line, before it was deleted. */

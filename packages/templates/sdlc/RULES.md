@@ -12,10 +12,10 @@
   `cli.github.com/manual/<command>`) and cite it as a page read.
 - **A card routed wrong is said, not worked around.** A card the front door routed (its run's brief says the door's reason) whose ask
   is not what your workflow is for — an idea still loose in build or quick, a decision left open in quick, a question that asks no
-  change — signs off `blocked`, saying which workflow it needs and why, so the person cancels the run and files the idea again: a card
-  is started once, so the routed card is neither queued again nor read again by the door, and the idea is filed under a name of its own
-  on the workflow it needs (`nemia inbox add <file> --workflow <workflow>`), or with the door's label for the door to route it again
-  (`--label <key=value>`).
+  change — signs off `blocked`, saying which workflow it needs and why, so the person sends the card on with one command: `nemia inbox
+  resend <card> --workflow <workflow>` files it again under a name of its own, handed the blocked run, on the workflow it needs, or,
+  with no `--workflow`, keeping the door's label for the door to route it again; and it cancels the blocked run. Nothing re-routes a
+  card on its own.
 
 ## Routing
 

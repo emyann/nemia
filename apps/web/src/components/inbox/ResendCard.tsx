@@ -33,7 +33,7 @@ export function ResendCard({
   return (
     <div data-resend={entry.name} className="space-y-2 rounded border border-outline-variant px-3 py-2">
       <p className="text-body-medium">
-        Send this card on as a card of its own, handed the run it was started as. A run that waits on you is cancelled.
+        Send this card on as a card of its own, handed the run it was started as. Where that run is held for your word, it is cancelled.
       </p>
       <RadioGroup
         aria-label={`Where ${entry.name} is sent on to`}

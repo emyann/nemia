@@ -38,23 +38,23 @@ const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag', artifacts: [], needs: null };
 const ACTOR = { kind: 'person', token: 'laptop' } as const;
 
-/** A repository with `workflows/quick`, plan then implement, which a card names by its name. */
+/** A repository with `workflows/deliver`, plan then implement, which a card names by its name. */
 const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'a.txt': 'one\n' });
-  const dir = path.join(repo, 'workflows', 'quick');
+  const dir = path.join(repo, 'workflows', 'deliver');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\n---\nplan it\n');
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nafter: plan\n---\nimplement it\n');
   return repo;
 };
 
-/** Files the card `name` in the store's inbox, on `quick`, gated at plan, labelled. */
+/** Files the card `name` in the store's inbox, on `deliver`, gated at plan, labelled. */
 const fileCard = (name: string) => {
   fs.mkdirSync(inboxAt(ROOT), { recursive: true });
   fs.writeFileSync(
     path.join(inboxAt(ROOT), `${name}.md`),
-    '---\nworkflow: quick\ngate: plan\nlabels: { door: front }\n---\nParse the flag.\n',
+    '---\nworkflow: deliver\ngate: plan\nlabels: { door: front }\n---\nParse the flag.\n',
   );
 };
 
@@ -108,20 +108,20 @@ describe('a card waiting on its person at a gate is sent on to another workflow,
   let id = '';
   s.test('a card whose run is still at work is refused Conflict, and nothing is filed', async () => {
     id = await started(b, 'parse-the-flag-k2q9', repo);
-    await assert.rejects(resend(b, 'parse-the-flag-k2q9', 'intake'), refusedAs('Conflict'));
+    await assert.rejects(resend(b, 'parse-the-flag-k2q9', 'triage'), refusedAs('Conflict'));
     assert.deepEqual(cards(), ['parse-the-flag-k2q9']);
   });
   s.test('once it waits at its gate, it is filed as <run>-resent, queued on the workflow named, handed the run', async () => {
     b.settle(`${id}-plan`, 'succeeded', SIGNED);
     assert.deepEqual((await pass(b, id)).filed, [], 'held at its gate');
-    const done = await resend(b, 'parse-the-flag-k2q9', 'intake');
+    const done = await resend(b, 'parse-the-flag-k2q9', 'triage');
     assert.equal(done.card.name, `${id}-resent`);
     assert.deepEqual(done.from, { card: 'parse-the-flag-k2q9', run: id });
-    assert.equal(done.card.workflow, 'intake');
+    assert.equal(done.card.workflow, 'triage');
     assert.ok(done.card.queued !== undefined, 'queued');
     assert.deepEqual(done.card.from, [id]);
     assert.deepEqual(done.card.labels, { door: 'front' }, 'its labels kept');
-    assert.equal(done.card.gate, undefined, "the gate named quick's step, and is dropped");
+    assert.equal(done.card.gate, undefined, "the gate named deliver's step, and is dropped");
     assert.deepEqual(cards(), [`${id}-resent`, 'parse-the-flag-k2q9'].sort());
   });
   s.test('the run it came from is cancelled, by who sent the card on', () => {
@@ -130,7 +130,7 @@ describe('a card waiting on its person at a gate is sent on to another workflow,
     assert.deepEqual(run.cancelledBy, ACTOR);
   });
   s.test('sent on again, it is refused Conflict: a card is sent on once', async () => {
-    await assert.rejects(resend(b, 'parse-the-flag-k2q9', 'quick'), refusedAs('Conflict'));
+    await assert.rejects(resend(b, 'parse-the-flag-k2q9', 'deliver'), refusedAs('Conflict'));
   });
   s.test('the card sent on, never started, is refused Invalid', async () => {
     await assert.rejects(resend(b, `${id}-resent`), refusedAs('Invalid'));
@@ -175,7 +175,7 @@ describe('a card whose run has ended is sent on, and no cancel is asked', () => 
     const id = await atGate(b, 'show-the-flag-a1b2', repo);
     await stage.runWith(b.e, CANCEL.handler({ runId: id }));
     await pass(b, id);
-    const done = await resend(b, 'show-the-flag-a1b2', 'intake');
+    const done = await resend(b, 'show-the-flag-a1b2', 'triage');
     assert.equal(done.card.name, `${id}-resent`);
     assert.equal(done.cancelled, undefined);
     assert.equal(done.cancelLeft, undefined);

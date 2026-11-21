@@ -981,6 +981,47 @@ describe("`nemia retry` writes a person's ask, and the tick honours it once, con
   });
 });
 
+describe("a step judged by named checks: the pass files them in their order, each under its own task, none after a refusal, and `retries:` tries the step again", () => {
+  let b!: import('./story.ts').Board;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const checkTask = (name: string) => `${run.id}-implement-check-${name}`;
+  const s = story(test);
+  s.test('implement signs off: the pass files its first check alone, told its name', async () => {
+    run = await startedRun(
+      implementThenReview([
+        'retries: 1',
+        'checks:',
+        '  - { name: probe, run: npm run probe }',
+        '  - { name: own, run: npm test, after: [probe] }',
+        '  - { name: ci, run: npm run ci, after: [own] }',
+      ]),
+    );
+    await tick(run.id);
+    ended(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
+    await tick(run.id);
+    assert.equal(b.tasks.get(checkTask('probe'))?.spec.config?.env?.WF_CHECK, 'probe');
+    assert.deepEqual([b.tasks.has(checkTask('own')), b.tasks.has(checkTask('ci'))], [false, false]);
+  });
+  s.test('the first passes: the next pass files the second, and the record names both', async () => {
+    ended(checkTask('probe'), 'succeeded', { exitCode: 0 });
+    await tick(run.id);
+    assert.equal(b.tasks.get(checkTask('own'))?.spec.config?.env?.WF_CHECK, 'own');
+    assert.equal(b.tasks.has(checkTask('ci')), false);
+    const tasks = runRecord(ROOT, run.id).steps.implement?.check?.tasks ?? {};
+    assert.deepEqual([tasks.probe, tasks.own], [checkTask('probe'), checkTask('own')]);
+  });
+  s.test('the second refuses: the third is never filed, and `retries:` files try 2 of the step', async () => {
+    ended(checkTask('own'), 'failed', { exitCode: 1 });
+    assert.deepEqual((await tick(run.id)).tried, ['implement']);
+    assert.equal(b.tasks.has(checkTask('ci')), false);
+  });
+});
+
 describe('`nemia retry --model` on a Claude Code step in `auto` (F21): a model that drops it refused, by name, writing no ask; anything that keeps the step as it asked is asked', () => {
   const refusedModel = async (lines: string[], model: string, ...facts: string[]) => {
     const run = await throughCheck(['check: npm test', ...lines], 'failed', { exitCode: 1 });

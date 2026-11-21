@@ -617,10 +617,10 @@ export const stepChecks = (step: Pick<StepSpec, 'check' | 'checks'>) =>
   (step.checks ?? (step.check === undefined ? [] : [{ name: SHORTHAND_CHECK, run: step.check, after: [] }])) satisfies readonly CheckSpec[];
 
 /**
- * Whether a step is judged by a check: it has a `check:` or a `checks:` list, which load never leaves empty.
+ * Whether a step is judged by a check: it has a `check:` line, or a `checks:` list holding one at least, an empty list being no check.
  * @param step The step.
  */
-export const hasChecks = (step: Pick<StepSpec, 'check' | 'checks'>) => step.check !== undefined || step.checks !== undefined;
+export const hasChecks = (step: Pick<StepSpec, 'check' | 'checks'>) => !!step.check || (step.checks?.length ?? 0) > 0;
 
 /**
  * The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none.

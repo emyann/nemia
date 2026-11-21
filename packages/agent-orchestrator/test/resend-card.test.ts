@@ -3,7 +3,8 @@
  * card of its own, `<run>-resent`, queued and handed that run, and the run is cancelled by who asked; sent on with no workflow, the card
  * names none and is left unqueued for its factory's card triggers; a card whose run has ended is sent on and no cancel asked. Refused by
  * kind, exit 2, with nothing filed: a card whose run is still at work, one sent on already, one never started, one not there, and a
- * workflow that is no workflow's name. Each story one describe on the stage (`story.ts`).
+ * workflow that is no workflow's name, or one the card's factory does not offer. A cancel that fails leaves the card filed and says so,
+ * and asking again names the cancel to type. Each story one describe on the stage (`story.ts`).
  *
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its cards name no factory.
  */
@@ -22,6 +23,9 @@ import { INBOX_RESEND } from '../src/inbox/commands.verb.ts';
 import { CANCEL } from '../src/cancel/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { told } from './typed.ts';
+import { Effect } from 'effect';
+import { RunDoor } from '../src/runs/runs.store.ts';
+import { addFactoryAt } from '../src/factory/factory.store.ts';
 
 const ROOT = scratch('wf-resend-card-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -72,6 +76,14 @@ const pass = (b: Board, id: string) => stage.runWith(b.e, advanceRun(runRecord(R
 /** The card `name` sent on, as the api's `resend` asks it, by the person. */
 const resend = (b: Board, name: string, workflow?: string) =>
   stage.runWith(b.e, INBOX_RESEND.handler({ name, ...(workflow === undefined ? {} : { workflow }), actor: ACTOR }));
+
+/** `program` given a Run door whose cancel fails, as a disk that refuses the cancellation's file would. */
+const cancelRefused = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const door = yield* RunDoor;
+    const refused = { ...door.runs, cancel: () => Effect.die(new Error('EACCES: the cancellation could not be written')) };
+    return yield* program.pipe(Effect.provideService(RunDoor, { ...door, runs: refused }));
+  });
 
 /** The card `name` filed and started on `repo`, its run filed and plan in flight: answers the run's id. */
 const started = async (b: Board, name: string, repo: string) => {
@@ -180,5 +192,71 @@ describe('a card whose run has ended is sent on, and no cancel is asked', () => 
     assert.equal(done.cancelled, undefined);
     assert.equal(done.cancelLeft, undefined);
     assert.equal(runRecord(ROOT, id).cancelledBy, undefined, 'the first cancellation stands');
+  });
+});
+
+describe('a cancel that fails leaves the card filed and says so, and asking again names the cancel to type', () => {
+  let repo!: string;
+  let b!: Board;
+  beforeAll(() => {
+    const t = teardowns();
+    repo = aRepo();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
+  let id = '';
+  s.test('the card is filed, `cancelLeft` says why the run was not called off, and the run still stands', async () => {
+    id = await atGate(b, 'cache-the-rows-q7w2', repo);
+    const done = await stage.runWith(
+      b.e,
+      cancelRefused(INBOX_RESEND.handler({ name: 'cache-the-rows-q7w2', workflow: 'triage', actor: ACTOR })),
+    );
+    assert.equal(done.card.name, `${id}-resent`);
+    assert.ok(cards().includes(`${id}-resent`), 'the card stays filed');
+    assert.equal(done.cancelled, undefined);
+    assert.ok(done.cancelLeft?.includes(`nemia cancel ${id}`), done.cancelLeft);
+    assert.equal(runRecord(ROOT, id).cancelledAt, undefined, 'the run was not called off');
+  });
+  s.test('sent on again, it is refused Conflict, naming the cancel of the run that has not ended', async () => {
+    await assert.rejects(resend(b, 'cache-the-rows-q7w2', 'triage'), (err: Error & { _tag?: string; exitCode?: number }) => {
+      assert.deepEqual([err._tag, err.exitCode], ['Conflict', 2], err.message);
+      assert.ok(err.message.includes(`nemia cancel ${id}`), err.message);
+      return true;
+    });
+  });
+});
+
+describe('a card of a factory sent on to a workflow its factory does not offer is refused, and nothing is filed', () => {
+  let b!: Board;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    addFactoryAt(ROOT, { name: 'acme', volumes: [`${aRepo()}:rw`] });
+    fs.writeFileSync(path.join(inboxAt(ROOT), 'tidy-the-docs-m3n8.md'), '---\nfactory: acme\n---\nTidy the docs.\n');
+    fs.writeFileSync(
+      path.join(ROOT, 'runs', 'tidy-the-docs-m3n8-r1.json'),
+      JSON.stringify({
+        id: 'tidy-the-docs-m3n8-r1',
+        repo: '/code/app',
+        workspace: '/code/app',
+        baseRef: 'abc123',
+        branch: 'main',
+        isolate: true,
+        brief: 'Tidy the docs.',
+        workflowDir: '/code/app/workflows',
+        createdAt: '2026-11-05T00:00:00.000Z',
+        workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+        steps: { implement: { taskId: null } },
+        from: { inbox: 'tidy-the-docs-m3n8' },
+      }),
+    );
+    fs.writeFileSync(path.join(ROOT, 'runs', 'tidy-the-docs-m3n8-r1.cancelled'), '2026-11-05T01:00:00.000Z');
+    return t.end;
+  });
+  const s = story(test);
+  s.test('refused Invalid, and no card is filed', async () => {
+    await assert.rejects(resend(b, 'tidy-the-docs-m3n8', 'triage'), refusedAs('Invalid'));
+    assert.ok(!cards().includes('tidy-the-docs-m3n8-r1-resent'), 'nothing filed');
   });
 });

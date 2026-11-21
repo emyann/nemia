@@ -40,14 +40,15 @@ export const resentFrom = (runs: readonly { readonly id: string; readonly phase:
  * @param refusal Why the card is not sent on.
  * @param card The card asked to be sent on, by name.
  * @param run The run it was started as that its state reads, by id; none for a card never started.
+ * @param standing Whether that run has not ended: a card sent on whose cancel failed, which the refusal of `sent` says to call off.
  */
-export function resendRefusalMessage(refusal: ResendRefusal, card: string, run: string | undefined) {
+export function resendRefusalMessage(refusal: ResendRefusal, card: string, run: string | undefined, standing = false) {
   const runId = run ?? '<run>';
   switch (refusal) {
     case 'unstarted':
       return `${card}: no run was started from this card, so there is nothing to send it on from. Queue it on the workflow it needs — nemia inbox queue ${card} --workflow <name> — or start it: nemia start ${card} --workflows <name>. Nothing was filed.`;
     case 'sent':
-      return `${card}: sent on already, as the card ${resentCardName(runId)}: an idea is sent on once from a card. Read it with nemia inbox, or drop it first with nemia inbox rm ${resentCardName(runId)}. Nothing was filed.`;
+      return `${card}: sent on already, as the card ${resentCardName(runId)}: an idea is sent on once from a card.${standing ? ` Its run ${runId} has not ended: call it off with nemia cancel ${runId}.` : ''} Read the card sent on with nemia inbox, or drop it first with nemia inbox rm ${resentCardName(runId)}. Nothing was filed.`;
     case 'in-flight':
       return `${card}: its run ${runId} is still at work, and the idea never runs twice at once. Wait until it waits on you or ends, or call it off first: nemia cancel ${runId}. Nothing was filed.`;
   }

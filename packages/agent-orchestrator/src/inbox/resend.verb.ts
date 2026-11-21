@@ -13,7 +13,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService } from '../runtime-client.ts';
 import { WorkflowError } from '../step/step.ts';
 import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
-import { cardState, cardWorkflowRefusal, inboxNameRefusal, noCardLine, parseInboxCard, type InboxCard } from './inbox.ts';
+import { CARD_IN_PLAY, cardState, cardWorkflowRefusal, inboxNameRefusal, noCardLine, parseInboxCard, type InboxCard } from './inbox.ts';
 import { CardName } from './inbox.model.ts';
 import { inboxCards } from './inbox.store.ts';
 import { resendRefusal, resendRefusalMessage, resentCardName, resentFrom, resentText } from './resend.ts';
@@ -73,7 +73,7 @@ export const resendCard = Effect.fn('resendCard')(function* (asked: ResendAsked,
   const why = resendRefusal({ state, taken });
   if (why !== null || run === undefined) {
     const said = why ?? 'unstarted';
-    return yield* Effect.fail(refusalOf(said, resendRefusalMessage(said, name, run?.id)));
+    return yield* Effect.fail(refusalOf(said, resendRefusalMessage(said, name, run?.id, CARD_IN_PLAY[state])));
   }
   const factory = yield* factoryOrNone(card.factory);
   const unattached = workflow === undefined || factory === undefined ? undefined : unattachedRefusal(factory, workflow);

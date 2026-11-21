@@ -40,8 +40,8 @@ const takes = http.post(RESEND, async ({ request }) => {
 });
 
 /**
- * A started card sent on, one story a state: the factory's workflows and none to choose among, a workflow picked and sent, none picked and
- * sent with no workflow, and a refusal told in the api's words.
+ * A started card sent on, one story a state: the factory's workflows and none to choose among, a workflow picked and sent and its answer
+ * said, none picked and sent with no workflow, a cancel that failed said with its command, and a refusal told in the api's words.
  */
 const meta: Meta<typeof ResendCard> = {
   title: 'Store/ResendCard',
@@ -78,6 +78,32 @@ export const ToAWorkflow: Story = {
     await waitFor(() => expect(sent).toEqual([{ workflow: 'intake' }]));
     await waitFor(() => expect(within(canvasElement).getByRole('button', { name: 'Send on' })).toBeEnabled());
     await expect(args.onRefused).not.toHaveBeenCalledWith(expect.any(String));
+    const said = canvasElement.querySelector('[data-resent="ship-it-k2rq-resent"]');
+    await waitFor(() => expect(said).toHaveTextContent('queued on intake'));
+    await expect(said).toHaveTextContent('Run ship-it-k2rq called off.');
+  },
+};
+
+/** Sent on, its run's cancel failed: the card filed, and why the run was not called off, with the command that does it. */
+export const CancelLeft: Story = {
+  parameters: {
+    msw: [
+      http.post(RESEND, () =>
+        HttpResponse.json(
+          {
+            card: filedCard(),
+            from: { card: 'ship-it', run: 'ship-it-k2rq' },
+            cancelLeft: 'the cancellation could not be written: call the run off with nemia cancel ship-it-k2rq.',
+          } satisfies CardResent,
+          { status: 201 },
+        ),
+      ),
+    ],
+  },
+  play: async ({ canvasElement, userEvent }) => {
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Send on' }));
+    await waitFor(() => expect(canvasElement.querySelector('[data-cancel-left]')).toHaveTextContent('nemia cancel ship-it-k2rq'));
+    await expect(canvasElement.querySelector('[data-resent]')).toHaveTextContent("naming no workflow, for its factory's card triggers");
   },
 };
 

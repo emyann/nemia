@@ -1,9 +1,9 @@
 /**
- * sdlc's front door as a factory gets it: its manifest asks `frontDoorLabel` of a person applying it (`ask: true`); applied with `frontDoorLabel` set, its tree's wiring holds the `front-door` trigger selecting
- * cards by that key, and with it left empty, none; `front-door` loads with Iris hired into its door and its answer — the door a judge
- * whose fence writes nothing, since a judge that writes is refused at load — routing to intake, build and quick by card nodes that file the
- * card as given, to an answer, and to a backlog node that files it back without the label; every hire of the template names an agent of
- * the team.
+ * sdlc's front door as a factory gets it: its manifest asks `frontDoorLabel` of a person applying it (`ask: true`); applied with
+ * `frontDoorLabel` set, its tree's wiring holds the `front-door` trigger selecting cards by that key, and with it left empty, none;
+ * `front-door` loads with Iris hired into its door and its answer — the door a judge whose fence writes nothing, since a judge that writes
+ * is refused at load — routing to intake, build and quick by card nodes that file the card as given, to an answer, and to a backlog node
+ * that files it back without the label; every hire of the template names an agent of the team.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

@@ -33,7 +33,8 @@ export const TemplateParameter = Schema.Struct({
   ),
   ask: Schema.optionalKey(
     Schema.Boolean.annotate({
-      description: 'Whether the template asks this parameter of a person applying it, drawn open rather than folded; never with whenOrigin.',
+      description:
+        'Whether the template asks this parameter of a person applying it, drawn open rather than folded; never with whenOrigin.',
     }),
   ),
 });

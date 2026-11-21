@@ -4,8 +4,8 @@
  * to it, what the runs it waits on concluded (`parentOf`), and what each step consumed. A task's phase and the engine's word for it are
  * `views-words.ts`'s. A controller: it reads the runtime through the client (`runtime-client.ts`), and the store's files beneath it, and
  * files nothing — the tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the engine is an Effect program
- * that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `checksHandedRead`,
- * `landingSaidRead`, `parentRead`, `parentsRead` — and fails with a refusal and dies of anything else.
+ * that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `refusalWholeRead`,
+ * `checksHandedRead`, `landingSaidRead`, `parentRead`, `parentsRead` — and fails with a refusal and dies of anything else.
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
@@ -14,7 +14,10 @@ import {
   attemptVerdict,
   CHECK_TAIL_LINES,
   failingLines,
+  keptOutput,
   lastLines,
+  REFUSAL_FILE_BYTES,
+  REFUSAL_LINES,
   reportedLines,
   type CheckHanded,
   type CheckRefusal,
@@ -473,6 +476,23 @@ export const refusalRead = Effect.fn('refusalOf')(function* (command: string, ta
 });
 
 /**
+ * What a check said, off the engine, for the try filed after it refused (`sendTry`): the refusal as `refusalRead` reads it with
+ * `REFUSAL_LINES` of each stream, and each stream whole up to `REFUSAL_FILE_BYTES`, its end past it (`keptOutput`), for the try's files.
+ * Reads four bytes past the bound, so a stream cut is told from one exactly at it. Fails with a refusal a read rejected with; dies of
+ * anything else.
+ * @param command The step's frozen `check:`.
+ * @param taskId The check's task.
+ */
+export const refusalWholeRead = Effect.fn('refusalWhole')(function* (command: string, taskId: string) {
+  const e = yield* EngineService;
+  const { verdict, stdout, stderr, killed } = yield* checkStreams(e, taskId, REFUSAL_FILE_BYTES + 4, REFUSAL_FILE_BYTES + 4);
+  const tail = (text: string) => lastLines(keptOutput(text, TAIL_BYTES).text, REFUSAL_LINES);
+  const said = { command, verdict, stdout: tail(stdout), stderr: tail(stderr) };
+  const whole = { stdout: keptOutput(stdout, REFUSAL_FILE_BYTES), stderr: keptOutput(stderr, REFUSAL_FILE_BYTES) };
+  return { refusal: (killed ? { ...said, killed } : said) satisfies CheckRefusal, whole };
+});
+
+/**
  * What a checked step's check said, for the step filed after it (`checkHandedSection`): the verdict, the tails of its streams, and the
  * lines it marked (`reportedLines`) from its whole stdout (`checkStreams`). Where `output` gave no stdout — no attempt yet, or none kept
  * under its name — the marked lines come from the log, which keeps only the end, and are `partial`. A read that rejects, with anything, is
@@ -491,7 +511,8 @@ export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string,
 /**
  * What the check of a run's ending said when it refused the merged tree, for the loop's target filed to merge that base (`LandingSaid`):
  * the verdict, the tails of its streams, and the lines naming a failing test (`failingLines`) from its whole stdout and the end of its
- * stderr (`checkStreams`) — `partial` where no whole stdout was kept. A read that rejects is `unreadable`, and the target is filed all the
+ * stderr (`checkStreams`) — `partial` where no whole stdout was kept — and, beside it, each stream whole up to `REFUSAL_FILE_BYTES`, its
+ * end past it (`keptOutput`), for the target's files. A read that rejects is `unreadable`, with no streams, and the target is filed all the
  * same. Dies of nothing a read throws.
  *
  * @param step The ending step, whose frozen `check:` is `command`.
@@ -499,12 +520,13 @@ export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string,
  */
 export const landingSaidRead = Effect.fn('landingSaid')(function* (step: string, command: string, check: string) {
   const e = yield* EngineService;
-  const read = yield* Effect.exit(checkStreams(e, check));
-  if (Exit.isFailure(read)) return { step, check, command, unreadable: unreadWords(check, read.cause) } satisfies LandingSaid;
+  const read = yield* Effect.exit(checkStreams(e, check, undefined, REFUSAL_FILE_BYTES + 4));
+  if (Exit.isFailure(read)) return { said: { step, check, command, unreadable: unreadWords(check, read.cause) } satisfies LandingSaid };
   const { verdict, stdout, stderr, kept } = read.value;
   const { lines, cut } = failingLines(`${stdout}\n${stderr}`);
   const said = { verdict, stdout: lastLines(stdout), stderr: lastLines(stderr), failing: lines, cut, partial: !kept };
-  return { step, check, command, ...said } satisfies LandingSaid;
+  const whole = { stdout: keptOutput(stdout, REFUSAL_FILE_BYTES), stderr: keptOutput(stderr, REFUSAL_FILE_BYTES) };
+  return { said: { step, check, command, ...said } satisfies LandingSaid, whole };
 });
 
 /** Why what a check's task printed cannot be given: the engine's words for the read that failed. */
@@ -531,15 +553,15 @@ export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, s
 const TAIL_BYTES = 64_000;
 
 /**
- * A check's verdict and streams, off the engine: the verdict of its latest attempt (`attemptVerdict`), its stderr's last `TAIL_BYTES`,
- * and its stdout — whole, or its last `stdoutBytes` — through `output`, which the runtime keeps whole for a check. Where `output` gives no
- * stdout (`kept` false: no attempt yet, or none kept under its name), stderr is what `output` gave or empty, and stdout is the end of the
- * log. Dies of what a read failed with, in the runtime's words (`asked`).
+ * A check's verdict and streams, off the engine: the verdict of its latest attempt (`attemptVerdict`), its stderr's last `stderrBytes`
+ * (`TAIL_BYTES` unless asked for more), and its stdout — whole, or its last `stdoutBytes` — through `output`, which the runtime keeps whole
+ * for a check. Where `output` gives no stdout (`kept` false: no attempt yet, or none kept under its name), stderr is what `output` gave or
+ * empty, and stdout is the end of the log. Dies of what a read failed with, in the runtime's words (`asked`).
  */
-const checkStreams = Effect.fnUntraced(function* (e: Engine, taskId: string, stdoutBytes?: number) {
+const checkStreams = Effect.fnUntraced(function* (e: Engine, taskId: string, stdoutBytes?: number, stderrBytes = TAIL_BYTES) {
   const view = yield* asked('view', e.view(taskId));
   const [stdout, stderr] = yield* Effect.all(
-    [asked('output', e.output(taskId, 'stdout', stdoutBytes)), asked('output', e.output(taskId, 'stderr', TAIL_BYTES))],
+    [asked('output', e.output(taskId, 'stdout', stdoutBytes)), asked('output', e.output(taskId, 'stderr', stderrBytes))],
     { concurrency: 'unbounded' },
   );
   const verdict = attemptVerdict(view.state.attempts.at(-1));

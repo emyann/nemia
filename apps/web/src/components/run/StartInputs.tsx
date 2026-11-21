@@ -29,7 +29,8 @@ const markOf = (index: number, sent: number) => (index < sent ? 'sent' : index =
  * file past it is marked in failure's ink, its size beside the cap: the form starts nothing while one is listed. A file added under a
  * name already listed takes its place (`inputsAdded`), since the run finds each by its name. While the start uploads them (`uploading`),
  * each says whether it is sent, uploading or waiting, `sent` being how many are, in order. `onChange` is told the list as it is after a
- * file is added or removed; `isDisabled` keeps it as it is while the start is pressed.
+ * file is added or removed; `isDisabled` keeps it as it is while the start is pressed. `label` and `note` say what the files are for and
+ * how large one may be, a run's start's unless given.
  */
 export function StartInputs({
   files,
@@ -37,7 +38,11 @@ export function StartInputs({
   sent = 0,
   uploading = false,
   isDisabled = false,
+  label = 'Files for the run',
+  note = `Each file up to ${MOST_WORDS}, kept ${KEPT} for the start.`,
 }: {
+  label?: string;
+  note?: string;
   files: readonly File[];
   onChange: (files: File[]) => void;
   sent?: number;
@@ -48,7 +53,7 @@ export function StartInputs({
   return (
     <div className="min-w-0 space-y-2" data-start-inputs>
       <DropZone
-        aria-label="Files for the run"
+        aria-label={label}
         isDisabled={isDisabled}
         className="flex-row flex-wrap justify-start gap-3 p-3 text-start"
         onDrop={(event) => {
@@ -57,9 +62,9 @@ export function StartInputs({
       >
         <UploadIcon aria-hidden size={20} className="shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="block text-body-medium">Files for the run: drop them here, or</span>
+          <span className="block text-body-medium">{label}: drop them here, or</span>
           <span className="block text-body-small text-on-surface-variant" data-file-limit>
-            Each file up to {MOST_WORDS}, kept {KEPT} for the start.
+            {note}
           </span>
         </span>
         <FileTrigger allowsMultiple onSelect={(list) => add([...(list ?? [])])}>
@@ -70,7 +75,7 @@ export function StartInputs({
       </DropZone>
       {files.length > 0 && (
         <ul
-          aria-label="Files listed for the run"
+          aria-label={`${label}, listed`}
           className="divide-y divide-outline-variant rounded-shape-small border border-outline-variant"
         >
           {files.map((file, index) => {

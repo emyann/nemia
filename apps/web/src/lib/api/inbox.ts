@@ -10,6 +10,7 @@ import {
   CARD_KEY_MEANINGS,
   CARD_KEYS,
   type CardKey,
+  type CardFileStatus,
   type CardList,
   type CardSpec,
   type CardState,
@@ -180,7 +181,7 @@ export const checkSelector = (selector: string) => cards.listAll(selector.trim()
  * A card's page: the card as the inbox lists it (`entryOf`), its file as written, frontmatter included (`status.source`, sent on a read of
  * one card), and each key a card may set, a row each (`cardKeysOf`) — none for an entry that does not read as a card.
  */
-export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
+export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null; files: CardFileStatus[] };
 
 /** Labels as a printer shows them, `a=b,c=d` in key order, as the orchestrator's `labelsText` does; null for none. */
 const labelsText = (labels: Readonly<Record<string, string>>) => {
@@ -205,6 +206,7 @@ const keyValue = (card: Card, key: CardKey) => {
   if (key === 'from') return entry.from.join(', ') || null;
   if (key === 'labels') return labelsText(entry.labels);
   if (key === 'model') return modelsText(card.spec.model ?? {});
+  if (key === 'files') return (card.spec.files ?? []).map((f) => f.name).join(', ') || null;
   return entry[key] ?? null;
 };
 
@@ -226,7 +228,7 @@ export const cardQuery = (name: string) =>
     queryKey: ['inbox', name],
     queryFn: async () => {
       const card = await cards.getAll(name);
-      return { ...entryOf(card), source: card.status.source ?? '', keys: cardKeysOf(card) };
+      return { ...entryOf(card), source: card.status.source ?? '', keys: cardKeysOf(card), files: [...(card.status.files ?? [])] };
     },
   });
 
@@ -234,27 +236,67 @@ export const cardQuery = (name: string) =>
 type CardRef = Pick<InboxEntry, 'name' | 'factory'>;
 
 /**
+ * Files attached to a card, as the CLI's `inbox attach <name> <path>...` does: each uploaded first to the card's namespace, then named to
+ * the card by its id under its own name (the Card's `attach`). Rejects with the api's refusal in full: a started card, a name it carries
+ * already, more files or bytes than a card carries.
+ * @param card The card: its name and its factory.
+ * @param given The files a person dropped, pasted or chose.
+ */
+export async function attachToCard(card: CardRef, given: readonly File[]) {
+  const namespace = namespaceOf(card.factory);
+  const named = await files.uploaded(namespace, { listed: given, sent: new Map() });
+  return cards.attach(
+    namespace,
+    card.name,
+    named.flatMap((input) => (input.name !== undefined && input.file !== undefined ? [{ name: input.name, file: input.file }] : [])),
+  );
+}
+
+/**
+ * A file taken off a card, as the CLI's `inbox detach <name> <file>` does (the Card's `detach`).
+ * @param card The card: its name and its factory.
+ * @param file The file's name in the card.
+ */
+export const detachFromCard = (card: CardRef, file: string) => cards.detach(namespaceOf(card.factory), card.name, file);
+
+/**
+ * Where a card's file is read: the bytes of the File it names in the card's namespace (`GET
+ * /api/namespaces/:namespace/files/:id/content`), a picture served as itself, which the card's markdown shows in place of its name.
+ * @param card The card: its factory.
+ * @param file The File's id.
+ */
+export const cardFileUrl = (card: Pick<InboxEntry, 'factory'>, file: string) =>
+  `/api/namespaces/${encodeURIComponent(namespaceOf(card.factory))}/files/${encodeURIComponent(file)}/content`;
+
+/**
  * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --factory <name>` does: in `factory`'s namespace when it names
  * one, in `default` when it is left out (the Card's `create`). Never a repository nor an origin: the factory places the card's run and
  * finds its workflow by name. Resolves with the card's name; rejects with the api's refusal in full — the package's words for an idea with
  * nothing in it or a factory the store does not have, or the api's own about the request or a workflow it has none of. `label`, where
- * given, are the labels the card is filed with, each `key=value`, which its run is started with too.
+ * given, are the labels the card is filed with, each `key=value`, which its run is started with too; `given`, the files it carries, each
+ * uploaded first to its namespace and named by its id.
  */
 export const fileCard = async ({
   factory,
   body,
   workflow,
   label,
+  given,
 }: {
   body: string;
   workflow?: string;
   factory?: string;
   label?: readonly string[];
+  given?: readonly File[];
 }) => {
-  const filed = await cards.create(namespaceOf(factory), {
+  const namespace = namespaceOf(factory);
+  const named = given === undefined || given.length === 0 ? [] : await files.uploaded(namespace, { listed: given, sent: new Map() });
+  const carried = named.flatMap((input) => (input.file !== undefined ? [{ file: input.file, name: input.name }] : []));
+  const filed = await cards.create(namespace, {
     body,
     ...(workflow === undefined ? {} : { workflow }),
     ...(label === undefined ? {} : { label }),
+    ...(carried.length === 0 ? {} : { files: carried }),
   });
   return { name: filed.metadata.name };
 };

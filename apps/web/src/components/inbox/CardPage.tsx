@@ -1,10 +1,11 @@
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { AsWritten, KeyTable } from '../field/FilePage';
 import { Instant } from '../time/Instant';
 import { StartedAs } from './InboxParts';
 import { Markdown } from '../markdown/Markdown';
 import { Labels } from '../field/Labels';
-import { cardQuery } from '@/lib/api/inbox';
+import { attachToCard, cardFileUrl, cardQuery, detachFromCard } from '@/lib/api/inbox';
+import { CardFiles } from './CardFiles';
 import { labelCard } from '@/lib/api/labels';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { startedCard } from '@/lib/inbox';
@@ -16,11 +17,17 @@ import { factoryLevel, inboxLevel, Trail } from '../nav/Trail';
 /**
  * One inbox card, to read: its body rendered, then each key a card may set with its value and what it means — or, with Source, its file as
  * written. A started card says the runs it was started as, beside its run's phase (`StartedAs`), whether that run is in flight or ended.
- * It starts and drops nothing: the Inbox page does.
+ * It starts and drops nothing: the Inbox page does. Its files are listed under its labels (`CardFiles`), attached and taken off until a run
+ * is started from it, and a picture its text shows by a file's name is shown from the api.
  */
 export function CardPage({ name }: { name: string }) {
   const { data: card } = useSuspenseQuery(cardQuery(name));
   const queryClient = useQueryClient();
+  const changed = () => queryClient.invalidateQueries({ queryKey: ['inbox'] });
+  const attach = useMutation({ mutationFn: (given: File[]) => attachToCard(card, given), onSuccess: changed });
+  const detach = useMutation({ mutationFn: (file: string) => detachFromCard(card, file), onSuccess: changed });
+  const shown = Object.fromEntries(card.files.filter((f) => f.kept).map((f) => [f.name, cardFileUrl(card, f.file)]));
+  const refusal = attach.error ?? detach.error;
 
   return (
     <article className="space-y-6">
@@ -50,6 +57,17 @@ export function CardPage({ name }: { name: string }) {
         />
       )}
 
+      {card.error === null && (
+        <CardFiles
+          files={card.files}
+          canChange={card.startedAs.length === 0}
+          onAttach={(given) => given.length > 0 && attach.mutate(given)}
+          onDetach={(file) => detach.mutate(file)}
+          pending={attach.isPending || detach.isPending}
+          refused={refusal === null ? null : refusal.message}
+        />
+      )}
+
       {startedCard(card) && <StartedAs startedAs={card.startedAs} state={card.state} />}
 
       {card.error !== null && (
@@ -60,7 +78,7 @@ export function CardPage({ name }: { name: string }) {
       )}
 
       <AsWritten file={card.file} source={card.source}>
-        {card.body !== null && <Markdown>{card.body}</Markdown>}
+        {card.body !== null && <Markdown files={shown}>{card.body}</Markdown>}
         {card.keys && (
           <KeyTable
             rows={card.keys}

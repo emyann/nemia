@@ -61,13 +61,27 @@ function stepIn(tree: string, workflow: string, step: string) {
 }
 
 /**
+ * `checks`, held to the chain `checkOf` joins them as: each after the one above it, by naming no `after:` (the default) or naming that
+ * one alone, and the first after none.
+ * @param at The step, for the failure's words.
+ * @param checks The step's `checks:`, as its frontmatter holds them.
+ */
+const chained = (at: string, checks: readonly { name?: unknown; run?: unknown; after?: unknown }[]) => {
+  checks.forEach((c, i) => {
+    const above = i === 0 ? [] : [checks[i - 1].name];
+    if (c.after !== undefined) assert.deepEqual([c.after].flat(), above, `${at}'s check ${String(c.name)} runs after the one above it`);
+  });
+  return checks;
+};
+
+/**
  * The check of the step `workflow/step` of `tree`: its `check:`; or its `checks:` as one line, each joined to the one before it by `&&`,
  * the order the pass runs sdlc's chained checks in; or a command node's `run:`, which runs with the same frozen folders.
  */
 const checkOf = (tree: string, workflow: string, step: string) => {
   const { front } = stepIn(tree, workflow, step);
   const checks = typeof front.checks === 'string' ? (JSON.parse(front.checks) as unknown) : front.checks;
-  if (Array.isArray(checks)) return checks.map((c: { run?: unknown }) => String(c.run ?? '')).join(' && ');
+  if (Array.isArray(checks)) return chained(`${workflow}/${step}`, checks).map((c) => String(c.run ?? '')).join(' && ');
   return String(front.check ?? front.run ?? '');
 };
 

@@ -57,7 +57,7 @@ import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { CLI_VERBS } from '../command/command.ts';
 import { levelsNow } from '../level/levels.verb.ts';
-import { SESSION_TOKEN } from '../filed/filed.ts';
+import { SESSION_TOKEN, mountOf } from '../filed/filed.ts';
 import { TokenDoor } from '../token/token.store.ts';
 import {
   NEMIA_DIGEST_EVERY,
@@ -112,10 +112,13 @@ const nemiaBrief = (operating: boolean) =>
     'The quota and its pace: `nemia quota`.',
   ].join(' ');
 
-/** Each factory's folders, read-only: what she reads of the work and never writes. A factory that does not read is left out. */
+/**
+ * Each factory's folders, read-only: what she reads of the work and never writes, as the runtime takes a mount (`mountOf`), with no
+ * volume's switch. A factory that does not read is left out.
+ */
 const factoryFolders = (home: string) => {
   const volumes = listedAtOnce(home).flatMap((f) => ('volumes' in f ? f.volumes : []));
-  return factoryMounts({ volumes }, undefined);
+  return factoryMounts({ volumes }, undefined).map(mountOf);
 };
 
 /**

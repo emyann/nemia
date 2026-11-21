@@ -1,0 +1,75 @@
+apiVersion: nemia.dev/v1alpha1
+kind: Workflow
+metadata:
+  name: front-door
+  description: "Route a raw card to the workflow it needs, with no gate. The front door's trigger queues each card of the factory labelled with frontDoorLabel that names no workflow; Iris, as a read-only judge, reads the card and sends it as given to intake, build or quick, answers a question with no change to the repository, or files it back to the inbox unqueued. Where she cannot tell, she signs off blocked and a person answers."
+spec:
+  steps:
+    - name: door
+      place: git
+      routes:
+        - intake
+        - build
+        - quick
+        - answer
+        - backlog
+      route: judge
+      output:
+        path: workflows/front-door/door.schema.json
+      overrides:
+        claude:
+          fence:
+            tools:
+              - Read
+              - Grep
+              - Glob
+    - name: to-intake
+      after:
+        - door
+      place: git
+      when:
+        - intake
+      workflow: intake
+      card: given
+    - name: to-build
+      after:
+        - door
+      place: git
+      when:
+        - build
+      workflow: build
+      card: given
+    - name: to-quick
+      after:
+        - door
+      place: git
+      when:
+        - quick
+      workflow: quick
+      card: given
+    - name: answer
+      after:
+        - door
+      place: git
+      when:
+        - answer
+      output:
+        path: workflows/front-door/answer.schema.json
+      overrides:
+        claude:
+          fence:
+            tools:
+              - Read
+              - Grep
+              - Glob
+              - WebFetch
+              - WebSearch
+    - name: backlog
+      after:
+        - door
+      place: git
+      when:
+        - backlog
+      card: backlog
+      unlabel:
+        - "${{ parameters.frontDoorLabel }}"

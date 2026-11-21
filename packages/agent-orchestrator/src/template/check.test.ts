@@ -305,6 +305,16 @@ describe('the check of a template folder: the whole folder passes, and each rule
     assertRefused(hire('nope/design', 'implementer'), 'nemia.yaml', ['spec', 'hires', 'nope/design'], 'names no workflow');
     assertRefused(hire('dev/design', 'nobody'), 'nemia.yaml', ['spec', 'hires', 'dev/design'], 'no agent of agents/');
   });
+  test("a card trigger to no workflow of the folder, or whose selector written whole does not read, is refused; a parameter's is read once rendered", () => {
+    const trigger = (selector: string, name: string, kind = 'Workflow') =>
+      refusalsOf((d) => (d['nemia.yaml'].spec.triggers = { door: { selector, target: { kind, name } } }));
+    const at = ['spec', 'triggers', 'door'];
+    assert.deepEqual(trigger('ready', 'dev'), []);
+    assert.deepEqual(trigger('${{ parameters.check }}', 'dev'), [], 'a selector a parameter writes is read rendered, an empty one no trigger');
+    assertRefused(trigger('ready', 'nope'), 'nemia.yaml', at, 'no workflow of workflows/');
+    assertRefused(trigger('ready', 'dev', 'Job'), 'nemia.yaml', at, 'targets a Workflow');
+    assertRefused(trigger('a in (b', 'dev'), 'nemia.yaml', at, 'selector');
+  });
   test("a skill the folder lacks is refused, an agent's or a step's, and a place skill nemia ships is present", () => {
     assertRefused(
       refusalsOf((d) => d[AGENT].spec.skills.push('nope')),

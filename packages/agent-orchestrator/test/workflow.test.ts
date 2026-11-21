@@ -236,7 +236,10 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${placed(l
 
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<
-    Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox' | 'routes' | 'route' | 'when' | 'ends' | 'workflow'>,
+    Exclude<
+      StepKey,
+      'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox' | 'routes' | 'route' | 'when' | 'ends' | 'workflow' | 'card' | 'unlabel'
+    >,
     string
   > = {
     after: 'implement',

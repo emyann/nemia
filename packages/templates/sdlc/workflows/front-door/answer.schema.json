@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "answer": {
+      "type": "string",
+      "description": "The answer to the card's question, whole, in markdown, each fact with where you read it: a file and its line, a page, a command's output."
+    }
+  },
+  "required": ["answer"],
+  "additionalProperties": false
+}

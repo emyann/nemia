@@ -54,7 +54,8 @@ function cardOf(step: string, written: string | undefined, workflow: string | un
 }
 
 /**
- * `unlabel:`, the label keys a backlog node files its card back without, on a `card: backlog` node alone.
+ * `unlabel:`, the label keys a backlog node files its card back without, on a `card: backlog` node alone; a line that lists none, as a
+ * template parameter left empty renders it, removes none.
  * @param step The step's name, which a refusal names.
  * @param written The text of its `unlabel:` line, or undefined where it has none.
  * @param card The node's `card:`, read.
@@ -69,8 +70,7 @@ function unlabelOf(step: string, written: string | undefined, card: NodeCard | u
     .split(',')
     .map((k) => k.trim())
     .filter(Boolean);
-  if (!keys.length) refuse(`${step}: \`unlabel:\` lists no label key. Name one, or delete the line.`);
-  return keys;
+  return keys.length ? keys : undefined;
 }
 
 /** A condition's own keys: `routes:` (two or more), `route:` beside it and never without it, and `ends:` on a condition alone. */

@@ -1,6 +1,6 @@
 /**
  * `nemia template lint`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
- * what the folder's parts say of each other — a hire, a skill, a sibling step, a parameter or a file named that the folder lacks, a step's
+ * what the folder's parts say of each other — a hire, a trigger's target or its selector, a skill, a sibling step, a parameter or a file named that the folder lacks, a step's
  * own schema outside its workflow's folder, a `${{ parameters.<name> }}` naming no declared parameter in a document's string or in a
  * text the render writes (`renderedTexts`) — and each harness's block against the words the runtime gives that harness
  * (`HARNESS_KNOBS`). Pure: every problem comes back at once, the texts read through the function the store hands in.
@@ -10,6 +10,7 @@ import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harn
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
 import { baseSpelled } from '../former/former.ts';
 import { OVERRIDABLE } from '../workflow/index.ts';
+import { selectorsRefusal } from '../watch/selector.ts';
 import {
   documentFile,
   documentRefusals,
@@ -118,6 +119,30 @@ function hireRefusals(held: Held) {
     else if (!read.steps.some((s) => s.name === step)) refusals.push(`hire ${key} names no step of ${workflow}: ${step} is not there.`);
     if (typeof agent === 'string' && !held.agents.has(agent))
       refusals.push(`hire ${key} names ${agent}, no agent of agents/: write agents/${agent}/agent.yaml, or hire one there is.`);
+    return refusals.map((message) => ({ file: 'nemia.yaml', at, message }));
+  });
+}
+
+/**
+ * What a card trigger of the manifest names that the folder lacks: a target that is no workflow of workflows/, and a selector written
+ * whole that does not read. One a parameter writes is read once rendered, where an empty one makes no trigger.
+ */
+function triggerRefusals(held: Held) {
+  const triggers = isMap(held.manifest.triggers) ? held.manifest.triggers : {};
+  return Object.entries(triggers).flatMap(([name, trigger]) => {
+    const at = ['spec', 'triggers', name];
+    const t = isMap(trigger) ? trigger : {};
+    const target = isMap(t.target) ? t.target : {};
+    const refusals: string[] = [];
+    if (target.kind !== 'Workflow')
+      refusals.push(`trigger ${name} targets a ${String(target.kind)}, and a trigger targets a Workflow: write target.kind: Workflow.`);
+    else if (typeof target.name !== 'string' || !held.workflows.has(target.name))
+      refusals.push(
+        `trigger ${name} targets ${String(target.name)}, no workflow of workflows/: name one there is, or carry workflows/${String(target.name)}/workflow.yaml.`,
+      );
+    const selector = typeof t.selector === 'string' ? t.selector : '';
+    const unread = selector.includes('${{') || !selector.trim() ? undefined : selectorsRefusal([selector]);
+    if (unread !== undefined) refusals.push(`trigger ${name}'s selector ${unread}`);
     return refusals.map((message) => ({ file: 'nemia.yaml', at, message }));
   });
 }
@@ -522,6 +547,7 @@ export function checkTemplate(
     ...layoutRefusals(folder, namedPaths(folder)),
     ...documents,
     ...hireRefusals(held),
+    ...triggerRefusals(held),
     ...originRefusals(held),
     ...agentRefusals(held),
     ...stepRefusals(held),

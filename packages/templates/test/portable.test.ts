@@ -120,6 +120,10 @@ const STEP_HOLDS: Record<string, string> = {
   next: 'nemia route',
   'to-build': 'workflow: build',
   'to-quick': 'workflow: quick',
+  'to-intake': 'workflow: intake',
+  door: 'Routing',
+  answer: 'change nothing',
+  backlog: 'naming no workflow',
 };
 
 /** The name each file of sdlc must hold, by its path from the template: the first rule whose pattern takes the path. */

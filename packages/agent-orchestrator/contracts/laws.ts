@@ -6,6 +6,7 @@ import type { Run } from '../src/record/record.ts';
 import type { StepSpec } from '../src/step/step.ts';
 import { reposNamed, type Factory } from '../src/factory/factory.ts';
 import { hiresInto, type WiringChange } from '../src/factory/wiring/wiring.ts';
+import { triggersOn } from '../src/factory/wiring/dictionaries.ts';
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
 export const gated = (step: StepSpec, run: Run) => step.gate === true || (run.gates ?? []).includes(step.name);
@@ -50,9 +51,8 @@ export const accepted = (
 export const triggerHeld = (factory: Pick<Factory, 'triggers'>, name: string) =>
   factory.triggers !== undefined && Object.hasOwn(factory.triggers, name);
 
-/** Whether a trigger of the factory targets `workflow`. */
-export const targets = (factory: Pick<Factory, 'triggers'>, workflow: string) =>
-  factory.triggers !== undefined && Object.values(factory.triggers).some((t) => t.target.name === workflow);
+/** Whether a trigger of the factory targets `workflow`: one of its triggers is on it (`triggersOn`). */
+export const targets = (factory: Pick<Factory, 'triggers'>, workflow: string) => triggersOn(factory.triggers, workflow).length !== 0;
 
 /**
  * The name a change of a workflow or a trigger carries: the trigger's for a trigger or an untrigger, else the workflow's; a hire's

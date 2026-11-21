@@ -16,6 +16,16 @@ export const hiresInto = (hires: Readonly<Record<string, string>>, workflow: str
   Object.keys(hires).some((step) => step.startsWith(`${workflow}/`));
 
 /**
+ * The names of the card triggers of `triggers` that target the workflow `workflow`, in the order held; none where it holds none.
+ * @param triggers The factory's own card triggers, each by its name, or undefined where it holds none.
+ * @param workflow The workflow's name.
+ */
+export const triggersOn = (
+  triggers: Readonly<Record<string, { readonly target: { readonly name: string } }>> | undefined,
+  workflow: string,
+) => Object.entries(triggers ?? {}).flatMap(([name, t]) => (t.target.name === workflow ? [name] : []));
+
+/**
  * `hires` with `agent` hired into `step`, an earlier hire there replaced.
  * @param hires The factory's hires: each agent by its step, `<workflow>/<step>`.
  * @param step The step hired into, `<workflow>/<step>`.

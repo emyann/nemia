@@ -27,7 +27,7 @@ import {
   untriggeredRefusal,
 } from '../factory.ts';
 import type { WiringRefused } from '../../../contracts/wiring.contract.ts';
-import { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictionaries.ts';
+import { withName, hiresInto, triggersOn, withHire, withEntry, withoutEntry } from './dictionaries.ts';
 
 export { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictionaries.ts';
 
@@ -53,10 +53,6 @@ const DONE = {
   untrigger: 'untriggered',
 } as const;
 
-/** The names of the triggers of `triggers` that target `workflow`. */
-const triggering = (triggers: Parameters<WiringRefusal>[0]['triggers'], workflow: string) =>
-  Object.entries(triggers ?? {}).flatMap(([name, t]) => (t.target.name === workflow ? [name] : []));
-
 const invalid = (message: string) => ({ kind: 'Invalid', message }) satisfies WiringRefused;
 const missing = (message: string) => ({ kind: 'Missing', message }) satisfies WiringRefused;
 
@@ -69,9 +65,9 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
   if (change.verb === 'hire') return hireRefused(factory, change.step, change.agent);
   if (change.verb === 'fire')
     return !holds(factory.hires, change.step) ? missing(unhiredFireRefusal(factory.name, change.step, factory.hires)) : null;
-  if (change.verb === 'trigger' || change.verb === 'untrigger') return triggerRefused(factory, change);
-  const badName = workflowNameRefusal(change.workflow);
+  const badName = workflowNameRefusal(change.verb === 'trigger' || change.verb === 'untrigger' ? change.name : change.workflow);
   if (badName !== undefined) return invalid(`${badName} Nothing was ${DONE[change.verb]}.`);
+  if (change.verb === 'trigger' || change.verb === 'untrigger') return triggerRefused(factory, change);
   if (change.verb === 'attach') return attachRefused(factory, change.workflow, change.repo);
   if (change.verb === 'schedule')
     return factory.workflows.includes(change.workflow) ? null : invalid(unofferedScheduleRefusal(factory.name, change.workflow));
@@ -83,15 +79,13 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
 };
 
 /**
- * Why `factory` cannot take a trigger or an untrigger: a name that is not one (`Invalid`); a trigger to a workflow it does not offer, or
- * named as a workflow it schedules (`Invalid`); an untrigger of a trigger it does not hold (`Missing`).
+ * Why `factory` cannot take a trigger or an untrigger whose name is one: a trigger to a workflow it does not offer, or named as a workflow
+ * it schedules (`Invalid`); an untrigger of a trigger it does not hold (`Missing`).
  */
 function triggerRefused(
   factory: Parameters<WiringRefusal>[0],
   change: Extract<Parameters<WiringRefusal>[1], { verb: 'trigger' | 'untrigger' }>,
 ) {
-  const badName = workflowNameRefusal(change.name);
-  if (badName !== undefined) return invalid(`${badName} Nothing was ${DONE[change.verb]}.`) satisfies WiringRefused | null;
   if (change.verb === 'untrigger')
     return (
       factory.triggers !== undefined && holds(factory.triggers, change.name)
@@ -133,7 +127,7 @@ function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string) 
   if (holds(factory.schedules, workflow)) return invalid(scheduledDetachRefusal(factory.name, workflow)) satisfies WiringRefused | null;
   if (factory.costLines !== undefined && holds(factory.costLines, workflow))
     return invalid(costLinedDetachRefusal(factory.name, workflow)) satisfies WiringRefused | null;
-  const triggers = triggering(factory.triggers, workflow);
+  const triggers = triggersOn(factory.triggers, workflow);
   if (triggers.length) return invalid(triggeredDetachRefusal(factory.name, workflow, triggers)) satisfies WiringRefused | null;
   return null;
 }

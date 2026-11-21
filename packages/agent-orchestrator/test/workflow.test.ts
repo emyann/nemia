@@ -298,6 +298,8 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual([condition.routes, condition.route, condition.ends], [['web', 'docs'], { kind: 'judge' }, ['docs']]);
   const routed = fm('to-build', 'after: triage\nwhen: web\nworkflow: build');
   assert.deepEqual([routed.when, routed.workflow], [['web'], 'build'], 'a node on a route: src/route/route.test.ts reads them too');
+  const filedBack = fm('backlog', 'after: triage\nwhen: docs\ncard: backlog\nunlabel: [ready]');
+  assert.deepEqual([filedBack.card, filedBack.unlabel], ['backlog', ['ready']], 'a card node: src/send/send.verb.test.ts reads them too');
   const all = {
     ...w,
     routes: condition.routes,
@@ -305,6 +307,8 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     ends: condition.ends,
     when: routed.when,
     workflow: routed.workflow,
+    card: filedBack.card,
+    unlabel: filedBack.unlabel,
     workspace: ending.workspace,
     slot: watching.slot,
     agent: attached.agent,

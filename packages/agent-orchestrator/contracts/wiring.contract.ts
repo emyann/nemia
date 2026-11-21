@@ -28,7 +28,7 @@ import {
   type Factory,
   type Schedule,
 } from '../src/factory/factory.ts';
-import { hiresInto, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
+import { hiresInto, triggersOn, withEntry, withHire, withName, withoutEntry } from '../src/factory/wiring/dictionaries.ts';
 import { accepted, changeNamed, targets, triggerHeld } from './laws.ts';
 
 /**
@@ -75,6 +75,9 @@ export const repoCount = assume(reposNamed, { pure: true });
 
 /** Whether hires hire into a workflow's steps: the domain's word, read the same by the laws and the code. */
 export const hiring = assume(hiresInto, { pure: true });
+
+/** The triggers of a factory on a workflow: the domain's word, read the same by the laws and the code. */
+export const triggering = assume(triggersOn, { pure: true });
 
 /** Names given one more hold it, and each they held. */
 export const named = assume(withName, {

@@ -19,22 +19,11 @@
  * reason and of the one it would have been written under (`formerOf`), so `reason=NeedsHuman` and `reason notin (WaitingForSlot)` keep
  * their meaning in a selector typed or stored before the codes were renamed, which is never rewritten.
  */
-import type { LabelKeyShape } from '../../contracts/label-key.contract.ts';
 import { formerOf, isFormerReason } from '../former-reason/former-reason.ts';
-import { involvedOf, upgraded, type ClosedFeedLabels, type Codes, type FeedLine } from '../feed/index.ts';
+import { involvedOf, upgraded, type Codes, type FeedLine } from '../feed/index.ts';
+import { LABEL_KEYS, labelKeySpellingRefusal, RESERVED_KEYS } from '../label-spelling/label-spelling.ts';
 
-/**
- * Every label key of a feed line, each named once. A `Record` of `keyof ClosedFeedLabels`, whose keys are required however optional the
- * labels themselves are, so a label added to `ClosedFeedLabels` fails the typecheck here until it is named — and a selector reaches it the
- * day it exists, rather than being refused as no key of a line.
- */
-const EVERY_LABEL: Record<keyof ClosedFeedLabels, true> = { run: true, factory: true, workflow: true, step: true, agent: true };
-
-/** The label keys a selector may name, in the order `ClosedFeedLabels` declares them: every one of them (`EVERY_LABEL`). */
-export const LABEL_KEYS: readonly (keyof ClosedFeedLabels)[] = Object.keys(EVERY_LABEL) as (keyof ClosedFeedLabels)[];
-
-/** The keys a signed line names of itself, which a selector reads beside the labels: what it is about, and how its writer judged it. */
-export const RESERVED_KEYS: readonly string[] = ['kind', 'reason', 'on', 'via', 'type', 'waits', 'source'];
+export { LABEL_KEYS, labelKeyShape, labelKeySpellingRefusal, RESERVED_KEYS } from '../label-spelling/label-spelling.ts';
 
 /** Every key a selector may name: the labels and the reserved keys, in that order. */
 export const SELECTABLE_KEYS: readonly string[] = [...LABEL_KEYS, ...RESERVED_KEYS];
@@ -68,56 +57,8 @@ export type Clause =
 /** Every selector given, parsed: the clauses of one all hold, and one selector of them does (AND within, OR across). */
 export type Selectors = readonly (readonly Clause[])[];
 
-/** A key's name segment, as Kubernetes spells one: alphanumerics at both ends, `-`, `_` and `.` between. */
-const NAME_SEGMENT = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
-
-/** A key's prefix, a DNS subdomain as Kubernetes spells one: lowercase labels of alphanumerics and `-`, each alphanumeric at both ends, joined by dots. */
-const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
-
 /** A word that may be a bare key: no space, operator or parenthesis in it. */
 const BARE = /^[^\s=!(),]+$/;
-
-/**
- * A label key's segments, as Kubernetes spells one: a name alone, a prefix and a name split at the one slash, or the first flaw of its
- * structure — a second slash, a prefix written empty, no name, a prefix past 253 or a name past 63. Pure, and proved by
- * `contracts/label-key.contract.ts`; what the characters of each segment may be is `labelKeySpellingRefusal`'s.
- * @param key The key as given.
- */
-export const labelKeyShape: LabelKeyShape = (key) => {
-  const slashed = key.includes('/');
-  const name = slashed ? key.slice(key.indexOf('/')).slice(1) : key;
-  if (slashed && name.includes('/')) return { kind: 'refused', reason: 'slashes' };
-  if (key.startsWith('/')) return { kind: 'refused', reason: 'empty-prefix' };
-  if (name === '') return { kind: 'refused', reason: 'empty-name' };
-  const prefix = key.slice(0, key.indexOf('/'));
-  if (slashed && prefix.length > 253) return { kind: 'refused', reason: 'long-prefix' };
-  if (name.length > 63) return { kind: 'refused', reason: 'long-name' };
-  if (!slashed) return { kind: 'name', name };
-  return { kind: 'prefixed', prefix, name };
-};
-
-/**
- * Why `key` is spelled as no label key, or undefined where it is one: its structure (`labelKeyShape`), then its name segment's
- * characters, then its prefix's, a DNS subdomain. Each refusal names the spelling to write. Pure: what a person's label and a
- * selector's key both read.
- * @param key The key as given.
- */
-export function labelKeySpellingRefusal(key: string) {
-  const shape = labelKeyShape(key);
-  const k = JSON.stringify(key);
-  if (shape.kind === 'refused') {
-    if (shape.reason === 'slashes') return `${k} holds more than one /: a key is an optional prefix, one /, and a name, as in team.example/stage`;
-    if (shape.reason === 'empty-prefix') return `${k} opens on its /: write the prefix before it, as in team.example/stage, or drop the /`;
-    if (shape.reason === 'empty-name') return `${k} has no name after its /: write one, as in ${key}stage`;
-    if (shape.reason === 'long-prefix') return `the prefix of ${k} is ${key.indexOf('/')} characters long: shorten it to 253 at most`;
-    return `the name of ${k} is ${key.length - key.indexOf('/') - 1} characters long: keep it to 63 at most`;
-  }
-  if (!NAME_SEGMENT.test(shape.name))
-    return `${k} is no label key: begin and end its name with a letter or a digit, with - _ . between, as in team or team.example/my.key_2`;
-  if (shape.kind === 'prefixed' && !DNS_SUBDOMAIN.test(shape.prefix))
-    return `the prefix of ${k} is no DNS subdomain: write it in lowercase letters, digits, - and ., each part beginning and ending with a letter or a digit, as in team.example/${shape.name}`;
-  return undefined;
-}
 
 /** The one key a selector refuses however it is spelled: the message, prose a person reads, which nothing selects on. */
 const PROSE_KEYS: readonly string[] = ['message'];

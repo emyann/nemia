@@ -298,7 +298,7 @@
     },
     {
       "term": "Label",
-      "meaning": "a person's free `key=value` on an inbox card or a run, in Kubernetes' spelling with no prefix, beside the closed `factory` and `workflow`: set in a card's `labels:`, with `--label` at `nemia inbox add` and `nemia start`, and changed at any time with `nemia label run` and `nemia label inbox`. A run's are kept in `runs/<id>.labels`, never in its record.",
+      "meaning": "a person's free `key=value` on an inbox card or a run, in Kubernetes' spelling, its key an optional prefix (a DNS subdomain, as in `team.example/stage`) and a name, beside the closed `factory` and `workflow`: set in a card's `labels:`, with `--label` at `nemia inbox add` and `nemia start`, and changed at any time with `nemia label run` and `nemia label inbox`. A run's are kept in `runs/<id>.labels`, never in its record.",
       "type": "Labels",
       "retired": []
     },
@@ -1075,8 +1075,20 @@
     },
     {
       "term": "Card node",
-      "meaning": "a node of a workflow that files a card and runs no agent, by its `card:`: `routed` (the default, a workflow node's card, titled and labelled by its run), `given` (the run's own card as it was given, its body and labels, with why it was routed and the reason its condition's producer gave), or `backlog` (the run's card back to the inbox naming no workflow, unqueued, without the label keys its `unlabel:` names) (`NodeCard`, `packages/agent-orchestrator/src/step/step.ts`).",
-      "type": "NodeCard"
+      "meaning": "a node of a workflow that files a card and runs no agent, by its `card:`: `routed` (the default, a workflow node's card, titled and labelled by its run), `given` (the run's own card as it was given, its body and labels, with why it was routed and the reason its condition's producer gave), or `backlog` (the run's card back to the inbox naming no workflow, unqueued, its labels after the label edits its `relabel:` lists, kubectl's: `key=value` sets a key, `key-` removes it) (`NodeCard`, `packages/agent-orchestrator/src/step/step.ts`).",
+      "type": "NodeCard",
+      "retired": [
+        {
+          "spelling": "unlabel",
+          "card": "front-door: sdlc ships its own labels and the trigger that reads them",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/route/route.test.ts",
+              "why": "the row that holds a step still writing the retired key refused at load"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

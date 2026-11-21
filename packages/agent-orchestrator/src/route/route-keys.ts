@@ -1,11 +1,12 @@
 /**
  * The routing keys of a step file, read and written: `routes:`, `when:` and `ends:` as lists of route words, `workflow:` as a workflow's
- * name, `card:` and `unlabel:` as what card a node files, and `route:` as a condition's eval (`RouteEval`) from its map — `{ from, table
+ * name, `card:` and `relabel:` as what card a node files, and `route:` as a condition's eval (`RouteEval`) from its map — `{ from, table
  * }`, `{ script }` — or `judge`, each refused in the file's words where it cannot be read (`routingOf`), and written back as the parser
  * reads it (`routeWritten`).
  */
 import { NODE_CARDS, refuse, type NodeCard, type RouteEval, type StepKey, type StepSpec } from '../step/step.ts';
 import type { FrontmatterValue } from '../frontmatter/frontmatter.ts';
+import { parseLabelEdits } from '../label-spelling/label-spelling.ts';
 
 /** A route's name, a step's `when:` and a condition's `routes:` and `ends:` alike: a lowercase word. */
 const ROUTE_WORD = /^[a-z][a-z0-9-]*$/;
@@ -19,7 +20,7 @@ export function routingOf(step: string, meta: Partial<Record<StepKey, string>>) 
   const { routes, route, ends } = conditionKeysOf(step, meta);
   const workflow = workflowOf(step, meta.workflow, routes !== undefined);
   const card = cardOf(step, meta.card, workflow);
-  const unlabel = unlabelOf(step, meta.unlabel, card);
+  const relabel = relabelOf(step, meta.relabel, card);
   return {
     ...(routes !== undefined && { routes }),
     ...(route !== undefined && { route }),
@@ -27,7 +28,7 @@ export function routingOf(step: string, meta: Partial<Record<StepKey, string>>) 
     ...(ends !== undefined && { ends }),
     ...(workflow !== undefined && { workflow }),
     ...(card !== undefined && { card }),
-    ...(unlabel !== undefined && { unlabel }),
+    ...(relabel !== undefined && { relabel }),
   };
 }
 
@@ -55,23 +56,27 @@ function cardOf(step: string, written: string | undefined, workflow: string | un
 }
 
 /**
- * `unlabel:`, the label keys a backlog node files its card back without, on a `card: backlog` node alone; a line that lists none, as a
- * template parameter left empty renders it, removes none.
+ * `relabel:`, the label edits a backlog node files its card back with, kubectl's (`key=value` sets a key, `key-` removes it), on a
+ * `card: backlog` node alone, each checked as `nemia label` checks it (`parseLabelEdits`); a line that lists none, as a template
+ * parameter left empty renders it, edits none.
  * @param step The step's name, which a refusal names.
- * @param written The text of its `unlabel:` line, or undefined where it has none.
+ * @param written The text of its `relabel:` line, or undefined where it has none.
  * @param card The node's `card:`, read.
  */
-function unlabelOf(step: string, written: string | undefined, card: NodeCard | undefined) {
+function relabelOf(step: string, written: string | undefined, card: NodeCard | undefined) {
   if (written === undefined) return undefined;
   if (card !== 'backlog')
     refuse(
-      `${step}: \`unlabel:\` names the label keys a backlog node files its card back without, and this step is no \`card: backlog\` node. Add \`card: backlog\`, or delete the line.`,
+      `${step}: \`relabel:\` lists the label edits a backlog node files its card back with, and this step is no \`card: backlog\` node. Add \`card: backlog\`, or delete the line.`,
     );
-  const keys = written
+  const edits = written
     .split(',')
     .map((k) => k.trim())
     .filter(Boolean);
-  return keys.length ? keys : undefined;
+  const parsed = parseLabelEdits(edits);
+  if ('refused' in parsed)
+    refuse(`${step}: \`relabel:\` ${parsed.refused}. Write key=value to set a key or key- to remove it: \`relabel: [ready-]\`.`);
+  return edits.length ? edits : undefined;
 }
 
 /** A condition's own keys: `routes:` (two or more), `route:` beside it and never without it, and `ends:` on a condition alone. */

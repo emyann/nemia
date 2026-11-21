@@ -28,14 +28,14 @@ const edits = (...texts: string[]) => {
 
 describe('labelRefusal: a label is spelled as Kubernetes spells one, an optional prefix and a name, and takes no key Nemia or the feed reads itself', () => {
   const refused: ReadonlyArray<{ rule: string; key: string; value?: string; named: string }> = [
-    { rule: 'a prefix in capitals, no DNS subdomain', key: 'Sdlc/stage', named: '"Sdlc/stage"' },
+    { rule: 'a prefix in capitals, no DNS subdomain', key: 'Team.example/stage', named: '"Team.example/stage"' },
     { rule: 'a prefix with an underscore, no DNS subdomain', key: 'team_x/stage', named: '"team_x/stage"' },
     { rule: 'a prefix that opens on a dash', key: '-a/x', named: '"-a/x"' },
     { rule: 'a prefix longer than 253', key: `${'p'.repeat(254)}/x`, named: '253' },
     { rule: 'two slashes', key: 'a/b/c', named: '"a/b/c"' },
     { rule: 'a prefix written empty', key: '/stage', named: '"/stage"' },
-    { rule: 'no name after the slash', key: 'sdlc/', named: '"sdlc/"' },
-    { rule: 'a prefixed name longer than 63', key: `sdlc/${'k'.repeat(64)}`, named: '63' },
+    { rule: 'no name after the slash', key: 'team.example/', named: '"team.example/"' },
+    { rule: 'a prefixed name longer than 63', key: `team.example/${'k'.repeat(64)}`, named: '63' },
     { rule: 'longer than 63', key: 'k'.repeat(64), named: '64' },
     { rule: 'a dash first', key: '-x', named: '"-x"' },
     { rule: 'a dash last', key: 'x-', named: '"x-"' },
@@ -56,7 +56,7 @@ describe('labelRefusal: a label is spelled as Kubernetes spells one, an optional
     ['my.key_2', 'a-b.c_d'],
     ['team', ''],
     ['constructor', 'x'],
-    ['sdlc/stage', 'sprint'],
+    ['team.example/stage', 'sprint'],
     ['example.com/team', 'core'],
     ['team.example/workflow', 'x'],
   ] as const)

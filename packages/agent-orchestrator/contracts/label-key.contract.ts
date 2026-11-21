@@ -1,5 +1,5 @@
 /**
- * A label key's two segments, as Kubernetes spells one (agent-orchestrator, src/watch/selector.ts, `labelKeyShape`): an optional prefix
+ * A label key's two segments, as Kubernetes spells one (agent-orchestrator, src/label-spelling/label-spelling.ts, `labelKeyShape`): an optional prefix
  * and a name, separated by one slash. The name is required, 63 characters at most; the prefix, where one is written, is not empty and
  * 253 characters at most. A key with no slash is a name alone; a key with one slash splits at it; a key with two is refused. What the
  * characters of each segment may be — the name's alphanumerics with `-`, `_` and `.` between, the prefix's lowercase DNS subdomain — is

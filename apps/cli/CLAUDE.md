@@ -82,6 +82,9 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   /api/daemon`). `agent-orchestrator` is in `dependencies` for that resolve alone.
 - **The printers are the client's alone**: each moved command prints from the api's decoded answer, its printer typed by the api's
   Schema; no line is printed by the orchestrator for a store verb, and no test compares the two paths' lines.
+  A read that prints the api's answer as it is (`objects`' `answerSpec`: `server version`, `server upgrades`, `capabilities`,
+  `repository`, `store`, `milestones`, `lines`, `factory commands`, `factory server sign-in`, `workflows keys`, `library <kind> <name>`)
+  prints it as YAML, or JSON with `--json`, through `src/commands/answer.ts`, its one printer.
 - **The feed's stream is followed under `src/watch/` alone**: no other file names `/api/feed/stream` or an `EventSource`. `nemia watch`
   prints its lines; `nemia channel` (`src/watch/channel.ts`, a verb of `CLIENT_VERBS`) pushes them into a Claude Code session as its
   notifications, a stdio MCP server Claude Code spawns. Its notifications are `objects`' Events, read off the Event list's watch

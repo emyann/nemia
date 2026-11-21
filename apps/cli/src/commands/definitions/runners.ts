@@ -8,6 +8,7 @@ import type { Runner } from '../runner.ts';
 import { agentsCard, agentsCopy, agentsListed, agentsSources } from './agents.ts';
 import { agentsCustom } from './custom.ts';
 import { agentsRm, agentsRun, workflowsRm } from './library.ts';
+import { answered } from '../answer.ts';
 import { policy, policyConfirm, policyPropose, policyRm } from './policy.ts';
 import { policyReach } from './reach.ts';
 
@@ -25,5 +26,6 @@ export const DEFINITION_RUNNERS: Readonly<Record<DefinitionCommand, Runner>> = {
   'policy confirm': policyConfirm,
   'policy rm': policyRm,
   'policy reach': policyReach,
+  'workflows keys': (args) => answered('workflows keys', args, (c) => c.workflows.keys()),
   'workflows rm': workflowsRm,
 };

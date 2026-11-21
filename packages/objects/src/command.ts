@@ -57,10 +57,10 @@ export type Args = Readonly<Record<string, string | number | boolean | readonly 
 type Filling = Record<string, string | number | boolean | readonly string[] | undefined>;
 
 /**
- * An argument given by its place. `required`: the command is given too little without it, and the CLI prints its help; `optional`: at
- * most one, after the required, never starting `--`; `rest`: every word after the required, joined by spaces, as one text; `many`: every
- * word after the required that starts with no `-`, among the flags, each once, in the order given — on the api, its path's one text, or a
- * body's list.
+ * An argument given by its place. `required`: the command is given too little without it, and the CLI prints its help; `optional`:
+ * after the required, never starting `--`, each filled in the order the spec lists them (`library [<kind> [<name>]]`); `rest`: every
+ * word after the required, joined by spaces, as one text; `many`: every word after the required that starts with no `-`, among the
+ * flags, each once, in the order given — on the api, its path's one text, or a body's list.
  */
 export type Positional = {
   readonly key: string;
@@ -243,8 +243,8 @@ function wordsOf(spec: Spec, argv: readonly string[]) {
 
 /**
  * `arg`, a positional after the required ones, put under the positional that takes it: a many positional's, beside the values before it
- * unless it is one of them, where it starts with no `-`; else the optional one's, once, where it starts with no `--` — an operand, given
- * after `--`, whatever it starts with. Returns whether one took it.
+ * unless it is one of them, where it starts with no `-`; else the first optional one's not filled yet, where it starts with no `--` — an
+ * operand, given after `--`, whatever it starts with. Returns whether one took it.
  */
 function placed(spec: Spec, arg: string, operand: boolean, args: Filling) {
   const many = spec.positionals.find((p) => p.takes === 'many');
@@ -254,8 +254,8 @@ function placed(spec: Spec, arg: string, operand: boolean, args: Filling) {
     args[many.key] = values.includes(arg) ? values : [...values, arg];
     return true;
   }
-  const optional = spec.positionals.find((p) => p.takes === 'optional');
-  if (!optional || (!operand && arg.startsWith('--')) || args[optional.key] !== undefined) return false;
+  const optional = spec.positionals.find((p) => p.takes === 'optional' && args[p.key] === undefined);
+  if (!optional || (!operand && arg.startsWith('--'))) return false;
   args[optional.key] = arg;
   return true;
 }

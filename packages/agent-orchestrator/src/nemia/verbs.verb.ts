@@ -23,8 +23,8 @@ export const REGENERATE = `${regenerating('verbsSkill', 'SKILL.md')} && ${regene
 /** An entry as the skill reads it: its name, usage, help, class, the side it is served on alone, its endpoints and its spec. */
 type Entry = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only' | 'class' | 'served'> & { readonly spec?: Spec };
 
-/** A verb the CLI runs by a hand of its own: its name, usage, help, class, its endpoints and its spec where it has one. */
-type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'> & { readonly spec?: Spec };
+/** A verb the CLI runs by a hand of its own: its name, usage, help, class, its endpoints, the side it is served on alone and its spec. */
+type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served' | 'only'> & { readonly spec?: Spec };
 
 /** The skill's sections, in order: the class each lists, its heading, and what it tells her of every verb under it; none lists `none`. */
 const SECTIONS: readonly { readonly class: 'read' | 'act' | 'ask' | 'answer'; readonly heading: string; readonly says: string }[] = [

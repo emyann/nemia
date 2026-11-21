@@ -10,8 +10,14 @@ import {
   amountOf as amountOfObjects,
   COMMAND_WORDS,
   CommandRefused,
+  FACTORY_COMMANDS_WORDS,
+  FACTORY_SERVER_SIGN_IN_WORDS,
+  LIBRARY_WORDS,
+  LINES_WORDS,
   MACHINE_VERBS,
   QUOTA_WORDS,
+  SERVER_READ_WORDS,
+  WORKFLOWS_KEYS_WORDS,
   RENAMED,
   STREAM_COMMANDS,
   parseArgv as parseArgvOf,
@@ -133,11 +139,18 @@ export const amountIn = (args: Args, key: string) => {
 /**
  * The verbs outside the table the api serves, each with its usage and help as `nemia`'s help prints them, its class, and the endpoint
  * that serves it: `nemia decide`, a read, which the client prints off the run's decision (`decisionRead`), served as data
- * (`runs.decision`); and `nemia quota`, a read whose words the client holds (`objects`' `QUOTA_WORDS`), the subscription's quota the api
- * reads itself (`server.quota`, its keep and its backoff the api's), with its spec, by which her verbs skill spells each key at a shell.
- * This CLI runs none of them, and answers each with its help.
+ * (`runs.decision`); `nemia get` and `nemia explain`, the client's own reads over every kind discovery lists (`get` links none: one
+ * link is one endpoint per tool, and its kinds' reads are said in `objects`' `UNLINKED_READS`; `explain` reads discovery,
+ * `discovery.resources`);
+ * and the reads whose words the client holds and whose answer the api reads itself, with no handler here: `nemia quota` (`objects`'
+ * `QUOTA_WORDS`, `server.quota`, its keep and its backoff the api's), `nemia library` and its items, `nemia lines`, the server's and the
+ * store's own reads (`SERVER_READ_WORDS`), `nemia factory commands`, `nemia factory server sign-in` and `nemia workflows keys`, each with
+ * its spec, by which her verbs skill spells each key at a shell. Her fence, the MCP port and the floor read them beside the table. This
+ * CLI runs none of them, and answers each with its help.
  */
-export const CLI_VERBS: readonly (Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'> & { readonly spec?: Spec })[] = [
+export const CLI_VERBS: readonly (Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served' | 'only'> & {
+  readonly spec?: Spec;
+})[] = [
   {
     name: 'decide',
     usage: '<runId> [--sensitive <globs>]',
@@ -145,7 +158,30 @@ export const CLI_VERBS: readonly (Pick<CommandSpec, 'name' | 'usage' | 'help' | 
     class: 'read',
     served: [{ endpoint: 'runs.decision', query: { diffs: '' } }],
   },
+  {
+    name: 'get',
+    usage: '<resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]',
+    help: ['the objects of a resource the api serves, or one by its name (nemia get --help)'],
+    class: 'read',
+    only: {
+      side: 'cli',
+      why: "generic over every kind discovery lists, where a port tool calls one endpoint: each kind's read is said in objects' UNLINKED_READS",
+    },
+  },
+  {
+    name: 'explain',
+    usage: '<resource>[.<field>]...',
+    help: ['what a resource the api serves is, and each of its fields (nemia explain --help)'],
+    class: 'read',
+    served: [{ endpoint: 'discovery.resources' }],
+  },
   QUOTA_WORDS,
+  LIBRARY_WORDS,
+  LINES_WORDS,
+  ...SERVER_READ_WORDS,
+  FACTORY_COMMANDS_WORDS,
+  FACTORY_SERVER_SIGN_IN_WORDS,
+  WORKFLOWS_KEYS_WORDS,
 ];
 
 /** An entry of a table as `commandBreaks` reads it: whether it has a handler and an `input`, its spec, and its links. */

@@ -12,6 +12,11 @@
       "type": "ToolWords"
     },
     {
+      "term": "Unlinked read",
+      "meaning": "a GET endpoint of the `Api` that no verb of the command table links (`served`), so neither Nemia's shell fence nor the MCP port reaches it: refused unless it is a stream, which no tool can serve, or `UNLINKED_READS` says in words why it has no verb; a reason for a read a verb links, a stream or no read is refused too (`readsUnlinked`, `unlinkedReadsOf`, `packages/objects/src/read-verbs.ts`).",
+      "type": "UnlinkedBreak"
+    },
+    {
       "term": "Guidance",
       "meaning": "what Nemia tells a session of itself, a paragraph at a time, each with its port form, which the MCP port answers on `initialize` (`portInstructions`), and its shell form, which Nemia's verbs skill opens with, null where the paragraph is the port's seat's alone (`GUIDANCE`, `packages/objects/src/guidance.ts`).",
       "type": "Guidance"

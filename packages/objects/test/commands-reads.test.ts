@@ -62,7 +62,7 @@ function argsOf(words: CommandWords, argv: readonly string[]) {
 test('the group lists each read once, in the order the help lists them', () => {
   assert.deepEqual(
     READ_WORDS.map((w) => w.name),
-    ['inbox', 'ls', 'show', 'closeout', 'watch'],
+    ['inbox', 'ls', 'show', 'lines', 'closeout', 'watch'],
   );
 });
 

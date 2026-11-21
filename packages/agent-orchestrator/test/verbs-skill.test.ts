@@ -9,7 +9,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Api, GUIDANCE, type Guidance, toolLinesOf, toolWordsOf, type ToolWords } from 'objects';
+import { Api, GUIDANCE, type Guidance, toolDescriptionOf, toolLinesOf, toolWordsOf, type ToolWords } from 'objects';
 import { REGENERATE, toolsReference, toolsReferenceOf, verbsSkill, verbsSkillOf } from '../src/nemia/verbs.verb.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { CLI_VERBS, toolsOf } from '../src/command/command.ts';
@@ -78,7 +78,20 @@ test('the verbs the api serves beside the table are said once, each with its cla
     CLI_VERBS.map((v) => [v.name, v.class]),
     [
       ['decide', 'read'],
+      ['get', 'read'],
+      ['explain', 'read'],
       ['quota', 'read'],
+      ['library', 'read'],
+      ['lines', 'read'],
+      ['server version', 'read'],
+      ['server upgrades', 'read'],
+      ['capabilities', 'read'],
+      ['repository', 'read'],
+      ['store', 'read'],
+      ['milestones', 'read'],
+      ['factory commands', 'read'],
+      ['factory server sign-in', 'read'],
+      ['workflows keys', 'read'],
     ],
   );
   assert.deepEqual(
@@ -220,6 +233,20 @@ const PORT_TOOLS: readonly PortToolOf[] = toolWordsOf<PortToolOf['verb'] & Pick<
 test('every tool the port lists has a section in tools.md that says each line of its description', () => {
   assert.ok(PORT_TOOLS.length > 100, `${PORT_TOOLS.length} tools read off the tables`);
   assert.deepEqual(unsaid(fs.readFileSync(TOOLS_MD, 'utf8'), PORT_TOOLS), []);
+});
+
+test('each port tool describes itself by the lines tools.md is held to, and no line besides', () => {
+  assert.deepEqual(
+    PORT_TOOLS.filter(({ verb, words }) => {
+      const lines = toolLinesOf(verb, words);
+      const parts = [...lines.help, lines.said, lines.usage, lines.call, ...lines.keys, ...lines.answers];
+      const described = toolDescriptionOf(verb, words)
+        .split('\n')
+        .filter((line) => line.trim() !== '');
+      return JSON.stringify(described) !== JSON.stringify(parts);
+    }).map(({ words }) => words.name),
+    [],
+  );
 });
 
 test("REFUSED: a tool's endpoint paragraph taken out, or a planted verb's key left unsaid, is named by the tool and the line", () => {

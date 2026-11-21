@@ -725,6 +725,7 @@ export {
   FACTORY_ADD_WORDS,
   FACTORY_ATTACH_WORDS,
   FACTORY_DETACH_WORDS,
+  FACTORY_COMMANDS_WORDS,
   FACTORY_LIST_WORDS,
   FACTORY_LS_WORDS,
   FACTORY_REVISIONS_WORDS,
@@ -739,6 +740,7 @@ export {
   FACTORY_SERVER_ADD_WORDS,
   FACTORY_SERVER_RM_WORDS,
   FACTORY_SERVERS_WORDS,
+  FACTORY_SERVER_SIGN_IN_WORDS,
   FACTORY_UNSCHEDULE_WORDS,
   FACTORY_TRIGGER_WORDS,
   FACTORY_UNTRIGGER_WORDS,
@@ -772,6 +774,7 @@ export {
   POLICY_REACH_WORDS,
   POLICY_RM_WORDS,
   POLICY_WORDS,
+  WORKFLOWS_KEYS_WORDS,
   WORKFLOWS_RM_WORDS,
 } from './commands-definitions.ts';
 export {
@@ -784,10 +787,14 @@ export {
   AGENTS_WORDS,
 } from './commands-definitions-agents.ts';
 export { LIBRARY_ADD_WORDS, LIBRARY_RM_WORDS, LIBRARY_WORDS } from './commands-library.ts';
-export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
+export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LINES_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
 export { QUOTA_WORDS } from './commands-rest-reads.ts';
+export { CAPABILITIES_WORDS, MILESTONES_WORDS, REPOSITORY_WORDS, SERVER_READ_WORDS } from './commands-rest-server.ts';
+export { SERVER_UPGRADES_WORDS, SERVER_VERSION_WORDS, STORE_WORDS } from './commands-rest-server.ts';
+export { getReadsOf, type GetRead, type ReadReason, readsUnlinked, UNLINKED_READS, unlinkedReadsOf } from './read-verbs.ts';
+export type { UnlinkedBreak, UnlinkedBreakReason } from './read-verbs.ts';
 export { LEVEL_FORM, LEVEL_WORDS, SUBSCRIBE_FORM, SUBSCRIBE_WORDS, UNSUBSCRIBE_WORDS, levelWritten } from './commands-rest-nemia.ts';
 export { BOARD_LINK_WORDS, OPEN_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from './commands-rest-pairing.ts';
 export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest-tokens.ts';

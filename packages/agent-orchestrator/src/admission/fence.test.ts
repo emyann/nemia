@@ -36,7 +36,13 @@ test('her fence is derived from the classes: reads, her writes and answers run u
       'Bash(nemia proposals decline)',
       'Bash(nemia proposals decline:*)',
     ],
-    ask: ['Bash(nemia cancel:*)', 'Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)'],
+    ask: [
+      'Bash(nemia cancel:*)',
+      'Bash(nemia level manual:*)',
+      'Bash(nemia agents custom *--clear*)',
+      'Bash(nemia library add:*)',
+      'Bash(nemia library rm:*)',
+    ],
     deny: ['Bash(nemia tick:*)', ASSIGNED],
   });
 });
@@ -53,7 +59,10 @@ test('REFUSED to run unasked: a command reclassed as a prompt asks, and one recl
 test('REFUSED to widen what is not a prompt allowed by its own rule: an answer, a deny and a broader allow leave the fence as it is', () => {
   const fence = nemiaFence(TABLE);
   const allows = ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)', 'Bash(nemia tick:*)', 'Bash(nemia:*)', 'Bash(nemia level:*)'];
-  assert.deepEqual(widened(fence, allows), { ...fence, ask: ['Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)'] });
+  assert.deepEqual(widened(fence, allows), {
+    ...fence,
+    ask: ['Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)', 'Bash(nemia library add:*)', 'Bash(nemia library rm:*)'],
+  });
   assert.deepEqual(widened(fence, ['Bash(nemia:*)', 'Bash(nemia level:*)']), fence);
 });
 

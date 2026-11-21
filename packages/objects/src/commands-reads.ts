@@ -1,11 +1,11 @@
 /**
- * The words of the moved reads: show, closeout, ls, inbox and watch, each parsed, helped and printed by the client from these words and
- * read through the `Api`. A check that needs the grammar of a label query is the api's to make: it refuses one in the grammar's own words.
- * The inbox's bare read is `INBOX_READ_WORDS`, apart from the inbox's writes (`INBOX_WORDS`); `nemia watch`'s words are cut into
- * `commands-reads-watch.ts`, and the inbox's manual into `commands-reads-inbox.ts`. Pure.
+ * The words of the moved reads: show, lines, closeout, ls, inbox and watch, each parsed, helped and printed by the client from these
+ * words and read through the `Api`. A check that needs the grammar of a label query is the api's to make: it refuses one in the
+ * grammar's own words. The inbox's bare read is `INBOX_READ_WORDS`, apart from the inbox's writes (`INBOX_WORDS`); `nemia watch`'s
+ * words are cut into `commands-reads-watch.ts`, and the inbox's manual into `commands-reads-inbox.ts`. Pure.
  */
 import { CLI, type Args, type CommandWords, type Flag } from './command.ts';
-import { labelFlags, SELECTOR_FLAG_FORM, selectorFlag } from './commands-flags.ts';
+import { answerSpec, labelFlags, SELECTOR_FLAG_FORM, selectorFlag } from './commands-flags.ts';
 import { INBOX_MANUAL } from './commands-reads-inbox.ts';
 import { WATCH_WORDS } from './commands-reads-watch.ts';
 
@@ -54,6 +54,17 @@ export const SHOW_WORDS = {
     flags: [{ flag: '--raw', kind: 'switch', key: 'raw' }],
     unknown: takesNo('show', "one run's id, and --raw"),
   },
+  writes: false,
+  class: 'read',
+} as const satisfies CommandWords;
+
+/** `nemia lines <runId>`: the lines kept beside a run, its decide and refresh lines and each step's, as YAML, or JSON with `--json`. */
+export const LINES_WORDS = {
+  name: 'lines',
+  served: [{ endpoint: 'runs.lines' }],
+  usage: '<runId> [--json]',
+  help: ["the lines a run keeps: its decide and refresh lines, each step's,", 'the card it came from, as YAML; --json: as JSON'],
+  spec: answerSpec('lines', '<runId> [--json]', ['runId']),
   writes: false,
   class: 'read',
 } as const satisfies CommandWords;
@@ -170,4 +181,11 @@ export const INBOX_READ_WORDS = {
 export { WATCH_WORDS };
 
 /** The group's words, in the order the help lists them. */
-export const READ_WORDS = [INBOX_READ_WORDS, LS_WORDS, SHOW_WORDS, CLOSEOUT_WORDS, WATCH_WORDS] as const satisfies readonly CommandWords[];
+export const READ_WORDS = [
+  INBOX_READ_WORDS,
+  LS_WORDS,
+  SHOW_WORDS,
+  LINES_WORDS,
+  CLOSEOUT_WORDS,
+  WATCH_WORDS,
+] as const satisfies readonly CommandWords[];

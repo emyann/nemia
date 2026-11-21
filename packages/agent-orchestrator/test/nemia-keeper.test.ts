@@ -300,6 +300,9 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       const allowed = spec.config.allowedTools as string[];
       assert.ok(allowed.includes('Bash(nemia quota)'), 'the quota hers to read, by its verb');
       assert.ok(allowed.includes('Bash(nemia decide)'), 'the verbs the api serves beside the table are in her fence');
+      const reads = ['get', 'explain', 'library', 'lines', 'server version', 'server upgrades', 'capabilities', 'repository', 'store'];
+      for (const name of [...reads, 'milestones', 'factory commands', 'factory server sign-in', 'workflows keys'])
+        assert.ok(allowed.includes(`Bash(nemia ${name}:*)`), `nemia ${name} hers to read, by its verb`);
       const curls = allowed.filter((rule) => /^Bash\(curl\b/.test(rule));
       assert.deepEqual(curls, [], 'no call of hers reaches the api but through a verb');
       const token = (spec.config.env as Record<string, string>)[SESSION_TOKEN] ?? '';

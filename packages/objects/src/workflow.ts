@@ -62,6 +62,8 @@ export const STEP_KEYS = [
   'when',
   'ends',
   'workflow',
+  'card',
+  'unlabel',
 ] as const;
 
 /** One of `STEP_KEYS`. */
@@ -137,6 +139,8 @@ export const STEP_KEY_FORM = {
   when: 'list',
   ends: 'list',
   workflow: 'text',
+  card: 'choice',
+  unlabel: 'list',
 } as const satisfies { readonly [K in StepKey]: StepKeyForm };
 
 /** Each key a step has as the loader reads it, every one optional: a key added to `STEP_KEYS` without one does not typecheck. */
@@ -301,6 +305,15 @@ const stepKeyFields = {
     Schema.NullOr(Strings).annotate({ description: 'The routes of this condition on which the run ends, nothing after it running.' }),
   ),
   workflow: Schema.optionalKey(Text.annotate({ description: 'The workflow this node routes to: it files a card for it from this run.' })),
+  card: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "What card this node files: routed, a card of its own (the default); given, the run's own card as given; backlog, the run's card back to the inbox, unqueued.",
+    }),
+  ),
+  unlabel: Schema.optionalKey(
+    Schema.NullOr(Strings).annotate({ description: 'The label keys a backlog node files the card back without.' }),
+  ),
 } satisfies { readonly [K in StepKey]: Schema.Top };
 
 /**

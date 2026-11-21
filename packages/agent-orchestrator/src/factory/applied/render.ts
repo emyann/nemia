@@ -143,6 +143,8 @@ const STEP_WORDS = [
   'ends',
   'when',
   'workflow',
+  'card',
+  'unlabel',
   'retries',
   'deadlineSeconds',
   'memory',

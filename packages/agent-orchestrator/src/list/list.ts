@@ -222,7 +222,7 @@ export interface ListingInput {
 type Stood = { status: StepStatus; own: StepStatus };
 
 /** Whether a step carries a routing key a step's word reads: a condition's `routes:`, or a workflow node's `workflow:`. */
-const routes = (step: StepSpec) => step.routes !== undefined || step.workflow !== undefined;
+const routes = (step: StepSpec) => step.routes !== undefined || step.workflow !== undefined || step.card !== undefined;
 
 /**
  * `listedSteps`, with the routing's rows laid over the steps it words (`routedRows`): a node `skipped (<condition>: <route>)`, a workflow

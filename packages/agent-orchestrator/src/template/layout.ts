@@ -120,6 +120,9 @@ export type Step = {
   ends?: readonly string[];
   when?: readonly string[];
   workflow?: string;
+  /** What card a node files (`routed`, `given`, `backlog`), and the label keys a `backlog` node files it back without. */
+  card?: string;
+  unlabel?: readonly string[];
   retries?: number;
   /** Which exit codes of its check a person answers, as the step's line reads it (`CheckFailurePolicy`, src/check/check-policy.ts). */
   checkFailurePolicy?: CheckFailurePolicy;
@@ -331,6 +334,8 @@ const STEP: Shape = {
     ends: 'strings',
     when: 'strings',
     workflow: 'string',
+    card: 'string',
+    unlabel: 'strings',
     retries: 'number',
     checkFailurePolicy: 'policy',
     deadlineSeconds: 'number',

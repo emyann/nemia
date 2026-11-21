@@ -417,8 +417,8 @@ export function fillsOf(hires: Hires, workflow: string) {
 }
 
 /** Whether a step runs an agent: every step but a condition a table or a script answers, and a workflow node, which files a card. */
-const runsAnAgent = (s: Pick<StepSpec, 'routes' | 'route' | 'workflow'>) =>
-  s.workflow === undefined && (s.routes === undefined || s.route?.kind === 'judge');
+const runsAnAgent = (s: Pick<StepSpec, 'routes' | 'route' | 'workflow' | 'card'>) =>
+  s.workflow === undefined && s.card === undefined && (s.routes === undefined || s.route?.kind === 'judge');
 
 /**
  * Why a run of `workflow` in the factory `factory` cannot start, or undefined: every step that is left with no agent — its file names none,

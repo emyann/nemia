@@ -10,28 +10,31 @@ import { READS } from './reads.ts';
 
 export type { GetRead, ReadReason, UnlinkedBreak, UnlinkedBreakReason } from '../contracts/reads-unlinked.contract.ts';
 
-/** A break of `read`, for `reason`. */
-const breakOf = (read: string, reason: UnlinkedBreakReason) => ({ read, reason }) satisfies UnlinkedBreak;
-
 /**
- * Each break of the rule, by its kind, each kind in the reads' or the reasons' order: a read no stream, no verb links and no reason
- * names (`unlinked`); and of each reason, one naming no GET endpoint (`none`), a stream (`stream`), a read a verb links (`linked`), and
- * one that says nothing (`unsaid`).
+ * Each break of the rule, in the reads' order and then the reasons': a read no stream, no verb links and no reason names (`unlinked`);
+ * and of each reason, one naming no GET endpoint (`none`), a stream (`stream`), a read a verb links (`linked`), and one that says
+ * nothing (`unsaid`).
  * @param reads Every GET endpoint of the `Api`, each with whether it is a stream.
  * @param linked The endpoints the verbs link, by their `served` links.
  * @param reasons Why each read with no verb has none.
  */
-export const readsUnlinked: ReadsUnlinked = (reads, linked, reasons) => [
-  ...reads
-    .filter((r) => !r.stream && !linked.includes(r.read) && !reasons.some((x) => x.read === r.read))
-    .map((r) => breakOf(r.read, 'unlinked')),
-  ...reasons.filter((x) => reads.find((r) => r.read === x.read) === undefined).map((x) => breakOf(x.read, 'none')),
-  ...reasons.filter((x) => reads.find((r) => r.read === x.read)?.stream === true).map((x) => breakOf(x.read, 'stream')),
-  ...reasons
-    .filter((x) => reads.find((r) => r.read === x.read)?.stream === false && linked.includes(x.read))
-    .map((x) => breakOf(x.read, 'linked')),
-  ...reasons.filter((x) => x.why.length === 0).map((x) => breakOf(x.read, 'unsaid')),
-];
+export const readsUnlinked: ReadsUnlinked = (reads, linked, reasons) => {
+  const named = new Set(reasons.map((x) => x.read));
+  const links = new Set(linked);
+  const unlinked: UnlinkedBreak[] = reads
+    .filter((r) => !r.stream && !links.has(r.read) && !named.has(r.read))
+    .map((r) => ({ read: r.read, reason: 'unlinked' }));
+  const reasonBreaks = reasons.flatMap((x) => {
+    const read = reads.find((r) => r.read === x.read);
+    const breaks: UnlinkedBreakReason[] = [];
+    if (read === undefined) breaks.push('none');
+    else if (read.stream) breaks.push('stream');
+    else if (links.has(x.read)) breaks.push('linked');
+    if (x.why.length === 0) breaks.push('unsaid');
+    return breaks.map((reason) => ({ read: x.read, reason }) satisfies UnlinkedBreak);
+  });
+  return [...unlinked, ...reasonBreaks];
+};
 
 /** What an Api is read as here: its groups, each its endpoints by name, with their method. */
 type ApiRead = {

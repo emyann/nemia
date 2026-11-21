@@ -842,7 +842,7 @@ describe("Her task's mounts are those the runtime takes, whatever switches a fac
   test("a volume with its CLAUDE.md on and its skills off: her task's config is one the runtime's file takes", () => {
     const home = scratch('wf-nemia-mounts-');
     const repo = fs.mkdtempSync(path.join(home, 'repo-'));
-    const { factory } = addFactoryAt(home, { name: 'pipao', volumes: [`${repo}:rw`] });
+    const { factory } = addFactoryAt(home, { name: 'acme', volumes: [`${repo}:rw`] });
     rewriteFactoryAt(home, { ...factory, volumes: factory.volumes.map((v) => ({ ...v, claudeMd: true, skills: false })) });
     const spec = nemiaSpec('nemia-mounts', undefined, 'token', home);
     assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }]);

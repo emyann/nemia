@@ -1,10 +1,10 @@
 /**
- * A label key's two segments, as Kubernetes spells one (agent-orchestrator, src/label-spelling/label-spelling.ts, `labelKeyShape`): an optional prefix
- * and a name, separated by one slash. The name is required, 63 characters at most; the prefix, where one is written, is not empty and
- * 253 characters at most. A key with no slash is a name alone; a key with one slash splits at it; a key with two is refused. What the
- * characters of each segment may be — the name's alphanumerics with `-`, `_` and `.` between, the prefix's lowercase DNS subdomain — is
- * a regular expression's, which tsverify does not read: `src/watch/selector.test.ts` and `src/labels/labels.test.ts` hold those, a row
- * each. The structure here is what a person's label, a card's `labels:` and a selector's key all read through.
+ * A label key's two segments, as Kubernetes spells one (agent-orchestrator, src/label-spelling/label-spelling.ts, `labelKeyShape`): an
+ * optional prefix and a name, separated by one slash. The name is required, 63 characters at most; the prefix, where one is written, is
+ * not empty and 253 characters at most. A key with no slash is a name alone; a key with one slash splits at it; a key with two is
+ * refused. What the characters of each segment may be — the name's alphanumerics with `-`, `_` and `.` between, the prefix's lowercase
+ * DNS subdomain — is a regular expression's, which tsverify does not read: `src/watch/selector.test.ts` and `src/labels/labels.test.ts`
+ * hold those, a row each. The structure here is what a person's label, a card's `labels:` and a selector's key all read through.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -76,15 +76,12 @@ const labelKeyShapeSpec = spec<(key: string) => LabelKeyParts>({
     },
     bareKeyIsItsName: {
       description: 'A key with no slash and no flaw is a name alone, the key itself',
-      condition: ({ input: [key], output }) =>
-        prefixed(key) || !shaped(key) || (output.kind === 'name' && output.name === key),
+      condition: ({ input: [key], output }) => prefixed(key) || !shaped(key) || (output.kind === 'name' && output.name === key),
     },
     prefixedSplitsAtItsSlash: {
       description: 'A key with one slash and no flaw is its prefix, before the slash, and its name, after it',
       condition: ({ input: [key], output }) =>
-        !prefixed(key) ||
-        !shaped(key) ||
-        (output.kind === 'prefixed' && output.prefix === prefixOf(key) && output.name === nameOf(key)),
+        !prefixed(key) || !shaped(key) || (output.kind === 'prefixed' && output.prefix === prefixOf(key) && output.name === nameOf(key)),
     },
   },
 });

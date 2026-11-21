@@ -76,7 +76,10 @@ const BLOCK_KEYS = ['model', 'effort', 'context'] as const;
 /** The step keys copied as they are, as strings. */
 const WORDS = ['place', 'workspace', 'check', 'run', 'checkMemory', 'loop', 'memory'] as const;
 
-/** The step keys of a route read as lists: a condition's routes and those it ends on, the routes a node runs on, and a backlog node's label edits. */
+/**
+ * The step keys of a route read as lists: a condition's routes and those it ends on, the routes a node runs on, and a backlog node's
+ * label edits.
+ */
 const ROUTE_LISTS = ['routes', 'ends', 'when', 'relabel'] as const;
 
 /** The step keys read as counts. */

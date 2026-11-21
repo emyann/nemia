@@ -6,12 +6,12 @@
  * carries it at all. Clauses of one selector are separated by commas and all must hold (AND); `-l` given more than once selects a line
  * any one of them holds for (OR). It is read by `nemia watch` here, and by every other surface that selects the feed's lines.
  *
- * **The keys are the line's own vocabulary and a person's labels, never its message**: the five labels a filing carries
- * (`FeedLabels`), every label a person put on the line's run (any key spelled as Kubernetes spells one, an optional prefix and a name, as in `team.example/stage`), and the
- * reserved keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via` (where an `AwaitingAnswer` line's
- * answer is asked), `type`, `waits` and `source`. The message a person reads is prose, worded anew whenever a
- * status is reworded, so nothing selects on it: `-l message=…` is refused. A key no line carries is no refusal, as in Kubernetes: it
- * selects nothing.
+ * **The keys are the line's own vocabulary and a person's labels, never its message**: the five labels a filing carries (`FeedLabels`),
+ * every label a person put on the line's run (any key spelled as Kubernetes spells one, an optional prefix and a name, as in
+ * `team.example/stage`), and the reserved keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via`
+ * (where an `AwaitingAnswer` line's answer is asked), `type`, `waits` and `source`. The message a person reads is prose, worded anew
+ * whenever a status is reworded, so nothing selects on it: `-l message=…` is refused. A key no line carries is no refusal, as in
+ * Kubernetes: it selects nothing.
  *
  * A label may not take a reserved name (`labelKeysRefusal`), or a line's label would decide what `reason` means to a selector.
  *

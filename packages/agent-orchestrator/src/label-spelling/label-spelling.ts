@@ -28,7 +28,10 @@ export const RESERVED_KEYS: readonly string[] = ['kind', 'reason', 'on', 'via', 
 /** A key's name segment, as Kubernetes spells one: alphanumerics at both ends, `-`, `_` and `.` between. */
 const NAME_SEGMENT = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
 
-/** A key's prefix, a DNS subdomain as Kubernetes spells one: lowercase labels of alphanumerics and `-`, each alphanumeric at both ends, joined by dots. */
+/**
+ * A key's prefix, a DNS subdomain as Kubernetes spells one: lowercase labels of alphanumerics and `-`, each alphanumeric at both ends,
+ * joined by dots.
+ */
 const DNS_SUBDOMAIN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/;
 
 /**
@@ -60,7 +63,8 @@ export function labelKeySpellingRefusal(key: string) {
   const shape = labelKeyShape(key);
   const k = JSON.stringify(key);
   if (shape.kind === 'refused') {
-    if (shape.reason === 'slashes') return `${k} holds more than one /: a key is an optional prefix, one /, and a name, as in team.example/stage`;
+    if (shape.reason === 'slashes')
+      return `${k} holds more than one /: a key is an optional prefix, one /, and a name, as in team.example/stage`;
     if (shape.reason === 'empty-prefix') return `${k} opens on its /: write the prefix before it, as in team.example/stage, or drop the /`;
     if (shape.reason === 'empty-name') return `${k} has no name after its /: write one, as in ${key}stage`;
     if (shape.reason === 'long-prefix') return `the prefix of ${k} is ${key.indexOf('/')} characters long: shorten it to 253 at most`;
@@ -174,4 +178,3 @@ export function parseLabelEdits(texts: readonly string[]) {
     | { readonly edits: readonly LabelChange[] }
     | { readonly refused: string };
 }
-

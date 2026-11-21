@@ -584,7 +584,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   ends: 'the routes of this condition on which the run ends, nothing after it running',
   workflow: 'the workflow this node routes to: it files a card for it, `from:` this run, and reads `sent`',
   card: "what card this node files: `routed`, one of its own (the default); `given`, the run's own card as given, for its `workflow:`; `backlog`, the run's card back to the inbox, unqueued",
-  relabel: 'the label edits a `card: backlog` node files the card back with: `key=value` sets a key, `key-` removes it, so no trigger queues it again',
+  relabel:
+    'the label edits a `card: backlog` node files the card back with: `key=value` sets a key, `key-` removes it, so no trigger queues it again',
 };
 
 /**

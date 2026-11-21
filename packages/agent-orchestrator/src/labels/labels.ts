@@ -1,8 +1,9 @@
 /**
- * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling, a key an optional prefix and a name (`team.example/stage`), put on inbox cards and runs and
- * changed at any time. What a label may be spelled (`labelRefusal`), kubectl's edits of a map (`parseLabelEdits`, `labelEdits`), and
- * what a start copies once, at creation (`inheritedLabels`); and a run's labels as a selection reads them (`runLabelMap`, `selectedRuns`,
- * `labelSegments`). No Effect: every caller wraps a refusal in the package's `Invalid`.
+ * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling, a key an optional prefix and a name
+ * (`team.example/stage`), put on inbox cards and runs and changed at any time. What a label may be spelled (`labelRefusal`), kubectl's
+ * edits of a map (`parseLabelEdits`, `labelEdits`), and what a start copies once, at creation (`inheritedLabels`); and a run's labels
+ * as a selection reads them (`runLabelMap`, `selectedRuns`, `labelSegments`). No Effect: every caller wraps a refusal in the package's
+ * `Invalid`.
  *
  * **One map, beside the closed keys.** A run's and a card's labels sit in one map with `factory` and `workflow`, which Nemia gives
  * itself and a person may not set (`CLOSED_LABEL_KEYS`). Nor may a label take a key a feed line or a selector already gives a meaning

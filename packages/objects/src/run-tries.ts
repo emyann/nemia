@@ -203,7 +203,8 @@ export const StepTry = Schema.Struct({
   }),
   checks: Schema.optionalKey(
     Schema.Array(StepCheck).annotate({
-      description: "Every check of the try, in the step's order; empty for a step with none, absent from an api older than checks: lists.",
+      description:
+        "Every check of the try, in the step's order, where its step has several; absent for a step with one, whose check is `check`, or none.",
     }),
   ),
   closeout: Schema.NullOr(StepCloseout).annotate({

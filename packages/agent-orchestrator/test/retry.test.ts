@@ -44,6 +44,7 @@ import {
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { artifactsDir, askFile, asksDir, listRuns, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
 import { checkOutputFile } from '../src/check/check.store.ts';
+import { readToken } from '../src/token/token.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import { isRepositoryRun, LINE_NAME, shownNote, shownStatus } from '../src/run.ts';
@@ -583,20 +584,30 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
         [{ requests: { memory: '64Mi' } }, 1],
         "the check asks its step's `checkMemory:` alone, the step's `memory:` binding its session alone, at a step's momentum",
       );
-      assert.deepEqual(spec.config, {
-        command: ['sh', '-c', 'npm test && npm run typecheck'],
-        env: {
-          WF_RUN: id(),
-          WF_STEP: 'implement',
-          WF_BASE_REF: run.baseRef,
-          WF_WORKSPACE: run.repo,
-          WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
-          WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
-          WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(runRecord(ROOT, id()).workflowFiles)),
-          WF_LABELS: '{"work":"fix"}',
+      const { WF_SESSION_TOKEN: token, ...env } = spec.config?.env ?? {};
+      assert.deepEqual(
+        { ...spec.config, env },
+        {
+          command: ['sh', '-c', 'npm test && npm run typecheck'],
+          env: {
+            WF_RUN: id(),
+            WF_STEP: 'implement',
+            WF_CHECK: 'check',
+            WF_BASE_REF: run.baseRef,
+            WF_WORKSPACE: run.repo,
+            WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
+            WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
+            WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(runRecord(ROOT, id()).workflowFiles)),
+            WF_LABELS: '{"work":"fix"}',
+          },
+          niceness: 10,
         },
-        niceness: 10,
-      });
+      );
+      assert.equal(
+        readToken(ROOT, token ?? '')?.task,
+        check1(),
+        "the check acts as its step's agent, under a token minted for its own task",
+      );
       assert.ok(fs.statSync(path.join(ROOT, 'runs', id(), 'artifacts', 'implement')).isDirectory(), 'its files have somewhere to go');
     },
   );

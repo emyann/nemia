@@ -613,7 +613,9 @@ export type CheckHanded = (
  * @param said What the step's check said, or why it cannot be read.
  */
 export function checkHandedSection(said: CheckHanded) {
-  const head = ['', `## What ${said.step}'s check ${said.check === undefined ? '' : `${codeSpan(said.check)} `}said`, ''];
+  const title =
+    said.check === undefined ? `## What ${said.step}'s check said` : `## What ${said.step}'s check ${codeSpan(said.check)} said`;
+  const head = ['', title, ''];
   if ('unreadable' in said)
     return [
       ...head,

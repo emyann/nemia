@@ -48,6 +48,25 @@ const writeRun = (run: { id: string } & Record<string, unknown>) => {
 };
 
 const at = '2026-09-12T00:10:00.000Z';
+/**
+ * A served check with its name, start and end held on their own, and the rest of it to compare whole: a step of one check serves it as
+ * `check`, its start and end instants or null.
+ */
+function timed(check: unknown) {
+  if (check === null || check === undefined) return check;
+  const { name, started, ended, ...rest } = check as Record<string, unknown>;
+  assert.equal(name, 'check', 'a step of one check serves it under the name check');
+  for (const instant of [started, ended])
+    assert.ok(
+      instant === null || (typeof instant === 'string' && !Number.isNaN(Date.parse(instant))),
+      'its start and end are instants, or null',
+    );
+  return rest;
+}
+
+/** A step's tries with each try's check held as `timed` holds it. */
+const timedTries = (tries: readonly { check?: unknown }[]) => tries.map((t) => ({ ...t, check: timed(t.check) }));
+
 const filedBrief = (taskId: string) => `The brief ${taskId} was filed with.`;
 
 /** A task's journal, as the engine writes it, and written again whole by a rename over it: the engine reads one only past what it kept. */
@@ -1937,7 +1956,7 @@ describe("a step's check read on the board: its command, and once it refused its
   const s = story(test);
   s.test("a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines", async () => {
     const run = (await objectOf(app, 'r-20')).status;
-    const checkOf = (name: string) => run.steps.find((s) => s.name === name)?.check;
+    const checkOf = (name: string) => timed(run.steps.find((s) => s.name === name)?.check);
     assert.deepEqual(checkOf('build'), {
       command: 'npm run build',
       taskId: 'r-20-build-check',
@@ -2215,7 +2234,7 @@ describe("a step's tries and its closeout: every try of a looped step off one ob
       assert.deepEqual([implement.message, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
       const implementTries = await triesOf(app, 'r-50', 'implement');
       assert.deepEqual(
-        implementTries,
+        timedTries(implementTries),
         [
           {
             try: 1,
@@ -2286,7 +2305,7 @@ describe("a step's tries and its closeout: every try of a looped step off one ob
         "the step's own check and closeout are its current try's",
       );
 
-      assert.deepEqual(await triesOf(app, 'r-50', 'review'), [
+      assert.deepEqual(timedTries(await triesOf(app, 'r-50', 'review')), [
         {
           try: 1,
           round: 1,

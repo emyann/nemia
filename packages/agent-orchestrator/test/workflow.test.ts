@@ -314,8 +314,21 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual([routed.when, routed.workflow], [['web'], 'build'], 'a node on a route: src/route/route.test.ts reads them too');
   const filedBack = fm('backlog', 'after: triage\nwhen: docs\ncard: backlog\nunlabel: [ready]');
   assert.deepEqual([filedBack.card, filedBack.unlabel], ['backlog', ['ready']], 'a card node: src/send/send.verb.test.ts reads them too');
+  const checked = fm('verify', 'checks:\n  - name: lint\n    run: npm run lint\n  - name: tests\n    run: npm test');
+  assert.deepEqual(
+    checked.checks?.map((c) => [c.name, c.after]),
+    [
+      ['lint', []],
+      ['tests', ['lint']],
+    ],
+    'checks: is read into its plan, and src/check/checks-plan.test.ts reads it too',
+  );
+  const commanded = fm('publish', 'after: verify\nrun: npm publish');
+  assert.equal(commanded.run, 'npm publish', 'a command node: src/command-node/command-node.test.ts reads it too');
   const all = {
     ...w,
+    checks: checked.checks,
+    run: commanded.run,
     routes: condition.routes,
     route: condition.route,
     ends: condition.ends,

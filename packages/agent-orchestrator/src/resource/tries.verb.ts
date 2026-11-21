@@ -32,7 +32,7 @@ import type { SpendOf } from '../status/status.ts';
 import { filedOwed } from '../pinned/pinned.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, workFolderOf, type StepArtifact, type StepValue } from './files.store.ts';
-import { checksIn, decidingCheck, type CheckStderr, type StepCheck } from './checks.verb.ts';
+import { checksIn, decidingCheck, severalChecks, type CheckStderr, type StepCheck } from './checks.verb.ts';
 import type { Actor, FieldShape, Outcome } from 'objects';
 
 /**
@@ -348,7 +348,7 @@ export function triesOf(
           ...earlierSaid(t, i),
           attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
           check: decidingCheck(checksIn(step, t.check, views, stderr)),
-          checks: checksIn(step, t.check, views, stderr),
+          ...severalChecks(checksIn(step, t.check, views, stderr)),
           closeout: closeoutIn(home, run, name, step, t.taskId, views, steps, turnAt(t, i)),
           unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
           answer: answerAt(i + 1),

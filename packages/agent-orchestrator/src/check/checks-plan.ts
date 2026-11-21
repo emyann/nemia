@@ -5,7 +5,7 @@
  * on. `check: <line>` is the one-check shorthand, read beside it by `stepChecks` (`src/step/step.ts`). The words follow GitHub Actions,
  * whose step's `run:` is a shell line and whose jobs wait by name.
  */
-import { parse } from 'yaml';
+import { readFrontmatter } from '../frontmatter/frontmatter.ts';
 import { refuse, type CheckSpec } from '../step/step.ts';
 
 /** What a check's name is: a word of lower-case letters, digits and dashes, opening on a letter, as a task id carries it. */
@@ -72,10 +72,15 @@ function writtenOf(step: string, entry: unknown) {
   } satisfies Written;
 }
 
-/** The value of the JSON text the reader keeps of `checks:`, read as YAML, which JSON is; the text itself where it is neither. */
-function listOf(text: string) {
+/**
+ * The value of the JSON text the reader keeps of `checks:`, read as the frontmatter reads a line, which JSON is; the text itself where
+ * it is neither.
+ * @param step The step's name, which the reader's refusal starts with.
+ * @param text The text of the step's `checks:`.
+ */
+function listOf(step: string, text: string) {
   try {
-    const read: unknown = parse(text);
+    const read: unknown = readFrontmatter(step, `checks: ${text}`).entries[0]?.value;
     return read;
   } catch {
     return text;
@@ -150,7 +155,7 @@ export function checksOf(step: string, check: string | undefined, text: string |
     refuse(
       `${step}: \`check:\` and \`checks:\` both say what judges the step. Keep one: \`check: <line>\` is one check named \`check\`, the same as \`checks: [ { name: check, run: <line> } ]\`.`,
     );
-  const list = listOf(text);
+  const list = listOf(step, text);
   if (!Array.isArray(list) || list.length === 0) return refuse(`${step}: \`checks:\` is a list of named checks: ${EXAMPLE}.`);
   const written = list.map((entry) => writtenOf(step, entry));
   const twice = written.find((c, i) => written.findIndex((d) => d.name === c.name) !== i);

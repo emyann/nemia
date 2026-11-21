@@ -123,8 +123,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                what a step's try signed off with: its latest, or --try <n>
                                each tool's words: tools.md#closeout
                                on the port: closeout
-  nemia check-output <runId> <step> [--try <n>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]
-                               what a step's try's check printed, its latest try or --try <n>:
+  nemia check-output <runId> <step> [--try <n>] [--check <name>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]
+                               what a step's try's check printed, its latest try or --try <n>, the check
+                               named by --check <name> where the step has several:
                                stdout whole, or --stderr; --from <n> or --before <n> with --limit <n>,
                                or --last <n>: one page; --match <text>: the lines containing it, any
                                case, numbered

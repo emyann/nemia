@@ -1321,8 +1321,9 @@ Its arguments:
 ## check-output
 
 ```text
-  nemia check-output <runId> <step> [--try <n>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]
-    what a step's try's check printed, its latest try or --try <n>:
+  nemia check-output <runId> <step> [--try <n>] [--check <name>] [--stderr] [--from <n> | --before <n>] [--limit <n>] [--last <n>] [--match <text>]
+    what a step's try's check printed, its latest try or --try <n>, the check
+    named by --check <name> where the step has several:
     stdout whole, or --stderr; --from <n> or --before <n> with --limit <n>,
     or --last <n>: one page; --match <text>: the lines containing it, any
     case, numbered
@@ -1337,6 +1338,7 @@ Its arguments:
 - runId (<runId> at a shell): The run's id, found among the runs the store lists in any namespace.
 - step (<step> at a shell): The step's name.
 - try (--try at a shell): The try's number, from 1.
+- check (--check at a shell): The check to read, by its name in the step's checks; the step's only check where not given, refused where it has several.
 - stream (--stderr at a shell): The stream to read, stdout or stderr; stdout where not given.
 - from (--from at a shell): The line number to read on from, from 1, as a page's next says it; never with before or last.
 - before (--before at a shell): The line number the lines answered end before, from 1, as a page's before says it: the limit lines held just before it; never with from or last.

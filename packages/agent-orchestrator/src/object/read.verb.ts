@@ -20,7 +20,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import type { Run } from '../record/record.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import type { StepSpec } from '../step/step.ts';
-import { type CheckStderr, checksOf, decidingCheck, refusedStderr, type StepCheck } from '../resource/checks.verb.ts';
+import { type CheckStderr, checksOf, decidingCheck, refusedStderr, severalChecks, type StepCheck } from '../resource/checks.verb.ts';
 import { attemptsIn, closeoutIn, type StepTry, triesOf, unreadableIn } from '../resource/tries.verb.ts';
 
 /**
@@ -160,7 +160,7 @@ export const currentOf = (home: string, { run, source, steps, views, judged, che
   return {
     ...stepSaid(judged, name),
     check: decidingCheck(checks.get(name) ?? []),
-    checks: checks.get(name) ?? [],
+    ...severalChecks(checks.get(name) ?? []),
     closeout: closeoutIn(home, run, name, step ?? bare(name), taskId, views, steps),
     unreadable: unreadableIn(taskId, views),
     attempts: attemptsIn(taskId, views, releases),

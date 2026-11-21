@@ -65,6 +65,7 @@ type CheckOnRecord = { readonly taskId: string; readonly tasks?: Readonly<Record
  * @param phaseOf The phase of a task the engine holds, by its id.
  */
 export const checksPhase = (check: CheckOnRecord, phaseOf: (taskId: string) => TaskPhase) => {
+  if (check.tasks === undefined) return phaseOf(check.taskId);
   const tasks = Object.values(check.tasks ?? { check: check.taskId });
   const phases = tasks.map((id) => phaseOf(id));
   if (phases.length <= 1) return phases[0] ?? phaseOf(check.taskId);
@@ -103,8 +104,18 @@ export const currentCheckTask = (run: Run, step: string, name: string) => {
 };
 
 /**
+ * The phase a check on the record stands in: a step's one check (`check:`, no `tasks` on its record) is on the record once it was filed,
+ * so a task the engine has no record of is one still checking, never one to file again; a check of several is named on the record before
+ * it is filed, so its task's phase is read as it is.
+ * @param check The check on the step's record.
+ * @param phase The phase of the check's task.
+ */
+const filedPhase = (check: CheckOnRecord, phase: TaskPhase) =>
+  (check.tasks === undefined && phase === 'unknown' ? 'running' : phase) satisfies TaskPhase;
+
+/**
  * What the pass does with a step's checks on its current try (`checksDue`): each check of its plan read where its task stands, a check not
- * filed yet `waiting`. Pure.
+ * filed yet `waiting`, and a step's one check, once on the record, never so (`filedPhase`). Pure.
  * @param run The run, whose record names the step's checks.
  * @param step The step, whose plan of checks is read (`stepChecks`).
  * @param phaseOf The phase of a task the engine holds, by its id: `unknown` for one it has no record of.
@@ -113,7 +124,7 @@ export const stepChecksDue = (run: Run, step: StepSpec, phaseOf: (taskId: string
   const filed = run.steps[step.name]?.check;
   return checksDue(
     checkNodes(stepChecks(step), (name) =>
-      filed === undefined ? 'waiting' : standingOf(phaseOf(currentCheckTask(run, step.name, name)), true),
+      filed === undefined ? 'waiting' : standingOf(filedPhase(filed, phaseOf(currentCheckTask(run, step.name, name))), true),
     ),
   );
 };

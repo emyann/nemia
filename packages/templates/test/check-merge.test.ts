@@ -18,8 +18,11 @@ const TEMPLATE = copyOf(SDLC);
 /** The end of the parts check in a workflow.yaml's checks, its quotes escaped as the YAML string writes them, up to the next check. */
 const PARTS_END = '/parts.ts\\" check"\n';
 
-/** The end of the probe check in a rendered step file's checks, which it writes as one flow list. */
-const PROBE_END = `/probe.ts" check', after: [] }, `;
+/** Where the probe check ends in a rendered step file's flow list of checks: first in build's, after size in quick's. */
+const PROBE_END: Record<string, string> = {
+  build: `/probe.ts" check', after: [] }, `,
+  quick: `/probe.ts" check', after: [ size ] }, `,
+};
 
 /** The sentence of build's implement note that lists the check's scripts on GitHub, as sdlc writes it. */
 const LISTED = 'Your check runs `probe.ts`, `parts.ts` and the factory';
@@ -50,8 +53,8 @@ function leftByOperators() {
     rewrite(
       spliced,
       `workflows/${workflow}/implement.md`,
-      PROBE_END,
-      `${PROBE_END}{ name: mine, run: "{ own-check; }", after: [ probe ] }, `,
+      PROBE_END[workflow] ?? '',
+      `${PROBE_END[workflow] ?? ''}{ name: mine, run: "{ own-check; }", after: [ probe ] }, `,
     );
   rewrite(spliced, 'workflows/build/implement.md', LISTED, LISTED.replace('`probe.ts`', '`own-check`, `probe.ts`'));
   fs.appendFileSync(path.join(factory('parameter').tree, 'RULES.md'), '\nA rule of our own.\n');

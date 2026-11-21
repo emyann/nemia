@@ -141,11 +141,12 @@ export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> 
  * A step judged by three named checks, its detail open: each check under its own name with its result, the one that refused beside the
  * one that passed and the one never run.
  */
-export const Checked: StoryObj = {
-  render: () => (
+export const Checked: StoryObj<{ step: string }> = {
+  args: { step: 'design' },
+  render: ({ step }) => (
     <QueryClientProvider client={client}>
       <div style={WHOLE}>
-        <StepPart view={RUNS.checked} step="design" size="L" now={NOW} />
+        <StepPart view={RUNS.checked} step={step} size="L" now={NOW} />
       </div>
     </QueryClientProvider>
   ),

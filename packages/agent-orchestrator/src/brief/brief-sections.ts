@@ -65,6 +65,7 @@ export const TASK_HEADINGS = {
   'From <step>': 'step',
   'Replies from <step>': 'step',
   "What <step>'s check said on the merged tree": 'check',
+  "What <step>'s check <check> said": 'check',
   "What <step>'s check said": 'check',
   'What the check said': 'check',
   'What <step> said': 'step',

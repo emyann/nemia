@@ -207,6 +207,12 @@ export const checksIn = (step: StepSpec, check: StepRecord['check'], views: View
   });
 
 /**
+ * A try's checks as an object serves them: each, where its step has several; nothing for one, whose check is `check`, or none.
+ * @param checks The try's checks, in the step's order.
+ */
+export const severalChecks = (checks: readonly StepCheck[]) => (checks.length > 1 ? { checks } : {});
+
+/**
  * The check a try is judged by, of its checks (`checksIn`): the first that refused, else the first that did not pass, else the first.
  * Null for a try with none.
  * @param checks The try's checks, in the step's order.

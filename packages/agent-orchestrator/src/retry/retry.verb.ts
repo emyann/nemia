@@ -93,11 +93,11 @@ export const retryRun = Effect.fn('retry')(function* (
       phaseOf,
       closeoutReader(views, run, steps),
       closeoutAsked(views),
-      exitVerdicts(views, run),
+      exitVerdicts(views, run, steps),
       asks,
       blocked,
       spendOf,
-      checkKills(views, run),
+      checkKills(views, run, steps),
       tipOf,
     );
 

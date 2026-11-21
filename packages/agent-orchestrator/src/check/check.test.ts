@@ -567,7 +567,7 @@ test(
     process.env.PATH = PATH;
     assert.equal(v.state.settled, 'failed');
     assert.equal(v.state.attempts.at(-1)?.exitCode, null, 'no exit code on the attempt');
-    const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never)('ship');
+    const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never, [])('ship');
     assert.equal(verdict, 'unfinished');
     assert.equal(refusedCheck(v.state.settled, verdict), false, 'not a refusal of the work');
     const log = (await Effect.runPromise(e.output(id, 'stdout'))) ?? '';

@@ -467,8 +467,8 @@ export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps:
   phaseOf: (taskId: string) => phaseOfView(views.get(taskId)),
   signedOff: closeoutReader(views, run, steps),
   asked: closeoutAsked(views),
-  verdictOf: exitVerdicts(views, run),
-  checkKillOf: checkKills(views, run),
+  verdictOf: exitVerdicts(views, run, steps),
+  checkKillOf: checkKills(views, run, steps),
   sessionBlocked: harnessBlocked(views),
   spendOf: spendReader(views),
 });

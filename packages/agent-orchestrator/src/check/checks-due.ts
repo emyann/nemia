@@ -76,15 +76,24 @@ export const checksPhase = (check: CheckOnRecord, phaseOf: (taskId: string) => T
 };
 
 /**
- * The task of a step's checks whose end says why they failed: the first that failed with an exit code (`exited`), else the first that
- * stopped or failed with none, else the first; what the step's verdict is read off (`exitVerdicts`) and its out-of-memory kill.
+ * The task of a step's checks whose end says why they failed: the first whose refusal the step's `checkFailurePolicy:` names a person's
+ * (`personal`), so a refusal that is a person's to answer is never hidden behind another the run would try again on its own; else the
+ * first that failed with an exit code (`exited`), else the first that stopped or failed with none, else the first; what the step's
+ * verdict is read off (`exitVerdicts`) and its out-of-memory kill.
  * @param check The check on the step's record.
  * @param phaseOf The phase of a task the engine holds, by its id.
  * @param exited Whether a task's last attempt exited with a code, by its id.
+ * @param personal Whether a task's exit code is one its step's policy hands a person (`FailStep`), by its id.
  */
-export const decidingCheckTask = (check: CheckOnRecord, phaseOf: (taskId: string) => TaskPhase, exited: (taskId: string) => boolean) => {
+export const decidingCheckTask = (
+  check: CheckOnRecord,
+  phaseOf: (taskId: string) => TaskPhase,
+  exited: (taskId: string) => boolean,
+  personal: (taskId: string) => boolean = () => false,
+) => {
   const tasks = Object.values(check.tasks ?? { check: check.taskId });
   return (
+    tasks.find((id) => phaseOf(id) === 'failed' && exited(id) && personal(id)) ??
     tasks.find((id) => phaseOf(id) === 'failed' && exited(id)) ??
     tasks.find((id) => phaseOf(id) === 'failed' || phaseOf(id) === 'stopped') ??
     check.taskId

@@ -1956,7 +1956,7 @@ describe("exitVerdicts: a check's verdict is its attempt's exit code, `unfinishe
     test(name, async () => {
       const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', end);
       const run = runRecord(ROOT, id);
-      const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
+      const verdictOf = exitVerdicts(await viewsOf(b.e, run), run, []);
       assert.equal(verdictOf('implement'), verdict);
       assert.equal(verdictOf('review'), undefined, 'a step with no check filed has no verdict at all');
       assert.equal((await stage.runWith(b.e, list(b.e, run))).steps[0].message, `failed ✗ check (${verdictWord(verdict!)})`);

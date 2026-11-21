@@ -23,6 +23,7 @@ import {
   type CheckRefusal,
   type LandingSaid,
   checksPhase,
+  checkFailureAction,
   decidingCheckTask,
 } from '../check/index.ts';
 import { stepChecks, type StepSpec } from '../step/step.ts';
@@ -376,23 +377,31 @@ export const spendReader = (views: ReadonlyMap<string, TaskView>) =>
  * Exported for a consumer that words a check as `nemia ls` does.
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name their checks' tasks.
+ * @param steps The workflow's steps, whose `checkFailurePolicy:` picks the deciding check of several (`decidingCheckTask`).
  */
-export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string) => {
-  const taskId = decidingTaskOf(views, run, step);
+export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly StepSpec[]) => (step: string) => {
+  const taskId = decidingTaskOf(views, run, step, steps);
   return taskId ? attemptVerdict(views.get(taskId)?.state.attempts.at(-1)) : undefined;
 };
 
 /**
  * The task of a step's current checks whose end its verdict is read off (`decidingCheckTask`): its one check's, or of several, the first
- * that refused with an exit code; a command node's own task, run on the command harness, whose exit is its verdict; undefined for a
- * step with no check filed.
+ * whose refusal the step's `checkFailurePolicy:` hands a person, else the first that refused with an exit code; a command node's own
+ * task, run on the command harness, whose exit is its verdict; undefined for a step with no check filed.
  */
-const decidingTaskOf = (views: ReadonlyMap<string, TaskView>, run: Run, step: string) => {
+const decidingTaskOf = (views: ReadonlyMap<string, TaskView>, run: Run, step: string, steps: readonly StepSpec[]) => {
   const check = run.steps[step]?.check;
   const own = run.steps[step]?.taskId;
   if (!check) return own && views.get(own)?.state.harness === 'command' ? own : undefined;
   const phaseOf = (id: string) => phaseOfView(views.get(id));
-  return decidingCheckTask(check, phaseOf, (id) => typeof attemptVerdict(views.get(id)?.state.attempts.at(-1)) === 'number');
+  const verdictOf = (id: string) => attemptVerdict(views.get(id)?.state.attempts.at(-1));
+  const policy = steps.find((s) => s.name === step)?.checkFailurePolicy;
+  return decidingCheckTask(
+    check,
+    phaseOf,
+    (id) => typeof verdictOf(id) === 'number',
+    (id) => checkFailureAction(policy, verdictOf(id)) === 'FailStep',
+  );
 };
 
 /**
@@ -401,10 +410,11 @@ const decidingTaskOf = (views: ReadonlyMap<string, TaskView>, run: Run, step: st
  * the machine killed again (`CheckKillOf`).
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name their checks' tasks.
+ * @param steps The workflow's steps, whose `checkFailurePolicy:` picks the deciding check of several (`decidingCheckTask`).
  */
-export const checkKills = (views: ReadonlyMap<string, TaskView>, run: Run) =>
+export const checkKills = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly StepSpec[]) =>
   ((step) => {
-    const taskId = decidingTaskOf(views, run, step);
+    const taskId = decidingTaskOf(views, run, step, steps);
     return taskId ? outOfMemory(killedMemoryOf(views.get(taskId)), undefined) : undefined;
   }) satisfies CheckKillOf;
 
@@ -716,8 +726,8 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
     phaseOf,
     signedOff: closeoutReader(views, record, steps),
     asked: closeoutAsked(views),
-    verdictOf: exitVerdicts(views, record),
-    checkKillOf: checkKills(views, record),
+    verdictOf: exitVerdicts(views, record, steps),
+    checkKillOf: checkKills(views, record, steps),
     sessionBlocked: harnessBlocked(views),
     spendOf: spendReader(views),
     asks,

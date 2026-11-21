@@ -146,7 +146,7 @@ export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]) =
     phaseOf: (taskId) => phaseOfView(views.get(taskId)),
     closeoutOf: closeoutReader(views, run, steps),
     askedCloseout: closeoutAsked(views),
-    verdictOf: exitVerdicts(views, run),
+    verdictOf: exitVerdicts(views, run, steps),
   }) satisfies RaiseReads;
 
 /**

@@ -72,6 +72,14 @@ describe("the step's verdict is read off the check that says why it failed", () 
     );
   });
 
+  test("a refusal the step's policy hands a person, before an earlier one the run would try again", () => {
+    const phases = phasesOf({ 't-probe': 'failed', 't-own': 'failed' });
+    assert.equal(
+      decidingCheckTask({ taskId: 't-probe', tasks: TASKS }, phases, () => true, (id) => id === 't-own'),
+      't-own',
+    );
+  });
+
   test('every one passed: the first', () => {
     assert.equal(
       decidingCheckTask({ taskId: 't-probe', tasks: TASKS }, phasesOf({}), () => true),

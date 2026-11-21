@@ -23,8 +23,7 @@ export type UnlinkedBreakReason = 'unlinked' | 'linked' | 'stream' | 'none' | 'u
 export type UnlinkedBreak = { readonly read: string; readonly reason: UnlinkedBreakReason };
 
 /** Whether no two entries name one read. */
-const distinct = (named: readonly { readonly read: string }[]) =>
-  named.every((n, i) => !named.slice(0, i).some((m) => m.read === n.read));
+const distinct = (named: readonly { readonly read: string }[]) => named.every((n, i) => !named.slice(0, i).some((m) => m.read === n.read));
 
 /** Whether `output` holds a break of `read` for `reason`. */
 const breaks = (output: readonly UnlinkedBreak[], read: string, reason: UnlinkedBreakReason) =>
@@ -73,8 +72,7 @@ const readsUnlinkedSpec = spec<(reads: readonly GetRead[], linked: readonly stri
     },
     eachBreakOnce: {
       description: 'No break is said twice',
-      condition: ({ output }) =>
-        output.every((b, i) => !output.slice(0, i).some((c) => c.read === b.read && c.reason === b.reason)),
+      condition: ({ output }) => output.every((b, i) => !output.slice(0, i).some((c) => c.read === b.read && c.reason === b.reason)),
     },
   },
 });

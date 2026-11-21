@@ -4,13 +4,7 @@
  * the reason it has no verb. `readsUnlinked` (proved by contracts/reads-unlinked.contract.ts) judges the rule on plain data, and
  * `unlinkedReadsOf` applies it to an `Api` and a table's entries, each break a sentence naming its fix. Pure.
  */
-import type {
-  GetRead,
-  ReadReason,
-  ReadsUnlinked,
-  UnlinkedBreak,
-  UnlinkedBreakReason,
-} from '../contracts/reads-unlinked.contract.ts';
+import type { GetRead, ReadReason, ReadsUnlinked, UnlinkedBreak, UnlinkedBreakReason } from '../contracts/reads-unlinked.contract.ts';
 import type { ApiGetName } from './api.ts';
 import { READS } from './reads.ts';
 
@@ -108,7 +102,7 @@ export const UNLINKED_READS: { readonly [K in ApiGetName]?: string } = {
   'proposals.get': BY_GET,
   'delegations.list': BY_GET,
   'delegations.get': BY_GET,
-  'server.health': "a liveness probe: `nemia server version` reads that the api answers, and its release",
+  'server.health': 'a liveness probe: `nemia server version` reads that the api answers, and its release',
   'server.metrics':
     "the runtime's raw instruments by name and attributes: a person's questions of the daemon are answered by `nemia passes`, `nemia series` and `nemia stats`",
   'readiness.fixOf':

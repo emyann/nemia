@@ -6,12 +6,34 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { CLI_VERBS, TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
-import { COMMAND_WORDS } from 'objects';
+import { Api, COMMAND_WORDS, QUOTA_WORDS, UNLINKED_READS, unlinkedReadsOf } from 'objects';
 import { RUNS } from '../src/cli/main.ts';
 import { HELD, KEPT } from './held-commands.baseline.ts';
 
 test('the shipped table breaks none of its rules against the CLI’s runners, nor gives a tool a name the verbs the api serves beside it give', () => {
   assert.deepEqual(commandBreaks(TABLE, [...RUNS.keys()], CLI_VERBS, [...KEPT, ...HELD]), []);
+});
+
+/** The read each sentence of the guard names, its first word: what a refusal carries, never its words. */
+const namedReads = (sentences: readonly string[]) => sentences.map((sentence) => sentence.split(' ')[0]);
+
+test("every read of objects' Api is linked by a verb her shell and the port reach, a stream, or excused in UNLINKED_READS", () => {
+  assert.deepEqual(unlinkedReadsOf(Api, [...TABLE, ...CLI_VERBS]), []);
+});
+
+test('REFUSED: a read whose verb is taken out is named unlinked, and a reason for a linked read or a stream is named', () => {
+  const entries = [...TABLE, ...CLI_VERBS];
+  assert.deepEqual(
+    namedReads(
+      unlinkedReadsOf(
+        Api,
+        entries.filter((e) => e.name !== QUOTA_WORDS.name),
+      ),
+    ),
+    ['server.quota'],
+  );
+  assert.deepEqual(namedReads(unlinkedReadsOf(Api, entries, { ...UNLINKED_READS, 'server.quota': 'x' })), ['server.quota']);
+  assert.deepEqual(namedReads(unlinkedReadsOf(Api, entries, { ...UNLINKED_READS, 'server.feed': 'x' })), ['server.feed']);
 });
 
 test('the store verbs this CLI still serves only shrink: each one held is an entry it serves whose words the client does not hold yet', () => {

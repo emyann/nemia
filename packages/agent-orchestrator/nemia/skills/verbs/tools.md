@@ -2684,6 +2684,17 @@ Its arguments:
 
 - On the port: Sends diffs= where the call gives no diffs: give it to ask otherwise.
 
+## explain
+
+```text
+  nemia explain <resource>[.<field>]...
+    what a resource the api serves is, and each of its fields (nemia explain --help)
+```
+
+Reads every resource the api serves, read off its own definition: each one's name, singular, kind, scope and verbs, as Kubernetes' /api says them. Answers APIResourceList.
+
+Calls `GET /api`.
+
 ## quota
 
 ```text
@@ -2696,3 +2707,347 @@ Its arguments:
 Reads the subscription's quota as the board is given it: its windows when fresh, or why there are none. Answers Quota.
 
 Calls `GET /api/quota`.
+
+## library
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+The store's library of skills: the person's beside the builtins, each with the factories that use it and what shadows it.
+
+Calls `GET /api/skills`.
+
+Its arguments:
+
+- limit: The most items a page holds, a whole number from 1.
+- continue: The token the page before answered, to read the page after it; absent, the first page.
+- labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
+- selector: The retired spelling of labelSelector, read the same.
+- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
+
+- On the port: Answers a line per item, as `library -o wide` prints them.
+- On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
+
+## library_agents
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+The store's library of agents: the person's beside the builtins, each with the factories that use it and what shadows it.
+
+Calls `GET /api/agents`.
+
+Its arguments:
+
+- limit: The most items a page holds, a whole number from 1.
+- continue: The token the page before answered, to read the page after it; absent, the first page.
+- labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
+- selector: The retired spelling of labelSelector, read the same.
+- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
+
+- On the port: Answers a line per item, as `library -o wide` prints them.
+- On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
+
+## library_mcpservers
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+The store's library of MCP servers: the person's, recorded once for every factory that adds one, beside those Nemia offers, each with the factories that add it.
+
+Calls `GET /api/mcpservers`.
+
+Its arguments:
+
+- limit: The most items a page holds, a whole number from 1.
+- continue: The token the page before answered, to read the page after it; absent, the first page.
+- labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
+- selector: The retired spelling of labelSelector, read the same.
+- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+
+- On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
+
+## library_workflows
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+The store's library of workflows: the person's beside the builtins, each with the factories that attach it and what shadows it.
+
+Calls `GET /api/workflows`.
+
+Its arguments:
+
+- limit: The most items a page holds, a whole number from 1.
+- continue: The token the page before answered, to read the page after it; absent, the first page.
+- labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
+- selector: The retired spelling of labelSelector, read the same.
+- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+- origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
+
+- On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
+
+## library_adds
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+The library items a factory has added, each with what it is there: resolved, shadowed by the factory's own, or missing from the library.
+
+Calls `GET /api/namespaces/:namespace/libraryadds`.
+
+Its arguments:
+
+- namespace: The namespace the list is of: the name of a factory, default for one that names none.
+- limit: The most items a page holds, a whole number from 1.
+- continue: The token the page before answered, to read the page after it; absent, the first page.
+- labelSelector: A label query, or several given again, that keeps the objects whose labels match any of them; absent, every object.
+- selector: The retired spelling of labelSelector, read the same.
+- resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
+
+- On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
+
+## library_skill
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+One skill of the store's library by its name, the person's first, with the factories that use it.
+
+Calls `GET /api/skills/:name`.
+
+Its arguments:
+
+- name (<name> at a shell): The library item's name, unique in the store's library for its kind.
+- origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
+
+## library_agent
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+One agent of the store's library by its name, the person's first, with the factories that use it.
+
+Calls `GET /api/agents/:name`.
+
+Its arguments:
+
+- name (<name> at a shell): The library item's name, unique in the store's library for its kind.
+- origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
+
+## library_mcpserver
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+One MCP server of the store's library, the person's or a builtin, by its name.
+
+Calls `GET /api/mcpservers/:name`.
+
+Its arguments:
+
+- name (<name> at a shell): The library item's name, unique in the store's library for its kind.
+
+## library_workflow
+
+```text
+  nemia library [skills|agents|mcpservers|workflows [<name>] [--json]] [--factory <factory>]
+    the store's library: the user library's skills, agents, MCP servers and
+    workflows beside the builtins, each with the factories that add it;
+    --factory: that factory's adds, each with its state and the fix of a missing one;
+    given a kind and a name, that item whole, as YAML (--json: as JSON)
+```
+
+One workflow of the store's library by its name, the person's first, with the factories that attach it.
+
+Calls `GET /api/workflows/:name`.
+
+Its arguments:
+
+- name (<name> at a shell): The library item's name, unique in the store's library for its kind.
+- origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
+
+## lines
+
+```text
+  nemia lines <runId> [--json]
+    the lines a run keeps: its decide and refresh lines, each step's,
+    the card it came from, as YAML; --json: as JSON
+```
+
+Reads the lines kept beside the run object: its decide and refresh lines, each step's, the card it came from and its workflow's page address. Answers RunLines, constant for a run.
+
+Calls `GET /api/runs/:name/lines`.
+
+Its arguments:
+
+- name: The run's name, found among the runs the store lists in any namespace.
+
+## server_version
+
+```text
+  nemia server version [--json]
+    the release the server runs and the newest it knows of, as YAML;
+    --json: as JSON. nemia version is this machine's
+```
+
+Reads the release the api runs, the code it was built from, and the newest release the daemon knows of. Answers VersionAnswer.
+
+Calls `GET /api/version`.
+
+## server_upgrades
+
+```text
+  nemia server upgrades [--json]
+    the server's last upgrade and the release going back goes to, as
+    YAML; --json: as JSON
+```
+
+Reads the release going back would go to and the store's last upgrade. Answers UpgradesRead.
+
+Calls `GET /api/upgrades`.
+
+## capabilities
+
+```text
+  nemia capabilities [--factory <factory>] [--repo <path>] [--json]
+    the harnesses, models, skills and servers a step may be given, as
+    YAML, in a factory or a repository of it; --json: as JSON
+```
+
+Reads what the repository the request's ?factory= and ?repo= resolve offers a step: its skills, agents, MCP servers and permission rules, the read-only commands, and what each step of each workflow gets. Answers the capabilities, or why no repository was read.
+
+Calls `GET /api/capabilities`.
+
+Its arguments:
+
+- factory (--factory at a shell): The factory the request is answered in.
+- repo (--repo at a shell): The repository of that factory the request is answered in.
+
+## repository
+
+```text
+  nemia repository [--factory <factory>] [--repo <path>] [--json]
+    the repository a factory works in, as the server reads it, as YAML;
+    --json: as JSON
+```
+
+Reads the repository a start runs in, as the request's ?factory= and ?repo= resolve it. Answers RepositoryAnswer.
+
+Calls `GET /api/repository`.
+
+Its arguments:
+
+- factory (--factory at a shell): The factory the request is answered in.
+- repo (--repo at a shell): The repository of that factory the request is answered in.
+
+## store
+
+```text
+  nemia store [--json]
+    where the store keeps its workflows, agents and skills, with the
+    commands that file a factory and turn Nemia on, as YAML; --json: as JSON
+```
+
+Reads your store's folders of workflows, agents and skills, the line that files a factory in it and the line that turns Nemia on. Answers YourStore.
+
+Calls `GET /api/store`.
+
+## milestones
+
+```text
+  nemia milestones [--json]
+    how far the store is towards its first landed change, each milestone
+    done or not, as YAML; --json: as JSON
+```
+
+Reads where the store stands on the way to its first landed change: a harness, a factory, a volume and a run landed, each done by what the store holds now. Answers Milestones.
+
+Calls `GET /api/readiness/milestones`.
+
+## factory_commands
+
+```text
+  nemia factory commands <factory> [--json]
+    the commands a factory's steps run, its checks among them, as YAML;
+    --json: as JSON
+```
+
+Reads the command lines a person types for a factory, built off the command table: each of its verbs with the factory's name filled in, and the line that takes back each schedule and volume. Answers FactoryCommands.
+
+Calls `GET /api/factories/:name/commands`.
+
+Its arguments:
+
+- name: The factory's name.
+
+## factory_server_sign-in
+
+```text
+  nemia factory server sign-in <factory> <server> [--json]
+    where the sign-in of a factory's MCP server stands, as YAML;
+    --json: as JSON
+```
+
+Reads where signing a factory's MCP server in stands. Answers SignInState.
+
+Calls `GET /api/namespaces/:namespace/mcpservers/:name/sign-in`.
+
+Its arguments:
+
+- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- name: The object's name, unique in its namespace for its kind.
+
+## workflows_keys
+
+```text
+  nemia workflows keys [--json]
+    every key a workflow's step takes, its kind and what it means, as
+    YAML; --json: as JSON
+```
+
+The builder's form: every key a step takes, with its kind and what it means.
+
+Calls `GET /api/workflow-keys`.

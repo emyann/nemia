@@ -1526,6 +1526,32 @@ test('her fence lets the quota through by its verb, unasked, and no call of the 
   assert.notEqual(verdictOf(rules, 'curl -s http://127.0.0.1:8787/api/quota'), 'allow');
 });
 
+test('her fence lets every read verb through unasked, nemia get and explain among them, and still asks or denies each write it did', () => {
+  const rules = herRules(herStore());
+  const reads = [
+    'nemia get workflows build -n f -o yaml',
+    'nemia explain workflows.spec',
+    'nemia server version',
+    'nemia server upgrades --json',
+    'nemia library skills s',
+    'nemia lines r-1',
+    'nemia capabilities --factory f',
+    'nemia milestones',
+    'nemia factory commands f',
+    'nemia factory server sign-in f s',
+    'nemia workflows keys',
+  ];
+  assert.deepEqual(
+    reads.filter((command) => verdictOf(rules, command) !== 'allow'),
+    [],
+  );
+  assert.equal(verdictOf(rules, 'nemia apply -f x.yaml'), 'unmatched');
+  assert.equal(verdictOf(rules, 'nemia server upgrade'), 'unmatched');
+  assert.equal(verdictOf(rules, 'nemia factory server add f s --type http'), 'deny');
+  assert.equal(verdictOf(rules, 'nemia library add skills s --factory f'), 'ask');
+  assert.equal(verdictOf(rules, 'nemia library rm skills s --factory f'), 'ask');
+});
+
 test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken away, and a deny taken away are each named', () => {
   const rules = herRules(herStore());
   const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, class: 'act' as const } : entry));

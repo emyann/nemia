@@ -153,5 +153,7 @@ export const answerSpec = (command: string, usage: string, positionals: readonly
     positionals: positionals.map((key) => ({ key, takes: 'required', kind: 'name' }) satisfies Positional),
     flags: [...flags, ANSWER_JSON],
     unknown: (arg) => `nemia ${command} does not take ${arg}: nemia ${command} ${usage}.`,
-    ...(positionals.length > 0 ? { missing: `nemia ${command} takes ${positionals.map((key) => `<${key}>`).join(', then ')}: nemia ${command} ${usage}.` } : {}),
+    ...(positionals.length > 0
+      ? { missing: `nemia ${command} takes ${positionals.map((key) => `<${key}>`).join(', then ')}: nemia ${command} ${usage}.` }
+      : {}),
   }) satisfies Spec;

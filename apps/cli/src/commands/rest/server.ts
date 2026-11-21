@@ -29,8 +29,7 @@ export const serverUpgrades = (args: Args) => answered('server upgrades', args, 
  * `nemia capabilities`' runner: what a step may be given, in the place named.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export const capabilities = (args: Args) =>
-  answered('capabilities', args, (c) => c.server.capabilities({ query: placeOf(args) }));
+export const capabilities = (args: Args) => answered('capabilities', args, (c) => c.server.capabilities({ query: placeOf(args) }));
 
 /**
  * `nemia repository`'s runner: the repository a factory works in, in the place named.

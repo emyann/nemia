@@ -2,8 +2,8 @@
  * The runners of the group's commands (`objects`' `FACTORY_WORDS`), by name: each takes its words parsed against its spec, asks the api
  * through `asked`, prints what it answers, and answers its exit code. The table is total over the group's names, so one left out does not
  * compile: the listing (`listing.ts`), a factory's own writes (`writes.ts`), its parts in its namespace (`parts.ts`), what it gives its
- * runs (`settings.ts`), what it says in words (`words.ts`), the reads printed as the api answers them (`reads.ts`), what a template makes of it (`templated.ts`), its move to another
- * store (`move.ts`) and a person's own session in its home (`home.ts`).
+ * runs (`settings.ts`), what it says in words (`words.ts`), the reads printed as the api answers them (`reads.ts`), what a template
+ * makes of it (`templated.ts`), its move to another store (`move.ts`) and a person's own session in its home (`home.ts`).
  */
 import type { FactoryCommand } from 'objects';
 import type { Runner } from '../runner.ts';

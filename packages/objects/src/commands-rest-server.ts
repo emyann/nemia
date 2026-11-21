@@ -83,7 +83,10 @@ export const STORE_WORDS = {
   name: 'store',
   served: [{ endpoint: 'server.store' }],
   usage: '[--json]',
-  help: ["where the store keeps its workflows, agents and skills, with the", 'commands that file a factory and turn Nemia on, as YAML; --json: as JSON'],
+  help: [
+    'where the store keeps its workflows, agents and skills, with the',
+    'commands that file a factory and turn Nemia on, as YAML; --json: as JSON',
+  ],
   spec: bareSpec('store'),
   writes: false,
   class: 'read',

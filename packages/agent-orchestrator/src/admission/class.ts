@@ -3,7 +3,7 @@
  * break the rules (`classBreaks`). Pure: an agent's fence is derived from the classes (`nemiaFence`), and a call's admission reads them
  * (`admissionOf`).
  */
-import type { CommandClass } from 'objects';
+import { type CommandClass, LIBRARY_ADD_WORDS, LIBRARY_RM_WORDS } from 'objects';
 
 /** The class of a command an agent calls (`objects`' `CommandClass`, which the client reads too), said once in its entry. */
 export type { CommandClass } from 'objects';
@@ -48,12 +48,16 @@ export const proposedForms = (names: readonly string[]) =>
 
 /**
  * The client's own verbs (`apps/cli`), which no entry of the table serves, as an agent's fence reads them: a proposal made or undone, and
- * a proposal approved or declined — each an act, which the api judges by who calls (`proposalApproval`; a decline is the person's).
+ * a proposal approved or declined — each an act, which the api judges by who calls (`proposalApproval`; a decline is the person's); and
+ * the library's writes (`library add`, `library rm`), classed by their words, which the allow of `nemia library`, a read, would reach
+ * unasked without their own rule.
  */
 export const CLIENT_CLASSES: readonly { readonly name: string; readonly class: CommandClass }[] = [
   { name: 'propose', class: 'act' },
   { name: 'proposals approve', class: 'act' },
   { name: 'proposals decline', class: 'act' },
+  { name: LIBRARY_ADD_WORDS.name, class: LIBRARY_ADD_WORDS.class },
+  { name: LIBRARY_RM_WORDS.name, class: LIBRARY_RM_WORDS.class },
 ];
 
 /** An entry as `classBreaks` reads it: its name, whether it writes, its class, whether it is asked every time and its spec's flags. */

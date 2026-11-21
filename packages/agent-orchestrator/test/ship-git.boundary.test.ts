@@ -45,6 +45,7 @@ import {
   gitPlaceLayer,
 } from '../src/runner.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { checkOutputFile } from '../src/check/check.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { roundOf } from '../src/run.ts';
 import { gitPlace } from '../place/git/place.ts';
@@ -846,6 +847,9 @@ test("a merge of work that merges cleanly but whose landing check refused the me
   assert.ok(brief.includes('so `git show --remerge-diff` shows the fix'), brief);
   assert.match(brief, /\n## What ship's check said on the merged tree\n/);
   assert.ok(brief.includes(`"exit": 1,\n  "failing": [\n    "@x/add:test: ✖ sub subtracts (2.1ms)"\n  ],\n`), brief);
+  const kept = (['stdout', 'stderr'] as const).map((stream) => checkOutputFile(artifactsDir(ROOT, { id }, 'implement'), checkId, stream));
+  for (const file of kept) assert.ok(brief.indexOf(file) > brief.indexOf("## What ship's check said"), file);
+  assert.equal(kept.map((file) => fs.readFileSync(file, 'utf8')).join(''), FAILING, "the check's whole output, in the target's files");
   assert.ok(brief.includes('You were handed no findings this round.'), 'a merge answers no finding');
 });
 

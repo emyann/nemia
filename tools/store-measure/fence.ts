@@ -13,6 +13,7 @@ import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import type { Place } from 'agent-orchestrator';
@@ -32,13 +33,18 @@ export const LEFT_OUT: readonly { path: string; why: string }[] = [
 /** What a copy of the runtime's own store (`AE_ROOT`) leaves out: the holder's token. */
 export const AE_LEFT_OUT: readonly { path: string; why: string }[] = [{ path: 'a2a', why: "the holder's token, a secret no read needs" }];
 
+/** The keyspace's file, by its path from the store's root: copied whole by SQLite, never file by file, its log and index beside it left. */
+const KEYSPACE = 'db/state.db';
+
 /** What a copy holds: its files and their bytes, and each path of `LEFT_OUT` that was there to leave out. */
 export type Copied = { files: number; bytes: number; leftOut: string[] };
 
 /**
  * `from` copied into `to`, a folder not there yet, but each path of `leftOut` under `from`: its folders, files and links, a link kept as
  * a link. A store being written while it is copied is copied as it is read: a file gone before it is copied is passed over, and a line
- * torn in the middle is the copy's. Anything but a folder, a file or a link (a socket, a fifo) is passed over.
+ * torn in the middle is the copy's. Anything but a folder, a file or a link (a socket, a fifo) is passed over. The keyspace
+ * (`db/state.db`), a SQLite file in write-ahead-log mode that a copy file by file could tear, is copied by SQLite as one snapshot
+ * (`VACUUM INTO`, which reads it in one transaction and writes nothing to it), its `-wal` and `-shm` files left.
  */
 export function copyStore(from: string, to: string, leftOut: readonly { path: string }[] = LEFT_OUT) {
   const out = new Set(leftOut.map((l) => l.path));
@@ -48,6 +54,8 @@ export function copyStore(from: string, to: string, leftOut: readonly { path: st
     for (const entry of entriesOf(path.join(from, at))) {
       const here = at === '' ? entry.name : `${at}/${entry.name}`;
       if (out.has(here)) copied.leftOut.push(here);
+      else if (here === `${KEYSPACE}-wal` || here === `${KEYSPACE}-shm`) continue;
+      else if (here === KEYSPACE) keyspaceCopied(path.join(from, here), path.join(to, here), copied);
       else if (entry.isDirectory()) walk(here);
       else passingGone(() => copyOne(path.join(from, here), path.join(to, here), entry, copied));
     }
@@ -77,6 +85,18 @@ function copyOne(source: string, dest: string, entry: fs.Dirent, copied: Copied)
     copied.files++;
     copied.bytes += fs.statSync(dest).size;
   }
+}
+
+/** The keyspace at `source` copied to `dest` as one snapshot SQLite takes, counted into `copied`. */
+function keyspaceCopied(source: string, dest: string, copied: Copied) {
+  const db = new DatabaseSync(source, { readOnly: true });
+  try {
+    db.prepare('VACUUM INTO ?').run(dest);
+  } finally {
+    db.close();
+  }
+  copied.files++;
+  copied.bytes += fs.statSync(dest).size;
 }
 
 /** Whether `inner` is `outer` or under it, each resolved. */

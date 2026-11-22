@@ -230,7 +230,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   cut (`docs/playbook-operator.md`, *Cut a product release*).
 - `tools/store-measure/` — what the store's reads cost, cold and warm: a tick pass, the run list, the stats, a run's page and the feed from
   a cursor, on a copy of both stores in a temp folder with the run count beside them, never the live store
-  (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>]`); the baseline before the
+  (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>] [--factory <name>]`); the baseline before the
   Run door is `tools/store-measure/baselines/s1.json`, the measure after it `s2.json`, and their comparison `s2-vs-s1.txt`. A
   session's measure, held by `tools/guards/test/store-measure.test.ts`. Beside it, what the passes cost the daemon's event loop
   (`node tools/store-measure/loop.ts [--passes N] [--every ms] [--json <file>] [--compare <loop.json>]`): the loop's delay and

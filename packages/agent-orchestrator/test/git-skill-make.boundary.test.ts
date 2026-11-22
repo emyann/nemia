@@ -226,7 +226,8 @@ function inputsFolder() {
 
 /** Every file under `dir`, by its path from it, sorted. */
 const filesUnder = (dir: string) =>
-  (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+  fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile())
     .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
     .sort();

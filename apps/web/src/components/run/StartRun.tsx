@@ -13,6 +13,7 @@ import { runsMoved } from '@/lib/runWrites';
 import { Pending, Reading } from '@/components/look';
 import { Button, Checkbox, Skeleton, TextField } from '@/components/ui/ds';
 import { pastLimit, StartInputs } from './StartInputs';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * A brief, the runs the new run waits on, the runs it reads as context (`ContextPicker`), and the button that starts a run of the
@@ -253,7 +254,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
           No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.
         </p>
       ) : runs.error ? (
-        <p className="text-body-small text-failure">Could not list the runs to wait on: {runs.error.message}</p>
+        <ReadTrouble what="the runs to wait on" error={runs.error} className="text-body-small" />
       ) : !onRepo ? (
         <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
           {[0, 1, 2].map((at) => (

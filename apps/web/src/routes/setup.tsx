@@ -14,18 +14,14 @@ import { quotaTitle } from '@/lib/quota';
 import { harnessAsked } from '@/lib/setup';
 import { useHarnessActivation } from '@/lib/useHarnessActivation';
 import { useNow } from '@/lib/useNow';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** Settings' Setup, at /setup: what the server needs to run its factories. Its loader reads the readiness read. */
 export const Route = createFileRoute('/setup')({
   loader: ({ context }) => context.queryClient.ensureQueryData(readinessQuery),
   component: SetupPage,
   pendingComponent: SetupReading,
-  errorComponent: ({ error }) => (
-    <p className="text-body-medium text-failure">
-      Could not read what this server has in place: {error instanceof Error ? error.message : String(error)}. Read it at the server's shell,
-      or reload the page once the api answers.
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="what this server has in place" error={error} then="Read it at the server's shell." />,
 });
 
 /**
@@ -108,9 +104,9 @@ function Pairings() {
         Clients waiting to pair
       </h2>
       {pairings.isError ? (
-        <p role="alert" className="text-body-medium break-words text-failure">
-          Could not read the pairings: {pairings.error.message}. Read them at the server's shell, or reload the page once the api answers.
-        </p>
+        <div role="alert">
+          <ReadTrouble what="the pairings" error={pairings.error} className="break-words" then="Read them at the server's shell." />
+        </div>
       ) : pairings.data === undefined ? (
         <PairingsReading />
       ) : (

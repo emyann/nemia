@@ -9,6 +9,7 @@ import { useNow } from '@/lib/useNow';
 import type { Actor as ActorRead } from 'objects';
 import { Actor } from '../actor/Actor';
 import { Pending, Reading, ReadingLines } from '@/components/look';
+import { troubleOf } from '@/lib/api/read';
 
 /** The popover's heading: the pause's state. */
 const HEADINGS: Record<PauseState, string> = {
@@ -116,7 +117,7 @@ export function NowForm({
     >
       {read.error && !read.data ? (
         <p data-pause-now-reading className="text-body-small text-on-surface-variant">
-          What runs could not be read: {read.error.message}
+          What runs could not be read: {troubleOf(read.error).words}
         </p>
       ) : !read.data ? (
         <div data-pause-now-reading>

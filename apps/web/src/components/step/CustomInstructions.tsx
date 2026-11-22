@@ -9,6 +9,7 @@ import {
 import { AgentRefused } from '../agent/AgentParts';
 import { Pending, Reading } from '@/components/look';
 import { Button, Skeleton, TextField } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * What a panel of custom instructions says of where the words reach and when a save takes effect: `told`, who is told them; `takes`, when
@@ -123,7 +124,7 @@ export function CustomInstructions({ name, repo, reach = HIRED }: { name: string
           }}
         />
       ) : error instanceof Error ? (
-        <p className="text-body-small text-on-surface-variant">Could not read the custom instructions: {error.message}</p>
+        <ReadTrouble what="the custom instructions" error={error} className="text-body-small text-on-surface-variant" />
       ) : (
         <Reading label="Reading the custom instructions…" className="flex flex-col gap-2">
           <Skeleton shape="rectangle" className="h-24 rounded-none" />

@@ -1,1 +1,3 @@
 apps/web/src/components/gate/Gate.tsx#surface-variant
+apps/web/src/components/gate/Gate.tsx#surface-variant
+apps/web/src/components/gate/Gate.tsx#surface-variant

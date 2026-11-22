@@ -7,6 +7,7 @@ import { useNow } from '../../lib/useNow';
 import { CustomInstructions, SESSION } from '../step/CustomInstructions';
 import { Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** A write of a rule: `confirm` puts it in force as its `words` read, `drop` takes it out. */
 type RuleAsk = { verb: 'confirm'; id: string; words: string } | { verb: 'drop'; id: string };
@@ -47,7 +48,7 @@ export function PolicyRules({ agent }: { agent: string }) {
       {data ? (
         <PolicyParts list={data} pending={write.isPending} onAsk={ask} />
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-on-surface-variant">Could not read her rules: {error.message}</p>
+        <ReadTrouble what="her rules" error={error} className="text-on-surface-variant" />
       ) : (
         <Reading label="Reading her rules…" className="flex flex-col gap-2">
           <Skeleton className="w-32 text-title-small" />

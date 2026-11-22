@@ -6,7 +6,7 @@ import { WaitingCard } from './WaitingCard';
 import { SelectorField } from '../field/SelectorField';
 import { finishedRunsQuery, openRunsQuery } from '@/lib/api/runs';
 import { runLinesQuery } from '@/lib/api/run';
-import { ReadRefusal } from '@/lib/api/read';
+import { ReadRefusal, troubleOf } from '@/lib/api/read';
 import { trailOf } from '@/lib/finished';
 import { ink } from '@/lib/meaning';
 import { CutTag, MeaningTag, Reading, ScanLines } from '../look';
@@ -103,7 +103,7 @@ export function RunsFailed({ error }: { error: unknown }) {
       <div role="alert" className="flex flex-col gap-1">
         <p className={`m-0 text-body-medium ${ink.failure}`}>The runs could not be loaded.</p>
         <p data-error-reason className="m-0 text-body-small break-words text-on-surface-variant">
-          {error instanceof Error ? error.message : String(error)}
+          {troubleOf(error).words}
         </p>
       </div>
     </Frame>

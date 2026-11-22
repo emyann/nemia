@@ -2,6 +2,7 @@ import { TriangleAlert } from 'lucide-react';
 import type { Quota } from '@/lib/api/quota';
 import { lastWords, quotaTitle, readingAge, type WindowWords, windowWords } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
+import { troubleOf } from '@/lib/api/read';
 
 /**
  * The subscription's quota over a factory's floor, led by `Quota on this machine:`, since it is the machine's and not the factory's: each
@@ -16,8 +17,8 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   const now = new Date(useNow(30_000));
   if (error) {
     return (
-      <p data-quota="error" className="max-w-md basis-full truncate text-body-small text-failure" title={error.message}>
-        The quota could not be read: {error.message}
+      <p data-quota="error" className="max-w-md basis-full truncate text-body-small text-failure" title={troubleOf(error).words}>
+        The quota could not be read: {troubleOf(error).words}
       </p>
     );
   }

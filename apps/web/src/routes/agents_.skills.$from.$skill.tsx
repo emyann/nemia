@@ -3,6 +3,7 @@ import { DefinitionTrail } from '../components/agent/AgentParts';
 import { SkillPage } from '../components/agent/SkillPage';
 import { skillQuery } from '../lib/api/skills.ts';
 import { pagePlaceOf } from '../lib/factories';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of a skill, at /agents/skills/$from/$skill: `agents_` draws it on its own, not inside the Agents page, which has no outlet for
@@ -29,7 +30,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <DefinitionTrail kind="skill" name={skill} place={{ ...Route.useSearch() }} />
-      <p className="text-body-medium text-failure">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this skill" error={error} />
     </div>
   );
 }

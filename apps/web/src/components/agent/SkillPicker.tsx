@@ -9,6 +9,7 @@ import { costWords, givenRows, offerOf, PLACE_LABELS } from '../../lib/skills';
 import { GivenSkills, SkillSourceBadge } from './AgentParts';
 import { Pending, Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The skills an agent of yours gives, composed from a list: each given one with where it is found and what it costs a turn, and Remove; and
@@ -62,7 +63,7 @@ export function SkillPicker({
                 work calls for it; one whose SKILL.md says <code className="font-mono text-body-small">preload: true</code> is loaded whole
                 every turn.
               </p>
-              {error && <p className="text-body-small text-failure">Could not list the skills: {error.message}</p>}
+              {error && <ReadTrouble what="the skills" error={error} className="text-body-small" />}
               {!places && !error && (
                 <Reading label="Reading the skills…" className="flex flex-col gap-3">
                   <Skeleton className="w-32 text-title-small" />

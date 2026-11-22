@@ -1,3 +1,9 @@
 apps/web/src/components/gate/Gate.tsx#text-body-medium
 apps/web/src/components/gate/Gate.tsx#text-body-small
 apps/web/src/components/gate/Gate.tsx#text-label-medium
+apps/web/src/components/gate/Gate.tsx#text-body-medium
+apps/web/src/components/gate/Gate.tsx#text-body-small
+apps/web/src/components/gate/Gate.tsx#text-label-medium
+apps/web/src/components/gate/Gate.tsx#text-body-medium
+apps/web/src/components/gate/Gate.tsx#text-body-small
+apps/web/src/components/gate/Gate.tsx#text-label-medium

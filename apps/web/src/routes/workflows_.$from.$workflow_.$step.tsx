@@ -3,6 +3,7 @@ import { WorkflowStepPage } from '../components/workflow/WorkflowStepPage';
 import { WorkflowTrail } from '../components/workflow/WorkflowPage';
 import { stepQuery } from '../lib/api/workflows.ts';
 import { pagePlaceOf } from '../lib/factories';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of a workflow's step, at /workflows/$from/$workflow/$step: `workflows_` and `$workflow_` draw it on its own, not
@@ -30,7 +31,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <WorkflowTrail from={from} workflow={workflow} step={step} place={{ ...Route.useSearch() }} />
-      <p className="text-body-medium text-failure">Could not load this step: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this step" error={error} />
     </div>
   );
 }

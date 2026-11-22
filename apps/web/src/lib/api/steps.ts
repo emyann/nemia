@@ -16,6 +16,7 @@ import {
   type LifecycleVerb,
 } from 'objects';
 import { call, read } from './objects.ts';
+import { BUILT_APART, UnreadAnswer } from './read.ts';
 
 export type { StepTranscript, TranscriptEvent } from 'objects';
 
@@ -105,7 +106,10 @@ export async function readTranscript(runId: string, step: string) {
     page = await transcriptPage(runId, step, from);
     events.push(...page.events);
     if (page.more === true && page.cursor === from)
-      throw new Error('The api answered a page of the conversation from the cursor it was asked from: restart the api (npm run dev).');
+      throw new UnreadAnswer(
+        `GET /api/runs/${runId}/steps/${step}/transcript`,
+        `The api answered a page of the conversation from the cursor it was asked from. ${BUILT_APART}`,
+      );
   }
   return { ...page, events };
 }
@@ -173,7 +177,7 @@ export const stepFileQuery = (url: string) =>
     queryFn: async () => {
       const [, runId, step, route, file] = SERVED.exec(url) ?? [];
       if (runId === undefined || step === undefined || file === undefined)
-        throw new Error(`${url} is not the address of a step's file: open it from its step's part.`);
+        throw new UnreadAnswer(url, `${url} is not the address of a step's file the board reads. ${BUILT_APART}`);
       const params = { runId: decodeURIComponent(runId), step: decodeURIComponent(step), file: decodeURIComponent(file) };
       const served = await call((c) => (route === 'files' ? c.steps.file({ params }) : c.steps.artifact({ params })), read(StepFile));
       return new TextDecoder().decode(served.body);

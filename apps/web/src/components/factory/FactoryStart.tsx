@@ -15,6 +15,7 @@ import { useBar } from '@/lib/useBar';
 import { BarPanel } from '../frame/BarPanel';
 import { StartRun } from '../run/StartRun';
 import { RadioTile, RadioTileGroup, Reading, ReadingLines } from '@/components/look';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
@@ -69,7 +70,7 @@ function StartIn({ name }: { name: string }) {
       description="A run of one of the workflows the factory offers, with its hires, on one of its repositories; it shows on its floor."
     >
       {factories.error ? (
-        <p className="text-body-medium text-failure">Could not read the factories: {factories.error.message}</p>
+        <ReadTrouble what="the factories" error={factories.error} />
       ) : !factories.data ? (
         <StartReading label="Reading the factories…" />
       ) : place === null ? (
@@ -107,7 +108,7 @@ function AskFactory() {
   return (
     <BarPanel title="Start a run" description="A run starts in a factory: pick the one it starts in, then its repository and workflow.">
       {factories.error ? (
-        <p className="text-body-medium text-failure">Could not read the factories: {factories.error.message}</p>
+        <ReadTrouble what="the factories" error={factories.error} />
       ) : !factories.data ? (
         <StartReading label="Reading the factories…" />
       ) : (
@@ -258,9 +259,7 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
           Workflow
         </legend>
         {workflows.error ? (
-          <p className="text-body-small text-failure">
-            Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
-          </p>
+          <ReadTrouble what={`the workflows of the factory ${place.factory}`} error={workflows.error} className="text-body-small" />
         ) : !workflows.data ? (
           <Reading label="Reading the workflows…">
             <ReadingLines widths={['w-40', 'w-48', 'w-36']} className="gap-1.5 text-body-medium" />

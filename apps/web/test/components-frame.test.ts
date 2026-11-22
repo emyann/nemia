@@ -138,3 +138,20 @@ test("presenceWord: the machine bar says Nemia's session in a word, down first, 
   assert.equal(presenceWord({ ...here, asksWaiting: 2, notSent: true }), 'Nemia asks 2');
   assert.equal(presenceWord({ ...here, notSent: true }), 'Nemia, not sent');
 });
+
+test("a failed read's one line is marked by its kind, names what it read, says the page's own next step after it, and no checkout's command", async () => {
+  const { ReadTrouble } = await import('../src/components/frame/ReadTrouble.tsx');
+  const { ReadRefusal, UnreadAnswer } = await import('../src/lib/api/read.ts');
+  const kinds: Array<[Error, string]> = [
+    [new ReadRefusal('no factory acme', 404), 'refused'],
+    [new UnreadAnswer('GET /api/agents', 'unread'), 'unread'],
+    [new TypeError('Failed to fetch'), 'unanswered'],
+  ];
+  for (const [error, kind] of kinds) {
+    const html = await routedWith(createElement(ReadTrouble, { what: 'the agents', error, then: 'Then this.' }));
+    assert.match(html, new RegExp(`<p data-read-trouble="${kind}"`), kind);
+    assert.ok(html.includes('the agents') && html.includes(error.message), html);
+    assert.ok(html.indexOf(error.message) < html.indexOf('Then this.'), 'the next step comes after the words');
+    assert.ok(!html.includes('npm run'), html);
+  }
+});

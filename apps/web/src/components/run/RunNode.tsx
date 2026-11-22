@@ -20,6 +20,7 @@ import { CardGate, type Taken } from '../inbox/CardGate';
 import { CardLift } from './LiftHold';
 import { previewBar } from '../step/StepPreview';
 import { Run, type PanelRead } from '../look';
+import { troubleOf } from '@/lib/api/read';
 
 /**
  * `finished` is a run not in flight: on the floor only when finished runs are asked for, and dimmed.
@@ -250,8 +251,8 @@ function TouchedLine({ run }: { run: RunView }) {
   const { data, error } = useQuery(decisionQuery(run.id, decisionStamp(run)));
   if (error) {
     return (
-      <p className="truncate px-3 text-body-small text-failure" title={error.message}>
-        touched: not read — {error.message}
+      <p className="truncate px-3 text-body-small text-failure" title={troubleOf(error).words}>
+        touched: not read — {troubleOf(error).words}
       </p>
     );
   }

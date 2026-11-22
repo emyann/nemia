@@ -1,1 +1,0 @@
-apps/web/src/routes/factories.$factory_.volume.tsx#text-body-medium

@@ -10,6 +10,7 @@ import { RunGone } from '../run/RunGone';
 import { StepInspector } from './StepInspector';
 import { Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The bar for the step `step` of the run `run`, titled by the step and described by its run's title. While the run is read it says so; a
@@ -43,9 +44,7 @@ function StepBody({ id, name, run, error }: { id: string; name: string; run: Run
 /** A bar's body for the run `id` not read yet: that it is read, or, with `error`, why the read failed. */
 export function Unread({ id, error }: { id: string; error: unknown }) {
   return error ? (
-    <p className="text-body-medium text-failure">
-      Could not read the run {id}: {error instanceof Error ? error.message : 'the api gave no reason'}
-    </p>
+    <ReadTrouble what={`the run ${id}`} error={error} />
   ) : (
     <Reading label="Reading the run…" className="flex flex-col gap-4">
       <Skeleton className="w-1/2 text-title-medium" />

@@ -3,6 +3,7 @@ import { WelcomePage } from '@/components/welcome/WelcomePage';
 import { readinessQuery } from '@/lib/api/readiness';
 import { readHarnessSkipped } from '@/lib/harnessSkip';
 import { welcomeAsked } from '@/lib/welcome';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The welcome, at /welcome, where a fresh store opens (`welcomeAsked`): a store that already has its harness or a factory, or whose
@@ -18,9 +19,6 @@ export const Route = createFileRoute('/welcome')({
   loader: ({ context }) => context.queryClient.ensureQueryData(readinessQuery),
   component: WelcomePage,
   errorComponent: ({ error }) => (
-    <p className="p-4 text-body-medium text-failure">
-      Could not read what this server has in place: {error instanceof Error ? error.message : String(error)}. Open the board at /, or reload
-      the page once the api answers.
-    </p>
+    <ReadTrouble what="what this server has in place" error={error} className="p-4" then="Open the board at /." />
   ),
 });

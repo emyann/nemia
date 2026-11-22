@@ -24,6 +24,7 @@ import {
 import { DELEGABLE } from '@/lib/proposals';
 import { Pending, Reading, ReadingLines } from '@/components/look';
 import { personOf } from '../agent/AgentParts';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** One grant as the form holds it: resources and verbs picked, and the names typed, comma-separated. */
 type Draft = { resources: readonly string[]; names: string; verbs: readonly ChangeVerb[] };
@@ -90,7 +91,7 @@ export function FactoryDelegations({ name }: { name: string }) {
           </p>
         )
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-on-surface-variant">Could not read the delegations: {error.message}</p>
+        <ReadTrouble what="the delegations" error={error} className="text-on-surface-variant" />
       ) : (
         <Reading label="Reading the delegations…">
           <ReadingLines widths={['w-3/4', 'w-2/3']} className="gap-2 text-body-medium" />

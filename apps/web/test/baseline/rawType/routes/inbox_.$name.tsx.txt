@@ -1,1 +1,0 @@
-apps/web/src/routes/inbox_.$name.tsx#text-body-medium

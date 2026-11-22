@@ -26,6 +26,7 @@ import { container, dashed, ringed } from '../../lib/meaning';
 import { OFFERS } from '../../lib/words';
 import { Button, Radio, RadioGroup, Tag, TextField } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * What the command line's decide shows a person of the run `run`, under the run's asks (`AsksOfYou`): read once for the run's state
@@ -37,9 +38,15 @@ export function Decide({ run }: { run: RunDetail }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
   if (decidable && error)
     return (
-      <p className="text-body-medium text-failure">
-        Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
-      </p>
+      <ReadTrouble
+        what="what there is to decide"
+        error={error}
+        then={
+          <>
+            <code>{run.decide}</code> reads it from the command line.
+          </>
+        }
+      />
     );
   if (!decidable || !isDecidable(data)) return <p className="text-body-medium text-on-surface-variant">Nothing to decide on it now.</p>;
   return (

@@ -35,6 +35,7 @@ import {
   type McpServerWrite,
 } from '../../lib/api/factories.ts';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** What a person asks of a factory's record: one server recorded, or one taken off. */
 type Change = { kind: 'record'; server: string; body: McpServerWrite } | { kind: 'remove'; server: string };
@@ -388,7 +389,7 @@ export function FactoryServers({ name }: { name: string }) {
           />
         </>
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-on-surface-variant">Could not read the servers: {error.message}</p>
+        <ReadTrouble what="the servers" error={error} className="text-on-surface-variant" />
       ) : (
         <Reading label="Reading the servers…">
           <CutFrame size={12}>

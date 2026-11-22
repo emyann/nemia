@@ -33,6 +33,8 @@ import { FLOOR_BOX } from '../../lib/classes';
 import { cn } from '../../lib/utils';
 import { Pending, Reading } from '@/components/look';
 import { Button, Skeleton, TextField } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
+import { troubleLine } from '@/lib/api/read';
 
 /** The builder's node types for React Flow, one object for the module's life. */
 const nodeTypes = { spec: SpecNode };
@@ -115,7 +117,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       setRefusal(null);
       setSaved(null);
     },
-    onError: (err) => setRefusal((was) => new BuildRefusal(`Could not read the folder again: ${err.message}`, [], was?.status ?? null)),
+    onError: (err) => setRefusal((was) => new BuildRefusal(troubleLine('the folder again', err), [], was?.status ?? null)),
   });
 
   const dirty = unsaved(steps, base) || readmeSent(readme, base) !== undefined;
@@ -248,7 +250,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
 
         <aside aria-label="Step" className="min-w-0 rounded border border-outline-variant p-3">
           {form.error ? (
-            <p className="text-body-small text-failure">Could not read the keys a step may set: {form.error.message}</p>
+            <ReadTrouble what="the keys a step may set" error={form.error} className="text-body-small" />
           ) : !form.data ? (
             <KeysReading />
           ) : step ? (

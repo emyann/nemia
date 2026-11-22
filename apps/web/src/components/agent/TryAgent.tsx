@@ -15,6 +15,7 @@ import { StatusChip } from '../step/StatusChip';
 import { runsMoved } from '@/lib/runWrites';
 import { Pending, Reading, ReadingLines } from '@/components/look';
 import { Button, TextField } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
@@ -118,9 +119,7 @@ export function TryRun({ id }: { id: string }) {
   }
   if (!run)
     return error instanceof Error ? (
-      <p className="text-body-small text-on-surface-variant">
-        Could not read the try {id}: {error.message}
-      </p>
+      <ReadTrouble what={`the try ${id}`} error={error} className="text-body-small text-on-surface-variant" />
     ) : (
       <Reading label="Reading the try…" className="rounded border border-outline-variant px-3 py-2">
         <ReadingLines widths={['w-1/2', 'w-5/6']} className="text-body-small" />

@@ -1,2 +1,6 @@
 apps/web/src/components/factory/FactoryServers.tsx#text-body-medium
 apps/web/src/components/factory/FactoryServers.tsx#text-body-small
+apps/web/src/components/factory/FactoryServers.tsx#text-body-medium
+apps/web/src/components/factory/FactoryServers.tsx#text-body-small
+apps/web/src/components/factory/FactoryServers.tsx#text-body-medium
+apps/web/src/components/factory/FactoryServers.tsx#text-body-small

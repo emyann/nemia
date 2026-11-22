@@ -1,3 +1,9 @@
 apps/web/src/components/step/CustomInstructions.tsx#text-body-medium
 apps/web/src/components/step/CustomInstructions.tsx#text-body-small
 apps/web/src/components/step/CustomInstructions.tsx#text-title-small
+apps/web/src/components/step/CustomInstructions.tsx#text-body-medium
+apps/web/src/components/step/CustomInstructions.tsx#text-body-small
+apps/web/src/components/step/CustomInstructions.tsx#text-title-small
+apps/web/src/components/step/CustomInstructions.tsx#text-body-medium
+apps/web/src/components/step/CustomInstructions.tsx#text-body-small
+apps/web/src/components/step/CustomInstructions.tsx#text-title-small

@@ -14,6 +14,7 @@ import { dollars } from '@/lib/money';
 import { dayStartOf, quotaLineOf, readoutOf, type Strip, stripOf } from '@/lib/strip';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
+import { troubleOf } from '@/lib/api/read';
 
 /**
  * The daemon's tag colour by its tone: alive while it ticks (a meaning's tag), neutral while read or warned of, failure when nothing
@@ -235,7 +236,7 @@ function QuotaFrame({ quota, error, now }: { quota: Quota | undefined; error: Er
       </div>
       {error && (
         <Body size="small" className="text-failure contain-inline-size">
-          The quota could not be read: {error.message}
+          The quota could not be read: {troubleOf(error).words}
         </Body>
       )}
       {quota && !fresh && (

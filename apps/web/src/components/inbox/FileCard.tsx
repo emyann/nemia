@@ -17,6 +17,7 @@ import { CARD_FILES_MOST } from 'objects';
 import { sayWritten } from '@/lib/written';
 import { inputsAdded } from '@/lib/startInputs';
 import { StartInputs } from '../run/StartInputs';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -157,7 +158,7 @@ function FactoryField({
           <SelectItem key={f.name} id={f.name} label={f.name} />
         ))}
       </Select>
-      {error && <p className="text-body-small text-failure">Could not list the factories: {error.message}</p>}
+      {error && <ReadTrouble what="the factories" error={error} className="text-body-small" />}
       {picked === '' && (
         <p data-parked className="text-body-small text-on-surface-variant">
           Parked with no factory: it gets its factory, workflow and repository when you start it.

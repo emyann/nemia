@@ -44,7 +44,7 @@ export default {
         [step, 'the step page'],
       ] as const) {
         await expectVisible(other.locator(`[data-run-gone="${id}"]`, { hasText: said }), `${where} says the store has no such run`);
-        await expectCount(other.getByText('Could not load this run'), 0, `and ${where} says no failure`);
+        await expectCount(other.locator('[data-read-trouble]'), 0, `and ${where} says no failure`);
         await expectCount(other.locator('article, header[aria-label="The step"]'), 0, `and ${where} draws no run`);
         await expectVisible(trailLevel(other, 'Runs'), `and ${where} links to the runs the store has`);
       }

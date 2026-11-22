@@ -1,1 +1,0 @@
-apps/web/src/routes/factories.$factory_.agents_.$agent.tsx#text-body-medium

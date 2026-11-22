@@ -1,1 +1,0 @@
-apps/web/src/routes/agents_.skills.$from.$skill.tsx#text-body-medium

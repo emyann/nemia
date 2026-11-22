@@ -11,6 +11,7 @@
 import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api/pause.ts';
 import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
+import { troubleOf } from './api/read.ts';
 
 /** What a timed pause does, the package's words: each working session stops at its call's end, cut once the timeout passes. */
 export const PAUSE_PARKS =
@@ -127,7 +128,7 @@ export function pauseWords(paused: Paused | undefined, error: Error | null, now:
   };
   if (!paused) {
     const line = error
-      ? `Whether all factories are paused could not be read: ${error.message}`
+      ? `Whether all factories are paused could not be read: ${troubleOf(error).words}`
       : 'Reading whether all factories are paused.';
     return { state: 'reading', text: null, label: 'The pause of all factories, not read', line, ...lists } satisfies PauseWords;
   }

@@ -2,3 +2,11 @@ apps/web/src/components/nemia/PolicyRules.tsx#text-body-medium
 apps/web/src/components/nemia/PolicyRules.tsx#text-body-small
 apps/web/src/components/nemia/PolicyRules.tsx#text-label-medium
 apps/web/src/components/nemia/PolicyRules.tsx#text-title-small
+apps/web/src/components/nemia/PolicyRules.tsx#text-body-medium
+apps/web/src/components/nemia/PolicyRules.tsx#text-body-small
+apps/web/src/components/nemia/PolicyRules.tsx#text-label-medium
+apps/web/src/components/nemia/PolicyRules.tsx#text-title-small
+apps/web/src/components/nemia/PolicyRules.tsx#text-body-medium
+apps/web/src/components/nemia/PolicyRules.tsx#text-body-small
+apps/web/src/components/nemia/PolicyRules.tsx#text-label-medium
+apps/web/src/components/nemia/PolicyRules.tsx#text-title-small

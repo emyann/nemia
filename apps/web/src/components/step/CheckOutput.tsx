@@ -12,6 +12,7 @@ import { Reading, ReadingLines } from '@/components/look';
 import { Button, SearchBar, Segment, SegmentedButton } from '@/components/ui/ds';
 import { focusRing } from '@/components/ui/ds/utils';
 import { cn } from '@/lib/utils';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** How many lines a page of the reader holds. */
 const PAGE = 200;
@@ -148,7 +149,7 @@ export function CheckOutput({ read }: { read: CheckRead }) {
         }}
       />
       {output.error ? (
-        <p className="text-body-small text-failure">{output.error.message}</p>
+        <ReadTrouble what="what the check printed" error={output.error} className="text-body-small" />
       ) : data === undefined ? (
         <Reading label="Reading what the check printed">
           <ReadingLines widths={['w-2/3', 'w-1/2', 'w-3/4']} className="gap-1 text-body-small" />

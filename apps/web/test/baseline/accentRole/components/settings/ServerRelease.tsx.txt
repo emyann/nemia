@@ -1,1 +1,3 @@
 apps/web/src/components/settings/ServerRelease.tsx#primary
+apps/web/src/components/settings/ServerRelease.tsx#primary
+apps/web/src/components/settings/ServerRelease.tsx#primary

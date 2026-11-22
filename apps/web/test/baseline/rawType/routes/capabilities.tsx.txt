@@ -1,1 +1,0 @@
-apps/web/src/routes/capabilities.tsx#text-body-medium

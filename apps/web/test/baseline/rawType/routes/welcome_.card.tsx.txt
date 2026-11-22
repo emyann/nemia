@@ -1,1 +1,0 @@
-apps/web/src/routes/welcome_.card.tsx#text-body-medium

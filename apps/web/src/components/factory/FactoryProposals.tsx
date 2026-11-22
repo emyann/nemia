@@ -16,7 +16,7 @@ import { ProposalTags } from '@/components/gate/ProposalTags';
 
 /**
  * Why the proposals of `factory` do not read, by what `error` is: the api's refusal in its words; an answer this board does not read, the
- * read named and the restart that brings the board and the api to one build; else nothing answered, and what to do about that.
+ * read named and the restart that brings the board and the api to one build; else nothing answered, and to reload once it does.
  */
 function ProposalsTrouble({ factory, error }: { factory: string; error: Error }) {
   const said =
@@ -24,13 +24,11 @@ function ProposalsTrouble({ factory, error }: { factory: string; error: Error })
       <>{error.message}</>
     ) : error instanceof UnreadAnswer ? (
       <>
-        {error.route} answered what this board does not read: the board and Nemia's api are of different builds. Restart the service (
-        <code>nemia service restart</code>), then reload the page.
+        {error.route} answered what this board does not read: the board and Nemia's api are of different builds. Restart Nemia's service,
+        then reload the page.
       </>
     ) : (
-      <>
-        Nemia's api did not answer ({error.message}). Reload the page once it does; <code>nemia doctor</code> says why it does not.
-      </>
+      <>Nemia's api did not answer ({error.message}). Reload the page once it is running again.</>
     );
   return (
     <p data-proposals-trouble className="text-body-medium text-failure">

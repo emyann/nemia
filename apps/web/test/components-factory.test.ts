@@ -501,6 +501,4 @@ test("a factory's Proposals page lists its rows, what waits first; a read that f
     assert.match(line, /data-proposals-trouble/, error.name);
     assert.ok(!line.includes('npm run dev'), error.name);
   }
-  assert.match(failed(new TypeError('fetch failed')), /nemia doctor/);
-  assert.match(failed(new UnreadAnswer('GET /x', 'unread')), /nemia service restart/);
 });

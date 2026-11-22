@@ -282,7 +282,7 @@ test("a proposal's row: its phase, whether it widens, why at its first line, who
         status: {
           phase: 'applied',
           widens: true,
-          proposedBy: { agent: 'seldon', run: 'r1', step: 'design' },
+          proposedBy: { agent: 'implementer', run: 'r1', step: 'plan' },
           changes: [
             { resource: 'agents', name: 'a', verb: 'create', access: 'widens' },
             { resource: 'workflows', name: 'w', verb: 'update', access: 'same' },
@@ -297,7 +297,7 @@ test("a proposal's row: its phase, whether it widens, why at its first line, who
     Phase: 'applied',
     Widens: true,
     Why: 'Hire a reviewer.',
-    'Proposed by': 'seldon (r1/design)',
+    'Proposed by': 'implementer (r1/plan)',
     Changes: 2,
   });
   assert.deepEqual(cellsOf(table, 1), { Name: 'p2', Phase: 'waiting', Widens: false, Why: '', 'Proposed by': 'person', Changes: 0 });

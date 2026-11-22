@@ -9,7 +9,7 @@
  * every object of this package is.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ObjectMeta, describedNumber, listOf } from './meta.ts';
+import { API_VERSION, DEFAULT_NAMESPACE, ObjectMeta, describedNumber, listOf } from './meta.ts';
 import { startExtras } from './run-actions.ts';
 
 /**
@@ -60,6 +60,25 @@ export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
   files:
     'the files the card carries, a map of the name its text and its run find each by to the File it names (`file_…`, uploaded to its factory first): copied into the `inputs/` of every run started from it; none when unset',
 };
+
+/** An idea's frontmatter: a block between `---` lines that opens its text. */
+const FRONTMATTER = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+
+/** A `factory:` line of a frontmatter, its value bare or quoted. */
+const FACTORY_LINE = /^factory:[ \t]*(["']?)([^\s"'#]+)\1[ \t]*(?:#.*)?$/m;
+
+/**
+ * The namespace a client files the idea `body` in: `factory` where one is given, else the factory the idea's own frontmatter names on its
+ * `factory:` line, else `default`. A light read, for a client choosing where to upload a card's files and file the card; the api refuses
+ * an idea whose `factory:` is not the namespace it is sent to, in its own reading of the card.
+ * @param body The idea's text, its frontmatter first where it has one.
+ * @param factory The factory given beside it (`--factory`, a picker), which wins; none or empty for none.
+ */
+export function filedNamespace(body: string, factory?: string) {
+  if (factory !== undefined && factory !== '') return factory;
+  const block = FRONTMATTER.exec(body)?.[1];
+  return (block === undefined ? undefined : FACTORY_LINE.exec(block)?.[2]) ?? DEFAULT_NAMESPACE;
+}
 
 /** A field of the card's spec, described by its key's meaning. */
 const described = <S extends Schema.Top>(schema: S, key: CardKey) => schema.annotate({ description: CARD_KEY_MEANINGS[key] });

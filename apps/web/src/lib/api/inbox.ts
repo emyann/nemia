@@ -15,6 +15,7 @@ import {
   type CardSpec,
   type CardState,
   DEFAULT_NAMESPACE,
+  filedNamespace,
 } from 'objects';
 import { selectorKey } from './selector.ts';
 import { cards, files, type StartFiles } from './objects.ts';
@@ -269,12 +270,12 @@ export const cardFileUrl = (card: Pick<InboxEntry, 'factory'>, file: string) =>
   `/api/namespaces/${encodeURIComponent(namespaceOf(card.factory))}/files/${encodeURIComponent(file)}/content`;
 
 /**
- * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --factory <name>` does: in `factory`'s namespace when it names
- * one, in `default` when it is left out (the Card's `create`). Never a repository nor an origin: the factory places the card's run and
- * finds its workflow by name. Resolves with the card's name; rejects with the api's refusal in full — the package's words for an idea with
- * nothing in it or a factory the store does not have, or the api's own about the request or a workflow it has none of. `label`, where
- * given, are the labels the card is filed with, each `key=value`, which its run is started with too; `given`, the files it carries, each
- * uploaded first to its namespace and named by its id.
+ * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --factory <name>` does: in `factory`'s namespace when it
+ * names one, else in that of the factory the idea's own `factory:` line names, else in `default` (`filedNamespace`, the Card's `create`).
+ * Never a repository nor an origin: the factory places the card's run and finds its workflow by name. Resolves with the card's name;
+ * rejects with the api's refusal in full — the package's words for an idea with nothing in it or a factory the store does not have, or the
+ * api's own about the request or a workflow it has none of. `label`, where given, are the labels the card is filed with, each `key=value`,
+ * which its run is started with too; `given`, the files it carries, each uploaded first to its namespace and named by its id.
  */
 export const fileCard = async ({
   factory,
@@ -289,7 +290,7 @@ export const fileCard = async ({
   label?: readonly string[];
   given?: readonly File[];
 }) => {
-  const namespace = namespaceOf(factory);
+  const namespace = filedNamespace(body, factory);
   const named = given === undefined || given.length === 0 ? [] : await files.uploaded(namespace, { listed: given, sent: new Map() });
   const carried = named.flatMap((input) => (input.file !== undefined ? [{ file: input.file, name: input.name }] : []));
   const filed = await cards.create(namespace, {

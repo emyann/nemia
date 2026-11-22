@@ -4,7 +4,7 @@
  * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines it
  * prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow given
  * as a path are refused, exit 2, before anything is asked. A card's files: an idea file's picture beside it and a `--file` uploaded and
- * carried, another attached, listed, one written out byte for byte, and one taken off.
+ * carried and said, a link quoted in code not carried, another attached, listed, one written out byte for byte, and one taken off.
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
@@ -159,7 +159,12 @@ test('a card carries the picture its idea file names beside it and a --file, and
   const dir = scratch('nemia-inbox-files-');
   const shot = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
   fs.writeFileSync(path.join(dir, 'shot.png'), shot);
-  fs.writeFileSync(path.join(dir, 'idea.md'), 'Fix the header\n\nSee ![it](./shot.png) and ![before](img/before.png).\n');
+  fs.writeFileSync(
+    path.join(dir, 'idea.md'),
+    'Fix the header\n\nSee ![it](./shot.png) and ![before](img/before.png), not `![q](quoted.png)`.\n\n```md\n![f](fenced.png)\n```\n',
+  );
+  fs.writeFileSync(path.join(dir, 'quoted.png'), shot);
+  fs.writeFileSync(path.join(dir, 'fenced.png'), shot);
   fs.mkdirSync(path.join(dir, 'img'));
   fs.writeFileSync(path.join(dir, 'img', 'before.png'), shot);
   fs.writeFileSync(path.join(dir, 'notes.txt'), 'notes\n');
@@ -171,6 +176,12 @@ test('a card carries the picture its idea file names beside it and a --file, and
     /img\/before\.png.*--file \S*img\/before\.png/,
     'a picture in a folder is named, with the --file that carries it',
   );
+  assert.match(
+    added.out,
+    /^\S+ {2}shot\.png {2}file_[0-9a-f]{32} {2}11 bytes {2}image\/png {2}in its text$/m,
+    'a line per file it carries',
+  );
+  assert.match(added.out, /^\S+ {2}notes\.txt {2}file_[0-9a-f]{32} /m);
   const name = nameIn(added.out);
   const listed = await store.nemia(['inbox', 'files', name]);
   ok(listed, 'inbox files');

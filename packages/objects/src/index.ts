@@ -179,7 +179,7 @@ export {
   type CardKey,
   type CardState,
 } from './card.ts';
-export { CARD_FILE_REF, CardAttach, CardFileNamed, CardFileRef, CardFileStatus } from './card.ts';
+export { CARD_FILE_REF, CardAttach, CardFileNamed, CardFileRef, CardFileStatus, filedNamespace } from './card.ts';
 export {
   Factory,
   FactoryCommands,

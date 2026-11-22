@@ -42,6 +42,7 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** Whether the path's `segments` are missing at `value`: a key absent from an object that holds the key's parent. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- recursive: its type cannot be inferred through its own call
 const missingAt = (value: unknown, segments: readonly string[]): boolean => {
   const [segment, ...rest] = segments;
   if (segment === undefined) return false;

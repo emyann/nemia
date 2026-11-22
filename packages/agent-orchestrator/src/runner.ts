@@ -444,6 +444,17 @@ export {
   proposalTable,
   skillTable,
 } from './kind-table/kind-table.ts';
+export {
+  delegationTable,
+  eventTable,
+  hireTable,
+  libraryAddTable,
+  scheduleTable,
+  subscriptionTable,
+  triggerTable,
+  volumeTable,
+} from './kind-table/wiring-table.ts';
+export { templateTable, workflowTable } from './kind-table/definition-table.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { runWatchVersion } from './runlist/runlist.ts';

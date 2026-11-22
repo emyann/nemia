@@ -1,10 +1,13 @@
 /**
- * Files given to a tool of the MCP port inline: a key of a tool's input whose items are a card's file reference (`objects`'
- * `CARD_FILE_REF` in its `$defs`) takes, besides `{ name?, file }` naming a File uploaded first, `{ name, data, mediaType? }`, the file's
- * bytes in base64 — of `MAX_INLINE_BYTES` at most — which the port uploads to the call's namespace (`POST
- * /api/namespaces/<namespace>/files`, through the app's own fetch, with the caller's `Authorization`) and sends on by the id it is
- * answered. The SDK this port is served by has no result that asks a client to upload a file and call again, as MCP's files extension
- * has, so inline bytes are a host's one way to hand a file through the port; a larger file is uploaded over HTTP first.
+ * Files given to a tool of the MCP port, in the shape of MCP's files extension (`io.modelcontextprotocol/files`, a draft): a key of a
+ * tool's input whose items are a card's file reference (`objects`' `CARD_FILE_REF` in its `$defs`) takes, besides `{ name?, file }`
+ * naming a File uploaded first, the extension's `FileInput` — `{ id, mimeType, size, name?, data?, digest? }`, its schema marked
+ * `x-mcp-file` — whose `data`, the file's bytes in base64 of `MAX_INLINE_BYTES` at most, the port uploads to the call's namespace (`POST
+ * /api/namespaces/<namespace>/files`, through the app's own fetch, with the caller's `Authorization`) and sends on by the File it is
+ * answered. The port advertises the extension inline alone (`FILES_EXTENSION`: `maxInlineBytes`, no `upload`): the server SDK it is
+ * served on (`@modelcontextprotocol/server` 2.4.0) answers a call `complete` or `input_required` and nothing else, so it cannot answer
+ * the extension's `upload_required`, and a `FileInput` without `data` is refused with the way to hand the file: upload it over HTTP
+ * first and name its File by `file`.
  */
 import { Predicate } from 'effect';
 import { CARD_FILE_REF, type ToolWords } from 'objects';
@@ -28,19 +31,26 @@ export function fileKeysOf(input: ToolInput) {
   );
 }
 
-/** A file given inline, as the port lists it beside a reference to a File. */
-const INLINE = {
+/** The files extension as the port advertises it on `initialize` and `server/discover`: inline `data` alone, no `upload`. */
+export const FILES_EXTENSION = { 'io.modelcontextprotocol/files': { maxInlineBytes: MAX_INLINE_BYTES } };
+
+/** A file given as the extension's `FileInput`, as the port lists it beside a reference to a File: marked `x-mcp-file`. */
+const FILE_INPUT = {
   type: 'object',
+  'x-mcp-file': { accept: ['*/*'], maxSize: MAX_INLINE_BYTES },
   properties: {
-    name: { type: 'string', description: 'The name it takes in the card, no folder in it.' },
+    id: { type: 'string', description: "The caller's own id for the file." },
+    mimeType: { type: 'string', description: "The file's media type, image/png for a picture." },
+    size: { type: 'integer', minimum: 0, description: "The file's size in bytes." },
+    name: { type: 'string', description: 'The name it takes in the card, no folder in it; absent, its id.' },
     data: {
       type: 'string',
       contentEncoding: 'base64',
-      description: `The file's bytes in base64, of ${MAX_INLINE_BYTES} bytes at most: the port uploads them and names the File it is answered. A larger file is uploaded first (POST /api/namespaces/<namespace>/files) and named by its id.`,
+      description: `The file's bytes in base64, of ${MAX_INLINE_BYTES} bytes at most: the port uploads them and names the File it is answered. Required here: this port takes no upload out of band. A larger file is uploaded first (POST /api/namespaces/<namespace>/files) and named by its File's id, as file.`,
     },
-    mediaType: { type: 'string', description: "The file's media type, image/png for a picture; absent, application/octet-stream." },
+    digest: { type: 'string', description: "A digest of the file's bytes, which the port does not check." },
   },
-  required: ['name', 'data'],
+  required: ['id', 'mimeType', 'size'],
   additionalProperties: false,
 };
 
@@ -51,7 +61,7 @@ const INLINE = {
 export function inlineInput(input: ToolInput) {
   const ref = input.$defs?.[CARD_FILE_REF];
   if (ref === undefined || fileKeysOf(input).length === 0) return input;
-  const listed: ToolInput = { ...input, $defs: { ...input.$defs, [CARD_FILE_REF]: { anyOf: [ref, INLINE] } } };
+  const listed: ToolInput = { ...input, $defs: { ...input.$defs, [CARD_FILE_REF]: { anyOf: [ref, FILE_INPUT] } } };
   return listed;
 }
 
@@ -93,12 +103,20 @@ async function uploaded(namespace: string, name: string, data: string, mediaType
   return { refused: `the file ${name} was not uploaded: ${said}` };
 }
 
-/** One item of a key naming a card's files, sent on: as it is, or, given inline, uploaded and named by its File's id; or why not. */
+/**
+ * One item of a key naming a card's files, sent on: as it is where it names a File (`file`), or, given as a `FileInput`, its `data`
+ * uploaded and named by its File's id under its name, else its id; or why not, where it has no `data`.
+ */
 async function itemSent(namespace: string, item: unknown, via: Uploading) {
-  if (!Predicate.isObject(item) || typeof item.data !== 'string' || typeof item.name !== 'string') return { item };
-  const mediaType = typeof item.mediaType === 'string' && item.mediaType !== '' ? item.mediaType : 'application/octet-stream';
-  const up = await uploaded(namespace, item.name, item.data, mediaType, via);
-  return up.id === undefined ? { refused: up.refused } : { item: { name: item.name, file: up.id } };
+  if (!Predicate.isObject(item) || typeof item.file === 'string' || typeof item.id !== 'string') return { item };
+  const name = typeof item.name === 'string' && item.name !== '' ? item.name : item.id;
+  if (typeof item.data !== 'string')
+    return {
+      refused: `the file ${name} has no data, and this port takes no upload out of band (no upload_required): give its bytes in base64 as data, of ${MAX_INLINE_BYTES} bytes at most, or upload it first (POST /api/namespaces/${namespace}/files) and name it by its File's id as file`,
+    };
+  const mediaType = typeof item.mimeType === 'string' && item.mimeType !== '' ? item.mimeType : 'application/octet-stream';
+  const up = await uploaded(namespace, name, item.data, mediaType, via);
+  return up.id === undefined ? { refused: up.refused } : { item: { name, file: up.id } };
 }
 
 /**

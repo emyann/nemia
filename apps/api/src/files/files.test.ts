@@ -284,21 +284,31 @@ test('a card filed with a kept file says it in its status, attaches another and 
   assert.equal(unknown.status, 422);
 });
 
-test("the port lists a card's files as an id or bytes inline, uploads a file given inline and refuses one past the inline bound", async () => {
+test("the port lists a card's files as an id or the files extension's FileInput, uploads its inline data, and refuses one past the inline bound or with no data", async () => {
   const tools = portTools(TABLE, CLI_VERBS, Api);
   const attach = tools.find((t) => t.name === 'inbox_attach');
   assert.ok(attach, 'the port has a tool for attaching files to a card');
   assert.deepEqual(attach.fileKeys, ['files']);
   assert.equal(
-    tools.filter((t) => t.fileKeys.length > 0).every((t) => JSON.stringify(t.inputSchema).includes('"contentEncoding":"base64"')),
+    tools
+      .filter((t) => t.fileKeys.length > 0)
+      .every(
+        (t) =>
+          JSON.stringify(t.inputSchema).includes('"contentEncoding":"base64"') && JSON.stringify(t.inputSchema).includes('"x-mcp-file"'),
+      ),
     true,
+    'each tool that takes files marks its FileInput x-mcp-file, its data in base64',
   );
   write(path.join(root, 'inbox', 'port-card.md'), '---\nworkflow: dev\nfactory: acme\n---\nLook at ![it](shot.png).\n');
   const from = new Request('http://127.0.0.1:8787/mcp', { method: 'POST', headers: BEARER });
   const shot = crypto.randomBytes(500);
   const result = await called(
     attach,
-    { namespace: 'acme', name: 'port-card', files: [{ name: 'shot.png', data: shot.toString('base64'), mediaType: 'image/png' }] },
+    {
+      namespace: 'acme',
+      name: 'port-card',
+      files: [{ id: 'f1', name: 'shot.png', mimeType: 'image/png', size: shot.length, data: shot.toString('base64') }],
+    },
     from,
     { fetch: (r) => app().fetch(r) },
   );
@@ -313,10 +323,30 @@ test("the port lists a card's files as an id or bytes inline, uploads a file giv
   const before = kept();
   const past = await called(
     attach,
-    { namespace: 'acme', name: 'port-card', files: [{ name: 'big.bin', data: Buffer.alloc(MAX_INLINE_BYTES + 1).toString('base64') }] },
+    {
+      namespace: 'acme',
+      name: 'port-card',
+      files: [
+        {
+          id: 'f2',
+          name: 'big.bin',
+          mimeType: 'application/octet-stream',
+          size: MAX_INLINE_BYTES + 1,
+          data: Buffer.alloc(MAX_INLINE_BYTES + 1).toString('base64'),
+        },
+      ],
+    },
     from,
     { fetch: (r) => app().fetch(r) },
   );
   assert.equal(past.isError, true);
+  assert.deepEqual(kept(), before);
+  const unsent = await called(
+    attach,
+    { namespace: 'acme', name: 'port-card', files: [{ id: 'f3', name: 'later.png', mimeType: 'image/png', size: 10 }] },
+    from,
+    { fetch: (r) => app().fetch(r) },
+  );
+  assert.equal(unsent.isError, true, 'a FileInput with no data is refused: this port takes no upload out of band');
   assert.deepEqual(kept(), before);
 });

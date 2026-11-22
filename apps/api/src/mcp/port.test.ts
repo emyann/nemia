@@ -30,6 +30,7 @@ import { Api, type Decidable, EventList, QUOTA_STATES, RUN_STATES } from 'object
 import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
 import { portTools } from './tools.ts';
+import { FILES_EXTENSION } from './files.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -459,6 +460,11 @@ test('on 2026-07-28 tools/list carries resultType complete, ttlMs PORT_LIST_TTL_
     'server/discover offers 2026-07-28',
   );
   assert.equal(discovered?.resultType, 'complete');
+  assert.deepEqual(
+    (discovered?.capabilities as { extensions?: unknown } | undefined)?.extensions,
+    FILES_EXTENSION,
+    'server/discover advertises the files extension, inline alone',
+  );
   await client.close();
 });
 

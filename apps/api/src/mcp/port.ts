@@ -40,7 +40,7 @@ import {
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, type ReadBound, READS, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, narrowingOf, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
-import { inlined } from './files.ts';
+import { FILES_EXTENSION, inlined } from './files.ts';
 import { PORT_INSTRUCTIONS } from './instructions.ts';
 import { FEED_TEMPLATES, type FeedView, viewOf } from './resources.ts';
 import { type PortTool, portTools } from './tools.ts';
@@ -292,6 +292,7 @@ export function portServer(
     capabilities: {
       tools: {},
       ...(feed === undefined ? {} : { resources: feed.era === 'modern' ? { subscribe: true } : {} }),
+      extensions: FILES_EXTENSION,
     },
     instructions: PORT_INSTRUCTIONS,
     cacheHints: {

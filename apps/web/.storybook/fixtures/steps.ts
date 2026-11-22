@@ -3,6 +3,7 @@
  */
 import type { StepCloseout, StepTry } from '../../src/lib/api/tries';
 import type { RunDetail, StepView } from '../../src/lib/runView';
+import { FLAG_PNG } from './flag';
 
 /** The instant the stories read the run at. */
 export const NOW = new Date('2026-10-12T17:11:00.000Z');
@@ -48,7 +49,7 @@ export const PLAN: StepCloseout = {
       path: '/wf/runs/r-1/artifacts/design/flag.png',
       relativePath: 'flag.png',
       name: 'flag.png',
-      url: 'https://placehold.co/480x360/png',
+      url: FLAG_PNG,
       kind: 'image',
       size: 48_213,
     },

@@ -144,6 +144,7 @@ test("on the repository's own claims, a change reaches the jobs that read it and
         'test templates',
         'e2e',
         'e2e-look',
+        'e2e-stories',
         ...LEGS.map((leg) => `contracts ${leg}`),
       ],
     },
@@ -162,11 +163,11 @@ test("on the repository's own claims, a change reaches the jobs that read it and
         'typecheck',
         'lint',
       ],
-      not: ['e2e-look', 'build', 'test objects'],
+      not: ['e2e-look', 'e2e-stories', 'build', 'test objects'],
     },
     {
       file: 'apps/web/src/routes/x.tsx',
-      due: ['e2e', 'e2e-look', 'build', 'test web', 'contracts rest'],
+      due: ['e2e', 'e2e-look', 'e2e-stories', 'build', 'test web', 'contracts rest'],
       not: ['contracts observe', 'contracts approval-refusal', 'test api'],
     },
     { file: 'tools/release/release.ts', due: ['typecheck', 'guards', 'lint'], not: ['build', 'e2e', 'contracts rest'] },
@@ -182,11 +183,11 @@ test("on the repository's own claims, a change reaches the jobs that read it and
   for (const file of EVERYWHERE) assert.deepEqual(reached(file), Object.keys(ROOT_CLAIMS), `${file} reaches every job`);
 });
 
-test("the repository's claims hold a key for each workspace's suite, the guards, typecheck, build, lint, the e2e, the look and each contracts leg", () => {
+test("the repository's claims hold a key for each workspace's suite, the guards, typecheck, build, lint, the e2e, the look, the stories and each contracts leg", () => {
   const suites = Object.keys(ROOT_CLAIMS).filter((key) => key.startsWith('test '));
   assert.ok(suites.includes('test agent-orchestrator') && suites.includes('test web'), 'a key per suite');
   assert.ok(!suites.includes('test guards'), 'the guards are their own job');
-  for (const key of ['guards', 'typecheck', 'build', 'lint', 'e2e', 'e2e-look']) assert.ok(key in ROOT_CLAIMS, key);
+  for (const key of ['guards', 'typecheck', 'build', 'lint', 'e2e', 'e2e-look', 'e2e-stories']) assert.ok(key in ROOT_CLAIMS, key);
   assert.deepEqual(
     Object.keys(ROOT_CLAIMS)
       .filter((key) => key.startsWith('contracts '))

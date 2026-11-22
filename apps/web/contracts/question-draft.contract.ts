@@ -1,5 +1,5 @@
 /**
- * What a person has said so far of a step's questions on the board (src/lib/questionDraft.ts), drawn by the one part that answers a
+ * What a person has said so far of a step's questions on the board (src/lib/question-draft/questionDraft.ts), drawn by the one part that answers a
  * series of questions (`QuestionSeries`, src/components/gate/Questions.tsx), and sent as the api's `answers` once nothing is left.
  *
  * Each question is answered by choosing among its options, or by one of the two ways out the board supplies on every question, as the
@@ -30,8 +30,31 @@ export type DraftQuestion = { readonly title: string; readonly options: readonly
 /** One answer as the api takes it (`answers`, objects' run-actions.ts): the title, the labels chosen, words where there are any, `none`. */
 export type SentAnswer = { question: string; chose: readonly string[]; own?: string; none?: true };
 
-/** What the person has said of `title`: nothing chosen, no words, no way out where they have said nothing. */
-const entryOf = (draft: Draft, title: string) => draft[title] ?? { chose: [], own: '', way: null };
+/**
+ * What the person has said of `title`: nothing chosen, no words, no way out where they have said nothing. Read of the draft's own keys
+ * alone, so a title `Object.prototype` holds (`toString`) reads as nothing said rather than as its member.
+ */
+const entryOf = (draft: Draft, title: string) =>
+  (Object.hasOwn(draft, title) ? draft[title] : undefined) ?? { chose: [], own: '', way: null };
+
+const entryOfSpec = spec<(draft: Draft, title: string) => DraftEntry>({
+  ensures: {
+    whatWasSaid: {
+      description: 'What is read of a question is what the person said of it, or nothing said where they said nothing',
+      condition: ({ input: [draft, title], output }) => {
+        const said = entryOf(draft, title);
+        return (
+          output.way === said.way &&
+          output.own === said.own &&
+          output.chose.length === said.chose.length &&
+          output.chose.every((l, i) => said.chose[i] === l)
+        );
+      },
+    },
+  },
+});
+/** The function's type, which the code takes: its key read proved once here, and read by this law alone where the others call it. */
+export type EntryOf = Implementation<typeof entryOfSpec>;
 
 /** Whether `entry` holds words of the person's own: text that is not blank. */
 const hasWords = (entry: DraftEntry) => entry.own.trim() !== '';
@@ -92,7 +115,14 @@ const answersFromSpec = spec<(questions: readonly DraftQuestion[], draft: Draft)
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type AnswersFrom = Implementation<typeof answersFromSpec>;
 
+/**
+ * Whether `title` can be a key of a draft: every title but `__proto__`, which a record written at sets its prototype rather than a key
+ * of its own, so nothing said of that question would be kept. The board's writers ask it; no agent names a question so.
+ */
+const aKeyOfItsOwn = (title: string) => title !== '__proto__';
+
 const chosenDraftSpec = spec<(draft: Draft, q: DraftQuestion, label: string, on: boolean) => Draft>({
+  requires: ({ input: [, q] }) => aKeyOfItsOwn(q.title),
   ensures: {
     aChoiceIsNotNone: {
       description: 'Choosing an option takes back "None of these"',
@@ -126,6 +156,7 @@ const chosenDraftSpec = spec<(draft: Draft, q: DraftQuestion, label: string, on:
 export type ChosenDraft = Implementation<typeof chosenDraftSpec>;
 
 const wayDraftSpec = spec<(draft: Draft, q: DraftQuestion, way: WayOut, on: boolean) => Draft>({
+  requires: ({ input: [, q] }) => aKeyOfItsOwn(q.title),
   ensures: {
     noneChoosesNothing: {
       description: 'Taking "None of these" takes back every choice of the question',

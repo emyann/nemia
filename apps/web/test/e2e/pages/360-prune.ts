@@ -23,7 +23,7 @@ export default {
   route: '/factories/default',
   expect: async (page) => {
     const { id, branch } = UNMERGED;
-    const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as {
+    const record = storedRecord(id) as {
       repo: string;
       steps: { implement: { workspace: string } };
     };

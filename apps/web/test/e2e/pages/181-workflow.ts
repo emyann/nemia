@@ -4,7 +4,7 @@ import { cancelledAt, nextVisit, photograph, themeOf, isRunStart, trailLevel } f
 import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { checkoutIn, DIAMOND, DIAMOND_RUNS, FACTORIES, FAKE, REVIEWER, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, runsHeld, store } from '../world.ts';
 
 const { hiring } = FACTORIES;
 /** The checkout's `dev` read in FACTORIES' `hiring`, the one factory on the checkout: the default one works on no repository. */
@@ -175,8 +175,7 @@ export default {
         );
       }
 
-      const runsDir = path.join(store!, 'runs');
-      const before = fs.readdirSync(runsDir).sort();
+      const before = runsHeld();
       const refused = await page.context().newPage();
       try {
         const { problems } = watch(refused);
@@ -205,9 +204,9 @@ export default {
           throw new Refused(
             `the refusal beside the form is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`,
           );
-        const after = fs.readdirSync(runsDir).sort();
+        const after = runsHeld();
         if (JSON.stringify(after) !== JSON.stringify(before))
-          throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
+          throw new Refused(`nothing is written on a refusal — the store's runs went from ${before.length} held to ${after.length}`);
         await settled(refused);
         await photograph(refused, path.join(OUT, `start-refused-${await themeOf(refused)}.png`), { fullPage: true });
         await idle(refused);

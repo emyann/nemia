@@ -34,6 +34,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { dropStoredRun, storeAsk, storeRecord } from './world.ts';
 
 export const FAKE = {
   id: 'give-the-board-a-look-e2e0',
@@ -738,13 +739,12 @@ export function seedFinished(root: string, run: { id: string; title: string; fac
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = run;
   const work = path.join(root, 'runs', id, 'work');
-  const record = path.join(root, 'runs', `${id}.json`);
   const journal = path.join(root, 'engine', 'tasks', `${id}-write.jsonl`);
   const feed = path.join(root, 'engine', 'feed.jsonl');
   const fedBefore = fs.readFileSync(feed, 'utf8');
   const body = 'Write a short note on what was asked.';
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -780,7 +780,7 @@ export function seedFinished(root: string, run: { id: string; title: string; fac
   write(journal, lines(events));
   fs.appendFileSync(feed, lines(events.map((event) => ({ taskId: `${id}-write`, event }))));
   return (() => {
-    fs.rmSync(record, { force: true });
+    dropStoredRun(id);
     fs.rmSync(journal, { force: true });
     fs.rmSync(path.join(root, 'runs', id), { recursive: true, force: true });
     fs.writeFileSync(feed, fedBefore);
@@ -842,15 +842,14 @@ export function seedRouted(root: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = ROUTED;
   const work = path.join(root, 'runs', id, 'work');
-  const record = path.join(root, 'runs', `${id}.json`);
   const feed = path.join(root, 'engine', 'feed.jsonl');
   const fedBefore = fs.readFileSync(feed, 'utf8');
   const folder = path.join(root, 'workflows', ROUTED.folder);
   for (const [name, text] of ROUTED_FILES) write(path.join(folder, name), text);
   const body = (says: string) => ({ body: says, harness: 'claude', workspace: 'folder' as const, permissionMode: 'dontAsk' });
   const table = Object.fromEntries(ROUTED.routes.map((r) => [r, r]));
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -918,7 +917,7 @@ export function seedRouted(root: string, now = Date.now()) {
     return journal;
   });
   return (() => {
-    fs.rmSync(record, { force: true });
+    dropStoredRun(id);
     for (const journal of journals) fs.rmSync(journal, { force: true });
     fs.rmSync(path.join(root, 'runs', id), { recursive: true, force: true });
     fs.rmSync(folder, { recursive: true, force: true });
@@ -1170,14 +1169,13 @@ export const CHAINED = {
 
 /**
  * Write CHAINED's record into the store at `root`, as the diamond's are written (`seedDiamond`), on the checkout at `repo`, from its
- * `main`: in its factory, nothing of it filed. Returns the record's path, for the page to take it back.
+ * `main`: in its factory, nothing of it filed. The page takes it back (`dropStoredRun`).
  */
 export function seedChained(root: string, repo: string, now = Date.now()) {
   const base = execFileSync('git', ['rev-parse', 'main'], { cwd: repo, encoding: 'utf8' }).trim();
   const workflowDir = path.join(root, 'workflow-diamond');
-  const file = path.join(root, 'runs', `${CHAINED.id}.json`);
-  write(
-    file,
+  storeRecord(
+    CHAINED.id,
     JSON.stringify(
       {
         id: CHAINED.id,
@@ -1198,7 +1196,6 @@ export function seedChained(root: string, repo: string, now = Date.now()) {
       2,
     ),
   );
-  return file;
 }
 
 /**
@@ -2195,19 +2192,23 @@ export function seedFeed(root: string) {
   write(path.join(root, 'engine', 'feed.jsonl'), lines(entries));
 }
 
-/** Each path `writeRegated` makes in `root`, a folder or a file, for the page that takes them back, whether or not all were made. */
+/**
+ * Each path `writeRegated` makes in `root`, a folder or a file, for the page that takes them back, whether or not all were made: its
+ * record and its approval, which are records of the store's keyspace, are taken back by `dropStoredRun`.
+ * @param root The store's root folder.
+ */
 export const regatedFiles = (root: string) =>
   [
     path.join(root, 'workflow-regated'),
-    path.join(root, 'runs', `${REGATED.id}.json`),
-    path.join(root, 'runs', `${REGATED.id}.asks`),
     path.join(root, 'engine', 'tasks', `${REGATED.id}-plan.jsonl`),
     path.join(root, 'engine', 'tasks', `${REGATED.id}-build.jsonl`),
   ] satisfies string[];
 
 /**
  * REGATED into `root`, its times minutes before `now`: its workflow folder, its record, plan's approval beside it, and the journals of
- * its two tasks (`regatedFiles`).
+ * its two tasks (`regatedFiles`); its record and its approval in the store's keyspace, as the api writes them.
+ * @param root The store's root folder.
+ * @param now The time its times are before.
  */
 export function writeRegated(root: string, now: number) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -2218,8 +2219,8 @@ export function writeRegated(root: string, now: number) {
   write(path.join(dir, 'ship.md'), '---\nplace: git\nharness: claude\nafter: build\n---\nShip what was built.\n');
   const lane = (step: string) => path.join(root, 'worktrees', id, step);
   const record = (step: string) => ({ taskId: `${id}-${step}`, workspace: lane(step), branch: `wf/${id}/${step}` });
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -2243,7 +2244,7 @@ export function writeRegated(root: string, now: number) {
       2,
     ),
   );
-  write(path.join(root, 'runs', `${id}.asks`, 'approve-plan-1'), `${JSON.stringify({ step: 'plan', try: 1, at: ago(approved) })}\n`);
+  storeAsk(id, 'approve-plan-1', `${JSON.stringify({ step: 'plan', try: 1, at: ago(approved) })}\n`);
   const journal = (step: string, filed: number, ended: number, summary: string) =>
     write(
       path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`),
@@ -3117,7 +3118,8 @@ export const ASKING = {
 
 /**
  * Writes ASKING into the store at `root` — its record, its folder and its two tasks, each ended once with the closeout it gave, flat as a
- * harness writes it, palette's with what it cost — and answers every path written, to take back.
+ * harness writes it, palette's with what it cost — and answers every path written, to take back; its record is the store's keyspace's,
+ * taken back by `dropStoredRun`.
  */
 export function writeAsking(root: string, now = Date.now()) {
   const { id, gated, raised } = ASKING;
@@ -3179,9 +3181,8 @@ export function writeAsking(root: string, now = Date.now()) {
     `${JSON.stringify({ ...schema, properties: { open: { 'x-shape': 'questions', description: ASKED.description } } }, null, 2)}\n`,
   );
   const output = { file: 'open.schema.json', schema };
-  const record = path.join(root, 'runs', `${id}.json`);
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -3204,7 +3205,7 @@ export function writeAsking(root: string, now = Date.now()) {
       2,
     ),
   );
-  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task(gated), task(raised)] satisfies string[];
+  return [dir, path.join(root, 'runs', id), task(gated), task(raised)] satisfies string[];
 }
 
 /**
@@ -3243,7 +3244,8 @@ export const SHAPED = {
 /**
  * Writes SHAPED into the store at `root` — its record, its folder, its two tasks each ended once with its closeout, flat as a harness
  * writes it, and `build`'s artifacts folder — and answers every path written, to take back. Given `tried`, an agent's name, its folder is
- * that agent's try's (`tries/<agent>`), so the run is a try of the agent, as `nemia agent try` starts one.
+ * that agent's try's (`tries/<agent>`), so the run is a try of the agent, as `nemia agent try` starts one. Its record is the store's
+ * keyspace's, taken back by `dropStoredRun`.
  */
 export function writeShaped(root: string, { now = Date.now(), tried }: { now?: number; tried?: string } = {}) {
   const { id, giver, step } = SHAPED;
@@ -3355,9 +3357,8 @@ export function writeShaped(root: string, { now = Date.now(), tried }: { now?: n
     },
   };
   write(path.join(dir, `${step}.schema.json`), `${JSON.stringify(marked, null, 2)}\n`);
-  const record = path.join(root, 'runs', `${id}.json`);
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -3387,7 +3388,7 @@ export function writeShaped(root: string, { now = Date.now(), tried }: { now?: n
       2,
     ),
   );
-  return [record, dir, path.join(root, 'runs', id), task(giver), task(step)] satisfies string[];
+  return [dir, path.join(root, 'runs', id), task(giver), task(step)] satisfies string[];
 }
 
 /**
@@ -3447,7 +3448,8 @@ export const BUDGETING = {
 /**
  * Writes BUDGETING into the store at `root` — its record, its folder and design's task, ended once with the closeout it gave, flat as a
  * harness writes it, with what it cost — and answers every path written, to take back. `id` names the run, `costLine` the line it was
- * started under, written on its record as the start writes it, none where it is not given.
+ * started under, written on its record as the start writes it, none where it is not given. Its record is the store's keyspace's, taken
+ * back by `dropStoredRun`.
  */
 export function writeBudgeting(root: string, { id = BUDGETING.id, costLine }: { id?: string; costLine?: number } = {}, now = Date.now()) {
   const { gated, above, under } = BUDGETING;
@@ -3511,9 +3513,8 @@ export function writeBudgeting(root: string, { id = BUDGETING.id, costLine }: { 
     path.join(dir, 'budgets.schema.json'),
     `${JSON.stringify({ ...schema, properties: { budgets: { 'x-shape': 'budgets', description: BUDGETED.description } } }, null, 2)}\n`,
   );
-  const record = path.join(root, 'runs', `${id}.json`);
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -3539,5 +3540,5 @@ export function writeBudgeting(root: string, { id = BUDGETING.id, costLine }: { 
       2,
     ),
   );
-  return [record, home, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task] satisfies string[];
+  return [home, path.join(root, 'runs', id), task] satisfies string[];
 }

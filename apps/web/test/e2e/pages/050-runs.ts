@@ -43,7 +43,7 @@ import { contrastHolds } from '../runs-contrast.ts';
 import { COSTLY, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import { seated } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, photographing, store } from '../world.ts';
+import { dropStoredRun, OUT, photographing, store } from '../world.ts';
 
 /**
  * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after
@@ -1119,6 +1119,7 @@ async function regated(page: Page) {
 /** REGATED taken out of the worker's store, whatever of it was written, and the feed told. */
 function regatedBack() {
   for (const file of regatedFiles(store!)) fs.rmSync(file, { recursive: true, force: true });
+  dropStoredRun(REGATED.id);
   fed(REGATED.id, 'gone');
 }
 

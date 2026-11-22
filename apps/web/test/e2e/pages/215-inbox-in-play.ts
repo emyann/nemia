@@ -5,7 +5,7 @@ import { cardsPath, fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, GATED, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, takeBackRuns } from '../world.ts';
+import { OUT, store, storedRecord, storedRuns, storeRecord, takeBackRuns } from '../world.ts';
 
 /** The card this page files in the factory, starts from the Inbox, and sees ended once its run is called off. */
 const CARD = 'show-the-cards-in-play-e2e0';
@@ -62,7 +62,7 @@ export default {
     const inbox = path.join(store!, 'inbox');
     const runsDir = path.join(store!, 'runs');
     const cardFile = path.join(inbox, `${CARD}.md`);
-    const runsBefore = fs.readdirSync(runsDir).sort();
+    const runsBefore = storedRuns();
     const theme = await themeOf(page);
     const other = await page.context().newPage();
     const unhire = hiringStarts(store!);
@@ -150,9 +150,9 @@ export default {
       await load(other, '/inbox?cards=ended');
       await expectVisible(cardIn(other, CARD), 'Ended is kept in the address: a load of ?cards=ended lists it again');
 
-      const gated = JSON.parse(fs.readFileSync(path.join(runsDir, `${GATED.id}.json`), 'utf8')) as Record<string, unknown>;
+      const gated = storedRecord(GATED.id) as Record<string, unknown>;
       fs.writeFileSync(path.join(inbox, `${WAITING}.md`), 'Wait on the plan\n\nA card whose run waits at its gate.\n');
-      fs.writeFileSync(path.join(runsDir, `${WAITING_RUN}.json`), JSON.stringify({ ...gated, id: WAITING_RUN, from: { inbox: WAITING } }));
+      storeRecord(WAITING_RUN, JSON.stringify({ ...gated, id: WAITING_RUN, from: { inbox: WAITING } }));
       await load(other, '/inbox');
       await expectVisible(
         cardIn(other, WAITING).locator('[data-card-state="waiting"]', { hasText: /^waits on you$/ }),
@@ -168,7 +168,7 @@ export default {
         );
     } finally {
       await other.close();
-      takeBackRuns(runsDir, runsBefore);
+      takeBackRuns(runsBefore);
       fs.rmSync(cardFile, { force: true });
       fs.rmSync(path.join(inbox, `${WAITING}.md`), { force: true });
       unhire();

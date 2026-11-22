@@ -5,7 +5,7 @@ import { photograph, pickIn, startOf, themeOf, isRunStart } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, takeBackRuns } from '../world.ts';
+import { OUT, store, storedRecord, storedRuns, takeBackRuns } from '../world.ts';
 
 /** The brief the page starts its run with. */
 const BRIEF = 'Start a run from the floor of its factory';
@@ -110,14 +110,13 @@ export default {
   name: 'factory-start',
   route: `/factories/${FACTORIES.hiring.name}`,
   expect: async (page) => {
-    const runsDir = path.join(store!, 'runs');
     const checkout = path.join(store!, 'checkout');
     const factory = FACTORIES.hiring.name;
     const workflow = WORKFLOWS.good.name;
     const factoryFile = path.join(store!, 'factories', `${factory}.json`);
     const factoryText = fs.readFileSync(factoryFile, 'utf8');
     const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
-    const runsBefore = fs.readdirSync(runsDir).sort();
+    const runsBefore = storedRuns();
     const filesDir = path.join(store!, 'files', factory);
     const kept = () => (fs.existsSync(filesDir) ? fs.readdirSync(filesDir) : []) satisfies string[];
     const filesBefore = new Set(kept());
@@ -185,7 +184,7 @@ export default {
         throw new Refused(`the run holds ${SHOT} among its inputs — it answered ${JSON.stringify(run?.inputs)}`);
       if (!fs.readFileSync(path.join(run.inputs.dir, SHOT)).equals(SHOT_BYTES))
         throw new Refused(`the run's ${SHOT} holds the bytes the board uploaded`);
-      const record = JSON.parse(fs.readFileSync(path.join(runsDir, `${id}.json`), 'utf8')) as { factory?: string; repo?: string };
+      const record = storedRecord(id) as { factory?: string; repo?: string };
       if (record.factory !== factory || record.repo !== checkout)
         throw new Refused(
           `the record names ${factory} and ${checkout} — it holds ${JSON.stringify({ factory: record.factory, repo: record.repo })}`,
@@ -201,7 +200,7 @@ export default {
         );
     } finally {
       await other.close();
-      takeBackRuns(runsDir, runsBefore);
+      takeBackRuns(runsBefore);
       for (const name of kept()) if (!filesBefore.has(name)) fs.rmSync(path.join(filesDir, name), { force: true });
       fs.rmSync(reviewerFile, { force: true });
       fs.writeFileSync(factoryFile, factoryText);

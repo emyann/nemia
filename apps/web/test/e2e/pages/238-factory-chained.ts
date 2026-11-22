@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, themeOf } from '../board.ts';
 import { cardOf, photographCard, wordsSaying } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { CHAINED, DIAMOND, FACTORIES, onSeveralRepos, QUEUE, QUEUED_IN, refusedWhy, seedChained } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 export default {
   /**
@@ -59,7 +58,7 @@ export default {
     }
     await page.goto(page.url(), { waitUntil: 'load' });
     await idle(page);
-    const file = seedChained(store!, path.join(store!, 'checkout'));
+    seedChained(store!, path.join(store!, 'checkout'));
     try {
       const said = (
         (await (await page.request.get(new URL(`/api/runs/${parent}`, page.url()).href)).json()) as { status: { status: string } }
@@ -86,7 +85,7 @@ export default {
       await photograph(page, path.join(OUT, `factory-chained-floor-${theme}.png`));
       await photographCard(page, card, path.join(OUT, `factory-chained-ghost-${theme}.png`));
     } finally {
-      fs.rmSync(file, { force: true });
+      dropStoredRun(CHAINED.id);
     }
   },
 } satisfies PageSpec;

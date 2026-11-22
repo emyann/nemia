@@ -69,7 +69,7 @@ const beat = (f: ReturnType<typeof files>) =>
  * the prompt.
  */
 function written(f: ReturnType<typeof files>) {
-  const neighbour = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${NEIGHBOUR.id}.json`), 'utf8')) as Record<string, unknown>;
+  const neighbour = storedRecord(NEIGHBOUR.id) as Record<string, unknown>;
   const at = new Date().toISOString();
   const run = {
     ...neighbour,

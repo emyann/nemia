@@ -4,7 +4,7 @@ import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectTexts, idle, settled } from '../checks.ts';
 import { HELD, REGATED, regatedFiles, writeRegated } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storeAsk, storedAsks } from '../world.ts';
 
 /** Who approved REGATED's plan, as the approval's file says it: the person, under the token named `laptop`. */
 const APPROVER = { kind: 'person', token: 'laptop' } as const;
@@ -28,9 +28,8 @@ export default {
   expect: async (page) => {
     try {
       writeRegated(store!, Date.now());
-      const approval = path.join(store!, 'runs', `${REGATED.id}.asks`, 'approve-plan-1');
-      const approved = JSON.parse(fs.readFileSync(approval, 'utf8')) as Record<string, unknown>;
-      fs.writeFileSync(approval, `${JSON.stringify({ ...approved, actor: APPROVER })}\n`);
+      const approved = JSON.parse(storedAsks(REGATED.id)['approve-plan-1']!) as Record<string, unknown>;
+      storeAsk(REGATED.id, 'approve-plan-1', `${JSON.stringify({ ...approved, actor: APPROVER })}\n`);
       fs.writeFileSync(
         holdFile(),
         JSON.stringify({ at: new Date().toISOString(), until: [HELD.id], by: 'operator', actor: HOLDER }, null, 2),
@@ -53,6 +52,7 @@ export default {
       fs.rmSync(holdFile(), { force: true });
       fs.rmSync(holdFile().replace(/\.hold$/, '.unheld'), { force: true });
       for (const file of regatedFiles(store!)) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(REGATED.id);
       fed(REGATED.id, 'gone');
     }
   },

@@ -5,7 +5,7 @@ import { fed, partOf, photograph, sidebar, themeOf, isRunAction } from '../board
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 export default {
   /**
@@ -64,6 +64,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(ASKING.id);
       fed(id, 'removed');
     }
     await expectCount(page.locator(`a[href="/runs/${id}"]`), 0, 'taken back and said on the feed: the run is gone from the list');

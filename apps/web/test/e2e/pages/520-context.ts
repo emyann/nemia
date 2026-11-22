@@ -87,7 +87,7 @@ const TASK = [
  */
 function written(filed: boolean) {
   const runs = path.join(store!, 'runs');
-  const bottom = JSON.parse(fs.readFileSync(path.join(runs, `${DIAMOND.bottom.id}.json`), 'utf8')) as {
+  const bottom = storedRecord(DIAMOND.bottom.id) as {
     repo: string;
     workflow: Array<Record<string, unknown>>;
   };

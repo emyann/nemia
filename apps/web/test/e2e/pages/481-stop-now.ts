@@ -66,7 +66,7 @@ function restore(before: ReturnType<typeof snapshot>) {
 
 /** Writes LANDING: ENDING's run with its ending filed, and ship's session at work in the repository's checkout, on the engine's feed. */
 function writeLanding() {
-  const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${ENDING.id}.json`), 'utf8')) as {
+  const record = storedRecord(ENDING.id) as {
     steps: Record<string, object>;
   };
   const steps = { ...record.steps, ship: { taskId: LANDING_TASK } };

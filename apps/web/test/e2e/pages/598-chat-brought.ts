@@ -5,7 +5,7 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../
 import { ASKING, writeAsking } from '../seed.ts';
 import type { Request } from 'playwright';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 /** Her brief, naming the gated step and the step held on its budget by their links, as `bring-what-waits` teaches her. */
 const BRIEF = [
@@ -105,6 +105,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(ASKING.id);
       fs.rmSync(path.join(store!, 'runs', `${id}.asks`), { recursive: true, force: true });
       fed(id, 'removed');
     }

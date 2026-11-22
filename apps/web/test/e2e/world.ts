@@ -74,7 +74,10 @@ const PASS =
 const inApi = (script: string, input = '') =>
   execFileSync(process.execPath, ['--input-type=module', '--eval', script], { cwd: API, env: apiEnv, input, encoding: 'utf8' });
 
-/** The record of the run `id` in the seeded store, as the tick wrote it: what a page reads to change it. Throws where there is none. */
+/**
+ * The record of the run `id` in the seeded store, as the tick wrote it: what a page reads to change it. Throws where there is none.
+ * @param id The run's id.
+ */
 export function storedRecord(id: string) {
   const text = inApi(
     `import { recordText, runKey } from 'agent-orchestrator/testing'; process.stdout.write(recordText(process.env.WF_ROOT, runKey(${JSON.stringify(id)})) ?? '');`,
@@ -83,7 +86,11 @@ export function storedRecord(id: string) {
   return JSON.parse(text) as Record<string, unknown>;
 }
 
-/** The record of the run `id` in the seeded store written as `text`, over the one there or none: what a page plants or changes. */
+/**
+ * The record of the run `id` in the seeded store written as `text`, over the one there or none: what a page plants or changes.
+ * @param id The run's id.
+ * @param text The record's text.
+ */
 export function storeRecord(id: string, text: string) {
   inApi(
     `import { plantRecord, runKey } from 'agent-orchestrator/testing'; import fs from 'node:fs'; plantRecord(process.env.WF_ROOT, runKey(${JSON.stringify(id)}), fs.readFileSync(0, 'utf8'));`,
@@ -91,7 +98,10 @@ export function storeRecord(id: string, text: string) {
   );
 }
 
-/** The record of the run `id` taken out of the seeded store, there or not: a run removed as `nemia rm` leaves its key. */
+/**
+ * The record of the run `id` taken out of the seeded store, there or not: a run removed as `nemia rm` leaves its key.
+ * @param id The run's id.
+ */
 export function dropStoredRecord(id: string) {
   inApi(`import { dropRecord, runKey } from 'agent-orchestrator/testing'; dropRecord(process.env.WF_ROOT, runKey(${JSON.stringify(id)}));`);
 }
@@ -127,20 +137,84 @@ export function unreadName(id: string) {
   return `${id} (where it stands is unread: ${unread})`;
 }
 
+/** The ids of the runs whose records the seeded store holds: what a page reads before it starts one, to take back what it started. */
+export function storedRuns() {
+  return JSON.parse(
+    inApi(
+      "import { keysUnder, runKey } from 'agent-orchestrator/testing'; process.stdout.write(JSON.stringify(keysUnder(process.env.WF_ROOT, runKey('')).map((key) => key.slice(runKey('').length))));",
+    ),
+  ) as string[];
+}
+
 /**
- * The runs a page started since it read `before` (the names under `runs/`) taken back by hand, each file of theirs under `runs/`, and the
- * claim under `started/` of each card one was started from (`claimCard`), where it names one of them: what `nemia rm` removes of a run.
+ * What the seeded store holds of its runs, sorted: `record <id>` for each run whose record it holds, and the name of each file under
+ * `runs/`: what a page compares before and after a refusal that writes nothing.
  */
-export function takeBackRuns(runsDir: string, before: readonly string[]) {
-  const made = fs.readdirSync(runsDir).filter((file) => !before.includes(file));
-  const ids = new Set(made.filter((file) => file.endsWith('.json')).map((file) => file.slice(0, -'.json'.length)));
-  for (const file of made) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
-  const started = path.join(path.dirname(runsDir), 'started');
-  for (const file of fs.existsSync(started) ? fs.readdirSync(started) : []) {
-    const claim = path.join(started, file);
-    try {
-      if (ids.has((JSON.parse(fs.readFileSync(claim, 'utf8')) as { run?: string }).run ?? '')) fs.rmSync(claim, { force: true });
-    } catch {}
-  }
-  if (fs.existsSync(started) && !fs.readdirSync(started).length) fs.rmdirSync(started);
+export function runsHeld() {
+  const runsDir = path.join(store!, 'runs');
+  return [...storedRuns().map((id) => `record ${id}`), ...(fs.existsSync(runsDir) ? fs.readdirSync(runsDir) : [])].sort();
+}
+
+/**
+ * The asks of the run `id` in the seeded store, each ask's text by its name: a waiting one by its name (`approve-plan-1`), a spent one as
+ * `done/<name>`. Empty where the run has none.
+ * @param id The run's id.
+ */
+export function storedAsks(id: string) {
+  return JSON.parse(
+    inApi(
+      `import { askNames, askText } from 'agent-orchestrator/testing'; const id = ${JSON.stringify(id)}; process.stdout.write(JSON.stringify(Object.fromEntries(askNames(process.env.WF_ROOT, id).map((name) => [name, askText(process.env.WF_ROOT, id, name) ?? '']))));`,
+    ),
+  ) as Record<string, string>;
+}
+
+/**
+ * The ask `name` of the run `id` written in the seeded store as `text`, over the one there or none: what a page plants as a person's ask.
+ * @param id The run's id.
+ * @param name The ask's name (`approve-plan-1`), a spent one as `done/<name>`.
+ * @param text What it holds.
+ */
+export function storeAsk(id: string, name: string, text: string) {
+  inApi(
+    `import { plantAsk } from 'agent-orchestrator/testing'; import fs from 'node:fs'; plantAsk(process.env.WF_ROOT, ${JSON.stringify(id)}, ${JSON.stringify(name)}, fs.readFileSync(0, 'utf8'));`,
+    text,
+  );
+}
+
+/**
+ * Every ask of the run `id` taken out of the seeded store, waiting and spent, there or not: what a page that asked takes back.
+ * @param id The run's id.
+ */
+export function dropStoredAsks(id: string) {
+  inApi(
+    `import { askNames, dropAsk } from 'agent-orchestrator/testing'; const id = ${JSON.stringify(id)}; for (const name of askNames(process.env.WF_ROOT, id)) dropAsk(process.env.WF_ROOT, id, name);`,
+  );
+}
+
+/**
+ * The run `id` taken out of the seeded store, its record and every ask of it, there or not: what a page that wrote a run takes back.
+ * @param id The run's id.
+ */
+export function dropStoredRun(id: string) {
+  inApi(
+    `import { askNames, dropAsk, dropRecord, runKey } from 'agent-orchestrator/testing'; const id = ${JSON.stringify(id)}; for (const name of askNames(process.env.WF_ROOT, id)) dropAsk(process.env.WF_ROOT, id, name); dropRecord(process.env.WF_ROOT, runKey(id));`,
+  );
+}
+
+/**
+ * The runs a page started since it read `before` (`storedRuns`) taken back by hand: each one's record, its asks, the claim of the card it
+ * was started from where that claim names it, and each of its files under `runs/` (its folder and its marks): what `nemia rm` removes of
+ * a run.
+ * @param before The ids of the runs the store held before the page started any.
+ */
+export function takeBackRuns(before: readonly string[]) {
+  const made = storedRuns().filter((id) => !before.includes(id));
+  if (!made.length) return;
+  inApi(
+    `import { askNames, claimKey, dropAsk, dropRecord, keysUnder, recordText, runKey } from 'agent-orchestrator/testing'; import fs from 'node:fs'; const root = process.env.WF_ROOT; const ids = new Set(JSON.parse(fs.readFileSync(0, 'utf8'))); for (const key of keysUnder(root, claimKey(''))) { try { if (ids.has(JSON.parse(recordText(root, key) ?? '{}').run ?? '')) dropRecord(root, key); } catch {} } for (const id of ids) { for (const name of askNames(root, id)) dropAsk(root, id, name); dropRecord(root, runKey(id)); }`,
+    JSON.stringify(made),
+  );
+  const runsDir = path.join(store!, 'runs');
+  for (const file of fs.existsSync(runsDir) ? fs.readdirSync(runsDir) : [])
+    if (made.some((id) => file === id || file.startsWith(`${id}.`))) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
 }

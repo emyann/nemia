@@ -54,7 +54,7 @@ export default {
   route: `/workflows/repo/${WORKFLOWS.good.name}?factory=${FACTORIES.hiring.name}`,
   expect: async (page) => {
     const runs = path.join(store!, 'runs');
-    const record = JSON.parse(fs.readFileSync(path.join(runs, `${DIAMOND.top.id}.json`), 'utf8')) as { brief: string };
+    const record = storedRecord(DIAMOND.top.id) as { brief: string };
     const file = path.join(runs, `${LONG.id}.json`);
     const starts = hiringStarts(store!);
     try {

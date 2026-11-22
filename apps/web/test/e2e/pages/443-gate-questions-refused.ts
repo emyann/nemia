@@ -4,7 +4,7 @@ import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 export default {
   /**
@@ -83,6 +83,7 @@ export default {
     } finally {
       await refused.close();
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(ASKING.id);
       fed(id, 'removed');
       await idle(page);
     }

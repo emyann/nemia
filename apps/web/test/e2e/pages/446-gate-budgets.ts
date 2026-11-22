@@ -6,7 +6,7 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../
 import { budgetWord, dollars } from '../../../src/lib/money.ts';
 import { BUDGETING, writeBudgeting } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 /** Whether `r` is the POST of the approval of the gated step. */
 const approving = (r: { request: () => { method: () => string }; url: () => string }) =>
@@ -126,6 +126,8 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(BUDGETING.id);
+      dropStoredRun(BUDGETING.underId);
       fed(id, 'removed');
       fed(underId, 'removed');
     }

@@ -187,7 +187,7 @@ export default {
         if (!stepFile.includes(line))
           throw new Refused(`tries/${seeded.name}/try.md says ${line} — it holds ${JSON.stringify(stepFile.join('\n'))}`);
       }
-      const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as {
+      const record = storedRecord(id) as {
         workflowDir: string;
         repo?: string;
         place?: { kind: string };

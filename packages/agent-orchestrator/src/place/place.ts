@@ -85,13 +85,16 @@ export type Followed =
 
 /**
  * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for the run's
- * log — what `.worktreeinclude` copied or refused, and a merge that failed with nothing conflicted.
+ * log — what `.worktreeinclude` copied or refused, and a merge that failed with nothing conflicted. `given`, when it was asked a copy
+ * (`PlaceRequests['make']`'s `given`): the path from the workspace it copied the folder to, kept out of what a hand-off commits. An answer
+ * without it, to a request with one, made no copy.
  */
 export type Made = {
   readonly workspace: string;
   readonly branch: string;
   readonly conflicts: readonly string[];
   readonly notes: readonly string[];
+  readonly given?: string;
 };
 
 /** What `handoff` answers: the commit it made of what a step left, or null when there was nothing to commit. */
@@ -254,7 +257,9 @@ export type PlaceAnswers = {
 
 /**
  * Each verb's request, as the code hands it. A run's branches are the place's to name: `make` is handed the run and the leaf of the
- * step's cut, and `inventory` the run, and the place lists that run's branches alone.
+ * step's cut, and `inventory` the run, and the place lists that run's branches alone. `make`'s `given`, where the run copies a folder
+ * into the workspace: the folder `from`, by its absolute path, written whole at `to`, a path from the workspace, on every ask, a take-up
+ * included, and never part of what a hand-off commits.
  */
 export type PlaceRequests = {
   readonly root: { readonly dir: string };
@@ -267,6 +272,7 @@ export type PlaceRequests = {
     readonly leaf: string;
     readonly from: string;
     readonly also: readonly string[];
+    readonly given?: { readonly from: string; readonly to: string };
   };
   readonly handoff: { readonly workspace: string; readonly step: string; readonly why: string };
   readonly report: {

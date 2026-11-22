@@ -171,10 +171,15 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  * Each is one more for `label-spelling/label-spelling.ts`, what a label key may be spelled and kubectl's edits of a map, which
  * `route/route-keys.ts` checks a backlog node's `relabel:` by and the selector and the labels re-export: pure, importing nothing but
  * types, and touching no disk.
+ *
+ * Each is two more since the out-of-memory folder has a face (the layout rule, `test-kit/layout`): `out-of-memory/index.ts`, through
+ * which the listing reads `outOfMemoryWords`, and `out-of-memory/peak.ts`, a try's memory peak, which it exports beside it. Both pure,
+ * importing nothing but the runtime's vocabulary door, already loaded, and types, and neither touching a disk. `memoryBytesWord` stays in
+ * `out-of-memory/out-of-memory.ts` rather than `objects`, whose one entry would load the effect barrel here.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 219, effect: 15 },
-  'agent-orchestrator/workflow': { all: 155, effect: 15 },
+  'agent-orchestrator/run': { all: 221, effect: 15 },
+  'agent-orchestrator/workflow': { all: 157, effect: 15 },
 };
 
 const isEffectModule = (url: string) => url.includes('/node_modules/effect/');

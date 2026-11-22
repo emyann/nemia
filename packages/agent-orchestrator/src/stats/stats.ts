@@ -16,6 +16,7 @@ import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { checkTasksOf, isRepositoryRun, tryOf, type Run } from '../record/record.ts';
 import { medianOf, p90Of } from '../costs/index.ts';
+import type { TryMemory } from '../out-of-memory/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { endsOnBase, hasChecks, type StepSpec } from '../step/step.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
@@ -95,6 +96,11 @@ export type TryFact = RunKeys & {
    * `pictures` on the record): on a step's first try alone, null for any other try or a step handed none; absent on a fact read before.
    */
   pictures?: { handed: number; shown: number } | null;
+  /**
+   * What its session peaked at in memory and what admission counted it at (`TryMemory`, `tryMemoryOf`), its peak null where none was
+   * measured; absent for a try with no session of its own (a recheck's, an answer's), whose session's are on the try that filed it.
+   */
+  memory?: TryMemory;
 };
 
 /** One check of a try (`TryFact.checks`): its name (`check` for a step's `check: <line>`), the ms it ran, and its verdict. */
@@ -139,6 +145,54 @@ export function checkRowsOf(tries: readonly TryFact[]) {
       p90Ms: p90Of(ms),
       refused: of.filter((c) => c.verdict === 'refused').length / of.length,
     } satisfies CheckRow;
+  });
+}
+
+/**
+ * The memory of one workflow step's sessions over the facts kept (`memoryRowsOf`): how many tries ran a session of their own, how many of
+ * those had a peak measured, the median, p90 (nearest rank) and highest of those peaks in bytes, each null where none was, what the latest
+ * of them was counted at by admission (`askedBytes`, null where it does not say), and how many peaked above what they were counted at
+ * (`aboveAsked`). A read, never a setting: Nemia applies nothing from it.
+ */
+export type MemoryRow = {
+  workflow: string;
+  step: string;
+  tries: number;
+  measured: number;
+  medianBytes: number | null;
+  p90Bytes: number | null;
+  maxBytes: number | null;
+  askedBytes: number | null;
+  aboveAsked: number;
+};
+
+/**
+ * A row per workflow step whose tries ran a session of their own (`MemoryRow`), in the order met: what a person reads to pick a step's
+ * `memoryRequest:` from the peaks measured, and to see a step whose sessions pass what they ask as plainly as one asking far more.
+ * @param tries The facts of the tries, in their order.
+ */
+export function memoryRowsOf(tries: readonly TryFact[]) {
+  const rows = new Map<string, { workflow: string; step: string; of: TryMemory[] }>();
+  for (const t of tries) {
+    if (t.memory === undefined) continue;
+    const key = JSON.stringify([t.workflow, t.step]);
+    const row = rows.get(key) ?? { workflow: t.workflow, step: t.step, of: [] };
+    row.of.push(t.memory);
+    rows.set(key, row);
+  }
+  return [...rows.values()].map(({ of, ...row }) => {
+    const peaks = of.flatMap((m) => (m.peak === null ? [] : [m.peak.peakBytes]));
+    const asked = of.flatMap((m) => (m.askedBytes === null ? [] : [m.askedBytes]));
+    return {
+      ...row,
+      tries: of.length,
+      measured: peaks.length,
+      medianBytes: medianOf(peaks),
+      p90Bytes: p90Of(peaks),
+      maxBytes: peaks.length ? Math.max(...peaks) : null,
+      askedBytes: asked.at(-1) ?? null,
+      aboveAsked: of.filter((m) => m.peak !== null && m.askedBytes !== null && m.peak.peakBytes > m.askedBytes).length,
+    } satisfies MemoryRow;
   });
 }
 
@@ -191,6 +245,7 @@ export type RunRead = {
   appliesOf: (step: StepSpec) => ReadonlyMap<string, readonly string[]>;
   closeoutOfTask: (taskId: string) => Closeout | undefined;
   deadlineOf: (taskId: string) => number | null;
+  memoryOf: (taskId: string) => TryMemory;
 };
 
 /**
@@ -223,6 +278,9 @@ function landingDeadlineOf(r: RunRead, step: StepSpec, t: TimelineTry) {
   return seconds === null ? null : seconds * 1000;
 }
 
+/** A try's session's memory (`TryFact.memory`), on a try that ran a session of its own; nothing on a recheck's or an answer's. */
+const ownMemoryOf = (r: RunRead, t: TimelineTry) => (t.session && t.turn === undefined ? { memory: r.memoryOf(t.session.taskId) } : {});
+
 /** A fact per try of `r`'s run that ended (`TryFact`). */
 function tryFactsOf(r: RunRead) {
   const keys = keysOf(r.run);
@@ -254,6 +312,7 @@ function tryFactsOf(r: RunRead) {
           landingDeadlineMs: landingDeadlineOf(r, step, t),
           checks: checkFactsOf(r, t),
           pictures: t.try === 1 ? picturesHanded(r.run.steps[step.name]?.pictures) : null,
+          ...ownMemoryOf(r, t),
         },
       ];
     }),
@@ -435,6 +494,7 @@ export type Group = {
   tallies: TallyRow[];
   slowLandings: SlowLanding[];
   checks: CheckRow[];
+  memory: MemoryRow[];
 };
 
 /**
@@ -569,6 +629,7 @@ function groupOf(f: Kept, from: string | null, to: string, today: string) {
     tallies: tallyRowsOf(kept.tries, from ? daysBetween(from, to) : []),
     slowLandings: slowLandingsOf(kept.tries),
     checks: checkRowsOf(kept.tries),
+    memory: memoryRowsOf(kept.tries),
   };
 }
 

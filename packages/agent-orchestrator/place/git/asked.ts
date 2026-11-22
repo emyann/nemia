@@ -84,6 +84,15 @@ function act(request: Request) {
   if (request.act === 'commit') text(request, 'message');
 }
 
+/** Refuses a `given` of `request` that is there and is no `{ from, to }` of strings. */
+function given(request: Request) {
+  const value = request.given;
+  if (value === undefined) return;
+  const one = (value ?? {}) as Record<string, unknown>;
+  if (typeof value !== 'object' || value === null || typeof one.from !== 'string' || typeof one.to !== 'string')
+    throw new Malformed(`the request's \`given\` is ${said(value)}, where { from, to } of strings, or nothing, is asked`);
+}
+
 /** `check` of each of `keys`, in order. */
 const each =
   (check: (request: Request, key: string) => void, ...keys: string[]) =>
@@ -95,7 +104,7 @@ const READS: { readonly [V in PlaceVerb]: readonly ((request: Request) => void)[
   root: [each(text, 'dir')],
   open: [each(text, 'root'), each(flag, 'isolate')],
   follow: [each(text, 'repo')],
-  make: [each(text, 'repo', 'at', 'run', 'leaf', 'from'), each(texts, 'also')],
+  make: [each(text, 'repo', 'at', 'run', 'leaf', 'from'), each(texts, 'also'), given],
   handoff: [each(text, 'workspace', 'step', 'why')],
   report: [each(text, 'repo', 'baseRef', 'onto'), each(texts, 'branches', 'diffOf', 'present', 'atBase')],
   standing: [each(text, 'repo', 'base'), branches],

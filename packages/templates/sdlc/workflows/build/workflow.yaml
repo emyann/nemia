@@ -73,6 +73,7 @@ spec:
       budget: 10
       check: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" receipt --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\" --wait-on-ci \"${{ parameters.landingWaitsOnCi }}\"; else { ${{ parameters.localCheck }}; }; fi"
       checkMemory: "${{ parameters.landingCheckMemory }}"
+      memoryRequest: "${{ parameters.lightMemoryRequest }}"
     - name: review
       after:
         - implement

@@ -7,6 +7,7 @@ spec:
   steps:
     - name: argus
       place: git
+      memoryRequest: "${{ parameters.lightMemoryRequest }}"
       checks:
         - name: cards
           run: "node \"${WF_WORKFLOW_FILES:?nemia check: cards.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/cards.ts\" check \"${WF_CLOSEOUT:-}\" --labels \"${{ parameters.pullRequestLabels }}\""

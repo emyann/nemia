@@ -46,7 +46,10 @@ base (refused at once, naming the merge of the base, since GitHub runs no CI on 
 for it to start, `WHOLE_SECONDS` whole, both in `exec.ts`), reading only the latest run of each check on the head, so a failure a later run of the same check
 superseded is neither judged nor listed: CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
 refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
-reads it for them. A red the context judged is first re-run, once: the failed jobs of its workflow run, with the jobs that need them
+reads it for them. A red the context judged is first told apart by the logs of its red jobs: where a job GitHub concluded failed
+has a log that names a line that failed it (a test, a type error, a lint rule), the change's, which a second run of the same commit would
+fail again, the red is refused at once, never re-run, and the refusal says so, naming each red job and whose it was. Any other red — a job
+timed out or started up wrong, a failure whose log names no failing line or gave none — is first re-run, once: the failed jobs of its workflow run, with the jobs that need them
 (`gh run rerun <id> --failed`), waited on within the same whole bound, and only a run on its first attempt is re-run, as GitHub says, so a
 head is never re-run twice; a job red again is the change's, and the pass or the refusal names each job re-run and how it ended the
 second time. A re-run still running at the bound is a refusal the next try answers by changing nothing, its check reading the re-run's

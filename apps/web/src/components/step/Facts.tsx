@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { memoryBytesWord } from 'objects';
 import type { Bridge } from '../../lib/api/bridge.ts';
 import type { Collisions } from '../../lib/api/decision.ts';
 import type { PeakMark, StepUsed } from '../../lib/api/usage.ts';
@@ -108,7 +109,8 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * `place` only where it says `folder` (`placeRows`): a detail from an api that does not carry the key has none. `loop` and `rounds`, the
  * edge back and how many rounds it may run, are rows beside `after` on a looping step only. A codex step's fence is its sandbox, which the
  * engine's task files as its permission mode: the same row, under Codex's name (`fenceLabel`). A step filed bridged has a `reach` row: its
- * session's web link, or why it is not up.
+ * session's web link, or why it is not up. A step filed with a memory request or limit, or whose session's peak was measured, has a
+ * `memory` row (`memoryWords`): what it asks, its limit and the peak it reached, said apart where it peaked above what it asks.
  *
  * @param spec the step's spec as the api gives it
  * @param filed what the step was filed with, none for a step not filed
@@ -134,6 +136,9 @@ export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null)
         [fenceLabel(spec), modeRow(spec.sandbox ?? spec.fence, filed)],
         ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
         ['deadline', ranWith(deadlineWord(spec.deadlineSeconds), filed, (f) => deadlineWord(f.deadlineSeconds), 'no limit')],
+        ...(filed?.memory
+          ? ([['memory', <MemoryWords key="memory" memory={filed.memory} />]] satisfies Array<[string, ReactNode]>)
+          : []),
         ...(filed?.bridge
           ? ([['reach', <BridgeWords key="reach" bridge={filed.bridge} data-step-bridge />]] satisfies Array<[string, ReactNode]>)
           : []),
@@ -189,6 +194,33 @@ export const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>) =>
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
 const toolsWord = (tools: readonly string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
 /** A deadline in seconds as every duration is said, to the second (`durationWords`): `45s`, `1h 05m`. */
+/**
+ * What a try's session asked of the machine's memory, its limit and the peak it reached, in words: `asks 1Gi · limit 6Gi · peaked 812Mi`,
+ * each part left out where it is not said, `peak not measured` where no peak was kept (one is only under a memory limit), and the peak said
+ * apart, `above what it asks`, where it passed what admission counted the session at.
+ * @param memory What the try was filed with in memory and peaked at.
+ */
+export const memoryWords = (memory: NonNullable<StepFiledView['memory']>) => {
+  const { request, limit, askedBytes, peakBytes } = memory;
+  const above = peakBytes !== null && askedBytes !== null && peakBytes > askedBytes;
+  const peak = peakBytes === null ? 'peak not measured' : `peaked ${memoryBytesWord(peakBytes)}`;
+  const parts = [request === null ? null : `asks ${request}`, limit === null ? null : `limit ${limit}`, peak].filter(
+    (part): part is string => part !== null,
+  );
+  return { said: parts.join(' · '), above };
+};
+
+/** A try's memory in words (`memoryWords`), the peak's excess over what it asks in the failure ink. */
+function MemoryWords({ memory }: { memory: NonNullable<StepFiledView['memory']> }) {
+  const { said, above } = memoryWords(memory);
+  return (
+    <span data-step-memory={above ? 'above' : 'within'}>
+      {said}
+      {above && <span className="text-failure">, above what it asks</span>}
+    </span>
+  );
+}
+
 const deadlineWord = (seconds: number | null) => (seconds === null ? null : durationWords(seconds * 1000, 'second'));
 
 /**

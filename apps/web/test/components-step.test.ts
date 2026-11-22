@@ -1461,6 +1461,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const bare: StepFiled = {
     model: null,
     askedModel: null,
+    memory: null,
     effort: null,
     contextTokens: null,
     fence: null,
@@ -1478,6 +1479,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const given: StepFiled = {
     model: 'opus',
     askedModel: null,
+    memory: null,
     effort: 'high',
     contextTokens: null,
     fence: 'auto',
@@ -1567,6 +1569,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const asSet: StepFiled = {
     model: 'opus',
     askedModel: null,
+    memory: null,
     effort: 'high',
     contextTokens: 200_000,
     fence: 'dontAsk',
@@ -1609,6 +1612,57 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '10m 00s'], "and the workflow's words where it does");
 });
 
+test("a step's memory row says what its session asks, its limit and its peak, the peak said apart above what it asks, and no row with none", () => {
+  const MI = 1024 ** 2;
+  const GI = 1024 * MI;
+  const spec = {
+    harness: 'claude',
+    model: null,
+    effort: null,
+    context: null,
+    after: [],
+    workspace: null,
+    place: null,
+    resume: null,
+    fence: null,
+    sandbox: null,
+    tools: null,
+    deadlineSeconds: null,
+    loop: null,
+    rounds: null,
+  } satisfies StepSpec;
+  const filed = (memory: StepFiled['memory']) =>
+    ({
+      model: null,
+      askedModel: null,
+      memory,
+      effort: null,
+      contextTokens: null,
+      fence: null,
+      runsIn: null,
+      tools: null,
+      deadlineSeconds: null,
+      remote: null,
+      bridge: null,
+    }) satisfies StepFiled;
+  const row = (memory: StepFiled['memory']) => {
+    const html = renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed(memory)) }));
+    const m = /<div data-fact="memory"[^>]*>\s*<dt[^>]*>memory<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/.exec(html);
+    return m ? { said: textsOf(m[1]!).join(''), mark: /data-step-memory="(\w+)"/.exec(m[1]!)?.[1] } : null;
+  };
+  const within = { request: '1Gi', limit: '6Gi', askedBytes: GI, peakBytes: 812 * MI, peakLimitBytes: 6 * GI };
+  assert.deepEqual(row(within), { said: 'asks 1Gi · limit 6Gi · peaked 812Mi', mark: 'within' });
+  assert.deepEqual(row({ ...within, request: '2Gi', askedBytes: 2 * GI, peakBytes: 3 * GI }), {
+    said: 'asks 2Gi · limit 6Gi · peaked 3Gi, above what it asks',
+    mark: 'above',
+  });
+  assert.deepEqual(row({ ...within, request: null, limit: '2Gi', askedBytes: 2 * GI, peakBytes: null, peakLimitBytes: null }), {
+    said: 'limit 2Gi · peak not measured',
+    mark: 'within',
+  });
+  assert.equal(row(null), null, 'nothing filed in memory and no peak: no row');
+});
+
 test('a step on a remote A2A agent says the agent and its address, and no model, effort, context, fence or tools the run never chose', () => {
   const rowsOf = (spec: StepSpec, filed: StepFiled | null) =>
     Object.fromEntries(
@@ -1637,6 +1691,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
   const bare: StepFiled = {
     model: null,
     askedModel: null,
+    memory: null,
     effort: null,
     contextTokens: null,
     fence: null,
@@ -1694,6 +1749,7 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     ({
       model: null,
       askedModel: null,
+      memory: null,
       effort: null,
       contextTokens: null,
       fence: null,

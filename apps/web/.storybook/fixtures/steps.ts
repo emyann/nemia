@@ -78,6 +78,7 @@ export const PLAN: StepCloseout = {
 const FILED: StepView['filed'] = {
   model: 'opus',
   askedModel: null,
+  memory: null,
   effort: 'high',
   contextTokens: 200_000,
   fence: 'auto',

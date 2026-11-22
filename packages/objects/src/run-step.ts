@@ -337,6 +337,29 @@ export const StepFiled = Schema.Struct({
   deadlineSeconds: NullNumber.annotate({
     description: 'How many seconds its session may run before it is stopped; null where filed without, which is no limit.',
   }),
+  memory: Schema.NullOr(
+    Schema.Struct({
+      request: NullString.annotate({
+        description: "The memory its session asked of the machine, a container's request such as 1Gi; null where it ran under none.",
+      }),
+      limit: NullString.annotate({
+        description: "The most memory its session could use, a container's limit such as 6Gi; null where it ran under none.",
+      }),
+      askedBytes: NullNumber.annotate({
+        description: 'What admission counted its session at, in bytes: its request, else its limit; null where it ran under neither.',
+      }),
+      peakBytes: NullNumber.annotate({
+        description:
+          'The most memory its session peaked at, in bytes, over its attempts; null where none was measured, as a peak is kept only under a memory limit.',
+      }),
+      peakLimitBytes: NullNumber.annotate({
+        description: 'The limit in bytes of the attempt that peaked there; null where no peak was measured.',
+      }),
+    }),
+  ).annotate({
+    description:
+      "What its session asked of the machine's memory, its limit and the peak it reached; null where it ran under no request or limit and no peak was measured.",
+  }),
 });
 
 /** A file's path from the step's folder that holds it, never the server's: what a client keys, matches and addresses a file by. */

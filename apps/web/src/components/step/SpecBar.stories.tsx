@@ -18,6 +18,4 @@ const meta: Meta<typeof SpecBar> = {
 export default meta;
 
 /** The workflows still read. */
-export const Reading: StoryObj<typeof meta> = {
-  play: saysReading('Reading the workflows…'),
-};
+export const Reading: StoryObj<typeof meta> = { tags: ['network'], play: saysReading('Reading the workflows…') };

@@ -22,6 +22,4 @@ const meta: Meta<typeof ActsOn> = {
 export default meta;
 
 /** The branch still read: the shape of what it stands at. */
-export const ReadingTheBranch: StoryObj<typeof meta> = {
-  play: saysReading('Reading the branch…'),
-};
+export const ReadingTheBranch: StoryObj<typeof meta> = { tags: ['network'], play: saysReading('Reading the branch…') };

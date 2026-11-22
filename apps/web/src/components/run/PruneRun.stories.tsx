@@ -31,6 +31,7 @@ export default meta;
 
 /** Asked, whether it was merged still read. */
 export const Reading: StoryObj<typeof meta> = {
+  tags: ['network'],
   play: async (context) => {
     await saysReading('Reading whether it was merged…')(context);
   },

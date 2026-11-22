@@ -134,6 +134,11 @@ export function MenuItem(props: MenuItemProps) {
           <Label className={s.label()} component="div" size="large">
             {label}
           </Label>
+          {/* A space between the two lines, which the flex column does not
+              draw: a `Select` shows its chosen row as its trigger's text, and
+              without it that text runs "NeverAnyone with…", which the
+              trigger's name ("Never Anyone with…") does not contain. */}
+          {supportingText && " "}
           {supportingText && (
             <Body className={s.supportingText()} component="div">
               {supportingText}

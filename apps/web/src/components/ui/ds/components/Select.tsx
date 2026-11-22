@@ -175,6 +175,14 @@ function Trigger({
         </span>
       )}
       <SelectValue data-slot="select-value" className={s.input()} />
+      {/* React Aria names the trigger "<value> <label>" (`aria-labelledby`
+          of both), and keeps the label beside the button. Here the label is
+          inside it, to float over the field, so the button's own text is the
+          value and the label run together ("1 weekLink expires in"), which
+          its name does not contain (WCAG 2.5.3, Label in Name). The space
+          makes the text read as the name does; in a flex row it draws
+          nothing. */}
+      {label && " "}
       {label && (
         <Label data-slot="label" className={s.label()}>
           {label}

@@ -42,6 +42,16 @@
                        is switched. Never written into the theme.
      the 27 variables of REFERENCE_DEFAULTS: elevation, state layer opacities,
                        easings and durations, under the theme's own names.
+     the 15 component tokens of COMPONENT_TOKENS: Material's own token
+                       names (`--md-comp-switch-selected-track-color`), each
+                       pointing one part at one colour role, written
+                       `var(--md-sys-color-<role>)` and nothing else. The kit
+                       declares none: each part reads its token with the
+                       spec's role as the fallback, except the switch's
+                       selected icon, which falls back to the kit's
+                       `on-primary-container` (see COMPONENT_TOKENS). A written one goes into
+                       both scheme blocks of theme.css, so it resolves in
+                       either scheme and on a `.dark` subtree.
 
    Every other name is ignored and listed in the warnings; so is a written
    colour pair whose contrast is poor, and so is what was assumed (a scheme, a
@@ -288,6 +298,59 @@ export const REFERENCE_DEFAULTS = {
   "--md3-duration-long-3": "550ms",
   "--md3-duration-long-4": "600ms",
 };
+
+/** Material's component tokens a DESIGN.md may point at another colour role,
+    `md.comp.<name>` written `--md-comp-<name with dashes>`, each with the role
+    the spec gives it (token db 41.1.12) and the component that reads it,
+    `components/<component>.tsx`, where the role is the fallback of
+    `var(--md-comp-<name>,var(--md-sys-color-<role>))`. One token covers one
+    element in one role: a state the spec gives the same role, and a state
+    layer tinted with that element, reads it too. The rest of Material's are
+    added as a project asks for them. Switch's selected icon defaults to what
+    the kit draws, `on-primary-container`, where the token db now gives
+    `primary`. */
+const comp = (component, role) => ({ component, role });
+export const COMPONENT_TOKENS = {
+  "--md-comp-switch-selected-track-color": comp("Switch", "primary"),
+  "--md-comp-switch-selected-handle-color": comp("Switch", "on-primary"),
+  "--md-comp-switch-selected-hover-handle-color": comp(
+    "Switch",
+    "primary-container",
+  ),
+  "--md-comp-switch-selected-icon-color": comp(
+    "Switch",
+    "on-primary-container",
+  ),
+  "--md-comp-checkbox-selected-container-color": comp("Checkbox", "primary"),
+  "--md-comp-checkbox-selected-icon-color": comp("Checkbox", "on-primary"),
+  "--md-comp-radio-button-selected-icon-color": comp("Radio", "primary"),
+  "--md-comp-slider-active-track-color": comp("Slider", "primary"),
+  "--md-comp-slider-active-handle-color": comp("Slider", "primary"),
+  "--md-comp-slider-active-stop-indicator-container-color": comp(
+    "Slider",
+    "on-primary",
+  ),
+  "--md-comp-primary-navigation-tab-active-indicator-color": comp(
+    "Tabs",
+    "primary",
+  ),
+  "--md-comp-primary-navigation-tab-with-label-text-active-label-text-color":
+    comp("Tabs", "primary"),
+  "--md-comp-primary-navigation-tab-with-icon-active-icon-color": comp(
+    "Tabs",
+    "primary",
+  ),
+  "--md-comp-button-text-label-text-color": comp("Button", "primary"),
+  "--md-comp-icon-button-standard-selected-icon-color": comp(
+    "IconButton",
+    "primary",
+  ),
+};
+
+/** What a component token may hold: one of the 49 roles, by its variable. */
+const COMPONENT_FORM = "one colour role (`var(--md-sys-color-on-surface)`)";
+const componentRole = (value) =>
+  /^var\(--md-sys-color-([a-z-]+)\)$/.exec(value)?.[1];
 
 /** The heading the kit reads the reference block under. */
 const REFERENCE_HEADING = "Reference CSS";
@@ -749,13 +812,15 @@ function findReference(body) {
 /* ---- deriving --------------------------------------------------------- */
 
 /** The body's reference block → the 27 values the theme is written with (the
-    kit's own where the block is silent), how dark is switched, and the
-    declarations the kit does not read, kept in source order. */
+    kit's own where the block is silent), the component tokens it writes, how
+    dark is switched, and the declarations the kit does not read, kept in
+    source order. */
 function deriveReference(body, warnings) {
   const { section, rule, second } = findReference(body);
   const unread = section !== undefined && !rule;
   const values = { ...REFERENCE_DEFAULTS };
   const written = [];
+  const components = {};
   const extra = [];
   let darkMode = DARK_MODES[0];
 
@@ -776,13 +841,23 @@ function deriveReference(body, warnings) {
       }
       values[name] = value;
       if (!written.includes(name)) written.push(name);
+    } else if (name !== null && Object.hasOwn(COMPONENT_TOKENS, name)) {
+      const role = componentRole(value);
+      if (role === undefined || !Object.hasOwn(ROLES, role)) {
+        throw new DesignMdError(
+          `DESIGN.md: ${name} is ${JSON.stringify(value)} — the kit reads ${COMPONENT_FORM}`,
+        );
+      }
+      components[name] = value;
     } else {
       const token = name ?? text;
       extra.push(text);
       warnings.push({
         kind: "ignored",
         token,
-        message: `${REFERENCE_HEADING}: ${token} is not a variable the kit reads: ignored`,
+        message: token.startsWith("--md-comp-")
+          ? `${REFERENCE_HEADING}: ${token} is not a component token the kit reads (the list is in the ds-theme skill's design-md.md): ignored`
+          : `${REFERENCE_HEADING}: ${token} is not a variable the kit reads: ignored`,
       });
     }
   }
@@ -803,7 +878,21 @@ function deriveReference(body, warnings) {
       message: `${REFERENCE_HEADING}: the kit reads the first \`css\` block under the heading — the second is ignored`,
     });
   }
-  return { values, written, extra, darkMode, unread };
+  /* In the table's order, so the theme and the resolved file do not depend
+     on the order the project wrote them in. */
+  const ordered = Object.fromEntries(
+    Object.keys(COMPONENT_TOKENS)
+      .filter((name) => Object.hasOwn(components, name))
+      .map((name) => [name, components[name]]),
+  );
+  return {
+    values,
+    written,
+    components: ordered,
+    extra,
+    darkMode,
+    unread,
+  };
 }
 
 function deriveFront(front, warnings) {
@@ -1291,7 +1380,7 @@ const themeCssHead = ({
    ========================================================================== */
 `;
 
-function schemeBlock(selector, roles, scheme) {
+function schemeBlock(selector, roles, scheme, components = {}) {
   // The light block is the one that titles its groups.
   const titled = scheme === "light";
   const groups = ROLE_GROUPS.map(([title, group]) =>
@@ -1302,6 +1391,21 @@ function schemeBlock(selector, roles, scheme) {
       ),
     ].join("\n"),
   );
+  /* A component token is written in both blocks, so its role resolves in
+     the scheme of the element that reads it. None written, none here. */
+  const written = Object.entries(components);
+  if (written.length > 0) {
+    groups.push(
+      [
+        ...(titled
+          ? [
+              "  /* Component tokens: where this project differs from Material (DESIGN.md) */",
+            ]
+          : []),
+        ...written.map(([name, value]) => `  ${name}: ${value};`),
+      ].join("\n"),
+    );
+  }
   return `${selector} {
   color: var(--md-sys-color-on-surface);
   color-scheme: ${scheme};
@@ -1314,9 +1418,19 @@ ${groups.join("\n\n")}\n}\n`;
     `:root` inside the system's `prefers-color-scheme` query. */
 function darkBlock(theme) {
   if (theme.reference.darkMode === "class") {
-    return schemeBlock(".dark", theme.colors.dark, "dark");
+    return schemeBlock(
+      ".dark",
+      theme.colors.dark,
+      "dark",
+      theme.reference.components,
+    );
   }
-  const block = schemeBlock(":root", theme.colors.dark, "dark")
+  const block = schemeBlock(
+    ":root",
+    theme.colors.dark,
+    "dark",
+    theme.reference.components,
+  )
     .replace(/^(?=.)/gm, "  ")
     .trimEnd();
   return `@media (prefers-color-scheme: dark) {\n${block}\n}\n`;
@@ -1340,7 +1454,7 @@ export function renderThemeCss(theme) {
    The mono face, which \`font-mono\` gives, is ${theme.mono.family.replaceAll("*/", "* /")}, on \`${theme.mono.hook}\`${monoOwn ? "" : ", the hook it shares"}.`
     : "";
   return `${themeCssHead(DARK_SWITCH[theme.reference.darkMode])}
-${schemeBlock(":root", theme.colors.light, "light")}
+${schemeBlock(":root", theme.colors.light, "light", theme.reference.components)}
 ${darkBlock(theme)}
 /* Typeface. The type scale is set in ${names}, as DESIGN.md writes it.
    ${hookNames} is the hook a host app fills with its own loaded face (Next:
@@ -1439,12 +1553,16 @@ export function applyThemeV4(v4Css, theme) {
 }
 
 /** The reference block, complete: how dark is switched, the 27 values the
-    theme was written with, then what the project wrote that the kit does not
-    read, so reading the result back lists the same warnings. */
-function referenceRule({ values, extra, darkMode }) {
+    theme was written with, the component tokens it wrote, then what the
+    project wrote that the kit does not read, so reading the result back lists
+    the same warnings. */
+function referenceRule({ values, components, extra, darkMode }) {
   return `:root {\n${[
     declaration("  ", DARK_MODE, darkMode),
     ...Object.entries(values).map(([name, value]) =>
+      declaration("  ", name, value),
+    ),
+    ...Object.entries(components).map(([name, value]) =>
       declaration("  ", name, value),
     ),
     ...extra.map((text) => `  ${text}`),

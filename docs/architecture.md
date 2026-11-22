@@ -476,31 +476,33 @@ came to empty the person's own `~/.agent-workflows/runs`. The runtime's half is 
 `EngineOptions`, `ClaudeOptions` and the journal's makers, and `packages/agent-runtime/src/cli/main.ts` is the one module that reads
 `AE_ROOT` (`test/engine-root.test.ts`).
 
-**The Run door.** A run — its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it — is read and
-written through one Effect service, `RunDoor` (`packages/agent-orchestrator/src/runs/runs.store.ts`), whose methods take a `RunId` and
-answer Effects failing with a refusal. It has two layers built the one way (`runDoorOver`): the files (`runDoorFiles`, over
-`filesStoreAt(home)`, so a record keeps its bytes) and a memory stand-in (`runDoorMemory`, `src/runs/memory.store.ts`, which no file of `src`
-imports: `STAND_INS` in `test/boundary.test.ts`). Each write is checked first, on both: a new run decodes through the model's `Run`
-(`src/record/record.model.ts`) with its id as `RunId.OnCreate` checks it, a run written back through `Run`, and a break of an invariant
-is `Invalid`; a new run at an id with a record is `Conflict`, the files' `wx`. One table of walks holds the layers to each other
-(`test/run-walks.ts`, run on files by `test/run-store.test.ts` and on memory by `src/runs/memory.store.test.ts`), as the place's do;
-the pattern — `doorOf`, `checked`, `fromThrow` and `rootedDoor` in `src/door/door.store.ts`, and the walk runner `test/door-walks.ts` — names no
-aggregate, for the doors after it. Unlike `PlaceService` and `StoreRoot`, the door has a default: it is a `Context.Reference` whose
-default value is rooted (`rootedDoor`) — the files door at the `StoreRoot` the program is given, refused `Invalid` where it was given
-none — so a program given no door reads the records of its own store, one given the memory layer reads that with no root at all, and
-no program's requirements change while the run store's callers move onto it. A default here departs from the rule above on purpose:
-`RunDoor` is no fact of where a program runs, as the place and the root are, and requiring it would have changed the type of every
-controller and of each of their callers at once. A synchronous caller — the stats, the run list, the pages, the command line — reads
-through the door at once (`runsAtOnce`, the same file), so its writes are checked as the door checks them; no file of `src` but the
-door's reads the files store (`filesStoreAt`), which `test/run-store.test.ts` refuses with no baseline. `runsAtOnce(home)` and
-`keptRuns(home, …)` read the files at the root they are handed, whatever door a program is given, so a test's memory door never sees
-them: each such read past the door is a debt counted per file in `packages/agent-orchestrator/test/run-door.baseline.ts`, which only
-shrinks. A run from a card is created once: on the files the create writes the record `wx`,
-then claims the card with a `wx` create of `<root>/started/<card>.json` naming the run — outside `runs/`, so no listing, prune or sweep
-of runs reads it — and a loser forgets its own record and is refused `Conflict` (`cardStartedTwice`). Forgetting a run (`runs.forget`,
-`nemia rm`) removes the claim that names it, so a store keeps no claim of a run it no longer has; a claim whose run has no record all the
-same, or one from another card — a crash between the two writes — is stale and taken over. The memory stand-in refuses the same off
-its map. It is the Run door's to hold, not the Card door's: only this door can tell whether a claim's run still has a record.
+**The Run door.** A run — its record, its card's claim and its asks, and the holds, refresh asks and forgetting markers a person keeps
+beside it — is read and written through one Effect service, `RunDoor` (`packages/agent-orchestrator/src/runs/runs.store.ts`), whose
+methods take a `RunId` and answer Effects failing with a refusal. It has two layers built the one way: the store's keyspace
+(`runDoorKeyspace`, over `runRecords` in `src/runs/records.store.ts`) and a memory stand-in (`runDoorMemory`, `src/runs/memory.store.ts`,
+which no file of `src` imports: `STAND_INS` in `test/boundary.test.ts`). On the keyspace a run's record is the record at
+`/registry/runs/<id>`, its card's claim the one at `/registry/claims/<card>` naming it, and each ask a person writes the one at
+`/registry/asks/<id>/<name>`, spent under `done/<name>` (`src/runs/run-keys.ts`); a person's markers stay files beside them under
+`runs/` until they become records too, and every read composes them onto the run. Writes that belong together are one transaction
+(`within`, `src/keyspace/keyspace.store.ts`): a run created with its card's claim, a pass's record written with the asks it spent
+(`runs.settle`), a run forgotten with its claim and its asks. Each write is checked first, on both layers: a new run decodes through
+the model's `Run` (`src/record/record.model.ts`) with its id as `RunId.OnCreate` checks it, a run written back through `Run`, and a
+break of an invariant is `Invalid`; a new run at an id with a record is `Conflict`. One table of walks holds the layers to each other
+(`test/run-walks.ts`, run on the keyspace by `test/run-store.test.ts` and on memory by `src/runs/memory.store.test.ts`), as the place's
+do; the pattern — `doorOf`, `checked`, `fromThrow` and `rootedDoor` in `src/door/door.store.ts`, and the walk runner
+`test/door-walks.ts` — names no aggregate, for the doors after it. Unlike `PlaceService` and `StoreRoot`, the door has a default: it is a
+`Context.Reference` whose default value is rooted (`rootedDoor`) — the keyspace door at the `StoreRoot` the program is given, refused
+`Invalid` where it was given none — so a program given no door reads the records of its own store, and one given the memory layer reads
+that with no root at all. A default here departs from the rule above on purpose: `RunDoor` is no fact of where a program runs, as the
+place and the root are, and requiring it would have changed the type of every controller and of each of their callers at once. Every
+caller of `src` yields the door: there is no synchronous face, and `test/run-store.test.ts` refuses a read of runs past it with no
+baseline. A store's run files, as a store before the keyspace kept them (`runs/<id>.json`, `runs/<id>.asks/`, `started/<card>.json`),
+are imported by the keyspace's open whenever `runs/` or `started/` moved since the last import (`runsImported`): each run in one
+transaction, a key already held never written over, and every file read moved aside under `<root>/imported/`, never deleted; a claim
+whose run has no record, or one from another card, is moved aside unimported, and a file larger than a record holds stops the import
+whole. A run from a card is created once: the claim is written with the record or neither is, and a second run from the card is refused
+`Conflict` (`cardStartedTwice`). Forgetting a run (`runs.forget`, `nemia rm`) removes the claim that names it. The memory stand-in refuses
+the same off its map. It is the Run door's to hold, not the Card door's: only this door can tell whether a claim's run still has a record.
 
 **The Factory door.** A factory — its file, and the level, rules and servers the store keeps beside it — is read and written through
 `FactoryDoor` (`packages/agent-orchestrator/src/factory/door/factories.store.ts`), on the Run door's pattern: two layers built the one way

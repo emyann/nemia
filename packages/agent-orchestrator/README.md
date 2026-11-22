@@ -338,14 +338,14 @@ wf stats --json                            # what GET /api/stats answers
 ## The Run door
 
 A run is read and written through one door, `RunDoor` (`src/runs/runs.store.ts`): an Effect service whose methods take a run's id
-as a `RunId` and answer Effects that fail with a refusal (`Missing`, `Conflict`, `Invalid`). Behind it are today's files, unchanged
-on disk, and a memory stand-in a test gives its program with `Effect.provide(program, runDoorMemory())`. Every write is checked
-first: a new run, or one written back, that breaks an invariant of the run's model (`src/record/record.model.ts`) is refused
-`Invalid` and nothing is written, and a new run at an id that has a record is refused `Conflict`. A program given no door reads the
-files at the root it is given (`StoreRoot`), and is refused `Invalid` given none. A synchronous caller reads through it at once
-(`runsAtOnce(home)`), and no file of `src` but the door's reads the files store (`test/run-store.test.ts`). `runsAtOnce(home)` and
-`keptRuns(home, …)` read the files at the root they are handed whatever door a program is given: a debt counted per file in
-`test/run-door.baseline.ts`, which only shrinks.
+as a `RunId` and answer Effects that fail with a refusal (`Missing`, `Conflict`, `Invalid`). Behind it are the store's keyspace — a
+run's record, its card's claim and its asks are records there (`src/runs/records.store.ts`), and a person's markers files beside them —
+and a memory stand-in a test gives its program with `Effect.provide(program, runDoorMemory())`. Every write is checked first: a new
+run, or one written back, that breaks an invariant of the run's model (`src/record/record.model.ts`) is refused `Invalid` and nothing is
+written, and a new run at an id that has a record is refused `Conflict`. What belongs together is written in one transaction: a run
+and its card's claim, a pass's record and the asks it spent (`runs.settle`). A program given no door reads the keyspace at the root it
+is given (`StoreRoot`), and is refused `Invalid` given none. Every caller yields the door (`test/run-store.test.ts`). A store's run
+files from before the keyspace are imported on its open and moved aside under `imported/`, never deleted.
 
 ## The Factory door
 

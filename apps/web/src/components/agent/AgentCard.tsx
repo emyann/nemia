@@ -12,7 +12,7 @@ const STATS: readonly AgentRoleKey[] = ['model', 'effort', 'harness'];
  * it gives and what becomes of Claude Code's own prompt are; its name is the link there, stretched over the card, and the factories' and
  * the nodes' links sit above it.
  */
-export function AgentCard({ agent }: { agent: AgentListing & { factories?: readonly string[] } }) {
+export function AgentCard({ agent }: { agent: Omit<AgentListing, 'body' | 'schema' | 'source'> & { factories?: readonly string[] } }) {
   return (
     <section
       aria-label={`Agent ${agent.name}`}

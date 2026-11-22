@@ -18,6 +18,7 @@
  * the same page's `Table` where the request asks for one (`TABLE_ACCEPT`): two successes of one status. A watch answers no Table.
  */
 import { Schema } from 'effect';
+import { Table } from './table.ts';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { Template, TemplateList } from './template.ts';
 import {
@@ -113,9 +114,13 @@ const EventListObject = EventList.annotate({ identifier: 'EventList' });
  * rendered with its parameters' defaults and served in the Schemas a namespace serves them in, with origin `builtin`.
  */
 export class TemplatesGroup extends HttpApiGroup.make('templates').add(
-  HttpApiEndpoint.get('listAll', '/api/templates', { query: listQuery, success: TemplateListObject, error: objectErrors }).annotate(
+  HttpApiEndpoint.get('listAll', '/api/templates', {
+    query: listQuery,
+    success: [TemplateListObject, Table],
+    error: objectErrors,
+  }).annotate(
     OpenApi.Description,
-    'Lists the templates Nemia builds in, which no namespace holds, a page at a time. Answers a TemplateList.',
+    'Lists the templates Nemia builds in, which no namespace holds, a page at a time. Answers a TemplateList, or the same page as a Table where the request asks for one.',
   ),
   HttpApiEndpoint.get('get', '/api/templates/:name', { params: templateParams, success: TemplateObject, error: objectErrors }).annotate(
     OpenApi.Description,
@@ -124,11 +129,11 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
   HttpApiEndpoint.get('workflows', '/api/templates/:name/workflows', {
     params: templateParams,
     query: listQuery,
-    success: WorkflowListObject,
+    success: [WorkflowListObject, Table],
     error: definitionErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a template's workflows, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a WorkflowList.",
+    "Lists a template's workflows, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a WorkflowList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('workflow', '/api/templates/:name/workflows/:doc', {
     params: documentParams,
@@ -141,11 +146,11 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
   HttpApiEndpoint.get('agents', '/api/templates/:name/agents', {
     params: templateParams,
     query: listQuery,
-    success: AgentListObject,
+    success: [AgentListObject, Table],
     error: definitionErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a template's agents, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers an AgentList.",
+    "Lists a template's agents, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers an AgentList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('agent', '/api/templates/:name/agents/:doc', {
     params: documentParams,
@@ -155,11 +160,11 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
   HttpApiEndpoint.get('skills', '/api/templates/:name/skills', {
     params: templateParams,
     query: listQuery,
-    success: SkillListObject,
+    success: [SkillListObject, Table],
     error: definitionErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a template's skills, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a SkillList.",
+    "Lists a template's skills, rendered with its parameters' defaults and served as a namespace serves them, with origin builtin. Answers a SkillList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('skill', '/api/templates/:name/skills/:doc', {
     params: documentParams,
@@ -173,9 +178,13 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
  * away (`nemia unsubscribe`).
  */
 export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
-  HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }).annotate(
+  HttpApiEndpoint.get('listAll', '/api/subscriptions', {
+    query: listQuery,
+    success: [SubscriptionListObject, Table],
+    error: objectErrors,
+  }).annotate(
     OpenApi.Description,
-    "Lists the feed's subscriptions, which no namespace holds, a page at a time. Answers a SubscriptionList.",
+    "Lists the feed's subscriptions, which no namespace holds, a page at a time. Answers a SubscriptionList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
     params: subscriptionParams,
@@ -206,18 +215,18 @@ export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
  * its name, the byte its line starts at — a daemon's or the store's that names no factory in no namespace.
  */
 export class EventsGroup extends HttpApiGroup.make('events').add(
-  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: EventListObject, error: objectErrors }).annotate(
+  HttpApiEndpoint.get('listAll', '/api/events', { query: listQuery, success: [EventListObject, Table], error: objectErrors }).annotate(
     OpenApi.Description,
-    "Lists the feed's lines as events, every one, in the order they were written, a page at a time; with watch=true and a resourceVersion, a stream from that byte. Answers an EventList.",
+    "Lists the feed's lines as events, every one, in the order they were written, a page at a time; with watch=true and a resourceVersion, a stream from that byte. Answers an EventList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/events', {
     params: namespaceParams,
     query: listQuery,
-    success: EventListObject,
+    success: [EventListObject, Table],
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists the feed's lines as events in one namespace, those naming its factory, in the order they were written, a page at a time. Answers an EventList.",
+    "Lists the feed's lines as events in one namespace, those naming its factory, in the order they were written, a page at a time. Answers an EventList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }).annotate(
     OpenApi.Description,

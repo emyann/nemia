@@ -6,7 +6,7 @@
  * Factory object carries. Ported word for word from the orchestrator's `factoryLines` (`factory/factory.ts`); `listingLines` is pure.
  */
 import { DEFAULT_NAMESPACE, type Factory, type FactoryInstruction, type Schedule } from 'objects';
-import { asked, everyPage, factoriesListed } from '../../objects.ts';
+import { asked, everyPage, factoriesListed, pageOf } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { said } from '../requests.ts';
 import { dollars, fireWord, worksOnLine } from './lines.ts';
@@ -148,7 +148,7 @@ const orNone = async <A>(read: () => Promise<A>) => {
 /** What the listing reads beside the factory `name`: its schedules, every page, and its instruction. */
 async function besideOf(command: string, name: string) {
   const [schedules, instruction] = await Promise.all([
-    orNone(() => asked(command, (c) => everyPage((page) => c.schedules.list({ params: { namespace: name }, query: page })))),
+    orNone(() => asked(command, (c) => pageOf(everyPage((page) => c.schedules.list({ params: { namespace: name }, query: page }))))),
     orNone(() => asked(command, (c) => c.factories.instruction({ params: { name } }))),
   ]);
   return { schedules: schedules?.items ?? [], instruction } satisfies Beside as Beside;

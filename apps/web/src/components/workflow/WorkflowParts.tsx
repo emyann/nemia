@@ -5,13 +5,13 @@
 import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { storeQuery } from '../../lib/api/store.ts';
-import { type WorkflowListing } from '../../lib/api/workflows.ts';
+import { type WorkflowRow } from '../../lib/api/workflows.ts';
 import { FACTORY_WAY, fromWord, type ListPlace } from '../../lib/factories';
 import { repoName } from '../../lib/factory';
 import { container } from '../../lib/meaning';
 
 /** Where a workflow is read from, read in `factory` (`fromWord`): the user library, this repository's, or the factory's. */
-export function FromBadge({ from, factory }: { from: WorkflowListing['from']; factory?: string }) {
+export function FromBadge({ from, factory }: { from: WorkflowRow['from']; factory?: string }) {
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-body-small leading-none font-medium ${
@@ -34,7 +34,7 @@ export function YoursFolder() {
  * read in the named factory `factory`, into a factory's folder — a factory's own tree changing the factory's way (`FACTORY_WAY`); and
  * the builder puts back the steps a folder reads as, so one of yours that does not read is fixed by hand first.
  */
-export function NoBuilder({ workflow: { from, error }, factory }: { workflow: WorkflowListing; factory?: string }) {
+export function NoBuilder({ workflow: { from, error }, factory }: { workflow: WorkflowRow; factory?: string }) {
   if (from === 'factory')
     return (
       <p data-no-builder data-way="factory" className="text-body-small text-on-surface-variant">

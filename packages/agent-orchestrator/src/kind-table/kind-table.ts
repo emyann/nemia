@@ -10,58 +10,29 @@
  */
 import {
   DEFAULT_NAMESPACE,
-  type Agent,
   type AgentList,
   type Factory,
   type FactoryList,
   type McpServer,
   type McpServerList,
-  type ObjectMeta,
-  type Proposal,
   type ProposalList,
-  type Skill,
   type SkillList,
   type Table,
   type TableColumnDefinition,
-  type TableColumnType,
 } from 'objects';
 
-/** A column: its name, what it says, its priority (0 shown by default, 1 when asked wide) and the type of its cells, text by default. */
-const column = (name: string, description: string, priority: 0 | 1, type: TableColumnType = 'string') =>
-  ({
-    name,
-    type,
-    format: name === 'Name' ? 'name' : '',
-    description,
-    priority,
-  }) satisfies TableColumnDefinition;
+/** An agent, a skill and a proposal as a list serves each: without its files' content (`LISTED_WITHOUT`). */
+type AgentListed = AgentList['items'][number];
+type SkillListed = SkillList['items'][number];
+type ProposalListed = ProposalList['items'][number];
+import { column, firstLine, tableOf } from './table-of.ts';
 
-/** `text` up to its first line's end; `''` for none. */
-const firstLine = (text: string | null | undefined) => {
-  if (!text) return '';
-  const at = text.indexOf('\n');
-  return at === -1 ? text : text.slice(0, at);
-};
-
-/** A row's object, as Kubernetes gives one beside a table's row: the item's metadata alone. */
-const partialOf = (metadata: ObjectMeta) => ({ kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata });
-
-/** A page as a table: its place (`continue`), its columns, and a row per item, its cells by `cells`, its metadata beside them. */
-const tableOf = <Item extends { readonly metadata: ObjectMeta }>(
-  page: { readonly metadata: { readonly continue?: string }; readonly items: readonly Item[] },
-  columns: readonly TableColumnDefinition[],
-  cells: (item: Item) => readonly unknown[],
-) =>
-  ({
-    kind: 'Table',
-    apiVersion: 'meta.k8s.io/v1',
-    metadata: page.metadata.continue === undefined ? {} : { continue: page.metadata.continue },
-    columnDefinitions: columns,
-    rows: page.items.map((item) => ({ cells: cells(item), object: partialOf(item.metadata) })),
-  }) satisfies Table as Table;
-
-/** What a definition's note says: why it does not read, and the origin that shadows it, `; `-joined; `''` for neither. */
-const definitionNote = (error: string | null, shadowedBy: string | undefined) =>
+/**
+ * What a definition's note says: why it does not read, and the origin that shadows it, `; `-joined; `''` for neither.
+ * @param error Why the definition does not read; null where it reads.
+ * @param shadowedBy The origin that shadows it, where one does.
+ */
+export const definitionNote = (error: string | null, shadowedBy: string | undefined) =>
   [...(error ? [`does not read: ${firstLine(error)}`] : []), ...(shadowedBy ? [`shadowed by ${shadowedBy}`] : [])].join('; ');
 
 /** The columns of an agent's row, in the order its cells are. */
@@ -79,11 +50,11 @@ export const AGENT_COLUMNS: readonly TableColumnDefinition[] = [
 ];
 
 /** What an agent's card says it can do: its entries' ids, or why it says nothing. */
-const canDo = ({ status }: Agent) =>
+const canDo = ({ status }: AgentListed) =>
   status.cardError ? `says nothing it can do — ${firstLine(status.cardError)}` : (status.card ?? []).map((entry) => entry.id).join(', ');
 
 /** Where an agent was copied from, and whether its source moved since: `''` for one never copied. */
-const copiedCell = ({ status: { copied } }: Agent) => {
+const copiedCell = ({ status: { copied } }: AgentListed) => {
   if (copied === null) return '';
   const since = copied.now === 'changed' ? '; the source has changed since' : copied.now === 'gone' ? '; the source is gone' : '';
   return `from ${copied.source} at ${copied.version}${since}`;
@@ -93,7 +64,7 @@ const copiedCell = ({ status: { copied } }: Agent) => {
 const harnessPromptCell = (prompt: string | null | undefined) => (prompt === 'keep' ? '' : firstLine(prompt));
 
 /** The cells of `agent`'s row, in `AGENT_COLUMNS`' order. */
-const agentCells = (agent: Agent) => [
+const agentCells = (agent: AgentListed) => [
   agent.metadata.name,
   agent.status.origin,
   firstLine(agent.spec.description),
@@ -125,7 +96,7 @@ export const SKILL_COLUMNS: readonly TableColumnDefinition[] = [
 ];
 
 /** The cells of `skill`'s row, in `SKILL_COLUMNS`' order. */
-const skillCells = (skill: Skill) => [
+const skillCells = (skill: SkillListed) => [
   skill.metadata.name,
   skill.status.origin,
   firstLine(skill.spec.description ?? skill.status.entry?.description),
@@ -259,13 +230,13 @@ const whyCell = (why: string | undefined) => {
 };
 
 /** Who proposed, as a cell: `person`, or the agent, with `(run/step)` where it was a run's. */
-const proposedByCell = ({ status: { proposedBy } }: Proposal) => {
+const proposedByCell = ({ status: { proposedBy } }: ProposalListed) => {
   if (proposedBy.agent === undefined) return 'person';
   return proposedBy.run === undefined ? proposedBy.agent : `${proposedBy.agent} (${proposedBy.run}/${proposedBy.step ?? ''})`;
 };
 
 /** The cells of `proposal`'s row, in `PROPOSAL_COLUMNS`' order. */
-const proposalCells = (proposal: Proposal) => [
+const proposalCells = (proposal: ProposalListed) => [
   proposal.metadata.name,
   proposal.status.phase,
   proposal.status.widens,

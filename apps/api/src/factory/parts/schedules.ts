@@ -4,7 +4,8 @@
  * so a warm read reads no finished run's record — written (`nemia factory schedule`) and taken back (`factory unschedule`), each entry
  * called by its `input` and answered with what it wrote and the cron it replaced (`written`).
  */
-import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE, scheduleList, scheduleObject } from 'agent-orchestrator';
+import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE, scheduleList, scheduleObject, scheduleTable } from 'agent-orchestrator';
+import { listOrTable } from '../../objects/table.ts';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { factoryNamed, queryOf } from './parts.ts';
@@ -18,10 +19,13 @@ const scheduleIn = (s: Served, namespace: string, name: string) =>
 export const schedulesHandlers = readsBounded(Api, 'schedules', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/namespaces/${namespace}/schedules`, namespace);
-        return s.inRequest(scheduleList(s.home, namespace, queryOf(query), s.memo.records.factories));
-      }),
+      listOrTable(
+        answered((s) => {
+          factoryNamed(`GET /api/namespaces/${namespace}/schedules`, namespace);
+          return s.inRequest(scheduleList(s.home, namespace, queryOf(query), s.memo.records.factories));
+        }),
+        scheduleTable,
+      ),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered(async (s) => {

@@ -38,3 +38,33 @@ export const taken = (group: string, name: string, value: unknown) =>
     [...endpointOf(group, name).payload.values()].flatMap((p) => p.schemas),
     value,
   ) satisfies unknown;
+
+/** `value` with the key at `segments` deleted, `[]` standing for each item of an array; a parent absent or null left as it is. */
+const deleteAt = (value: unknown, segments: readonly string[]) => {
+  const [segment, ...rest] = segments;
+  if (segment === undefined || typeof value !== 'object' || value === null) return;
+  const many = segment.endsWith('[]');
+  const key = many ? segment.slice(0, -2) : segment;
+  const record = value as Record<string, unknown>;
+  if (rest.length === 0 && !many) {
+    delete record[key];
+    return;
+  }
+  const inner = record[key];
+  if (many && Array.isArray(inner)) for (const item of inner) deleteAt(item, rest);
+  else if (!many) deleteAt(inner, rest);
+};
+
+/**
+ * `page` as a list answers it where its items leave `paths` out: each item a copy without them, every other key kept.
+ * @param paths The paths an item leaves out, as `LISTED_WITHOUT` writes them.
+ * @param page The page, its items whole.
+ */
+export const listedPage = <Page extends { readonly items: readonly unknown[] }>(paths: readonly string[], page: Page) => {
+  const items = page.items.map((item) => {
+    const copy: unknown = JSON.parse(JSON.stringify(item));
+    for (const path of paths) deleteAt(copy, path.split('.'));
+    return copy;
+  });
+  return { ...page, items };
+};

@@ -8,7 +8,7 @@ import { NewWorkflow } from './NewWorkflow';
 import { FromBadge, Unplaced, YoursFolder } from './WorkflowParts';
 import { factoriesQuery } from '@/lib/api/factories';
 import { storeQuery } from '@/lib/api/store';
-import { workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '@/lib/api/workflows';
+import { workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowRow } from '@/lib/api/workflows';
 import { listPlace, workflowFactories } from '@/lib/factories';
 import { workflowLink, workflowsLink } from '@/lib/factoryAddress';
 import { matches, useFilterText } from '@/lib/listFilter';
@@ -84,7 +84,7 @@ export function WorkflowsPage({ place: address, query, onQuery }: { place: PageP
 type Filter = { text: string; onClear: () => void };
 
 /** The workflows of `all` the filter keeps, by name and description. */
-const kept = (all: readonly WorkflowListing[], { text }: Filter) => all.filter((one) => matches(text, one.name, one.description));
+const kept = (all: readonly WorkflowRow[], { text }: Filter) => all.filter((one) => matches(text, one.name, one.description));
 
 /**
  * Every workflow read with no factory that the filter keeps, each tagged with the factories it is in (`workflowFactories`), linked to
@@ -157,7 +157,7 @@ function WorkflowCard({
   tags,
   factory,
 }: {
-  workflow: WorkflowListing;
+  workflow: WorkflowRow;
   address: PagePlace;
   tags: readonly string[];
   factory?: string;

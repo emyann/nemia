@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Background, BackgroundVariant, MarkerType, Position, ReactFlow, type Connection } from '@xyflow/react';
-import { BuildRefusal, saveWorkflow, workflowsQuery, type WorkflowListing } from '../../lib/api/workflows.ts';
+import { BuildRefusal, saveWorkflow, workflowQuery, workflowsQuery, type WorkflowListing } from '../../lib/api/workflows.ts';
 import { keyFormQuery } from '../../lib/api/builder.ts';
 import {
   addStep,
@@ -99,6 +99,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       startFrom(answer.workflow);
       setSaved(answer);
       queryClient.setQueryData(workflowsQuery.queryKey, (list) => listedWith(list, answer.workflow));
+      queryClient.setQueryData(workflowQuery('user', answer.workflow.name).queryKey, answer.workflow);
       void rereadWorkflows(queryClient);
     },
     onError: (err) => {
@@ -109,10 +110,9 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
   });
 
   const reread = useMutation({
-    mutationFn: () => queryClient.fetchQuery({ ...workflowsQuery, staleTime: 0 }),
-    onSuccess: (list) => {
-      const now = list.find((w) => w.from === 'user' && w.name === base.name);
-      if (!now || now.error) return onClose();
+    mutationFn: () => queryClient.fetchQuery({ ...workflowQuery('user', base.name), staleTime: 0 }),
+    onSuccess: (now) => {
+      if (now.error) return onClose();
       startFrom(now);
       setRefusal(null);
       setSaved(null);

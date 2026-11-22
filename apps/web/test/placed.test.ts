@@ -38,16 +38,18 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, factories: F
   return asked satisfies string[];
 }
 
-test("REFUSED: a write of a folder of yours reads again the list read with no factory and every factory's — never a step's page keyed under it", async () => {
+test("REFUSED: a write of a folder of yours reads again the list read with no factory, every factory's and each workflow read whole — never a step's page keyed under it", async () => {
   const client = new QueryClient();
   const step = ['workflows', 'yours', 'mine', 'plan', null, null];
-  const kept = [['workflows'], ['factory-workflows', 'pipao', '/code/pipao'], ['factory-workflows', 'quay', '/a'], step];
+  const whole = ['workflow', 'user', 'mine', 'quay', '/a'];
+  const kept = [['workflows'], ['factory-workflows', 'pipao', '/code/pipao'], ['factory-workflows', 'quay', '/a'], step, whole];
   for (const key of kept) client.setQueryData(key, []);
   await rereadWorkflows(client);
   const stale = (key: readonly unknown[]) => client.getQueryState(key)?.isInvalidated;
   assert.equal(stale(kept[0]), true, 'the list the builder drafts from');
   assert.equal(stale(kept[1]), true, "a factory's list, which its page draws from");
   assert.equal(stale(kept[2]), true, "and every other factory's");
+  assert.equal(stale(whole), true, 'a workflow read whole, which its page and its builder draw from');
   assert.equal(stale(step), false, "a step's page is read again on its own visit");
 });
 

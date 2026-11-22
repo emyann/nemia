@@ -1,11 +1,11 @@
-import type { WorkflowListing } from '../../lib/api/workflows.ts';
+import type { WorkflowRow } from '../../lib/api/workflows.ts';
 import { unreadWorkflows, workflowKey } from '../../lib/inbox';
 
 /**
  * The workflows a list leaves out, each by name with why it does not read; nothing when every one reads. Drawn as
  * what a person weighs: the workflow is theirs to correct before it is offered.
  */
-export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowListing[] }) {
+export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowRow[] }) {
   const unread = unreadWorkflows(workflows);
   if (unread.length === 0) return null;
   return (

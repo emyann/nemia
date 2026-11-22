@@ -6,8 +6,8 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Skill, SkillFile, SkillWrite } from 'objects';
-import { answered, taken } from './served.ts';
+import { API_VERSION, Skill, SkillFile, SkillWrite, LISTED_WITHOUT } from 'objects';
+import { answered, listedPage, taken } from './served.ts';
 
 const skill = {
   apiVersion: API_VERSION,
@@ -39,7 +39,7 @@ test("the Api's get answers a skill and its list a page of them, every key kept,
   assert.deepEqual(answered('skills', 'get', skill), skill);
   assert.deepEqual(answered('skills', 'get', unread), unread);
   const page = { apiVersion: API_VERSION, kind: 'SkillList', metadata: {}, items: [skill, unread] };
-  assert.deepEqual(answered('skills', 'list', page), page);
+  assert.deepEqual(answered('skills', 'list', page), listedPage(LISTED_WITHOUT.Skill, page));
   assert.equal(answered('skills', 'get', { ...skill, kind: 'Agent' }), undefined);
   assert.equal(answered('skills', 'list', { ...page, kind: 'AgentList' }), undefined);
 });

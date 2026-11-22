@@ -4,7 +4,8 @@
  * (`nemia factory volume set`), answered as it reads after with the file written (`written`). `nemia factory volume add` and `rm`, which
  * take a folder by its whole path, are the factories group's.
  */
-import { FACTORY_VOLUME_SET, informerMemo, verifiesRest, volumeList, volumeObject } from 'agent-orchestrator';
+import { FACTORY_VOLUME_SET, informerMemo, verifiesRest, volumeList, volumeObject, volumeTable } from 'agent-orchestrator';
+import { listOrTable } from '../../objects/table.ts';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { factoryNamed, queryOf } from './parts.ts';
@@ -21,10 +22,13 @@ const howOf = (s: Served) => ({
 export const volumesHandlers = readsBounded(Api, 'volumes', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/namespaces/${namespace}/volumes`, namespace);
-        return s.inRequest(volumeList(s.e, howOf(s), namespace, queryOf(query)));
-      }),
+      listOrTable(
+        answered((s) => {
+          factoryNamed(`GET /api/namespaces/${namespace}/volumes`, namespace);
+          return s.inRequest(volumeList(s.e, howOf(s), namespace, queryOf(query)));
+        }),
+        volumeTable,
+      ),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered((s) => {

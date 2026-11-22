@@ -92,7 +92,6 @@ export const unstartedCard = (name: string, factory: string) => ({
   startedAs: [],
   state: 'filed',
   error: null,
-  body: `${name}\n`,
   filedAt: AT,
   factoryRepo: null,
 }) satisfies InboxEntry;

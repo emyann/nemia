@@ -5,8 +5,8 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, DEFINITION_ORIGINS, EDGE_KINDS, GraphEdge, Workflow, WorkflowCreate } from 'objects';
-import { answered, taken } from './served.ts';
+import { API_VERSION, DEFINITION_ORIGINS, EDGE_KINDS, GraphEdge, Workflow, WorkflowCreate, LISTED_WITHOUT } from 'objects';
+import { answered, listedPage, taken } from './served.ts';
 
 const step = {
   name: 'design',
@@ -53,7 +53,7 @@ test("the Api's get answers a workflow and its list a page of them, every key ke
   assert.deepEqual(answered('workflows', 'get', workflow), workflow);
   assert.deepEqual(answered('workflows', 'get', shadowed), shadowed);
   const page = { apiVersion: API_VERSION, kind: 'WorkflowList', metadata: {}, items: [workflow, shadowed] };
-  assert.deepEqual(answered('workflows', 'list', page), page);
+  assert.deepEqual(answered('workflows', 'list', page), listedPage(LISTED_WITHOUT.Workflow, page));
   assert.equal(answered('workflows', 'get', { ...workflow, kind: 'Agent' }), undefined);
   assert.equal(answered('workflows', 'list', { ...page, kind: 'AgentList' }), undefined);
 });

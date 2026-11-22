@@ -5,7 +5,8 @@
  * the caller judged first: an agent is refused whether or not one is there, the person told `Missing` where none is.
  */
 import { Effect } from 'effect';
-import { delegationGet, delegationPut, delegationRemove, delegationsList } from 'agent-orchestrator';
+import { delegationGet, delegationPut, delegationRemove, delegationsList, delegationTable } from 'agent-orchestrator';
+import { listOrTable } from '../objects/table.ts';
 import { Api } from 'objects';
 import { queryOf } from '../factory/parts/index.ts';
 import { listed } from '../definitions/served.ts';
@@ -15,7 +16,10 @@ import { readsBounded } from '../objects/answer-bound.ts';
 export const delegationsHandlers = readsBounded(Api, 'delegations', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answeredWriteIn(namespace, async (s) => listed('Delegation', await s.inRequest(delegationsList(namespace)), queryOf(query))),
+      listOrTable(
+        answeredWriteIn(namespace, async (s) => listed('Delegation', await s.inRequest(delegationsList(namespace)), queryOf(query))),
+        delegationTable,
+      ),
     )
     .handle('get', ({ params: { namespace, name } }) => answeredWriteIn(namespace, (s) => s.inRequest(delegationGet(namespace, name))))
     .handle('put', ({ params: { namespace, name }, payload }) =>

@@ -4,7 +4,8 @@
  * names no factory read at `/api/events/<name>` alone. Read through the package's Feed door (`eventList`, `eventObject`), at the app's
  * `StoreRoot`.
  */
-import { eventList, eventObject } from 'agent-orchestrator';
+import { eventList, eventObject, eventTable } from 'agent-orchestrator';
+import { listOrTable } from '../objects/table.ts';
 import { Api } from 'objects';
 import { factoryNamed, queryOf } from '../factory/parts/parts.ts';
 import { runPlaced } from '../store.ts';
@@ -13,12 +14,20 @@ import { readsBounded } from '../objects/answer-bound.ts';
 
 export const eventsHandlers = readsBounded(Api, 'events', (handlers) =>
   handlers
-    .handle('listAll', ({ query }) => answered((s) => runPlaced(s, s.e, eventList(queryOf(query)))))
+    .handle('listAll', ({ query }) =>
+      listOrTable(
+        answered((s) => runPlaced(s, s.e, eventList(queryOf(query)))),
+        eventTable,
+      ),
+    )
     .handle('list', ({ params: { namespace }, query }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/namespaces/${namespace}/events`, namespace);
-        return runPlaced(s, s.e, eventList({ ...queryOf(query), namespace }));
-      }),
+      listOrTable(
+        answered((s) => {
+          factoryNamed(`GET /api/namespaces/${namespace}/events`, namespace);
+          return runPlaced(s, s.e, eventList({ ...queryOf(query), namespace }));
+        }),
+        eventTable,
+      ),
     )
     .handle('getAll', ({ params: { name } }) => answered((s) => runPlaced(s, s.e, eventObject(name))))
     .handle('get', ({ params: { namespace, name } }) =>

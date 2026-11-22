@@ -261,8 +261,7 @@ const answerVerbOf = (tasks: Map<string, TestTask>) =>
       const config = options?.config;
       const priority = options?.priority;
       const refused =
-        answerOptionsRefusalOf(options ?? {}) ??
-        answerRefusalOf(taskId, t ? stateOf(taskId, t) : undefined, text, config, priority);
+        answerOptionsRefusalOf(options ?? {}) ?? answerRefusalOf(taskId, t ? stateOf(taskId, t) : undefined, text, config, priority);
       if (refused !== undefined || !t) return yield* Effect.fail(new InputRefused({ message: refused ?? unknownTask(taskId) }));
       const input: Input = {
         at: new Date().toISOString(),

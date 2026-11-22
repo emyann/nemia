@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { StepPart } from '@/components/step/part/StepPart';
-import {
-  SessionQueuedBand,
-  SessionRetryingBand,
-  SessionStoppedBand,
-  SessionUnreadableBand,
-} from '@/components/step/session/SessionBand';
+import { SessionQueuedBand, SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/step/session/SessionBand';
 import { stepQueuedSaid } from '@/lib/queued';
 import { SessionComposer } from '@/components/step/session/SessionComposer';
 import { SessionQuiet, SessionTalk } from '@/components/step/session/SessionTalk';

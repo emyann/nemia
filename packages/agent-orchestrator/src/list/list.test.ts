@@ -183,7 +183,7 @@ describe('a held run waits on no one and lists no try due, though a step signed 
   });
 });
 
-describe('queuedForOf: the runtime\'s wait served as `QueuedFor`, the engine unschedulable as the store paused', () => {
+describe("queuedForOf: the runtime's wait served as `QueuedFor`, the engine unschedulable as the store paused", () => {
   const rows: Array<[string, HeldBack | undefined, unknown]> = [
     ['no wait', undefined, null],
     ['paused', { for: 'unschedulable' }, { for: 'paused' }],

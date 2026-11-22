@@ -5,7 +5,7 @@
  * Pure: the pass hands it the views it built off its one observation (`tick` in `engine/engine.ts`) and one reading of the machine,
  * and journals what it returns.
  */
-import type { AdmissionPass, AdmissionWait, AdmitOne, Holder, MachineMemory } from '../../contracts/admission.contract.ts';
+import type { AdmissionPass, AdmissionWait, AdmitOne, Holder, MachineMemory, PassWait } from '../../contracts/admission.contract.ts';
 import type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
 import type { TaskPhase } from './session.ts';
 import type { TaskResources } from './domain.ts';
@@ -44,6 +44,26 @@ export const roomOf = (m: MachineMemory, holders: readonly Holder[]) => {
 };
 
 /**
+ * A wait for memory: the need, the room left to the waiter at least nothing, and the kept memory withheld from it where any is.
+ * @param needBytes What the waiter needs.
+ * @param left The room left to it, below nothing where the machine is past it.
+ * @param withheld The kept memory withheld from it.
+ */
+const memoryWait = (needBytes: number, left: number, withheld: number) => {
+  const roomBytes = left < 0 ? 0 : left;
+  return withheld > 0
+    ? ({ for: 'memory', needBytes, roomBytes, keptBytes: withheld } satisfies PassWait)
+    : ({ for: 'memory', needBytes, roomBytes } satisfies PassWait);
+};
+
+/**
+ * The kept memory left once a need is counted against it, down to nothing.
+ * @param kept The kept memory still free.
+ * @param need The need counted.
+ */
+const keptLeft = (kept: number, need: number) => (need >= kept ? 0 : kept - need);
+
+/**
  * What a pass decides of one waiter, in turn: a turn that may take kept room takes a kept place of its pool while one is free, any
  * other a place under the ceiling, and one with neither waits for a slot; one that needs more than the room left to it — the room the
  * machine has left, less the kept memory still free where its turn may not take kept room — waits for memory, told its need, that
@@ -58,14 +78,8 @@ export const admitOne: AdmitOne = (one) => {
   if (!keptPlace && one.inPool >= one.ceiling) return { for: 'slot', pool: one.pool, ceiling: one.ceiling };
   const room = one.roomBytes;
   const withheld = one.kept ? 0 : one.keptBytes;
-  if (room !== null && one.needBytes > 0 && one.needBytes > room - withheld) {
-    const left = room - withheld;
-    const roomBytes = left < 0 ? 0 : left;
-    return withheld > 0
-      ? { for: 'memory', needBytes: one.needBytes, roomBytes, keptBytes: withheld }
-      : { for: 'memory', needBytes: one.needBytes, roomBytes };
-  }
-  const keptBytes = one.kept ? (one.needBytes >= one.keptBytes ? 0 : one.keptBytes - one.needBytes) : one.keptBytes;
+  if (room !== null && one.needBytes > 0 && one.needBytes > room - withheld) return memoryWait(one.needBytes, room - withheld, withheld);
+  const keptBytes = one.kept ? keptLeft(one.keptBytes, one.needBytes) : one.keptBytes;
   return {
     for: 'admitted',
     roomBytes: room === null ? null : room - one.needBytes,
@@ -93,7 +107,7 @@ export const admitting = (pass: AdmissionPass) => {
     held.set(h.pool, (held.get(h.pool) ?? 0) + 1);
     if (!h.kept) continue;
     keptHeld.set(h.pool, (keptHeld.get(h.pool) ?? 0) + 1);
-    keptBytes = h.needBytes >= keptBytes ? 0 : keptBytes - h.needBytes;
+    keptBytes = keptLeft(keptBytes, h.needBytes);
   }
   const inPool = new Map<string, number>();
   const keptSlots = new Map<string, number>();

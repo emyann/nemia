@@ -83,9 +83,9 @@ test("a step whose task waits to start says why, its session's wait before its c
     task: 'session',
     wait: slot,
   });
-  assert.deepEqual(
-    needsOf(withCheck, 'build', new Map([['c-build', queued('c-build', { for: 'unschedulable' })]]), judged).queuedFor,
-    { task: 'check', wait: { for: 'paused' } },
-  );
+  assert.deepEqual(needsOf(withCheck, 'build', new Map([['c-build', queued('c-build', { for: 'unschedulable' })]]), judged).queuedFor, {
+    task: 'check',
+    wait: { for: 'paused' },
+  });
   assert.equal(needsOf(withCheck, 'build', new Map([['t-build', queued('t-build')]]), judged).queuedFor, null, 'no wait: none');
 });

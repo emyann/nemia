@@ -1,7 +1,8 @@
 /**
  * The lines over a step's session that are about the session itself, each the shared band both conversations draw
- * (`conversation/ConversationBand.tsx`): the session or its check waiting to start, the session the api is reading again on a beat, the session the board cannot read at all, and
- * the session that has ended, which is where a person is told there is nobody left to say anything to.
+ * (`conversation/ConversationBand.tsx`): the session or its check waiting to start, the session the api is reading again on a beat,
+ * the session the board cannot read at all, and the session that has ended, which is where a person is told there is nobody left to
+ * say anything to.
  *
  * The frame is the family's; the words are a step's alone, which is why they live here and not in the family's folder.
  */

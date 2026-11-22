@@ -550,10 +550,10 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig) => {
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the options as
  * handed in, untyped, and refuses, in this order: a `sayTimeoutMs`, which no harness reads now; a `maxConcurrent` that is not a whole
- * number from 1; a `keptRoom` it cannot hold (`keptRoomRefusalOf`); a harness named by a word other than `'claude'`, or brought as an object whose `pool` is not a name; a spec whose `can`
- * cannot be read, or that carries a boolean `can` replaced (`specRefusalOf`); a remote agent's entry `remoteConfigRefusal` refuses, its
- * `pool` aside; a `holder` entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a `missingCredential` that is not a
- * function; and a `telemetry` that names no collector.
+ * number from 1; a `keptRoom` it cannot hold (`keptRoomRefusalOf`); a harness named by a word other than `'claude'`, or brought as
+ * an object whose `pool` is not a name; a spec whose `can` cannot be read, or that carries a boolean `can` replaced (`specRefusalOf`);
+ * a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; a `holder` entry `holderRefusal` refuses; an
+ * `unschedulable`, a `credentials` or a `missingCredential` that is not a function; and a `telemetry` that names no collector.
  * @param options The engine's options as handed in, its `root` aside.
  */
 export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>) => {

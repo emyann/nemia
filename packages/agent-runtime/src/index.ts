@@ -69,7 +69,17 @@ export type {
   McpSignInStarted,
   McpSignInState,
 } from './service/index.ts';
-export type { EngineOptions, HarnessConfig, KeptRoomOption, Pooled, Resources, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
+export type {
+  EngineOptions,
+  HarnessConfig,
+  KeptRoomOption,
+  Pooled,
+  Resources,
+  TaskSpec,
+  TickReport,
+  EngineIo,
+  ObserveCount,
+} from './service/options.ts';
 /**
  * A memory limit's bytes, read off its Kubernetes quantity, and words for one the runtime does not read: for a caller that checks a
  * limit before it files it. And whether this host can hold one at all (a scope of systemd's user manager), in words that say what to

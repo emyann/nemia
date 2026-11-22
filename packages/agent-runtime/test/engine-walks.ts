@@ -687,12 +687,7 @@ const ANSWER_TURN: readonly Walk[] = [
       const given = await asked(engine.answer('a', 'make it smaller', { priority: 1000 }));
       return [halves, beyond, given, (await turnOf(engine, 'a')).inputs];
     },
-    says: [
-      { refused: 'InputRefused' },
-      { refused: 'InputRefused' },
-      { ...INPUT, priority: 1000 },
-      [{ ...INPUT, priority: 1000 }],
-    ],
+    says: [{ refused: 'InputRefused' }, { refused: 'InputRefused' }, { ...INPUT, priority: 1000 }, [{ ...INPUT, priority: 1000 }]],
   },
 ];
 

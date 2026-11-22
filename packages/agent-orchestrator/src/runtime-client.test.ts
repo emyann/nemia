@@ -62,7 +62,11 @@ describe("`storeAdmission`: the room kept for a person's turn, WF_KEPT_TURNS pla
       memory: String(2560 * 2 ** 20),
     }));
   test('two turns, no request: twice the limit', () =>
-    assert.deepEqual(keptOf({ WF_KEPT_TURNS: '2', WF_MEMORY_LIMIT: '4Gi' }), { priority: ASKED_PRIORITY, sessions: 2, memory: String(8 * GI) }));
+    assert.deepEqual(keptOf({ WF_KEPT_TURNS: '2', WF_MEMORY_LIMIT: '4Gi' }), {
+      priority: ASKED_PRIORITY,
+      sessions: 2,
+      memory: String(8 * GI),
+    }));
   test('no ask set: places alone', () => assert.deepEqual(keptOf({}), { priority: ASKED_PRIORITY, sessions: 1 }));
   test('0, or refused: none kept', () => {
     assert.equal(keptOf({ WF_KEPT_TURNS: '0' }), undefined);

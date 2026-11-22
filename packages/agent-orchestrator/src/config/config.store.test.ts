@@ -171,8 +171,9 @@ describe('each WF_ variable reads its default unset, empty or blank, and the val
       [1, 3, 3, 50, 7],
     ],
     [
-      "WF_KEPT_TURNS: one turn kept unset, empty or blank, none at 0, and a whole count as written",
-      () => [{}, { WF_KEPT_TURNS: '' }, { WF_KEPT_TURNS: ' ' }, { WF_KEPT_TURNS: '0' }, { WF_KEPT_TURNS: ' 2 ' }].map((env) => keptTurns(env)),
+      'WF_KEPT_TURNS: one turn kept unset, empty or blank, none at 0, and a whole count as written',
+      () =>
+        [{}, { WF_KEPT_TURNS: '' }, { WF_KEPT_TURNS: ' ' }, { WF_KEPT_TURNS: '0' }, { WF_KEPT_TURNS: ' 2 ' }].map((env) => keptTurns(env)),
       [1, 1, 1, 0, 2],
     ],
     ['WF_MAX_RUNS a whole count', () => ['  ', '0', '2', ' 3 '].map((value) => maxRuns({ WF_MAX_RUNS: value })), [0, 0, 2, 3]],

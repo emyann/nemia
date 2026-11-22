@@ -452,23 +452,19 @@ export type EngineShape = {
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
    * the task's next turn: an attempt that continues the session that ended (`--resume`), told `text` in place of the
-   * brief, with `config` laid over the task's own if given, and admitted at `priority` if given — the turn's own, as a Pod's, which
-   * goes before the waiting turns below it and takes the room kept for it (`keptRoom`) — else at the task's filing's. A turn gives its own spend cap and nothing else
-   * (`config: { budgetUsd }`, `TURN_ARGS`): the rest of its configuration is the session's it continues. Nothing is
-   * sent to any session: none is running.
+   * brief, with `config` laid over the task's own if given, and admitted at `priority` if given — the turn's own, as a Pod's,
+   * which goes before the waiting turns below it and takes the room kept for it (`keptRoom`) — else at the task's filing's. A turn
+   * gives its own spend cap and nothing else (`config: { budgetUsd }`, `TURN_ARGS`): the rest of its configuration is the session's
+   * it continues. Nothing is sent to any session: none is running.
    *
    * Refused — `InputRefused`, and nothing journalled — for an empty `text`; a `config`
    * with any key but `budgetUsd`, or a `budgetUsd` that is not dollars above 0, or one its harness would not keep (as
-   * `file` refuses one); a `priority` that is not a whole number in int32; a `budgetUsd` given beside `config` rather than in it, naming where it goes; a task this engine has no
-   * record of; one not filed to be held open; one settled, closed or asked to stop; and one not waiting — an attempt
-   * running (`say` reaches it), between attempts, not started, or answered already and its next turn not yet begun.
-   * Two answers journalled before the next turn begins are told to it both, in order.
+   * `file` refuses one); a `priority` that is not a whole number in int32; a `budgetUsd` given beside `config` rather than in it,
+   * naming where it goes; a task this engine has no record of; one not filed to be held open; one settled, closed or asked to stop;
+   * and one not waiting — an attempt running (`say` reaches it), between attempts, not started, or answered already and its next
+   * turn not yet begun. Two answers journalled before the next turn begins are told to it both, in order.
    */
-  readonly answer: (
-    taskId: string,
-    text: string,
-    options?: { config?: HarnessArgs; priority?: number },
-  ) => Effect.Effect<Input, InputRefused | JournalError>;
+  readonly answer: (taskId: string, text: string, options?: AnswerOptions) => Effect.Effect<Input, InputRefused | JournalError>;
   /**
    * Settle a task held open that waits for an answer: journalled as a `closed` entry, and settled `succeeded`, note
    * `closed`, by the next tick. Refused — `InputRefused`, nothing journalled — as `answer` is, for a task
@@ -842,6 +838,9 @@ const viewVerbOf = (harnessOf: (state: State) => Harnessed, runners: Record<stri
     return { ...v, sessionId: handleOf(events, last.n) ?? v.sessionId };
   });
 
+/** What an answer is given beside its words: the turn's configuration (`config`) and its priority at admission (`priority`). */
+type AnswerOptions = { config?: HarnessArgs; priority?: number };
+
 /** A task's events, read through the Task door `journal` gives. */
 const readOn = (journal: Layer.Layer<Journal>, taskId: string) =>
   Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId))).pipe(Effect.provide(journal));
@@ -940,11 +939,7 @@ const make = (options: EngineOptions) =>
       return (yield* go(transcriptOf(nameFor(taskId, last.n), after === start ? undefined : after))) ?? nothing;
     });
 
-    const answerVerb = Effect.fn('Engine.answer')(function* (
-      taskId: string,
-      text: string,
-      options: { config?: HarnessArgs; priority?: number } = {},
-    ) {
+    const answerVerb = Effect.fn('Engine.answer')(function* (taskId: string, text: string, options: AnswerOptions = {}) {
       const refuse = (message: string) => Effect.fail(new InputRefused({ message }));
       const misplaced = answerOptionsRefusalOf(options);
       if (misplaced) return yield* refuse(misplaced);

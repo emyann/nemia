@@ -958,12 +958,13 @@ describe("toAdmit with room kept for a person's turn: places beyond the ceiling 
     const v = queued(id, filed, 'a', priority);
     return { ...v, state: { ...v.state, ...(memory ? { resources: { requests: { memory } } } : {}) } } satisfies AdmissionView;
   };
-  const keeping = (ceiling: number, slots: number, bytes = 0, machine?: MachineMemory): AdmissionRule => ({
-    ceiling,
-    poolOf: ownPool,
-    kept: () => ({ priority: PERSON, slots, bytes }),
-    ...(machine ? { machine: () => machine } : {}),
-  });
+  const keeping = (ceiling: number, slots: number, bytes = 0, machine?: MachineMemory) =>
+    ({
+      ceiling,
+      poolOf: ownPool,
+      kept: () => ({ priority: PERSON, slots, bytes }),
+      ...(machine ? { machine: () => machine } : {}),
+    }) satisfies AdmissionRule;
   test("a person's turn takes the kept place beyond a full ceiling; the work behind it waits for a slot", () => {
     const out = toAdmit([working('w'), asking('work', 1), asking('person', 2, PERSON)], keeping(1, 1));
     assert.deepEqual(out.admit, ['person']);

@@ -3428,8 +3428,10 @@ run 'wf tick' (or 'wf up') to start it
 - **`nemia inbox edit <name> <file>`, or `nemia inbox edit <name> -- "<card>"`, changes a card where it lives.** It takes a
   card's text, frontmatter and body, as `status.source` serves it, and reads it as the card's own file is read: a key no card has,
   or one whose value does not read, is refused by name, and nothing is written. The body and the keys `workflow:`, `gate:`,
-  `model:` and `from:` are the text's, a key left out taken off; the card keeps its name, so every reference to it still holds,
-  though its title may no longer slug to it. Its labels are `nemia label inbox`'s, and its factory and `queued:` its own: a text
+  `model:`, `from:` and `after:` are the text's, a key left out taken off; the card keeps its name, so every reference to it still
+  holds, though its title may no longer slug to it. Its answer says the card's wait, as `nemia inbox add` does, with the cards it
+  waited on where they changed; a text with no `after:` takes the wait off, and the answer names the cards it waited on and, for a
+  card queued (by hand or by a card trigger) and not started, that it may now start on the next pass. Its labels are `nemia label inbox`'s, and its factory and `queued:` its own: a text
   that says other labels, another factory or another `queued:` is refused, naming the verb that does it, and one that leaves them
   out or says them as they are keeps them. A started card is refused (`Conflict`), since its run copied it, naming `nemia inbox
   add` for a new card. The api serves it as the Card's `edit`, `PUT /api/namespaces/<factory>/cards/<name>/source`, which takes

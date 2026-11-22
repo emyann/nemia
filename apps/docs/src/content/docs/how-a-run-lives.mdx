@@ -91,7 +91,7 @@ any other, and its run starts from the base as it is then. So a person can put a
 on the one before, and the factory runs it in order.
 
 The inbox, the Card's `status.waitingOn` and the board list a waiting card with each card it waits on, the card that work stands at
-now and that card's state. Read on every pass, nothing is written on the card. A wait that only a person can release is **stuck**: a
+now and that card's state. Read on every pass, nothing is written on the card. A wait that only a person can release is **stalled**: a
 name the store does not know, a cycle of `after:` lines, or a card whose run ended without landing or whose start was refused. It is
 said on the inbox's line with its fix, and once on the feed when it begins and once when it clears. The fixes are to send the card
 on, change this card's `after:`, or start this card by hand. A start by hand starts a waiting card all the same, and says which cards

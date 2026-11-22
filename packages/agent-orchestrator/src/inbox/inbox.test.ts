@@ -899,7 +899,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
   test('a hand-queued card whose named card has not landed is listed waiting on it, at no place in the queue, and the tick starts none of it', () => {
     const listing = inboxListing(files, [], new Map(), new Map(), undefined, waitingOver({ 'a-1x2y': {} }));
     const b = listing.find((l) => l.name === 'b-3z4w');
-    assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'filed', stuck: false }]);
+    assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'filed', stalled: false }]);
     assert.equal(b?.queued?.place, null, 'no place in the queue while it waits');
     assert.deepEqual(queueOrder(listing), []);
     assert.equal(nextQueued(listing, '/repo'), undefined);
@@ -932,14 +932,14 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     assert.equal(c.waits?.length, 1);
   });
 
-  test('a wait on a card whose run ended unlanded, on a name the store does not know, and on a cycle, is stuck', () => {
+  test('a wait on a card whose run ended unlanded, on a name the store does not know, and on a cycle, is stalled', () => {
     const ended = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', landed: false }] } }, { 'a-run': 'failed' });
     const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'failed' }];
     const b = inboxListing(files, runs, new Map(), new Map(), undefined, ended).find((l) => l.name === 'b-3z4w');
-    assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'failed', stuck: true }]);
+    assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'failed', stalled: true }]);
 
     const missing = inboxListing([files[1]], [], new Map(), new Map(), undefined, waitingOver({}));
-    assert.deepEqual(missing[0].waits, [{ card: 'a-1x2y', kind: 'missing', stuck: true }]);
+    assert.deepEqual(missing[0].waits, [{ card: 'a-1x2y', kind: 'missing', stalled: true }]);
 
     const cycle = [
       { file: 'a-1x2y.md', text: '---\nafter: b-3z4w\n---\nFirst.\n' },
@@ -949,8 +949,8 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     assert.deepEqual(
       both.map((l) => l.waits),
       [
-        [{ card: 'b-3z4w', kind: 'cycle', cycle: ['a-1x2y', 'b-3z4w', 'a-1x2y'], stuck: true }],
-        [{ card: 'a-1x2y', kind: 'cycle', cycle: ['b-3z4w', 'a-1x2y', 'b-3z4w'], stuck: true }],
+        [{ card: 'b-3z4w', kind: 'cycle', cycle: ['a-1x2y', 'b-3z4w', 'a-1x2y'], stalled: true }],
+        [{ card: 'a-1x2y', kind: 'cycle', cycle: ['b-3z4w', 'a-1x2y', 'b-3z4w'], stalled: true }],
       ],
     );
   });
@@ -963,24 +963,27 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'succeeded' }];
     const listed = inboxListing([...files, { file: 'a2-7q8r.md', text: A }], runs, new Map(), new Map(), undefined, routed);
     assert.deepEqual(listed.find((l) => l.name === 'b-3z4w')?.waits, [
-      { card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'filed', stuck: false },
+      { card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'filed', stalled: false },
     ]);
   });
 
   test('`nemia inbox` says each wait: the card, where its work stands and its state, and what to type where only a person can release it', () => {
     const lineOf = (w: ListedWait) => inboxLines([{ ...inboxListing([files[1]], [])[0], waits: [w] }])[0];
     assert.match(
-      lineOf({ card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'running', stuck: false }),
+      lineOf({ card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'running', stalled: false }),
       /waiting on a-1x2y at a2-7q8r \(running\)/,
     );
-    assert.doesNotMatch(lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'running', stuck: false }), /needs you/);
-    const stuck = lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'failed', stuck: true });
-    assert.match(stuck, /needs you/);
-    assert.match(stuck, /nemia inbox resend a-1x2y/);
-    assert.match(stuck, /nemia inbox edit b-3z4w/);
-    assert.match(stuck, /nemia start b-3z4w/);
-    assert.match(lineOf({ card: 'a-1x2y', kind: 'missing', stuck: true }), /waiting on a-1x2y \(no such card\)/);
-    assert.match(lineOf({ card: 'a-1x2y', kind: 'cycle', cycle: ['b-3z4w', 'a-1x2y', 'b-3z4w'], stuck: true }), /b-3z4w → a-1x2y → b-3z4w/);
+    assert.doesNotMatch(lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'running', stalled: false }), /needs you/);
+    const stalled = lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'failed', stalled: true });
+    assert.match(stalled, /needs you/);
+    assert.match(stalled, /nemia inbox resend a-1x2y/);
+    assert.match(stalled, /nemia inbox edit b-3z4w/);
+    assert.match(stalled, /nemia start b-3z4w/);
+    assert.match(lineOf({ card: 'a-1x2y', kind: 'missing', stalled: true }), /waiting on a-1x2y \(no such card\)/);
+    assert.match(
+      lineOf({ card: 'a-1x2y', kind: 'cycle', cycle: ['b-3z4w', 'a-1x2y', 'b-3z4w'], stalled: true }),
+      /b-3z4w → a-1x2y → b-3z4w/,
+    );
   });
 });
 

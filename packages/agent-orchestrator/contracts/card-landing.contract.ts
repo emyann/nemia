@@ -100,7 +100,7 @@ const cardLandedSpec = spec<(card: WaitedCard, onward: readonly CardLanding[]) =
 export type CardLanded = Implementation<typeof cardLandedSpec>;
 
 /**
- * A wait as the listing says it to a person, for whether it is stuck: its kind — `waiting` at a card, `missing`, or `cycle`, a card whose
+ * A wait as the listing says it to a person, for whether it is stalled: its kind — `waiting` at a card, `missing`, or `cycle`, a card whose
  * `after:` leads back to itself — and, for `waiting`, the state of the card its work stands at as the inbox lists it (null where not read).
  */
 export type ListedWait = {
@@ -114,23 +114,24 @@ export type ListedWait = {
  */
 const ENDED_UNLANDED: readonly CardState[] = ['succeeded', 'failed', 'stopped', 'cancelled', 'refused'];
 
-const waitStuckSpec = spec<(wait: ListedWait) => boolean>({
+const waitStalledSpec = spec<(wait: ListedWait) => boolean>({
   ensures: {
-    missingIsStuck: {
-      description: 'A wait on a name the store knows nothing of is stuck: no pass will ever find it',
+    missingIsStalled: {
+      description: 'A wait on a name the store knows nothing of is stalled: no pass will ever find it',
       condition: ({ input: [wait], output }) => wait.kind !== 'missing' || output,
     },
-    cycleIsStuck: {
-      description: 'A wait on a cycle of after: is stuck: each card waits on the other for ever',
+    cycleIsStalled: {
+      description: 'A wait on a cycle of after: is stalled: each card waits on the other for ever',
       condition: ({ input: [wait], output }) => wait.kind !== 'cycle' || output,
     },
-    endedUnlandedIsStuck: {
-      description: 'A wait standing at a card whose run ended unlanded, or whose start was refused, is stuck',
+    endedUnlandedIsStalled: {
+      description: 'A wait standing at a card whose run ended unlanded, or whose start was refused, is stalled',
       condition: ({ input: [wait], output }) =>
         !(wait.kind === 'waiting' && wait.state !== null && ENDED_UNLANDED.includes(wait.state)) || output,
     },
-    stuckOnlyThen: {
-      description: 'A wait at a card still to start or still at work, or whose state was not read, is not stuck: the tick may yet land it',
+    stalledOnlyThen: {
+      description:
+        'A wait at a card still to start or still at work, or whose state was not read, is not stalled: the tick may yet land it',
       condition: ({ input: [wait], output }) =>
         !output || wait.kind !== 'waiting' || (wait.state !== null && ENDED_UNLANDED.includes(wait.state)),
     },
@@ -138,7 +139,7 @@ const waitStuckSpec = spec<(wait: ListedWait) => boolean>({
 });
 
 /**
- * `waitStuck`'s type, which src/inbox/waits.ts takes: whether a wait will never be released without a person, which the listing marks
- * (`CardWait.stuck`) and the feed says once, begun and ended (`CardWaitStuck`, `CardWaitFreed`).
+ * `waitStalled`'s type, which src/inbox/waits.ts takes: whether a wait will never be released without a person, which the listing marks
+ * (`CardWait.stalled`) and the feed says once, begun and ended (`CardWaitStalled`, `CardWaitFreed`).
  */
-export type WaitStuck = Implementation<typeof waitStuckSpec>;
+export type WaitStalled = Implementation<typeof waitStalledSpec>;

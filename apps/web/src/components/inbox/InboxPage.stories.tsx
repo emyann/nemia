@@ -22,7 +22,7 @@ const drawn = (cards: readonly InboxEntry[]) => (
 
 /**
  * The inbox page, one story a state: two cards in play, one filed and one queued; a started card waiting on its person beside one not
- * started; cards a trigger queues and one two triggers clash on; cards that wait on others, one stuck; and an empty inbox. Axe's
+ * started; cards a trigger queues and one two triggers clash on; cards that wait on others, one stalled; and an empty inbox. Axe's
  * `label-content-name-mismatch` alone is off, for the box's Factory list: the ds kit's `Select` draws its value before its floating
  * label and is named by the label first, which axe reads as visible text left out of its name, an ask of the kit.
  */
@@ -85,7 +85,7 @@ export const Triggered: Story = {
 
 /**
  * Cards that wait on the cards their `after:` names: one queued behind a card still running, with no place in the queue; and one whose
- * named card the store does not know, stuck, in the failure's colours, with what a person can do.
+ * named card the store does not know, stalled, in the failure's colours, with what a person can do.
  */
 export const WaitingOnCards: Story = {
   render: () =>
@@ -93,19 +93,19 @@ export const WaitingOnCards: Story = {
       {
         ...queuedCard('second-slice', FACTORY, 1),
         queued: { at: '2026-11-19T00:00:00.000Z', place: null },
-        waits: [{ card: 'first-slice', kind: 'waiting', at: 'first-slice-routed', state: 'running', stuck: false }],
+        waits: [{ card: 'first-slice', kind: 'waiting', at: 'first-slice-routed', state: 'running', stalled: false }],
       },
-      { ...unstartedCard('third-slice', FACTORY), waits: [{ card: 'no-such-slice', kind: 'missing', stuck: true }] },
+      { ...unstartedCard('third-slice', FACTORY), waits: [{ card: 'no-such-slice', kind: 'missing', stalled: true }] },
     ]),
   play: async ({ canvasElement }) => {
     const second = within(canvasElement).getByRole('listitem', { name: 'Card second-slice' });
     const waiting = second.querySelector('[data-card-waits]');
     await expect(waiting).toHaveTextContent('Waiting on first-slice, at first-slice-routed (running).');
-    await expect(waiting).toHaveAttribute('data-stuck', 'false');
+    await expect(waiting).toHaveAttribute('data-stalled', 'false');
     const third = within(canvasElement).getByRole('listitem', { name: 'Card third-slice' });
-    const stuck = third.querySelector('[data-card-waits]');
-    await expect(stuck).toHaveAttribute('data-stuck', 'true');
-    await expect(stuck).toHaveTextContent(/Needs you: Waiting on no-such-slice \(no such card\)\./);
+    const stalled = third.querySelector('[data-card-waits]');
+    await expect(stalled).toHaveAttribute('data-stalled', 'true');
+    await expect(stalled).toHaveTextContent(/Needs you: Waiting on no-such-slice \(no such card\)\./);
   },
 };
 

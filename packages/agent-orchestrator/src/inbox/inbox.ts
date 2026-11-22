@@ -66,7 +66,7 @@ import {
 import { labelRefusal, labelsText, type Labels } from '../labels/labels.ts';
 import { FILE_ID_PREFIX } from 'objects';
 import { cardTriggered, matchingTriggers, triggerCardOf, type SelectingTrigger } from './triggered.ts';
-import { afterCycle, cardWaitsOf, waitStuck, type CardLook } from './waits.ts';
+import { afterCycle, cardWaitsOf, waitStalled, type CardLook } from './waits.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `nemia inbox rm` and a start name it by. */
@@ -532,7 +532,7 @@ export const cardInPlay = (l: Pick<InboxListing, 'state'>) => CARD_IN_PLAY[l.sta
  * One card a card waits on that has not landed, as the listing says it: the card named; `waiting` at the card its work stands at (`at`,
  * where it is another), `missing` where the store knows nothing of it, or `cycle` where its `after:` leads back to the waiting card, by
  * the route (`cycle`); the state of the card the work stands at as listed, where it was read; and whether only a person can release it
- * (`waitStuck`). The objects' `CardWait`.
+ * (`waitStalled`). The objects' `CardWait`.
  */
 export type ListedWait = {
   card: string;
@@ -540,7 +540,7 @@ export type ListedWait = {
   at?: string;
   state?: CardState;
   cycle?: string[];
-  stuck: boolean;
+  stalled: boolean;
 };
 
 /**
@@ -699,9 +699,9 @@ function waitsOf(
   if (waiting === undefined || !after?.length || startedAs.length) return {};
   const cycle = afterCycle(name, afterOf);
   const waits = cardWaitsOf(after, waiting.look).map<ListedWait>(({ card, landing }) => {
-    if (cycle !== undefined && cycle[1] === card) return { card, kind: 'cycle', cycle, stuck: true };
-    if (landing.kind === 'missing') return { card, kind: 'missing', ...(landing.card === card ? {} : { at: landing.card }), stuck: true };
-    return { card, kind: 'waiting', ...(landing.card === card ? {} : { at: landing.card }), stuck: false };
+    if (cycle !== undefined && cycle[1] === card) return { card, kind: 'cycle', cycle, stalled: true };
+    if (landing.kind === 'missing') return { card, kind: 'missing', ...(landing.card === card ? {} : { at: landing.card }), stalled: true };
+    return { card, kind: 'waiting', ...(landing.card === card ? {} : { at: landing.card }), stalled: false };
   });
   return (waits.length ? { waits } : {}) satisfies Pick<CardListing, 'waits'>;
 }
@@ -709,7 +709,7 @@ function waitsOf(
 /**
  * Each wait of `listed` given the state of the card its work stands at — that card's as listed (`cardState`, off the phases of its runs
  * as `phaseOf` read them), or off the runs started from it where the inbox no longer has it, none where a phase was not read — and
- * whether only a person can release it (`waitStuck`). Writes the waits in place, as the queue's places are written.
+ * whether only a person can release it (`waitStalled`). Writes the waits in place, as the queue's places are written.
  */
 function statesOfWaits(listed: readonly CardListing[], runs: readonly Pick<Run, 'id' | 'from'>[], phaseOf: Waiting['phaseOf']) {
   const byName = new Map(listed.map((l) => [l.name, l]));
@@ -726,7 +726,7 @@ function statesOfWaits(listed: readonly CardListing[], runs: readonly Pick<Run, 
       if (w.kind === 'cycle') continue;
       const state = stateOf(w.at ?? w.card);
       if (state !== null) w.state = state;
-      w.stuck = waitStuck({ kind: w.kind, state });
+      w.stalled = waitStalled({ kind: w.kind, state });
     }
   }
 }
@@ -932,7 +932,7 @@ export function waitSaid(name: string, w: ListedWait) {
         ? `(a cycle: ${(w.cycle ?? []).join(' → ')})`
         : `${w.at === undefined ? '' : `at ${w.at} `}(${w.state ?? 'not read'})`;
   const resend = w.kind === 'waiting' && w.state !== 'refused' ? `nemia inbox resend ${w.at ?? w.card}, ` : '';
-  const fix = w.stuck ? ` — needs you: ${resend}nemia inbox edit ${name} to change after:, or nemia start ${name}` : '';
+  const fix = w.stalled ? ` — needs you: ${resend}nemia inbox edit ${name} to change after:, or nemia start ${name}` : '';
   return `waiting on ${w.card} ${where}${fix}`;
 }
 

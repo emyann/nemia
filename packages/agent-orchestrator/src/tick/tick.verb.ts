@@ -421,12 +421,12 @@ const informed = Effect.fnUntraced(function* (
 });
 
 /**
- * What the inbox owes the feed on this pass (`inboxNow`): its cards' clashes and their stuck waits, each run's landing read through the
+ * What the inbox owes the feed on this pass (`inboxNow`): its cards' clashes and their stalled waits, each run's landing read through the
  * pass's `landed` and its phase as the pass judged it; none of either where the inbox does not read.
  */
 const inboxOfPass = (runs: readonly Run[], landed: RunLanded, { done }: Judging) =>
   inboxNow(runs, landed, (id) => phaseOfStatus(done.get(id)?.status)).pipe(
-    Effect.map(({ clashes, stuck }) => ({ clashes, waits: stuck }) satisfies { clashes?: FeedClashes; waits?: FeedWaits }),
+    Effect.map(({ clashes, stalled }) => ({ clashes, waits: stalled }) satisfies { clashes?: FeedClashes; waits?: FeedWaits }),
     Effect.orElseSucceed(() => ({}) satisfies { clashes?: FeedClashes; waits?: FeedWaits }),
   );
 

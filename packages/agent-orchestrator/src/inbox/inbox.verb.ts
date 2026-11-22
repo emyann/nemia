@@ -532,14 +532,14 @@ const waitedOnNow = Effect.fnUntraced(function* (card: InboxCard, landed: RunLan
 
 /**
  * A card whose wait on the cards of its `after:` only a person can release, as the inbox lists it now: its factory (`default` for a
- * card that names none), its name, and what a person reads of each such wait (`waitSaid`) — what the feed says a stuck wait begun and
+ * card that names none), its name, and what a person reads of each such wait (`waitSaid`) — what the feed says a stalled wait begun and
  * ended by.
  */
-export type StuckWait = { factory: string; card: string; waits: string[] };
+export type StalledWait = { factory: string; card: string; waits: string[] };
 
 /**
  * What the inbox owes the feed now: each card of a factory that the card triggers of its factory would send to two workflows (`clash`),
- * its factory, its name and the triggers that clash; and each card whose wait only a person can release (`StuckWait`). It reads no run
+ * its factory, its name and the triggers that clash; and each card whose wait only a person can release (`StalledWait`). It reads no run
  * record of its own: a card's runs are the pass's `runs`, so a pass costs what is in flight; no clash where no factory has a card
  * trigger, and no wait where no card names one.
  * @param runs The runs the pass read, which say which cards were started and what each passed its work on to.
@@ -556,16 +556,16 @@ export const inboxNow = Effect.fn('inboxNow')(function* (
   const factories = yield* readableFactories();
   const triggering = yield* triggeringOf(files, factories.values());
   const waiting = yield* waitingOf(files, runs, landed, phaseOf);
-  if (triggering === undefined && waiting === undefined) return { clashes: [], stuck: [] };
+  if (triggering === undefined && waiting === undefined) return { clashes: [], stalled: [] };
   const listed = cardsListed(files, runs, yield* door.tries.list(), factories, triggering, waiting);
   const clashes = listed.flatMap((l) =>
     l.clash !== undefined && l.factory !== null ? [{ factory: l.factory, card: l.name, by: [...l.clash] }] : [],
   ) satisfies Array<{ factory: string; card: string; by: string[] }>;
-  const stuck = listed.flatMap((l) => {
-    const held = (l.waits ?? []).filter((w) => w.stuck);
+  const stalled = listed.flatMap((l) => {
+    const held = (l.waits ?? []).filter((w) => w.stalled);
     return held.length ? [{ factory: l.factory ?? DEFAULT_NAMESPACE, card: l.name, waits: held.map((w) => waitSaid(l.name, w)) }] : [];
-  }) satisfies StuckWait[];
-  return { clashes, stuck };
+  }) satisfies StalledWait[];
+  return { clashes, stalled };
 });
 
 /**

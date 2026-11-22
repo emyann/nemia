@@ -99,7 +99,7 @@ export const LINE_WORDS = {
   AddsResolved: 'library adds resolved',
   TriggersClash: 'triggers clash',
   ClashSettled: 'clash settled',
-  CardWaitStuck: 'card wait stuck',
+  CardWaitStalled: 'card wait stalled',
   CardWaitFreed: 'card wait freed',
   RevisionsBehind: 'revisions behind',
   LeftEnded: 'left running, ended',
@@ -156,7 +156,7 @@ export const REASONS = {
   AddsResolved: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   TriggersClash: { kinds: ['Factory'], type: 'Warning', source: 'tick' },
   ClashSettled: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
-  CardWaitStuck: { kinds: ['Factory'], type: 'Warning', source: 'tick' },
+  CardWaitStalled: { kinds: ['Factory'], type: 'Warning', source: 'tick' },
   CardWaitFreed: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   LeftEnded: { kinds: ['Store'], type: 'Warning', source: 'daemon' },
 } as const satisfies Record<string, Entry>;
@@ -308,7 +308,7 @@ const FACTORY_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.AddsResolved, reason: 'AddsResolved' },
   { is: LINE_WORDS.TriggersClash, reason: 'TriggersClash' },
   { is: LINE_WORDS.ClashSettled, reason: 'ClashSettled' },
-  { is: LINE_WORDS.CardWaitStuck, reason: 'CardWaitStuck' },
+  { is: LINE_WORDS.CardWaitStalled, reason: 'CardWaitStalled' },
   { is: LINE_WORDS.CardWaitFreed, reason: 'CardWaitFreed' },
 ];
 

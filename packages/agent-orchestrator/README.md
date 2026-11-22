@@ -3376,7 +3376,7 @@ run 'wf tick' (or 'wf up') to start it
   run's `nemia decide` says, or the run of the card its run passed the work on to, a workflow node's card or `nemia inbox resend`'s — no
   card trigger queues it, the tick starts none of it, and `nemia inbox`, the Card's `status.waitingOn` and the board list it waiting,
   with the card its work stands at and that card's state; a wait only a person can release (a card the store does not know, a cycle,
-  a run ended unlanded, a start refused) is said stuck there and once on the feed (`CardWaitStuck`, `CardWaitFreed`). When the last lands
+  a run ended unlanded, a start refused) is said stalled there and once on the feed (`CardWaitStalled`, `CardWaitFreed`). When the last lands
   the next pass queues it as any other card, its run started from the base as it is then. `nemia start <card>` still starts a waiting
   card, saying which had not landed; `nemia start --after <run>` still waits on runs. A plan's card keeps its rules: a plan's repository is `wf start <folder> --repo`. A third key, `queued:`, marks a card to start on its
   own, and `wf inbox queue` writes it ([below](#cards-that-start-themselves-wf-inbox-queue)). A fourth, `gate: <step>`, names

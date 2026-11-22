@@ -1,11 +1,11 @@
 /**
  * What a card waits on (`after:`): whether each card it names has landed (`cardLanded`, proved by `contracts/card-landing.contract.ts`),
  * following its work through the cards its runs passed it on to (`cardWaitsOf`); a cycle of `after:` lines (`afterCycle`); and whether a
- * wait will never be released without a person (`waitStuck`). Read from the level on every pass and written nowhere. Pure: the listing
+ * wait will never be released without a person (`waitStalled`). Read from the level on every pass and written nowhere. Pure: the listing
  * hands it what the store and git said (inbox.ts, inbox.verb.ts).
  */
 import type { CardState } from 'objects';
-import type { CardLanded, CardLanding, WaitedRun, WaitStuck } from '../../contracts/card-landing.contract.ts';
+import type { CardLanded, CardLanding, WaitedRun, WaitStalled } from '../../contracts/card-landing.contract.ts';
 
 export type { CardLanding, ListedWait, WaitedCard, WaitedRun } from '../../contracts/card-landing.contract.ts';
 
@@ -34,7 +34,7 @@ const ENDED_UNLANDED: readonly CardState[] = ['succeeded', 'failed', 'stopped', 
  * or whose start was refused.
  * @param wait The wait's kind, and the state of the card it stands at as the inbox lists it (null where not read).
  */
-export const waitStuck: WaitStuck = (wait) => wait.kind !== 'waiting' || (wait.state !== null && ENDED_UNLANDED.includes(wait.state));
+export const waitStalled: WaitStalled = (wait) => wait.kind !== 'waiting' || (wait.state !== null && ENDED_UNLANDED.includes(wait.state));
 
 /** A card as the walk reads it: whether the store knows it, its runs with whether each landed, and the cards its runs passed work on to. */
 export type CardLook = { readonly known: boolean; readonly runs: readonly WaitedRun[]; readonly onward: readonly string[] };

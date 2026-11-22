@@ -181,7 +181,7 @@ const STORE_LINES: readonly Case[] = [
 
 /**
  * The eight words a factory's lines say, spelled by hand as the owner named them: its conflicts', each with its `ConflictsPending`
- * condition's message, its library adds', a card's clash, begun and ended, and a card's stuck wait, begun and ended.
+ * condition's message, its library adds', a card's clash, begun and ended, and a card's stalled wait, begun and ended.
  */
 const FACTORY_LINES: readonly Case[] = [
   { kind: 'Factory', word: 'conflicts pending', note: 'agents/coder.md: choose one', reason: 'ConflictsPending' },
@@ -190,7 +190,7 @@ const FACTORY_LINES: readonly Case[] = [
   { kind: 'Factory', word: 'library adds resolved', reason: 'AddsResolved' },
   { kind: 'Factory', word: 'triggers clash', note: 'card both-ways waits: triggers bugs, ready', reason: 'TriggersClash' },
   { kind: 'Factory', word: 'clash settled', note: 'card both-ways clashes no more', reason: 'ClashSettled' },
-  { kind: 'Factory', word: 'card wait stuck', note: 'card b-2 waits on a-1, which is missing', reason: 'CardWaitStuck' },
+  { kind: 'Factory', word: 'card wait stalled', note: 'card b-2 waits on a-1, which is missing', reason: 'CardWaitStalled' },
   { kind: 'Factory', word: 'card wait freed', note: 'card b-2 waits on no card a person must free', reason: 'CardWaitFreed' },
 ];
 
@@ -277,7 +277,7 @@ describe('reasonOf names a reason for every word the package writes, only of a k
     assert.equal(
       entries.length,
       58,
-      "the table the owner named has 58 entries: a factory's library adds two of them, a card its triggers clash on two more (TriggersClash, ClashSettled), and a card's stuck wait two more (CardWaitStuck, CardWaitFreed)",
+      "the table the owner named has 58 entries: a factory's library adds two of them, a card its triggers clash on two more (TriggersClash, ClashSettled), and a card's stalled wait two more (CardWaitStalled, CardWaitFreed)",
     );
     assert.equal(REASON_CODES.length, 47, 'of 47 distinct codes');
     assert.deepEqual(

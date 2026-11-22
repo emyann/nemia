@@ -249,9 +249,9 @@ export function CardQueue({ entry }: { entry: InboxEntry }) {
       {entry.waits?.length ? (
         <p
           data-card-waits={entry.waits.map((w) => w.card).join(' ')}
-          data-stuck={entry.waits.some((w) => w.stuck) ? 'true' : 'false'}
+          data-stalled={entry.waits.some((w) => w.stalled) ? 'true' : 'false'}
           className={
-            entry.waits.some((w) => w.stuck)
+            entry.waits.some((w) => w.stalled)
               ? 'rounded border border-failure bg-failure-container px-3 py-2 text-body-small text-on-failure-container'
               : 'text-body-small text-on-surface-variant'
           }

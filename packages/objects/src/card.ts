@@ -157,7 +157,7 @@ export type CardWaitKind = (typeof CARD_WAIT_KINDS)[number];
 
 /**
  * One card a card waits on that has not landed: the card named, the kind of the wait, the card its work stands at and that card's state,
- * the route of a cycle, and whether only a person can release it (`stuck`).
+ * the route of a cycle, and whether only a person can release it (`stalled`).
  */
 export const CardWait = Schema.Struct({
   card: Schema.String.annotate({ description: "The card named in the card's `after:`, by name." }),
@@ -181,7 +181,7 @@ export const CardWait = Schema.Struct({
       description: 'On a cycle only: the route of `after:` lines from this card back to itself, by name, the card first and last.',
     }),
   ),
-  stuck: Schema.Boolean.annotate({
+  stalled: Schema.Boolean.annotate({
     description:
       'Whether the wait will never be released without a person: a missing card, a cycle, or a card whose run ended without landing or whose start was refused. Fix it with nemia inbox resend <card>, nemia inbox edit <this card> to change after:, or nemia start <this card>.',
   }),

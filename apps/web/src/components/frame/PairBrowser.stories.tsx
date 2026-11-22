@@ -29,6 +29,7 @@ type Story = StoryObj<Args>;
 
 /** Offered: Pair this browser, with its icon. */
 export const Offered: Story = {
+  tags: ['network'],
   parameters: { msw: [http.post('/api/pairings', async () => delay('infinite'))] },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole('button', { name: 'Pair this browser' })).toBeEnabled();
@@ -37,6 +38,7 @@ export const Offered: Story = {
 
 /** Pressed while the api is asked: Asking…, the press off until it answers. */
 export const Asking: Story = {
+  tags: ['network'],
   parameters: { msw: [http.post('/api/pairings', async () => delay('infinite'))] },
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Pair this browser' }));
@@ -46,6 +48,7 @@ export const Asking: Story = {
 
 /** Asked: the code the person approves, large, waiting on the approval. */
 export const Waiting: Story = {
+  tags: ['network'],
   parameters: {
     msw: [
       http.post('/api/pairings', () => HttpResponse.json(ASKED, { status: 201 })),

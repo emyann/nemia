@@ -67,6 +67,7 @@ export const Two: Story = {
 
 /** Its memory files turned on for one volume: the api is sent that switch alone, on the volume by its name, and nothing is refused. */
 export const Switched: Story = {
+  tags: ['network'],
   args: { factory: { ...factoryView(FACTORY), volumes } },
   parameters: {
     msw: [
@@ -101,6 +102,7 @@ export const Switched: Story = {
 
 /** A switch the api refuses, the volume gone meanwhile: its words shown under the form, as an alert, nothing changed. */
 export const SwitchRefused: Story = {
+  tags: ['network'],
   args: { factory: { ...factoryView(FACTORY), volumes } },
   parameters: {
     msw: [
@@ -121,6 +123,7 @@ export const SwitchRefused: Story = {
 
 /** A path typed, read only picked, and Add: the api is sent the path with its mark, and nothing is refused. */
 export const Added: Story = {
+  tags: ['network'],
   parameters: {
     msw: [
       http.post(VOLUMES, async ({ request }) => {
@@ -148,6 +151,7 @@ export const Added: Story = {
 
 /** A volume the api refuses: its words shown under the form, as an alert. */
 export const Refused: Story = {
+  tags: ['network'],
   parameters: {
     msw: [
       http.post(VOLUMES, () =>
@@ -167,6 +171,7 @@ export const Refused: Story = {
 
 /** Remove pressed on a volume, its removal still out: that row's Remove pending, every write held, its switches among them. */
 export const Removing: Story = {
+  tags: ['network'],
   args: { factory: { ...factoryView(FACTORY), volumes } },
   parameters: { msw: [http.delete(VOLUMES, async () => delay('infinite'))] },
   play: async ({ canvasElement }) => {

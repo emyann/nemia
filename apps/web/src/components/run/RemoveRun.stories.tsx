@@ -31,6 +31,7 @@ export const Asking: StoryObj<typeof meta> = {
 
 /** Pressed through: the try is removed, the question closes, and the snackbar the frame hosts names the run removed. */
 export const Removed: StoryObj<typeof meta> = {
+  tags: ['network'],
   parameters: {
     msw: [
       http.get('/api/runs/:name', () => HttpResponse.json(TARGET_RUNS.x57v)),

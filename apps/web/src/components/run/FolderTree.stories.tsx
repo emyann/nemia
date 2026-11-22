@@ -41,6 +41,7 @@ const pictures = [
 
 /** A step's whole folder of files, by folder: each folder folds, a picture's row draws it small, a press on a file opens it. */
 const meta: Meta<typeof FolderTree> = {
+  tags: ['network'],
   title: 'Run/FolderTree',
   component: FolderTree,
   args: { files: FOLDER, step: 'implement' },

@@ -37,12 +37,16 @@ const manifest = (name: string, ...deps: string[]) =>
 
 /**
  * A repository with the manifests committed, and its first commit's sha: the workspaces `due.ts`'s table names, `agent-orchestrator`
- * depending on `agent-runtime`, `api` on `agent-orchestrator`, and `lib` on nothing, which the guards depend on.
+ * depending on `agent-runtime`, `api` on `agent-orchestrator`, `design-system` and `lib` on nothing, the guards depending on `lib`.
  */
 const planted = () => {
   const root = scratch('guards-due-');
   git(root, 'init', '-q', '-b', 'main');
-  write(root, 'package.json', JSON.stringify({ name: 'r', private: true, workspaces: ['packages/*', 'apps/*', 'tools/guards'] }));
+  write(
+    root,
+    'package.json',
+    JSON.stringify({ name: 'r', private: true, workspaces: ['packages/*', 'apps/*', 'tools/guards', 'tools/design-system'] }),
+  );
   write(root, 'packages/lib/package.json', manifest('lib'));
   write(root, 'packages/agent-runtime/package.json', manifest('agent-runtime'));
   write(root, 'packages/agent-orchestrator/package.json', manifest('agent-orchestrator', 'agent-runtime'));
@@ -52,6 +56,7 @@ const planted = () => {
   write(root, 'apps/cli/package.json', manifest('cli', 'api'));
   write(root, 'apps/web/package.json', manifest('web', 'objects'));
   write(root, 'tools/guards/package.json', manifest('guards', 'lib', 'typescript'));
+  write(root, 'tools/design-system/package.json', manifest('design-system'));
   write(
     root,
     'turbo.json',

@@ -62,6 +62,7 @@ const answered = (url: URL, over: Partial<Printed> = {}, stdout = STDOUT) => {
  * check still running; a stdout the runtime did not keep; a check not filed yet.
  */
 const meta: Meta<typeof CheckOutput> = {
+  tags: ['network'],
   title: 'Run/CheckOutput',
   component: CheckOutput,
   args: { read: { runId: 'r-1', step: 'implement', try: 2 } },

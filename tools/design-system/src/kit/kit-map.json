@@ -1,0 +1,696 @@
+{
+  "GROUPS": [
+    [
+      "actions",
+      "Actions"
+    ],
+    [
+      "communication",
+      "Communication"
+    ],
+    [
+      "containment",
+      "Containment"
+    ],
+    [
+      "navigation",
+      "Navigation"
+    ],
+    [
+      "selection",
+      "Selection"
+    ],
+    [
+      "text-inputs",
+      "Text inputs"
+    ]
+  ],
+  "JOINED": {
+    "FAB": "Button",
+    "Search": "SearchBar"
+  },
+  "SKIPPED": [
+    "Form"
+  ],
+  "PICK": {
+    "Button": [
+      "Filled",
+      "Tonal",
+      "Outlined",
+      "Text",
+      "Elevated",
+      "Sizes",
+      "Shapes",
+      "Toggles"
+    ],
+    "FAB": [
+      "Small",
+      "Medium",
+      "Large",
+      "Extended"
+    ],
+    "IconButton": [
+      "Default",
+      "ColorStyles",
+      "Toggle",
+      "Sizes",
+      "Disabled",
+      "Contained"
+    ],
+    "ButtonGroup": [
+      "Standard",
+      "StandardSizes",
+      "StandardSquareToggles",
+      "ConnectedSingleSelect",
+      "ConnectedMultiSelect"
+    ],
+    "FabMenu": [
+      "Closed",
+      "ColorSets",
+      "TwoItems"
+    ],
+    "SegmentedButton": [
+      "SingleSelect",
+      "MultiSelect",
+      "IconOnly",
+      "Disabled"
+    ],
+    "SplitButton": [
+      "Variants",
+      "Sizes"
+    ],
+    "Pressable": [
+      "AroundAnAvatar",
+      "ALinkAroundACardsContent",
+      "Disabled"
+    ],
+    "Skeleton": [
+      "List",
+      "Card",
+      "OnAFilledCard",
+      "SameHeightAsTheText"
+    ],
+    "Popover": [
+      "Filters",
+      "Notifications"
+    ],
+    "Tree": [
+      "FoldersAndFiles",
+      "Dense",
+      "WithCheckboxes"
+    ],
+    "Breadcrumbs": [
+      "Path",
+      "LongPath"
+    ],
+    "ContextMenu": [
+      "OnACard",
+      "OneAreaForAList",
+      "WithADisabledEntry"
+    ],
+    "Link": [
+      "InASentence",
+      "InAList",
+      "External",
+      "Disabled"
+    ],
+    "DropZone": [
+      "Outlined",
+      "Disabled",
+      "BareOverAList"
+    ],
+    "Badge": [
+      "Sizes",
+      "Counts",
+      "OnNavigationBar",
+      "OnNavigationRail",
+      "OnNavigationDrawer",
+      "OnTabs",
+      "OnIconButton"
+    ],
+    "LoadingIndicator": [
+      "Default",
+      "Contained",
+      "Sizes",
+      "InAButton",
+      "OverContent"
+    ],
+    "Meter": [
+      "Default",
+      "CustomScale",
+      "Colors",
+      "Thickness",
+      "RightToLeft"
+    ],
+    "Avatar": [
+      "Image",
+      "Initials",
+      "Glyph",
+      "Sizes"
+    ],
+    "Divider": [
+      "FullWidth",
+      "Inset",
+      "MiddleInset",
+      "Vertical"
+    ],
+    "EmptyState": [
+      "WithActions",
+      "Small"
+    ],
+    "PreviewTrigger": [
+      "ProductList"
+    ],
+    "ProgressIndicator": [
+      "LinearDeterminate",
+      "LinearIndeterminate",
+      "CircularDeterminate",
+      "CircularIndeterminate"
+    ],
+    "Snackbar": [
+      "SingleLine",
+      "WithAction",
+      "TwoLinesWithAction",
+      "ActionAndClose"
+    ],
+    "Tag": [
+      "Tonal",
+      "Filled",
+      "Outlined",
+      "Colors"
+    ],
+    "Tooltip": [
+      "PlainTooltip",
+      "RichTooltip"
+    ],
+    "BottomSheet": [
+      "Standard"
+    ],
+    "Card": [
+      "Filled",
+      "Outlined",
+      "Elevated",
+      "FilledWithMedia"
+    ],
+    "Carousel": [
+      "MultiBrowse",
+      "Hero",
+      "Uncontained",
+      "UncontainedMultiAspectRatio",
+      "WithText",
+      "Outlined",
+      "WithShowAll"
+    ],
+    "Dialog": [
+      "DefaultDialog",
+      "DialogWithIconInTitle"
+    ],
+    "DialogContent": [
+      "Basic",
+      "WithIcon"
+    ],
+    "Disclosure": [
+      "Single",
+      "Group",
+      "Outlined"
+    ],
+    "GridList": [
+      "SingleSelection",
+      "WithActions"
+    ],
+    "ListItem": [
+      "Default",
+      "ListItemWithSupportingText",
+      "ListItemWithLeadingImage",
+      "ListItemWithTrailingElement",
+      "SelectedListItem"
+    ],
+    "Modal": [
+      "Default"
+    ],
+    "SideSheet": [
+      "Default"
+    ],
+    "Table": [
+      "Sortable",
+      "Selectable"
+    ],
+    "Tabs": [
+      "Primary",
+      "Secondary",
+      "WithIcons"
+    ],
+    "BottomNavigation": [
+      "ThreeDestinations",
+      "FiveDestinations"
+    ],
+    "Menu": [
+      "FromButton",
+      "FromIconButton"
+    ],
+    "NavigationDrawer": [
+      "Standard",
+      "Sections"
+    ],
+    "NavigationRail": [
+      "Collapsed",
+      "Expanded"
+    ],
+    "Search": [
+      "Bar",
+      "ViewClosed",
+      "InTopAppBar"
+    ],
+    "Toolbar": [
+      "Docked",
+      "Floating",
+      "Vibrant",
+      "Vertical",
+      "WithFab"
+    ],
+    "TopAppBar": [
+      "Small",
+      "CenterAligned",
+      "Medium",
+      "Large"
+    ],
+    "Checkbox": [
+      "Unselected",
+      "Selected",
+      "Indeterminate",
+      "Error",
+      "Disabled",
+      "Group"
+    ],
+    "Chip": [
+      "AssistChip",
+      "AssistChipWithIcon",
+      "FilterChip",
+      "FilterChipSelected",
+      "InputChip",
+      "InputChipWithBothIcons",
+      "FilterChipGroup"
+    ],
+    "ColorPicker": [
+      "Picker",
+      "Area",
+      "HueSlider",
+      "Field"
+    ],
+    "DatePicker": [
+      "Fields",
+      "Disabled",
+      "RangeField",
+      "Docked"
+    ],
+    "Radio": [
+      "Vertical",
+      "Horizontal",
+      "WithSupportingText",
+      "Error"
+    ],
+    "Select": [
+      "Outlined",
+      "Filled",
+      "WithValue",
+      "Error"
+    ],
+    "Slider": [
+      "Continuous",
+      "Stepped",
+      "Range",
+      "Disabled"
+    ],
+    "Switch": [
+      "Off",
+      "On",
+      "WithIcons",
+      "Disabled"
+    ],
+    "TimePicker": [
+      "Dial12h"
+    ],
+    "ComboBox": [
+      "Autocomplete",
+      "Multiple",
+      "Filled",
+      "Error"
+    ],
+    "ImageField": [
+      "Empty",
+      "WithImage",
+      "Error"
+    ],
+    "NumberField": [
+      "Outlined",
+      "Steppers",
+      "Currency",
+      "Error"
+    ],
+    "PhoneField": [
+      "Outlined",
+      "WithValue",
+      "Error"
+    ],
+    "TextField": [
+      "Outlined",
+      "Filled",
+      "WithValue",
+      "WithIcons",
+      "Error",
+      "Multiline"
+    ]
+  },
+  "ROOM": {
+    "TimePicker": 640
+  },
+  "SCREEN": {
+    "BottomSheet": 480,
+    "SideSheet": 480
+  },
+  "TYPE_GROUP": "Type",
+  "TYPE": {
+    "Display": [
+      "The largest text: short, large words or numerals.",
+      "Use it rarely in an application: a hero figure, a first-run screen. It is set in the brand face.",
+      "Supply the text as children and a `size`: `large`, `medium` or `small`. `colorRole` states a colour where inheriting is wrong."
+    ],
+    "Headline": [
+      "A page's or a section's heading.",
+      "Use one headline level per page section. It is set in the brand face.",
+      "Supply the text as children and a `size`: `large`, `medium` or `small`."
+    ],
+    "Title": [
+      "A smaller heading: a card's title, a dialog's title, a list item's headline.",
+      "Use it for the heading of a contained thing. It is set in the brand face, at medium weight.",
+      "Supply the text as children and a `size`: `large`, `medium` or `small`."
+    ],
+    "Body": [
+      "Running text and supporting text.",
+      "Use it for passages. Under a heading, give supporting text `colorRole=\"on-surface-variant\"`. It is set in the plain face.",
+      "Supply the text as children and a `size`: `large`, `medium` or `small`."
+    ],
+    "Label": [
+      "Short text inside or beside a control: a caption, a table head, a count.",
+      "Use it for words that label, not words that are read as a passage. It is set in the plain face, at medium weight.",
+      "Supply the text as children and a `size`: `large`, `medium` or `small`."
+    ]
+  },
+  "GUIDES": {
+    "Pressable": [
+      "A button, or with `href` a link, that holds anything: it gives its content the keyboard, a name, the state layer and the focus ring, and draws nothing else.",
+      "Use it around an avatar that opens a menu, a card pressed whole or a line of a transcript. Use `Button` or `IconButton` where the control is one of theirs.",
+      "The content as children, `onPress` or `href`, a name (`aria-label`) where the content has no text, and the shape as a class (`rounded-shape-full`)."
+    ],
+    "Skeleton": [
+      "A placeholder for content that is loading: a quiet block the size and shape of what will take its place, so the page does not jump when it arrives.",
+      "Use it while a first read is out, in the shape of what is coming. A `text` skeleton stands inside the type primitive it replaces and takes its line height.",
+      "Wrap the skeletons in a `SkeletonGroup` with a `label`, the line a screen reader hears. Give each a `shape` (`text`, `rectangle` or `circle`) and its size as a class."
+    ],
+    "Popover": [
+      "A surface that opens beside the control that asked for it, holding a few controls or a short list; `PopoverTrigger` puts the control and the popover side by side.",
+      "Use it for filters, a short list of notifications or a small form that belongs to one control. Material 3 does not describe it; use a `Dialog` where the page must wait.",
+      "A pressable kit component and the `Popover` inside a `PopoverTrigger`. It opens on press, Enter or Space, and gives the focus back on close."
+    ],
+    "Tree": [
+      "A hierarchy a person opens level by level: folders and files, sections and pages, categories.",
+      "Use it where rows have children. The arrow keys move between rows; Right opens a row and Left closes it.",
+      "A name (`aria-label`), and `TreeItem`s nested in each other, each an `id`, a `title` and an optional `icon`; `selectionMode` where rows are chosen."
+    ],
+    "Breadcrumbs": [
+      "The path to the page a person is on: a row of links to each level above it, then the page itself, which is not a link.",
+      "Use it on a page deep enough that the way back is not one step. Put it in a `nav` with a name, so the path is a landmark.",
+      "One `Breadcrumb` a level, each with an `href` but the last."
+    ],
+    "ContextMenu": [
+      "A menu asked for on something itself, where it is: the actions of a file, a row or a selection, opened by a right click, a long press or the Menu key.",
+      "Use it for actions that are also reachable another way: nothing on the page says a context menu is there.",
+      "The area as children, a name (`aria-label`) and `items`, the kit's `Menu` rows: each an `id`, a `label` and `onAction`, or a divider."
+    ],
+    "Link": [
+      "A text link: a word or a phrase that goes somewhere, in a sentence or in a list of links.",
+      "Use it inside running text or as one of a list of links. It sets no type: it takes the size and weight of the text it sits in.",
+      "`href`, or `onPress` for a link that acts; `color` and `underline`; `target` for a link that leaves."
+    ],
+    "DropZone": [
+      "An area files, or anything dragged, are dropped onto: from the computer, or from another part of the page.",
+      "Use it where a person adds files. Give it a button inside that picks files too: a drop is never the only way.",
+      "A name (`aria-label`), `onDrop`, and what the area says as children."
+    ],
+    "Button": [
+      "The main way to act: a pill-shaped button in five colour styles and five sizes, round or square, as a button, a link or a toggle; and the floating action button.",
+      "Use `filled` for the one primary action of a screen, `tonal` for the next ones, `outlined` and `text` for the rest, and `elevated` where a button sits on a busy ground; `color=\"error\"` for one that destroys. `size` runs from `xsmall` to `xlarge`, 32 to 136 pixels tall (`small` is the default), and `shape` is `round` or `square`. `isToggle` makes it a toggle whose corners turn when it is selected. The floating action button is the `fab` variant: one per screen, for its main action; with a label it is the extended FAB.",
+      "Supply the label as children and, where it helps, an `icon`: one of `Nemia.Icons`, or any component that takes a size and a class. An `href` makes it a link. A `fab` with no label takes an `aria-label`. `xsmall` and `small` answer over a 48 pixel target: leave that room around them."
+    ],
+    "IconButton": [
+      "A button that shows an icon alone, as a button, a link or a toggle.",
+      "Use it for a compact action in a bar, a row or a card. Variants are `standard`, `filled` (the default), `tonal` and `outlined`, in five sizes from `xsmall` to `xlarge`. `isToggle` with `isSelected` makes it a toggle that shows whether it is on; `badge` sets a dot or a count on its icon.",
+      "Supply the `icon` (one of `Nemia.Icons`, or any component that takes a size and a class) and an `aria-label`: the icon is all a person sees, the label is all a screen reader says."
+    ],
+    "ButtonGroup": [
+      "Buttons and icon buttons that answer to each other: a `standard` group that hugs them, or a `connected` row that selects.",
+      "Use `standard` for a few related actions side by side: a pressed button widens and its neighbours move. Use `connected` with a `selectionMode` (`single` or `multiple`) for a choice among a few options, in place of a segmented button. The group hands its `size` to its buttons.",
+      "Supply `Button`s or `IconButton`s as its direct children (a wrapped button loses its corners), a `variant` and a `size`; for a choice, `selectionMode`, and each child `isToggle` and an `id`."
+    ],
+    "FabMenu": [
+      "A floating action button that opens two to six related actions above it, and turns into their close button.",
+      "Use it where the main action of a screen comes in a few kinds, such as a new note, photo or list. Place it at the window's trailing edge (`fixed bottom-4 end-4`): it grows upwards. Keep to six items.",
+      "Supply the FAB's `icon` and `aria-label`, the `items` (each an `id`, a `label`, an `icon` and an `onAction`), a `color` (`primary`, `secondary` or `tertiary`) and a `fabSize`."
+    ],
+    "SegmentedButton": [
+      "Two to five options in one outlined row, for one choice or several.",
+      "Material no longer recommends it: for new work use a `ButtonGroup` with `variant=\"connected\"` and a `selectionMode`. It is kept for screens that already use it.",
+      "Supply `Segment` children, each with an `id` and a label, or an icon and an `aria-label`; a `selectionMode` (`single`, the default, or `multiple`); and an `aria-label` that says what the row chooses."
+    ],
+    "SplitButton": [
+      "A button for the main action, joined to a button that opens a menu of related ones.",
+      "Use it where one action is the usual one and a few others are its variants, such as Share and where to. It comes `elevated`, `filled` (the default), `tonal` or `outlined`, in the five button sizes.",
+      "Supply the leading button's label as children and its `onPress`, the menu's `items`, and `menuLabel`, the name of the button that opens the menu."
+    ],
+    "Avatar": [
+      "A person's or a thing's picture, with a fallback when there is none.",
+      "Use it beside a name. Never as the only way to say who someone is.",
+      "Supply `src` and `alt`, and a `fallback` such as initials for when the picture is missing."
+    ],
+    "Badge": [
+      "A notification dot, or a small count, on the corner of a destination's icon.",
+      "Use it on a navigation bar, a rail, a drawer, a tab or an icon button to say that something new waits there: the dot says there is something, a count says how many, up to 999+. Prefer the host's `badge` prop to a badge placed by hand: the host joins its words to the destination's name.",
+      "Supply the host's `badge` (a count, a short text, or `true` for the dot) and an optional `badgeLabel`. A badge alone takes a `value`, and `anchored` to sit on its positioned parent's corner. A count of 0 draws nothing."
+    ],
+    "Divider": [
+      "A thin line between groups of content.",
+      "Use it to separate groups, not to box every row. It runs `horizontal` or `vertical`, and `full-width`, `inset` or `middle-inset`.",
+      "Supply nothing but its orientation and inset."
+    ],
+    "EmptyState": [
+      "What a view shows when it has nothing to show.",
+      "Use it in place of an empty list or table: say what will appear here, and offer the action that fills it.",
+      "Supply a title, a `description`, optional `media`, and an `action` with at most one `secondaryAction`."
+    ],
+    "LoadingIndicator": [
+      "A shape that morphs in a loop while something short loads.",
+      "Use it for a wait whose length is not known, between a fifth of a second and five seconds. `contained` sets it on a circle, for a loader over other content. Where the progress can be known, use a `ProgressIndicator` from the start.",
+      "Supply an `aria-label` that says what is loading, and a `size` from 24 to 240 pixels (48 by default)."
+    ],
+    "Meter": [
+      "A quantity within a known range, such as a quota, a disk's use or a score, as a bar.",
+      "Use it for a reading, not for a task under way: that is a `ProgressIndicator`. Give `color=\"error\"` to a quantity over its limit, and say so in words: the colour never carries it alone.",
+      "Supply a `label` and a `value`, the range (`minValue`, `maxValue`) where it is not 0 to 100, `showValue` to print it, and `valueLabel` to say it in words (\"3 of 5\")."
+    ],
+    "PreviewTrigger": [
+      "A preview card that opens beside a link or an element on hover or focus.",
+      "Use it to show what a link leads to without leaving the page. Keep the card short: it closes when the pointer leaves.",
+      "Supply the trigger as the first child and a `PreviewCard` with the preview's content."
+    ],
+    "ProgressIndicator": [
+      "Progress of something under way, drawn as a line or a circle.",
+      "Use `linear` across a container and `circular` in a small space. Leave the value out when the length of the wait is unknown.",
+      "Supply a `label`, and a value where one is known; `showValue` prints it."
+    ],
+    "Snackbar": [
+      "A brief message at the foot of the screen, with one action at most.",
+      "Use it to confirm what just happened. It leaves by itself, so never put in it what a person must read or answer.",
+      "Supply a queue to one `SnackbarRegion` at the root of the app, and add messages to that queue."
+    ],
+    "Tag": [
+      "A small label that marks a status or a category.",
+      "Use it for a state that is read, not pressed. Variants are `tonal`, `filled` and `outlined`, in `neutral`, `primary`, `secondary`, `tertiary` or `error`. Say the state in its words: the colour alone does not carry it.",
+      "Supply the label as children."
+    ],
+    "Tooltip": [
+      "A short hint shown on hover or keyboard focus: plain, or rich with a headline and supporting text.",
+      "Use a plain one to name an icon button, a rich one to explain a control. Never put in it what a person needs to act.",
+      "Wrap the control and the `Tooltip` in a `TooltipTrigger`. A rich one takes a `headline` and `supportingText`."
+    ],
+    "BottomSheet": [
+      "A sheet anchored to the bottom of the screen, for supplementary content.",
+      "Use `standard` for content that goes with the page and leaves it usable, such as a player; `modal` for a short set of choices over a scrim, which must be dismissed. Its drag handle moves it between its heights, `partial` and `expanded`.",
+      "Supply `isOpen` with `onClose`, the content as children, and a `title` or an `aria-label`. A standard sheet sits at the bottom of its positioned container; `className=\"fixed\"` pins it to the window."
+    ],
+    "Card": [
+      "A container for one subject: a filled, outlined or elevated surface.",
+      "Use it to group what belongs to one thing. `filled` is the default; `outlined` on a ground of its own tone; `elevated` where the card must lift.",
+      "Supply a `CardContent` with a `headline`, `supportingText`, `media` and `actions`. `CardContent` takes those four and no children."
+    ],
+    "Carousel": [
+      "A row of items, mostly pictures, that scrolls sideways.",
+      "Use `multi-browse` to show many items at once in three sizes, `hero` or `center-aligned-hero` to put one forward, `uncontained` for items of one width that run past the edge, and `full-screen` for one item at a time. On a page that scrolls down, give a Show all button or an arrow beside its header: the carousel does not.",
+      "Supply `CarouselItem` children, each with its picture and an `onPress` or an `href`, a `layout`, and an `aria-label` for the row."
+    ],
+    "Dialog": [
+      "A dialog: a title, supporting text and its actions, drawn in place or, as `ModalDialog`, over the page.",
+      "Use it for a decision or a short task that must be finished or dismissed before going on. Give a confirmation that must be answered `role=\"alertdialog\"`: a click outside then no longer dismisses it.",
+      "Supply a `title`, `supportingText` or children, and `actions`: the labels of a confirm and a cancel, or buttons of your own. `ModalDialog` takes the same, with `isOpen` and `onClose`, and comes `basic` or `fullscreen`."
+    ],
+    "DialogContent": [
+      "The body a dialog draws: an optional icon, a title, supporting text and its actions.",
+      "Use it where a dialog's layout is wanted in a container of your own. `Dialog` already draws it.",
+      "Supply a `title`, `supportingText` or children, and `actions`: the labels of a confirm and a cancel, or buttons of your own."
+    ],
+    "Disclosure": [
+      "A heading that opens and closes the content under it; several in a group make an accordion.",
+      "Use it for content most people skip. Do not hide in it what a person needs to decide.",
+      "Supply a `DisclosureHeader` with a `DisclosureTrigger`, and a `DisclosurePanel`. A `DisclosureGroup` holds several."
+    ],
+    "GridList": [
+      "A list or a grid of items a person can move through, select and act on.",
+      "Use it for a list the keyboard walks through row by row. Use a `Table` when rows are compared by column.",
+      "Supply `GridListItem` children, each with a `ListItem` or a `Card` inside, and an `aria-label` for the list."
+    ],
+    "ListItem": [
+      "One row of a list: a headline, supporting text, and an element at each end.",
+      "Use it for every row of a list, a menu-like panel or a settings page, so rows line up.",
+      "Supply a `headline`, optional `supportingText`, and a `leadingElement` and `trailingElement`: an icon, an avatar, a switch, a tag."
+    ],
+    "Modal": [
+      "The veil and the centred layer that content opens in, over the page.",
+      "Use it to open content of your own over the page. For a dialog, `ModalDialog` already includes it. One modal at a time.",
+      "Supply the content as children, and `isOpen` with `onOpenChange`."
+    ],
+    "SideSheet": [
+      "A panel that slides in from an edge for secondary content.",
+      "Use it for detail or filters that go with the page behind it. It opens from the `right` or the `left`.",
+      "Supply a `title`, the content as children, an optional `footer`, and `isOpen` with `onClose`."
+    ],
+    "Table": [
+      "A data table whose columns can sort.",
+      "Use it where rows are compared by column. Align numbers to the `end`.",
+      "Supply a `TableHeader` of `Column`s and a `TableBody` of `Row`s of `Cell`s, and an `aria-label`."
+    ],
+    "Tabs": [
+      "Views of one subject, one shown at a time.",
+      "Use `primary` tabs for the main views of a page and `secondary` tabs inside one of them. Not for steps of a flow.",
+      "Supply a `TabList` of `Tab`s and a `TabPanel` for each. A `Tab` takes an `icon`, above or beside its label."
+    ],
+    "BottomNavigation": [
+      "Three to five destinations at the foot of a small screen.",
+      "Use it on a phone. On a wider screen use a `NavigationRail` or a `NavigationDrawer`.",
+      "Supply `items`, each with a label and an icon, and the selected key."
+    ],
+    "Menu": [
+      "A list of choices that opens from a button.",
+      "Use it for the actions of one thing, or the overflow of a bar. Not for navigation between pages.",
+      "Supply the `triggerButton` and the `items`."
+    ],
+    "MenuItem": [
+      "One row of a menu.",
+      "Use it inside a `Menu`, or to draw a row that looks like one.",
+      "Supply a `label`, and where they help a `leadingIcon`, a `trailingIcon`, `supportingText` or a `shortcut`."
+    ],
+    "NavigationDrawer": [
+      "A side panel of destinations, standing beside the page or opening over it.",
+      "Use `standard` on a wide screen and `modal` on a narrow one.",
+      "Supply `items` or `sections` of them, an optional `headline`, and the selected key."
+    ],
+    "NavigationRail": [
+      "Destinations down the side of a medium or wide screen.",
+      "Use it for three to seven destinations of equal weight. It can expand to show its labels.",
+      "Supply `items`, each with a label and an icon, the selected key, and an optional `header` and `footer`."
+    ],
+    "SearchBar": [
+      "A search bar, and the search view it opens, where suggestions and results are listed as a person types.",
+      "Use `SearchBar` for a field that runs its query on Enter. Use `SearchView` where suggestions or results should list as one types: `docked` opens over the bar, `full-screen` fills the window, each `divided` or `contained`. In a `TopAppBar`, `search` takes the title's place.",
+      "Supply a `placeholder`, which is also its name; `leading` and `trailing` icon buttons or an avatar; and for a view, `SearchViewItem`s in `SearchViewSection`s, with `onAction` or `onSubmit`."
+    ],
+    "Toolbar": [
+      "A row of the actions that belong to the current page, docked to the bottom of the window or floating over the content.",
+      "Use `docked` across the bottom of a window, in place of a bottom app bar, and `floating` over the content; `vibrant` draws the eye where `standard` does not. `fab` sets a floating action button beside a floating toolbar. Give it an `aria-label` where a page has more than one.",
+      "Supply standard `IconButton`s and text `Button`s as children, which the toolbar colours; a `variant`, a `color`, an `orientation`, and an optional `fab`."
+    ],
+    "TopAppBar": [
+      "The bar at the top of a screen: its title, a way back or to the menu, and its actions.",
+      "Use one per screen. It comes `small`, `center-aligned`, `medium` or `large`.",
+      "Supply the `title`, a navigation icon button, and the actions as icon buttons."
+    ],
+    "Checkbox": [
+      "A box for a choice that is on or off; grouped, for several of a set.",
+      "Use it where a person picks any number of options, or accepts one thing. For a setting that takes effect at once, use a `Switch`.",
+      "Supply the label as children. A `CheckboxGroup` takes a `label`, `supportingText` and an `errorMessage`."
+    ],
+    "Chip": [
+      "A compact element that filters, suggests an action or holds an entry.",
+      "Use `assist` for a suggested action, `filter` for a choice that narrows what is shown, `input` for an entry a person made. A `ChipGroup` holds a set.",
+      "Supply the label as children; a `ChipGroup` takes a `label`."
+    ],
+    "ColorPicker": [
+      "A colour chosen by area, slider, field or swatch.",
+      "Use it where a person picks a colour freely. Offer swatches where the choice is among a few.",
+      "Supply a `label`, and the parts to show as children: `ColorArea`, `ColorSlider`, `ColorField`, `ColorSwatch`."
+    ],
+    "DatePicker": [
+      "A date field whose calendar button opens a calendar, for one date (`DatePicker`) or a range (`DateRangePicker`).",
+      "Use `docked` (the default) on a wide screen, `modal` where the calendar should hold the focus, and `fullscreen` on a compact window. A person may also type the date in the field. A range picker is always full screen.",
+      "Supply a `label` and an `@internationalized/date` value (`Nemia.Dates.parseDate(\"2026-06-15\")`), and where they apply `minValue`, `maxValue` and `isDateUnavailable`. Set the locale with `Nemia.Aria.I18nProvider`."
+    ],
+    "Radio": [
+      "One choice of a set.",
+      "Use it for two to five options that exclude each other and should all be seen. For more, use a `Select`.",
+      "Supply `Radio` children with their labels to a `RadioGroup`, which takes a `label`, `supportingText` and an `errorMessage`."
+    ],
+    "Select": [
+      "One choice from a list that opens from a field.",
+      "Use it for more options than radios show well. Where a person would rather type, use a `ComboBox`.",
+      "Supply a `label` and `SelectItem` children, each with a `label` and optional `supportingText` and icons."
+    ],
+    "Slider": [
+      "A value, or a range, picked along a track.",
+      "Use it where the feel of the value matters more than its exact number. Offer a `NumberField` beside it where the number matters.",
+      "Supply a label, the range, and `showOutput` to print the value."
+    ],
+    "Switch": [
+      "A toggle for a setting that takes effect at once.",
+      "Use it for on or off with no confirm step. In a form that is sent later, use a `Checkbox`.",
+      "Supply the label as children. `icons` draws a mark in the thumb."
+    ],
+    "TimePicker": [
+      "A field that opens a dialog to pick an hour and a minute, on a clock dial or typed.",
+      "Use it for a time of day. The dial suits a pointer and the typed input a keyboard; a person can switch between them. `hourCycle` sets 12 or 24 hours, else the locale does.",
+      "Supply a `label` and a `Time` value (`new Nemia.Dates.Time(7, 0)`), and where it helps a `defaultMode` (`dial` or `input`) and an `orientation`."
+    ],
+    "ComboBox": [
+      "A field that filters a list as a person types, for one choice or several.",
+      "Use it for a long list. With `multiple`, each choice becomes a chip in the field.",
+      "Supply a `label` and `ComboBoxItem` children, and optional `supportingText` and `errorMessage`."
+    ],
+    "ImageField": [
+      "A field that takes one image, dropped or chosen, and shows it.",
+      "Use it for a single picture in a form. It refuses a file of the wrong type or over the size given, and says which.",
+      "Supply a `label`, the accepted types and largest size, and the words of its buttons."
+    ],
+    "NumberField": [
+      "A field for a number, with steppers.",
+      "Use it for a quantity a person may type or nudge.",
+      "Supply a `label`, and the range and step where there are any."
+    ],
+    "PhoneField": [
+      "A field for a phone number, with a country to pick.",
+      "Use it wherever a phone number is asked: it formats as the country writes it.",
+      "Supply a `label` and, where known, the default country."
+    ],
+    "TextField": [
+      "A field for a line or more of text.",
+      "Use `outlined` on a busy ground and `filled` on a plain one; keep to one in a form. Put the hint in `supportingText`, never in a placeholder alone.",
+      "Supply a `label`, and where they help `supportingText`, an `errorMessage` and icons."
+    ]
+  }
+}

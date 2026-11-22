@@ -102,6 +102,7 @@ const written: string[] = [];
  * factory serves none of.
  */
 export const Unlisted: Story = {
+  tags: ['network'],
   parameters: {
     msw: [
       http.put(PUT, ({ params }) => {
@@ -127,6 +128,7 @@ export const Unlisted: Story = {
 
 /** A write the api refuses: its words under the form, the name kept in the field to mend. */
 export const Refused: Story = {
+  tags: ['network'],
   parameters: {
     msw: [http.put(PUT, () => HttpResponse.json({ error: 'this factory serves no agent named nobody' }, { status: 422 }))],
   },

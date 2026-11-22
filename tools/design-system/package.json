@@ -1,0 +1,30 @@
+{
+  "name": "design-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Builds the board's Design System artifact (window.Nemia on React 18, its stylesheet, tokens, faces, types and one preview card per story file and kit component) into a folder. Never shipped.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "produce": "node src/produce.ts",
+    "test": "vitest run",
+    "typecheck": "tsrs --noEmit"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/node": "4.3.3",
+    "@tailwindcss/oxide": "4.3.3",
+    "@types/node": "^24.19.2",
+    "esbuild": "0.28.2",
+    "lucide-react": "1.61.0",
+    "msw": "3.0.6",
+    "playwright": "1.64.1",
+    "tailwindcss": "4.3.3",
+    "test-kit": "*",
+    "typescript": "^6.0.3",
+    "vitest": "5.1.0"
+  }
+}

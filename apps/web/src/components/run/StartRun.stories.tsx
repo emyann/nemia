@@ -35,6 +35,7 @@ const NOTE: WorkflowListing = {
  * files api's limit keeps from starting. Its read of the runs is answered by MSW with none.
  */
 const meta: Meta<typeof StartRun> = {
+  tags: ['network'],
   title: 'Run/StartRun',
   component: StartRun,
   args: { workflow: NOTE },

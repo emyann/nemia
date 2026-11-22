@@ -5,6 +5,7 @@ import { YouAreSet } from './YouAreSet';
 
 /** "You are set", its reads answered by MSW from typed fixtures (`.storybook/fixtures/firstCard.ts`), one story a state. */
 const meta: Meta<typeof YouAreSet> = {
+  tags: ['network'],
   title: 'Pages/You are set',
   args: {},
   parameters: { msw: firstCardStore({ landed: true }) },

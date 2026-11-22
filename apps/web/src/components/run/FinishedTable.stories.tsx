@@ -14,6 +14,7 @@ const meta: Meta<typeof FinishedTable> = {
   title: 'Run/FinishedTable',
   component: FinishedTable,
   args: { page: PAGE, trail: [] },
+  tags: ['network'],
   parameters: { msw: [http.get('/api/runs/:name/lines', ({ params }) => HttpResponse.json(linesOf(String(params.name))))] },
   render: (args) => (
     <div style={{ width: 1100 }}>

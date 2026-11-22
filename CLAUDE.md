@@ -35,7 +35,7 @@ holds what every change needs.
   `npx vitest run <file>` in every package, and `npx vitest run --project=node <file>` in `apps/web`; the tests that read a doc, a
   skill or a workflow file are found by grepping the tests for its path. One package runs by
   `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
-  (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Implement's round check runs the
+  (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`, `design-system`). Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs on it every
   job the change reaches (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
   the pull request `ci` judged was merged (`packages/templates/sdlc/carried/landing.ts`), then a wait on main's own `ci` at the
@@ -213,6 +213,11 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   (the root, the workspaces, git's file list), `test-kit/imports` (the import scanners), `test-kit/layout` (the folder rule's judgement,
   `docs/architecture.md`, *Folders, in every package*) and `test-kit/debt` (the door-debt counter). It imports only Node's built-ins and
   TypeScript, only tests import it, and each workspace lists it under `devDependencies` (`tools/guards/test/test-kit.test.ts`).
+- `tools/design-system/` — the board's Design System artifact (`window.Nemia` on React 18, its stylesheet, tokens, faces, types and a
+  preview card per story file and kit component), built whole by `npm run design-system` from the checkout and verified in both themes,
+  its last lines naming the files changed against the last build; never shipped, it publishes nothing, a person's session does
+  (`tools/design-system/README.md`). A story that reads the api is tagged `network`, one open over the window at rest `overlay`. CI's
+  `design-system` job builds it on every push that reaches it or the board.
 - `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
 - `tools/contracts/` — what `npm run contracts` runs (`prove.ts`): every contract proved by tsverify, in the legs `legs.ts` names, which

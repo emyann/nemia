@@ -31,6 +31,7 @@ const loaded = async (canvas: HTMLElement) => {
 
 /** A fresh store: its one harness, the one line, Activate, and the skip. */
 export const Fresh: Story = {
+  tags: ['network'],
   parameters: { msw: freshStore },
   play: async ({ canvasElement }) => {
     const page = within(await loaded(canvasElement));
@@ -42,6 +43,7 @@ export const Fresh: Story = {
 
 /** Activate pressed: the pinned copy installs, its output followed on the page. */
 export const Installing: Story = {
+  tags: ['network'],
   parameters: { msw: freshStore },
   play: async ({ canvasElement, userEvent }) => {
     const page = await loaded(canvasElement);
@@ -53,6 +55,7 @@ export const Installing: Story = {
 
 /** Installed and signed in, its version not the pin: both versions said, and the install offered again. */
 export const CheckFailed: Story = {
+  tags: ['network'],
   parameters: { msw: checkFailed },
   play: async ({ canvasElement }) => {
     const page = await loaded(canvasElement);
@@ -67,6 +70,7 @@ export const CheckFailed: Story = {
  * page.
  */
 export const Ready: Story = {
+  tags: ['network'],
   parameters: { msw: harnessReady },
   play: async ({ canvasElement }) => {
     const page = await loaded(canvasElement);

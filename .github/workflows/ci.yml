@@ -53,12 +53,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      # Every leg runs: one package's failure on one node says nothing about the other nineteen.
+      # Every leg runs: one package's failure on one node says nothing about the other twenty-one.
       fail-fast: false
       matrix:
         # The orchestrator is not here: its suite is run in halves, and a matrix cannot split one combination, so its four legs arrive
         # through include below.
-        workspace: [agent-runtime, objects, api, cli, web, docs, templates, test-kit]
+        workspace: [agent-runtime, objects, api, cli, web, docs, templates, test-kit, design-system]
         # Quoted, both of them: YAML reads 24.16 as a number and setup-node then installs the wrong Node. 24.16.0 is the floor
         # engines.node claims; 24 is its line's latest.
         node: ['24.16.0', '24']
@@ -686,6 +686,74 @@ jobs:
             exit 1
           fi
 
+  design-system:
+    # The board's Design System artifact built whole (tools/design-system, `npm run design-system`), on every push that reaches the
+    # producer or the board: every card drawn in both themes on React 18, the faces and the icons checked, and every fault named, so a
+    # story that reads the api and says nothing fails here rather than at a person's next build. It publishes nothing: publishing is a
+    # person's session's act (tools/design-system/README.md). The kit's stories are fetched at the release's tag, GITHUB_TOKEN sent
+    # since the runners share an address and its limit.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        timeout-minutes: 5
+        # No cache: npm, as the legs above.
+        with:
+          node-version: '24.16.0'
+      - name: Decide whether the design system is due
+        id: due
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts design-system
+      - run: npm ci
+        if: steps.due.outputs.due == 'true'
+        timeout-minutes: 10
+      - name: Read the Playwright the lockfile pins
+        id: playwright
+        if: steps.due.outputs.due == 'true'
+        # The browsers' cache key, as the e2e's jobs read it: the same key restores the same builds.
+        run: |
+          node -e '
+            const version = require("./package-lock.json").packages["node_modules/playwright"]?.version;
+            if (!version || !process.env.ImageOS) throw new Error("no playwright in package-lock.json or no ImageOS on the runner: the browsers cache key needs both");
+            console.log(`key=playwright-${process.env.ImageOS}-${version}`);
+          ' >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright's browsers
+        id: browsers
+        if: steps.due.outputs.due == 'true'
+        uses: actions/cache@v6
+        timeout-minutes: 5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright.outputs.key }}
+      - name: Install Chromium
+        if: steps.due.outputs.due == 'true' && (steps.browsers.outputs.cache-hit != 'true')
+        run: npx playwright install --with-deps chromium
+        timeout-minutes: 15
+        working-directory: tools/design-system
+      - name: Build the design system
+        if: steps.due.outputs.due == 'true'
+        run: npm run design-system -- --out .design-system
+        timeout-minutes: 15
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload the verification's pictures
+        # A failure's alone: each card's picture in both themes, the faces' and the icons', to read beside the faults the log names.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        timeout-minutes: 5
+        with:
+          name: design-system-shots
+          path: .design-system/shots
+          include-hidden-files: true
+          if-no-files-found: ignore
+
   guards:
     # The repository's own guards (tools/guards): tests of this file, the docs and the skills, run only when the push or the pull
     # request touched what they read — the guards#test inputs in turbo.json, or a workspace they depend on — as every job's work is.
@@ -724,7 +792,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [test, lint, typecheck, contracts, e2e, e2e-look, e2e-bound, build, gitleaks, guards]
+    needs: [test, lint, typecheck, contracts, e2e, e2e-look, e2e-bound, build, gitleaks, guards, design-system]
     # A dispatched run — the release workflow's, on the release pull request's head — also posts the ci context as a commit status. Its
     # check runs belong to a check suite no pull request is linked to, so the pull request never counts them; a status belongs to the
     # commit, and one posted with this token is set by GitHub Actions, the app branch protection pins. This job alone may write one,

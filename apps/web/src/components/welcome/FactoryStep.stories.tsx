@@ -17,6 +17,7 @@ function HerProbe() {
  * `templates.ts`), under her sheet's state as the frame holds it, one story a state.
  */
 const meta: Meta<typeof FactoryStep> = {
+  tags: ['network'],
   title: 'Pages/Welcome factory',
   component: FactoryStep,
   args: {},

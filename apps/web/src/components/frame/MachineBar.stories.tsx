@@ -40,6 +40,7 @@ const drawn = ({ read, waiting }: Args) => (
  * dots, which the rule reads as text left out of the name. Every other rule holds the bar.
  */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Frame/MachineBar',
   args: { read: RUNNING, waiting: 0 },
   parameters: { msw: quietChat, a11y: { config: { rules: [{ id: 'label-content-name-mismatch', enabled: false }] } } },

@@ -1,11 +1,21 @@
 /**
  * The kit's stories (`src/kit/kit.ts`): fetched as GitHub's tarball of the release's tag, and read by a tar reader of its own, which
- * keeps the regular files by their paths, a pax long name included, and leaves out the global header and every other entry.
+ * keeps the regular files by their paths, a pax long name included, and leaves out the global header and every other entry; refused
+ * when GitHub has no tag of the release, and when its tarball holds no `stories/` folder. Each refusal is asked of a version no cache
+ * holds, and writes nothing to the cache.
  */
-import { test } from 'vitest';
+import { afterAll, afterEach, beforeAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { tarballOf, tarEntries } from '../src/kit/kit.ts';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { kitStories, tarballOf, tarEntries } from '../src/kit/kit.ts';
+
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 /** One tar header of `name`, `size` and `type`, its checksum left blank: the reader trusts the archive GitHub sent. */
 const header = (name: string, size: number, type: string) => {
@@ -45,4 +55,21 @@ test('the regular files are read by their paths, a pax path over a long name, an
   );
   assert.equal(read[0]?.bytes.toString(), 'export const Filled = {};\n');
   assert.equal(read[1]?.bytes.toString(), 'long');
+});
+
+test('a release GitHub has no tag of is refused, not read as an empty kit', async () => {
+  const version = '0.0.0-untagged';
+  server.use(http.get(tarballOf(version), () => new HttpResponse(null, { status: 404 })));
+  await assert.rejects(kitStories(version), (error: unknown) => error instanceof Error && error.message.includes(`v${version}`));
+});
+
+test('a tarball that holds no stories/ folder is refused', async () => {
+  const version = '0.0.0-storyless';
+  const archive = gzipSync(Buffer.concat([entry('top/README.md', 'moved\n'), Buffer.alloc(1024)]));
+  server.use(
+    http.get(tarballOf(version), () =>
+      HttpResponse.arrayBuffer(archive.buffer.slice(archive.byteOffset, archive.byteOffset + archive.byteLength)),
+    ),
+  );
+  await assert.rejects(kitStories(version), (error: unknown) => error instanceof Error && error.message.includes('stories/'));
 });

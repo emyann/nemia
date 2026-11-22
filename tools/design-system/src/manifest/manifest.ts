@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FileChange } from '../../contracts/produce.contract.ts';
 import { fileChange } from '../decide.ts';
-import { filesUnder } from '../paths.ts';
+import { filesUnder, writeIn } from '../paths.ts';
 
 /** Each file of a build by its path: its sha256 and its bytes. */
 export type Manifest = Readonly<Record<string, { readonly sha256: string; readonly bytes: number }>>;
@@ -54,6 +54,18 @@ export const lastManifest = (since: string | undefined) => {
   if (fs.existsSync(written)) return JSON.parse(fs.readFileSync(written, 'utf8')) as Manifest;
   const project = path.join(since, 'project');
   return manifestOf(fs.existsSync(project) ? project : since);
+};
+
+/**
+ * Records `manifest` at `file` as the last build when the build had no fault, and leaves the last good build's there when it had
+ * some: the next build is measured against what a session could publish, so a card a failed build changed is still named changed,
+ * and a build that stopped early leaves no near-empty manifest to name every file added.
+ * @param file the build's `manifest.json`.
+ * @param manifest this build's manifest.
+ * @param faults this build's faults.
+ */
+export const recordManifest = (file: string, manifest: Manifest, faults: readonly string[]) => {
+  if (faults.length === 0) writeIn(file, `${JSON.stringify(manifest, null, 1)}\n`);
 };
 
 /**

@@ -19,7 +19,7 @@ import { writeDocs, type Told } from './docs/docs.ts';
 import { COVER } from './docs/cover.ts';
 import { kitCards, type KitCard } from './kit/cards.ts';
 import { kitStories, kitVersion } from './kit/kit.ts';
-import { changeLines, changesSince, lastManifest, manifestOf } from './manifest/manifest.ts';
+import { changeLines, changesSince, lastManifest, manifestOf, recordManifest } from './manifest/manifest.ts';
 import { REPO, WORK, filesUnder, layout, writeIn, type Layout } from './paths.ts';
 import { boardStories } from './stories/stories.ts';
 import { boardFaces, copyFaces, type Face } from './stylesheet/fonts.ts';
@@ -207,7 +207,7 @@ export const main = async (argv: readonly string[]) => {
   }
   const manifest = manifestOf(where.project);
   const changes = changesSince(before, manifest);
-  writeIn(where.manifest, `${JSON.stringify(manifest, null, 1)}\n`);
+  recordManifest(where.manifest, manifest, faults);
   writeIn(where.changes, `${JSON.stringify(changes, null, 1)}\n`);
   for (const fault of faults) console.error(`design-system: ${fault}`);
   if (faults.length) console.error(`design-system: ${faults.length} faults: the build is not one to publish`);

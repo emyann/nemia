@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { changeLines, changesSince, lastManifest, manifestOf, type Manifest } from '../src/manifest/manifest.ts';
+import { changeLines, changesSince, lastManifest, manifestOf, recordManifest, type Manifest } from '../src/manifest/manifest.ts';
 
 const at = (sha256: string) => ({ sha256, bytes: 1 });
 
@@ -39,4 +39,17 @@ test("the last build is its folder's manifest, or its project's files hashed whe
   assert.deepEqual(Object.keys(lastManifest(path.join(root, 'download'))), ['kept']);
   assert.deepEqual(lastManifest(path.join(root, 'nowhere')), {});
   assert.deepEqual(lastManifest(undefined), {});
+});
+
+test("a build with faults leaves the last good build's manifest in place, and one with none records its own", () => {
+  const root = scratch('design-system-recorded');
+  const file = path.join(root, 'manifest.json');
+  const good: Manifest = { 'components/X/preview.html': at('1') };
+  recordManifest(file, good, []);
+  assert.deepEqual(lastManifest(root), good);
+  recordManifest(file, { 'components/X/preview.html': at('2') }, ['X Story: undeclared']);
+  assert.deepEqual(lastManifest(root), good);
+  assert.deepEqual(changesSince(lastManifest(root), { 'components/X/preview.html': at('2') }).changed, ['components/X/preview.html']);
+  recordManifest(file, {}, ['the build stopped: no tag']);
+  assert.deepEqual(lastManifest(root), good);
 });

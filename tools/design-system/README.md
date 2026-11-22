@@ -76,7 +76,8 @@ that names MSW handlers and carries neither tag is refused, so the network is sa
 ## When it fails
 
 It exits 1 on any fault, each named with what to do, and still writes the folder and its last lines, so the faults can be read
-against the pictures:
+against the pictures; its `manifest.json` stays the last good build's, so the build after the fix still names every file changed
+since the build a session could publish:
 
 - `<Card> <Story>: undeclared` — it names MSW handlers and no tag: tag it `network` (or `overlay`).
 - `<Card> <Story>: waits-on-network`, `api-picture`, or `draws-nothing` after asking the api — tag it `network`.
@@ -111,6 +112,11 @@ component's card), `SKIPPED`, `GUIDES` and `TYPE` (each card's guideline), `ROOM
 modal) and `SCREEN` (the height of a story that fills the window). A pick the release renamed fails the build, naming the file.
 
 ## What it does not show
+
+A story file whose meta names MSW handlers is tagged `network` whole, and has no card: twelve cards of the 2026-11-21 build have
+none (AddressPick, ContextPicker, FolderPick, FolderTree, ForgetToken, FrameRail, PairBrowser, Raise, ResendCard, ScratchForm,
+StartRun, TemplateForm), nor has FinishedTable, added since; most of their stories name the handlers only for what a press asks. Such
+a file gains a card when its handlers move from its meta onto the stories that read the api at rest, the rest left untagged.
 
 A story is drawn at rest: what its play function presses or opens is not shown, and the build checks the first render only, not a
 press, a hover or an overlay opened. The kit's blocks (`stories/blocks/`) have no card. Motion is no token family. On a canvas of your

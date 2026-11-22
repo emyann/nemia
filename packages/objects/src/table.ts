@@ -105,6 +105,21 @@ type ApiSuccesses = {
   >;
 };
 
+/** Whether `value` can hold keys: an object, or a function, which a Schema is. */
+const keyed = (value: unknown): value is object => (typeof value === 'object' && value !== null) || typeof value === 'function';
+
+/** The Schema a success of an endpoint holds: HttpApi keeps each as a `{ schema, ast }`, the Schema declared under `schema`. */
+const declared = (success: unknown) => (keyed(success) && 'schema' in success ? success.schema : success);
+
+/**
+ * Whether `success` declares the `Table`: the Table itself, or a union one of whose members is (`Schema.Union([RunList, Table])`).
+ * @param success One success of an endpoint, as its set holds it.
+ */
+const answersTable = (success: unknown) => {
+  const schema = declared(success);
+  return schema === Table || (keyed(schema) && 'members' in schema && Array.isArray(schema.members) && schema.members.includes(Table));
+};
+
 /**
  * Each GET endpoint of `api` that `reads` calls a list's page (`page`) and whose successes hold no `Table`, in words naming the fix: a
  * list that cannot be asked for its table makes a client print it by a printer of its own. Empty for an Api every page of which answers
@@ -116,7 +131,7 @@ export const pagesWithoutTable = (api: ApiSuccesses, reads: Readonly<Record<stri
   Object.values(api.groups).flatMap((group) =>
     Object.entries(group.endpoints)
       .filter(([name, endpoint]) => endpoint.method === 'GET' && reads[`${group.identifier}.${name}`]?.shape === 'page')
-      .filter(([, endpoint]) => !endpoint.success.has(Table))
+      .filter(([, endpoint]) => ![...endpoint.success].some(answersTable))
       .map(
         ([name]) =>
           `${group.identifier}.${name} is a page that answers no Table: declare \`[<Kind>List, Table]\` as its success and answer the kind's table where \`wantsTable\``,

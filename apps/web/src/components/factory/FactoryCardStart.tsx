@@ -9,7 +9,7 @@ import { Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
 import { factoryWorkflowsQuery, type Place, type Started, type WorkflowRow } from '../../lib/api/workflows.ts';
 import { storeQuery } from '../../lib/api/store.ts';
-import { cardQuery, type InboxEntry } from '../../lib/api/inbox.ts';
+import { cardBodyQuery, type InboxEntry } from '../../lib/api/inbox.ts';
 import { startRepo } from '../../lib/factories';
 import { cardPlace, factoriesOffered, startPlace, type CardPlace } from '../../lib/inbox';
 import { StartRun } from '../run/StartRun';
@@ -214,17 +214,17 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
 
 /**
  * The start of `entry` as a run of `workflow`, its brief prefilled with the card's body, which no list of cards carries: read with the one
- * card (`cardQuery`) before the start is drawn.
+ * card (`cardBodyQuery`) before the start is drawn.
  */
 function StartCard({ entry, workflow, place, onStarted, onRefused }: { entry: InboxEntry; workflow: WorkflowRow; place: Place } & Told) {
-  const card = useQuery(cardQuery(entry.name));
-  if (card.error)
+  const body = useQuery(cardBodyQuery(entry.name));
+  if (body.error)
     return (
       <p className="text-body-small text-failure">
-        Could not read the card {code(entry.name)}: {card.error.message}
+        Could not read the card {code(entry.name)}: {body.error.message}
       </p>
     );
-  if (!card.data)
+  if (body.data === undefined)
     return (
       <Reading label="Reading the card…" className="flex flex-col gap-2">
         <ReadingLines widths={['w-2/3']} className="text-body-small" />
@@ -233,7 +233,7 @@ function StartCard({ entry, workflow, place, onStarted, onRefused }: { entry: In
   return (
     <StartRun
       workflow={workflow}
-      card={{ name: entry.name, factory: entry.factory, body: card.data.body ?? '' }}
+      card={{ name: entry.name, factory: entry.factory, body: body.data }}
       repo={place.repo}
       place={place}
       onStarted={onStarted}

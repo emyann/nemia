@@ -238,6 +238,8 @@ async function applied(object: unknown, resources: readonly APIResource[], names
   const read = readOf(object, resources, namespace);
   const { resource, name } = read;
   const served = await servedOf(read);
+  const whole = wholeOf(read);
+  if (!whole) throw partial(read);
   const writes = KIND_CALLS[resource.kind].writes;
   const prepared: Prepared | string = writes === undefined ? { spec: read.spec } : writes.prepared(read.spec, served);
   if (typeof prepared === 'string')
@@ -248,11 +250,10 @@ async function applied(object: unknown, resources: readonly APIResource[], names
   const action = applyOf(
     served === null ? { exists: false } : { exists: true, same: sameAs(read, prepared.spec, served, writes?.labels === true) },
     { create: create !== undefined, update: update !== undefined, upsert: writes?.upsert === true },
-    wholeOf(read),
+    whole,
   );
   const at = appliedAt(read, served);
   const said = (word: Said) => `${resource.name}/${name} ${word}`;
-  if (action === 'partial') throw partial(read);
   if (action === 'no-create' || action === 'no-update') throw refusal(read, action, writes?.madeBy);
   if (action === 'create' && create !== undefined) await asked('apply', create(at));
   if (action === 'update' && update !== undefined) await asked('apply', update(at));

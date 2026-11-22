@@ -40,19 +40,17 @@ export const workflowSearch = (search: Record<string, unknown>) =>
   }) satisfies { build?: true; repo?: string };
 
 /**
- * What a workflow's page loads before it draws, in `place`: the list it is read from (`loadWorkflowsIn`), the store, the workflow read
- * whole there, and for one of yours the folder read whole with no factory too, which its builder drafts from.
+ * What a workflow's page loads before it draws, in `place`: the list it is read from (`loadWorkflowsIn`), the store, and for one of yours
+ * the list read with no factory too. The workflow read whole waits on the list, which says whether it is there to read, and as what.
  * @param client The board's query client.
  * @param place The factory and the repository the page is read in.
  * @param from Where the workflow is read from.
- * @param name The workflow's name.
  */
-export const loadWorkflow = (client: QueryClient, place: PagePlace, from: string, name: string) =>
+export const loadWorkflow = (client: QueryClient, place: PagePlace, from: string) =>
   Promise.all([
     loadWorkflowsIn(client, place),
     client.ensureQueryData(storeQuery),
-    client.prefetchQuery(workflowQuery(from, name, place)),
-    from === 'user' && place.factory ? client.prefetchQuery(workflowQuery(from, name)) : null,
+    from === 'user' ? client.prefetchQuery(workflowsQuery) : null,
   ]);
 
 /**
@@ -103,7 +101,7 @@ function Everywhere({ from, name, address, building, factories }: Asked & { fact
   const { data: all } = useSuspenseQuery(workflowsQuery);
   const listed = all.find((w) => fromMatches(w.from, from) && w.name === name);
   if (!listed) return <NotListed from={from} name={name} />;
-  return <EverywhereWhole from={from} name={name} address={address} building={building} factories={factories} />;
+  return <EverywhereWhole from={listed.from} name={name} address={address} building={building} factories={factories} />;
 }
 
 /** The workflow `name` listed with no factory, read whole (`workflowQuery`): its README and each step's body and layers. */
@@ -148,7 +146,7 @@ function InFactory({ from, name, address, place, building, factory }: Asked & { 
   const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
   const row = listed.find((w) => fromMatches(w.from, from) && w.name === name);
   if (!row) return <NotOffered from={from} name={name} place={place} address={address} attach={factory?.commands.attach} />;
-  return <InFactoryWhole from={from} name={name} address={address} place={place} building={building} />;
+  return <InFactoryWhole from={row.from} name={name} address={address} place={place} building={building} />;
 }
 
 /**

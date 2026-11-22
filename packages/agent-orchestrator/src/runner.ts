@@ -439,22 +439,21 @@ export {
   MCP_SERVER_COLUMNS,
   SKILL_COLUMNS,
   agentTable,
-  factoryTable,
-  mcpServerTable,
-  proposalTable,
-  skillTable,
-} from './kind-table/kind-table.ts';
-export {
   delegationTable,
   eventTable,
+  factoryTable,
   hireTable,
   libraryAddTable,
+  mcpServerTable,
+  proposalTable,
   scheduleTable,
+  skillTable,
   subscriptionTable,
+  templateTable,
   triggerTable,
   volumeTable,
-} from './kind-table/wiring-table.ts';
-export { templateTable, workflowTable } from './kind-table/definition-table.ts';
+  workflowTable,
+} from './kind-table/index.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { runWatchVersion } from './runlist/runlist.ts';

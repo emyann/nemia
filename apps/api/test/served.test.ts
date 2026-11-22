@@ -124,7 +124,11 @@ test("/api/listing, retired with nemia ls's whole answer, is the api's 404 for n
 const PAGE_NAMES: Readonly<Record<string, string>> = { namespace: 'default', name: 'sdlc' };
 
 test('every page of the Api answers a Table where it is asked one, each row the metadata of its item alone', async () => {
-  const pages = ENDPOINTS.filter(({ group, name, method }) => method === 'GET' && READS[`${group}.${name}` as ApiGetName].shape === 'page');
+  const pages = Object.values(Api.groups).flatMap((group) =>
+    Object.entries(group.endpoints)
+      .filter(([name, e]) => e.method === 'GET' && READS[`${group.identifier}.${name}` as ApiGetName]?.shape === 'page')
+      .map(([name, e]) => ({ group: group.identifier, name, path: e.path })),
+  );
   assert.ok(pages.length >= 25, `${pages.length} pages read off the Api`);
   const untabled: string[] = [];
   for (const { group, name, path } of pages) {

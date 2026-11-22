@@ -474,7 +474,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
     assert.deepEqual(await listed(), []);
   });
   s.test(
-    "the Card's create files a card as `nemia inbox add` does: the idea alone; a workflow by its name, a repository's or yours, `from` ignored; no repository — and GET /api/cards lists each with its body and when it was filed",
+    "the Card's create files a card as `nemia inbox add` does: the idea alone; a workflow by its name, a repository's or yours, `from` ignored; no repository — and GET /api/cards lists each with its title and when it was filed, never its body",
     async () => {
       clear();
       const bare = await file({ body: 'Cache the views between passes\n\nThe tick reads each task twice.' });
@@ -532,16 +532,16 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
           startedAs: [],
           state: 'filed',
           error: null,
-          body: 'Cache the views between passes\n\nThe tick reads each task twice.',
+          body: null,
           filedAt: old.toISOString(),
           labels: {},
         },
-        'listed with its body and a filing time, and started as none',
+        'listed with its title and a filing time, its body left out (a read of one carries it), and started as none',
       );
       const namedEntry = entries.find((e) => e.name === named.name)!;
       assert.deepEqual(
         [namedEntry.title, namedEntry.workflow, namedEntry.repo, namedEntry.body],
-        ['Show what a step cost', 'dev', null, 'Show what a step cost'],
+        ['Show what a step cost', 'dev', null, null],
       );
       assert.ok(Date.parse(namedEntry.filedAt) > old.getTime());
     },

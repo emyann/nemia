@@ -49,7 +49,7 @@ const missingAt = (value: unknown, segments: readonly string[]): boolean => {
   const many = segment.endsWith('[]');
   const key = many ? segment.slice(0, -2) : segment;
   if (!isRecord(value)) return false;
-  if (!(key in value)) return true;
+  if (!(key in value)) return rest.length === 0;
   const inner = value[key];
   if (!many) return missingAt(inner, rest);
   return Array.isArray(inner) && inner.some((item) => missingAt(item, rest));

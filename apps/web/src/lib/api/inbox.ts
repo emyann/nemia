@@ -242,8 +242,8 @@ export const cardKeysOf = (card: Card) =>
   card.status.error === undefined ? CARD_KEYS.map((key) => ({ key, value: keyValue(card, key), meaning: CARD_KEY_MEANINGS[key] })) : null;
 
 /**
- * A card, for its page and its start: the Card read by its name, whichever factory holds it (`cards.getAll`), with its body and its file
- * as written, which no list carries. Read again on each visit, as the inbox is.
+ * A card, for its page: the Card read by its name, whichever factory holds it (`cards.getAll`), with its body and its file as written,
+ * which no list carries. Read again on each visit, as the inbox is.
  * @param name The card's name.
  */
 export const cardQuery = (name: string) =>
@@ -259,6 +259,19 @@ export const cardQuery = (name: string) =>
         files: [...(card.status.files ?? [])],
       };
     },
+  });
+
+/**
+ * The body of a card, the brief its start is prefilled with, read by its name (`cards.getAll`) each time a start opens, since no list
+ * carries it. Keyed apart from the inbox's reads, which a start reads again: those must not read again a card the start took away.
+ * @param name The card's name.
+ */
+export const cardBodyQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['card-body', name],
+    queryFn: async () => (await cards.getAll(name)).spec.body ?? '',
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 
 /** A card as a verb names it: its name, and its factory, which is its namespace (`namespaceOf`). */

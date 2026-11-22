@@ -94,7 +94,7 @@ export async function fileRead(uri: string, path: string, from: Request, app: Fe
   if (size > bound)
     return {
       kind: 'refused' as const,
-      message: `${uri} is ${size} characters, past the ${bound} a read answers: fetch it whole over HTTP, GET ${path} with your token`,
+      message: `${uri} is ${size} characters, past the ${bound} a read answers: read it whole over HTTP, GET ${path} with your token`,
     };
   return { kind: 'read' as const, content };
 }

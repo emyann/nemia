@@ -356,12 +356,18 @@ const WORKFLOW_FILE = /^\.github\/workflows\/[^/]+\.ya?ml$/;
  */
 export const declaresCi = (paths: readonly string[]) => paths.some((p) => WORKFLOW_FILE.test(p));
 
-/** Whose the red job `job` is: the change's, the machine's, or untold where its failure's log could not be read. */
+/**
+ * Whose a red job is: the change's, the machine's, or untold where its failure's log could not be read.
+ * @param job The red job, by its conclusion and what its log said.
+ */
 export const toldOf: ToldOf = (job) => {
   if (job.verdict !== 'FAILURE') return 'machine';
   if (job.reading === 'failing') return 'change';
   return job.reading === 'unread' ? 'untold' : 'machine';
 };
 
-/** Whether a red context whose red jobs are `told` is re-run once, or reported now. */
+/**
+ * Whether a red context is re-run once, or reported now.
+ * @param told Whose each of its red jobs is.
+ */
 export const rerunDue: RerunDue = (told) => (told.includes('change') ? 'report' : 'rerun');

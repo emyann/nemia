@@ -109,7 +109,7 @@ here.
   `pages-<i>-of-<n>.json` where the pictures go (`$WF_ARTIFACTS`, else `.e2e/`), and `node test/e2e/pages-bound.ts <dir>…` sums every
   shard's together against `PAGES_BOUND_MS` — the bound being the whole run's and additive — refusing a shard that is missing, doubled or
   of another run. CI runs the e2e in four shards and that command over them (`.github/workflows/ci.yml`); a shard runs no look test,
-  and CI's `e2e-look` job runs them once (`--look`, refused beside `--shard`).
+  and CI's `e2e-look` job runs them once (`--look`, refused beside `--shard`), its `e2e-stories` job every story beside it.
 - `npm run e2e -- --photos --contrast` visits light, then dark, and writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
   <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
@@ -125,8 +125,8 @@ here.
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
 - `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium): `npm run e2e -- --look`, and a whole `npm run
-  e2e`, build Storybook static once, then run them, two files at a time (`LOOK_TESTS`, `e2e/look.ts`), then every story (`npm run
-  stories`); `--pages` and `--shard` run none. A web test that needs
+  e2e`, build Storybook static once, then run them, two files at a time (`LOOK_TESTS`, `e2e/look.ts`), and a whole run then every
+  story (`npm run stories`, `Plan.stories`, `e2e/pages.ts`), `--look` none; `--pages` and `--shard` run none. A web test that needs
   no browser sits in `test/`.
 - The stories are the one place the parts are shown, and where a step builds and judges a visual change: write or extend the story
   first, then the part. They draw under one decorator (`.storybook/preview.tsx`: the look's ground, a router of the story's own in
@@ -142,17 +142,23 @@ here.
   (`LIGHT_CANARIES`, `.storybook/approved.ts`); `.storybook/compare.ts` compares the story's ground against it, strictly (pixelmatch's
   0.1, anti-aliasing ignored, no other pixel), on a clock that stands still, in reduced motion, the pointer moved off and a read
   still out drawn at once. It compares only in the pinned place, Ubuntu 24.04 on x64 with the lockfile's Chromium
-  (`test/e2e/stories/pinned.ts`, which `npm run stories` runs), as CI's `e2e-look` job (`runs-on: ubuntu-24.04`) and the steps' server both
+  (`test/e2e/stories/pinned.ts`, which `npm run stories` runs), as CI's `e2e-stories` job (`runs-on: ubuntu-24.04`) and the steps' server both
   are; anywhere else it says so and compares nothing, but under CI, where it refuses (`placeVerdict`). A story that differs fails, its reference, actual and diff left under `.vitest/attachments/approved/`
-  (uploaded by `e2e-look` on a failure); `npm run stories -- --update <file>.stories.tsx` writes the pictures of a change meant, to
-  commit with it. `test/approved.test.ts` refuses a story with no picture and a picture of no story. `npm run e2e -- --look` runs it after the look's
-  tests (`LOOK_RUNS`, `e2e/look.ts`), so CI's `e2e-look` job does; `npm test` never does. One file:
-  `npm run stories -- <file>.stories.tsx`. A story axe fails today says `a11y: { test: 'todo' }` itself, and the
+  (uploaded by `e2e-stories` on a failure); `npm run stories -- --update <file>.stories.tsx` writes the pictures of a change meant, to
+  commit with it. `test/approved.test.ts` refuses a story with no picture and a picture of no story. A whole `npm run e2e` runs it after the look's
+  tests (`LOOK_RUNS`, `e2e/look.ts`), `--look` never; CI runs it in its `e2e-stories` job, beside `e2e-look`; `npm test` never does. One file:
+  `npm run stories -- <file>.stories.tsx`. It runs one story file at a time, each a Chromium page of about a gigabyte, on a machine
+  whose memory is shared; one a core under CI (`CI` set); and as many as `STORIES_WORKERS=<n>` asks anywhere, an ask no whole number
+  refused as the config loads (`storiesWorkersOf`, `.storybook/workers.ts`, proved by `contracts/stories-workers.contract.ts`), the
+  bound said on the runner's first line. A story axe fails today says `a11y: { test: 'todo' }` itself, and the
   count only shrinks.
 - A page body's stories (`Pages/`, the runs page's `components/run/RunsPage.stories.tsx` the pattern) answer its reads through MSW
   (`parameters.msw`), with handlers over fixtures typed by `objects`' own types (`.storybook/fixtures/`), so a key the api renames
   fails the typecheck there; no file of `src` gains a seam for a story. MSW's worker, `.storybook/public/mockServiceWorker.js`, is
-  written by `npx msw init .storybook/public --no-save` and served to Storybook alone.
+  written by `npx msw init .storybook/public --no-save` and served to Storybook alone. No story reaches the network: a request no
+  handler of its story answers, to the api or to another origin, is answered with a network error by the preview's fallback and fails
+  the story after it draws, naming each (`strayHandler`, `straysSaid`, `.storybook/network.ts`, which strays proved by
+  `contracts/story-stray.contract.ts`): answer it with a handler in the story's `parameters.msw`.
 - A story that reads the api, through MSW handlers or with none, is tagged `network` (Storybook's `tags`, at its meta or on itself), and
   one that opens a layer over the whole window at rest `overlay`: the design system's producer (`tools/design-system/README.md`)
   draws neither in a card, refuses a story with handlers and no tag, and its CI job names a story that waits on the api untagged.

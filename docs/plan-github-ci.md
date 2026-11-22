@@ -168,7 +168,7 @@ and forgetting to wire it in:
   `ci` still reports on every event — a workflow-level `paths:` would skip the gate with the rest, and a job-level `if:` cannot reach a
   matrix leg. `due.ts` reads the range a pull request or a push to main changed; where a job runs a turbo task (the legs, the guards,
   `typecheck`, `build`) its claims are that task's `inputs` in `turbo.json` and the folders of the workspaces it depends on, so turbo's
-  cache and CI's filter are one list; where it runs none (`lint`, `e2e` and its bound, `e2e-look`, each contracts leg) they are a table
+  cache and CI's filter are one list; where it runs none (`lint`, `e2e` and its bound, `e2e-look`, `e2e-stories`, each contracts leg) they are a table
   in `due.ts` held by its tests to `tools/contracts/legs.ts` and `.oxfmtrc.json`. It fails closed: the lockfile, `package.json`,
   `turbo.json`, `.gitignore`, `ci.yml` and `due.ts` itself, a path no job claims, a dispatch, a first push and a range git cannot
   resolve run every job. Main's own push is path-aware too, over the merge's own changes, and stays the last word on what it reached;

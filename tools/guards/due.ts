@@ -6,7 +6,7 @@
  * Where a job runs a turbo task, its claims are turbo's own (`claimsOf`): the task's `inputs` in `turbo.json` (`<workspace>#<task>`,
  * else `<task>`, else `$TURBO_DEFAULT$`) and the folders of the workspaces its workspace depends on, followed through `dependencies`
  * and `devDependencies` as `^transit` and `^build` follow them. So turbo's cache and CI's filter are one list. Where a job runs no turbo
- * task (`lint`, `e2e`, `e2e-look`, `contracts <leg>`), its claims are written below (`LINT_SKIPS`, `LINT_CONFIGS`, `LINT_READS`,
+ * task (`lint`, `e2e`, `e2e-look`, `e2e-stories`, `contracts <leg>`), its claims are written below (`LINT_SKIPS`, `LINT_CONFIGS`, `LINT_READS`,
  * `WRITTEN`), each held by `test/due.test.ts` to what it is read off. A typecheck reads its workspace's tests too (`TURBO_JOBS`).
  *
  * `jobDueOf` is the decision, pure, and `dueOf` the decision of one claim. It fails closed: a path in `EVERYWHERE`, or a path no
@@ -78,12 +78,13 @@ export const CONTRACTS_TOOL = '$TURBO_ROOT$/tools/contracts/**';
 /**
  * The jobs that run no turbo task, by the workspaces they reach, each with the workspaces those depend on. `e2e` (asked by `e2e-bound`
  * too) visits the board, served by the api it spawns (`apps/web/test/e2e/served.ts`), whose orchestrator finds the builtin templates by
- * path; `e2e-look` draws the board's stories; `design-system` builds the board's Design System artifact with its producer; each
+ * path; `e2e-look` runs the look's browser tests over the board's stories, and `e2e-stories` draws every story; `design-system` builds the board's Design System artifact with its producer; each
  * contracts leg proves the files `tools/contracts/legs.ts` gives it, which lie in these workspaces (`test/due.test.ts` holds it).
  */
 export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   e2e: ['web', 'api', 'templates'],
   'e2e-look': ['web'],
+  'e2e-stories': ['web'],
   'design-system': ['design-system', 'web'],
   'contracts observe': ['agent-runtime'],
   'contracts approval-refusal': ['agent-orchestrator'],
@@ -254,7 +255,7 @@ export const dependencyFolders = (root: string, folder = GUARDS) => {
 
 /**
  * Every key a job of `ci.yml` asks, with its claims, read off the repository at `root`: `test <name>` for each workspace with a `test`
- * script but the guards, `guards`, `typecheck` and `build` from turbo's tasks; `lint`, `e2e`, `e2e-look` and `contracts <leg>` from
+ * script but the guards, `guards`, `typecheck` and `build` from turbo's tasks; `lint`, `e2e`, `e2e-look`, `e2e-stories` and `contracts <leg>` from
  * this file's table. Throws on a workspace the table names that the repository has not.
  *
  * @param root the repository's root.

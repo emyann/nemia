@@ -32,6 +32,18 @@ export const E2E = 'e2e';
  */
 export const LOOK = 'e2e-look';
 
+/**
+ * The job that runs every story in Chromium (`npm run stories`, from `apps/web`) once per push, beside the look's: it reads no static
+ * build, and run one story file a core on a runner of its own it is not held behind the look's tests.
+ */
+export const STORIES = 'e2e-stories';
+
+/** The command the stories job runs, from `apps/web`: every story, compared in the pinned place (`apps/web/test/e2e/stories/pinned.ts`). */
+export const STORIES_COMMAND = 'npm run stories';
+
+/** The folder the stories job runs its command from, the board's, where the `stories` script is. */
+export const STORIES_FOLDER = 'apps/web';
+
 /** The e2e's flag that runs the look's tests (`planOf`, `apps/web/test/e2e/pages.ts`): the look job passes it, and a shard never does. */
 export const LOOK_FLAG = '--look';
 
@@ -93,6 +105,7 @@ export type Step = {
   run?: string;
   env?: Record<string, string>;
   'timeout-minutes'?: unknown;
+  'working-directory'?: string;
 };
 
 export type Job = {

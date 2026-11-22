@@ -6,19 +6,31 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import type { Agent, Factory, McpServer, Skill, Table } from 'objects';
+import type { Agent, Factory, McpServer, Proposal, Skill, Table } from 'objects';
 import {
   AGENT_COLUMNS,
   FACTORY_COLUMNS,
   MCP_SERVER_COLUMNS,
+  PROPOSAL_COLUMNS,
   SKILL_COLUMNS,
+  WHY_CELL_MOST,
   agentTable,
   factoryTable,
   mcpServerTable,
+  proposalTable,
   skillTable,
 } from './kind-table.ts';
 
 const meta = (name: string) => ({ name, namespace: 'default', creationTimestamp: '2026-11-01T00:00:00Z', resourceVersion: '1' });
+
+const proposalOf = (name: string, more: { spec?: Partial<Proposal['spec']>; status?: Partial<Proposal['status']> } = {}) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Proposal',
+    metadata: meta(name),
+    spec: { objects: [], ...more.spec },
+    status: { phase: 'waiting', proposedBy: {}, changes: [], widens: false, ...more.status },
+  }) satisfies Proposal;
 
 const page = <K extends string, I>(kind: K, items: readonly I[], cont?: string) => ({
   apiVersion: 'nemia/v1' as const,
@@ -114,7 +126,8 @@ test('each kind shows by default the columns a person scans, the rest wide', () 
   assert.deepEqual(shown(SKILL_COLUMNS), ['Name', 'Origin', 'Description', 'Note']);
   assert.deepEqual(shown(FACTORY_COLUMNS), ['Name', 'Repositories', 'Note']);
   assert.deepEqual(shown(MCP_SERVER_COLUMNS), ['Name', 'Type', 'URL', 'State', 'Tools', 'Error']);
-  for (const columns of [AGENT_COLUMNS, SKILL_COLUMNS, FACTORY_COLUMNS, MCP_SERVER_COLUMNS])
+  assert.deepEqual(shown(PROPOSAL_COLUMNS), ['Name', 'Phase', 'Widens', 'Why']);
+  for (const columns of [AGENT_COLUMNS, SKILL_COLUMNS, FACTORY_COLUMNS, MCP_SERVER_COLUMNS, PROPOSAL_COLUMNS])
     assert.ok(columns.every((c) => c.priority === 0 || c.priority === 1));
 });
 
@@ -259,4 +272,51 @@ test("each row's object is the item's metadata alone, and the page's continue is
     assert.deepEqual(table.rows[0]?.object, { kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata: meta('a') });
   }
   assert.deepEqual(agentTable(page('AgentList', [agent])).metadata, {});
+});
+
+test("a proposal's row: its phase, whether it widens, why at its first line, who proposed it and how many changes", () => {
+  const table = proposalTable(
+    page('ProposalList', [
+      proposalOf('p1', {
+        spec: { why: 'Hire a reviewer.\nAt length.' },
+        status: {
+          phase: 'applied',
+          widens: true,
+          proposedBy: { agent: 'seldon', run: 'r1', step: 'design' },
+          changes: [
+            { resource: 'agents', name: 'a', verb: 'create', access: 'widens' },
+            { resource: 'workflows', name: 'w', verb: 'update', access: 'same' },
+          ],
+        },
+      }),
+      proposalOf('p2'),
+    ]),
+  );
+  assert.deepEqual(cellsOf(table, 0), {
+    Name: 'p1',
+    Phase: 'applied',
+    Widens: true,
+    Why: 'Hire a reviewer.',
+    'Proposed by': 'seldon (r1/design)',
+    Changes: 2,
+  });
+  assert.deepEqual(cellsOf(table, 1), { Name: 'p2', Phase: 'waiting', Widens: false, Why: '', 'Proposed by': 'person', Changes: 0 });
+});
+
+test("a proposal's row carries none of its objects, however large, and a long why is cut", () => {
+  const large = { body: 'x'.repeat(1_000_000) };
+  const object = { kind: 'Agent' as const, metadata: { name: 'a', resourceVersion: '1' }, spec: large };
+  const table = proposalTable(
+    page('ProposalList', [
+      proposalOf('big', {
+        spec: { objects: [object], why: 'y'.repeat(WHY_CELL_MOST + 50) },
+        status: { phase: 'applied', before: [object] },
+      }),
+    ]),
+  );
+  assert.ok(JSON.stringify(table).length < WHY_CELL_MOST + 1_000);
+  assert.deepEqual(table.rows[0]?.object, { kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata: meta('big') });
+  const why = String(cellsOf(table, 0).Why);
+  assert.equal(why.length, WHY_CELL_MOST);
+  assert.ok(why.endsWith('…'));
 });

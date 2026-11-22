@@ -1,11 +1,12 @@
 /**
- * A page of agents, skills, factories or a factory's MCP servers as a table (`agentTable`, `skillTable`, `factoryTable`,
- * `mcpServerTable`), Kubernetes' server-side printing of a list (`objects`' `Table`), as `runTable` gives the runs': the columns `nemia
- * <verb>` prints of each kind — what a person scans by default at priority 0, the rest when asked wide — a row per item of the page in its
- * order, its cells in the columns' order, and the item's metadata beside them (`PartialObjectMetadata`), never the whole item: an agent's
- * instructions and source and a skill's body are what a table leaves out. Every cell is one line of text read off the served object, a
- * text of several lines cut at its first break, and none is `''`, never null. The api answers it to a list asked for a `Table`
- * (`TABLE_ACCEPT`), and `tableLines` prints it for the client and the MCP port alike. Pure.
+ * A page of agents, skills, factories, a factory's MCP servers or its proposals as a table (`agentTable`, `skillTable`, `factoryTable`,
+ * `mcpServerTable`, `proposalTable`), Kubernetes' server-side printing of a list (`objects`' `Table`), as `runTable` gives the runs':
+ * the columns `nemia <verb>` prints of each kind — what a person scans by default at priority 0, the rest when asked wide — a row per item
+ * of the page in its order, its cells in the columns' order, and the item's metadata beside them (`PartialObjectMetadata`), never the
+ * whole item: an agent's instructions and source, a skill's body and a proposal's objects are what a table leaves out. Every cell is one
+ * line of text read off the served object, a text of several lines cut at its first break, and none is `''`, never null; a `boolean` or
+ * `integer` column's cells are a boolean or a number. The api answers it to a list asked for a `Table` (`TABLE_ACCEPT`), and
+ * `tableLines` prints it for the client and the MCP port alike. Pure.
  */
 import {
   DEFAULT_NAMESPACE,
@@ -16,17 +17,20 @@ import {
   type McpServer,
   type McpServerList,
   type ObjectMeta,
+  type Proposal,
+  type ProposalList,
   type Skill,
   type SkillList,
   type Table,
   type TableColumnDefinition,
+  type TableColumnType,
 } from 'objects';
 
-/** A text column: its name, what it says and its priority (0 shown by default, 1 when asked wide). */
-const column = (name: string, description: string, priority: 0 | 1) =>
+/** A column: its name, what it says, its priority (0 shown by default, 1 when asked wide) and the type of its cells, text by default. */
+const column = (name: string, description: string, priority: 0 | 1, type: TableColumnType = 'string') =>
   ({
     name,
-    type: 'string',
+    type,
     format: name === 'Name' ? 'name' : '',
     description,
     priority,
@@ -46,7 +50,7 @@ const partialOf = (metadata: ObjectMeta) => ({ kind: 'PartialObjectMetadata', ap
 const tableOf = <Item extends { readonly metadata: ObjectMeta }>(
   page: { readonly metadata: { readonly continue?: string }; readonly items: readonly Item[] },
   columns: readonly TableColumnDefinition[],
-  cells: (item: Item) => readonly string[],
+  cells: (item: Item) => readonly unknown[],
 ) =>
   ({
     kind: 'Table',
@@ -234,3 +238,44 @@ const mcpServerCells = (server: McpServer) => [
  * @param list The page of MCP servers, as the list answers it.
  */
 export const mcpServerTable = (list: McpServerList) => tableOf(list, MCP_SERVER_COLUMNS, mcpServerCells) satisfies Table;
+
+/** The most characters a proposal's `why` cell holds, its last a `…` where the text was cut. */
+export const WHY_CELL_MOST = 200;
+
+/** The columns of a proposal's row, in the order its cells are. */
+export const PROPOSAL_COLUMNS: readonly TableColumnDefinition[] = [
+  column('Name', "The proposal's name.", 0),
+  column('Phase', 'Where the proposal stands in its life.', 0),
+  column('Widens', 'Whether the whole proposal widens access.', 0, 'boolean'),
+  column('Why', `The first line of why it is proposed, cut at ${WHY_CELL_MOST} characters.`, 0),
+  column('Proposed by', 'Who proposed it: the person, or the agent with its run and step.', 1),
+  column('Changes', 'How many changes it makes.', 1, 'integer'),
+];
+
+/** The first line of `why`, cut to `WHY_CELL_MOST` characters with a `…` where cut; `''` for none. */
+const whyCell = (why: string | undefined) => {
+  const line = firstLine(why);
+  return line.length > WHY_CELL_MOST ? `${line.slice(0, WHY_CELL_MOST - 1)}…` : line;
+};
+
+/** Who proposed, as a cell: `person`, or the agent, with `(run/step)` where it was a run's. */
+const proposedByCell = ({ status: { proposedBy } }: Proposal) => {
+  if (proposedBy.agent === undefined) return 'person';
+  return proposedBy.run === undefined ? proposedBy.agent : `${proposedBy.agent} (${proposedBy.run}/${proposedBy.step ?? ''})`;
+};
+
+/** The cells of `proposal`'s row, in `PROPOSAL_COLUMNS`' order. */
+const proposalCells = (proposal: Proposal) => [
+  proposal.metadata.name,
+  proposal.status.phase,
+  proposal.status.widens,
+  whyCell(proposal.spec.why),
+  proposedByCell(proposal),
+  proposal.status.changes.length,
+];
+
+/**
+ * `list` as a table: `PROPOSAL_COLUMNS`, and a row per proposal of the page, none of its objects.
+ * @param list The page of proposals, as the list answers it.
+ */
+export const proposalTable = (list: ProposalList) => tableOf(list, PROPOSAL_COLUMNS, proposalCells) satisfies Table;

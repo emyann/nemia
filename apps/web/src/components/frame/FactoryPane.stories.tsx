@@ -53,16 +53,11 @@ const drawn = ({ path, search, factory, lit }: Parameters<typeof FactoryPane>[0]
 /**
  * A factory's pane, one story a state of what its places say: two proposals waiting on the person, none waiting, and the default
  * factory, which holds no proposal and asks for none.
- *
- * Axe's `label-content-name-mismatch` alone is off, for the switcher at the pane's head (`FactoryPicker`): the ds kit's `Select` draws
- * its value before its floating label inside its trigger, while React Aria names the trigger label first, so a populated kit select
- * fails it wherever it is drawn. That is the kit's to mend, upstream; every other rule holds the pane.
  */
 const meta: Meta<typeof FactoryPane> = {
   title: 'Frame/FactoryPane',
   component: FactoryPane,
   args: { path: `/factories/${FACTORY}`, search: {}, factory: FACTORY, lit: 'runs' },
-  parameters: { a11y: { config: { rules: [{ id: 'label-content-name-mismatch', enabled: false }] } } },
 };
 export default meta;
 

@@ -22,15 +22,12 @@ const drawn = (cards: readonly InboxEntry[]) => (
 
 /**
  * The inbox page, one story a state: two cards in play, one filed and one queued; a started card waiting on its person beside one not
- * started; cards a trigger queues and one two triggers clash on; cards that wait on others, one stalled; and an empty inbox. Axe's
- * `label-content-name-mismatch` alone is off, for the box's Factory list: the ds kit's `Select` draws its value before its floating
- * label and is named by the label first, which axe reads as visible text left out of its name, an ask of the kit.
+ * started; cards a trigger queues and one two triggers clash on; cards that wait on others, one stalled; and an empty inbox.
  */
 const meta: Meta<typeof InboxPage> = {
   title: 'Pages/Inbox',
   component: InboxPage,
   args: { at: {}, onSearch: () => undefined },
-  parameters: { a11y: { config: { rules: [{ id: 'label-content-name-mismatch', enabled: false }] } } },
 };
 export default meta;
 

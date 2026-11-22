@@ -199,8 +199,8 @@ export const FILE_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: 'a File past its day is let go of, a younger one kept',
       walk: async ({ door }) => {
-        const old = await uploaded(door, 'acme', OLD);
         const young = await uploaded(door, 'default', NOW - FILE_KEPT_FOR + 60 * 60 * 1000);
+        const old = await uploaded(door, 'acme', OLD);
         const gone = await settled(door.files.pruned(NOW));
         return [
           gone.length === 1 && gone[0] === `acme/${old.id}`,

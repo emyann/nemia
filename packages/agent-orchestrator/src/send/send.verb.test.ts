@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
 import { parseWorkflow } from '../workflow/step-file.ts';
 import { parseInboxCard } from '../inbox/index.ts';
-import { sentCardText } from './send.verb.ts';
+import { filesLeftOff, sentCardText } from './send.verb.ts';
 
 const RUN: Run = {
   id: 'r-door',
@@ -62,4 +62,30 @@ describe('what card a node files, by its card:', () => {
     );
     assert.ok(card.body.startsWith(GIVEN.body));
   });
+});
+
+describe("the given card's files, on the card a node files", () => {
+  const files = [
+    { name: 'shot.png', file: `file_${'a'.repeat(32)}` },
+    { name: 'run.log', file: `file_${'b'.repeat(32)}` },
+  ];
+  const rows: [string, string, string, typeof files | undefined, string[]][] = [
+    ["given, the card of the run's factory: its files, the same Files", 'workflow: quick\ncard: given', 'mill', files, []],
+    ['backlog, the same', 'card: backlog', 'mill', files, []],
+    ['routed: none, as it carries none of the given card', 'workflow: quick', 'mill', undefined, []],
+    [
+      'given, the card of another factory: none, each named as left off',
+      'workflow: quick\ncard: given',
+      'other',
+      undefined,
+      ['shot.png', 'run.log'],
+    ],
+    ['backlog, of another factory: the same', 'card: backlog', 'other', undefined, ['shot.png', 'run.log']],
+  ];
+  for (const [what, keys, namespace, carried, leftOff] of rows)
+    test(what, () => {
+      const given = { ...GIVEN, files, namespace };
+      assert.deepEqual(filed(keys, given).files, carried);
+      assert.deepEqual(filesLeftOff(RUN, nodeOf('to', keys), given), leftOff);
+    });
 });

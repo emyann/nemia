@@ -139,14 +139,29 @@ export function sentCardText(run: Run, node: StepSpec, why: Why, at: string, tit
   return [...head, body, '', ...whyLines(run, node, why), ''].join('\n');
 }
 
+/** Whether the given card's Files are kept by the run's factory, whose inbox the onward card is filed in. */
+const sameFactory = (run: Run, given: GivenCard | undefined) =>
+  (given?.namespace ?? DEFAULT_NAMESPACE) === (run.factory ?? DEFAULT_NAMESPACE);
+
 /** The `files:` pair the onward card carries: the given card's files, for `given` and `backlog`, kept in the run's factory. */
 const filesCarried = (run: Run, kind: string, given: GivenCard | undefined) => {
   const files = given?.files ?? [];
-  const same = (given?.namespace ?? DEFAULT_NAMESPACE) === (run.factory ?? DEFAULT_NAMESPACE);
   const pairs: FrontmatterPair[] =
-    kind !== 'routed' && files.length && same ? [['files', Object.fromEntries(files.map((f) => [f.name, f.file]))]] : [];
+    kind !== 'routed' && files.length && sameFactory(run, given) ? [['files', Object.fromEntries(files.map((f) => [f.name, f.file]))]] : [];
   return pairs;
 };
+
+/**
+ * The names of the given card's files the onward card a `given` or `backlog` node files does not carry, since the given card is of
+ * another namespace than the run's factory, whose inbox keeps none of its Files; none where it carries them all, or is routed.
+ * @param run The run the card is routed from: its factory.
+ * @param node The node that files the card: its `card:`.
+ * @param given The run's own card, where it was started from one that reads; undefined otherwise.
+ */
+export function filesLeftOff(run: Run, node: Pick<StepSpec, 'card'>, given: GivenCard | undefined) {
+  const kind = node.card ?? 'routed';
+  return kind === 'routed' || sameFactory(run, given) ? [] : (given?.files ?? []).map((f) => f.name);
+}
 
 /**
  * The run's own card as it was given, where it was started from one that is still filed and reads: its body and its labels.
@@ -206,7 +221,7 @@ const nodeCardText = Effect.fnUntraced(function* (
     route: answer?.kind === 'route' ? answer.route : undefined,
     reason: producer?.summary,
   };
-  return sentCardText(run, node, why, now, sentCardTitle(run, producer), labels, given);
+  return { text: sentCardText(run, node, why, now, sentCardTitle(run, producer), labels, given), leftOff: filesLeftOff(run, node, given) };
 });
 
 /**
@@ -229,7 +244,7 @@ export const sendCards = Effect.fn('sendCards')(function* (f: { run: Run; reads:
     if ((node.workflow === undefined && node.card !== 'backlog') || run.steps[name]?.sent) continue;
     const card = sentCardName(run.id, name);
     const now = new Date().toISOString();
-    const text = yield* nodeCardText(door, run, reads, node, wordOf, now);
+    const { text, leftOff } = yield* nodeCardText(door, run, reads, node, wordOf, now);
     const filed = yield* Effect.result(door.cards.add(CardName.read(card), text));
     if (filed._tag === 'Failure' && filed.failure._tag !== 'Conflict') {
       f.notes.push(`${name}: its card ${card} could not be filed — ${filed.failure.message}. The next pass files it again.`);
@@ -238,6 +253,10 @@ export const sendCards = Effect.fn('sendCards')(function* (f: { run: Run; reads:
     const at = filed._tag === 'Failure' ? ((yield* door.cards.filedAt(CardName.read(card))) ?? now) : now;
     run.steps[name] = { ...(run.steps[name] ?? { taskId: null }), sent: { card, at } };
     f.notes.push(filedNote(node, card));
+    if (leftOff.length)
+      f.notes.push(
+        `${name}: its card ${card} carries none of ${leftOff.join(', ')}: the card it was given from is of another factory than the run's, ${run.factory ?? DEFAULT_NAMESPACE}, which keeps none of its Files. Attach them to ${card} with nemia inbox attach ${card} <path>.`,
+      );
     sent.push(name);
   }
   return sent;

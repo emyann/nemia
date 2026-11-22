@@ -217,12 +217,7 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
  */
 function StartCard({ entry, workflow, place, onStarted, onRefused }: { entry: InboxEntry; workflow: WorkflowRow; place: Place } & Told) {
   const body = useQuery(cardBodyQuery(entry.name));
-  if (body.error)
-    return (
-      <p className="text-body-small text-failure">
-        Could not read the card {code(entry.name)}: {body.error.message}
-      </p>
-    );
+  if (body.error) return <ReadTrouble what={`the card ${entry.name}`} error={body.error} className="text-body-small" />;
   if (body.data === undefined)
     return (
       <Reading label="Reading the card…" className="flex flex-col gap-2">

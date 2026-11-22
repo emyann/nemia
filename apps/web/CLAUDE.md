@@ -261,7 +261,8 @@ here.
   own takes `troubleLine` or `troubleOf` (`lib/api/read.ts`, its words `troubleWords`, proved by `contracts/read-trouble.contract.ts`),
   by the kind of failure: the api's words where it refused, the answer's message where it answered what the board does not read, and
   that Nemia's api did not answer, why, and to reload where nothing answered. No line spells a checkout's command, nor words a failed
-  read by hand (`test/structure.test.ts`): a person on an install has no `npm run`.
+  read by hand, nor follows `<what> could not be read: ` with an error's bare `message` (`test/structure.test.ts`, which sees a
+  bare message only after those words): a person on an install has no `npm run`.
 - A time of day in words has one writer, `timeOfDay` (`lib/timeOfDay.ts`): 12-hour (`1:11 PM`), date-fns's `h:mm a` under `zoneOf`,
   which is the one place a zone becomes date-fns's context and gives none where there is none, the browser's own. Every date word is
   date-fns's default English, wherever the browser is. `clockWord`, `whenWords` and `fireWord` each decide their day

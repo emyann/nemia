@@ -177,7 +177,7 @@ export const stepFileQuery = (url: string) =>
     queryFn: async () => {
       const [, runId, step, route, file] = SERVED.exec(url) ?? [];
       if (runId === undefined || step === undefined || file === undefined)
-        throw new Error(`${url} is not the address of a step's file: open it from its step's part.`);
+        throw new UnreadAnswer(url, `${url} is not the address of a step's file the board reads. ${BUILT_APART}`);
       const params = { runId: decodeURIComponent(runId), step: decodeURIComponent(step), file: decodeURIComponent(file) };
       const served = await call((c) => (route === 'files' ? c.steps.file({ params }) : c.steps.artifact({ params })), read(StepFile));
       return new TextDecoder().decode(served.body);

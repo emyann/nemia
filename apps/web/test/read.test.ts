@@ -261,3 +261,16 @@ test("an answer this board does not read ends on the fix for an install, and nam
   );
   assert.ok(!BUILT_APART.includes('npm run'));
 });
+
+test('a step file at an address the board does not read is an answer unread, never nothing having answered', async () => {
+  const { QueryClient } = await import('@tanstack/react-query');
+  const { stepFileQuery } = await import('../src/lib/api/steps.ts');
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const error = await client.fetchQuery(stepFileQuery('/x')).then(
+    () => null,
+    (err: unknown) => err,
+  );
+  assert.ok(error instanceof UnreadAnswer, String(error));
+  assert.equal(troubleOf(error).kind, 'unread');
+  assert.ok(error.message.endsWith(BUILT_APART), error.message);
+});

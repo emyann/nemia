@@ -20,6 +20,7 @@ import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type Gate
 import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Actor } from '../actor/Actor';
 import { Pending, Reading, ReadingLines } from '@/components/look';
+import { troubleOf } from '@/lib/api/read';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -548,7 +549,9 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
         {!standings.length &&
           (error || isDecidable(data) ? (
             <p className="text-body-small text-muted-foreground">
-              {error ? `The branch could not be read: ${error.message}` : 'No result branch of its own: the work is on the base branch.'}
+              {error
+                ? `The branch could not be read: ${troubleOf(error).words}`
+                : 'No result branch of its own: the work is on the base branch.'}
             </p>
           ) : (
             <Reading label="Reading the branch…">

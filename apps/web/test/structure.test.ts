@@ -13,7 +13,8 @@
  * file of `src` spells one, JSDoc included (`STORE_PATHS`, `COMMAND_TEXT`, both empty). `ratchetBreaks` refuses a file the baseline does
  * not hold, a count above the measure or below it, an entry for a file that is gone or clean, and an entry that names no card. Nor does
  * it spell a checkout's command, which a person on an install has none of (`CHECKOUT_COMMAND`, `CHECKOUT_TEXT`, empty), nor word a
- * failed read by hand: `ReadTrouble` and `troubleLine` say it, by its kind, from `src/lib/api/read.ts` alone (`HAND_TROUBLE`,
+ * failed read by hand: `ReadTrouble` and `troubleLine` say it, by its kind, from `src/lib/api/read.ts` alone, and a line of its own
+ * that says `<what> could not be read: ` takes `troubleOf(error).words`, never the bare `message` (`HAND_TROUBLE`,
  * `HAND_TROUBLES`, empty). A story and the kit's files are let through both: their words are a stand-in's and another repository's.
  *
  * A person's words for a step's state are written once, in `src/lib/words.ts`'s `PERSON`: no other file spells a word of it
@@ -68,8 +69,12 @@ const COMMAND = /\b(?:wf|nemia) [a-z]+/g;
 /** A checkout's command, which a person on an install has none of: `npm run dev`, `npm run theme:generate`, never `npm test`. */
 const CHECKOUT_COMMAND = /\bnpm run [a-z:]+/g;
 
-/** A failed read worded by hand, where `ReadTrouble` and `troubleLine` (`src/lib/api/read.ts`) say it one way on every page. */
-const HAND_TROUBLE = /Could not (?:read|load|list)\b/g;
+/**
+ * A failed read worded by hand, where `ReadTrouble` and `troubleLine` (`src/lib/api/read.ts`) say it one way on every page: a line that
+ * opens `Could not read`, `load` or `list`, or one that says `<what> could not be read: ` and then an error's bare `message`, where
+ * `troubleOf(error).words` says it by its kind. A message shown bare with no such words before it is not seen.
+ */
+const HAND_TROUBLE = /Could not (?:read|load|list)\b|could not be (?:read|loaded)\b[^.\n]*: \$?\{[^}\n]*\b(?:message|messageOf)\b/g;
 
 /** The one file that words a failed read: `troubleLine` and the trouble's words by kind. */
 const TROUBLE = 'src/lib/api/read.ts';
@@ -560,9 +565,19 @@ test("the checkout's command and the hand-worded failed read are found, and not 
       'b.ts',
       "const say = [`Could not read ${x}`, 'Could not load it', 'Could not list them'];\nconst no = 'Could not reader, could not read';",
     ],
+    [
+      'c.tsx',
+      [
+        'const a = <p>The quota could not be read: {error.message}</p>;',
+        'const b = `The branch could not be read: ${error?.message}`;',
+        'const c = <p>The release could not be read: {messageOf(error)}</p>;',
+        'const no = <p>The quota could not be read: {troubleOf(error).words}</p>;',
+        '/** A statement that could not be read is said, not dropped. */',
+      ].join('\n'),
+    ],
   ]);
   assert.deepEqual(measured(texts, CHECKOUT_COMMAND), { 'a.ts': 2 });
-  assert.deepEqual(measured(texts, HAND_TROUBLE), { 'b.ts': 3 });
+  assert.deepEqual(measured(texts, HAND_TROUBLE), { 'b.ts': 3, 'c.tsx': 3 });
 });
 
 test("REFUSED: a checkout's command or a failed read worded by hand in the board; a story, the kit and the one place let through", () => {
@@ -577,17 +592,11 @@ test("REFUSED: a checkout's command or a failed read worded by hand in the board
         onDisk,
       ),
     );
-  const troubles = (file: string) =>
-    named(
-      ratchetBreaks(
-        'failed reads worded by hand',
-        measured(troubleTexts(plant(file, 'const say = `Could not read the agents: ${e.message}`;\n')), HAND_TROUBLE),
-        HAND_TROUBLES,
-        onDisk,
-      ),
-    );
+  const troubles = (file: string, text = 'const say = `Could not read the agents: ${e.message}`;\n') =>
+    named(ratchetBreaks('failed reads worded by hand', measured(troubleTexts(plant(file, text)), HAND_TROUBLE), HAND_TROUBLES, onDisk));
   assert.deepEqual(commands('src/x.tsx'), ['src/x.tsx']);
   assert.deepEqual(troubles('src/x.tsx'), ['src/x.tsx']);
+  assert.deepEqual(troubles('src/x.tsx', 'const say = <p>The quota could not be read: {error.message}</p>;\n'), ['src/x.tsx']);
   for (const file of ['src/x.stories.tsx', 'src/components/ui/ds/x.tsx']) {
     assert.deepEqual(commands(file), [], `${file} is let through`);
     assert.deepEqual(troubles(file), [], `${file} is let through`);

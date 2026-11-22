@@ -17,7 +17,7 @@ export type Reading = 'failing' | 'bare' | 'unread';
 
 /**
  * A job the CI context judged red, as the wait knows it before it re-runs anything: `verdict`, its conclusion upper-cased as GitHub
- * gives it (`FAILURE`, `TIMED_OUT`, `STARTUP_FAILURE`, …, a cancel GitHub cut off at the job's time limit read as `TIMED_OUT`), and
+ * gives it (`FAILURE`, `TIMED_OUT`, a startup failure, …, a cancel GitHub cut off at the job's time limit read as `TIMED_OUT`), and
  * `reading`, what its log said.
  */
 export type RedJob = { verdict: string; reading: Reading };

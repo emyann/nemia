@@ -376,7 +376,7 @@ describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the way
     const html = await drawn(createElement(Pager, { trail: ['f.a'], next: 'f.b', count: 9, total: 25, size: 9 }));
     for (const mark of ['data-pager-newer', 'data-pager-older']) {
       const button = tagWith(html, mark);
-      assert.match(button, /\bfont-plain\b/, `${mark} is in the label face`);
+      assert.match(button, /\bfont-label-large\b/, `${mark} is in the label face`);
       assert.match(button, /text-label-large uppercase/);
       assert.match(button, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/);
       assert.doesNotMatch(button, /font-mono|ring-2\b|ring-offset/);

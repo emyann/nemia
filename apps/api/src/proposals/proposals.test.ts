@@ -19,7 +19,7 @@ import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
-import { TABLE_ACCEPT, type Delegation, type Proposal, type Table } from 'objects';
+import { LISTED_WITHOUT, TABLE_ACCEPT, filesHeld, type Delegation, type Proposal, type Table } from 'objects';
 import { AnswerBound } from '../layer.ts';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 
@@ -410,8 +410,13 @@ describe('the proposals asked as a Table: a row per proposal, none of its object
     assert.equal(mine.length, names.length);
     for (const row of mine) assert.equal(row.cells[at('Why')], 'Plan at length.');
   });
-  test('REGRESSION: proposals each past the bound refuse the list of objects 422, and answer the Table 200 with every row', async () => {
-    assert.equal((await bounded().request(`${ns}/proposals`)).status, 422);
+  test('REGRESSION: proposals each past the bound are listed 200, each without its objects, and as a Table 200 with every row; a read of one whole is what passes the bound, 422', async () => {
+    const listed = await bounded().request(`${ns}/proposals`);
+    assert.equal(listed.status, 200, 'a list carries no proposed object, so it stays under the bound');
+    const page = (await listed.json()) as { items: unknown[] };
+    const mine = page.items.filter((item) => names.includes((item as Proposal).metadata.name));
+    assert.equal(mine.length, names.length);
+    for (const item of mine) assert.deepEqual(filesHeld(LISTED_WITHOUT.Proposal, item), [], 'each listed without its objects');
     const res = await asTable('', bounded);
     assert.equal(res.status, 200);
     const table = (await res.json()) as Table;
@@ -421,5 +426,14 @@ describe('the proposals asked as a Table: a row per proposal, none of its object
         table.rows.some((row) => row.cells[at] === name),
         name,
       );
+    for (const name of names) {
+      assert.equal((await bounded().request(`${ns}/proposals/${name}`)).status, 422, `${name} read whole passes the bound`);
+      const whole = await app().request(`${ns}/proposals/${name}`);
+      assert.equal(whole.status, 200);
+      assert.ok(
+        filesHeld(LISTED_WITHOUT.Proposal, await whole.json()).includes('spec.objects[].spec'),
+        'and, unbounded, carries its proposed objects whole',
+      );
+    }
   });
 });

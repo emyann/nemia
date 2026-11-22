@@ -332,7 +332,12 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
         fs.mkdirSync(path.join(ROOT, 'runs', id, kept), { recursive: true });
         fs.writeFileSync(path.join(ROOT, 'runs', id, kept, 'kept.md'), 'kept\n');
       }
-      fs.mkdirSync(path.join(ROOT, 'runs', `${id}.asks`, 'done'), { recursive: true });
+      plantAsk(
+        ROOT,
+        id,
+        'done/retry-implement-1',
+        JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
+      );
       const files = path.join(ROOT, 'runs', id, 'artifacts');
 
       const dry = await typed(b.e, 'prune', id, '--artifacts');
@@ -354,7 +359,10 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.ok(!fs.existsSync(files) && !fs.existsSync(run0.wt), 'the files and the worktree are gone');
       assert.equal(fs.readFileSync(path.join(outside, 'precious.png'), 'utf8'), 'keep me\n', 'a link among the files is not followed');
       for (const kept of ['inputs', 'agents']) assert.ok(under('runs', id, kept, 'kept.md'), `${kept} is kept`);
-      assert.ok(recordText(ROOT, runKey(id)) !== undefined && askText(ROOT, id, 'done') !== undefined, 'the record and the asks are kept');
+      assert.ok(
+        recordText(ROOT, runKey(id)) !== undefined && askText(ROOT, id, 'done/retry-implement-1') !== undefined,
+        'the record and the asks are kept',
+      );
       assert.ok(hasBranch(run0.repo, run0.branch), 'and the branch');
       const pruned = runRecord(ROOT, id).pruned!;
       assert.equal(pruned.worktrees.length, 1);

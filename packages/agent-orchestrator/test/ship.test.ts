@@ -308,7 +308,7 @@ async function endings(stage: Stage, root: string) {
     const second = await atTheGate({ repo });
     await stage.runWith(b.e, approveRun(first.id, 'ship'));
     const { file } = await stage.runWith(b.e, approveRun(second.id, 'ship'));
-    fs.writeFileSync(file, JSON.stringify({ at: '2026-09-17T08:00:00.000Z' }));
+    plantRecord(ROOT, file, JSON.stringify({ at: '2026-09-17T08:00:00.000Z' }));
     return { repo, first, second };
   }
 
@@ -1697,7 +1697,7 @@ describe('a checkout held by a merge staged and not landed, and claimed by no ru
       const repo = at.aRepo();
       const waiting = await at.atTheGate({ repo });
       const child = await stage.runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: at.mergeOnly(), after: [waiting.id] }));
-      fs.writeFileSync((await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
       assert.deepEqual((await at.pass(child.id)).filed, [], 'a merge-only run approved oldest waits on a run at its own gate');
       await stage.runWith(e(), approveRun(waiting.id, 'ship'));
       assert.deepEqual((await at.pass(waiting.id)).filed, ['ship'], 'so the checkout goes to the run that would use it');
@@ -1707,7 +1707,7 @@ describe('a checkout held by a merge staged and not landed, and claimed by no ru
       const inFlight = await at.atTheGate({ repo: other });
       await stage.runWith(e(), approveRun(inFlight.id, 'ship'));
       const queued = await stage.runPlaced(startRun({ brief: 'ship the flag', repo: other, workflowDir: at.mergeOnly() }));
-      fs.writeFileSync((await stage.runWith(e(), approveRun(queued.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T05:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(queued.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T05:00:00.000Z' }));
       ENV.WF_MAX_RUNS = '1';
       try {
         const capped = await stage.runWith(e(), advanceRun(runRecord(ROOT, queued.id), { inFlight: 1, cap: 1 }));
@@ -1734,9 +1734,9 @@ describe('a checkout held by a merge staged and not landed, and claimed by no ru
         "the merge-only run's parent has landed",
       );
       const other = await at.atTheGate({ repo });
-      fs.writeFileSync((await stage.runWith(e(), approveRun(other.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(other.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
       const child = await stage.runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: at.mergeOnly(), after: [parent.id] }));
-      fs.writeFileSync((await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+      plantRecord(ROOT, (await stage.runWith(e(), approveRun(child.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
       assert.deepEqual((await at.pass(other.id)).filed, ['ship'], 'the older word takes the checkout');
       assert.deepEqual((await at.pass(child.id)).filed, [], 'and the run with nothing filed waits for it');
       await at.aPass(e());

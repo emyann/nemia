@@ -230,6 +230,14 @@ export const runsDir = (home: string) => path.join(home, 'runs');
 export const runFile = (home: string, id: string) => path.join(runsDir(home), `${id}.json`);
 
 /**
+ * The folder a store kept a run's asks in before they were records of its keyspace, `runs/<id>.asks`: what an import reads, then moves
+ * aside (`runFilesOf`, runs/records.store.ts).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
+export const asksDir = (home: string, id: string) => path.join(runsDir(home), `${id}.asks`);
+
+/**
  * A cancellation, in a file of its own.
  *
  * The run's json has one writer that rewrites it constantly — a tick reads the record, spends
@@ -298,6 +306,13 @@ export const marksAt = (home: string, id: string) =>
  * @param id The run's id.
  */
 export const holdFile = (home: string, id: string) => path.join(runsDir(home), `${id}.hold`);
+
+/**
+ * Whether a person holds the run: its hold's file is there, whether or not it reads as a hold (`holdFile`).
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
+export const holdStands = (home: string, id: string) => fs.existsSync(holdFile(home, id));
 
 /**
  * The hold, read: undefined for a run nobody holds. A file that does not read as a hold still holds the run, on no run named: the tick

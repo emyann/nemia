@@ -674,7 +674,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
   );
   assert.doesNotMatch(late, /take that acceptance back|\.asks directory/, 'and does not send them to delete it');
 
-  fs.rmSync(file);
+  dropRecord(ROOT, file);
   assert.equal(
     runRecord(ROOT, run.id).acceptances,
     undefined,

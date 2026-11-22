@@ -54,13 +54,14 @@ import {
   answersIn,
   askIn,
   asksCounted,
+  asksDir,
   roundAskIn,
   approvalIn,
   approvalsIn,
   asksIn,
   composedRun,
   heldText,
-  holdFile,
+  holdStands,
   keepSaid,
   markCancelled,
   readAs,
@@ -557,7 +558,7 @@ function markerMethods(home: string) {
     holds: {
       lift: (id, at, actor) => fromThrow(() => removeHold(home, id, at, actor)),
       put: (id, until, said) => fromThrow(() => writeHold(home, id, until, said)),
-      stands: (id) => fromThrow(() => fs.existsSync(holdFile(home, id))),
+      stands: (id) => fromThrow(() => holdStands(home, id)),
     },
     said: { put: (id, step, text) => fromThrow(() => keepSaid(home, id, step, text)) },
     labels: { put: (id, labels) => fromThrow(() => writeLabels(home, id, labels)) },
@@ -627,7 +628,7 @@ export function runFilesOf(home: string) {
   const runs = filesIn(runsDir(home))
     .filter((n) => n.endsWith('.json'))
     .map((n) => n.slice(0, -'.json'.length));
-  const asksAt = (id: string) => path.join(runsDir(home), `${id}.asks`);
+  const asksAt = (id: string) => asksDir(home, id);
   const ids = [
     ...new Set([
       ...runs,

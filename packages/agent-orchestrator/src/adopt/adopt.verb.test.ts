@@ -116,7 +116,7 @@ async function aFinished(repo: string, factory: string) {
 function card(name: string, factory: string, workflow: string) {
   fs.mkdirSync(INBOX, { recursive: true });
   const file = path.join(INBOX, `${name}.md`);
-  plantRecord(ROOT, file, `---\nworkflow: ${workflow}\nfactory: ${factory}\n---\n\nCache the views.\n`);
+  fs.writeFileSync(file, `---\nworkflow: ${workflow}\nfactory: ${factory}\n---\n\nCache the views.\n`);
   return file;
 }
 

@@ -131,8 +131,8 @@ describe('a record in the store, read and written back through the door: what it
   });
   test("a person's files are composed onto the run read, and never written into its record", () => {
     const run = made('r-composed');
-    markCancelled(ROOT, run.id);
     writeHold(ROOT, run.id, ['other-run']);
+    markCancelled(ROOT, run.id);
     const read = store.runs.read(run.id);
     assert.ok(read.cancelledAt && read.hold);
     assert.equal(store.runs.rewrite(read), true);
@@ -418,7 +418,11 @@ describe("a store's run files imported into its keyspace once, moved aside under
     fs.writeFileSync(path.join(root, 'runs', 'i-huge.json'), JSON.stringify({ ...aRun('i-huge'), brief: 'x'.repeat(RECORD_CEILING) }));
     assert.deepEqual(imported(root), { refused: 'Invalid' });
     assert.equal(fs.existsSync(path.join(root, 'imported')), false);
-    assert.equal(recordText(root, runKey('i-run')), undefined);
+    assert.equal(
+      act(Effect.flatMap(keyspaceAt(keyspaceFile(root)), (keyspace) => keyspace.get(runKey('i-run')))),
+      undefined,
+      'no record made: read off the keyspace without importing again',
+    );
   });
   test('a key the keyspace already holds is never written over, and the file is still moved aside', () => {
     const root = planted();

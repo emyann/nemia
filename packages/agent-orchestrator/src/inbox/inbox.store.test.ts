@@ -9,7 +9,7 @@
  * `WF_VERIFY_REST=0`: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
 import { dropRecord, keysUnder, plantRecord, recordText, runKey, runRecord, runsNow } from '../../testing.ts';
-import { afterAll, beforeAll, describe, test, vi } from 'vitest';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,6 +28,7 @@ import { inboxDir, parseArgv, START, StartInput, startRun, startFromInbox, Store
 import type { Started } from '../start/commands.verb.ts';
 import * as verbs from '../runner.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
+import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
 import { INBOX as INBOX_LIST, INBOX_ADD, type InboxAddInput } from './commands.verb.ts';
 import { inboxLines, type InboxListing } from './inbox.ts';
 import { factsOf, handled, typed, type StartedAnswer } from '../../test/typed.ts';
@@ -768,14 +769,20 @@ test('a card gone between its start and the taking off of its `queued:` line is 
   const file = path.join(INBOX, 'gone-a1b2.md');
   fs.mkdirSync(INBOX, { recursive: true });
   fs.writeFileSync(file, `---\nworkflow: dev\nrepo: ${repo}\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views\n`);
-  const write = fs.writeFileSync;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the card removed as the run is made: a race no seam gives
-  vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
-    write.apply(this, args);
-    const created = typeof args[0] === 'string' && path.dirname(args[0]) === path.join(ROOT, 'runs') && args[0].endsWith('.json');
-    if (created && fs.existsSync(file)) fs.rmSync(file);
-  });
-  const started = await runPlaced(startFromInbox({ name: 'gone-a1b2', callerRepo: repo }));
+  const started = await runPlaced(
+    Effect.gen(function* () {
+      const door = yield* RunDoor;
+      const racing: RunDoorShape = {
+        ...door,
+        runs: {
+          ...door.runs,
+          create: (...made: Parameters<RunDoorShape['runs']['create']>) =>
+            Effect.tap(door.runs.create(...made), () => Effect.sync(() => fs.rmSync(file, { force: true }))),
+        },
+      };
+      return yield* startFromInbox({ name: 'gone-a1b2', callerRepo: repo }).pipe(Effect.provideService(RunDoor, racing));
+    }),
+  );
   assert.equal(started.queueLeft, undefined, 'a card already gone is not a line left');
   assert.deepEqual(runRecord(ROOT, started.run.id).from, { inbox: 'gone-a1b2' });
   assert.deepEqual(readInbox(), []);

@@ -723,7 +723,7 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
         );
         assert.equal(open.asked, plain.asked, "the open runs by state: what the plain poll costs, no finished run's journal");
       } finally {
-        for (const file of ['r-paged.json', 'r-paged-too.json', 'r-asks.json']) fs.rmSync(path.join(root, 'runs', file));
+        for (const id of ['r-paged', 'r-paged-too', 'r-asks']) dropRecord(root, runKey(id));
       }
     },
   );

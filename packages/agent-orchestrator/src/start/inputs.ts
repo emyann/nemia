@@ -138,6 +138,8 @@ const inputKind = (name: string) => {
  * @param inFolder Whether the step is of a folder run, which gets a copy of the inputs in its folder.
  * @param folders The folders the step is filed with, whose inputs mount is named where there is one; undefined where it is filed none.
  * @param cards The inbox cards handed, by name; none where not given.
+ * @param named The files of `names` that what was asked names by a markdown image or link (`namedInText`): each file is then said to be
+ *   named there or not, so a step reads first the ones the request points at. None said where it names none, or is not read for them.
  */
 export const inputsLine = (
   dir: string | undefined,
@@ -145,10 +147,12 @@ export const inputsLine = (
   inFolder = false,
   folders?: Pick<FiledFolders, 'inputs'>,
   cards: readonly string[] = [],
+  named?: readonly string[],
 ) => {
   if (!dir || (!names?.length && !cards.length)) return undefined;
+  const where = (n: string) => (!named?.length ? '' : named.includes(n) ? ', named in what was asked' : ', named nowhere in it');
   const files = names?.length
-    ? `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: ${names.map((n) => `\`${n}\`, ${inputKind(n)}`).join('; ')}.`
+    ? `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: ${names.map((n) => `\`${n}\`, ${inputKind(n)}${where(n)}`).join('; ')}.`
     : undefined;
   const handed = cards.length
     ? `The person handed these inbox cards with it (\`nemia start --card\`), each copied as it read when the run started, under \`${CARDS_FOLDER}/\` as \`<name>.md\`: ${cards.map((c) => `\`${c}\``).join(', ')}.`

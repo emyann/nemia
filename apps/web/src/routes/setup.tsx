@@ -131,7 +131,7 @@ function SetupHead() {
   return (
     <header className="flex flex-col gap-1">
       <h1 className="text-title-large">Setup</h1>
-      <p className="text-body-medium text-muted-foreground">
+      <p className="text-body-medium text-on-surface-variant">
         What this server needs to run its factories, each piece in place or with the fix that puts it there.
       </p>
     </header>

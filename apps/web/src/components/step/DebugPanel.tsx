@@ -38,7 +38,7 @@ export function DebugPanel({ run, step, shown }: { run: RunDetail; step: Step; s
     <section aria-label="Debug" className="shrink-0">
       <Disclosure isExpanded={isExpanded} onExpandedChange={setExpanded}>
         <DisclosureTrigger className="min-h-0 py-1.5">
-          <span className="text-body-small font-body-small text-muted-foreground">Debug</span>
+          <span className="text-body-small font-body-small text-on-surface-variant">Debug</span>
         </DisclosureTrigger>
         <DisclosurePanel isUnstyled className={UNCLIPPED}>
           {isExpanded && <PathOf run={run} step={step} shown={shown} />}
@@ -74,7 +74,7 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
 
   return (
     <div className="max-h-[60svh] space-y-2 overflow-y-auto px-4 pb-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
         <span>
           {PATH_TITLE}
           {read.data?.taskId ? (
@@ -122,7 +122,7 @@ function PathDrawn({
   taken: readonly string[];
   onScrub: (i: number) => void;
 }) {
-  if (read.taskId === null) return <p className="text-body-medium text-muted-foreground">Not filed yet, so there is no path to show.</p>;
+  if (read.taskId === null) return <p className="text-body-medium text-on-surface-variant">Not filed yet, so there is no path to show.</p>;
   return (
     <div
       data-path={read.taskId}
@@ -231,7 +231,7 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleTransition[];
         showOutput={false}
         className="px-2"
       />
-      <p data-shown className="text-body-small text-muted-foreground">
+      <p data-shown className="text-body-small text-on-surface-variant">
         Entry {at + 1} of {path.length}
         {at === path.length - 1 ? ', the newest' : ''}
       </p>
@@ -257,7 +257,7 @@ function Timeline({
 }) {
   const now = new Date(useNow(60_000));
   const routes = new Set(machine.edges.map((e) => `${e.from}->${e.to}`));
-  if (path.length === 0) return <p className="text-body-medium text-muted-foreground">Its journal has nothing on it yet.</p>;
+  if (path.length === 0) return <p className="text-body-medium text-on-surface-variant">Its journal has nothing on it yet.</p>;
   return (
     <div className="space-y-2">
       <Scrubber path={path} at={at} onScrub={onScrub} />
@@ -272,21 +272,21 @@ function Timeline({
                 className={cn(
                   'flex w-full items-baseline gap-2 rounded-shape-extra-small px-1.5 py-0.5',
                   i === at && 'bg-alive-container text-on-alive-container',
-                  i > at && 'text-muted-foreground',
+                  i > at && 'text-on-surface-variant',
                 )}
               >
                 <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
                   <span data-said>
-                    <span className="font-semibold">{s.state}</span> <span className="text-muted-foreground">← {s.event}</span>
+                    <span className="font-semibold">{s.state}</span> <span className="text-on-surface-variant">← {s.event}</span>
                   </span>
                   {verb && (
-                    <span data-by-person={verb} className="text-muted-foreground italic">
+                    <span data-by-person={verb} className="text-on-surface-variant italic">
                       (by a person: {verb})
                     </span>
                   )}
-                  {offGraph && <span className="text-muted-foreground">(no edge)</span>}
+                  {offGraph && <span className="text-on-surface-variant">(no edge)</span>}
                 </span>
-                <span className="shrink-0 text-muted-foreground">{clockWord(new Date(s.at), now)}</span>
+                <span className="shrink-0 text-on-surface-variant">{clockWord(new Date(s.at), now)}</span>
               </Pressable>
             </li>
           );

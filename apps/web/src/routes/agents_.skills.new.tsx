@@ -31,7 +31,7 @@ function NewSkillPage() {
       <DefinitionTrail kind="skill" name="New skill" place={{}} />
       <header className="space-y-1">
         <h1 className="text-title-medium">New skill</h1>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           Written to <code className="font-mono text-body-small">{store.skills}/&lt;name&gt;/SKILL.md</code>, your library. An agent of
           yours gives it by its name, from its page's skills.
         </p>

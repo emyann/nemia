@@ -6,7 +6,7 @@ const meta: Meta = { title: 'Run/Jump' };
 export default meta;
 
 /** Where the pill stands in its story: a panel's width, on the card's ground. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
+const PANEL = { width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)' };
 
 /** Two new. */
 export const Two: StoryObj = {

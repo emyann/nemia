@@ -51,13 +51,13 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
   if (!proposal) {
     if (readGone(error))
       return (
-        <p data-no-proposal={name} className="text-body-medium text-muted-foreground">
+        <p data-no-proposal={name} className="text-body-medium text-on-surface-variant">
           {factory} has no proposal named {name}: it was never made, or its factory is gone.
         </p>
       );
     if (error)
       return (
-        <p data-proposal-reading={name} className="text-body-medium text-muted-foreground">
+        <p data-proposal-reading={name} className="text-body-medium text-on-surface-variant">
           Could not read the proposal: {error.message}
         </p>
       );
@@ -104,7 +104,7 @@ function ChangeRow({ change, phase }: { change: ProposalChange; phase: ProposalP
       <code className="font-mono break-all">
         {change.resource}/{change.name}
       </code>
-      <span className={cn('text-body-small', change.access === 'widens' ? ink[widensHue(phase)] : 'text-muted-foreground')}>
+      <span className={cn('text-body-small', change.access === 'widens' ? ink[widensHue(phase)] : 'text-on-surface-variant')}>
         {ACCESS_WORDS[change.access]}
       </span>
     </li>
@@ -174,7 +174,7 @@ function ProposalView({
           ))}
         </ul>
         {message && (
-          <p data-proposal-message className="text-body-small break-words text-muted-foreground">
+          <p data-proposal-message className="text-body-small break-words text-on-surface-variant">
             {message}
           </p>
         )}

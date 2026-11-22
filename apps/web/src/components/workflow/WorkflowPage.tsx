@@ -114,7 +114,7 @@ function Everywhere({ from, name, address, building, factories }: Asked & { fact
  */
 function StartsInFactory({ name, factories }: { name: string; factories: readonly string[] }) {
   return (
-    <p data-starts-in-factory className="text-body-medium whitespace-pre-wrap break-words text-muted-foreground">
+    <p data-starts-in-factory className="text-body-medium whitespace-pre-wrap break-words text-on-surface-variant">
       {factories.length
         ? `A run of ${name} starts in a factory that attaches it: open it in ${factories.join(', ')}.`
         : `A run of ${name} starts in a factory that attaches it, and none does yet: attach it to one, then open it there.`}
@@ -223,7 +223,7 @@ function Workflow({
         <>
           <WorkflowCanvas workflow={workflow} place={address} />
           <section className="space-y-2">
-            <h2 className="text-label-medium text-muted-foreground uppercase">Steps</h2>
+            <h2 className="text-label-medium text-on-surface-variant uppercase">Steps</h2>
             {children}
           </section>
           {start}
@@ -261,7 +261,7 @@ function WorkflowHeader({
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (
-          <span className="text-body-small text-muted-foreground">
+          <span className="text-body-small text-on-surface-variant">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}
           </span>
         )}
@@ -273,7 +273,7 @@ function WorkflowHeader({
         )}
         {removable && <RemoveWorkflow workflow={removable} onRemoved={onRemoved} />}
       </div>
-      <p data-folder className="font-mono text-body-small break-all text-muted-foreground">
+      <p data-folder className="font-mono text-body-small break-all text-on-surface-variant">
         {dir}
       </p>
       <NoBuilder workflow={workflow} factory={factory} />
@@ -301,7 +301,7 @@ function NotOffered({
   return (
     <div className="space-y-3">
       <WorkflowTrail from={from} workflow={name} place={address} />
-      <p data-not-offered={place.factory} className="text-body-medium text-muted-foreground">
+      <p data-not-offered={place.factory} className="text-body-medium text-on-surface-variant">
         {place.factory} does not offer {name} on <span className="font-mono text-body-small break-all">{place.repo}</span>, so nothing of it
         is read here and it hires no agent into its steps: attach the workflow to {place.factory} first
         {attach ? (
@@ -319,12 +319,12 @@ function NotOffered({
 /** The README whole, as the markdown it is written in, or that there is none. */
 function Readme({ text }: { text: string | null }) {
   return (
-    <section aria-label="README" className="space-y-2 rounded-lg border border-outline-variant bg-card p-4">
-      <h2 className="text-label-medium text-muted-foreground uppercase">README</h2>
+    <section aria-label="README" className="space-y-2 rounded-lg border border-outline-variant bg-surface-container-low p-4">
+      <h2 className="text-label-medium text-on-surface-variant uppercase">README</h2>
       {text?.trim() ? (
         <Markdown className="text-body-medium">{text}</Markdown>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           No README: a <code className="font-mono text-body-small">README.md</code> in the folder says what the workflow is for, its first
           paragraph its description.
         </p>
@@ -348,7 +348,7 @@ function NotListed({ from, name }: { from: string; name: string }) {
   return (
     <div className="space-y-3">
       <WorkflowTrail from={from} workflow={name} place={{}} />
-      <p data-not-listed className="text-body-medium text-muted-foreground">
+      <p data-not-listed className="text-body-medium text-on-surface-variant">
         No workflow <span className="font-mono">{name}</span> is listed {from === 'user' ? 'among yours' : "in this repository's"}: it may
         have been removed or renamed.
       </p>

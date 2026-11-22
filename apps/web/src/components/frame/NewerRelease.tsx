@@ -16,10 +16,10 @@ export function NewerRelease() {
   return (
     <p
       data-newer-release={version.data?.latest?.version}
-      className="flex items-center gap-1.5 border-b border-outline-variant px-4 py-1.5 text-body-small text-muted-foreground"
+      className="flex items-center gap-1.5 border-b border-outline-variant px-4 py-1.5 text-body-small text-on-surface-variant"
     >
       <ArrowUpCircle aria-hidden className="size-3.5 shrink-0" />
-      <TextLink to="/settings" className="text-muted-foreground underline">
+      <TextLink to="/settings" className="text-on-surface-variant underline">
         {words}
       </TextLink>
     </p>

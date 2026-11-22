@@ -59,7 +59,7 @@ export function NemiaSettings() {
     <section aria-label="Nemia" data-nemia-section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h2 className="text-title-medium">Nemia</h2>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           The store's own agent, across every factory: on Semi-auto she keeps a session of her own, and what waits on you — a gate, a step's
           question, a loop out of rounds — is asked of you first, as is a write that cannot be undone or changes your settings or a factory.
           The rest is hers. On Auto, an answer the rules you confirmed allow is hers too.
@@ -70,9 +70,9 @@ export function NemiaSettings() {
           <LevelPart nemia={data} pending={write.isPending} onAsk={askLevel} />
           <FactoriesPart factories={data.factories} pending={write.isPending} out={out} onAsk={ask} />
           {write.error && (
-            <div data-nemia-refused className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-              <p className="text-body-medium font-medium text-destructive">Not set:</p>
-              <p className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
+            <div data-nemia-refused className="flex flex-col gap-1 rounded-lg border border-failure/40 bg-failure/5 px-3 py-2">
+              <p className="text-body-medium font-medium text-failure">Not set:</p>
+              <p className="font-mono text-body-small break-words whitespace-pre-wrap text-failure">{write.error.message}</p>
             </div>
           )}
           <PolicyRules agent="nemia" />
@@ -81,7 +81,7 @@ export function NemiaSettings() {
           <SpendPart nemia={data} />
         </>
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read where she is: {error.message}</p>
+        <p className="text-body-medium text-on-surface-variant">Could not read where she is: {error.message}</p>
       ) : (
         <Reading label="Reading where she is…" className="flex flex-col gap-4">
           {[0, 1, 2].map((at) => (
@@ -153,9 +153,9 @@ function LevelPart({ nemia, pending, onAsk }: { nemia: NemiaLevel; pending: bool
     <Part heading="Level" data-nemia-level={nemia.level}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <LevelSelect label="Her level" level={nemia.level} pending={pending} onPick={onAsk} marks={{ 'data-nemia-pick': true }} />
-        {pending && <span className="text-body-small text-muted-foreground">Writing…</span>}
+        {pending && <span className="text-body-small text-on-surface-variant">Writing…</span>}
       </div>
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         {LEVEL_LINES[nemia.level]}
         {nemia.since !== null && <span data-nemia-since> Set at {clockWord(new Date(nemia.since), new Date(now))}.</span>}
       </p>
@@ -192,7 +192,7 @@ function FactoriesPart({
   const now = useNow(60_000);
   return (
     <Part heading="Factories" data-nemia-factories>
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         She works on a factory at Semi-auto, and at Auto gives unasked what your rules allow; one at Manual is left alone, its runs and its
         news not hers. Raise one for a stretch: it goes back to its default by itself once the stretch ends.
       </p>
@@ -245,7 +245,7 @@ function FactoryRow({
           </Tag>
         )}
       </div>
-      <p data-factory-words className="text-body-small text-muted-foreground">
+      <p data-factory-words className="text-body-small text-on-surface-variant">
         {factoryWords(row, byDefault, now)}
       </p>
       {!byDefault && (
@@ -362,7 +362,7 @@ function SessionPart({
     <Part heading="Her session" data-nemia-session data-state={kind}>
       <p className="text-body-medium">{words}</p>
       {nemia.phase !== null && (
-        <p className="flex flex-wrap gap-x-4 gap-y-1 text-body-small text-muted-foreground">
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-body-small text-on-surface-variant">
           <span>
             Task{' '}
             <code data-nemia-task className="font-mono">
@@ -405,19 +405,19 @@ function ReachPart({ reach, bridge }: { reach: readonly string[]; bridge: Bridge
   const rest = bridge === null ? lines : lines.slice(0, -1);
   return (
     <Part heading="Reach her" data-nemia-reach>
-      <div className="flex max-w-full items-center gap-1 self-start rounded-md border bg-muted/40 px-2 py-1">
+      <div className="flex max-w-full items-center gap-1 self-start rounded-md border bg-surface-container-highest/40 px-2 py-1">
         <code data-nemia-attach className="font-mono text-body-small break-all">
           {command}
         </code>
         <CopyButton text={command} />
       </div>
       {rest.map((line) => (
-        <p key={line} className="text-body-small text-muted-foreground">
+        <p key={line} className="text-body-small text-on-surface-variant">
           {line}
         </p>
       ))}
       {bridge && (
-        <p className="text-body-small text-muted-foreground">
+        <p className="text-body-small text-on-surface-variant">
           <BridgeWords bridge={bridge} data-nemia-bridge />
         </p>
       )}
@@ -437,12 +437,12 @@ function SpendPart({ nemia }: { nemia: NemiaLevel }) {
       )}
       {nemia.allows.length > 0 && (
         <div data-nemia-allows className="flex flex-col gap-1">
-          <p className="text-body-small text-muted-foreground">
+          <p className="text-body-small text-on-surface-variant">
             Allowed at a prompt, beyond what is built in (her folder's local settings):
           </p>
           <span className="flex flex-wrap gap-1">
             {nemia.allows.map((rule) => (
-              <code key={rule} className="rounded bg-muted px-1.5 py-0.5 font-mono text-body-small">
+              <code key={rule} className="rounded bg-surface-container-highest px-1.5 py-0.5 font-mono text-body-small">
                 {rule}
               </code>
             ))}
@@ -468,18 +468,18 @@ function MemoryPart() {
             ))}
           </ul>
         ) : (
-          <p data-nemia-no-facts className="text-body-medium text-muted-foreground">
+          <p data-nemia-no-facts className="text-body-medium text-on-surface-variant">
             She keeps no facts yet.
           </p>
         )
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read her memory: {error.message}</p>
+        <p className="text-body-medium text-on-surface-variant">Could not read her memory: {error.message}</p>
       ) : (
         <Reading label="Reading her memory…">
           <ReadingLines widths={['w-40', 'w-32', 'w-48']} className="font-mono text-body-small" />
         </Reading>
       )}
-      <p data-nemia-prune className="text-body-small text-muted-foreground">
+      <p data-nemia-prune className="text-body-small text-on-surface-variant">
         {PRUNE_WORDS}
       </p>
     </Part>
@@ -504,13 +504,13 @@ function FactText({ name }: { name: string }) {
     return (
       <pre
         data-nemia-fact-text
-        className="mt-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-body-small break-words whitespace-pre-wrap"
+        className="mt-1 rounded-md border bg-surface-container-highest/40 px-3 py-2 font-mono text-body-small break-words whitespace-pre-wrap"
       >
         {data.fact.text}
       </pre>
     );
   if (error instanceof Error)
-    return <p className="mt-1 text-body-small text-muted-foreground">Could not read this fact: {error.message}</p>;
+    return <p className="mt-1 text-body-small text-on-surface-variant">Could not read this fact: {error.message}</p>;
   return (
     <Reading label="Reading the fact…" className="mt-1 rounded-md border px-3 py-2">
       <ReadingLines widths={['w-full', 'w-3/4']} className="font-mono text-body-small" />

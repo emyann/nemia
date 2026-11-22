@@ -16,7 +16,7 @@ function ConditionLine({ condition }: { condition: FactoryCondition }) {
         {condition.type} {condition.status}
       </Tag>
       <span className="font-medium">{condition.reason}</span>
-      <span className="text-muted-foreground">{condition.message}</span>
+      <span className="text-on-surface-variant">{condition.message}</span>
     </li>
   );
 }
@@ -59,7 +59,7 @@ export function TemplateCard({ template }: { template: FactoryTemplate }) {
           <dl className="flex flex-wrap gap-x-4 gap-y-1 text-body-small" data-template-params>
             {params.map(([key, value]) => (
               <div key={key} className="flex gap-1" data-param={key}>
-                <dt className="text-muted-foreground">{key}</dt>
+                <dt className="text-on-surface-variant">{key}</dt>
                 <dd className="font-mono">{String(value)}</dd>
               </div>
             ))}

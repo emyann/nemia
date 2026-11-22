@@ -47,11 +47,11 @@ export function attemptsWord({ count, latest }: StepAttempts) {
 
 /** The ink of a check's verdict, by its result: plain where it passed, a failure where it failed or did not finish, else muted. */
 const VERDICT_CLASS: Record<CheckResult, string> = {
-  passed: 'text-foreground',
+  passed: 'text-on-surface',
   failed: 'font-semibold text-failure',
   unfinished: 'font-semibold text-failure',
-  running: 'text-muted-foreground',
-  unknown: 'text-muted-foreground',
+  running: 'text-on-surface-variant',
+  unknown: 'text-on-surface-variant',
 };
 
 /** A try's check's verdict as its detail says it — `check exit 1` — inked by its result; `not filed` until the run files the check. */
@@ -59,7 +59,7 @@ export function CheckVerdictWords({ verdict }: { verdict: CheckVerdict | null })
   const said = verdict ? verdictWords(verdict) : 'not filed';
   return (
     <span data-verdict={said} data-verdict-result={verdict?.result}>
-      check <span className={cn('font-mono', verdict ? VERDICT_CLASS[verdict.result] : 'text-muted-foreground')}>{said}</span>
+      check <span className={cn('font-mono', verdict ? VERDICT_CLASS[verdict.result] : 'text-on-surface-variant')}>{said}</span>
     </span>
   );
 }
@@ -68,7 +68,7 @@ export function CheckVerdictWords({ verdict }: { verdict: CheckVerdict | null })
 export function AsItCame({ raw }: { raw: unknown }) {
   return (
     <section aria-label="As it came" className="space-y-1">
-      <h4 className="text-body-small text-muted-foreground">the statement as it came</h4>
+      <h4 className="text-body-small text-on-surface-variant">the statement as it came</h4>
       <Json data-raw value={raw} />
     </section>
   );
@@ -82,7 +82,7 @@ export function YourAnswer({ answer, by }: { answer: string; by: StepTry['answer
   return (
     <div className="space-y-0.5">
       <p data-your-answer className="whitespace-pre-wrap break-words">
-        <span className="font-medium text-muted-foreground">your answer:</span> {answer}
+        <span className="font-medium text-on-surface-variant">your answer:</span> {answer}
       </p>
       <Actor actor={by} />
     </div>
@@ -97,7 +97,7 @@ export function Statement({ closeout }: { closeout: Frozen<Pick<StepCloseout, 's
   return (
     <>
       {!bodyLeadsWith(closeout.summary, closeout.body) && (
-        <p data-summary className="text-body-medium text-foreground">
+        <p data-summary className="text-body-medium text-on-surface">
           {summaryShown(closeout.summary)}
         </p>
       )}

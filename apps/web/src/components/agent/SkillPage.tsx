@@ -59,11 +59,11 @@ export function SkillPage({ from, name, place }: { from: string; name: string; p
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-mono text-body-large font-semibold">{skill.name}</h1>
-          <span className="text-body-small text-muted-foreground">a skill</span>
+          <span className="text-body-small text-on-surface-variant">a skill</span>
           <SkillSourceBadge from={skill.from} />
         </div>
         {skill.entry && (
-          <p className="text-body-medium text-foreground">
+          <p className="text-body-medium text-on-surface">
             {skill.entry.name !== skill.name && <span className="font-medium">{skill.entry.name}. </span>}
             {skill.entry.description}
           </p>
@@ -79,7 +79,7 @@ export function SkillPage({ from, name, place }: { from: string; name: string; p
         </div>
       )}
 
-      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-muted-foreground">{skill.dir}/SKILL.md</p>
+      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-on-surface-variant">{skill.dir}/SKILL.md</p>
       <SkillForm
         key={shown.version}
         detail={shown}
@@ -101,7 +101,7 @@ export function SkillPage({ from, name, place }: { from: string; name: string; p
                 />
               ) : (
                 readPast && (
-                  <p data-skill-read-again className="text-body-small text-muted-foreground">
+                  <p data-skill-read-again className="text-body-small text-on-surface-variant">
                     It has been read again since: the page shows it as it now reads.
                   </p>
                 )
@@ -150,14 +150,14 @@ function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void })
 /** The agents that give this very skill, each linked, or that none does. */
 function GivenBy({ detail, place }: { detail: SkillDetail; place: PagePlace }) {
   return (
-    <p data-skill-users className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-muted-foreground">
+    <p data-skill-users className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-on-surface-variant">
       {detail.users.length ? (
         <>
           <span>Given by</span>
           {detail.users.map((user, i) => (
             <span key={`${user.from}:${user.name}`}>
-              <AgentLink from={user.from} name={user.name} place={place} className="text-body-small text-foreground" />
-              {user.from === 'repo' && <span className="text-muted-foreground"> (this repository)</span>}
+              <AgentLink from={user.from} name={user.name} place={place} className="text-body-small text-on-surface" />
+              {user.from === 'repo' && <span className="text-on-surface-variant"> (this repository)</span>}
               {i < detail.users.length - 1 && ','}
             </span>
           ))}
@@ -173,7 +173,7 @@ function GivenBy({ detail, place }: { detail: SkillDetail; place: PagePlace }) {
 function Elsewhere({ detail }: { detail: SkillDetail }) {
   const { from } = detail.skill;
   return (
-    <p data-copy-hint className="text-body-small text-muted-foreground">
+    <p data-copy-hint className="text-body-small text-on-surface-variant">
       {from === 'user' && detail.copyHint && (
         <>
           For this repository's agents to be given it, copy it into the repository by hand — the board writes no checkout — and commit it:{' '}
@@ -213,21 +213,21 @@ function Preload({
   const mine = skill.from === 'user';
   return (
     <fieldset data-preload className="space-y-2 rounded border border-outline-variant px-3 py-3">
-      <legend className="px-1 text-label-medium text-muted-foreground uppercase">Every turn, or when needed</legend>
+      <legend className="px-1 text-label-medium text-on-surface-variant uppercase">Every turn, or when needed</legend>
       <Switch isSelected={skill.preload} onChange={onSwitch} isDisabled={!mine || changed || pending}>
         <span>
-          Load it every turn <code className="font-mono text-body-small text-muted-foreground">(preload: true)</code>
+          Load it every turn <code className="font-mono text-body-small text-on-surface-variant">(preload: true)</code>
         </span>
       </Switch>
       {skill.cost && (
         <>
-          <p data-skill-cost className="text-body-small text-foreground">
+          <p data-skill-cost className="text-body-small text-on-surface">
             Now: {costWords(skill.cost)}.
           </p>
-          <p className="text-body-small text-muted-foreground">{preloadWords(skill.cost)}</p>
+          <p className="text-body-small text-on-surface-variant">{preloadWords(skill.cost)}</p>
         </>
       )}
-      <p data-skill-reach className="text-body-small text-muted-foreground">
+      <p data-skill-reach className="text-body-small text-on-surface-variant">
         {reachWords(detail.users)}
       </p>
       {mine && changed && (

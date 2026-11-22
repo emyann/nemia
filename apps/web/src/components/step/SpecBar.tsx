@@ -103,24 +103,24 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
   return (
     <>
       <section aria-label="Runs on" className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">Runs on</h3>
+        <h3 className="text-label-medium text-on-surface-variant">Runs on</h3>
         <p className="font-mono" data-runs-on>
           {runsOn(step.spec)}
         </p>
       </section>
       <section aria-label="Keys" className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">Keys</h3>
+        <h3 className="text-label-medium text-on-surface-variant">Keys</h3>
         <dl className="space-y-1">
           {specLines(step.spec).map(([label, value, whole = value]) => (
             <div key={label} className="flex min-w-0 gap-2">
-              <dt className="w-16 shrink-0 text-muted-foreground">{label}</dt>
+              <dt className="w-16 shrink-0 text-on-surface-variant">{label}</dt>
               <dd className="min-w-0 font-mono break-words">{whole}</dd>
             </div>
           ))}
         </dl>
       </section>
       <section aria-label="Waits on" className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">Waits on</h3>
+        <h3 className="text-label-medium text-on-surface-variant">Waits on</h3>
         <p data-waits-on>{waits.length ? <span className="font-mono">{waits.join(', ')}</span> : 'nothing: it starts first'}</p>
       </section>
     </>

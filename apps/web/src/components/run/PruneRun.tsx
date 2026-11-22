@@ -99,7 +99,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
           <Radio key={c.key} value={c.key} isDisabled={c.unavailable !== null} data-prune-choice={c.key} className={CHOICE}>
             <span className="min-w-0 space-y-0.5">
               <span className="block text-body-small font-medium">{c.label}</span>
-              <span className={cn('block text-body-small leading-snug', c.how.unmerged ? 'text-yours' : 'text-muted-foreground')}>
+              <span className={cn('block text-body-small leading-snug', c.how.unmerged ? 'text-yours' : 'text-on-surface-variant')}>
                 {c.says}
               </span>
               {c.unavailable && <span className="block text-body-small leading-snug text-yours">{c.unavailable}</span>}
@@ -143,7 +143,7 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
         </div>
       )}
       {prune.data && prune.data.left > 0 && (
-        <pre data-prune-said className="overflow-x-auto font-mono text-body-small whitespace-pre-wrap text-muted-foreground">
+        <pre data-prune-said className="overflow-x-auto font-mono text-body-small whitespace-pre-wrap text-on-surface-variant">
           {prune.data.lines.join('\n')}
         </pre>
       )}

@@ -17,7 +17,7 @@ export type RunTone = ChipTone;
 export const runRecipe = tv({
   slots: {
     base: 'relative min-w-0 text-on-surface',
-    ground: 'bg-card',
+    ground: 'bg-surface-container-low',
     head: 'flex min-w-0 items-center gap-3.5 text-body-small font-medium text-on-surface-variant',
     id: 'font-mono text-body-small text-on-surface-variant',
     title: 'relative z-10 m-0 min-w-0 flex-1 font-medium text-on-surface',
@@ -60,11 +60,11 @@ export const runRecipe = tv({
     tone: {
       alive: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-secondary-container)_22%,var(--md-sys-color-surface-container-low))]' },
       yours: {
-        ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_3%,var(--md-sys-color-surface-container-low))]',
+        ground: 'bg-surface-container-low dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_3%,var(--md-sys-color-surface-container-low))]',
         clock: 'text-yours',
       },
-      failure: { ground: 'bg-card dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_4%,var(--md-sys-color-surface-container-low))]' },
-      waits: { ground: 'bg-card' },
+      failure: { ground: 'bg-surface-container-low dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_4%,var(--md-sys-color-surface-container-low))]' },
+      waits: { ground: 'bg-surface-container-low' },
       rest: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-inverse-surface)_4%,var(--md-sys-color-surface-container-low))]' },
     },
   },

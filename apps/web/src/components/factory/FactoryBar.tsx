@@ -70,7 +70,7 @@ function Unread({ name, error, read }: { name: string; error: Error | null; read
 function FactoryBody({ block, factory }: { block: FactoryBlock; factory: Factory | undefined }) {
   if (block.error)
     return (
-      <p className="flex gap-2 text-destructive" data-error>
+      <p className="flex gap-2 text-failure" data-error>
         <TriangleAlert className="mt-0.5 size-4 shrink-0" />
         <span className="break-all">Its file does not read: {block.error}</span>
       </p>
@@ -79,13 +79,13 @@ function FactoryBody({ block, factory }: { block: FactoryBlock; factory: Factory
     <>
       {factory && <FactoryTrust factory={factory} />}
       <section aria-label="Runs" className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">Runs</h3>
+        <h3 className="text-label-medium text-on-surface-variant">Runs</h3>
         <p className="font-medium" data-runs>
           {runsOf(block)}
         </p>
       </section>
       <section aria-label="Offers" className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">Offers</h3>
+        <h3 className="text-label-medium text-on-surface-variant">Offers</h3>
         <p data-offer>{offerOf(block)}</p>
       </section>
     </>

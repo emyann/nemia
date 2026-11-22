@@ -79,7 +79,7 @@ function TokenField({ sent }: { sent: ReturnType<typeof useTokenSent> }) {
           setToken(typed);
           send.reset();
         }}
-        className="[--md3-field-notch:var(--card)]"
+        className="[--md3-field-notch:var(--md-sys-color-surface-container-low)]"
         inputClassName="font-mono"
       />
       {send.isError && (
@@ -115,14 +115,14 @@ function OpenHerePage({ asked }: { asked: TokenAsked }) {
             Open Nemia from your terminal
           </h1>
           <LinkRefusal />
-          <p className="text-body-medium text-muted-foreground">{WHY_HERE[asked.reason]}</p>
+          <p className="text-body-medium text-on-surface-variant">{WHY_HERE[asked.reason]}</p>
           <div data-token-way className="flex flex-col gap-2">
-            <p className="text-body-medium text-muted-foreground">Type this in a terminal on this machine:</p>
+            <p className="text-body-medium text-on-surface-variant">Type this in a terminal on this machine:</p>
             <p className="flex items-center gap-2 rounded-shape-small bg-surface-container px-3 py-2">
               <code className="min-w-0 flex-1 font-mono text-body-medium break-all text-on-surface">{OPEN}</code>
               <CopyButton text={OPEN} />
             </p>
-            <p className="text-body-medium text-muted-foreground">
+            <p className="text-body-medium text-on-surface-variant">
               It opens the board at localhost in your browser, signed in, with nothing to copy or paste. It stays signed in while you use
               it.
             </p>
@@ -138,7 +138,7 @@ function OpenHerePage({ asked }: { asked: TokenAsked }) {
               {pasting && (
                 <div className="flex flex-col gap-4 pt-2">
                   {asked.message && (
-                    <p data-token-said className="font-mono text-body-small break-words text-muted-foreground">
+                    <p data-token-said className="font-mono text-body-small break-words text-on-surface-variant">
                       {asked.message}
                     </p>
                   )}
@@ -166,24 +166,24 @@ function TokenAskedPage({ asked }: { asked: TokenAsked }) {
             Paste a token
           </h1>
           <LinkRefusal />
-          <p className="text-body-medium text-muted-foreground">{WHY[ask]}</p>
-          <p data-token-way className="text-body-medium text-muted-foreground">
+          <p className="text-body-medium text-on-surface-variant">{WHY[ask]}</p>
+          <p data-token-way className="text-body-medium text-on-surface-variant">
             To sign this browser in, type <code className="font-mono text-on-surface">{BOARD_LINK}</code> on the machine the store is on and
             open the link it prints; or paste a token of yours here.
           </p>
           {asked.message && (
-            <p data-token-said className="font-mono text-body-small break-words text-muted-foreground">
+            <p data-token-said className="font-mono text-body-small break-words text-on-surface-variant">
               {asked.message}
             </p>
           )}
-          <p className="text-body-medium text-muted-foreground">
+          <p className="text-body-medium text-on-surface-variant">
             This browser keeps the token you paste while you use it, until thirty days after your last visit, or until you forget it in
             Settings.
           </p>
           <TokenField sent={sent} />
         </form>
         <section aria-label="Pair this browser" className="flex flex-col gap-3 border-t border-outline-variant p-6">
-          <p className="text-body-medium text-muted-foreground">
+          <p className="text-body-medium text-on-surface-variant">
             Or pair this browser: it shows a code, and you approve it at the server, with no token to copy.
           </p>
           <PairBrowser />

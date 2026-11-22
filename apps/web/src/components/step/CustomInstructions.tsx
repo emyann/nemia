@@ -98,11 +98,11 @@ export function CustomInstructions({ name, repo, reach = HIRED }: { name: string
     >
       <div className="space-y-1">
         <h2 className="text-title-small">Custom instructions</h2>
-        <p className="text-body-small text-muted-foreground">{reach.told(<code className="font-mono">{name}</code>)}</p>
+        <p className="text-body-small text-on-surface-variant">{reach.told(<code className="font-mono">{name}</code>)}</p>
         <p
           data-custom-frozen={reach.takes.mark === 'frozen' || undefined}
           data-custom-told={reach.takes.mark === 'told' || undefined}
-          className="text-body-small text-muted-foreground"
+          className="text-body-small text-on-surface-variant"
         >
           {reach.takes.words}
         </p>
@@ -123,7 +123,7 @@ export function CustomInstructions({ name, repo, reach = HIRED }: { name: string
           }}
         />
       ) : error instanceof Error ? (
-        <p className="text-body-small text-muted-foreground">Could not read the custom instructions: {error.message}</p>
+        <p className="text-body-small text-on-surface-variant">Could not read the custom instructions: {error.message}</p>
       ) : (
         <Reading label="Reading the custom instructions…" className="flex flex-col gap-2">
           <Skeleton shape="rectangle" className="h-24 rounded-none" />
@@ -131,7 +131,7 @@ export function CustomInstructions({ name, repo, reach = HIRED }: { name: string
         </Reading>
       )}
       {done && (
-        <p data-custom-done className="text-body-small text-muted-foreground">
+        <p data-custom-done className="text-body-small text-on-surface-variant">
           {done}
         </p>
       )}
@@ -175,7 +175,7 @@ function CustomForm({
         if (draft.trim() && !unchanged) onSave(draft);
       }}
     >
-      <p data-custom-file className="font-mono text-body-small break-all text-muted-foreground">
+      <p data-custom-file className="font-mono text-body-small break-all text-on-surface-variant">
         {custom.file}
         {!held && ' — none yet'}
       </p>
@@ -228,7 +228,7 @@ function Clear({
       </Button>
     );
   return (
-    <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+    <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
       {asks}
       <Button icon={pending ? Pending : undefined} color="error" onPress={onClear} isDisabled={pending}>
         {pending ? 'Clearing…' : 'Clear'}

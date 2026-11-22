@@ -3,7 +3,7 @@ import { expect, within } from 'storybook/test';
 import { TalkReading } from './TalkReading';
 
 /** A box as a panel gives a talk (`Talk.stories.tsx`'s). */
-const PANEL = { width: 460, height: 420, padding: 16, background: 'var(--card)', display: 'flex' };
+const PANEL = { width: 460, height: 420, padding: 16, background: 'var(--md-sys-color-surface-container-low)', display: 'flex' };
 
 /** The talk's place while its conversation is first read, in the shape of its turns, beside the talk's own stories (`Run/Talk`). */
 const meta: Meta<typeof TalkReading> = {

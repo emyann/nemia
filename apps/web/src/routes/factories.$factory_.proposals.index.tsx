@@ -33,11 +33,11 @@ function ProposalsPage() {
   return (
     <article data-proposals-page={name} className="mx-auto flex max-w-3xl flex-col gap-6">
       {factory === undefined ? (
-        <p data-no-factory={name} className="text-body-medium text-muted-foreground">
+        <p data-no-factory={name} className="text-body-medium text-on-surface-variant">
           No factory is named {name}: the factories are listed on the Factories page.
         </p>
       ) : factory.default ? (
-        <p data-default-factory className="text-body-medium text-muted-foreground">
+        <p data-default-factory className="text-body-medium text-on-surface-variant">
           The default factory has no proposals: they are made in the factories a person makes.
         </p>
       ) : (

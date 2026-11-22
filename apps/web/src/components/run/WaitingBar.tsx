@@ -22,12 +22,12 @@ function WaitingRow({ row }: { row: BellRow }) {
         search={{}}
         hash={bellHash(row)}
         data-waiting-run={row.run}
-        className="block space-y-1.5 rounded-md border p-3 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="block space-y-1.5 rounded-md border p-3 outline-none hover:bg-surface-container-highest focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <span className="block truncate text-body-medium font-medium" title={row.title}>
           {row.title}
         </span>
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-small text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-small text-on-surface-variant">
           <FactoryTag name={row.factory} />{' '}
           <span data-waits-for className="text-yours">
             {row.waitsFor.join(' · ')}
@@ -59,7 +59,7 @@ export function WaitingBar() {
             ))}
           </ul>
         ) : (
-          <p data-waiting className="text-body-medium text-muted-foreground">
+          <p data-waiting className="text-body-medium text-on-surface-variant">
             Nothing waits on you.
           </p>
         )

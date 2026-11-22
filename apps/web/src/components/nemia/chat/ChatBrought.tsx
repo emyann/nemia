@@ -84,7 +84,7 @@ function Part({ part, run, step }: { part: BroughtPart; run: RunDetail; step: St
 /** A step that waits on nobody: its state and note as the inspector says them, and its approval where it was approved. */
 function Settled({ run, step }: { run: RunDetail; step: StepView }) {
   return (
-    <div className="space-y-2 rounded border border-outline-variant bg-card p-3 text-body-medium">
+    <div className="space-y-2 rounded border border-outline-variant bg-surface-container-low p-3 text-body-medium">
       <p className="break-words">
         <strong>{step.name}</strong> of {titleOf(run)} waits on nobody now.
       </p>

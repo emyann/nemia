@@ -23,13 +23,13 @@ export function WorkflowStepPage({ from, workflow, step, place }: { from: string
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-mono text-body-large font-semibold">{page.step}</h1>
-          <span className="text-body-small text-muted-foreground">
-            a step of <span className="font-mono text-foreground">{page.workflow}</span>
+          <span className="text-body-small text-on-surface-variant">
+            a step of <span className="font-mono text-on-surface">{page.workflow}</span>
           </span>
           <span
             data-from={page.from}
             className={`rounded-full px-2 py-0.5 text-body-small leading-none font-medium ${
-              page.from === 'user' ? container.grey : 'bg-muted text-muted-foreground'
+              page.from === 'user' ? container.grey : 'bg-surface-container-highest text-on-surface-variant'
             }`}
           >
             {fromWord(page.from, place.factory)}

@@ -27,7 +27,7 @@ export function HarnessImport({ items }: { items: readonly LibraryItem[] }) {
   return (
     <section aria-label="Import your own agents" data-harness-import className="flex flex-col gap-2">
       <h2 className="text-title-medium">Import your own agents</h2>
-      <p className="text-body-medium text-muted-foreground">
+      <p className="text-body-medium text-on-surface-variant">
         The agents your harness keeps for you on the api's machine, outside any repository. An import copies one into the user library, with
         the skills it gives.
       </p>
@@ -37,7 +37,7 @@ export function HarnessImport({ items }: { items: readonly LibraryItem[] }) {
         </p>
       )}
       {sources.data && offered.length === 0 && (
-        <p className="text-body-medium text-muted-foreground">No agent of your own outside the library.</p>
+        <p className="text-body-medium text-on-surface-variant">No agent of your own outside the library.</p>
       )}
       {offered.length > 0 && (
         <ul className="flex flex-col gap-2">
@@ -62,7 +62,7 @@ function ImportRow({ one, pending, onImport }: { one: Importable; pending: boole
     <li data-harness-agent={one.name} className="flex flex-wrap items-center gap-2 text-body-medium">
       <span className="font-mono">{one.name}</span>
       {one.error === null ? (
-        one.description !== null && <span className="text-body-small text-muted-foreground">{one.description}</span>
+        one.description !== null && <span className="text-body-small text-on-surface-variant">{one.description}</span>
       ) : (
         <span className="text-body-small text-failure">{one.error}</span>
       )}

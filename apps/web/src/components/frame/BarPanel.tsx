@@ -115,14 +115,14 @@ export function BarPanel({
       aria-labelledby={heading}
       tabIndex={-1}
       data-bar={open ? barValue(open) : undefined}
-      className="-m-4 flex h-[calc(100%+2rem)] min-w-0 flex-col text-body-medium text-foreground outline-none"
+      className="-m-4 flex h-[calc(100%+2rem)] min-w-0 flex-col text-body-medium text-on-surface outline-none"
     >
       <div className="flex items-start gap-2 border-b p-4">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <h2 id={heading} className="font-heading text-title-medium text-foreground">
+          <h2 id={heading} className="font-heading text-title-medium text-on-surface">
             {title}
           </h2>
-          {description && <div className="text-muted-foreground">{description}</div>}
+          {description && <div className="text-on-surface-variant">{description}</div>}
         </div>
         {actions}
         {page && (

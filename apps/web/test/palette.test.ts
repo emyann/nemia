@@ -184,7 +184,7 @@ test('REFUSED: a palette colour is found, where it is, under any variant; a role
     'border-outline-variant',
     'bg-surface-container-highest',
     'whitespace-nowrap',
-    'text-foreground',
+    'text-on-surface-variant',
     'bg-background',
     'the amber banner, on white, is yours; a red that is no failure',
     'gap-100 scale-950 text-whiteboard',
@@ -206,7 +206,7 @@ test("the board's source names no palette colour: a role of the theme, or a mean
   assert.deepEqual(
     paletteIn(WEB),
     [],
-    'give each a role of the theme (bg-card, border-outline, text-muted-foreground) or a form of src/lib/meaning.ts, whose roles src/styles.css reads',
+    'give each a role of the theme (bg-surface-container-low, border-outline, text-on-surface-variant) or a form of src/lib/meaning.ts, whose roles src/styles.css reads',
   );
 });
 
@@ -316,6 +316,6 @@ test("the board's source writes no raw colour: a role of the theme, or a colour 
   assert.deepEqual(
     rawIn(WEB),
     [],
-    "give each a role of the theme (bg-card, border-outline), a meaning's form of src/lib/meaning.ts, or paint for an SVG",
+    "give each a role of the theme (bg-surface-container-low, border-outline), a meaning's form of src/lib/meaning.ts, or paint for an SVG",
   );
 });

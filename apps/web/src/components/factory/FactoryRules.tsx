@@ -42,7 +42,7 @@ export function FactoryRules({ name }: { name: string }) {
     <section aria-label="Rules" data-factory-rules className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-title-medium">Rules</h2>
-        <p data-rules-told className="text-body-medium text-muted-foreground">
+        <p data-rules-told className="text-body-medium text-on-surface-variant">
           Told to every agent hired into this factory, after its custom instructions and before the step's own policy. Runs already started
           keep what they were told.
         </p>
@@ -58,7 +58,7 @@ export function FactoryRules({ name }: { name: string }) {
           <RulesForm key={`${data.words ?? ''}\n${data.error ?? ''}`} data={data} pending={change.isPending} onChange={ask} />
         </>
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read the rules: {error.message}</p>
+        <p className="text-body-medium text-on-surface-variant">Could not read the rules: {error.message}</p>
       ) : (
         <Reading label="Reading the rules…" className="flex flex-col gap-2">
           <Skeleton shape="rectangle" className="h-32 rounded-none" />
@@ -66,7 +66,7 @@ export function FactoryRules({ name }: { name: string }) {
         </Reading>
       )}
       {change.isSuccess && said && (
-        <p data-rules-done className="text-body-medium text-muted-foreground">
+        <p data-rules-done className="text-body-medium text-on-surface-variant">
           {said.done}
         </p>
       )}
@@ -119,7 +119,7 @@ function RulesForm({ data, pending, onChange }: { data: Rules; pending: boolean;
           </Button>
           {kept &&
             (asking ? (
-              <span data-rules-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+              <span data-rules-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
                 Remove the rules of this factory?
                 <Button
                   variant="destructive"

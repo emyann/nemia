@@ -65,7 +65,7 @@ export function FactoryDelegations({ name }: { name: string }) {
     <section aria-label="Delegations" data-factory-delegations className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-title-medium">Delegations</h2>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           An agent named here may approve, at Auto, a proposal of this factory's that its grants cover. Only you write them.
         </p>
       </div>
@@ -85,12 +85,12 @@ export function FactoryDelegations({ name }: { name: string }) {
             ))}
           </ul>
         ) : (
-          <p data-no-delegation className="text-body-medium text-muted-foreground">
+          <p data-no-delegation className="text-body-medium text-on-surface-variant">
             None: every proposal of this factory waits on you.
           </p>
         )
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read the delegations: {error.message}</p>
+        <p className="text-body-medium text-on-surface-variant">Could not read the delegations: {error.message}</p>
       ) : (
         <Reading label="Reading the delegations…">
           <ReadingLines widths={['w-3/4', 'w-2/3']} className="gap-2 text-body-medium" />
@@ -219,7 +219,7 @@ function GrantFields({
 }) {
   return (
     <fieldset data-delegation-grant-form={index} className="flex flex-col gap-2 rounded-md border px-3 py-2">
-      <legend className="px-1 text-label-medium text-muted-foreground">Grant {index + 1}</legend>
+      <legend className="px-1 text-label-medium text-on-surface-variant">Grant {index + 1}</legend>
       <div className="flex flex-wrap gap-3" aria-label="Resources">
         {DELEGABLE.map((resource) => (
           <Checkbox

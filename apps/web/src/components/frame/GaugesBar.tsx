@@ -20,7 +20,7 @@ import { Reading, ReadingLines } from '@/components/look';
 function Gauge({ name, children }: { name: string; children: ReactNode }) {
   return (
     <section className="space-y-1">
-      <h3 className="text-label-medium text-muted-foreground">{name}</h3>
+      <h3 className="text-label-medium text-on-surface-variant">{name}</h3>
       {children}
     </section>
   );

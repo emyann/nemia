@@ -4,7 +4,7 @@ import { type WorkflowPageAddress } from '../../lib/api/address.ts';
 import { placeOfAddress } from '../../lib/factories';
 import { workflowLink } from '../../lib/factoryAddress';
 
-const LABEL = 'text-body-small text-muted-foreground hover:text-foreground';
+const LABEL = 'text-body-small text-on-surface-variant hover:text-on-surface';
 
 /**
  * Where a run's workflow is linked to: its page in the run's place where the api gives the run one (`page`), and the Workflows page
@@ -22,7 +22,7 @@ export function WorkflowLink({ dir, page }: { dir: string; page: WorkflowPageAdd
   const name = workflowNameOf(dir);
   return (
     <Link {...workflowTarget(page)} title={dir} data-workflow={name} className={LABEL}>
-      workflow <span className="font-mono text-foreground underline decoration-outline underline-offset-2">{name}</span>
+      workflow <span className="font-mono text-on-surface underline decoration-outline underline-offset-2">{name}</span>
     </Link>
   );
 }

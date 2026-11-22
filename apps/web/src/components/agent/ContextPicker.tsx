@@ -36,7 +36,7 @@ export function ContextPicker({
       <legend id={legend} className="text-body-medium font-medium">
         {label}
       </legend>
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not landed, not judged.
       </p>
       {runs.error ? (
@@ -52,7 +52,7 @@ export function ContextPicker({
           ))}
         </Reading>
       ) : !listed.length ? (
-        <p className="text-body-small text-muted-foreground">No run to read.</p>
+        <p className="text-body-small text-on-surface-variant">No run to read.</p>
       ) : (
         <ul aria-label="Runs to read" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {listed.map((run) => (
@@ -62,14 +62,14 @@ export function ContextPicker({
                 isDisabled={disabled}
                 isSelected={selected.includes(run.id)}
                 onChange={(checked) => onChange(checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
-                className="flex w-full cursor-pointer px-2 hover:bg-accent"
+                className="flex w-full cursor-pointer px-2 hover:bg-surface-container-high"
               >
                 <span className="flex min-w-0 flex-1 items-baseline gap-2">
                   <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={run.title}>
                     {run.title}
                   </span>
-                  <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
-                  <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.advice}>
+                  <span className="hidden shrink-0 font-mono text-body-small text-on-surface-variant @md/page:inline">{run.id}</span>
+                  <span data-standing className="shrink-0 text-body-small text-on-surface-variant" title={run.advice}>
                     {run.standing}
                   </span>
                 </span>
@@ -94,7 +94,7 @@ export function ConcludedPreview({ run }: { run: string }) {
   const concluded = useQuery(concludedQuery(run));
   return (
     <section data-concluded={run} className="space-y-1 rounded border border-outline-variant p-2">
-      <h4 className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+      <h4 className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
         <span>
           What <span className="font-mono">{run}</span> hands
         </span>
@@ -111,7 +111,7 @@ export function ConcludedPreview({ run }: { run: string }) {
           <ReadingLines widths={['w-full', 'w-5/6', 'w-1/2']} className="text-body-small" />
         </Reading>
       ) : (
-        <Markdown level={5} className="max-h-60 overflow-y-auto rounded bg-muted/60 p-2 text-body-small">
+        <Markdown level={5} className="max-h-60 overflow-y-auto rounded bg-surface-container-highest/60 p-2 text-body-small">
           {concluded.data.section}
         </Markdown>
       )}

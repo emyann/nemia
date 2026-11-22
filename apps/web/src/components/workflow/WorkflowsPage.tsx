@@ -42,7 +42,7 @@ export function WorkflowsPage({ place: address, query, onQuery }: { place: PageP
   return (
     <article className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-body-medium text-muted-foreground">
+        <p className="min-w-0 flex-1 text-body-medium text-on-surface-variant">
           A workflow is a folder of steps:{' '}
           {where.kind === 'every' ? (
             <>
@@ -107,7 +107,7 @@ function Every({ address, filter }: { address: PagePlace; filter: Filter }) {
         />
       ))}
       {all.length === 0 && (
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           No workflows. Add a folder of steps under <YoursFolder /> — <code className="font-mono text-body-small">dev/implement.md</code>,
           say — or pick a factory to list its repository&apos;s.
         </p>
@@ -127,7 +127,7 @@ function InFactory({ place, address, filter }: { place: Place; address: PagePlac
   return (
     <>
       {listed.length === 0 && (
-        <p data-filtered-out className="text-body-medium text-muted-foreground">
+        <p data-filtered-out className="text-body-medium text-on-surface-variant">
           No workflow is in the factory <span className="font-mono">{place.factory}</span>. {everyFactory}.
         </p>
       )}
@@ -167,13 +167,13 @@ function WorkflowCard({
     <section
       aria-label={`Workflow ${name}`}
       data-from={from}
-      className="space-y-2 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
+      className="space-y-2 rounded-lg border border-outline-variant bg-surface-container-low p-4 shadow-sm"
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h2 className="font-mono text-body-large font-semibold">
           <RouteLink
             {...workflowLink(address, from, name)}
-            className="rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-on-surface focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             {name}
           </RouteLink>
@@ -181,7 +181,7 @@ function WorkflowCard({
         <FromBadge from={from} factory={factory} />
         <FactoryTags names={tags} linked />
         {!error && (
-          <span className="text-body-small text-muted-foreground">
+          <span className="text-body-small text-on-surface-variant">
             {steps.length} {steps.length === 1 ? 'step' : 'steps'}
           </span>
         )}
@@ -189,7 +189,7 @@ function WorkflowCard({
       {description ? (
         <Markdown className="text-body-medium">{description}</Markdown>
       ) : (
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           No description: the first paragraph of a <code className="font-mono text-body-small">README.md</code> in the folder is one.
         </p>
       )}

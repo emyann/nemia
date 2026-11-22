@@ -166,7 +166,7 @@ test('REFUSED: a size written by hand is found, where it is, under any variant; 
     'text-body-small',
     'text-label-large uppercase',
     'text-on-surface',
-    'text-muted-foreground',
+    'text-on-surface-variant',
     'text-left',
     'text-[color:var(--x)]',
     'leading-none',
@@ -288,7 +288,7 @@ test("REFUSED: the package's own cn in the board's source: it drops a role besid
   assert.equal(roleBlind("import { cn } from '@/lib/utils';"), false);
   assert.equal(roleBlind("import { createCn } from 'cn/config';"), false);
   const { cn: blind } = await import('cn');
-  assert.equal(blind('text-body-medium text-foreground', 'text-muted-foreground'), 'text-muted-foreground');
+  assert.equal(blind('text-body-medium text-on-surface', 'text-on-surface-variant'), 'text-on-surface-variant');
   for (const file of sources(WEB))
     assert.equal(roleBlind(fs.readFileSync(path.join(WEB, file), 'utf8')), false, `${file}: import cn from @/lib/utils`);
 });

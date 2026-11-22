@@ -81,9 +81,9 @@ export function ServerRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium">{server.name}</span>
         <ServerState state={server.state} />
-        <span className="font-mono text-body-small text-muted-foreground">{server.type}</span>
+        <span className="font-mono text-body-small text-on-surface-variant">{server.type}</span>
         {server.tools !== undefined && (
-          <span className="text-body-small text-muted-foreground">{server.tools === 1 ? '1 tool' : `${server.tools} tools`}</span>
+          <span className="text-body-small text-on-surface-variant">{server.tools === 1 ? '1 tool' : `${server.tools} tools`}</span>
         )}
         <span className="ml-auto">
           <CutPress pending={removing} isDisabled={pending} onPress={() => onRemove(server.name)}>
@@ -91,14 +91,14 @@ export function ServerRow({
           </CutPress>
         </span>
       </div>
-      <p className="font-mono text-body-small break-all text-foreground">{server.url}</p>
+      <p className="font-mono text-body-small break-all text-on-surface">{server.url}</p>
       {headers.length > 0 && (
-        <p data-server-headers className="font-mono text-body-small break-all text-muted-foreground">
+        <p data-server-headers className="font-mono text-body-small break-all text-on-surface-variant">
           {headers.map(([k, v]) => `${k}: ${v}`).join('  ')}
         </p>
       )}
       {server.oauth && (
-        <p data-server-oauth className="text-body-small text-muted-foreground">
+        <p data-server-oauth className="text-body-small text-on-surface-variant">
           Signs in as client <span className="font-mono break-all">{server.oauth.clientId}</span>
           {server.oauth.callbackPort !== undefined && <> on port {server.oauth.callbackPort}</>}.
         </p>
@@ -241,7 +241,7 @@ export function ServerForm({
     >
       {builtin.length > 0 && (
         <div data-server-builtin className="flex flex-wrap items-center gap-2">
-          <span className="text-body-medium text-muted-foreground">Built into Nemia:</span>
+          <span className="text-body-medium text-on-surface-variant">Built into Nemia:</span>
           {builtin.map((one) => (
             <Button key={one.name} type="button" variant="outline" size="sm" onClick={() => setDraft(draftOf(one))}>
               {one.name}
@@ -251,7 +251,7 @@ export function ServerForm({
       )}
       {recorded.length > 0 && (
         <div data-server-recorded className="flex flex-wrap items-center gap-2">
-          <span className="text-body-medium text-muted-foreground">Change one recorded:</span>
+          <span className="text-body-medium text-on-surface-variant">Change one recorded:</span>
           {recorded.map((one) => (
             <Button key={one.name} type="button" variant="outline" size="sm" onClick={() => setDraft(draftOf(one))}>
               {one.name}
@@ -364,7 +364,7 @@ export function FactoryServers({ name }: { name: string }) {
           </CutPress>
         </span>
       </div>
-      <p data-servers-told className="text-body-medium text-muted-foreground">
+      <p data-servers-told className="text-body-medium text-on-surface-variant">
         Handed to every step of every run started in this factory whose agent names one, before the checkout's{' '}
         <code className="font-mono text-body-small">.mcp.json</code>. A step whose server needs a sign-in is not started until it has one.
         The state is read when this page opens and when you press Check again, never on the board's poll: reading one starts a short-lived
@@ -388,7 +388,7 @@ export function FactoryServers({ name }: { name: string }) {
           />
         </>
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read the servers: {error.message}</p>
+        <p className="text-body-medium text-on-surface-variant">Could not read the servers: {error.message}</p>
       ) : (
         <Reading label="Reading the servers…">
           <CutFrame size={12}>
@@ -404,7 +404,7 @@ export function FactoryServers({ name }: { name: string }) {
         </Reading>
       )}
       {change.isSuccess && said && (
-        <p data-servers-done className="text-body-medium text-muted-foreground">
+        <p data-servers-done className="text-body-medium text-on-surface-variant">
           {said.done}
         </p>
       )}

@@ -56,7 +56,7 @@ export function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
     <section
       aria-label={`What ${step.name} asks of you`}
       data-asked="approve"
-      className="space-y-3 rounded border border-yours bg-card p-3"
+      className="space-y-3 rounded border border-yours bg-surface-container-low p-3"
     >
       <h3 className="text-label-medium text-yours uppercase">Waiting on you</h3>
       <p data-brief="waits" className="break-words">
@@ -105,7 +105,7 @@ function Waits({
   children?: ReactNode;
 }) {
   return (
-    <section aria-label="What the run asks of you" data-asked={kind} className="space-y-2 rounded border border-yours bg-card p-3">
+    <section aria-label="What the run asks of you" data-asked={kind} className="space-y-2 rounded border border-yours bg-surface-container-low p-3">
       <h3 className="text-label-medium text-yours uppercase">Waiting on you</h3>
       {children ?? <p className="break-words whitespace-pre-wrap">{said}</p>}
       <RouteLink

@@ -7,7 +7,7 @@ const meta: Meta<typeof SessionOwn> = { title: 'Run/SessionOwn', args: { step: '
 export default meta;
 
 /** Where an item stands in its story: a panel's width, on the card's ground, laid out as the talk lays its items out. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)', display: 'flex', flexDirection: 'column' as const };
+const PANEL = { width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)', display: 'flex', flexDirection: 'column' as const };
 
 /** The brief it was told, folded to the trace's line; opened, its words. */
 export const Brief: StoryObj<typeof SessionOwn> = {

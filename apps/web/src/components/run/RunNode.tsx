@@ -98,7 +98,7 @@ function UnjudgedCard({ run, inspected }: { run: UnjudgedRun; inspected: boolean
           >
             {run.id}
           </Link>
-          <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground" title={run.id}>
+          <p className="mt-0.5 truncate font-mono text-body-small text-on-surface-variant" title={run.id}>
             {run.id}
           </p>
         </div>
@@ -258,7 +258,7 @@ function TouchedLine({ run }: { run: RunView }) {
   if (!isDecidable(data)) return null;
   const line = touchedSummary(data.touched);
   return (
-    <p data-touched-line className="truncate px-3 font-mono text-body-small text-muted-foreground" title={line}>
+    <p data-touched-line className="truncate px-3 font-mono text-body-small text-on-surface-variant" title={line}>
       {line}
     </p>
   );
@@ -273,7 +273,7 @@ function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolea
     <span className="ml-auto flex flex-wrap items-center justify-end gap-1 empty:hidden">
       {run.try && <TryTag agent={run.try.agent} />}
       {run.context.length > 0 && (
-        <Tag variant="outlined" data-context title={reads.join('\n')} className="text-muted-foreground">
+        <Tag variant="outlined" data-context title={reads.join('\n')} className="text-on-surface-variant">
           ⧉ reads {run.context.length} {run.context.length === 1 ? 'run' : 'runs'}
         </Tag>
       )}

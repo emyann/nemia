@@ -21,7 +21,7 @@ import { composeTailwindRenderProps, Link, type LinkProps } from '../ui/ds';
  */
 export const RouteLink = routeLink(InheritedLink);
 
-const LINK = 'underline decoration-outline hover:decoration-foreground';
+const LINK = 'underline decoration-outline hover:decoration-on-surface';
 
 /**
  * The kit's link in the colour of the text around it, and with no underline unless the caller's classes give one: the board's route
@@ -46,7 +46,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
       data-from={from}
       className={cn(
         'rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
-        from === 'user' ? container.grey : 'bg-muted text-muted-foreground',
+        from === 'user' ? container.grey : 'bg-surface-container-highest text-on-surface-variant',
       )}
     >
       {AGENT_FROM[from]}
@@ -64,9 +64,9 @@ function NodeLink({ user }: { user: AgentUser | AgentFill }) {
     <RouteLink
       {...workflowLink(user.from === 'user' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
       data-node={`${user.workflow}/${user.step}`}
-      className={cn('font-mono text-body-small text-foreground', LINK)}
+      className={cn('font-mono text-body-small text-on-surface', LINK)}
     >
-      {user.workflow} <span className="text-muted-foreground">›</span> {user.step}
+      {user.workflow} <span className="text-on-surface-variant">›</span> {user.step}
     </RouteLink>
   );
 }
@@ -86,7 +86,7 @@ const nodesOf = ({ usedBy, fills }: Pick<AgentListing, 'usedBy' | 'fills'>) => {
 export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'usedBy' | 'fills'>; className?: string }) {
   const nodes = nodesOf(listing);
   return (
-    <p data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-muted-foreground', className)}>
+    <p data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1 text-body-small text-on-surface-variant', className)}>
       {nodes.length ? (
         <>
           <span>Attached to</span>
@@ -121,7 +121,7 @@ export function Skills({
   compact?: boolean;
   className?: string;
 }) {
-  if (!skills?.length) return none ? <p className="text-body-small text-muted-foreground">{none}</p> : null;
+  if (!skills?.length) return none ? <p className="text-body-small text-on-surface-variant">{none}</p> : null;
   return (
     <ul data-skills className={cn('space-y-1.5', className)}>
       {skills.map((skill) => (compact ? <CompactSkill key={skill.id} skill={skill} /> : <FullSkill key={skill.id} skill={skill} />))}
@@ -133,11 +133,11 @@ export function Skills({
 function FullSkill({ skill }: { skill: AgentSkill }) {
   return (
     <li data-agent-skill={skill.id} className="text-body-small leading-snug">
-      <span className="font-medium text-foreground">{skill.name}</span> <span className="text-muted-foreground">{skill.description}</span>
+      <span className="font-medium text-on-surface">{skill.name}</span> <span className="text-on-surface-variant">{skill.description}</span>
       {skill.tags.length > 0 && (
         <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
           {skill.tags.map((tag) => (
-            <span key={tag} className="rounded bg-muted px-1 py-px font-mono text-body-small text-muted-foreground">
+            <span key={tag} className="rounded bg-surface-container-highest px-1 py-px font-mono text-body-small text-on-surface-variant">
               {tag}
             </span>
           ))}
@@ -151,8 +151,8 @@ function FullSkill({ skill }: { skill: AgentSkill }) {
 function CompactSkill({ skill }: { skill: AgentSkill }) {
   return (
     <li data-agent-skill={skill.id} className="text-body-medium leading-snug">
-      <span className="block font-semibold text-foreground">{skill.name}</span>{' '}
-      <span className="line-clamp-2 text-body-small text-muted-foreground">{skill.description}</span>
+      <span className="block font-semibold text-on-surface">{skill.name}</span>{' '}
+      <span className="line-clamp-2 text-body-small text-on-surface-variant">{skill.description}</span>
     </li>
   );
 }
@@ -168,7 +168,7 @@ export const personOf = (name: string) => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
-const FACE = 'shrink-0 rounded-full bg-muted';
+const FACE = 'shrink-0 rounded-full bg-surface-container-highest';
 
 const PLATE = 'shrink-0 dark:[&>path]:opacity-25';
 
@@ -258,7 +258,7 @@ function FactoryUserLink({ factory }: { factory: string }) {
       to="/factories/$factory/settings"
       params={{ factory }}
       data-factory-user={factory}
-      className={cn('font-mono text-body-small text-foreground', LINK)}
+      className={cn('font-mono text-body-small text-on-surface', LINK)}
     >
       {factory}
     </RouteLink>
@@ -336,7 +336,7 @@ export function SkillSourceBadge({ from, foundIn = null }: { from: SkillSource |
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
         from === 'user' && container.grey,
-        (from === 'repo' || folder) && 'bg-muted text-muted-foreground',
+        (from === 'repo' || folder) && 'bg-surface-container-highest text-on-surface-variant',
         from === 'builtin' && hairline,
         lost && container.failure,
       )}
@@ -363,7 +363,7 @@ export function GivenSkills({
 }) {
   if (!rows.length)
     return (
-      <p data-given-none className="text-body-small text-muted-foreground">
+      <p data-given-none className="text-body-small text-on-surface-variant">
         {none}
       </p>
     );
@@ -374,25 +374,25 @@ export function GivenSkills({
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {row.from ? (
-                <SkillLink from={row.from} name={row.name} className="text-body-small font-medium text-foreground" />
+                <SkillLink from={row.from} name={row.name} className="text-body-small font-medium text-on-surface" />
               ) : (
-                <span className="font-mono text-body-small font-medium text-foreground">{row.name}</span>
+                <span className="font-mono text-body-small font-medium text-on-surface">{row.name}</span>
               )}
               <SkillSourceBadge from={row.from} foundIn={row.foundIn} />
             </p>
             {row.from === null && row.foundIn !== null && (
-              <p data-found-in className="text-body-small text-muted-foreground">
+              <p data-found-in className="text-body-small text-on-surface-variant">
                 Read from <code className="font-mono break-all">{row.foundIn}</code>
               </p>
             )}
-            {row.entry && <p className="text-body-small text-muted-foreground">{row.entry.description}</p>}
+            {row.entry && <p className="text-body-small text-on-surface-variant">{row.entry.description}</p>}
             {row.error !== null && (
               <p data-given-error className="font-mono text-body-small whitespace-pre-wrap break-words text-failure">
                 {row.error}
               </p>
             )}
             {row.cost && (
-              <p data-skill-cost className="text-body-small text-muted-foreground">
+              <p data-skill-cost className="text-body-small text-on-surface-variant">
                 {costWords(row.cost)}
               </p>
             )}

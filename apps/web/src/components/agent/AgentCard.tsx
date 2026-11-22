@@ -19,9 +19,9 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
       data-agent={agent.name}
       data-from={agent.from}
       data-agent-card
-      className="relative flex h-full flex-col overflow-hidden rounded-xl bg-card text-card-foreground shadow-sm ring-1 ring-foreground/10 transition-shadow hover:shadow-md hover:ring-foreground/20"
+      className="relative flex h-full flex-col overflow-hidden rounded-xl bg-surface-container-low text-on-surface shadow-sm ring-1 ring-on-surface/10 transition-shadow hover:shadow-md hover:ring-on-surface/20"
     >
-      <div className="flex justify-center bg-muted pt-6 pb-4">
+      <div className="flex justify-center bg-surface-container-highest pt-6 pb-4">
         <AgentFace name={agent.name} size={112} follows plate className="drop-shadow-sm" />
       </div>
       <div className="flex flex-1 flex-col gap-3 px-4 pt-3 pb-4">
@@ -35,7 +35,7 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
               {personOf(agent.name)}
             </RouteLink>
           </h3>
-          <p data-agent-role className="text-body-small text-muted-foreground">
+          <p data-agent-role className="text-body-small text-on-surface-variant">
             {agent.role ?? 'No role yet'} · <span className="font-mono">{agent.name}</span>
           </p>
           <div className="flex flex-wrap items-center justify-center gap-1">
@@ -43,7 +43,7 @@ export function AgentCard({ agent }: { agent: AgentListing & { factories?: reado
             <FactoryTags names={agent.factories ?? []} linked className="relative z-10" />
           </div>
         </header>
-        {agent.description && <p className="text-center text-body-medium text-foreground">{agent.description}</p>}
+        {agent.description && <p className="text-center text-body-medium text-on-surface">{agent.description}</p>}
         {agent.error === null &&
           (agent.cardError !== null ? (
             <p data-card-error className="font-mono text-body-small break-words text-failure">
@@ -70,9 +70,9 @@ function Stats({ keys }: { keys: AgentListing['keys'] }) {
   return (
     <dl data-agent-stats className="flex flex-wrap gap-1.5 text-body-small leading-none">
       {set.map((key) => (
-        <div key={key} className="flex items-center gap-1 rounded-md bg-muted px-1.5 py-1">
-          <dt className="text-muted-foreground">{key}</dt>
-          <dd className="font-mono font-medium text-foreground">{keys[key]}</dd>
+        <div key={key} className="flex items-center gap-1 rounded-md bg-surface-container-highest px-1.5 py-1">
+          <dt className="text-on-surface-variant">{key}</dt>
+          <dd className="font-mono font-medium text-on-surface">{keys[key]}</dd>
         </div>
       ))}
     </dl>

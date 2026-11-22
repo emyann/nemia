@@ -107,7 +107,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
             <span
               data-following
               data-streamed={following.streamed || undefined}
-              className="inline-flex items-center gap-1.5 text-body-small text-muted-foreground"
+              className="inline-flex items-center gap-1.5 text-body-small text-on-surface-variant"
             >
               <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-alive" />
               following live

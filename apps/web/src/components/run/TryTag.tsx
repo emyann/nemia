@@ -26,9 +26,9 @@ export function StartedFrom({
 }) {
   if (!run.try) return <WorkflowLink dir={run.workflowDir} page={run.workflowPage} />;
   return (
-    <span className="flex items-center gap-1.5 text-body-small text-muted-foreground" title={run.workflowDir}>
+    <span className="flex items-center gap-1.5 text-body-small text-on-surface-variant" title={run.workflowDir}>
       <TryTag agent={run.try.agent} />
-      of <AgentLink from="user" name={run.try.agent} className="text-foreground" />
+      of <AgentLink from="user" name={run.try.agent} className="text-on-surface" />
     </span>
   );
 }

@@ -14,8 +14,8 @@ const HEADING = {
   h2: 'text-[1.08em]',
   h3: '',
   h4: '',
-  h5: 'text-[0.95em] text-muted-foreground',
-  h6: 'text-[0.95em] text-muted-foreground',
+  h5: 'text-[0.95em] text-on-surface-variant',
+  h6: 'text-[0.95em] text-on-surface-variant',
 } as const;
 
 const TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
@@ -37,7 +37,7 @@ const heading = (Tag: (typeof TAGS)[number]) =>
 /** Each heading as the tag `placeHeadings` named it. */
 const HEADINGS: Components = Object.fromEntries(TAGS.map((tag) => [tag, heading(tag)]));
 
-const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-muted-foreground';
+const LINK = 'font-medium text-on-surface underline underline-offset-2 break-words hover:text-on-surface-variant';
 
 /** A link, as `COMPONENTS` draws it. */
 const drawnLink = ({ node: _node, href, children, className, ...props }: ComponentProps<'a'> & ExtraProps) => {
@@ -87,7 +87,7 @@ const COMPONENTS: Components = {
     return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-body-small [&_pre]:whitespace-pre" />;
   },
   code: ({ node: _node, className, ...props }) => (
-    <code className={cn('box-decoration-clone rounded bg-muted px-1 py-px font-mono text-[0.9em]', className)} {...props} />
+    <code className={cn('box-decoration-clone rounded bg-surface-container-highest px-1 py-px font-mono text-[0.9em]', className)} {...props} />
   ),
   p: ({ node: _node, className, ...props }) => <p className={cn('my-2 leading-relaxed', className)} {...props} />,
   ul: ({ node: _node, className, ...props }) => <ul className={cn('my-2 list-disc space-y-1 pl-5', className)} {...props} />,
@@ -96,7 +96,7 @@ const COMPONENTS: Components = {
   li: ({ node: _node, className, ...props }) => (
     <li
       className={cn(
-        'pl-0.5 leading-relaxed marker:text-muted-foreground [&>ol]:my-1 [&>p]:my-1 [&>ul]:my-1',
+        'pl-0.5 leading-relaxed marker:text-on-surface-variant [&>ol]:my-1 [&>p]:my-1 [&>ul]:my-1',
         className?.includes('task-list-item') && '-ml-5 list-none',
         className,
       )}
@@ -112,7 +112,7 @@ const COMPONENTS: Components = {
     />
   ),
   blockquote: ({ node: _node, className, ...props }) => (
-    <blockquote className={cn('my-2 border-l-2 border-outline pl-3 text-muted-foreground', className)} {...props} />
+    <blockquote className={cn('my-2 border-l-2 border-outline pl-3 text-on-surface-variant', className)} {...props} />
   ),
   hr: ({ node: _node, className, ...props }) => <hr className={cn('my-4 border-outline-variant', className)} {...props} />,
   table: ({ node: _node, className, ...props }) => (

@@ -58,12 +58,12 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 
-  if (!step.taskId) return <p className="text-muted-foreground">Not filed yet, so there is no conversation.</p>;
-  if (!sessionToRead(step)) return <p className="text-muted-foreground">No session of it has started, so there is no conversation yet.</p>;
+  if (!step.taskId) return <p className="text-on-surface-variant">Not filed yet, so there is no conversation.</p>;
+  if (!sessionToRead(step)) return <p className="text-on-surface-variant">No session of it has started, so there is no conversation yet.</p>;
 
   return (
     <>
-      <div className="flex items-baseline justify-between gap-2 text-body-small text-muted-foreground">
+      <div className="flex items-baseline justify-between gap-2 text-body-small text-on-surface-variant">
         <p>
           {!following.loading && (following.live ? 'Followed as it runs.' : 'Not running, so not followed.')}
           {tail.length < turns.length && ` The last ${tail.length} of ${turns.length}.`}
@@ -71,7 +71,7 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
         <Link
           to="/runs/$runId/steps/$step"
           params={{ runId: run.id, step: step.name }}
-          className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline"
+          className="shrink-0 font-medium text-on-surface underline-offset-2 hover:underline"
         >
           Open the session
         </Link>
@@ -85,7 +85,7 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
         </Suspense>
       ) : (
         !following.error && (
-          <p className="text-muted-foreground">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
+          <p className="text-on-surface-variant">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
         )
       )}
     </>

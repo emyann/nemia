@@ -41,7 +41,7 @@ export function Decide({ run }: { run: RunDetail }) {
         Could not read what there is to decide: {error.message} <code>{run.decide}</code> reads it from the command line.
       </p>
     );
-  if (!decidable || !isDecidable(data)) return <p className="text-body-medium text-muted-foreground">Nothing to decide on it now.</p>;
+  if (!decidable || !isDecidable(data)) return <p className="text-body-medium text-on-surface-variant">Nothing to decide on it now.</p>;
   return (
     <DecideFrame>
       <DecisionParts runId={run.id} decision={data} run={run} />
@@ -55,7 +55,7 @@ function DecideFrame({ children }: { children: ReactNode }) {
     <section aria-label="Decide" id="decide" className="scroll-mt-4 space-y-5 rounded border border-outline-variant p-4">
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
-        <p className="text-body-small text-muted-foreground">
+        <p className="text-body-small text-on-surface-variant">
           What there is to decide on this run. Copy a command to run it yourself; each step's own answer is in its part, where the board
           runs its command as the command line would.
         </p>
@@ -98,7 +98,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       <div className="space-y-4">
         {inFolders ? (
           <div data-in-folders className="space-y-1">
-            <p className="text-body-medium text-muted-foreground">
+            <p className="text-body-medium text-on-surface-variant">
               Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.
             </p>
             <Facts rows={[['work', pathRow(run.work)]]} />
@@ -106,7 +106,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
-          <p className="text-body-medium text-muted-foreground">No branch to read: no step worked on one.</p>
+          <p className="text-body-medium text-on-surface-variant">No branch to read: no step worked on one.</p>
         )}
         {!inFolders && <LessonChip lesson={lesson} />}
       </div>
@@ -218,7 +218,7 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}
-      className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
     >
       {offer.case === 'answer' && offer.needs ? (
         <Asks data-said step={offer.step} needs={offer.needs} />
@@ -246,7 +246,7 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           supportingText={rechecking ? recheck.placeholder : words.placeholder}
         />
         {rechecking && message.trim() && (
-          <p data-recheck-note className="text-body-small text-muted-foreground">
+          <p data-recheck-note className="text-body-small text-on-surface-variant">
             {recheck.note}
           </p>
         )}
@@ -264,7 +264,7 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           >
             {modes.map((m) => (
               <Radio key={m} value={m}>
-                {MODES[m]} <code className="text-muted-foreground">--{m}</code>
+                {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
               </Radio>
             ))}
           </RadioGroup>
@@ -332,7 +332,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
   return (
     <div data-touched={branch} className="space-y-2">
       <p className="text-body-medium">
-        <span className="text-muted-foreground">touched </span>
+        <span className="text-on-surface-variant">touched </span>
         <span className="break-all font-mono text-body-small">{branch}</span>
       </p>
       {'error' in radius ? (
@@ -343,7 +343,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
           <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
         </>
       ) : (
-        <p className="text-body-medium text-muted-foreground">nothing — the branch changed no file against the base</p>
+        <p className="text-body-medium text-on-surface-variant">nothing — the branch changed no file against the base</p>
       )}
     </div>
   );
@@ -363,17 +363,17 @@ function GroupRows({ groups }: { groups: readonly Group[] }) {
             <span className="truncate font-mono" title={g.name}>
               {g.name}
             </span>
-            <span className="text-right tabular-nums text-muted-foreground">
+            <span className="text-right tabular-nums text-on-surface-variant">
               {g.files} file{g.files === 1 ? '' : 's'}
             </span>
             <GroupBar group={g} most={most} />
             <span className="font-mono tabular-nums">
               {counted > 0 && (
                 <>
-                  <span className="text-foreground">+{g.added}</span> <span className="text-muted-foreground">−{g.removed}</span>
+                  <span className="text-on-surface">+{g.added}</span> <span className="text-on-surface-variant">−{g.removed}</span>
                 </>
               )}
-              {g.binary > 0 && <span className="text-muted-foreground">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
+              {g.binary > 0 && <span className="text-on-surface-variant">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
             </span>
           </li>
         );
@@ -390,9 +390,9 @@ export function GroupBar({ group, most }: { group: Pick<Group, 'added' | 'remove
       data-bar
       role="img"
       aria-label={`+${group.added} −${group.removed}`}
-      className="flex h-2 w-full overflow-hidden rounded-sm bg-muted"
+      className="flex h-2 w-full overflow-hidden rounded-sm bg-surface-container-highest"
     >
-      <span data-added className="h-full bg-foreground" style={{ width: `${added}%` }} />
+      <span data-added className="h-full bg-on-surface" style={{ width: `${added}%` }} />
       <span data-removed className="h-full bg-outline" style={{ width: `${removed}%` }} />
     </span>
   );
@@ -410,7 +410,7 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
   const row = (label: string, files: readonly string[], kind: string, title: string, className: string) =>
     files.length > 0 && (
       <p className="flex items-start gap-1.5">
-        <span className="w-28 shrink-0 py-0.5 text-muted-foreground">{label}</span>
+        <span className="w-28 shrink-0 py-0.5 text-on-surface-variant">{label}</span>
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {files.map((file) => (
             <Tag
@@ -441,7 +441,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
       <h3 className={HEADING}>In full: the check-affecting files — what a change could edit to make its check pass</h3>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
-          {sensitive.length > 1 && <p className="break-all font-mono text-body-small text-muted-foreground">{branch}</p>}
+          {sensitive.length > 1 && <p className="break-all font-mono text-body-small text-on-surface-variant">{branch}</p>}
           {error ? (
             <p className="text-body-medium text-failure">{error}</p>
           ) : files.length ? (
@@ -456,7 +456,7 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
               />
             ))
           ) : (
-            <p className="text-body-medium text-muted-foreground">none</p>
+            <p className="text-body-medium text-on-surface-variant">none</p>
           )}
         </div>
       ))}
@@ -465,10 +465,10 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
 }
 
 const LINE_CLASS: Record<DiffLine, string> = {
-  meta: 'font-semibold text-muted-foreground',
-  hunk: 'bg-muted text-muted-foreground',
-  added: 'bg-accent text-foreground',
-  removed: 'text-muted-foreground',
+  meta: 'font-semibold text-on-surface-variant',
+  hunk: 'bg-surface-container-highest text-on-surface-variant',
+  added: 'bg-surface-container-high text-on-surface',
+  removed: 'text-on-surface-variant',
   context: '',
 };
 
@@ -479,8 +479,8 @@ const LINE_CLASS: Record<DiffLine, string> = {
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
     <details data-diff={file.path} className="group rounded border border-outline-variant">
-      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-body-small hover:bg-accent">
-        <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-body-small hover:bg-surface-container-high">
+        <ChevronRight aria-hidden className="size-3.5 shrink-0 text-on-surface-variant transition-transform group-open:rotate-90" />
         <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
           {file.path}
         </span>
@@ -490,7 +490,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
               'binary'
             ) : (
               <>
-                <span className="text-foreground">+{counts.added}</span> <span className="text-muted-foreground">−{counts.removed}</span>
+                <span className="text-on-surface">+{counts.added}</span> <span className="text-on-surface-variant">−{counts.removed}</span>
               </>
             )}
           </span>
@@ -507,7 +507,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
         })}
       </pre>
       {file.cut > 0 && (
-        <p data-cut={file.cut} className="border-t border-outline-variant px-2 py-1 text-body-small text-muted-foreground">
+        <p data-cut={file.cut} className="border-t border-outline-variant px-2 py-1 text-body-small text-on-surface-variant">
           {file.cut} more line{file.cut === 1 ? '' : 's'} — the command line&apos;s decide prints them all
         </p>
       )}
@@ -553,7 +553,7 @@ function Commands({ commands }: { commands: readonly DecideCommand[] }) {
           ))}
         </ul>
       ) : (
-        <p className="text-body-medium text-muted-foreground">None yet: the run is still moving.</p>
+        <p className="text-body-medium text-on-surface-variant">None yet: the run is still moving.</p>
       )}
     </section>
   );

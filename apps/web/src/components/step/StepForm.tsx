@@ -116,7 +116,7 @@ function StepHead({
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="min-w-0 truncate font-mono text-body-medium font-semibold" title={name}>
           {name}
-          <span className="font-sans text-body-small font-normal text-muted-foreground">.md</span>
+          <span className="font-sans text-body-small font-normal text-on-surface-variant">.md</span>
         </h3>
         <Button
           variant="outlined"
@@ -191,7 +191,7 @@ function KeyInput({
           ))}
         </div>
       ) : (
-        <p className="text-body-small text-muted-foreground">No other step to name.</p>
+        <p className="text-body-small text-on-surface-variant">No other step to name.</p>
       );
       return (
         <fieldset data-field={key} className="space-y-1">
@@ -328,7 +328,7 @@ function givenText(key: keyof WorkflowStepSpec, value: WorkflowStepSpec[keyof Wo
 }
 
 function Meaning({ children }: { children: string }) {
-  return <Markdown className="text-body-small leading-snug text-muted-foreground">{children}</Markdown>;
+  return <Markdown className="text-body-small leading-snug text-on-surface-variant">{children}</Markdown>;
 }
 
 const asIs = (value: string) => value;

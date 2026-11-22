@@ -123,7 +123,7 @@ describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each w
     );
     assert.match(
       tagWith(html, 'data-cut-ground'),
-      /bg-card[^>]*clip-path:polygon\(1px 1px, calc\(100% - 28\.41px\) 1px, calc\(100% - 1px\) 28\.41px,/,
+      /bg-surface-container-low[^>]*clip-path:polygon\(1px 1px, calc\(100% - 28\.41px\) 1px, calc\(100% - 1px\) 28\.41px,/,
       "the ground a pixel inside the edge, its cut beside the edge's",
     );
     assert.ok(html.indexOf('data-cut-ground') < html.indexOf('<button'), 'the shape comes before the content, which stands above it');

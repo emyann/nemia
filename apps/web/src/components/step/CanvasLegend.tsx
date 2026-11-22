@@ -20,7 +20,7 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
     <Panel
       position="bottom-left"
       aria-label="Legend"
-      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground ${className}`}
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-on-surface-variant ${className}`}
     >
       <Item sample={<Sample state="to-come" />}>{PERSON.waiting.rail}</Item>
       <Item

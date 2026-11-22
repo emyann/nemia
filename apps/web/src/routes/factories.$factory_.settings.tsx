@@ -79,15 +79,15 @@ function SettingsPage() {
         <Trail levels={[...factoryLevel(name), { name: 'Settings' }]} />
         <div className="flex flex-col gap-1">
           <h1 className="text-title-large">{name}</h1>
-          <p className="text-body-medium text-muted-foreground">This factory's settings.</p>
+          <p className="text-body-medium text-on-surface-variant">This factory's settings.</p>
         </div>
       </header>
       {factory === undefined ? (
-        <p data-no-factory={name} className="text-body-medium text-muted-foreground">
+        <p data-no-factory={name} className="text-body-medium text-on-surface-variant">
           No factory is named {name}: the factories are listed on the Factories page.
         </p>
       ) : factory.default ? (
-        <p data-default-factory className="text-body-medium text-muted-foreground">
+        <p data-default-factory className="text-body-medium text-on-surface-variant">
           The default factory has no file, so it keeps no settings: they are kept by the factories a person makes.
         </p>
       ) : (

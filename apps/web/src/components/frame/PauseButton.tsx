@@ -69,7 +69,7 @@ function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; 
         onPut(why.trim());
       }}
     >
-      <p className="text-body-small text-muted-foreground">Until they resume, in every factory: {PAUSE_PARKS}.</p>
+      <p className="text-body-small text-on-surface-variant">Until they resume, in every factory: {PAUSE_PARKS}.</p>
       <WhyField why={why} setWhy={setWhy} />
       <FormActions label="Pause" onClose={onClose} isPending={isPending} />
     </form>
@@ -115,7 +115,7 @@ export function NowForm({
       }}
     >
       {read.error && !read.data ? (
-        <p data-pause-now-reading className="text-body-small text-muted-foreground">
+        <p data-pause-now-reading className="text-body-small text-on-surface-variant">
           What runs could not be read: {read.error.message}
         </p>
       ) : !read.data ? (
@@ -126,7 +126,7 @@ export function NowForm({
         </div>
       ) : (
         <>
-          <p className="text-body-small text-muted-foreground">
+          <p className="text-body-small text-on-surface-variant">
             {read.data.interrupts.length === 0
               ? 'Nothing outside a landing is at work: stopping now stops nothing.'
               : `A landing finishes; stopping now cuts ${read.data.interrupts.length} at work, each going on at Resume:`}
@@ -172,7 +172,7 @@ function PauseFacts({
           <ReadingLines widths={['w-full', 'w-2/3']} className="text-body-small" />
         </Reading>
       ) : (
-        <p data-pause-line className="text-body-small text-muted-foreground">
+        <p data-pause-line className="text-body-small text-on-surface-variant">
           {words.line}
         </p>
       )}
@@ -312,7 +312,7 @@ export function PauseButton() {
           />
         )}
         {refused && (
-          <p role="alert" data-pause-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">
+          <p role="alert" data-pause-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-failure">
             {refused.message}
           </p>
         )}

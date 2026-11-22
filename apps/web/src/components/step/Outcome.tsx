@@ -9,7 +9,7 @@ const BADGE: Record<Outcome['by'] | 'blocked', string> = {
   blocked: container.yours,
   machine: container.failure,
   unreadable: container.failure,
-  nobody: 'bg-muted text-foreground',
+  nobody: 'bg-surface-container-highest text-on-surface',
 };
 
 const BY: Record<Outcome['by'], string> = {
@@ -30,13 +30,13 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
       <div className="flex items-center justify-between gap-2">
         <p data-outcome={word} data-by={outcome.by} className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Tag className={BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by]}>{word}</Tag>{' '}
-          <span className="text-body-small text-muted-foreground">{BY[outcome.by]}</span>
+          <span className="text-body-small text-on-surface-variant">{BY[outcome.by]}</span>
         </p>
         {aside}
       </div>
       {outcome.by === 'agent' && outcome.cut && <p className="text-body-small text-failure">… {outcome.cut}.</p>}
       {outcome.by !== 'agent' && (
-        <p data-reason className="text-muted-foreground">
+        <p data-reason className="text-on-surface-variant">
           {outcome.words}
         </p>
       )}
@@ -48,7 +48,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value : JSON.strin
 
 const ANSWER: Record<string, string> = {
   fixed: container.sage,
-  "won't fix": 'bg-surface-container-highest text-foreground',
+  "won't fix": 'bg-surface-container-highest text-on-surface',
 };
 
 /**
@@ -64,7 +64,7 @@ export function Replies({ replies }: { replies: ReadonlyArray<Record<string, unk
         return (
           <li key={i} data-answer={answer} className="space-y-0.5">
             <Markdown>{text(reply.finding ?? '')}</Markdown>{' '}
-            <div className="flex items-start gap-1.5 text-muted-foreground">
+            <div className="flex items-start gap-1.5 text-on-surface-variant">
               <span className="shrink-0">
                 → <Tag className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Tag>
               </span>
@@ -87,7 +87,7 @@ export function Json({ value, ...data }: { value: unknown } & Record<`data-${str
   return (
     <pre
       {...data}
-      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-body-small leading-snug"
+      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-container-highest p-2 font-mono text-body-small leading-snug"
     >
       {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
     </pre>

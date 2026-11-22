@@ -24,7 +24,7 @@ const DOT: Record<DaemonTone, string> = {
   ok: 'bg-alive',
   warn: 'bg-yours',
   down: 'bg-failure',
-  reading: 'bg-muted-foreground/40',
+  reading: 'bg-on-surface-variant/40',
 };
 
 /**

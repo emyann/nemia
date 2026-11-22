@@ -39,6 +39,7 @@ export const ROOTS = [
   'apps/web/src/lib/frameFold.ts',
   'apps/web/src/lib/nowChip.ts',
   'apps/web/src/lib/proposals.ts',
+  'apps/web/src/lib/question-draft',
   'apps/web/src/lib/runResult.ts',
   'apps/web/src/lib/runSays.ts',
   'apps/web/src/lib/setup.ts',

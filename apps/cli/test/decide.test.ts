@@ -260,11 +260,11 @@ test('the questions a step waiting on you asks are said after the collisions and
     '       It is big.',
     '       a  small — The shape first.  (recommended)',
     '       b  whole — All of it.',
-    '       choose one, or answer in your own words',
+    '       choose one, answer in your own words, or none (1=none)',
     '    2. Where do the answers go?',
     '       a  retry — Into the next try.',
     '       b  gate',
-    '       choose one or more, or answer in your own words',
+    '       choose one or more, answer in your own words, or none (2=none)',
   ]);
   assert.ok(from > lines.findIndex((line) => line.startsWith('  wf/r-1/plan  ahead')), lines.join('\n'));
   assert.ok(from < lines.findIndex((line) => line.startsWith('  1. approve:')), lines.join('\n'));

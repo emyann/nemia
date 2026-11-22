@@ -11,7 +11,8 @@ import { stepAnchor } from '../../lib/asks';
 import { RouteLink } from '../agent/AgentParts';
 import { LINK } from '../step/Facts';
 import { MODES, Refusal, useAsk } from './Ask';
-import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
+import { QuestionSeries, RecommendButton } from './Questions';
+import { answersFrom, unanswered, type Draft } from '../../lib/question-draft/questionDraft.ts';
 import { when } from '../step/Facts';
 import { useApprove } from '../../lib/useApprove';
 import { backName, endingWarning } from '../../lib/gate';
@@ -164,7 +165,7 @@ function GateQuestions({
       <p data-said>
         <strong>{step}</strong> asks {questions.length === 1 ? 'a question' : `${questions.length} questions`}: answer before you approve.
       </p>
-      <QuestionFields questions={questions} draft={draft} onDraft={onDraft} />
+      <QuestionSeries questions={questions} draft={draft} onDraft={onDraft} />
       <RecommendButton questions={questions} draft={draft} onDraft={onDraft} />
     </section>
   );

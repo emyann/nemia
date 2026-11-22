@@ -62,16 +62,16 @@ describe('questionLines', () => {
       '     a  one card — All at once.',
       '     b  two cards — The shape first.  (recommended)',
       '     c  three, cut thin — Smallest.',
-      '     choose one, or answer in your own words',
+      '     choose one, answer in your own words, or none (1=none)',
       '  2. Where do the answers go?',
       '     a  retry — Into the next try.',
       '     b  gate — With the approval.',
-      '     choose one or more, or answer in your own words',
+      '     choose one or more, answer in your own words, or none (2=none)',
       'later:',
       '  3. When?',
       '     a  retry — Into the next try.',
       '     b  gate — With the approval.',
-      '     choose one, or answer in your own words',
+      '     choose one, answer in your own words, or none (3=none)',
     ]);
     assert.ok(!questionLines([{ field: 'later', questions: [when] }]).some((l) => l.includes('(recommended)')));
   });
@@ -106,10 +106,17 @@ describe('numberedAnswers', () => {
       { question: when.title, chose: [], own: 'only words' },
     ]);
   });
+  test('resolves none to an answer that chooses nothing and says none of the options fits, with words where typed', () => {
+    assert.deepEqual(numberedAnswers(questions, ['1=none', '2=None: neither place', '3=a']), [
+      { question: cut.title, chose: [], none: true },
+      { question: where.title, chose: [], none: true, own: 'neither place' },
+      { question: when.title, chose: ['retry'] },
+    ]);
+  });
   test('resolves nothing for a step that asks none, which answerRefusal refuses itself', () => {
     assert.deepEqual(numberedAnswers([], ['1=a']), []);
   });
-  for (const value of ['x', '1=', '=a', '1a', '1', '1:', '1=a b', '1=2'])
+  for (const value of ['x', '1=', '=a', '1a', '1', '1:', '1=a b', '1=2', '1=a,none', '2=none,b'])
     test(`REFUSED: an --answer in no form, naming the forms it takes: ${value}`, () => {
       const said = unresolved([value]);
       assert.ok(said.startsWith(`--answer ${value} `), said);

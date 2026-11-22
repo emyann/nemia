@@ -28,7 +28,8 @@ const NotBlank = Schema.String.check(NOT_BLANK);
 const notBlank = (description: string) => Schema.String.annotate({ description }).check(NOT_BLANK);
 
 /**
- * A person's answers to the questions a step's closeout asks: the question, the options chosen, and their own words. Its description says
+ * A person's answers to the questions a step's closeout asks: the question, the options chosen, their own words, and whether none of its
+ * options fits (`none`), the way out every question offers, which no agent writes. Its description says
  * what each key is matched against, for a caller that reads the schema alone (the MCP port's tools): the questions as the run's decision
  * lists them (`Decidable`'s `questions`, decide.ts).
  */
@@ -39,12 +40,16 @@ const Answers = Schema.Array(
       description: 'The labels of the options chosen, never their letters; several only where the question takes several.',
     }),
     own: Schema.optionalKey(Schema.String.annotate({ description: "The person's own words, beside a choice or instead of one." })),
+    none: Schema.optionalKey(
+      Schema.Boolean.annotate({ description: "True where none of the question's options fits: chose stays empty, own may say why." }),
+    ),
   }),
 ).annotate({
   description:
     "One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): " +
     "question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where " +
-    'the question takes several (multiple); own your own words, beside a choice or instead of one.',
+    'the question takes several (multiple); own your own words, beside a choice or instead of one; none true where none of its ' +
+    'options fits, with chose empty and own, if given, saying why.',
 });
 
 /**

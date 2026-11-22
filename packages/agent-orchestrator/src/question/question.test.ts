@@ -328,6 +328,14 @@ describe('answerText and approvedAnswerText', () => {
       answerText([cut], [{ question: cut.title, chose: [], own: 'Neither.' }]),
       'Answers to your questions:\n\n1. How is the card cut?\n   In my own words: Neither.\n\nAnswered by: the person, on the board',
     );
+    assert.equal(
+      answerText([cut], [{ question: cut.title, chose: [], none: true }]),
+      'Answers to your questions:\n\n1. How is the card cut?\n   None of these: none of the options fits.\n\nAnswered by: the person, on the board',
+    );
+    assert.equal(
+      answerText([cut], [{ question: cut.title, chose: [], none: true, own: 'Cut it three ways.' }]),
+      'Answers to your questions:\n\n1. How is the card cut?\n   None of these: none of the options fits.\n   In my own words: Cut it three ways.\n\nAnswered by: the person, on the board',
+    );
   });
   test('approvedAnswerText says whose questions they answer, each in the order asked, the note, and who answered', () => {
     const text = approvedAnswerText(

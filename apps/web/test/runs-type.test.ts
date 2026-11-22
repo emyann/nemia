@@ -15,6 +15,7 @@ const FILES = [
   'components/run/WaitingCard.tsx',
   'components/look/StatTile.tsx',
   'components/look/CopyId.tsx',
+  'components/look/CheckTile.tsx',
   'components/look/CutButton.tsx',
   'components/look/CutCue.tsx',
   'components/look/CutField.tsx',

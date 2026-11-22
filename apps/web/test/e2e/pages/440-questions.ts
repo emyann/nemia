@@ -17,7 +17,6 @@ const QUESTIONS = {
   id: 'answer-by-choosing-e2e',
   title: 'Answer by choosing',
   needs: 'Two questions before the spec is cut.',
-  own: 'The retry first; the gate once a gate can carry them.',
   cut: {
     title: 'How is the card cut?',
     body: 'It is **big**: the shape, the board and the terminal.',
@@ -136,20 +135,21 @@ function writeRun(root: string) {
 /** Every option of the form's questions that is chosen: none until the person chooses. */
 const chosen = (form: ReturnType<Page['locator']>) => form.locator('fieldset[data-question] input:checked');
 
-/** The labels chosen on the question titled `title`. */
+/** The labels chosen on the question titled `title`: the options' tiles selected, by the label each names. */
 const chosenOn = (form: ReturnType<Page['locator']>, title: string) =>
   form
-    .locator(`fieldset[data-question="${title}"] input:checked`)
-    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value)) satisfies Promise<string[]>;
+    .locator(`fieldset[data-question="${title}"] label[data-option][data-selected]`)
+    .evaluateAll((tiles) => tiles.map((tile) => tile.getAttribute('data-option') ?? '')) satisfies Promise<string[]>;
 
 export default {
   /**
    * A run whose steps ask questions as data. A done step's are drawn read-only in what its part gave, each option it recommends marked. A
-   * blocked step's are a form in what its part asks of you: an option for each answer, radios where it takes one and checkboxes where
-   * several, nothing chosen, and `Answer and continue` held until each question has an answer. `Choose the recommended answers` chooses the
-   * one recommended and leaves the question without one as it was; a box ticked there and words of the person's own beside it, the answers
-   * go to the api, which writes them as the next try's message, in the package's words. The page leaves the run before it takes it back, so
-   * no poll asks for a run that is gone.
+   * blocked step's are a form in what its part asks of you: a tile for each answer, radio tiles where it takes one and check tiles where
+   * several, Something else and None of these after them, no box for words, nothing chosen, and `Answer and continue` held until each
+   * question has an answer. `Choose the recommended answers` chooses the one recommended and leaves the question without one as it was;
+   * there a tile ticked, then None of these taken, which takes the tile back and opens a box for why that may stay empty, the answers go
+   * to the api, which writes them as the next try's message, in the package's words, None of these among them. The page leaves the run
+   * before it takes it back, so no poll asks for a run that is gone.
    */
   name: 'questions',
   route: '/runs',
@@ -183,15 +183,17 @@ export default {
       await expectVisible(form, 'spec, blocked, asks its questions as a form in what its part asks of you');
       await expectVisible(row.locator('[data-said]', { hasText: QUESTIONS.needs }), 'beside what it needs');
       await expectCount(
-        form.locator(`fieldset[data-question="${cut.title}"] input[type="radio"]`),
+        form.locator(`fieldset[data-question="${cut.title}"] label[data-option] input[type="radio"]`),
         2,
-        'a radio for each answer to one that takes one',
+        'a radio tile for each answer to one that takes one',
       );
       await expectCount(
-        form.locator(`fieldset[data-question="${where.title}"] input[type="checkbox"]`),
+        form.locator(`fieldset[data-question="${where.title}"] label[data-option] input[type="checkbox"]`),
         2,
-        'a checkbox for each answer to one that takes several',
+        'a check tile for each answer to one that takes several',
       );
+      await expectCount(form.locator('[data-way]'), 4, 'Something else and None of these on each question');
+      await expectCount(form.locator('[data-own]'), 0, 'no box for words until the person asks for one');
       await expectCount(chosen(form), 0, 'nothing is chosen until the person chooses');
       const send = form.getByRole('button', { name: 'Answer and continue' });
       if (await send.isEnabled())
@@ -208,7 +210,11 @@ export default {
 
       const whereField = form.locator(`fieldset[data-question="${where.title}"]`);
       await whereField.locator(`label[data-option="${where.options[0].label}"]`).click();
-      await whereField.locator('[data-own] textarea').fill(QUESTIONS.own);
+      await whereField.locator('[data-way="none"]').click();
+      const whereAfter = await chosenOn(form, where.title);
+      if (whereAfter.length !== 0)
+        throw new Refused(`None of these takes back the options chosen on "${where.title}" — it left ${JSON.stringify(whereAfter)}`);
+      await expectVisible(whereField.locator('[data-own] textarea'), 'None of these opens the box for why, which may stay empty');
       await expectVisible(form.locator('button[type="submit"]:enabled'), 'every question answered, Answer and continue is offered');
       await settled(page);
       await photograph(row, path.join(OUT, `questions-form-${theme}.png`));
@@ -232,7 +238,7 @@ export default {
       const lines = [
         'Answers to your questions:',
         `1. ${cut.title}\n   Chose: ${cut.recommended} — ${cut.options[0].meaning}`,
-        `2. ${where.title}\n   Chose: ${where.options[0].label} — ${where.options[0].meaning}\n   In my own words: ${QUESTIONS.own}`,
+        `2. ${where.title}\n   None of these: none of the options fits.`,
         `Answered by: ${ask.actor ? actorWords(ask.actor) : 'nobody'}`,
       ];
       if (ask.mode !== 'continue' || !ask.actor || ask.message !== lines.join('\n\n'))

@@ -175,6 +175,12 @@ describe('POST …/retry with answers: what it refuses — answers that do not f
     assert.ok(field?.startsWith('payload.answers'), field);
     assert.deepEqual(asked(), []);
   });
+  test('an answer whose none is not true or false', async () => {
+    const body = { mode: 'continue', answers: [{ question: cut.title, chose: [], none: 'yes' }] };
+    const { field } = await refused(await ask('design', body), 400);
+    assert.ok(field?.startsWith('payload.answers'), field);
+    assert.deepEqual(asked(), []);
+  });
 });
 
 describe('a person reads the questions a closeout asks on the run’s detail and answers them on the try: the answers are its message, in the package’s words', () => {
@@ -201,10 +207,10 @@ describe('a person reads the questions a closeout asks on the run’s detail and
     },
   );
   s.test(
-    'answers that fit are the try’s message, in the package’s words, their note the message beside them; a free-text question still takes a message, and questions that do not read wait on the run',
+    'answers that fit, none of the options among them, are the try’s message, in the package’s words, their note the message beside them; a free-text question still takes a message, and questions that do not read wait on the run',
     async () => {
       const answers = [
-        { question: cut.title, chose: [], own: 'Three ways.' },
+        { question: cut.title, chose: [], none: true, own: 'Three ways.' },
         { question: where.title, chose: ['retry', 'gate'] },
       ];
       const res = await ask('design', { mode: 'continue', message: 'Thanks.', answers });

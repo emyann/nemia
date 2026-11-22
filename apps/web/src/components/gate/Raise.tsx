@@ -9,7 +9,8 @@ import type { RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, raiseTo, type Answer } from '../../lib/asks';
 import { OFFERS } from '../../lib/words';
 import { MODES, Refusal, useAsk, useRound } from './Ask';
-import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
+import { Asks, QuestionSeries, RecommendButton } from './Questions';
+import { answersFrom, unanswered, type Draft } from '../../lib/question-draft/questionDraft.ts';
 import type { Frozen } from '../../lib/frozen';
 import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
 import { Pending } from '@/components/look';
@@ -241,7 +242,7 @@ function RaiseWords({
         : OFFERS.raise.placeholder;
   return (
     <>
-      {choosing && <QuestionFields questions={questions} draft={draft} onDraft={onDraft} />}
+      {choosing && <QuestionSeries questions={questions} draft={draft} onDraft={onDraft} />}
       {choosing && <RecommendButton questions={questions} draft={draft} onDraft={onDraft} />}
       <TextField
         aria-label={

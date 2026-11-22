@@ -745,7 +745,7 @@ const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean>
       (w) =>
         underCeilingAfter(pass, out, w.pool) <= Math.max(pass.ceiling, underCeilingBefore(pass, w.pool)) &&
         admittedIn(pass, out, w.pool, false) <= Math.max(0, pass.ceiling - underCeilingBefore(pass, w.pool)) &&
-        inPoolAfter(pass, out, w.pool) <= Math.max(heldInPool(pass, w.pool), pass.ceiling + pass.kept.slots),
+        inPoolAfter(pass, out, w.pool) <= Math.max(underCeilingBefore(pass, w.pool), pass.ceiling) + pass.kept.slots,
     ),
   workLeavesTheKeptMemory: (pass, out) =>
     pass.machine === null ||

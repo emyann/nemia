@@ -1,0 +1,82 @@
+store measure of /tmp/nemia-measure-9sio/wf (/tmp/nemia-measure-9sio/ae), copied: 738676 files, 15066.2 MB in 172 s, without nothing
+295 runs (292 finished, 3 open), 2682 tasks, 31.7 MB of journals, 11539 feed lines, 369 cards (278 started); unreadable: 0 runs, 0 pass lines; invariant refusals: 0
+AMD EPYC-Genoa Processor, 8 cores, 16366.5 MB, node v24.16.0, load 2.01; commit 795e179c7733; 2026-11-22T13:26:52.944Z; median of 3
+runs read: finished a-red-ci-that-is-a-real-fail-faza, open board-look-a-cost-is-ink-and-x5js; feed from byte 5450586, 1000 lines; her chat: task nemia-20261121051038481, 45 events listed, cursor 3.44.6.5.5.0.1.1.0
+
+| read | cold ms | cold heap MB | warm ms | warm heap MB | run records read, cold / warm | answer KB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 2910.2 | 0.5 | 437.9 | 0.4 | — | — |
+| tickPassInformed | 3437.9 | 40.1 | 464.2 | 0.4 | — | — |
+| runList | 472.6 | 25.5 | 328.7 | 0.7 | 295 / 275 | 432.1 |
+| runListHundred | 1021.4 | 101.3 | 351.1 | 3.0 | 295 / 197 | 2137.7 |
+| runSummaries | 1536.2 | 305.9 | 93.9 | 0.2 | 295 / 7 | 45.9 |
+| stats | 38592.7 | 198.6 | 851.4 | 0.4 | 295 / 10 | 119.0 |
+| finishedRun | 128.2 | 1.8 | 115.0 | 0.2 | 1 / 1 | 28.1 |
+| openRun | 122.8 | 0.4 | 117.2 | 0.1 | 1 / 1 | 15.3 |
+| feedFromCursor | 54.1 | 0.2 | 49.0 | 0.1 | 0 / 0 | — |
+| runListAfterPass | 127.9 | 0.7 | 77.4 | 0.5 | 0 / 0 | 432.1 |
+| openRunAfterPass | 117.8 | 0.1 | 120.2 | -0.0 | 1 / 1 | 15.3 |
+| inbox | 2067.1 | 305.8 | 706.8 | 0.8 | 593 / 307 | 192.8 |
+| inboxAfterPass | 628.8 | 1.1 | 638.7 | 0.7 | 298 / 298 | 192.8 |
+| chatHistory | 1435.0 | 0.1 | 84.6 | 0.0 | — | — |
+| chatBeatBefore | 1438.1 | 0.1 | 85.9 | -0.1 | — | — |
+| chatFoldStep | 2.5 | -0.1 | 2.4 | -0.0 | — | — |
+| factoryList | 138.4 | 0.1 | 120.4 | 0.0 | 0 / 0 | 9.6 |
+| factoryGet | 37.6 | 0.0 | 45.4 | 0.0 | 0 / 0 | 2.4 |
+| factoryCommands | 28.0 | 0.2 | 24.3 | 0.0 | 0 / 0 | 0.7 |
+| scheduleList | 264.9 | 0.3 | 18.2 | -0.0 | 295 / 0 | 0.1 |
+| hireList | 36.6 | 0.1 | 35.1 | 0.1 | 0 / 0 | 13.5 |
+| volumeList | 324.3 | 0.9 | 306.8 | 0.1 | 295 / 294 | 0.4 |
+| mcpServerList | 4.7 | -0.0 | 4.2 | -0.0 | 0 / 0 | 0.1 |
+| libraryAddList | 15.1 | 0.1 | 13.6 | -0.0 | 0 / 0 | 0.5 |
+| proposalList | 4.0 | 0.0 | 3.0 | 0.0 | 0 / 0 | 0.1 |
+| proposalWaiting | 3.9 | 0.0 | 3.2 | -0.0 | 0 / 0 | 0.1 |
+| cardList | 1923.3 | 305.4 | 513.6 | 0.3 | 593 / 307 | 4.0 |
+| libraryAgents | 18.5 | 0.1 | 17.9 | 0.0 | 0 / 0 | 0.1 |
+| librarySkills | 108.6 | 0.4 | 97.3 | 0.2 | 0 / 0 | 3.2 |
+| ceilings | 269.7 | 0.1 | 328.9 | -0.0 | 295 / 295 | 1.1 |
+| ceilingsAfterPass | 285.7 | -0.5 | 286.6 | -0.2 | 295 / 295 | 1.1 |
+
+spawned: git read (read) ×98, git read (pass) ×102; place writes refused: none
+
+against 819c3898d7bb of 2026-11-22T13:16:13.018Z: 295 runs now, 295 then; 2682 tasks now, 2682 then; 369 cards now, 369 then
+
+| read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline | answer KB now | baseline |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 2910.2 | 2799.1 | ×1.04 | 437.9 | 450.9 | ×0.97 | — | — | — | — |
+| tickPassInformed | 3437.9 | 3613.6 | ×0.95 | 464.2 | 484.3 | ×0.96 | — | — | — | — |
+| runList | 472.6 | 501.0 | ×0.94 | 328.7 | 345.5 | ×0.95 | 295 / 275 | 295 / 275 | 432.1 | 432.1 |
+| runListHundred | 1021.4 | 1055.7 | ×0.97 | 351.1 | 351.4 | ×1.00 | 295 / 197 | 295 / 197 | 2137.7 | 2137.7 |
+| runSummaries | 1536.2 | 1528.6 | ×1.00 | 93.9 | 93.7 | ×1.00 | 295 / 7 | 295 / 7 | 45.9 | 45.9 |
+| stats | 38592.7 | 19761.7 | ×1.95 | 851.4 | 839.7 | ×1.01 | 295 / 10 | 295 / 10 | 119.0 | 119.0 |
+| finishedRun | 128.2 | 135.1 | ×0.95 | 115.0 | 116.9 | ×0.98 | 1 / 1 | 1 / 1 | 28.1 | 28.1 |
+| openRun | 122.8 | 121.2 | ×1.01 | 117.2 | 112.2 | ×1.04 | 1 / 1 | 1 / 1 | 15.3 | 15.3 |
+| feedFromCursor | 54.1 | 49.6 | ×1.09 | 49.0 | 46.6 | ×1.05 | 0 / 0 | 0 / 0 | — | — |
+| runListAfterPass | 127.9 | 119.2 | ×1.07 | 77.4 | 74.0 | ×1.05 | 0 / 0 | 0 / 0 | 432.1 | 432.1 |
+| openRunAfterPass | 117.8 | 112.8 | ×1.04 | 120.2 | 109.1 | ×1.10 | 1 / 1 | 1 / 1 | 15.3 | 15.3 |
+| inbox | 2067.1 | 1954.9 | ×1.06 | 706.8 | 653.4 | ×1.08 | 593 / 307 | 593 / 307 | 192.8 | 192.8 |
+| inboxAfterPass | 628.8 | 605.5 | ×1.04 | 638.7 | 602.8 | ×1.06 | 298 / 298 | 298 / 298 | 192.8 | 192.8 |
+| chatHistory | 1435.0 | 1461.9 | ×0.98 | 84.6 | 89.7 | ×0.94 | — | — | — | — |
+| chatBeatBefore | 1438.1 | 1459.2 | ×0.99 | 85.9 | 84.2 | ×1.02 | — | — | — | — |
+| chatFoldStep | 2.5 | 2.2 | ×1.15 | 2.4 | 2.4 | ×1.01 | — | — | — | — |
+| factoryList | 138.4 | 150.7 | ×0.92 | 120.4 | 144.8 | ×0.83 | 0 / 0 | 0 / 0 | 9.6 | 9.6 |
+| factoryGet | 37.6 | 45.3 | ×0.83 | 45.4 | 42.6 | ×1.06 | 0 / 0 | 0 / 0 | 2.4 | 2.4 |
+| factoryCommands | 28.0 | 28.2 | ×0.99 | 24.3 | 25.4 | ×0.96 | 0 / 0 | 0 / 0 | 0.7 | 0.7 |
+| scheduleList | 264.9 | 281.1 | ×0.94 | 18.2 | 17.7 | ×1.03 | 295 / 0 | 295 / 0 | 0.1 | 0.1 |
+| hireList | 36.6 | 36.0 | ×1.02 | 35.1 | 35.5 | ×0.99 | 0 / 0 | 0 / 0 | 13.5 | 13.5 |
+| volumeList | 324.3 | 285.3 | ×1.14 | 306.8 | 317.2 | ×0.97 | 295 / 294 | 295 / 294 | 0.4 | 0.4 |
+| mcpServerList | 4.7 | 4.6 | ×1.03 | 4.2 | 3.9 | ×1.08 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| libraryAddList | 15.1 | 14.4 | ×1.05 | 13.6 | 11.8 | ×1.15 | 0 / 0 | 0 / 0 | 0.5 | 0.5 |
+| proposalList | 4.0 | 3.7 | ×1.10 | 3.0 | 3.1 | ×0.98 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| proposalWaiting | 3.9 | 3.8 | ×1.04 | 3.2 | 3.2 | ×1.01 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| cardList | 1923.3 | 1928.8 | ×1.00 | 513.6 | 507.0 | ×1.01 | 593 / 307 | 593 / 307 | 4.0 | 4.0 |
+| libraryAgents | 18.5 | 21.5 | ×0.86 | 17.9 | 18.1 | ×0.99 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| librarySkills | 108.6 | 103.4 | ×1.05 | 97.3 | 101.4 | ×0.96 | 0 / 0 | 0 / 0 | 3.2 | 3.2 |
+| ceilings | 269.7 | 281.1 | ×0.96 | 328.9 | 273.0 | ×1.20 | 295 / 295 | 295 / 295 | 1.1 | 1.1 |
+| ceilingsAfterPass | 285.7 | 290.8 | ×0.98 | 286.6 | 276.8 | ×1.04 | 295 / 295 | 295 / 295 | 1.1 | 1.1 |
+
+Both sides were measured on one frozen copy of the live store (/tmp/nemia-measure-9sio, copied once at 2026-11-22T13:0x by
+fence.ts's copyStore), each run copying it again to a temp folder: the base at 819c3898d7bb (before.json), this card at 795e179c7733
+(s16.json). `stats` cold reads ×1.95 here, and is noise of the shared machine, not this card: it reads no File and no keyspace, and a
+second run of each side on the same copy gave 36427.5 ms for this card and 38305.5 ms for the base. The reads the card reaches (inbox,
+cardList, the card's files through the File door, the File records imported on the first open) stay within ×0.95 to ×1.08.

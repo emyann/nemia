@@ -1,0 +1,497 @@
+{
+  "machine": {
+    "cpu": "AMD EPYC-Genoa Processor",
+    "cores": 8,
+    "memoryBytes": 16366510080,
+    "node": "v24.16.0",
+    "platform": "linux",
+    "load": 2.01
+  },
+  "commit": "795e179c77333be349d6dce67fa551b59dbb56bb",
+  "date": "2026-11-22T13:26:52.944Z",
+  "repeat": 3,
+  "from": "/tmp/nemia-measure-9sio/wf",
+  "engine": "/tmp/nemia-measure-9sio/ae",
+  "copy": {
+    "files": 738676,
+    "bytes": 15066169510,
+    "ms": 171505.99117000002,
+    "leftOut": []
+  },
+  "counts": {
+    "runs": 295,
+    "finishedRuns": 292,
+    "openRuns": 3,
+    "tasks": 2682,
+    "journalBytes": 31745763,
+    "feedLines": 11539,
+    "cards": {
+      "listed": 369,
+      "started": 278
+    },
+    "unreadable": {
+      "runs": 0,
+      "passLines": 0
+    },
+    "invariantRefusals": 0
+  },
+  "asked": {
+    "factory": "design-system",
+    "finishedRun": "a-red-ci-that-is-a-real-fail-faza",
+    "openRun": "board-look-a-cost-is-ink-and-x5js",
+    "feedCursor": 5450586,
+    "feedLinesRead": 1000,
+    "chat": {
+      "task": "nemia-20261121051038481",
+      "events": 45,
+      "cursor": "3.44.6.5.5.0.1.1.0"
+    }
+  },
+  "measures": {
+    "runList": {
+      "cold": {
+        "ms": 472.6307129999914,
+        "heapMb": 25.45112
+      },
+      "warm": {
+        "ms": 328.6527730000089,
+        "heapMb": 0.652336
+      },
+      "records": {
+        "cold": 295,
+        "warm": 275
+      },
+      "bytes": 432063
+    },
+    "runListHundred": {
+      "cold": {
+        "ms": 1021.3520089999947,
+        "heapMb": 101.286624
+      },
+      "warm": {
+        "ms": 351.1226289999904,
+        "heapMb": 3.037952
+      },
+      "records": {
+        "cold": 295,
+        "warm": 197
+      },
+      "bytes": 2137715
+    },
+    "runSummaries": {
+      "cold": {
+        "ms": 1536.2107520000136,
+        "heapMb": 305.922552
+      },
+      "warm": {
+        "ms": 93.92968899998232,
+        "heapMb": 0.150184
+      },
+      "records": {
+        "cold": 295,
+        "warm": 7
+      },
+      "bytes": 45949
+    },
+    "stats": {
+      "cold": {
+        "ms": 38592.70758000002,
+        "heapMb": 198.647488
+      },
+      "warm": {
+        "ms": 851.414300000004,
+        "heapMb": 0.39916
+      },
+      "records": {
+        "cold": 295,
+        "warm": 10
+      },
+      "bytes": 118959
+    },
+    "finishedRun": {
+      "cold": {
+        "ms": 128.19582099997206,
+        "heapMb": 1.819208
+      },
+      "warm": {
+        "ms": 115.02571000001626,
+        "heapMb": 0.249984
+      },
+      "records": {
+        "cold": 1,
+        "warm": 1
+      },
+      "bytes": 28076
+    },
+    "openRun": {
+      "cold": {
+        "ms": 122.77710000000661,
+        "heapMb": 0.388744
+      },
+      "warm": {
+        "ms": 117.16532899998128,
+        "heapMb": 0.143656
+      },
+      "records": {
+        "cold": 1,
+        "warm": 1
+      },
+      "bytes": 15344
+    },
+    "feedFromCursor": {
+      "cold": {
+        "ms": 54.05582300003152,
+        "heapMb": 0.17576
+      },
+      "warm": {
+        "ms": 49.015829999989364,
+        "heapMb": 0.066088
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      }
+    },
+    "tickPass": {
+      "cold": {
+        "ms": 2910.1839579999214,
+        "heapMb": 0.466208
+      },
+      "warm": {
+        "ms": 437.9213760000421,
+        "heapMb": 0.426016
+      }
+    },
+    "tickPassInformed": {
+      "cold": {
+        "ms": 3437.880981000024,
+        "heapMb": 40.146352
+      },
+      "warm": {
+        "ms": 464.22396400000434,
+        "heapMb": 0.36092
+      }
+    },
+    "runListAfterPass": {
+      "cold": {
+        "ms": 127.92549900000449,
+        "heapMb": 0.673208
+      },
+      "warm": {
+        "ms": 77.3746290000272,
+        "heapMb": 0.509152
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 432063
+    },
+    "openRunAfterPass": {
+      "cold": {
+        "ms": 117.78167599998415,
+        "heapMb": 0.054528
+      },
+      "warm": {
+        "ms": 120.15813100000378,
+        "heapMb": -0.027696
+      },
+      "records": {
+        "cold": 1,
+        "warm": 1
+      },
+      "bytes": 15344
+    },
+    "inbox": {
+      "cold": {
+        "ms": 2067.1042180000222,
+        "heapMb": 305.763992
+      },
+      "warm": {
+        "ms": 706.846979999973,
+        "heapMb": 0.755368
+      },
+      "records": {
+        "cold": 593,
+        "warm": 307
+      },
+      "bytes": 192782
+    },
+    "inboxAfterPass": {
+      "cold": {
+        "ms": 628.7669279999682,
+        "heapMb": 1.103344
+      },
+      "warm": {
+        "ms": 638.746987999999,
+        "heapMb": 0.657232
+      },
+      "records": {
+        "cold": 298,
+        "warm": 298
+      },
+      "bytes": 192782
+    },
+    "chatHistory": {
+      "cold": {
+        "ms": 1434.9648030000972,
+        "heapMb": 0.134168
+      },
+      "warm": {
+        "ms": 84.60965500003658,
+        "heapMb": 0.045968
+      }
+    },
+    "chatBeatBefore": {
+      "cold": {
+        "ms": 1438.0708119999617,
+        "heapMb": 0.112192
+      },
+      "warm": {
+        "ms": 85.90770199999679,
+        "heapMb": -0.069464
+      }
+    },
+    "chatFoldStep": {
+      "cold": {
+        "ms": 2.5312550000380725,
+        "heapMb": -0.050936
+      },
+      "warm": {
+        "ms": 2.3911739999894053,
+        "heapMb": -0.044536
+      }
+    },
+    "factoryList": {
+      "cold": {
+        "ms": 138.36849399999483,
+        "heapMb": 0.091424
+      },
+      "warm": {
+        "ms": 120.42863199999556,
+        "heapMb": 0.019696
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 9639
+    },
+    "factoryGet": {
+      "cold": {
+        "ms": 37.616898000007495,
+        "heapMb": 0.034488
+      },
+      "warm": {
+        "ms": 45.387435999989975,
+        "heapMb": 0.001232
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 2368
+    },
+    "factoryCommands": {
+      "cold": {
+        "ms": 27.950046000012662,
+        "heapMb": 0.19804
+      },
+      "warm": {
+        "ms": 24.276029000000563,
+        "heapMb": 0.044048
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 743
+    },
+    "scheduleList": {
+      "cold": {
+        "ms": 264.91820299997926,
+        "heapMb": 0.26516
+      },
+      "warm": {
+        "ms": 18.21409299998777,
+        "heapMb": -0.021776
+      },
+      "records": {
+        "cold": 295,
+        "warm": 0
+      },
+      "bytes": 94
+    },
+    "hireList": {
+      "cold": {
+        "ms": 36.62356899998849,
+        "heapMb": 0.14216
+      },
+      "warm": {
+        "ms": 35.08385100000305,
+        "heapMb": 0.069392
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 13465
+    },
+    "volumeList": {
+      "cold": {
+        "ms": 324.34629700001096,
+        "heapMb": 0.94716
+      },
+      "warm": {
+        "ms": 306.81384600000456,
+        "heapMb": 0.05752
+      },
+      "records": {
+        "cold": 295,
+        "warm": 294
+      },
+      "bytes": 432
+    },
+    "mcpServerList": {
+      "cold": {
+        "ms": 4.704652999993414,
+        "heapMb": -0.003496
+      },
+      "warm": {
+        "ms": 4.1758999999728985,
+        "heapMb": -0.000424
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 95
+    },
+    "libraryAddList": {
+      "cold": {
+        "ms": 15.053944999992382,
+        "heapMb": 0.116736
+      },
+      "warm": {
+        "ms": 13.619426999997813,
+        "heapMb": -0.017152
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 453
+    },
+    "proposalList": {
+      "cold": {
+        "ms": 4.025553999992553,
+        "heapMb": 0.037336
+      },
+      "warm": {
+        "ms": 2.9991749999462627,
+        "heapMb": 0.007216
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 117
+    },
+    "proposalWaiting": {
+      "cold": {
+        "ms": 3.914158000028692,
+        "heapMb": 0.0084
+      },
+      "warm": {
+        "ms": 3.222780000010971,
+        "heapMb": -0.002736
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 117
+    },
+    "cardList": {
+      "cold": {
+        "ms": 1923.3022350000101,
+        "heapMb": 305.357408
+      },
+      "warm": {
+        "ms": 513.6465209999587,
+        "heapMb": 0.273608
+      },
+      "records": {
+        "cold": 593,
+        "warm": 307
+      },
+      "bytes": 4024
+    },
+    "libraryAgents": {
+      "cold": {
+        "ms": 18.48539999994682,
+        "heapMb": 0.058104
+      },
+      "warm": {
+        "ms": 17.94885600003181,
+        "heapMb": 0.04756
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 91
+    },
+    "librarySkills": {
+      "cold": {
+        "ms": 108.64885799994227,
+        "heapMb": 0.355816
+      },
+      "warm": {
+        "ms": 97.29343499999959,
+        "heapMb": 0.20452
+      },
+      "records": {
+        "cold": 0,
+        "warm": 0
+      },
+      "bytes": 3245
+    },
+    "ceilings": {
+      "cold": {
+        "ms": 269.6647159999702,
+        "heapMb": 0.064168
+      },
+      "warm": {
+        "ms": 328.92151400004514,
+        "heapMb": -0.000056
+      },
+      "records": {
+        "cold": 295,
+        "warm": 295
+      },
+      "bytes": 1121
+    },
+    "ceilingsAfterPass": {
+      "cold": {
+        "ms": 285.7082190000219,
+        "heapMb": -0.481352
+      },
+      "warm": {
+        "ms": 286.59686600009445,
+        "heapMb": -0.152776
+      },
+      "records": {
+        "cold": 295,
+        "warm": 295
+      },
+      "bytes": 1118
+    }
+  },
+  "spawned": {
+    "git read (read)": 98,
+    "git read (pass)": 102
+  },
+  "placeRefused": {},
+  "refusals": []
+}

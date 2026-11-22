@@ -1,10 +1,18 @@
 /**
  * A card's files: the files it names by the api's File id under its `files:` key, each by the name its text and its run find it by. Why
- * the files as given cannot be written (`cardFilesRefusal`), asked wherever a card's `files:` is written, before anything is written; and
- * whether a kept File is let go of (`fileLetGo`), asked by the files' prune (`filesPruned`) of every file it reads. Both pure, proved by
- * `contracts/card-files.contract.ts`. Beside them, the refusal's words, each naming the fix.
+ * the files as given cannot be written (`cardFilesRefusal`), asked wherever a card's `files:` is written, before anything is written;
+ * whether a file the card holds is taken off as more are attached (`cardFileReplaced`), a gone reference replaced by a file attached under
+ * its name; and whether a kept File is let go of (`fileLetGo`), asked by the files' prune (`filesPruned`) of every file it reads. Each
+ * pure, proved by `contracts/card-files.contract.ts`. Beside them, the refusal's words, each naming the fix.
  */
-import type { CardFileGiven, CardFileHeld, CardFilesRefusal, CardFilesRefusalOf, FileLetGo } from '../../contracts/card-files.contract.ts';
+import type {
+  CardFileGiven,
+  CardFileHeld,
+  CardFileReplaced,
+  CardFilesRefusal,
+  CardFilesRefusalOf,
+  FileLetGo,
+} from '../../contracts/card-files.contract.ts';
 import { CLI } from 'objects';
 
 /** The folder of a run's `inputs/` the handed cards are copied into, which no file of a card may take the place of. */
@@ -42,6 +50,15 @@ export const cardFilesRefusal: CardFilesRefusalOf = (given, held, started, most,
   if (bytes > most.bytes) return { reason: 'bytes' };
   return undefined;
 };
+
+/**
+ * Whether the file a card holds is taken off as files are attached beside it: its File is no longer kept, and a file is attached under its
+ * name, which takes its place. A held file whose File is still kept stays, so a name attached again beside it is refused as given twice
+ * (`cardFilesRefusal`).
+ * @param held The file the card holds, with the size of its File kept in the card's namespace (null where none is).
+ * @param attached The files attached.
+ */
+export const cardFileReplaced: CardFileReplaced = (held, attached) => held.size === null && attached.some((a) => a.name === held.name);
 
 /**
  * Whether the prune lets a kept File go: no card names it, and its day from its last write is over.

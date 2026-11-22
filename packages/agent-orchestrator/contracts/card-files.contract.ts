@@ -143,48 +143,34 @@ const cardFilesRefusalSpec = spec<
 /** Why a card's files as given cannot be written, or undefined where they can. */
 export type CardFilesRefusalOf = Implementation<typeof cardFilesRefusalSpec>;
 
-/** Whether two files are the one file: the same name, the same File, the same size kept. */
-const sameGiven = (a: CardFileGiven, b: CardFileGiven) => a.name === b.name && a.file === b.file && a.size === b.size;
+/** Whether one of `attached` is given the name `name`. */
+const namedIn = (attached: readonly CardFileGiven[], name: string) => attached.some((a) => a.name === name);
 
-/**
- * Whether the held file `held` is a reference that is gone, which a file attached under its name takes the place of: its File is no
- * longer kept in the card's namespace, and one of `attached` is given its name.
- */
-const replacedBy = (held: CardFileGiven, attached: readonly CardFileGiven[]) =>
-  held.size === null && attached.some((a) => a.name === held.name);
-
-const cardFilesAttachedSpec = spec<(held: readonly CardFileGiven[], attached: readonly CardFileGiven[]) => readonly CardFileGiven[]>({
+const cardFileReplacedSpec = spec<(held: CardFileGiven, attached: readonly CardFileGiven[]) => boolean>({
   ensures: {
     aGoneReferenceIsReplaced: {
       description:
-        "A file the card holds whose File is no longer kept is taken off where a file is attached under its name: attaching it again is how the refusal at start is answered",
-      condition: ({ input: [held, attached], output }) =>
-        output.length === held.filter((h) => !replacedBy(h, attached)).length + attached.length,
+        'A file the card holds whose File is no longer kept is taken off where a file is attached under its name: attaching it again is how the refusal at start is answered',
+      condition: ({ input: [held, attached], output }) => held.size !== null || !namedIn(attached, held.name) || output,
     },
     whatIsKeptStays: {
       description:
-        'Every other file the card holds stays, a kept File under a name attached again among them, so two files of one name are still refused',
-      condition: ({ input: [held, attached], output }) =>
-        held.every((h) => replacedBy(h, attached) || output.some((o) => sameGiven(o, h))),
+        'A file the card holds whose File is still kept stays, a name attached again beside it among them, so two files of one name are still refused',
+      condition: ({ input: [held], output }) => held.size === null || !output,
     },
-    everyAttachedFileIsCarried: {
-      description: 'Every file attached is carried',
-      condition: ({ input: [held, attached], output }) => attached.every((a) => output.some((o) => sameGiven(o, a))),
-    },
-    nothingElseIsCarried: {
-      description: 'The card carries no file it neither held nor was attached',
-      condition: ({ input: [held, attached], output }) =>
-        output.every((o) => held.some((h) => sameGiven(o, h)) || attached.some((a) => sameGiven(o, a))),
+    onlyByItsName: {
+      description: 'A file the card holds stays unless a file is attached under its very name',
+      condition: ({ input: [held, attached], output }) => namedIn(attached, held.name) || !output,
     },
   },
 });
 
 /**
- * The files a card is to carry once `attached` are attached beside the ones it holds (`held`), each with the size of its File kept in the
- * card's namespace: the held, but each whose File is gone and whose name an attached file takes, then the attached. What `cardFilesRefusal`
- * then judges.
+ * Whether the file a card holds (`held`, with the size of its File kept in the card's namespace, null for none) is taken off as files
+ * are attached beside it (`attached`): a reference that is gone, replaced by a file attached under its name. The card then carries the
+ * held files this keeps, then the attached, which `cardFilesRefusal` judges.
  */
-export type CardFilesAttached = Implementation<typeof cardFilesAttachedSpec>;
+export type CardFileReplaced = Implementation<typeof cardFileReplacedSpec>;
 
 /**
  * A kept File as the prune reads it: when it was last written, in milliseconds, and whether a card names it — its id written anywhere in

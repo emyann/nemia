@@ -65,8 +65,11 @@ export type RowWritten = {
 /** A write's answer: the row it appends, or why it is refused. */
 export type WriteDecision = { readonly written: RowWritten } | { readonly refused: WriteRefusal };
 
-/** Whether `n` is a whole number from 0, as a revision, a size and a ceiling are. */
-const whole = (n: number) => Number.isInteger(n) && n >= 0;
+/** The largest whole number a double holds exactly, `Number.MAX_SAFE_INTEGER`, written out: the verifier reads no global's constant. */
+const MAX_SAFE = 9_007_199_254_740_991;
+
+/** Whether `n` is a whole number from 0 that a double holds exactly, as a revision, a size and a ceiling are. */
+const whole = (n: number) => Number.isSafeInteger(n) && n >= 0;
 
 /** Whether the key `held` names is live: it has a row, and that row deletes nothing. */
 const live = (held: Held | null) => held !== null && !held.deleted;
@@ -89,6 +92,7 @@ const heldAt = (held: Held | null, head: number) =>
 const keyspaceWriteSpec = spec<(held: Held | null, write: KeyWrite, head: number, ceiling: number) => WriteDecision>({
   requires: ({ input: [held, write, head, ceiling] }) =>
     whole(head) &&
+    head < MAX_SAFE &&
     whole(ceiling) &&
     whole(write.size) &&
     heldAt(held, head) &&

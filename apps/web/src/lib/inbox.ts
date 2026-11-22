@@ -2,7 +2,7 @@ import type { CardState, InboxEntry } from './api/inbox.ts';
 import type { Ceilings } from './api/ceilings.ts';
 import type { Factory } from './api/factories.ts';
 import type { WorkflowListing } from './api/workflows.ts';
-import { DEFAULT_NAMESPACE } from 'objects';
+import { type CardWait, DEFAULT_NAMESPACE } from 'objects';
 import { shownIn, startRepo, type StartRepo } from './factories.ts';
 
 /**
@@ -233,6 +233,24 @@ export function ordinal(n: number) {
 export const queuedWord = (queued: NonNullable<InboxEntry['queued']>) => {
   const word = queued.by?.length ? `queued by ${queued.by.join(', ')}` : 'queued';
   return queued.place ? `${word} · ${ordinal(queued.place)}` : word;
+};
+
+/**
+ * The line of a card's waits on the cards of its `after:` not landed: each card, the card its work stands at where it is another, and that
+ * card's state, or that the store has no such card, or the cycle; and, where only a person can release one, `Needs you:` with the fix.
+ * @param name The waiting card, by name, which the fix names.
+ * @param waits The cards it waits on that have not landed.
+ */
+export const waitWords = (name: string, waits: readonly CardWait[]) => {
+  const one = (w: CardWait) => {
+    const at = w.at === undefined ? '' : `, at ${w.at}`;
+    if (w.kind === 'missing') return `${w.card}${at} (no such card)`;
+    if (w.kind === 'cycle') return `${w.card} (a cycle: ${(w.cycle ?? []).join(' → ')})`;
+    return `${w.card}${at} (${w.state ?? 'not read'})`;
+  };
+  const stalled = waits.filter((w) => w.stalled);
+  const said = `Waiting on ${waits.map(one).join('; ')}.`;
+  return stalled.length ? `Needs you: ${said} Send the work on, change ${name}'s after:, or start it by hand.` : said;
 };
 
 /**

@@ -14,6 +14,7 @@ import {
   type CardList,
   type CardSpec,
   type CardState,
+  type CardWait,
   DEFAULT_NAMESPACE,
   filedNamespace,
 } from 'objects';
@@ -65,6 +66,11 @@ export type InboxEntry = {
   /** On a card two triggers of its factory would send to two workflows: their names. It waits until a selector or its labels change. */
   clash?: string[];
   /**
+   * On a card not started whose `after:` names cards that have not landed (`status.waitingOn`): each, where its work stands and whether
+   * only a person can release it. No trigger queues it and the tick starts none of it while any is listed.
+   */
+  waits?: CardWait[];
+  /**
    * On a queued card only, whose start the tick tried and did not make, as the card stands: when, on which repository, why, and whether the
    * package refused it — which lasts until the card is edited or queued again — or something else failed, which the tick tries again.
    */
@@ -107,6 +113,7 @@ export const entryOf = (card: Card) => {
         ? { queued: { at: metadata.creationTimestamp, place: status.place ?? null, by: [...status.queuedBy] } }
         : {}),
     ...(status.clash !== undefined ? { clash: [...status.clash] } : {}),
+    ...(status.waitingOn?.length ? { waits: status.waitingOn.map((w) => ({ ...w, ...(w.cycle ? { cycle: [...w.cycle] } : {}) })) } : {}),
     ...(status.lastStart !== undefined ? { tried: { ...status.lastStart } } : {}),
     factoryRepo: null,
     labels: { ...metadata.labels },
@@ -197,7 +204,8 @@ const modelsText = (models: Readonly<Record<string, string>>) =>
     .join(', ') || null;
 
 /**
- * The value a card's page shows for `key` of `card`: when it was queued, the runs its `from:` names, comma-joined, its models as
+ * The value a card's page shows for `key` of `card`: when it was queued, the runs its `from:` names and the cards its `after:` names,
+ * each comma-joined, its models as
  * `<step>=<model>`, comma-joined, its labels as
  * `a=b,c=d`, its factory (its namespace, none for `default`), or what the card writes; null for a key it does not set.
  */
@@ -205,6 +213,7 @@ const keyValue = (card: Card, key: CardKey) => {
   const entry = entryOf(card);
   if (key === 'queued') return entry.queued?.at ?? null;
   if (key === 'from') return entry.from.join(', ') || null;
+  if (key === 'after') return (card.spec.after ?? []).join(', ') || null;
   if (key === 'labels') return labelsText(entry.labels);
   if (key === 'model') return modelsText(card.spec.model ?? {});
   if (key === 'files') return (card.spec.files ?? []).map((f) => f.name).join(', ') || null;

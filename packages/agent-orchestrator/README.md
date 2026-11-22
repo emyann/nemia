@@ -3371,8 +3371,14 @@ run 'wf tick' (or 'wf up') to start it
   ```
 
   `workflow:` is optional, since an idea often does not know its workflow, and is a workflow's name: a path is refused where it is
-  written. An inbox card has no `after:`: what it waits on is said at start, with `--after`, once the runs it could wait on are
-  known. A plan's card keeps its rules: a plan's repository is `wf start <folder> --repo`. A third key, `queued:`, marks a card to start on its
+  written. An inbox card's `after:` names cards, not runs, since a card has no run before it starts: `after: add-a-cache-k2q9,
+  parse-the-flag-1x2y` (`nemia inbox add --after <card>`, once per card) waits on each. While one has not landed — its own run, as that
+  run's `nemia decide` says, or the run of the card its run passed the work on to, a workflow node's card or `nemia inbox resend`'s — no
+  card trigger queues it, the tick starts none of it, and `nemia inbox`, the Card's `status.waitingOn` and the board list it waiting,
+  with the card its work stands at and that card's state; a wait only a person can release (a card the store does not know, a cycle,
+  a run ended unlanded, a start refused) is said stalled there and once on the feed (`CardWaitStalled`, `CardWaitFreed`). When the last lands
+  the next pass queues it as any other card, its run started from the base as it is then. `nemia start <card>` still starts a waiting
+  card, saying which had not landed; `nemia start --after <run>` still waits on runs. A plan's card keeps its rules: a plan's repository is `wf start <folder> --repo`. A third key, `queued:`, marks a card to start on its
   own, and `wf inbox queue` writes it ([below](#cards-that-start-themselves-wf-inbox-queue)). A fourth, `gate: <step>`, names
   the step of its workflow whose closeout waits for a person in the run it starts, one step, refused as a list or as a step's
   `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)). A fifth, `factory: <name>`, names

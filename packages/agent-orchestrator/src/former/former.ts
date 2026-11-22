@@ -238,11 +238,20 @@ export function readKeys<K extends string>(
 /** The keys in `maps` whose value is a list of maps, kept as its JSON text too: `checks:`. */
 const LIST_OF_MAPS: readonly string[] = ['checks'];
 
+/**
+ * Whether the loader keeps the value `value` of the key `key` as its JSON text, left to the key's own reader: a map on a key in
+ * `maps`, or a list on one of them that holds a list of maps (`checks:`). The one rule for every reading of a step's keys, the
+ * loader's and a Workflow's spec (`workflowSpecOf`), so the two never disagree on a key's shape.
+ * @param key The frontmatter key.
+ * @param value Its value as the frontmatter reads it.
+ * @param maps The keys whose value may be a map.
+ */
+export const keptAsJson = (key: string, value: unknown, maps: readonly string[]) =>
+  maps.includes(key) && typeof value === 'object' && (!Array.isArray(value) || LIST_OF_MAPS.includes(key));
+
 /** A key's value as a line holds it (`flatValue`), or the JSON text of a map on a key in `maps`, left to its own reader. */
 const keyValue = (step: string, entry: FrontmatterEntry, maps: readonly string[]) =>
-  maps.includes(entry.key) && typeof entry.value === 'object' && (!Array.isArray(entry.value) || LIST_OF_MAPS.includes(entry.key))
-    ? JSON.stringify(entry.value)
-    : flatValue(step, entry, LIST_KEYS.includes(entry.key));
+  keptAsJson(entry.key, entry.value, maps) ? JSON.stringify(entry.value) : flatValue(step, entry, LIST_KEYS.includes(entry.key));
 
 /** Refused: a fence key written both at the top level, its former spelling, and under its harness's block. */
 const bothSpellings = (step: string, key: string, harness: string) =>

@@ -1,10 +1,11 @@
 /**
- * `nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...`: an idea filed as a card through the
- * Card's `create`, in the namespace of `--factory`, else of the factory the idea's own `factory:` line names, else `default`
- * (`filedNamespace`). A file is read here and its text sent (Q8); a folder is refused, naming the command. `--workflow` is sent by its
- * name, a path refused; `--label` each edit as typed. A card names no repository: its words refuse `--repo`, the factory's wiring placing
- * its run. Each `--file`, and each file beside an idea file that its text names as a markdown image's or link's target outside code
- * (`besideIdea`), is uploaded first to the namespace's files and carried by the card by its id, and a line says each file it carries.
+ * `nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--after <card>]... [--label <key=value>]...`: an idea filed as
+ * a card through the Card's `create`, in the namespace of `--factory`, else of the factory the idea's own `factory:` line names, else
+ * `default` (`filedNamespace`). A file is read here and its text sent (Q8); a folder is refused, naming the command. `--workflow` is sent
+ * by its name, a path refused; `--after` each card it waits on, and `--label` each edit, as typed. A card names no repository: its words
+ * refuse `--repo`, the factory's wiring placing its run. Each `--file`, and each file beside an idea file that its text names as a
+ * markdown image's or link's target outside code (`besideIdea`), is uploaded first to the namespace's files and carried by the card by
+ * its id, and a line says each file it carries.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,7 +26,7 @@ const leftOutLines = (card: Card) =>
   );
 
 /**
- * What `nemia inbox add` prints of the card filed: a line of it, a line per label left out, and how to start it.
+ * What `nemia inbox add` prints of the card filed: a line of it, the cards it waits on, a line per label left out, and how to start it.
  * @param card The card the api filed.
  */
 export const filedLines = (card: Card) => {
@@ -34,6 +35,7 @@ export const filedLines = (card: Card) => {
   const title = (spec.body ?? '').split('\n')[0] ?? '';
   return [
     `${name}  ${title.slice(0, 56)}${spec.workflow ? `  workflow: ${spec.workflow}` : ''}${factoryLine(card)}${labels && Object.keys(labels).length ? `  labels: ${labelsText(labels)}` : ''}`,
+    ...(spec.after?.length ? [`  after: ${spec.after.join(', ')} — queued and started once each has landed`] : []),
     ...leftOutLines(card),
     `filed: ${fileOf(card)} — start it with nemia start ${name}${spec.workflow ? '' : ' --workflows <w>'}`,
   ];
@@ -91,6 +93,7 @@ export async function inboxAdd(args: Args) {
   const body = textOrFile(idea, COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');
   const label = listArg(args, 'label');
+  const after = listArg(args, 'after');
   const namespace = filedNamespace(body, textArg(args, 'factory'));
   const typed = listArg(args, 'file');
   const named = besideIdea(idea, body);
@@ -102,6 +105,7 @@ export async function inboxAdd(args: Args) {
     body,
     ...(workflow === undefined ? {} : { workflow }),
     ...(label.length ? { label } : {}),
+    ...(after.length ? { after } : {}),
     ...(files.length ? { files } : {}),
   };
   const card = await asked(COMMAND, (c) => c.cards.create({ params: { namespace }, payload }));

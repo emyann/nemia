@@ -15,11 +15,12 @@ export type SelectingTrigger = CardTrigger & { readonly selector: string };
 
 /**
  * What the card triggers that select a card do with it on this pass.
- * @param card The card as a trigger reads it: its factory and workflow, whether it is queued by hand, started, and reads.
+ * @param card The card as a trigger reads it: its factory and workflow, whether it is queued by hand, started, reads, and waits on a card
+ *   of its `after:` not landed.
  * @param matching The triggers whose selector selects the card's labels, every factory's.
  */
 export const cardTriggered: CardTriggered = (card, matching) => {
-  if (card.factory === null || card.queued || card.started || !card.readable) return { kind: 'none' };
+  if (card.factory === null || card.queued || card.started || !card.readable || card.waiting) return { kind: 'none' };
   const own = matching.filter((t) => t.factory === card.factory);
   const first = own[0];
   if (first === undefined) return { kind: 'none' };
@@ -40,7 +41,8 @@ export const matchingTriggers = <T extends SelectingTrigger>(labels: Readonly<Re
 
 /**
  * The card `card` as `cardTriggered` reads it, from what the listing knows of it.
- * @param card The entry's factory and workflow (null or empty for none), whether it is queued by hand, started, and reads.
+ * @param card The entry's factory and workflow (null or empty for none), whether it is queued by hand, started, reads, and waits on a
+ *   card of its `after:` not landed.
  */
 export const triggerCardOf = (card: {
   readonly factory: string | null;
@@ -48,6 +50,7 @@ export const triggerCardOf = (card: {
   readonly queued: boolean;
   readonly started: boolean;
   readonly readable: boolean;
+  readonly waiting: boolean;
 }) =>
   ({
     factory: card.factory || null,
@@ -55,4 +58,5 @@ export const triggerCardOf = (card: {
     queued: card.queued,
     started: card.started,
     readable: card.readable,
+    waiting: card.waiting,
   }) satisfies TriggerCard;

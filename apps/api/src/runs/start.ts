@@ -106,6 +106,7 @@ const startedOf = (started: Awaited<ReturnType<typeof runStarted>>) => ({
   ...(started.card !== undefined ? { card: started.card } : {}),
   ...(started.queueLeft !== undefined ? { queueLeft: started.queueLeft } : {}),
   ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+  ...(started.waitedOn !== undefined ? { waitedOn: [...started.waitedOn] } : {}),
   ...(started.paused !== undefined ? { paused: started.paused } : {}),
   ...(started.landed !== undefined ? { landed: [...started.landed] } : {}),
   ...(started.hints !== undefined ? { hints: [...started.hints] } : {}),

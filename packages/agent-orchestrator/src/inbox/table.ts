@@ -1,15 +1,15 @@
 /**
  * The inbox as a table (`objects`' `Table`, Kubernetes' server-side printing): the columns `nemia inbox` prints of each entry and a row's
  * cells, in their order, from the same judgement as its lines (`inboxLines`): the name, the first line of the card or why the entry does
- * not read as one, its workflow, repository, gate, models and factory, its place in the queue, the tick's last missed start of it, its
- * state as a
- * person reads it beside its run, the runs it was started as, and its labels. A client prints the cells and keeps no printer of its own.
+ * not read as one, its workflow, repository, gate, models and factory, its place in the queue, the tick's last missed start of it, the
+ * cards it waits on, its state as a person reads it beside its run, the runs it was started as, and its labels. A client prints the cells
+ * and keeps no printer of its own.
  * Pure.
  */
 import { modelsText } from '../start/index.ts';
 import type { TableColumnDefinition } from 'objects';
 import { labelsText } from '../labels/labels.ts';
-import { cardLabels, phaseSaid, triedClause, type InboxListing } from './inbox.ts';
+import { cardLabels, phaseSaid, triedClause, waitsSaid, type InboxListing } from './inbox.ts';
 
 /** A column of the inbox's table: a string, shown by default (`priority` 0) unless it is only asked wide. */
 const column = (name: string, description: string, priority = 0, type: TableColumnDefinition['type'] = 'string') => ({
@@ -31,6 +31,10 @@ export const INBOX_COLUMNS: readonly TableColumnDefinition[] = [
   column('Factory', 'the factory the card is started in, empty for the default one'),
   column('Queued', 'the place of a queued card among every card queued, from 1; null where it is not queued', 0, 'integer'),
   column('Last start', "the tick's last start of the queued card that did not happen, and what to do, empty where none", 1),
+  column(
+    'Waits',
+    'the cards of its after: that have not landed, where the work of each stands, and what to do where only a person can release it; empty where none',
+  ),
   column('State', 'where the card is in its life: its run\'s phase once started, "waiting on you" where its run waits on a person'),
   column('Runs', 'the runs the card was started as, comma-separated'),
   column('Labels', "the labels a selector reads of the card: a person's, its workflow and its factory", 1),
@@ -52,6 +56,7 @@ export const inboxCells = (l: InboxListing, unfactoredStarts: boolean) => [
   l.factory ?? '',
   l.queued?.place ?? null,
   triedClause(l, unfactoredStarts).replace(/^ — /, ''),
+  waitsSaid(l).join('; '),
   phaseSaid(l.state),
   l.startedAs.join(', '),
   labelsText(cardLabels(l)),

@@ -10,6 +10,7 @@ export {
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   cardLabels,
+  afterLine,
   fromLine,
   labelledText,
   ignoredRepoLine,
@@ -22,7 +23,17 @@ export {
   queueOrder,
   startedRefusal,
 } from './inbox.ts';
-export type { CardListing, CardRun, CardState, InboxCard, InboxListing, LabelsShown, QueueStarted, MissedStart } from './inbox.ts';
+export type {
+  CardListing,
+  CardRun,
+  CardState,
+  InboxCard,
+  InboxListing,
+  LabelsShown,
+  ListedWait,
+  QueueStarted,
+  MissedStart,
+} from './inbox.ts';
 export { cardFileReplaced, fileLetGo } from './card-files.ts';
 export { queueFactoryRefusal } from './queue-factory.ts';
 export { INBOX_COLUMNS, inboxCells } from './table.ts';

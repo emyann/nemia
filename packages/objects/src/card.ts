@@ -34,7 +34,7 @@ export type CardState = (typeof CARD_STATES)[number];
  * The keys a card's frontmatter may set, in the order a card's page lists them: six are its `spec`'s, `factory` is its
  * `metadata.namespace` and `labels` its `metadata.labels`.
  */
-export const CARD_KEYS = ['workflow', 'repo', 'queued', 'gate', 'model', 'factory', 'from', 'labels', 'files'] as const;
+export const CARD_KEYS = ['workflow', 'repo', 'queued', 'gate', 'model', 'factory', 'from', 'after', 'labels', 'files'] as const;
 
 /** A key a card's frontmatter may set. */
 export type CardKey = (typeof CARD_KEYS)[number];
@@ -55,6 +55,8 @@ export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
   factory:
     'the factory that processes the card: its run is started in it, on its repository when it has only one; required to start, unless the start names one',
   from: 'runs whose conclusions its run is handed as context, by id, comma-separated: it does not wait on them; none when unset',
+  after:
+    'the cards it waits on, by name, comma-separated: no trigger queues it and the tick starts none of it until each has landed — its own run, or the run of the card its work was passed on to; none when unset',
   labels:
     "a person's labels on the card, a map of a key to its value: what `-l key=value` selects it by, copied to the run it starts; none when unset",
   files:
@@ -135,6 +137,7 @@ export const CardSpec = Schema.Struct({
   gate: Schema.optionalKey(described(Schema.String, 'gate')),
   model: Schema.optionalKey(described(Schema.Record(Schema.String, Schema.String), 'model')),
   from: Schema.optionalKey(described(Schema.Array(Schema.String), 'from')),
+  after: Schema.optionalKey(described(Schema.Array(Schema.String), 'after')),
   queued: Schema.optionalKey(described(Schema.String, 'queued')),
   files: Schema.optionalKey(described(Schema.Array(CardFileNamed), 'files')),
   body: Schema.optionalKey(
@@ -163,6 +166,46 @@ export const CardLabelLeftOut = Schema.Struct({
   ).annotate({ description: 'Each run of its `from:` with its value of the label.' }),
 });
 export type CardLabelLeftOut = typeof CardLabelLeftOut.Type;
+
+/**
+ * What a wait of a card is, closed: `waiting`, on a named card whose work has not landed yet, standing at a card (`at`); `missing`, on a
+ * name the store knows nothing of; `cycle`, on a card whose `after:` leads back to this one.
+ */
+export const CARD_WAIT_KINDS = ['waiting', 'missing', 'cycle'] as const;
+export type CardWaitKind = (typeof CARD_WAIT_KINDS)[number];
+
+/**
+ * One card a card waits on that has not landed: the card named, the kind of the wait, the card its work stands at and that card's state,
+ * the route of a cycle, and whether only a person can release it (`stalled`).
+ */
+export const CardWait = Schema.Struct({
+  card: Schema.String.annotate({ description: "The card named in the card's `after:`, by name." }),
+  kind: Schema.Literals(CARD_WAIT_KINDS).annotate({
+    description:
+      'What the wait is: waiting, on a named card whose work has not landed; missing, on a name the store knows nothing of; cycle, on a card whose after: leads back to this one.',
+  }),
+  at: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The card where the named card's work stands now, where it is another: the card its run passed the work on to. Absent where it is the named card itself.",
+    }),
+  ),
+  state: Schema.optionalKey(
+    Schema.Literals(CARD_STATES).annotate({
+      description: 'The state of the card the work stands at, as the inbox lists it; absent where it was not read.',
+    }),
+  ),
+  cycle: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description: 'On a cycle only: the route of `after:` lines from this card back to itself, by name, the card first and last.',
+    }),
+  ),
+  stalled: Schema.Boolean.annotate({
+    description:
+      'Whether the wait will never be released without a person: a missing card, a cycle, or a card whose run ended without landing or whose start was refused. Fix it with nemia inbox resend <card>, nemia inbox edit <this card> to change after:, or nemia start <this card>.',
+  }),
+}).annotate({ description: 'One card a card waits on that has not landed, and where its work stands.' });
+export type CardWait = typeof CardWait.Type;
 
 /**
  * What Nemia read of the card: its `state`, the runs it was started as (`runs`), the tick's last missed start (`lastStart`), the first
@@ -216,6 +259,12 @@ export const CardStatus = Schema.Struct({
         'The card triggers of its factory that would send it, naming no workflow, to two workflows: it waits until a labelSelector of theirs or its labels change.',
     }),
   ),
+  waitingOn: Schema.optionalKey(
+    Schema.Array(CardWait).annotate({
+      description:
+        'The cards of its after: that have not landed, each with where its work stands: no trigger queues it and the tick starts none of it while any is listed. Read on every pass, never written on the card; absent where it waits on none.',
+    }),
+  ),
   queueLength: Schema.optionalKey(
     describedNumber("How many cards are queued and not started, every factory's, the card among them: on the answer of a queue alone."),
   ),
@@ -265,6 +314,11 @@ export const CardFile = Schema.Struct({
   factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory the card is filed in.' })),
   label: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({ description: 'The labels the card is filed with, each as `key=value`.' }),
+  ),
+  after: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description: 'The cards it waits on, by name: it is queued and started only once each has landed.',
+    }),
   ),
   files: Schema.optionalKey(
     Schema.Array(CardFileRef).annotate({

@@ -60,13 +60,18 @@ test('--answer n=letter resolves to the question and label, several letters and 
   assert.deepEqual(numberedAnswers(QUESTIONS, ['1: neither, a file'], 'r-1'), [
     { question: 'Which store?', chose: [], own: 'neither, a file' },
   ]);
+  assert.deepEqual(numberedAnswers(QUESTIONS, ['1=none', '2=None: none of them yet'], 'r-1'), [
+    { question: 'Which store?', chose: [], none: true },
+    { question: 'Which tests?', chose: [], none: true, own: 'none of them yet' },
+  ]);
   assert.deepEqual(numberedAnswers([], ['1=a'], 'r-1'), [], 'a step that asks none is the api to refuse');
 });
 
-test('REFUSED, exit 2: an --answer in no form, a question past the last, a letter the question does not offer', () => {
+test('REFUSED, exit 2: an --answer in no form (none beside a letter among them), a question past the last, a letter the question does not offer', () => {
   refused(() => numberedAnswers(QUESTIONS, ['a=1'], 'r-1'), '--answer a=1');
   refused(() => numberedAnswers(QUESTIONS, ['3=a'], 'r-1'), 'nemia decide r-1');
   refused(() => numberedAnswers(QUESTIONS, ['1=c'], 'r-1'), 'a (redis)', 'b (memory)');
+  refused(() => numberedAnswers(QUESTIONS, ['2=a,none'], 'r-1'), '--answer 2=a,none');
 });
 
 test('--budget step=amount reads into budgets; one that is not a step and dollars above zero is refused, exit 2', () => {

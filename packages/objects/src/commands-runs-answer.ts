@@ -12,7 +12,8 @@ export const ANSWER_HELP = [
   '<runId> prints them, with the option its letter names; once for each',
   'question: "<n>=a,c" chooses several where it takes several,',
   '"<n>=a: <words>" adds your own words, "<n>: <words>" says words',
-  'alone; --message is then the note under your answers',
+  'alone, "<n>=none" says none of its options fits; --message is',
+  'then the note under your answers',
 ] as const;
 
 /**

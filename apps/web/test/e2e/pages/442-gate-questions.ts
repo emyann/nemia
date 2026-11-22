@@ -8,11 +8,11 @@ import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
-/** The labels chosen on the question titled `title`, in `where`. */
+/** The labels chosen on the question titled `title`, in `where`: the options' tiles selected, by the label each names. */
 const chosenOn = (where: Locator, title: string) =>
   where
-    .locator(`fieldset[data-question="${title}"] input:checked`)
-    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value)) satisfies Promise<string[]>;
+    .locator(`fieldset[data-question="${title}"] label[data-option][data-selected]`)
+    .evaluateAll((tiles) => tiles.map((tile) => tile.getAttribute('data-option') ?? '')) satisfies Promise<string[]>;
 
 /** The JSON of the ask `file`, or nothing where it is not there. */
 const askIn = (file: string) =>

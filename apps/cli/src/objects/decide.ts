@@ -96,7 +96,7 @@ const questionBlock = (q: DecisionQuestion) => [
         .map((line) => `     ${line}`)
     : []),
   ...q.options.map((o) => `     ${o.letter}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${o.recommended ? '  (recommended)' : ''}`),
-  `     ${q.multiple ? 'choose one or more' : 'choose one'}, or answer in your own words`,
+  `     ${q.multiple ? 'choose one or more' : 'choose one'}, answer in your own words, or none (${q.number}=none)`,
 ];
 
 /**

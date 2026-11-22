@@ -13,6 +13,7 @@
     "packages/*",
     "apps/*",
     "tools/guards",
+    "tools/design-system",
     "tools/test-kit"
   ],
   "engines": {
@@ -38,7 +39,8 @@
     "board:stop": "npm run board:stop --workspace web",
     "storybook": "npm run storybook --workspace web",
     "release:check": "npm run typecheck && npm test",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "design-system": "npm run produce --workspace design-system --"
   },
   "devDependencies": {
     "@emyann/tsverify": "0.9.1",

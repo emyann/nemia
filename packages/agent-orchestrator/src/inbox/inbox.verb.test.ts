@@ -12,7 +12,10 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest } from '../../test/placed.ts';
 import { CardDoor, cardDoorOver, type CardLayer } from '../cards/cards.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
-import { startQueued } from './inbox.verb.ts';
+import { landedThrough, startQueued, waitingOf } from './inbox.verb.ts';
+import type { Engine } from '../runtime-client.ts';
+import type { BranchReader } from '../branches/branches.store.ts';
+import type { ParentRun } from '../wait/wait.ts';
 import type { MissedStart } from './index.ts';
 import { CardName } from './inbox.model.ts';
 import { cardDoorMemory } from '../cards/memory.store.ts';
@@ -80,4 +83,53 @@ test('a queued card that waits on a card whose run has not landed is not started
     );
   assert.equal(await pass(false), undefined, 'the card waits: nothing is taken');
   assert.equal((await pass(true))?.card, 'b-3z4w', 'its card landed: the queue takes it');
+});
+
+/** The engine and the branch reader of a pass whose runs were all read before: neither is reached, since `Parents.read` answers each. */
+const unreached = { e: {} as unknown as Engine, git: {} as unknown as BranchReader };
+
+test("through the pass's landing read (`landedThrough` over `Parents.read`), a queued card waits while its card's run reads unlanded, and is taken once it reads landed", async () => {
+  const first: Run = { ...aRun('a-run-k2q9'), from: { inbox: 'a-1x2y' } };
+  const pass = (landed: boolean) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const door = yield* CardDoor;
+        yield* door.cards.add(CardName.read('a-1x2y'), aCard('First', { workflow: 'dev' }));
+        yield* door.cards.add(
+          CardName.read('b-3z4w'),
+          aCard('Second', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z', after: 'a-1x2y' }),
+        );
+        const read = new Map<string, ParentRun>([['a-run-k2q9', { landed }]]);
+        return yield* startQueued('/repo', [first], landedThrough(unreached.e, { git: unreached.git, read }));
+      }).pipe(Effect.provide(Layer.mergeAll(stand().layer, cardDoorMemory(), runDoorMemory(), configGiven(STORE, process.env)))),
+    );
+  assert.equal(await pass(false), undefined, 'its run read unlanded: nothing is taken');
+  assert.equal((await pass(true))?.card, 'b-3z4w', 'its run read landed: the queue takes it');
+});
+
+test('`waitingOf` follows a card to the card a node of its run filed (`sent`) and to the card it was sent on as (`<run>-resent`), reading the landing of each run once', () => {
+  const at = '2026-11-01T10:00:00.000Z';
+  const routed: Run = {
+    ...aRun('a-run-k2q9'),
+    from: { inbox: 'a-1x2y' },
+    steps: { route: { taskId: 'a-run-k2q9-route', sent: { card: 'a2-3z4w', at } } },
+  };
+  const onward: Run = { ...aRun('a2-run-m5n6'), from: { inbox: 'a2-3z4w' } };
+  const resent: Run = { ...aRun('x-run-p7q8'), from: { inbox: 'x-5v6u' } };
+  const files = [
+    { file: 'b-9r8s.md', text: '---\nworkflow: dev\nafter: a-1x2y, x-5v6u, gone-1a2b\n---\nSecond.\n' },
+    { file: 'a-1x2y.md', text: '---\nworkflow: dev\n---\nFirst.\n' },
+    { file: 'x-run-p7q8-resent.md', text: '---\nworkflow: dev\n---\nSent on.\n' },
+  ];
+  const asked: string[] = [];
+  const landed = (id: string) => Effect.sync(() => (asked.push(id), id === 'a2-run-m5n6'));
+  const waiting = Effect.runSync(waitingOf(files, [routed, onward, resent], landed));
+  assert.ok(waiting, 'a card not started names cards in its after:, so they are read');
+  assert.deepEqual(waiting.look('a-1x2y'), { known: true, runs: [{ id: 'a-run-k2q9', landed: false }], onward: ['a2-3z4w'] });
+  assert.deepEqual(waiting.look('a2-3z4w'), { known: true, runs: [{ id: 'a2-run-m5n6', landed: true }], onward: [] });
+  assert.deepEqual(waiting.look('x-5v6u'), { known: true, runs: [{ id: 'x-run-p7q8', landed: false }], onward: ['x-run-p7q8-resent'] });
+  assert.deepEqual(waiting.look('x-run-p7q8-resent'), { known: true, runs: [], onward: [] }, 'in the inbox, with no run of its own yet');
+  assert.equal(waiting.look('gone-1a2b').known, false, 'neither in the inbox nor started from');
+  assert.deepEqual([...asked].sort(), ['a-run-k2q9', 'a2-run-m5n6', 'x-run-p7q8'], 'each run read once');
+  assert.equal(Effect.runSync(waitingOf(files.slice(1), [routed], landed)), undefined, 'no card names one: nothing is read');
 });

@@ -131,6 +131,12 @@ const COMPONENTS: Components = {
 /** The components a text is drawn with. */
 const DRAWN: Components = { ...COMPONENTS, ...HEADINGS };
 
+/**
+ * A file a text carries, as the board reads it: the address it is served at, and whether it is a picture the api serves as its own type
+ * (`PICTURE_TYPES`), shown where the text draws it as an image; any other is a link to it.
+ */
+export type TextFile = { readonly at: string; readonly picture: boolean };
+
 /** The name a target written `name` or `./name` stands for, with its escapes read. */
 const targetName = (src: string) => {
   const bare = src.startsWith('./') ? src.slice(2) : src;
@@ -145,24 +151,26 @@ const targetName = (src: string) => {
  * The components a text that carries `files` is drawn with: an image whose target is one of them shown, from the address the board
  * reads it at, and a link to one led there; every other image and link as `DRAWN` draws it.
  */
-const drawnWith = (files: Readonly<Record<string, string>>) => {
+const drawnWith = (files: Readonly<Record<string, TextFile>>) => {
   const fileOf = (src: unknown) => (typeof src === 'string' ? files[targetName(src)] : undefined);
   const drawn: Components = {
     ...DRAWN,
     img: (props) => {
-      const at = fileOf(props.src);
-      if (at === undefined) return drawnImage(props);
+      const file = fileOf(props.src);
+      if (file === undefined) return drawnImage(props);
+      if (!file.picture) return drawnImage({ ...props, src: file.at });
+      const at = file.at;
       return (
         <img src={at} alt={props.alt ?? ''} data-card-file className="my-2 max-h-96 max-w-full rounded border border-outline-variant" />
       );
     },
-    a: (props) => drawnLink({ ...props, href: fileOf(props.href) ?? props.href }),
+    a: (props) => drawnLink({ ...props, href: fileOf(props.href)?.at ?? props.href }),
   };
   return drawn;
 };
 
 /** Whether two maps of a text's files say the same. */
-const sameFiles = (a: Readonly<Record<string, string>> | undefined, b: Readonly<Record<string, string>> | undefined) =>
+const sameFiles = (a: Readonly<Record<string, TextFile>> | undefined, b: Readonly<Record<string, TextFile>> | undefined) =>
   JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
 
 type MarkdownProps = {
@@ -179,10 +187,11 @@ type MarkdownProps = {
   /** Marks a text by what it is on its page (`data-body`, a closeout's body), on the element that holds it. */
   'data-body'?: boolean;
   /**
-   * The files the text carries, by the name its markdown targets them with, each the address the board reads it at: a card's, served by
-   * the api as itself. An image naming one is shown; any other image stays a link, never fetched.
+   * The files the text carries, by the name its markdown targets them with, each the address the board reads it at and whether it is a
+   * picture (`TextFile`): a card's, served by the api as itself. An image naming a picture is shown; an image naming any other file is a
+   * link to it, and any other image stays a link, never fetched.
    */
-  files?: Readonly<Record<string, string>>;
+  files?: Readonly<Record<string, TextFile>>;
 };
 
 /**

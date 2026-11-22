@@ -9,6 +9,7 @@ import { CardFiles } from './CardFiles';
 import { labelCard } from '@/lib/api/labels';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { startedCard } from '@/lib/inbox';
+import { PICTURE_TYPES } from 'objects';
 
 import { seatFactory } from '../nav/nav';
 import { useSeat } from '../nav/useSeat';
@@ -20,13 +21,18 @@ import { factoryLevel, inboxLevel, Trail } from '../nav/Trail';
  * It starts and drops nothing: the Inbox page does. Its files are listed under its labels (`CardFiles`), attached and taken off until a run
  * is started from it, and a picture its text shows by a file's name is shown from the api.
  */
+/** Whether a file of the type `mediaType` is a picture the api serves as its own type, and a page may show. */
+const isPictureType = (mediaType: string | undefined) => PICTURE_TYPES.some((type) => type === mediaType);
+
 export function CardPage({ name }: { name: string }) {
   const { data: card } = useSuspenseQuery(cardQuery(name));
   const queryClient = useQueryClient();
   const changed = () => queryClient.invalidateQueries({ queryKey: ['inbox'] });
   const attach = useMutation({ mutationFn: (given: File[]) => attachToCard(card, given), onSuccess: changed });
   const detach = useMutation({ mutationFn: (file: string) => detachFromCard(card, file), onSuccess: changed });
-  const shown = Object.fromEntries(card.files.filter((f) => f.kept).map((f) => [f.name, cardFileUrl(card, f.file)]));
+  const shown = Object.fromEntries(
+    card.files.filter((f) => f.kept).map((f) => [f.name, { at: cardFileUrl(card, f.file), picture: isPictureType(f.mediaType) }] as const),
+  );
   const refusal = attach.error ?? detach.error;
 
   return (

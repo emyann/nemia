@@ -114,6 +114,16 @@ test('REFUSED: a link whose address could run script is its words and no link; a
   assert.match(image, /<span data-image="true">image<\/span>/, 'an image whose address was emptied is a word');
 });
 
+test("a card's picture its text names is shown; a file of it of another type, named as an image, is a link to it, never drawn", () => {
+  const files = { 'shot.png': { at: '/c/shot', picture: true }, 'arch.svg': { at: '/c/arch', picture: false } };
+  const text = '![shot](./shot.png) and ![arch](arch.svg)';
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = renderToStaticMarkup(createElement(Markdown, { files, children: text }));
+  assert.match(html, /<img src="\/c\/shot"[^>]*data-card-file/);
+  assert.doesNotMatch(html, /<img[^>]*\/c\/arch/);
+  assert.match(html, /<a href="\/c\/arch"[^>]*data-image="true"[^>]*>image: arch<\/a>/);
+});
+
 test("a fenced block is the board's code block in its fence's language; one it has no grammar for is text; inline code is inline", () => {
   const html = md('Run `npm test`:\n\n```bash\nnpm test\nnpm run e2e\n```\n\n```python\nprint(1)\n```\n\n```\nplain\n```');
   assert.match(html, /data-language="bash"[^>]*>.*<code>npm test\nnpm run e2e<\/code>/s, 'the code, less the newline the block ends with');

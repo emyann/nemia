@@ -76,7 +76,7 @@ export const Refused: Story = {
 export const PictureInText: Story = {
   render: () => (
     <div style={{ width: 560 }}>
-      <Markdown files={{ 'shot.png': PIXELS }}>
+      <Markdown files={{ 'shot.png': { at: PIXELS, picture: true } }}>
         {'The header is cut off:\n\n![the header](./shot.png)\n\nNot fetched: ![elsewhere](https://example.com/x.png)'}
       </Markdown>
     </div>

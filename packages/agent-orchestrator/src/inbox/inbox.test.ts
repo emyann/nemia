@@ -233,7 +233,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
     { file: 'README.md', text: '# ideas\n' },
     { file: '.cache-the-views-k2q9.md.swp', text: '' },
     { file: 'cache-the-views-k2q9.md', text: '---\nrepo: /home/me/code/app\n---\n# Cache the views between passes.\n' },
-    { file: 'broken-a1b2.md', text: '---\nafter: parse-the-flag-1x2y\n---\nx\n' },
+    { file: 'broken-a1b2.md', text: '---\nafter: broken-a1b2\n---\nx\n' },
     { file: 'notes.txt', text: '' },
     { file: 'drafts/', text: '' },
   ];
@@ -326,9 +326,8 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
     ] satisfies InboxListing[],
   );
   const broken = said.get('broken-a1b2')!;
-  assert.match(broken, /^broken-a1b2\.md: `after` is not a key/);
-  assert.match(broken, /nemia start <inbox>\/broken-a1b2\.md --after <runId>/);
-  assert.match(broken, /Delete the line\.$/);
+  assert.match(broken, /^broken-a1b2\.md: `after: broken-a1b2` names the card itself/);
+  assert.match(broken, /Take broken-a1b2 off the line\.$/);
   for (const name of ['drafts/', 'notes.txt']) {
     const error = said.get(name)!;
     assert.ok(error.startsWith(`${name}: not a card.`), error);

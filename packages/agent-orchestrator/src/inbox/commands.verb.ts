@@ -30,7 +30,7 @@ import { setting } from '../config/config.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 import type { LeftOut } from '../labels/labels.ts';
-import { cardInPlay, cardLabels, type InboxCard, type InboxListing } from './inbox.ts';
+import { cardInPlay, cardLabels, ideaFactory, type InboxCard, type InboxListing } from './inbox.ts';
 import { addToInbox, dropFromInbox, queueInInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
 import { EngineService } from '../runtime-client.ts';
 import { howOf } from '../summary/how.verb.ts';
@@ -93,14 +93,28 @@ export const InboxAddInput = Schema.Struct({
 export type InboxAddInput = typeof InboxAddInput.Type;
 
 /**
+ * Why an idea whose own `factory:` names `named` cannot be filed in the namespace of `factory` (`default` for none), naming where it can.
+ * @param named The factory the idea's frontmatter names.
+ * @param factory The factory of the namespace it was sent to, none for `default`.
+ */
+const namespaceRefusal = (named: string, factory: string | undefined) =>
+  `the idea names the factory ${named} in its \`factory:\` line, and was sent to the namespace ${factory ?? DEFAULT_NAMESPACE}: a card's namespace is its factory, and the files it carries are uploaded there first. File it in ${named}'s: nemia inbox add <idea> reads its \`factory:\` line, or POST /api/namespaces/${named}/cards; or take the line out. Nothing was filed.`;
+
+/**
  * `nemia inbox add`: an idea filed as a card, its words the client's (`objects`' `INBOX_ADD_WORDS`). Its handler is handed the idea's text
- * under `idea` — the client reads a file where it is typed and sends its text — and the keys the api's `create` found (`filingOf`).
+ * under `idea` — the client reads a file where it is typed and sends its text — and the keys the api's `create` found (`filingOf`), its
+ * `factory` the namespace's. An idea whose own `factory:` names another factory is refused `Invalid`, nothing filed (`ideaFactory`): its
+ * files were uploaded to the namespace it was sent to, and a card is kept in its factory's, as Kubernetes refuses an object whose
+ * namespace is not the one of the path it is sent to.
  */
 export const INBOX_ADD: Served<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }, InboxAddInput> = {
   ...INBOX_ADD_WORDS,
   input: InboxAddInput,
   handler: ({ idea, label, files, ...keys }) =>
     Effect.gen(function* () {
+      const named = ideaFactory(idea);
+      if (named !== undefined && named !== (keys.factory ?? DEFAULT_NAMESPACE))
+        return yield* Effect.fail(new Invalid({ message: namespaceRefusal(named, keys.factory) }));
       const kept = files === undefined ? undefined : yield* filesKept(keys.factory ?? DEFAULT_NAMESPACE, files);
       return yield* addToInbox({ text: idea, ...keys, labels: [...(label ?? [])], ...(kept !== undefined ? { files: kept } : {}) });
     }),

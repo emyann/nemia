@@ -1,18 +1,19 @@
 /**
  * `nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--after <card>]... [--label <key=value>]...`: an idea filed as
- * a card through the
- * Card's `create`, in the namespace of `--factory` (`default` for none). A file is read here and its text sent (Q8); a folder is refused,
- * naming the command. `--workflow` is sent by its name, a path refused; `--after` each card it waits on, and
- * `--label` each edit, as typed. A card names no repository: its
- * words refuse `--repo`, the factory's wiring placing its run. Each `--file`, and each file beside an idea file that its text names as a
- * markdown image's or link's target (`besideIdea`), is uploaded first to the namespace's files and carried by the card by its id.
+ * a card through the Card's `create`, in the namespace of `--factory`, else of the factory the idea's own `factory:` line names, else
+ * `default` (`filedNamespace`). A file is read here and its text sent (Q8); a folder is refused, naming the command. `--workflow` is sent
+ * by its name, a path refused; `--after` each card it waits on, and `--label` each edit, as typed. A card names no repository: its words
+ * refuse `--repo`, the factory's wiring placing its run. Each `--file`, and each file beside an idea file that its text names as a
+ * markdown image's or link's target outside code (`besideIdea`), is uploaded first to the namespace's files and carried by the card by
+ * its id, and a line says each file it carries.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_NAMESPACE, INBOX_ADD_WORDS, type Args, type Card } from 'objects';
+import { filedNamespace, INBOX_ADD_WORDS, type Args, type Card } from 'objects';
 import { asked } from '../../objects.ts';
 import { listArg, said, textArg } from '../requests.ts';
 import { inputsOf, uploaded } from '../runs/start.ts';
+import { cardFileLines } from './attach.ts';
 import { factoryLine, fileOf, labelsText, textOrFile, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_ADD_WORDS;
@@ -43,10 +44,17 @@ export const filedLines = (card: Card) => {
 /** A markdown image's or link's target, up to its closing parenthesis or a title after a space: `](<target>`. */
 const TARGET = /\]\(\s*<?([^)\s>]+)>?/g;
 
+/** A fenced code block, from its fence of three backticks or tildes to the line that closes it, or to the end where none does. */
+const FENCED = /^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm;
+
+/** An inline code span: a run of backticks, what it quotes, and a run of as many. */
+const SPAN = /(?<!`)(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g;
+
 /**
- * The files of the idea file `idea` that its text names as a markdown image's or link's target, each a file there, in the order the text
- * names them, once: `taken`, each beside it (`name` or `./name`), which the card carries; `notTaken`, each in a folder below or beside it
- * (`img/shot.png`), which it does not, as the text names it and as `--file` takes it.
+ * The files of the idea file `idea` that its text names as a markdown image's or link's target outside code, each a file there, in the
+ * order the text names them, once — a link quoted in a code span or a fenced code block, an example of one, names none: `taken`, each
+ * beside it (`name` or `./name`), which the card carries; `notTaken`, each in a folder below or beside it (`img/shot.png`), which it does
+ * not, as the text names it and as `--file` takes it.
  * @param idea The idea as typed: a file's path, or words, which name none.
  * @param body The idea's text.
  */
@@ -55,7 +63,7 @@ export function besideIdea(idea: string, body: string) {
   const notTaken = new Map<string, string>();
   if (!fs.statSync(idea, { throwIfNoEntry: false })?.isFile()) return { taken: [...taken], notTaken: [...notTaken] };
   const dir = path.dirname(idea);
-  for (const match of body.matchAll(TARGET)) {
+  for (const match of body.replace(FENCED, ' ').replace(SPAN, ' ').matchAll(TARGET)) {
     const target = (match[1] ?? '').replace(/^\.\//, '');
     if (target === '' || target.includes(':') || path.isAbsolute(target)) continue;
     const at = path.join(dir, target);
@@ -84,10 +92,9 @@ export async function inboxAdd(args: Args) {
   const idea = textArg(args, 'idea') ?? '';
   const body = textOrFile(idea, COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');
-  const factory = textArg(args, 'factory');
   const label = listArg(args, 'label');
   const after = listArg(args, 'after');
-  const namespace = factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
+  const namespace = filedNamespace(body, textArg(args, 'factory'));
   const typed = listArg(args, 'file');
   const named = besideIdea(idea, body);
   const typedHere = (f: string) => typed.some((t) => path.resolve(t) === path.resolve(f));
@@ -101,7 +108,9 @@ export async function inboxAdd(args: Args) {
     ...(after.length ? { after } : {}),
     ...(files.length ? { files } : {}),
   };
-  said(filedLines(await asked(COMMAND, (c) => c.cards.create({ params: { namespace }, payload }))));
+  const card = await asked(COMMAND, (c) => c.cards.create({ params: { namespace }, payload }));
+  said(filedLines(card));
+  if (card.status.files?.length) said(cardFileLines(card));
   said(notTakenLines(named.notTaken.filter(([, at]) => !typedHere(at))));
   return 0;
 }

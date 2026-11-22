@@ -143,6 +143,35 @@ const cardFilesRefusalSpec = spec<
 /** Why a card's files as given cannot be written, or undefined where they can. */
 export type CardFilesRefusalOf = Implementation<typeof cardFilesRefusalSpec>;
 
+/** Whether one of `attached` is given the name `name`. */
+const namedIn = (attached: readonly CardFileGiven[], name: string) => attached.some((a) => a.name === name);
+
+const cardFileReplacedSpec = spec<(held: CardFileGiven, attached: readonly CardFileGiven[]) => boolean>({
+  ensures: {
+    aGoneReferenceIsReplaced: {
+      description:
+        'A file the card holds whose File is no longer kept is taken off where a file is attached under its name: attaching it again is how the refusal at start is answered',
+      condition: ({ input: [held, attached], output }) => held.size !== null || !namedIn(attached, held.name) || output,
+    },
+    whatIsKeptStays: {
+      description:
+        'A file the card holds whose File is still kept stays, a name attached again beside it among them, so two files of one name are still refused',
+      condition: ({ input: [held], output }) => held.size === null || !output,
+    },
+    onlyByItsName: {
+      description: 'A file the card holds stays unless a file is attached under its very name',
+      condition: ({ input: [held, attached], output }) => namedIn(attached, held.name) || !output,
+    },
+  },
+});
+
+/**
+ * Whether the file a card holds (`held`, with the size of its File kept in the card's namespace, null for none) is taken off as files
+ * are attached beside it (`attached`): a reference that is gone, replaced by a file attached under its name. The card then carries the
+ * held files this keeps, then the attached, which `cardFilesRefusal` judges.
+ */
+export type CardFileReplaced = Implementation<typeof cardFileReplacedSpec>;
+
 /**
  * A kept File as the prune reads it: when it was last written, in milliseconds, and whether a card names it — its id written anywhere in
  * an inbox card's text, a card that does not read included, so a card nobody can parse loses none of its files.

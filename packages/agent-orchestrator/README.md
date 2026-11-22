@@ -3402,8 +3402,14 @@ run 'wf tick' (or 'wf up') to start it
   the repository.
 - **A card carries files** (`files:`, a map of the name its text and its run find each by to the File it names, `file_…`). Each
   is uploaded first to the card's namespace (`POST /api/namespaces/<namespace>/files`) and named to the card by its id:
-  `nemia inbox add "<idea>" --file <path>`, every file beside an idea file that its text names as a markdown image or link, and
-  `nemia inbox attach <name> <path>...`; `nemia inbox detach <name> <file>...` takes one off and `nemia inbox files <name>
+  `nemia inbox add "<idea>" --file <path>`, every file beside an idea file that its text names as a markdown image or link outside
+  code (a link quoted in a code span or a fenced block is an example, carried by none, and named by none in `namedInText`), and
+  `nemia inbox attach <name> <path>...`; `nemia inbox add` says each file the card carries. A card is filed in its factory's
+  namespace, where its files were uploaded: `nemia inbox add` and the board file an idea whose own `factory:` line names a factory
+  in that one, and the filing refuses an idea whose `factory:` is not the namespace it is sent to, nothing filed (the `INBOX_ADD`
+  handler, `ideaFactory`). A file attached under the name of one the card holds whose File is gone replaces it
+  (`cardFileReplaced`), which is how the start's refusal of a gone File is answered; one whose File is still kept is refused as a
+  name given twice. `nemia inbox detach <name> <file>...` takes one off and `nemia inbox files <name>
   [--get <file>]` lists them or writes one out. A card carries 32 files and 256 MiB at most, each name a file's own, never
   `cards`, and its files change only until a run is started from it (`cardFilesRefusal`, `src/inbox/card-files.ts`, proved by
   `contracts/card-files.contract.ts`). A File is kept while any inbox entry's text names its id, and let go of a day after its

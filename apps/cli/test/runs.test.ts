@@ -1,9 +1,10 @@
 /**
  * The run's verbs the client holds, told as a person types them, against a store served by the api (`served.ts`) with no tick: `nemia
  * start` of a brief, a file, a plan card's file and an inbox card, each by its workflow's name, with its models, gates and inputs sent;
- * then `hold` and its lift, `say` kept for a step not filed, `cancel`, `rm` and `prune`, and the store's `pause`, `pause --now`,
- * `resume` and `pause-timeout`, and `wait`; and `start` and `hold` under a remote context pointed at an exposed store. Each asserts its
- * exit code and what the store holds after it; a refusal, its exit code and the command or flag it names, never its sentence.
+ * and an idea file naming its factory and a picture beside it, filed and started; then `hold` and its lift, `say` kept for a step not
+ * filed, `cancel`, `rm` and `prune`, and the store's `pause`, `pause --now`, `resume` and `pause-timeout`, and `wait`; and `start` and
+ * `hold` under a remote context pointed at an exposed store. Each asserts its exit code and what the store holds after it; a refusal, its
+ * exit code and the command or flag it names, never its sentence.
  */
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -100,6 +101,32 @@ test('nemia start of a brief in words, with --model, --gate and --input, starts 
   assert.deepEqual(run.inputs, ['notes.md']);
   assert.equal(fs.readFileSync(path.join(store.root, 'runs', id, 'inputs', 'notes.md'), 'utf8'), 'Read me first.\n');
   assert.match(said.out, /^gated at: implement/m);
+});
+
+test('an idea file naming its factory and a picture beside it, filed with no --factory, is filed in that factory with its File, and starts', async () => {
+  const dir = scratch('nemia-runs-pictured-');
+  const shot = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 4, 5, 6]);
+  fs.writeFileSync(path.join(dir, 'shot.png'), shot);
+  fs.writeFileSync(path.join(dir, 'quoted.png'), shot);
+  write(path.join(dir, 'card.md'), '---\nfactory: acme\nworkflow: dev\n---\nMatch the page\n\n![it](shot.png), not `![q](quoted.png)`.\n');
+  const added = await store.nemia(['inbox', 'add', path.join(dir, 'card.md')]);
+  assert.equal(added.code, 0, added.err);
+  const name = /^(\S+) {2}/.exec(added.out)?.[1] ?? assert.fail(`no card in: ${added.out}`);
+  assert.match(added.out, /^\S+ {2}shot\.png {2}file_[0-9a-f]{32} {2}11 bytes {2}image\/png {2}in its text$/m, 'the file it carries, kept');
+  assert.doesNotMatch(added.out, /quoted\.png/, 'a link quoted in code is not carried');
+  const listed = await store.nemia(['inbox', 'files', name]);
+  assert.equal(listed.code, 0, listed.err);
+  assert.doesNotMatch(listed.out, /let go of/);
+  const said = await store.nemia(['start', name]);
+  assert.equal(said.code, 0, said.err);
+  const id = idIn(said);
+  assert.equal(recordOf(store.root, id).factory, 'acme');
+  assert.deepEqual(recordOf(store.root, id).inputs, ['shot.png']);
+  assert.ok(fs.readFileSync(path.join(store.root, 'runs', id, 'inputs', 'shot.png')).equals(shot), 'the picture, byte for byte');
+
+  const elsewhere = await store.nemia(['inbox', 'add', path.join(dir, 'card.md'), '--factory', 'beta']);
+  assert.equal(elsewhere.code, 2, elsewhere.err);
+  assert.ok(elsewhere.err.includes('/api/namespaces/acme/cards'), elsewhere.err);
 });
 
 test('nemia start of an inbox card with three pictures of 3 MB in all uploads each, and its run holds each byte for byte', async () => {

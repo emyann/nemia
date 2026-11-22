@@ -11,6 +11,7 @@ import {
   cardLabels,
   fromText,
   ideaCard,
+  ideaFactory,
   labelledText,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
@@ -146,6 +147,18 @@ test("`model:` names a step's model in the card's run alone, carried by the card
     'queued: the models stay, in their order',
   );
   assert.equal(ideaCard('./idea.md', text, {}).text, text, "filed from a file whose frontmatter is a card's: kept");
+});
+
+test("ideaFactory: the factory an idea's own frontmatter names, never thrown for one that does not read", () => {
+  const rows: [string, string | undefined, string][] = [
+    ['---\nfactory: acme\nworkflow: dev\n---\nFix it\n', 'acme', "a card's frontmatter naming one"],
+    ['---\nworkflow: dev\n---\nFix it\n', undefined, 'a frontmatter naming none'],
+    ['Fix it\n', undefined, 'no frontmatter'],
+    ['---\nfactory: acme\ntitle: x\n---\nFix it\n', undefined, 'a block of keys no card has: the body whole, as ideaCard reads it'],
+    ['---\nfactory: acme\nqueued: 2026-01-01T00:00:00.000Z\n---\nFix it\n', undefined, 'a text ideaCard refuses'],
+    ['', undefined, 'nothing in it'],
+  ];
+  for (const [text, factory, why] of rows) assert.equal(ideaFactory(text), factory, why);
 });
 
 test("`gate:` names the step a card's run waits at for a person, carried by the card, its listing, its line, a queue and a filing", () => {

@@ -19,6 +19,7 @@ import { contextRefusal } from '../start/index.ts';
 import { cardWriteRefusal } from './card-write.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import {
+  cardFileReplaced,
   cardText,
   cardWorkflowRefusal,
   afterLine,
@@ -165,8 +166,10 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
 });
 
 /**
- * The card `name` of `namespace` with `files` attached beside those it carries, through the Card door: refused as `cardFilesJudged`
- * judges the whole (a started card, `Conflict`; a name given twice or an unkept File, `Invalid`), nothing written then.
+ * The card `name` of `namespace` with `files` attached beside those it carries, through the Card door: a file it carries whose File is
+ * no longer kept, and whose name one of `files` takes, is replaced by it (`cardFileReplaced`), which is how a start refused for a gone
+ * File is answered; then refused as `cardFilesJudged` judges the whole (a started card, `Conflict`; a name given twice beside a kept File,
+ * or an unkept File, `Invalid`), nothing written then.
  * @param name The card's name.
  * @param namespace Its namespace, its factory or `default`, whose Files the ids name.
  * @param files The files to attach, each a File's id and the name it takes, the File's own where none is given.
@@ -174,7 +177,9 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
 export const attachToCard = Effect.fn('attachToCard')(function* (name: string, namespace: string, files: readonly CardFileRef[]) {
   const { card, card$, file, started } = yield* cardToWrite(name, namespace);
   const held = card.files ?? [];
-  const judged = yield* cardFilesJudged(card.name, yield* filesKept(namespace, [...held, ...files]), held, started.length > 0);
+  const attached = yield* filesKept(namespace, files);
+  const staying = (yield* filesKept(namespace, held)).filter((h) => !cardFileReplaced(h, attached));
+  const judged = yield* cardFilesJudged(card.name, [...staying, ...attached], held, started.length > 0);
   const written = yield* tried(() => cardText(card, { files: judged }));
   yield* (yield* CardDoor).cards.rewrite(card$, written);
   const out: CardReplaced = { card: parseInboxCard(`${name}.md`, written), file, written: true };

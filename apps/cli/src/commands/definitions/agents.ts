@@ -10,7 +10,7 @@ import {
   AGENTS_SOURCES_WORDS,
   AGENTS_WORDS,
   DEFAULT_NAMESPACE,
-  type Agent,
+  type AgentList,
   type AgentCopied,
   type AgentSource,
   type AgentSources,
@@ -20,12 +20,14 @@ import { asked, everyPage, pageOf } from '../../objects.ts';
 import { listArg, pathSent, said, textArg } from '../requests.ts';
 import { onRepo } from './sent.ts';
 
+/** An agent as the list serves it, without its files' content. */
+type AgentListed = AgentList['items'][number];
 /** The line of an agent copied in: the file and version it came from, and whether that file has changed since or is gone. */
-const copiedLine = ({ source, version, now }: NonNullable<Agent['status']['copied']>) =>
+const copiedLine = ({ source, version, now }: NonNullable<AgentListed['status']['copied']>) =>
   `   copied from ${source} at ${version}${now === 'changed' ? '; the source has changed since' : now === 'gone' ? '; the source is gone' : ''}`;
 
 /** One agent's lines on `nemia agents`: what it is for, what it says it can do, and the skills it is given; or why it does not read. */
-function agentLines({ metadata: { name }, spec, status }: Agent) {
+function agentLines({ metadata: { name }, spec, status }: AgentListed) {
   const from = status.origin;
   if (status.error !== null) return [`${name}  ${from}  does not read: ${status.error.split('\n')[0]}`];
   const custom = status.custom ?? null;
@@ -45,7 +47,7 @@ function agentLines({ metadata: { name }, spec, status }: Agent) {
  * `nemia agents`' lines: each agent, and how to get one's card; or where an agent would be, for none.
  * @param agents The agents the api lists, in its order; none prints where an agent would be.
  */
-export const agentsLines = (agents: readonly Agent[]) =>
+export const agentsLines = (agents: readonly AgentListed[]) =>
   (agents.length
     ? [...agents.flatMap(agentLines), `\none in A2A's shape: nemia agents card <name>`]
     : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"]) satisfies string[];

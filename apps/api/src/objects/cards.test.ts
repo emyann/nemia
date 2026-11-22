@@ -126,7 +126,10 @@ test('GET /api/cards/:name finds a card in its factory, its file as written in s
   assert.equal(inNamespace.status.source, object.status.source, 'a read in its namespace carries it too');
   assert.equal((await app.request('/api/cards/no-such-card')).status, 404);
   for (const url of ['/api/cards', '/api/namespaces/default/cards'])
-    for (const item of (await list(url)).body.items) assert.equal(item.status.source, undefined, `${url}: ${item.metadata.name}`);
+    for (const item of (await list(url)).body.items) {
+      assert.equal('source' in item.status, false, `${url}: ${item.metadata.name}`);
+      assert.equal('body' in item.spec, false, `${url}: ${item.metadata.name}`);
+    }
 });
 
 test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVersion and a started card are 409, the file as it was', async (t) => {
@@ -297,7 +300,7 @@ test('a card file that does not parse is listed all the same, its status saying 
   t.onTestFinished(() => fs.rmSync(path.join(inbox, 'y-broken.md'), { force: true }));
   const listed = (await list('/api/cards')).body.items.find((c) => c.metadata.name === 'y-broken');
   assert.ok(listed, 'listed, never hidden');
-  assert.equal(listed.spec.body, undefined, 'no body read of a card that does not parse');
+  assert.equal('body' in listed.spec, false, 'a list carries no body');
   assert.match(listed.status.error ?? '', /not-a-key/, 'its status says why, naming the key');
   const read = (await (await app.request('/api/namespaces/default/cards/y-broken')).json()) as typeof Card.Type;
   assert.match(read.status.error ?? '', /not-a-key/);

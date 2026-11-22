@@ -10,7 +10,7 @@
  * And the floor of an agent's standing token, run where the endpoint a request reaches is first known (`floorHandled`): before every
  * endpoint's handler, writes included, a request an agent's token reaches past its floor is refused 403.
  */
-import { Effect } from 'effect';
+import { Effect, Exit, Schema } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { tokenFloor } from 'agent-orchestrator';
@@ -129,11 +129,33 @@ export class AnswerPastBound extends Error {
   }
 }
 
+/** The success Schemas of the GET endpoint `endpoint` of `objects`' `Api`; none where it has no such endpoint. */
+const successesOf = (endpoint: ApiGetName) => {
+  const [group = '', name = ''] = endpoint.split('.');
+  const groups = Api.groups as Readonly<
+    Record<string, { readonly endpoints: Readonly<Record<string, { readonly success: ReadonlySet<Schema.Top> }>> }>
+  >;
+  return [...(groups[group]?.endpoints[name]?.success ?? [])];
+};
+
+/**
+ * `answer` as the first of `schemas` that encodes it writes it, every key its Schema does not declare left out, as HttpApi will send it:
+ * a list's items without their files' content (`LISTED_WITHOUT`); `answer` itself where none encodes it.
+ */
+const asSent = (schemas: readonly Schema.Top[], answer: unknown) => {
+  for (const schema of schemas) {
+    const sent = Schema.encodeUnknownExit(schema as Schema.Codec<unknown, unknown>)(answer);
+    if (Exit.isSuccess(sent)) return sent.value;
+  }
+  return answer;
+};
+
 /**
  * `handler`, the handler of the GET endpoint `endpoint`, its success measured against the app's bound (`Served.answerMost`) before HttpApi
- * encodes it: past it, a defect of `AnswerPastBound`, answered 422. A read of bytes or a stream (`READS`' `bytes`, `stream`), and a
- * response the handler built itself, are answered as they are. Every GET handler of the `Api` is given through it by its group
- * (`readsBounded`), which `test/bounded.test.ts` holds.
+ * encodes it: past it, a defect of `AnswerPastBound`, answered 422. A list's page (`READS`' `page`) is measured as its endpoint's success
+ * Schema writes it, which leaves its items' files' content out, so a page is not refused for what it never sends. A read of bytes or a
+ * stream (`READS`' `bytes`, `stream`), and a response the handler built itself, are answered as they are. Every GET handler of the
+ * `Api` is given through it by its group (`readsBounded`), which `test/bounded.test.ts` holds.
  * @param endpoint The GET endpoint, by its group and name.
  * @param handler The endpoint's handler.
  */
@@ -148,7 +170,8 @@ export const readHandled = <Args extends ReadonlyArray<unknown>, A, E, R>(
       const answer = yield* handler(...args);
       if (HttpServerResponse.isHttpServerResponse(answer)) return answer;
       const { answerMost } = yield* ServedNow;
-      if (jsonLengthPast(answer, answerMost) > answerMost) return yield* Effect.die(new AnswerPastBound(endpoint, answerMost));
+      const measured = shape === 'page' ? asSent(successesOf(endpoint), answer) : answer;
+      if (jsonLengthPast(measured, answerMost) > answerMost) return yield* Effect.die(new AnswerPastBound(endpoint, answerMost));
       return answer;
     });
   }) satisfies (...args: Args) => Effect.Effect<A, E, R | ServedNow>;

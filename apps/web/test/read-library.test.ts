@@ -8,7 +8,15 @@ import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { agentsQuery, readAgent, type LibraryAgent } from '../src/lib/api/agents.ts';
 import { skillQuery, skillsQuery, type SkillDetail, type SkillPlace } from '../src/lib/api/skills.ts';
-import { stepQuery, workflowsInQuery, workflowsQuery, type WorkflowListing, type WorkflowStepPage } from '../src/lib/api/workflows.ts';
+import {
+  stepQuery,
+  workflowQuery,
+  workflowsInQuery,
+  workflowsQuery,
+  type WorkflowListing,
+  type WorkflowRow,
+  type WorkflowStepPage,
+} from '../src/lib/api/workflows.ts';
 import {
   agentObject,
   consistentSkill,
@@ -44,7 +52,7 @@ const answering = (t: { onTestFinished: (fn: () => void) => void }, body: unknow
 const readAgents = agentsQuery.queryFn as unknown as () => Promise<LibraryAgent[]>;
 const readSkill = skillQuery('user', 'review-a-change').queryFn as unknown as () => Promise<SkillDetail>;
 const readSkills = skillsQuery.queryFn as unknown as () => Promise<SkillPlace[]>;
-const readWorkflows = workflowsQuery.queryFn as unknown as () => Promise<WorkflowListing[]>;
+const readWorkflows = workflowsQuery.queryFn as unknown as () => Promise<WorkflowRow[]>;
 
 /** `workflow()` as its object's view reads it: its graph with a node for each step. */
 const viewed = (listing: WorkflowListing = workflow()) =>
@@ -52,6 +60,17 @@ const viewed = (listing: WorkflowListing = workflow()) =>
     ...listing,
     graph: { ...listing.graph, nodes: listing.steps.map((step) => ({ name: step.name, kind: 'step' })) },
   }) satisfies WorkflowListing;
+
+/** `listing` as a list of workflows carries it: without its README, nor each step's body, own note and layers. */
+const rowOf = ({ readme: _, steps, ...listing }: WorkflowListing) =>
+  ({
+    ...listing,
+    steps: steps.map(({ body: _body, layers: _layers, own, ...step }) => ({ ...step, own: own && { keys: own.keys } })),
+  }) satisfies WorkflowRow;
+
+/** `agent` as a list of agents carries it: without its instructions, its result schema and its file as written. */
+const agentRowOf = ({ body: _, schema: _schema, source: _source, ...agent }: ReturnType<typeof listedAgent>) =>
+  agent satisfies LibraryAgent;
 
 /** `value` without `keys`, as an api that does not send them answers. */
 const without = <T extends object>(value: T, ...keys: string[]) =>
@@ -94,7 +113,7 @@ describe("a step's page and a list of workflows are read in the place named, und
   });
   test("a Workflow is read as the board's view of it, and a step its object spells `workspace: main` is unread", async (t) => {
     answering(t, listOfItems('Workflow', [workflowObject()]));
-    assert.deepEqual(await readWorkflows(), [viewed()], "each step resolved with every key, its own keys and note, the graph's nodes");
+    assert.deepEqual(await readWorkflows(), [rowOf(viewed())], "each step resolved with every key, its own keys, the graph's nodes");
     const object = workflowObject();
     const former = {
       ...object,
@@ -114,6 +133,18 @@ describe("a step's page and a list of workflows are read in the place named, und
     assert.equal(asked.at(-1), '/api/namespaces/f/workflows?limit=500&repo=%2Fcode%2Fapp');
     assert.deepEqual([...placed.queryKey], ['factory-workflows', 'f', '/code/app']);
   });
+  test("a list of workflows carries no file's content; the one workflow, read in its place under a key of that place, carries its README and each step's body and layers", async (t) => {
+    const listAsked = answering(t, listOfItems('Workflow', [workflowObject()]));
+    const [row] = await readWorkflows();
+    assert.equal(listAsked.length, 1);
+    assert.equal(Object.hasOwn(row, 'readme'), false);
+    assert.equal(Object.hasOwn(row.steps[0], 'body') || Object.hasOwn(row.steps[0], 'layers'), false);
+    const asked = answering(t, workflowObject());
+    const one = workflowQuery('user', viewed().name, { factory: 'f', repo: '/code/app' });
+    assert.deepEqual(await (one.queryFn as unknown as () => Promise<WorkflowListing>)(), viewed());
+    assert.equal(asked.at(-1), `/api/namespaces/f/workflows/${viewed().name}?origin=user&repo=%2Fcode%2Fapp`);
+    assert.notDeepEqual(one.queryKey, workflowQuery('user', viewed().name).queryKey, 'two places, two answers kept apart');
+  });
 });
 
 describe("get, the library's reads: each decodes what the api gives, keeps out what it leaves out, drops what the board does not know, and keeps a refusal of the api's", () => {
@@ -130,7 +161,7 @@ describe("get, the library's reads: each decodes what the api gives, keeps out w
       'yours read whole, shadowed or not: the default namespace has no repository to read',
     );
     assert.equal(Object.hasOwn(read.card?.[0] ?? {}, 'examples'), false);
-    assert.deepEqual(read, listedAgent({ card: [bare], untried: null }));
+    assert.deepEqual(read, agentRowOf(listedAgent({ card: [bare], untried: null })));
 
     const draft = without(consistentSkill().draft ?? assert.fail('the fixture has a draft'), 'preload', 'title');
     const skillAsked = answering(t, skillObject(consistentSkill({ draft })));
@@ -143,7 +174,7 @@ describe("get, the library's reads: each decodes what the api gives, keeps out w
     serving(t, (path) => listOfItems('Agent', path.includes('origin=user') ? [{ ...agentObject(), colour: 'blue' }] : []));
     const [read] = await readAgents();
     assert.equal(Object.hasOwn(read, 'colour'), false);
-    assert.deepEqual(read, listedAgent());
+    assert.deepEqual(read, agentRowOf(listedAgent()));
 
     const object = workflowObject();
     const [step] = object.status.steps;
@@ -153,7 +184,7 @@ describe("get, the library's reads: each decodes what the api gives, keeps out w
     );
     const [listed] = await readWorkflows();
     assert.equal(Object.hasOwn(listed.steps[0].spec, 'mood'), false);
-    assert.deepEqual(listed, viewed());
+    assert.deepEqual(listed, rowOf(viewed()));
   });
   test("an agent the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {
     answering(t, { error: 'no agent agora of yours' }, 404);

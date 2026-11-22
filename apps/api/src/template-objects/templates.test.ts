@@ -16,7 +16,7 @@ import { Layer, Schema } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { BuiltinTemplates, testPlace } from 'agent-orchestrator/testing';
 import { TemplateRenders } from 'agent-orchestrator';
-import { Agent, AgentList, Skill, SkillList, Template, TemplateList, Workflow, WorkflowList } from 'objects';
+import { Agent, AgentList, LISTED_WITHOUT, Skill, SkillList, Template, TemplateList, Workflow, WorkflowList, filesHeld } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
 import { scratch } from 'test-kit/scratch';
 
@@ -119,6 +119,20 @@ test('the builtin templates are listed and read as Templates', async () => {
   assert.equal(mill.status.problems, undefined, 'the scratch template reads');
 });
 
+/** `value` less the key `segments` reach, each item of an array where a segment ends `[]`, as a list leaves a file's content out. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- recursive: its type cannot be inferred through its own call
+const less = (value: unknown, [segment, ...rest]: readonly string[]): unknown => {
+  if (segment === undefined || typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const key = segment.endsWith('[]') ? segment.slice(0, -2) : segment;
+  if (!(key in value)) return value;
+  const { [key]: inner, ...others } = value as Record<string, unknown>;
+  if (rest.length === 0) return others;
+  return { ...others, [key]: segment.endsWith('[]') && Array.isArray(inner) ? inner.map((item) => less(item, rest)) : less(inner, rest) };
+};
+
+/** `object` as a list serves it: less each path its kind lists as a file's content (`LISTED_WITHOUT`). */
+const listedOf = (paths: readonly string[], object: unknown) => paths.reduce((was, path) => less(was, path.split('.')), object);
+
 test("a template's workflows are served as Workflows read from its render", async () => {
   const list = await get('/api/templates/mill/workflows');
   assert.equal(list.status, 200);
@@ -139,7 +153,8 @@ test("a template's workflows are served as Workflows read from its render", asyn
   assert.equal(press.status.steps[0]?.hired, 'drafter', "the template's hires fill its step, as in a factory applied from it");
   assert.equal(press.status.steps[0]?.layers?.agent, 'drafter', 'the step is told as the hired agent');
   assert.equal(press.status.unfilled, null, 'every step is filled, so a run of it could start');
-  assert.deepEqual(items[0], press, 'the list holds the object a read answers');
+  assert.ok(filesHeld(LISTED_WITHOUT.Workflow, press).length > 0, 'the read answers its files whole');
+  assert.deepEqual(items[0], listedOf(LISTED_WITHOUT.Workflow, press), "the list holds the object a read answers, less its files' content");
 });
 
 test("a template's agents are served as Agents read from its render", async () => {

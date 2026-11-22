@@ -474,7 +474,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
     assert.deepEqual(await listed(), []);
   });
   s.test(
-    "the Card's create files a card as `nemia inbox add` does: the idea alone; a workflow by its name, a repository's or yours, `from` ignored; no repository — and GET /api/cards lists each with its body and when it was filed",
+    "the Card's create files a card as `nemia inbox add` does: the idea alone; a workflow by its name, a repository's or yours, `from` ignored; no repository — and GET /api/cards lists each with its title and when it was filed, never its body",
     async () => {
       clear();
       const bare = await file({ body: 'Cache the views between passes\n\nThe tick reads each task twice.' });
@@ -532,16 +532,16 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
           startedAs: [],
           state: 'filed',
           error: null,
-          body: 'Cache the views between passes\n\nThe tick reads each task twice.',
+          body: null,
           filedAt: old.toISOString(),
           labels: {},
         },
-        'listed with its body and a filing time, and started as none',
+        'listed with its title and a filing time, its body left out (a read of one carries it), and started as none',
       );
       const namedEntry = entries.find((e) => e.name === named.name)!;
       assert.deepEqual(
         [namedEntry.title, namedEntry.workflow, namedEntry.repo, namedEntry.body],
-        ['Show what a step cost', 'dev', null, 'Show what a step cost'],
+        ['Show what a step cost', 'dev', null, null],
       );
       assert.ok(Date.parse(namedEntry.filedAt) > old.getTime());
     },
@@ -613,11 +613,12 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       const items = ((await (await app.request('/api/cards')).json()) as CardList).items;
       const listedAs = items.find((c) => c.metadata.name === 'cache-the-views-k2q9');
       assert.deepEqual(
-        { ...page, status: { ...page.status, source: undefined } },
-        { ...listedAs, status: { ...listedAs?.status, source: undefined } },
-        'the card as GET /api/cards lists it',
+        { ...page, spec: { ...page.spec, body: undefined }, status: { ...page.status, source: undefined } },
+        { ...listedAs, spec: { ...listedAs?.spec, body: undefined }, status: { ...listedAs?.status, source: undefined } },
+        'the card as GET /api/cards lists it, but its file and its body',
       );
-      assert.equal(listedAs?.status.source, undefined, 'a list carries no file');
+      assert.equal('source' in (listedAs?.status ?? {}), false, 'a list carries no file');
+      assert.equal('body' in (listedAs?.spec ?? {}), false, 'a list carries no body');
       assert.equal(page.spec.body, '# Cache the views\n\n- between passes\n- per task');
       assert.deepEqual([page.spec.workflow, page.spec.repo], ['dev', repo]);
       assert.equal(page.status.source, text, 'the file byte for byte, frontmatter included');

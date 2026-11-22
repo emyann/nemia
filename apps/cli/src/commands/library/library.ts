@@ -24,15 +24,8 @@ const items = (list: { readonly items: readonly Held[] }) => list.items satisfie
 const heldOf = (c: ObjectsClient, kind: (typeof KINDS)[number]) => {
   if (kind === 'skills') return Effect.map(pageOf(everyPage((page) => c.skills.listLibrary({ query: page }))), items);
   if (kind === 'agents') return Effect.map(pageOf(everyPage((page) => c.agents.listLibrary({ query: page }))), items);
-  if (kind === 'workflows')
-    return Effect.map(
-      everyPage((page) => c.workflows.listLibrary({ query: page })),
-      items,
-    );
-  return Effect.map(
-    everyPage((page) => c.mcpservers.listLibrary({ query: page })),
-    items,
-  );
+  if (kind === 'workflows') return Effect.map(pageOf(everyPage((page) => c.workflows.listLibrary({ query: page }))), items);
+  return Effect.map(pageOf(everyPage((page) => c.mcpservers.listLibrary({ query: page }))), items);
 };
 
 /** A line of the library: the kind and name, the origin, and who adds it. */
@@ -75,10 +68,7 @@ const libraryItem = (kind: string, name: string, args: Args) => {
 /** `nemia library --factory <factory>`: each add of the factory, with its state. */
 async function factoryAddsListed(namespace: string) {
   const adds = await asked(LIBRARY_WORDS.name, (c) =>
-    Effect.map(
-      everyPage((page) => c.libraryadds.list({ params: { namespace }, query: page })),
-      (list) => list.items,
-    ),
+    Effect.map(pageOf(everyPage((page) => c.libraryadds.list({ params: { namespace }, query: page }))), (list) => list.items),
   );
   said(adds.length === 0 ? [`${namespace} has added nothing from the library`] : adds.map((add) => addLine(add, 'added')));
   return 0;

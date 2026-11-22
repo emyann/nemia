@@ -4,7 +4,8 @@
  * from it (`factory fire`), each answered with what it wrote and the agent it replaced or fired (`written`). A name two steps join to is
  * read and written by neither: `Conflict`, naming both and the fix.
  */
-import { FACTORY_FIRE, FACTORY_HIRE, hireList, hireObject } from 'agent-orchestrator';
+import { FACTORY_FIRE, FACTORY_HIRE, hireList, hireObject, hireTable } from 'agent-orchestrator';
+import { listOrTable } from '../../objects/table.ts';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { factoryNamed, queryOf } from './parts.ts';
@@ -17,10 +18,13 @@ const hireIn = (s: Served, namespace: string, name: string) => s.inRequest(hireO
 export const hiresHandlers = readsBounded(Api, 'hires', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/namespaces/${namespace}/hires`, namespace);
-        return s.inRequest(hireList(s.home, namespace, queryOf(query)));
-      }),
+      listOrTable(
+        answered((s) => {
+          factoryNamed(`GET /api/namespaces/${namespace}/hires`, namespace);
+          return s.inRequest(hireList(s.home, namespace, queryOf(query)));
+        }),
+        hireTable,
+      ),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered(async (s) => {

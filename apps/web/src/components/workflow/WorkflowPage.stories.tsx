@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
-import { workflowsQuery, type WorkflowListing } from '@/lib/api/workflows';
+import { workflowQuery, workflowsQuery, type WorkflowListing } from '@/lib/api/workflows';
 import { listing } from '../../../.storybook/fixtures/factories';
 import { seeded } from '../../../.storybook/fixtures/proposals';
 import { WorkflowPage } from './WorkflowPage';
@@ -20,6 +20,7 @@ const meta: Meta<typeof WorkflowPage> = {
       client={seeded([
         [factoriesQuery.queryKey, []],
         [workflowsQuery.queryKey, [TRIAGE]],
+        [workflowQuery('user', 'triage').queryKey, TRIAGE],
       ])}
     >
       <div style={{ width: 880 }}>

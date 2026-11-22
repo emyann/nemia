@@ -103,7 +103,7 @@ test('five cards walked two at a time answer each once in name order, 3, 1 and 0
   );
   assert.equal('continue' in (pages.at(-1)?.metadata ?? {}), false);
   for (const page of pages) assert.equal(page.kind, 'CardList');
-  for (const page of pages) for (const item of page.items) assert.equal(item.status.source, undefined, "a list's items carry no file");
+  for (const page of pages) for (const item of page.items) assert.equal('source' in item.status, false, "a list's items carry no file");
 });
 
 test('a card is an object: its factory its namespace, filed time, a digest of its text, its labels, spec and status', () => {
@@ -327,7 +327,7 @@ test('a card the listing read and that no longer parses when its text is read is
   const page = valueOf(Effect.runSyncExit(cardListOf(read, {}).pipe(Effect.provide(cardDoorFiles(home)), Effect.provide(stand().layer))));
   const [alpha] = page.items;
   assert.equal(alpha?.metadata.name, 'alpha');
-  assert.equal(alpha?.spec.body, undefined, 'no body of a text that does not parse');
+  assert.equal('body' in (alpha?.spec ?? {}), false, 'no body of a text that does not parse');
   assert.match(alpha?.status.error ?? '', /not-a-key/, 'why it does not parse, naming the key');
 });
 

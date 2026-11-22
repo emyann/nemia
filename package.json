@@ -43,7 +43,7 @@
     "design-system": "npm run produce --workspace design-system --"
   },
   "devDependencies": {
-    "@emyann/tsverify": "0.9.1",
+    "@emyann/tsverify": "0.9.2",
     "@interfere/landmines": "0.1.1",
     "@playwright/mcp": "0.0.80",
     "@types/js-yaml": "^4.0.9",

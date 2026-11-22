@@ -5,6 +5,7 @@
  * it is visited, never as it is imported, when the worker has set up nothing yet.
  */
 import { execFileSync } from 'node:child_process';
+import { MessageChannel, receiveMessageOnPort, Worker, type MessagePort } from 'node:worker_threads';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -68,11 +69,85 @@ const PASS =
   "import { engine, passStanding, RunDoor, runWith, builtin, storeConfigLayer } from 'agent-orchestrator'; import { Effect } from 'effect'; await runWith(engine(process.env), builtin(Effect.provide(Effect.flatMap(Effect.flatMap(RunDoor, (door) => door.runs.list()), (runs) => passStanding(runs)), storeConfigLayer(process.env))));";
 
 /**
- * What `script` prints, run in a process of the api's package on the api's environment, given `input` on its stdin: how the e2e, which
- * imports no package, reads and writes a run's record, a record of the store's keyspace (`agent-orchestrator/testing`).
+ * The script a worker's helper runs, in a process of the api's package on the api's environment: each line on its stdin a request, a
+ * function's body and what it is given, run with `agent-orchestrator/testing` as `t`, the store's root as `root` and the request's `input`,
+ * and each answer a line on its fd 3, what the body returned or what it threw. Its own stdout and stderr are the worker's.
  */
-const inApi = (script: string, input = '') =>
-  execFileSync(process.execPath, ['--input-type=module', '--eval', script], { cwd: API, env: apiEnv, input, encoding: 'utf8' });
+const HELPER = `import * as t from 'agent-orchestrator/testing';
+import fs from 'node:fs';
+import readline from 'node:readline';
+const Body = (async () => {}).constructor;
+for await (const line of readline.createInterface({ input: process.stdin })) {
+  const { body, input } = JSON.parse(line);
+  let answer;
+  try {
+    answer = { out: String((await new Body('t', 'root', 'input', body)(t, process.env.WF_ROOT, input)) ?? '') };
+  } catch (err) {
+    answer = { error: String(err instanceof Error ? (err.stack ?? err.message) : err) };
+  }
+  fs.writeSync(3, JSON.stringify(answer) + '\\n');
+}`;
+
+/**
+ * The thread that holds the helper: it starts it, passes each request on, and hands each answer back on `port`, raising `signal` for the
+ * page waiting on it. It loads no package.
+ */
+const RELAY = `const { workerData } = require('node:worker_threads');
+const { spawn } = require('node:child_process');
+const readline = require('node:readline');
+const { port, signal, cwd, env, script } = workerData;
+const helper = spawn(process.execPath, ['--input-type=module', '--eval', script], { cwd, env, stdio: ['pipe', 'inherit', 'inherit', 'pipe'] });
+const answer = (said) => { port.postMessage(said); Atomics.store(signal, 0, 1); Atomics.notify(signal, 0); };
+readline.createInterface({ input: helper.stdio[3] }).on('line', (line) => answer(JSON.parse(line)));
+helper.on('exit', (code, by) => answer({ error: 'the e2e helper in the api package ended (' + (by ?? code) + ')' }));
+port.on('message', (asked) => helper.stdin.write(JSON.stringify(asked) + '\\n'));`;
+
+/**
+ * The worker's helper, started on the first request for the store it serves, and started again for another store, or once it has ended:
+ * a word from it that nobody asked for is its end.
+ */
+let helper: { root: string | undefined; port: MessagePort; signal: Int32Array; thread: Worker } | undefined;
+
+/** How long a page waits on one answer of the helper before it gives up on it. */
+const HELPER_WAIT_MS = 120_000;
+
+/**
+ * What `body` returns, as text, run by the worker's helper in a process of the api's package on the api's environment, with
+ * `agent-orchestrator/testing` as `t`, the store's root as `root` and `input` as given: how the e2e, which imports no package, reads and
+ * writes a run's record, a record of the store's keyspace. One process for the worker's life, not one per call, since each loads the
+ * package anew.
+ * @param body The body of an async function of `t`, `root` and `input`.
+ * @param input What the body is given as `input`.
+ */
+const inApi = (body: string, input: unknown = '') => {
+  const at = helperNow();
+  Atomics.store(at.signal, 0, 0);
+  at.port.postMessage({ body, input });
+  if (Atomics.wait(at.signal, 0, 0, HELPER_WAIT_MS) === 'timed-out')
+    throw new Error(`the e2e helper in the api package gave no answer in ${HELPER_WAIT_MS / 1000} s: read its stderr above`);
+  const said = receiveMessageOnPort(at.port)?.message as { out: string } | { error: string } | undefined;
+  if (said === undefined || 'error' in said) throw new Error(said?.error ?? 'the e2e helper in the api package answered nothing');
+  return said.out;
+};
+
+/** The worker's helper for the store the api serves now, started where there is none for it or the one there has ended. */
+function helperNow() {
+  const ended = helper !== undefined && receiveMessageOnPort(helper.port) !== undefined;
+  if (helper !== undefined && !ended && helper.root === apiEnv.WF_ROOT) return helper;
+  void helper?.thread.terminate();
+  const { port1, port2 } = new MessageChannel();
+  const signal = new Int32Array(new SharedArrayBuffer(4));
+  const thread = new Worker(RELAY, {
+    eval: true,
+    workerData: { port: port2, signal, cwd: API, env: apiEnv, script: HELPER },
+    transferList: [port2],
+  });
+  thread.unref();
+  port1.unref();
+  const made = { root: apiEnv.WF_ROOT, port: port1, signal, thread };
+  helper = made;
+  return made;
+}
 
 /**
  * The text of the record of the run `id` in the seeded store, as the tick wrote it: what a page keeps to put back. Throws where there is
@@ -80,9 +155,7 @@ const inApi = (script: string, input = '') =>
  * @param id The run's id.
  */
 export function storedRecordText(id: string) {
-  const text = inApi(
-    `import { recordText, runKey } from 'agent-orchestrator/testing'; process.stdout.write(recordText(process.env.WF_ROOT, runKey(${JSON.stringify(id)})) ?? '');`,
-  );
+  const text = inApi("return t.recordText(root, t.runKey(input)) ?? '';", id);
   if (!text) throw new Error(`the seeded store holds no record of run ${id}: seed it first`);
   return text;
 }
@@ -101,10 +174,7 @@ export function storedRecord(id: string) {
  * @param text The record's text.
  */
 export function storeRecord(id: string, text: string) {
-  inApi(
-    `import { plantRecord, runKey } from 'agent-orchestrator/testing'; import fs from 'node:fs'; plantRecord(process.env.WF_ROOT, runKey(${JSON.stringify(id)}), fs.readFileSync(0, 'utf8'));`,
-    text,
-  );
+  inApi('t.plantRecord(root, t.runKey(input.id), input.text);', { id, text });
 }
 
 /**
@@ -112,7 +182,7 @@ export function storeRecord(id: string, text: string) {
  * @param id The run's id.
  */
 export function dropStoredRecord(id: string) {
-  inApi(`import { dropRecord, runKey } from 'agent-orchestrator/testing'; dropRecord(process.env.WF_ROOT, runKey(${JSON.stringify(id)}));`);
+  inApi('t.dropRecord(root, t.runKey(input));', id);
 }
 
 /**
@@ -149,20 +219,14 @@ export function unreadName(id: string) {
 /** The ids of the runs whose records the seeded store holds: what a page reads before it starts one, to take back what it started. */
 export function storedRuns() {
   return JSON.parse(
-    inApi(
-      "import { keysUnder, runKey } from 'agent-orchestrator/testing'; process.stdout.write(JSON.stringify(keysUnder(process.env.WF_ROOT, runKey('')).map((key) => key.slice(runKey('').length))));",
-    ),
+    inApi("return JSON.stringify(t.keysUnder(root, t.runKey('')).map((key) => key.slice(t.runKey('').length)));"),
   ) as string[];
 }
 
 /** The record of every run in the seeded store, read in one go: what a page reads to place a run of its own among them. */
 export function storedRecords() {
   return (
-    JSON.parse(
-      inApi(
-        "import { keysUnder, recordText, runKey } from 'agent-orchestrator/testing'; const root = process.env.WF_ROOT; process.stdout.write(JSON.stringify(keysUnder(root, runKey('')).map((key) => recordText(root, key) ?? '')));",
-      ),
-    ) as string[]
+    JSON.parse(inApi("return JSON.stringify(t.keysUnder(root, t.runKey('')).map((key) => t.recordText(root, key) ?? ''));")) as string[]
   ).map((text) => JSON.parse(text) as Record<string, unknown>);
 }
 
@@ -183,7 +247,8 @@ export function runsHeld() {
 export function storedAsks(id: string) {
   return JSON.parse(
     inApi(
-      `import { askNames, askText } from 'agent-orchestrator/testing'; const id = ${JSON.stringify(id)}; process.stdout.write(JSON.stringify(Object.fromEntries(askNames(process.env.WF_ROOT, id).map((name) => [name, askText(process.env.WF_ROOT, id, name) ?? '']))));`,
+      "return JSON.stringify(Object.fromEntries(t.askNames(root, input).map((name) => [name, t.askText(root, input, name) ?? ''])));",
+      id,
     ),
   ) as Record<string, string>;
 }
@@ -195,10 +260,7 @@ export function storedAsks(id: string) {
  * @param text What it holds.
  */
 export function storeAsk(id: string, name: string, text: string) {
-  inApi(
-    `import { plantAsk } from 'agent-orchestrator/testing'; import fs from 'node:fs'; plantAsk(process.env.WF_ROOT, ${JSON.stringify(id)}, ${JSON.stringify(name)}, fs.readFileSync(0, 'utf8'));`,
-    text,
-  );
+  inApi('t.plantAsk(root, input.id, input.name, input.text);', { id, name, text });
 }
 
 /**
@@ -206,9 +268,7 @@ export function storeAsk(id: string, name: string, text: string) {
  * @param id The run's id.
  */
 export function dropStoredAsks(id: string) {
-  inApi(
-    `import { askNames, dropAsk } from 'agent-orchestrator/testing'; const id = ${JSON.stringify(id)}; for (const name of askNames(process.env.WF_ROOT, id)) dropAsk(process.env.WF_ROOT, id, name);`,
-  );
+  inApi('for (const name of t.askNames(root, input)) t.dropAsk(root, input, name);', id);
 }
 
 /** Where the keyspace keeps every run's record and every run's asks (`runKey`, `askKeyOf`). */
@@ -221,7 +281,8 @@ const RUN_PREFIXES = ['/registry/runs/', '/registry/asks/'];
 export function storedRunKeys() {
   return JSON.parse(
     inApi(
-      `import { keysUnder, recordText } from 'agent-orchestrator/testing'; const root = process.env.WF_ROOT; process.stdout.write(JSON.stringify(Object.fromEntries(${JSON.stringify(RUN_PREFIXES)}.flatMap((prefix) => keysUnder(root, prefix)).map((key) => [key, recordText(root, key) ?? '']))));`,
+      "return JSON.stringify(Object.fromEntries(input.flatMap((prefix) => t.keysUnder(root, prefix)).map((key) => [key, t.recordText(root, key) ?? ''])));",
+      RUN_PREFIXES,
     ),
   ) as Record<string, string>;
 }
@@ -233,8 +294,8 @@ export function storedRunKeys() {
  */
 export function restoreRunKeys(before: Record<string, string>) {
   inApi(
-    `import { dropRecord, keysUnder, plantRecord, recordText } from 'agent-orchestrator/testing'; import fs from 'node:fs'; const root = process.env.WF_ROOT; const before = JSON.parse(fs.readFileSync(0, 'utf8')); for (const key of ${JSON.stringify(RUN_PREFIXES)}.flatMap((prefix) => keysUnder(root, prefix))) if (!(key in before)) dropRecord(root, key); for (const [key, text] of Object.entries(before)) if (recordText(root, key) !== text) plantRecord(root, key, text);`,
-    JSON.stringify(before),
+    'for (const key of input.prefixes.flatMap((prefix) => t.keysUnder(root, prefix))) if (!(key in input.before)) t.dropRecord(root, key); for (const [key, text] of Object.entries(input.before)) if (t.recordText(root, key) !== text) t.plantRecord(root, key, text);',
+    { prefixes: RUN_PREFIXES, before },
   );
 }
 
@@ -243,9 +304,7 @@ export function restoreRunKeys(before: Record<string, string>) {
  * @param id The run's id.
  */
 export function dropStoredRun(id: string) {
-  inApi(
-    `import { askNames, dropAsk, dropRecord, runKey } from 'agent-orchestrator/testing'; const id = ${JSON.stringify(id)}; for (const name of askNames(process.env.WF_ROOT, id)) dropAsk(process.env.WF_ROOT, id, name); dropRecord(process.env.WF_ROOT, runKey(id));`,
-  );
+  inApi('for (const name of t.askNames(root, input)) t.dropAsk(root, input, name); t.dropRecord(root, t.runKey(input));', id);
 }
 
 /**
@@ -258,8 +317,8 @@ export function takeBackRuns(before: readonly string[]) {
   const made = storedRuns().filter((id) => !before.includes(id));
   if (!made.length) return;
   inApi(
-    `import { askNames, claimKey, dropAsk, dropRecord, keysUnder, recordText, runKey } from 'agent-orchestrator/testing'; import fs from 'node:fs'; const root = process.env.WF_ROOT; const ids = new Set(JSON.parse(fs.readFileSync(0, 'utf8'))); for (const key of keysUnder(root, claimKey(''))) { try { if (ids.has(JSON.parse(recordText(root, key) ?? '{}').run ?? '')) dropRecord(root, key); } catch {} } for (const id of ids) { for (const name of askNames(root, id)) dropAsk(root, id, name); dropRecord(root, runKey(id)); }`,
-    JSON.stringify(made),
+    "const ids = new Set(input); for (const key of t.keysUnder(root, t.claimKey(''))) { try { if (ids.has(JSON.parse(t.recordText(root, key) ?? '{}').run ?? '')) t.dropRecord(root, key); } catch {} } for (const id of ids) { for (const name of t.askNames(root, id)) t.dropAsk(root, id, name); t.dropRecord(root, t.runKey(id)); }",
+    made,
   );
   const runsDir = path.join(store!, 'runs');
   for (const file of fs.existsSync(runsDir) ? fs.readdirSync(runsDir) : [])

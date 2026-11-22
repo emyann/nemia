@@ -962,7 +962,7 @@ describe("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's
     '`labels:` holding a list': ['---\nlabels: { team: [a, b] }\n---\nx\n', [F, '`labels`', 'team']],
     '`labels:` with a reserved key': ['---\nlabels: { reason: x }\n---\nx\n', [F, 'reason']],
     '`labels:` with a closed key': ['---\nlabels: { workflow: x }\n---\nx\n', [F, 'workflow']],
-    '`labels:` with a prefixed key': ['---\nlabels: { a/b: x }\n---\nx\n', [F, '"a/b"', 'prefix']],
+    '`labels:` with a key whose prefix is no DNS subdomain': ['---\nlabels: { A/b: x }\n---\nx\n', [F, '"A/b"', 'DNS subdomain']],
     '`labels:` twice': ['---\nlabels: { a: x }\nlabels: { b: y }\n---\nx\n', [F, '`labels` is set twice']],
   };
   for (const [name, [text, facts]] of Object.entries(rows)) test(name, () => assert.throws(() => read(text), refusedNaming(...facts)));

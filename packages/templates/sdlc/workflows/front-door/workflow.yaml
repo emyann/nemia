@@ -2,7 +2,7 @@ apiVersion: nemia.dev/v1alpha1
 kind: Workflow
 metadata:
   name: front-door
-  description: "Route a raw card to the workflow it needs, with no gate. The front door's trigger queues each card of the factory labelled with frontDoorLabel that names no workflow; Iris, as a read-only judge, reads the card and sends it as given to intake, build or quick, answers a question with no change to the repository, or files it back to the inbox unqueued. Where she cannot tell, she signs off blocked and a person answers."
+  description: "Route a raw card to the workflow it needs, with no gate. The front door's trigger queues each card of the factory in the sprint and ready to work (sdlc/stage=sprint and sdlc/state=ready-to-work) that names no workflow; Iris, as a read-only judge, reads the card and sends it as given to intake, build or quick, answers a question with no change to the repository, or files it back to the backlog unqueued, by sdlc/stage=backlog. Where she cannot tell, she signs off blocked and a person answers."
 spec:
   steps:
     - name: door
@@ -73,5 +73,5 @@ spec:
       when:
         - backlog
       card: backlog
-      unlabel:
-        - "${{ parameters.frontDoorLabel }}"
+      relabel:
+        - sdlc/stage=backlog

@@ -26,9 +26,16 @@ const edits = (...texts: string[]) => {
   return parsed.edits;
 };
 
-describe('labelRefusal: a label is spelled as Kubernetes spells one, with no prefix, and takes no key Nemia or the feed reads itself', () => {
+describe('labelRefusal: a label is spelled as Kubernetes spells one, an optional prefix and a name, and takes no key Nemia or the feed reads itself', () => {
   const refused: ReadonlyArray<{ rule: string; key: string; value?: string; named: string }> = [
-    { rule: 'a prefix', key: 'a/b', named: 'a/b' },
+    { rule: 'a prefix in capitals, no DNS subdomain', key: 'Team.example/stage', named: '"Team.example/stage"' },
+    { rule: 'a prefix with an underscore, no DNS subdomain', key: 'team_x/stage', named: '"team_x/stage"' },
+    { rule: 'a prefix that opens on a dash', key: '-a/x', named: '"-a/x"' },
+    { rule: 'a prefix longer than 253', key: `${'p'.repeat(254)}/x`, named: '253' },
+    { rule: 'two slashes', key: 'a/b/c', named: '"a/b/c"' },
+    { rule: 'a prefix written empty', key: '/stage', named: '"/stage"' },
+    { rule: 'no name after the slash', key: 'team.example/', named: '"team.example/"' },
+    { rule: 'a prefixed name longer than 63', key: `team.example/${'k'.repeat(64)}`, named: '63' },
     { rule: 'longer than 63', key: 'k'.repeat(64), named: '64' },
     { rule: 'a dash first', key: '-x', named: '"-x"' },
     { rule: 'a dash last', key: 'x-', named: '"x-"' },
@@ -49,6 +56,9 @@ describe('labelRefusal: a label is spelled as Kubernetes spells one, with no pre
     ['my.key_2', 'a-b.c_d'],
     ['team', ''],
     ['constructor', 'x'],
+    ['team.example/stage', 'sprint'],
+    ['example.com/team', 'core'],
+    ['team.example/workflow', 'x'],
   ] as const)
     test(`taken: ${key}=${value}`, () => assert.equal(labelRefusal(key, value), undefined));
   test('a map with no wrong pair is taken', () => assert.equal(labelsRefusal({ team: 'core', tier: '' }), undefined));
@@ -63,6 +73,13 @@ describe('parseLabelEdits: key=value sets, key- removes, and anything else, or o
         { key: 'note', op: 'set', value: '' },
       ],
     }));
+  test('a prefixed key is edited as any other', () =>
+    assert.deepEqual(parseLabelEdits(['team.example/stage=backlog', 'team.example/state-']), {
+      edits: [
+        { key: 'team.example/stage', op: 'set', value: 'backlog' },
+        { key: 'team.example/state', op: 'remove' },
+      ],
+    }));
   for (const row of [
     { rule: 'one key twice', texts: ['a=1', 'a-'], named: 'a' },
     { rule: 'no key before =', texts: ['=x'], named: '"=x"' },
@@ -70,7 +87,7 @@ describe('parseLabelEdits: key=value sets, key- removes, and anything else, or o
     { rule: 'neither form', texts: ['team'], named: '"team"' },
     { rule: 'a key a label cannot take', texts: ['factory=x'], named: 'factory' },
     { rule: 'a value a label cannot take', texts: ['eq=a=b'], named: '"a=b"' },
-    { rule: 'a removed key a label cannot take', texts: ['a/b-'], named: 'a/b' },
+    { rule: 'a removed key a label cannot take', texts: ['a/b/c-'], named: 'a/b/c' },
   ])
     test(`refused: ${row.rule}`, () => {
       const parsed = parseLabelEdits(row.texts);

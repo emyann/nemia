@@ -24,7 +24,7 @@ const stepIn = (workflow: string, step: string, keys: string) => {
 };
 stepIn('sort', 'pick', 'routes: [make, later]\nroute: { script: pick.ts }\n');
 stepIn('sort', 'to-make', 'after: pick\nwhen: make\nworkflow: make\ncard: given\n');
-stepIn('sort', 'back', 'after: pick\nwhen: later\ncard: backlog\nunlabel: ready\n');
+stepIn('sort', 'back', 'after: pick\nwhen: later\ncard: backlog\nrelabel: ready-\n');
 stepIn('tidy', 'sweep', 'routes: [a, b]\nroute: { script: sweep.ts }\nends: [a, b]\n');
 stepIn('make', 'code', '');
 for (const [workflow, script] of [

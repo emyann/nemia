@@ -289,8 +289,11 @@ export type StepSpec = {
    * back to the inbox, unqueued and naming no workflow, with no `workflow:` of its own.
    */
   card?: NodeCard;
-  /** `unlabel: [ready]`: the label keys a `card: backlog` node files the card back without, so no trigger queues it again. */
-  unlabel?: string[];
+  /**
+   * `relabel: [stage=backlog, ready-]`: the label edits a `card: backlog` node files the card back with, kubectl's (`key=value` sets,
+   * `key-` removes), each checked at load, so no trigger queues it again.
+   */
+  relabel?: string[];
   /**
    * The agent attached to the step (`agent:`), and what the step said itself: the keys its own file set — never `agent` — and its own note.
    * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions, then a
@@ -466,7 +469,7 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'ends',
   'workflow',
   'card',
-  'unlabel',
+  'relabel',
 ];
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -489,7 +492,7 @@ export const LIST_KEYS: readonly string[] = [
   'routes',
   'when',
   'ends',
-  'unlabel',
+  'relabel',
   'from',
   'overridable',
   'disallow',
@@ -581,7 +584,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   ends: 'the routes of this condition on which the run ends, nothing after it running',
   workflow: 'the workflow this node routes to: it files a card for it, `from:` this run, and reads `sent`',
   card: "what card this node files: `routed`, one of its own (the default); `given`, the run's own card as given, for its `workflow:`; `backlog`, the run's card back to the inbox, unqueued",
-  unlabel: 'the label keys a `card: backlog` node files the card back without, so no trigger queues it again',
+  relabel:
+    'the label edits a `card: backlog` node files the card back with: `key=value` sets a key, `key-` removes it, so no trigger queues it again',
 };
 
 /**

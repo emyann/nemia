@@ -167,10 +167,14 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  * Each is two more since a step's checks are named (`checks:`): `check/checks-plan.ts`, the plan the loader resolves a step's checks
  * into, and `check/checks-due.ts`, which of them a pass files, both through the check folder's face. Both pure, importing nothing but
  * files already loaded and types, and neither touching a disk.
+ *
+ * Each is one more for `label-spelling/label-spelling.ts`, what a label key may be spelled and kubectl's edits of a map, which
+ * `route/route-keys.ts` checks a backlog node's `relabel:` by and the selector and the labels re-export: pure, importing nothing but
+ * types, and touching no disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 218, effect: 15 },
-  'agent-orchestrator/workflow': { all: 154, effect: 15 },
+  'agent-orchestrator/run': { all: 219, effect: 15 },
+  'agent-orchestrator/workflow': { all: 155, effect: 15 },
 };
 
 const isEffectModule = (url: string) => url.includes('/node_modules/effect/');

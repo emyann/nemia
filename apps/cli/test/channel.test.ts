@@ -361,12 +361,12 @@ test('a selector the api refuses is refused, exit 2, naming the key, on stderr a
   const store = storeOf();
   await store.pass({ 'r-1': stepAt('running') });
   await apiOver(t, store.root);
-  const c = await channel(t, store.root, ['-l', 'no/pe=x']);
+  const c = await channel(t, store.root, ['-l', 'No/pe=x']);
   assert.equal(await c.ended, 2, 'REFUSED: a key no label is spelled');
-  assert.match(c.err(), /no\/pe/);
+  assert.match(c.err(), /No\/pe/);
   const refusals = c.notices.filter((n) => n.meta.notice === 'refused');
   assert.equal(refusals.length, 1, `one notice: ${JSON.stringify(c.notices)}`);
-  assert.match(refusals[0]?.content ?? '', /no\/pe/);
+  assert.match(refusals[0]?.content ?? '', /No\/pe/);
 });
 
 test("the skipped lines' read names the channel's context, quotes each selector, and joins a namespace's factory to each", () => {

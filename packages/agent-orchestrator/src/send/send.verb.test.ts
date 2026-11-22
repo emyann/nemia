@@ -1,7 +1,7 @@
 /**
  * The card a node files, by its `card:` (`sentCardText`), read back as the inbox reads it: a routed card titled and labelled by the run,
  * a given card the run's own card as it was given — its body and its labels — with why it was routed and the producer's reason, and a
- * backlog card the run's card filed back naming no workflow, unqueued, without the label keys its `unlabel:` names.
+ * backlog card the run's card filed back naming no workflow, unqueued, its labels after the edits its `relabel:` lists.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -53,9 +53,13 @@ describe('what card a node files, by its card:', () => {
     assert.ok(card.body.startsWith(RUN.brief));
     assert.deepEqual(card.labels, { team: 'core' });
   });
-  test('backlog: the card back to the inbox, naming no workflow and unqueued, without the label keys unlabel: names', () => {
-    const card = filed('card: backlog\nunlabel: [ready]');
-    assert.deepEqual([card.workflow, card.queued, card.labels], [undefined, undefined, { area: 'board' }]);
+  test('backlog: the card back to the inbox, naming no workflow and unqueued, its labels after the edits relabel: lists, every other kept', () => {
+    const labelled = { ...GIVEN, labels: { ...GIVEN.labels, 'team.example/stage': 'sprint', 'team.example/sprint': 'w48' } };
+    const card = filed('card: backlog\nrelabel: [team.example/stage=backlog, ready-]', labelled);
+    assert.deepEqual(
+      [card.workflow, card.queued, card.labels],
+      [undefined, undefined, { area: 'board', 'team.example/stage': 'backlog', 'team.example/sprint': 'w48' }],
+    );
     assert.ok(card.body.startsWith(GIVEN.body));
   });
 });

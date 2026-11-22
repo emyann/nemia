@@ -289,9 +289,9 @@ test("a selector naming a former reason prints its hint on stderr once; one the 
   assert.equal(served.err.split('\n').filter((l) => l.startsWith('nemia watch:')).length, 1, `the hint, once: ${served.err}`);
   assert.match(served.out, new RegExp(`cursor: ${store.size()}\\n$`), "read to the feed's end");
 
-  const refused = await ran(t, store.root, ['watch', '--once', '-l', 'no/pe=x']);
+  const refused = await ran(t, store.root, ['watch', '--once', '-l', 'No/pe=x']);
   assert.equal(refused.code, 2, 'REFUSED: a key no label is spelled');
-  assert.match(refused.err, /no\/pe/);
+  assert.match(refused.err, /No\/pe/);
   assert.equal(refused.out, '');
 });
 

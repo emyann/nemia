@@ -126,6 +126,14 @@ test('`nemia apply --help` is its own; `--local` is refused exit 2 by the route,
   assert.match(local.err, /`nemia apply -f -`/);
 });
 
+test('a hand-written Agent with no instructions is created: a document of its own is whole, whatever optional file key it leaves out', async () => {
+  const file = path.join(store.home, 'terse.yaml');
+  fs.writeFileSync(file, 'apiVersion: nemia/v1\nkind: Agent\nmetadata:\n  name: terse\nspec:\n  description: Says little.\n');
+  const made = await store.nemia(['apply', '-f', file]);
+  assert.equal(made.code, 0, made.err);
+  assert.equal(made.out, 'agents/terse created\n');
+});
+
 test('REFUSED: the List `nemia get workflows -o yaml` prints is applied as nothing, exit 2 naming `nemia get`: its items lack their files', async () => {
   const file = path.join(store.home, 'kept.yaml');
   fs.writeFileSync(file, workflow('Keep it.').replace('name: tidy', 'name: kept'));

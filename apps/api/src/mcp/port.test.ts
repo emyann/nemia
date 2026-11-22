@@ -32,6 +32,7 @@ import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
 import { portTools } from './tools.ts';
 import { FILES_EXTENSION } from './files.ts';
+import { fileRead, fileUriOf } from './links.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -639,4 +640,26 @@ test("a tool that reads a file hands it over as a resource_link, never its bytes
   const shot = await client.readResource({ uri: `nemia:///api/runs/${id}/steps/implement/artifacts/shot.png` });
   assert.equal((shot.contents[0] as { blob?: string }).blob, picture.toString('base64'));
   await client.close();
+});
+
+test('REFUSED: a link read past the bound answers no content and names the path to read whole; one the api refuses answers its status', async () => {
+  const id = 'r-port-linked-bound';
+  planted(id);
+  const files = path.join(root, 'runs', id, 'artifacts', 'implement');
+  fs.mkdirSync(files, { recursive: true });
+  const notes = '# Notes\n\nOne fact a line, and more of them.\n';
+  fs.writeFileSync(path.join(files, 'notes.md'), notes);
+  const uri = `nemia:///api/runs/${id}/steps/implement/artifacts/notes.md`;
+  const filePath = fileUriOf(uri) ?? assert.fail(`${uri} names a file the api serves`);
+  const from = new Request('http://127.0.0.1:8787/mcp', { headers: { authorization: `Bearer ${personToken}` } });
+  const under = await fileRead(uri, filePath, from, app(), notes.length);
+  assert.equal(under.kind, 'read', 'a file of the bound exactly is read');
+  const past = await fileRead(uri, filePath, from, app(), notes.length - 1);
+  assert.equal(past.kind, 'refused');
+  assert.equal('content' in past, false, 'no byte of it answered');
+  assert.ok(past.kind === 'refused' && past.message.includes(`GET ${filePath}`), 'naming the path that reads it whole');
+  const gone = `nemia:///api/runs/${id}/steps/implement/artifacts/gone.md`;
+  const missing = await fileRead(gone, fileUriOf(gone) ?? assert.fail(`${gone} names a file the api serves`), from, app());
+  assert.equal(missing.kind, 'refused', 'a file the api does not have is refused, not read');
+  assert.ok(missing.kind === 'refused' && missing.message.includes('404'), "with the api's status");
 });

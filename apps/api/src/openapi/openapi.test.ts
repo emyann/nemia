@@ -26,7 +26,10 @@ const runWith = runOver(() => stand().layer);
 
 const R = 'r-openapi';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-plantRecord(root, runKey(R), JSON.stringify({
+plantRecord(
+  root,
+  runKey(R),
+  JSON.stringify({
     id: R,
     repo: '/code/app',
     workspace: '/code/app',
@@ -41,7 +44,8 @@ plantRecord(root, runKey(R), JSON.stringify({
       { name: 'implement', after: ['design'], input: ['design'], body: 'Implement it.', harness: 'claude' },
     ],
     steps: { design: { taskId: 't-design' } },
-  }));
+  }),
+);
 beforeEachTest(() => {
   Effect.runSync(engine().file({ id: 't-design', brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle('t-design', 'succeeded', {

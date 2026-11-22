@@ -909,7 +909,7 @@ describe('POST /api/namespaces/default/runs: what a start refuses, writing nothi
 
 /** A run of the repository's `good` as `nemia start` records one, never filed — and called off, when `cancelledAt` says when. */
 function parentRun(id: string, cancelledAt?: string) {
-  if ((recordText(root, runKey(id)) !== undefined)) return;
+  if (recordText(root, runKey(id)) !== undefined) return;
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
   write(
     path.join(root, 'runs', `${id}.json`),

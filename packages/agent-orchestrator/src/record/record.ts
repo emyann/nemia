@@ -623,9 +623,10 @@ export type Spent = {
  * asks and the files a person keeps beside it, by run id and never by path. The tick writes the record; a person's verbs write their own
  * asks and files; no method lets one writer write the other's, but the tick's settle of the asks its record answers and a hold lifted. The
  * Run door (`RunDoor`, `src/runs/runs.store.ts`) answers each method as an Effect: over the keyspace (`src/runs/records.store.ts`), and
- * over the memory stand-in (`memory.store.ts`), which keeps this plain shape. What the tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds`,
- * `said`, `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a
- * person's cards, which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
+ * over the memory stand-in (`memory.store.ts`), which keeps this plain shape. What the tick's pass and a person's verbs read and write of
+ * the store, grouped as `runs`, `asks`, `holds`, `said`, `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the
+ * engine forget; and the inbox, `inbox`: a person's cards, which their verbs write, and the tick's tries of a queued card's start, which
+ * the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {
@@ -682,9 +683,9 @@ export type RunStore = {
     readonly cancel: (id: string, actor?: Actor) => string;
     /**
      * Remove what the store keeps under the run's id, whether or not its record is there — the record, its claim while it names the run
-     * and its asks, in one transaction; then the cancellation, the prune marker, the hold, the refresh ask, the labels, what was said before
-     * a step was filed and the run's own directory, in that order — and answer with each key removed and each path, from `WF_ROOT`, a
-     * directory's with a trailing `/`. Writes nothing.
+     * and its asks, in one transaction; then the cancellation, the prune marker, the hold, the refresh ask, the labels, what was said
+     * before a step was filed and the run's own directory, in that order — and answer with each key removed and each path, from `WF_ROOT`,
+     * a directory's with a trailing `/`. Writes nothing.
      */
     readonly forget: (id: string) => string[];
     /**

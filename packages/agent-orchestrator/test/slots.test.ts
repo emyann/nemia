@@ -8,7 +8,7 @@
  *
  * The store is the file's own at `ROOT`, given as `ENV`; each test names its `WF_MAX_RUNS` on a copy of it, and no pass has written a cap.
  */
-import { plantRecord, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test } from 'vitest';
@@ -31,7 +31,7 @@ import { sameJudgement } from '../src/summary/judgement.verb.ts';
 
 const ROOT = scratch('wf-slots-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 
@@ -101,7 +101,10 @@ const WORKFLOW = [
 ];
 function writeRun(id: string, minute: number, steps: Record<string, object>) {
   fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-  plantRecord(ROOT, runKey(id), JSON.stringify({
+  plantRecord(
+    ROOT,
+    runKey(id),
+    JSON.stringify({
       id,
       workspace: ROOT,
       brief: `The brief of ${id}`,
@@ -110,7 +113,8 @@ function writeRun(id: string, minute: number, steps: Record<string, object>) {
       place: { kind: 'folder' },
       workflow: WORKFLOW,
       steps,
-    }));
+    }),
+  );
 }
 
 signedOff('r-a-implement');

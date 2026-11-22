@@ -112,7 +112,10 @@ async function aRun(id: string, i: number, costUsd: number, more: { settled?: bo
       closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] },
       usage: { costUsd },
     });
-  plantRecord(ROOT, runKey(id), JSON.stringify({
+  plantRecord(
+    ROOT,
+    runKey(id),
+    JSON.stringify({
       id,
       repo: '/repos/home',
       baseRef: 'abc',
@@ -125,7 +128,8 @@ async function aRun(id: string, i: number, costUsd: number, more: { settled?: bo
       ...(more.factory ? { factory: more.factory } : {}),
       workflow: [{ name: 'design', after: [], body: 'Design it.', harness: 'codex', reads: ['costs'] }],
       steps: { design: { taskId } },
-    }));
+    }),
+  );
 }
 
 describe('Costs told to the step that reads them: after the approval and before where to look, the window of finished runs, never again to a session continued', () => {

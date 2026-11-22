@@ -331,7 +331,7 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(forgot.kind, 'forgotten');
   assert.equal(forgot.folder, true);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', run.id)), false, 'its folders went with it');
-  assert.equal((recordText(ROOT, runKey(run.id)) !== undefined), false);
+  assert.equal(recordText(ROOT, runKey(run.id)) !== undefined, false);
   assert.deepEqual(
     [forgot.removed, forgot.gone, forgot.handedOff, forgot.branches],
     [[], [], [], []],

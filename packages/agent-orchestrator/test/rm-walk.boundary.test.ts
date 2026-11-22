@@ -258,12 +258,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
         [wt],
         [{ step: 'implement', branch, commit }],
         [],
-        [
-          runKey(run.id),
-          `runs/${run.id}/`,
-          `checks/${run.id}-implement-check.stderr`,
-          `worktrees/${run.id}/`,
-        ],
+        [runKey(run.id), `runs/${run.id}/`, `checks/${run.id}-implement-check.stderr`, `worktrees/${run.id}/`],
         [{ branch, deleted: false, why: 'default' }],
         run.branch,
       ],

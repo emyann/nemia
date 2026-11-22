@@ -32,7 +32,10 @@ fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.md'), CARD);
 
 /** A run's record of one step, `implement`, its task `t-<id>`, started from the card `card`. */
 const runFrom = (id: string, card: string) =>
-  plantRecord(ROOT, runKey(id), JSON.stringify({
+  plantRecord(
+    ROOT,
+    runKey(id),
+    JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -45,7 +48,8 @@ const runFrom = (id: string, card: string) =>
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
       steps: { implement: { taskId: `t-${id}` } },
       from: { inbox: card },
-    }));
+    }),
+  );
 
 test("`INBOX`: the cards in play by default — a card whose run ended left out and counted — every card with --all, each in its run's phase; -l composes with both; a stray file that is no card is listed beside the card of its name, never hidden", async () => {
   fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });

@@ -4,7 +4,7 @@
  * place that refuses the start refuses it in its words, and nothing is written. A SIGINT to `nemia start` is not passed on to the
  * process group of the git `open` runs, which outlives it. Its store is its own at `ROOT`.
  */
-import { plantRecord, recordText, runKey, runsNow as filesStoreAt } from '../testing.ts';
+import { plantRecord, recordText, runKey, runsNow } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,11 +21,11 @@ import { startRun } from '../src/start/start.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { gitPlaceLayer, builtinGitPlace } from '../src/place/builtin.store.ts';
-import { runFile } from '../src/record/record.store.ts';
+
 import { Invalid } from '../src/refusal/refusal.ts';
 
 const ROOT = scratch('wf-start-place-');
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 
 /** The command run on its entry's handler, as the api runs it (`typed`): a child imports it to start a run in a process of its own. */
 const TYPED = path.join(import.meta.dirname, 'typed.ts');

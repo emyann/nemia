@@ -983,6 +983,7 @@ const PINNED: Record<string, string[]> = {
     'dropAsk',
     'readAsks',
     'readAnswers',
+    'RECORD_CEILING',
   ],
   'agent-orchestrator/workflow': [
     'checkFailurePolicyLine',

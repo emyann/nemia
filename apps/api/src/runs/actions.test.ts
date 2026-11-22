@@ -361,7 +361,7 @@ describe('what an action ignores of its body, and the removals the board will no
     assert.ok(said.startsWith(`${id}  not forgotten: ${worktree} is held (a person holds it)`), said);
     for (const fact of [`git -C ${repo} worktree unlock ${worktree}`, `nemia rm ${id} again`])
       assert.ok(said.includes(fact), `${fact} in ${said}`);
-    assert.ok((recordText(root, runKey(id)) !== undefined), 'the record is kept');
+    assert.ok(recordText(root, runKey(id)) !== undefined, 'the record is kept');
     assert.ok(fs.existsSync(worktree), 'and the worktree');
   });
 });

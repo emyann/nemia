@@ -30,7 +30,10 @@ const JSON_TYPE = { 'content-type': 'application/json' };
 
 const writeRun = (run: { id: string } & Record<string, unknown>) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(run.id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(run.id),
+    JSON.stringify({
       repo: '/code/app',
       workspace: '/code/app',
       baseRef: 'abc123',
@@ -41,7 +44,8 @@ const writeRun = (run: { id: string } & Record<string, unknown>) => {
       createdAt: '2026-09-12T00:00:00.000Z',
       steps: { implement: { taskId: null } },
       ...run,
-    }));
+    }),
+  );
 };
 
 /** A task filed with `brief` and waiting for a slot: the package's engine files every task queued. */

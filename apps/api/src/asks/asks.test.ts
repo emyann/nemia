@@ -122,7 +122,7 @@ beforeEachTest(() => {
   task('t-working', 'claude', 'working');
 });
 
-const record = (recordText(root, recordFile) ?? '');
+const record = recordText(root, recordFile) ?? '';
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -148,7 +148,7 @@ const asked = (run = R) => {
 /** Nothing was written: no ask, and the run's record as it was. */
 const nothingWritten = (why: string) => {
   assert.deepEqual(asked(), [], `no ask file: ${why}`);
-  assert.equal((recordText(root, recordFile) ?? ''), record, `the run's record untouched: ${why}`);
+  assert.equal(recordText(root, recordFile) ?? '', record, `the run's record untouched: ${why}`);
 };
 
 /** The run object of `id` (`GET /api/runs/:id`). */
@@ -298,7 +298,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       });
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       assert.deepEqual(asked(), ['retry-implement-2']);
-      assert.equal((recordText(root, recordFile) ?? ''), record, "the api wrote nothing of the run's record");
+      assert.equal(recordText(root, recordFile) ?? '', record, "the api wrote nothing of the run's record");
 
       const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const run = await object();
@@ -368,7 +368,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       );
       assert.ok(!Number.isNaN(Date.parse(freshWhen)), freshWhen);
 
-      assert.equal((recordText(root, recordFile) ?? ''), record, "the api wrote nothing of the run's record");
+      assert.equal(recordText(root, recordFile) ?? '', record, "the api wrote nothing of the run's record");
       assert.deepEqual(tasksOf(), tasks, "nor of the engine's tasks");
       assert.deepEqual([standIn().said, standIn().interrupts], [[], []], 'and said nothing to a session');
       assert.equal(

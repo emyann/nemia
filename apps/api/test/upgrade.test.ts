@@ -39,7 +39,10 @@ function keptByTheOldRelease(name: string) {
 function planted(id: string) {
   const file = runKey(id);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  plantRecord(root, file, JSON.stringify({
+  plantRecord(
+    root,
+    file,
+    JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -51,7 +54,8 @@ function planted(id: string) {
       createdAt: '2026-11-11T09:00:00.000Z',
       workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
       steps: { implement: { taskId: null } },
-    }));
+    }),
+  );
 }
 
 /** Who the hold on run `id` says put it, as its file keeps it. */

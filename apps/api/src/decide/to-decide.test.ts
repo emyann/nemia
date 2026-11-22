@@ -489,13 +489,13 @@ describe("a finished run's `to decide`, level-triggered: its branch ahead of the
   );
   s.test('level-triggered: a branch merged by hand stops being one to decide on the next pass, with nobody telling the run', async () => {
     const id = 'r-plain';
-    const record = (recordText(root, runKey(id)) ?? '');
+    const record = recordText(root, runKey(id)) ?? '';
     git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, `wf/${id}/implement`);
     try {
       await aPass();
       assert.equal((await detailOf(id)).status.toDecide, null, 'the branch is on the base: nothing left to decide');
       assert.equal((await listedOf(id)).toDecide, null);
-      assert.equal((recordText(root, runKey(id)) ?? ''), record, "and nothing is written on the run's record");
+      assert.equal(recordText(root, runKey(id)) ?? '', record, "and nothing is written on the run's record");
       assert.deepEqual(
         await decisionOf(id),
         { nothing: `landed — wf/${id}/implement is already on main` },

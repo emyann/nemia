@@ -822,8 +822,7 @@ test('a try a pass filed and died before writing down is adopted on what filing 
   assert.equal(pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n, 2, 'a pass takes the refresh, with nothing yet to file');
   await runWith(b.e, retryRun(run.id, 'build', { mode: 'continue' }));
   const beforeFiling = runRecord(ROOT, run.id);
-  const asked = askNames(ROOT, run.id)
-    .map((name) => [name, (recordText(ROOT, askKeyOf(run.id, name)) ?? '')] as const);
+  const asked = askNames(ROOT, run.id).map((name) => [name, recordText(ROOT, askKeyOf(run.id, name)) ?? ''] as const);
 
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const filed = runRecord(ROOT, run.id).steps.build;

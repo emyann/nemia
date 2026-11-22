@@ -122,7 +122,8 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
  * @param given The record a run's id is answered by, undefined for a run read from the store; left out,
  * every run is read.
  */
-export const storeRunsGiven = (given?: (id: string) => Run | undefined) => Effect.flatMap(RunDoor, (door) => door.runs.list(undefined, given));
+export const storeRunsGiven = (given?: (id: string) => Run | undefined) =>
+  Effect.flatMap(RunDoor, (door) => door.runs.list(undefined, given));
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no cap

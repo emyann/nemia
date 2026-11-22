@@ -1,8 +1,8 @@
 /**
- * A run's record, a person's files beside it and the inbox are read and written through `filesStoreAt` (`src/record/files.store.ts`): over
- * the orchestrator's `src` and the api's, tests left out (`sourcesOf`), a call that hands `fs` a path from `runsDir()` or `inboxDir()`,
- * or one built from them, is refused outside the store's own two files (`OWN`), read off each file's syntax tree, so a call oxfmt splits
- * over lines is the same call. Each of `RULES` is a part of the matcher, and each is proven by a fixture that only it refuses:
+ * A run's record, a person's files beside it and the inbox are read and written through the Run door (`RunDoor`, `src/runs/runs.store.ts`):
+ * over the orchestrator's `src` and the api's, tests left out (`sourcesOf`), a call that hands `fs` a path from `runsDir()` or
+ * `inboxDir()`, or one built from them, is refused outside the store's own files (`OWN`), read off each file's syntax tree, so a call oxfmt
+ * splits over lines is the same call. Each of `RULES` is a part of the matcher, and each is proven by a fixture that only it refuses:
  *
  * - **`aliases`**: a call of `runsDir` or `inboxDir` (`ROOTS`) is a root, and so is a call of a name an import binds either to;
  * - **`propagation`**: a variable, or a variable assigned, whose value holds a root or a name that does is tainted, by its symbol, so a
@@ -36,7 +36,11 @@ const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const SOURCES = ['packages/agent-orchestrator/src', 'apps/api/src'];
 
 /** The store's own files: the run store's (`runsDir`) and the inbox's (`inboxDir`). */
-const OWN = ['packages/agent-orchestrator/src/record/record.store.ts', 'packages/agent-orchestrator/src/record/files.store.ts'];
+const OWN = [
+  'packages/agent-orchestrator/src/record/record.store.ts',
+  'packages/agent-orchestrator/src/record/files.store.ts',
+  'packages/agent-orchestrator/src/runs/records.store.ts',
+];
 
 /** The functions whose call names a folder of the store. */
 const ROOTS = ['runsDir', 'inboxDir'];
@@ -63,7 +67,7 @@ const EXCEPTIONS: Readonly<Record<string, Exception>> = {
     through: ['agentFilesDir'],
     why:
       "a run's rendered agents, runs/<id>/agents/<step>, are written once at nemia start and read by the tick: neither its record, a " +
-      "person's file nor the inbox, which are filesStoreAt's",
+      "person's file nor the inbox, which are the Run door's",
   },
   'packages/agent-orchestrator/src/frozen/frozen.store.ts': {
     through: ['workflowFilesDir', 'carriedFilesDir', 'homeFilesDir'],
@@ -259,7 +263,7 @@ function programOf(texts: ReadonlyMap<string, string>) {
 }
 
 const FIX =
-  'read and write it through filesStoreAt, adding the method to RunStore (src/record/record.ts), or name the file in EXCEPTIONS ' +
+  'read and write it through the Run door (RunDoor), adding the method to RunStore (src/record/record.ts), or name the file in EXCEPTIONS ' +
   '(test/store-paths.test.ts) with the declarations it goes through and why';
 
 /** What `texts` break of the rule under `exceptions` and `rules`, each a sentence naming the file, the line and the fix. */
@@ -277,7 +281,7 @@ function breaks(
   }
   for (const [file, exception] of Object.entries(exceptions)) {
     const source = sources.get(file);
-    if (!exception.why.trim()) out.push(`${file}'s exception says no why: say why its paths reach fs outside filesStoreAt`);
+    if (!exception.why.trim()) out.push(`${file}'s exception says no why: say why its paths reach fs outside the Run door`);
     if (!source) {
       out.push(`${file} is excepted but is not read: where it moved, rename its entry; else take it off`);
       continue;
@@ -365,7 +369,7 @@ test("texts that name the store's folders and hand fs none of them pass: a messa
   for (const text of PASSING) assert.deepEqual(breaks(one(text), {}), [], text);
 });
 
-test("the store's own two files may hand fs its folders", () => {
+test("the store's own files may hand fs its folders", () => {
   for (const file of OWN) assert.deepEqual(breaks(one(PLAIN[0], file), {}), [], file);
   assert.equal(breaks(one(PLAIN[0], 'packages/agent-orchestrator/src/record/pause.store.ts'), {}).length, 1);
 });
@@ -397,7 +401,7 @@ test('an exception lets its declarations through, and no other root of its file'
 test('REFUSED: an exception with no why, one through a name its file does not declare, one not needed, one for no file', () => {
   const texts = one(AGENTS_TEXT, AGENTS);
   assert.deepEqual(breaks(texts, { [AGENTS]: { through: ['agentFilesDir'], why: ' ' } }), [
-    `${AGENTS}'s exception says no why: say why its paths reach fs outside filesStoreAt`,
+    `${AGENTS}'s exception says no why: say why its paths reach fs outside the Run door`,
   ]);
   assert.deepEqual(breaks(texts, { [AGENTS]: { through: ['agentFilesDir', 'nowhere'], why: 'its own' } }), [
     `${AGENTS}'s exception goes through nowhere, which it does not declare: name a declaration`,

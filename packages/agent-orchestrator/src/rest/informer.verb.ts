@@ -31,7 +31,6 @@ import { type Judgements, type Judgement, type JudgedOrWhy, judgementsOf, restin
 import { followedFeed } from './rest.verb.ts';
 import { evictedBy, informedOf, type Watch } from './rest.ts';
 import type { Run as RunObject } from '../object/run.model.ts';
-import { StoreRoot } from '../config/root.store.ts';
 import { NeedsMemory, needsVersionOf } from '../needs/needs.verb.ts';
 
 /**
@@ -239,7 +238,6 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
   git: BranchReader,
   same: (kept: T, fresh: T) => boolean = isDeepStrictEqual,
 ) {
-  const home = yield* StoreRoot;
   const needsMemo = yield* NeedsMemory;
   const fed = yield* followedFeed(e, memo);
   const readTo = memo.cursor;

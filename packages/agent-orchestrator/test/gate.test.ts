@@ -116,7 +116,7 @@ const asksOf = (id: string, dir = '') =>
     .map((n) => (dir === 'done' ? n.slice('done/'.length) : n))
     .sort();
 /** The record as the tick wrote it, unread by `runRecord`. */
-const recordOf = (id: string) => (recordText(ROOT, runKey(id)) ?? '');
+const recordOf = (id: string) => recordText(ROOT, runKey(id)) ?? '';
 
 /** `nemia start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits there. */
 const atItsGate = async (keys: Parameters<typeof planned>[0] = {}) => {
@@ -482,7 +482,7 @@ describe('`nemia cancel` and `nemia rm` at a gate', () => {
     const said = refusal.kind === 'refused' ? (refusal.refusal ?? '') : '';
     for (const fact of ['plan waits at its gate', `nemia approve ${id} plan`, `nemia cancel ${id}`, `nemia rm ${id}`])
       assert.ok(said.includes(fact), said);
-    assert.ok((recordText(ROOT, runKey(id)) !== undefined), 'nothing of it removed');
+    assert.ok(recordText(ROOT, runKey(id)) !== undefined, 'nothing of it removed');
     const typedRm = await runWith(gate.e, RM.handler({ runId: id }));
     assert.equal(typedRm.removed, false, 'nemia rm left it, its line naming why');
   });
@@ -654,7 +654,7 @@ describe("a wordless `nemia retry` asked while a gated step's harness blocked it
       };
     await assert.rejects(runWith(b.e, approveRun(id, 'plan')), naming('at its gate', 'retry-plan-2', 'then approve it'));
     await assert.rejects(runWith(b.e, retryRun(id, 'plan', { mode: 'continue', message: 'store it first' })), naming('awaiting approval'));
-    assert.ok((recordText(ROOT, file) !== undefined), 'left where it is, for a person to take back');
+    assert.ok(recordText(ROOT, file) !== undefined, 'left where it is, for a person to take back');
   });
   s.test('with the ask deleted, the approval files what follows', async () => {
     dropRecord(ROOT, file);

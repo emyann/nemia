@@ -783,10 +783,7 @@ describe('a step retried, answered, over its budget and nudged: what `nemia deci
       ['blocked', 'And the README, too?'],
       'and what the try made of them',
     );
-    assert.ok(
-      !(recordText(ROOT, runKey(id)) ?? '').includes('The flag is public'),
-      'composed on read: the record keeps no message',
-    );
+    assert.ok(!(recordText(ROOT, runKey(id)) ?? '').includes('The flag is public'), 'composed on read: the record keeps no message');
   });
   s.test('what a step consumed is summed over its attempts — one that never started left out, the one in flight read off the view', () => {
     const views: Record<string, unknown> = {

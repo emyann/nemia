@@ -122,7 +122,7 @@ test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: 
   const ended = await rm.closed;
   assert.equal(ended.signal, 'SIGINT', `nemia rm ended by SIGINT; it said: ${rm.err()}`);
   assert.ok(groupOf(pgid).includes(String(pgid)), "the group of remove's git outlives the rm");
-  assert.ok(fs.existsSync(wt) && (recordText(STORE, runKey(id)) !== undefined), 'the worktree and the record are still there');
+  assert.ok(fs.existsSync(wt) && recordText(STORE, runKey(id)) !== undefined, 'the worktree and the record are still there');
   assert.ok(killGroup(pgid), "the group of remove's git is killed");
   await waitFor(() => groupOf(pgid).length === 0);
   const again = rmIn({ ...env, PATH: process.env.PATH });

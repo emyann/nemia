@@ -59,7 +59,10 @@ const agentToken = door((d) => d.persons.mint('port-ops', { kind: 'agent', agent
 const planted = (id: string) => {
   const file = runKey(id);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  plantRecord(root, file, JSON.stringify({
+  plantRecord(
+    root,
+    file,
+    JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -71,7 +74,8 @@ const planted = (id: string) => {
       createdAt: '2026-11-11T09:00:00.000Z',
       workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
       steps: { implement: { taskId: null } },
-    }));
+    }),
+  );
 };
 
 /**
@@ -89,7 +93,10 @@ const askingAtGate = (id: string) => {
       additionalProperties: false,
     }),
   );
-  plantRecord(root, file, JSON.stringify({
+  plantRecord(
+    root,
+    file,
+    JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -105,7 +112,8 @@ const askingAtGate = (id: string) => {
         { name: 'implement', after: ['design'], body: 'Implement it.' },
       ],
       steps: { design: { taskId: `${id}-design`, branch: `wf/${id}/design` }, implement: { taskId: null } },
-    }));
+    }),
+  );
   Effect.runSync(engineFor(standIn()).file({ id: `${id}-design`, brief: 'Design it.', cwd: '/code/app', harness: 'codex' }));
   standIn().settle(`${id}-design`, 'succeeded', {
     exitCode: 0,

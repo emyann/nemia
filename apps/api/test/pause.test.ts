@@ -158,7 +158,10 @@ describe('the board pauses the store and lifts it, refused a second of each; the
     async () => {
       const id = 'r-pause-now';
       fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-      plantRecord(root, runKey(id), JSON.stringify({
+      plantRecord(
+        root,
+        runKey(id),
+        JSON.stringify({
           id,
           workspace: root,
           brief: 'Pause me.',
@@ -167,7 +170,8 @@ describe('the board pauses the store and lifts it, refused a second of each; the
           place: { kind: 'folder' },
           workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
           steps: { implement: { taskId: 't-now' } },
-        }));
+        }),
+      );
       const { on, stops } = appAtWork('t-now');
       const read = await on.request('/api/pause/now');
       assert.equal(read.status, 200);

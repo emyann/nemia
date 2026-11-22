@@ -410,10 +410,10 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
     assert.equal(record.workflow[0].agent.name, 'implementer');
   });
   s.test('a later hire and fire change no step of the run started', () => {
-    const before = (recordText(ROOT, runKey(run)) ?? '');
+    const before = recordText(ROOT, runKey(run)) ?? '';
     hireAgentAt(ROOT, { factory: 'pipao', agent: 'shipper', step: 'build/implement' });
     fireAgentAt(ROOT, { factory: 'pipao', step: 'build/review' });
-    assert.equal((recordText(ROOT, runKey(run)) ?? ''), before);
+    assert.equal(recordText(ROOT, runKey(run)) ?? '', before);
     assert.equal(runRecord(ROOT, run).workflow?.[0].agent?.name, 'implementer');
     hired();
   });
@@ -464,14 +464,14 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
         [readOnly.map((v) => v.path), []],
         'the start says the volumes it mounts',
       );
-      const before = (recordText(ROOT, runKey(id)) ?? '');
+      const before = recordText(ROOT, runKey(id)) ?? '';
       const unwired = filed.filter((v) => v.readOnly || ![a, b].includes(v.path));
       for (const v of unwired) await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]);
       assert.deepEqual(
         readFactoryAt(ROOT, f).volumes.map((v) => v.path),
         [a, b],
       );
-      assert.equal((recordText(ROOT, runKey(id)) ?? ''), before);
+      assert.equal(recordText(ROOT, runKey(id)) ?? '', before);
       const gone = unwired[0]?.path ?? '';
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, gone]), 'Missing', gone);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, a]), 'Conflict', 'nemia factory attach');
@@ -527,10 +527,10 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
         const settings = spec.config?.claude?.settings;
         assert.deepEqual(JSON.parse(settings ?? '{}').attribution, { commit: '', pr: '' }, spec.id);
       }
-      const record = (recordText(ROOT, runKey(id)) ?? '');
+      const record = recordText(ROOT, runKey(id)) ?? '';
       await typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']);
       assert.equal('harnessSettings' in fileOf(f), false, 'the key is gone once none is left');
-      assert.equal((recordText(ROOT, runKey(id)) ?? ''), record);
+      assert.equal(recordText(ROOT, runKey(id)) ?? '', record);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']), 'Missing', 'claude.attribution');
     },
   );
@@ -546,10 +546,10 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
       const frozen = await start(b, '--factory', f);
       assert.equal(frozen.costLine, 80);
       assert.equal((await start(aRepo())).costLine, undefined, 'a run in the default factory');
-      const record = (recordText(ROOT, runKey(frozen.id)) ?? '');
+      const record = recordText(ROOT, runKey(frozen.id)) ?? '';
       await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'build', '95']);
       await typedFrom(ROOT, ['factory', 'cost-line', 'rm', f, 'notes']);
-      assert.equal((recordText(ROOT, runKey(frozen.id)) ?? ''), record, 'the run keeps the line it began with');
+      assert.equal(recordText(ROOT, runKey(frozen.id)) ?? '', record, 'the run keeps the line it began with');
       await refusedBy(() => typedFrom(ROOT, ['factory', 'detach', f, 'build']), 'Invalid');
       await typedFrom(ROOT, ['factory', 'cost-line', 'rm', f, 'build']);
       assert.equal('costLines' in fileOf(f), false, 'the key is gone once none is left');

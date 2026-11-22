@@ -78,7 +78,10 @@ const TREE = (() => {
 })();
 
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-plantRecord(root, runKey(RUN), JSON.stringify({
+plantRecord(
+  root,
+  runKey(RUN),
+  JSON.stringify({
     id: RUN,
     repo: path.join(root, 'pr-repo'),
     workspace: path.join(root, 'pr-repo'),
@@ -91,7 +94,8 @@ plantRecord(root, runKey(RUN), JSON.stringify({
     workflow: [{ name: 'design', after: [], body: 'Design it.' }],
     steps: { design: { taskId: TASK } },
     factory: FACTORY,
-  }));
+  }),
+);
 
 /** A session's token for the step `design` of the run, its try the live one while `TASK` is filed and unsettled. */
 const token = Effect.runSync(

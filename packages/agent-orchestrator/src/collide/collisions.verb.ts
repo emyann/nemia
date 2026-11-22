@@ -27,13 +27,7 @@ const ahead = (standings: readonly BranchStanding[]) => standings.filter((s) => 
  * @param git What reads where the other runs' branches stand.
  * @param place The place whose trial verb merges.
  */
-export const collisionsAt = (
-  run: Run,
-  ending: string,
-  standings: readonly BranchStanding[],
-  git: BranchReader,
-  place: Place,
-) =>
+export const collisionsAt = (run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader, place: Place) =>
   Effect.gen(function* () {
     const ours = ahead(standings);
     if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;

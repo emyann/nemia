@@ -13,7 +13,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, and no cap is set on runs or sessions.
  */
-import { askKeyOf, asksPrefix, dropRecord, keysUnder, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { askKeyOf, asksPrefix, dropRecord, keysUnder, runRecord, runsNow } from '../testing.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -74,7 +74,7 @@ const ENV: Record<string, string | undefined> = {
 };
 /** A run's steps read now, at this test's store. */
 const stepsOf = (run: Parameters<typeof stepsNow>[0]) => stepsNow(run, ROOT);
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 /** `program` given the place of the test running now, and still to be run. */
@@ -414,7 +414,10 @@ describe("each verb's program, given its services, answers what its plain face a
         ['nemia cancel', cancelRun('garbled')],
       ];
       for (const [what, program] of programs) assert.match(await recovered(e, program, 'Invalid'), /is not JSON/, what);
-      assert.ok(!(keysUnder(ROOT, asksPrefix('garbled')).length > 0) && !fs.existsSync(path.join(ROOT, 'runs', 'garbled.cancelled')), 'nothing written');
+      assert.ok(
+        !(keysUnder(ROOT, asksPrefix('garbled')).length > 0) && !fs.existsSync(path.join(ROOT, 'runs', 'garbled.cancelled')),
+        'nothing written',
+      );
     } finally {
       fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
     }

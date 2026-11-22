@@ -440,7 +440,6 @@ const handedOffBy = Effect.fnUntraced(function* (place: Place, workspace: string
  * a person's (`holdOnce`) — by the time it is worded the hold is off the record, and nothing but this knows who took it off.
  */
 const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Parents) {
-  const home = yield* StoreRoot;
   const nothing: { notes: string[]; lifted?: string } = { notes: [] };
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
   let landed = true;

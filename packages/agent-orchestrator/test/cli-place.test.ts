@@ -97,7 +97,7 @@ test('a run started, read once a pass has read where its branch stands, and remo
 
   const forgot = await forgetTyped((effect) => runWith(engineOf(engine().layer), effect), ROOT, ['rm', id]);
   assert.equal(forgot.error, undefined, forgot.printed.join('\n'));
-  assert.equal((recordText(ROOT, runKey(id)) !== undefined), false, 'nemia rm forgot the run');
+  assert.equal(recordText(ROOT, runKey(id)) !== undefined, false, 'nemia rm forgot the run');
   assert.equal(fs.existsSync(workspace), false, 'its workspace removed by the place it was handed');
   assert.notEqual(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'what the step left handed off on its branch first');
 });

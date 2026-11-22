@@ -44,8 +44,7 @@ const record = (id: string, card?: string) => ({
   ...(card ? { from: { inbox: card } } : {}),
 });
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-for (const [id, card] of [[R], [FROM, 'lines-card'], [UNFILED]] as const)
-  plantRecord(root, runKey(id), JSON.stringify(record(id, card)));
+for (const [id, card] of [[R], [FROM, 'lines-card'], [UNFILED]] as const) plantRecord(root, runKey(id), JSON.stringify(record(id, card)));
 beforeEachTest(() => {
   for (const id of [R, FROM]) {
     Effect.runSync(engine().file({ id: `t-${id}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));

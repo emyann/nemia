@@ -14,7 +14,7 @@
  *
  * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
-import { plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -54,7 +54,7 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_RUNS: undefined,
   WF_KEEP_WORKTREES: undefined,
 };
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 /** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const world = () => stage.place().world;
@@ -237,7 +237,7 @@ describe(
         const branch = runRecord(ROOT, id).steps.work.branch!;
         const tip = world().tip(repo, branch);
         assert.ok(tip, 'the run has its branch');
-        const record = (recordText(ROOT, runKey(id)) ?? '');
+        const record = recordText(ROOT, runKey(id)) ?? '';
         assert.ok(fs.existsSync(wt), 'landed, its worktree is still there: no pass removes it');
 
         const pass = await tick();
@@ -269,7 +269,7 @@ describe(
           'one inventory, one standing and one remove, every one off the loop',
         );
 
-        assert.equal((recordText(ROOT, runKey(id)) ?? ''), record, 'the sweep wrote nothing on the run record');
+        assert.equal(recordText(ROOT, runKey(id)) ?? '', record, 'the sweep wrote nothing on the run record');
         assert.equal(world().tip(repo, branch), tip, 'its branch is kept');
         assert.ok(fs.existsSync(path.join(ROOT, 'runs', id)), 'and its files under runs/<id>/');
         assert.equal((await stage.runWith(engine(), decideRun(id))).decision.kind, 'landed');

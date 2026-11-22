@@ -6,7 +6,6 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import * as store from './record.store.ts';
 import { routeAsk } from '../route/index.ts';
@@ -15,16 +14,7 @@ import { dropRecord, listRuns, plantAsk, plantRecord, recordText, rewriteRun, ru
 const ROOT = scratch('wf-record-read-');
 /** A person's route for a condition's try, planted where `nemia route` writes it. */
 const plantRoute = (id: string, step: string, n: number, text: string) => plantAsk(ROOT, id, routeAsk(step, n), text);
-const {
-  UnreadableRecord,
-  acceptanceIn,
-  approvalIn,
-  askIn,
-  roundAskIn,
-  runsDir,
-  pruneFile,
-  holdFile,
-} = store;
+const { UnreadableRecord, acceptanceIn, approvalIn, askIn, roundAskIn, runsDir, pruneFile, holdFile } = store;
 
 fs.mkdirSync(runsDir(ROOT), { recursive: true });
 

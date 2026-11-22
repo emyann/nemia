@@ -58,9 +58,10 @@ const interruptsRead = Effect.fnUntraced(function* (memo?: PauseRuns) {
   const seen = yield* keptRuns(memo, runTasks, yield* setting('verifyRest'));
   const ids = [...new Set(seen.filter((run) => !run.cancelledAt).flatMap((run) => run.tasks))];
   const views = new Map((ids.length ? (yield* asked('list', e.list(ids))).views : []).map((v) => [v.id, v]));
-  const runs = (yield* Effect.forEach(liveAmong(seen, (id) => views.get(id)), (id) => door.runs.find(RunId.read(id)))).filter(
-    (run) => run !== undefined,
-  );
+  const runs = (yield* Effect.forEach(
+    liveAmong(seen, (id) => views.get(id)),
+    (id) => door.runs.find(RunId.read(id)),
+  )).filter((run) => run !== undefined);
   const steps = new Map(yield* Effect.forEach(runs, (run) => Effect.map(stepsOf(run), (s) => [run.id, s] as const)));
   return {
     runs: new Map<string, Run>(runs.map((r) => [r.id, r])),

@@ -264,6 +264,11 @@ export async function stepPage(s: Served, { name, from, dir }: { name: string; f
     hiredIn: factory ? [] : hiredInOf(listedAtOnce(home), name, found.name, from, repo),
     hiring: await hiringOf(factory, name, found, hired, from, agents),
     skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
-    recentRuns: recentRunsOf(await s.inRequest(keptRuns(memo.records.step, stepRun, s.config.verifyRest)), dir, found.name, factory?.name ?? null),
+    recentRuns: recentRunsOf(
+      await s.inRequest(keptRuns(memo.records.step, stepRun, s.config.verifyRest)),
+      dir,
+      found.name,
+      factory?.name ?? null,
+    ),
   } satisfies WorkflowStepPage;
 }

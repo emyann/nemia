@@ -18,11 +18,13 @@ import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
 export const mergesOf = Effect.fnUntraced(function* (place: Place, runId: string, branches: readonly string[]) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
   if (!isRepositoryRun(run)) return {} satisfies Record<string, StandingMerge> as Record<string, StandingMerge>;
-  const { trials } = yield* tried(() => trialMerges(
-    run.repo,
-    branches.map((branch) => ({ onto: run.branch, branch })),
-    place,
-  ));
+  const { trials } = yield* tried(() =>
+    trialMerges(
+      run.repo,
+      branches.map((branch) => ({ onto: run.branch, branch })),
+      place,
+    ),
+  );
   return Object.fromEntries(
     branches.map((branch, i) => {
       const merge = mergeWordOf(trials[i] ?? { unknown: `the place answered no trial of ${branch}` });

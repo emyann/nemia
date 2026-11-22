@@ -433,7 +433,10 @@ const pending = (taskId: string) => {
 /** A run of one step, frozen on the record as `nemia start` freezes it. */
 function writeRun(id: string, minute: number, fields: { after?: string[]; taskId?: string; cancelled?: boolean } = {}) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(id),
+    JSON.stringify({
       id,
       repo,
       workspace: repo,
@@ -446,7 +449,8 @@ function writeRun(id: string, minute: number, fields: { after?: string[]; taskId
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
       steps: { implement: fields.taskId ? { taskId: fields.taskId, workspace: repo, branch: `wf/${id}/implement` } : { taskId: null } },
       ...(fields.after ? { after: fields.after } : {}),
-    }));
+    }),
+  );
   if (fields.cancelled) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), at(minute + 1));
 }
 

@@ -6,7 +6,7 @@
 import { RunId } from '../record/record.model.ts';
 import { Effect, Schema } from 'effect';
 import { CHECK_OUTPUT_WORDS, type CheckOutput, CLOSEOUT_WORDS, LOGS_WORDS, OUTPUT_STREAMS, Run as RunObject, SHOW_WORDS } from 'objects';
-import { EngineService, asked, tried } from '../runtime-client.ts';
+import { EngineService, asked } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { StoreConfig } from '../config/config.store.ts';

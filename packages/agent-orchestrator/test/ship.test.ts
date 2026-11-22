@@ -17,7 +17,7 @@
  * (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon. `endings(stage, root)` copies the team's agents and skills
  * beside every folder made under `root`, since the team's `ship.md` names `agent: shipper`.
  */
-import { askKeyOf, askNames, askText, plantAsk, plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { askKeyOf, askNames, askText, plantAsk, plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -55,7 +55,7 @@ import {
 import { told, type StartedAnswer } from './typed.ts';
 import { staged, story } from './story.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { runFile } from '../src/record/record.store.ts';
+
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { resumePause, putPause } from '../src/pause/pause.store.ts';
 import { PlaceService } from '../src/place/place.store.ts';
@@ -142,7 +142,7 @@ const filedAs = (record: StepRecord | undefined) => {
  *   check settled `failed` with exit 1, or with none where it did not finish; the pass after aborts the merge.
  */
 async function endings(stage: Stage, root: string) {
-  const rooted = filesStoreAt(ROOT);
+  const rooted = runsNow(ROOT);
   fs.cpSync(path.join(TEAM, 'agents'), path.join(root, 'agents'), { recursive: true });
   fs.cpSync(path.join(TEAM, 'skills'), path.join(root, 'skills'), { recursive: true });
   const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
@@ -370,7 +370,7 @@ const ENV: Record<string, string | undefined> = {
 };
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const at = await endings(stage, ROOT);
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 type Place = import('../src/place/place.store.ts').Place;
 type PlaceAnswers = import('../src/place/place.ts').PlaceAnswers;
 type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
@@ -1197,7 +1197,7 @@ describe('a result a person merged by hand before its ending ran: the run has la
       at.mergedByHand(repo, branch);
       const forgot = await stage.runWith(e(), forgetRun(id));
       assert.equal(forgot.kind, 'forgotten', forgot.kind === 'refused' ? forgot.refusal : '');
-      assert.equal((recordText(ROOT, runKey(id)) !== undefined), false);
+      assert.equal(recordText(ROOT, runKey(id)) !== undefined, false);
     },
   );
   s.test(

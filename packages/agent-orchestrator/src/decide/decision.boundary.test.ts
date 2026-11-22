@@ -5,7 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
-import { plantRecord, runKey, runsNow as filesStoreAt } from '../../testing.ts';
+import { plantRecord, runKey, runsNow } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -26,7 +26,7 @@ import type { Env } from '../config/config.store.ts';
 
 const root = scratch('wf-decision-');
 const ENV: Env = { ...process.env, WF_ROOT: root };
-const stored = filesStoreAt(root);
+const stored = runsNow(root);
 type Place = import('../place/place.store.ts').Place;
 
 /** The engine every read of this file goes through, over the journals it writes under the store's root. */
@@ -122,7 +122,10 @@ const workflow = [
 
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(run.id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(run.id),
+    JSON.stringify({
       workspace: run.repo,
       branch: 'main',
       isolate: true,
@@ -131,7 +134,8 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow,
       ...run,
-    }));
+    }),
+  );
 }
 
 /**

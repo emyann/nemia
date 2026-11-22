@@ -8,7 +8,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { rewriteRun, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { rewriteRun, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -45,7 +45,7 @@ const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Plac
     ? typed(argv, e, undefined, place, env)
     : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 const SCHEMA = JSON.stringify({
   type: 'object',

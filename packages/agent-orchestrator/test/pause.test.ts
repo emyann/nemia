@@ -20,7 +20,19 @@
  * instant written as a literal. The store is the file's own, at `ROOT`, given as `ENV`, and the run cap high, so the
  * schedule's fire is held by the pause alone.
  */
-import { askKeyOf, askNames, asksPrefix, dropRecord, keysUnder, listRuns, plantRecord, recordText, retryAskKey, runKey, runRecord } from '../testing.ts';
+import {
+  askKeyOf,
+  askNames,
+  asksPrefix,
+  dropRecord,
+  keysUnder,
+  listRuns,
+  plantRecord,
+  recordText,
+  retryAskKey,
+  runKey,
+  runRecord,
+} from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -138,9 +150,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
           const run = Object.values(runs).find((r) => JSON.stringify(runRecord(ROOT, r.id).steps).includes(`"${taskId}"`));
           stops.push({
             taskId,
-            askOnDisk:
-              run !== undefined &&
-              asksOf(run.id).some((f) => (recordText(ROOT, askKeyOf(run.id, f)) ?? '').includes(taskId)),
+            askOnDisk: run !== undefined && asksOf(run.id).some((f) => (recordText(ROOT, askKeyOf(run.id, f)) ?? '').includes(taskId)),
           });
           if (taskId !== task('ended')) return b.e.stop(taskId);
           return Effect.promise(async () => {
@@ -210,7 +220,11 @@ describe("the store paused, then paused at once, then resumed: nothing new start
     await stage.runWith(b.e, approveRun(runs.landing.id, 'ship'));
     await pass();
     b.settle(task('landing', 'ship'), 'working');
-    plantRecord(ROOT, retryAskKey(runs.asked.id, 'work', 2), JSON.stringify({ step: 'work', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }));
+    plantRecord(
+      ROOT,
+      retryAskKey(runs.asked.id, 'work', 2),
+      JSON.stringify({ step: 'work', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }),
+    );
     markCancelled(ROOT, runs.called.id);
     assert.equal(readPause(ROOT), null);
   });
@@ -306,7 +320,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
         [],
         'a landing is asked no try',
       );
-      assert.equal((keysUnder(ROOT, asksPrefix(runs.called.id)).length > 0), false, 'a run called off is left alone');
+      assert.equal(keysUnder(ROOT, asksPrefix(runs.called.id)).length > 0, false, 'a run called off is left alone');
       for (const name of ['session', 'ended', 'called'] as const) parked.add(task(name));
     },
   );
@@ -417,7 +431,10 @@ describe("the store paused, then paused at once, then resumed: nothing new start
 test("a warm read of what a pause at once would stop reads the live runs' records alone, and answers a cold read's own", async (t) => {
   const b = stage.board();
   const write = (id: string, taskId: string) =>
-    plantRecord(ROOT, runKey(id), JSON.stringify({
+    plantRecord(
+      ROOT,
+      runKey(id),
+      JSON.stringify({
         id,
         workspace: ROOT,
         brief: `The brief of ${id}`,
@@ -426,7 +443,8 @@ test("a warm read of what a pause at once would stop reads the live runs' record
         place: { kind: 'folder' },
         workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
         steps: { implement: { taskId } },
-      }));
+      }),
+    );
   const ids = ['r-live', ...Array.from({ length: 200 }, (_, n) => `fin-${String(n).padStart(3, '0')}`)];
   t.onTestFinished(() => {
     for (const id of ids) dropRecord(ROOT, runKey(id));

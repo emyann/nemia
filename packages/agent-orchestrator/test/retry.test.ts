@@ -10,7 +10,20 @@
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
-import { askKeyOf, askNames, asksPrefix, keysUnder, listRuns, plantRecord, readAnswers, recordText, retryAskKey, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import {
+  askKeyOf,
+  askNames,
+  asksPrefix,
+  keysUnder,
+  listRuns,
+  plantRecord,
+  readAnswers,
+  recordText,
+  retryAskKey,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -69,7 +82,7 @@ const ENV: Env = {
 };
 /** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
 const stage = staged({ runWith, main: told, engineOf, env: ENV });
-const filesStore = filesStoreAt(ROOT);
+const filesStore = runsNow(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = () => {
@@ -159,7 +172,7 @@ describe("a retry over a void pause ask waits for the pass that sets it aside, t
       refusedAs('Conflict', 'try 2 of implement is held by the ask ', 'nemia pause --now', `nemia retry ${id} implement`),
     );
     assert.deepEqual(onDisk(retryAskKey(id, 'implement', 2)), pauseAsk);
-    assert.equal((keysUnder(ROOT, `${asksPrefix(id)}done/`).length > 0), false, 'the verb moves no file the tick reads');
+    assert.equal(keysUnder(ROOT, `${asksPrefix(id)}done/`).length > 0, false, 'the verb moves no file the tick reads');
   });
   s.test('a pass sets the void ask aside into done/', async () => {
     await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
@@ -186,7 +199,7 @@ describe('a pause ask still due holds a retry of its try, and is left as it is',
       refusedAs('Conflict', 'try 2 of implement is asked by nemia pause --now'),
     );
     assert.deepEqual(onDisk(retryAskKey(id, 'implement', 2)), pauseAsk);
-    assert.equal((keysUnder(ROOT, `${asksPrefix(id)}done/`).length > 0), false);
+    assert.equal(keysUnder(ROOT, `${asksPrefix(id)}done/`).length > 0, false);
   });
 });
 
@@ -959,7 +972,7 @@ describe("`nemia retry` writes a person's ask, and the tick honours it once, con
     const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh', model: 'opus' }));
     file = asked.file;
     assert.equal(file, askKeyOf(run.id, 'retry-implement-2'));
-    written = (recordText(ROOT, file) ?? '');
+    written = recordText(ROOT, file) ?? '';
     assert.deepEqual(JSON.parse(written), asked.ask);
     assert.equal(runRecord(ROOT, run.id).steps.implement?.tries, undefined, 'the verb writes no record');
     assert.match((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note ?? '', /^try 2 asked \(--model opus\)/);
@@ -972,7 +985,7 @@ describe("`nemia retry` writes a person's ask, and the tick honours it once, con
   });
   s.test('the ask is consumed, moved whole into done/, and a second pass files nothing', async () => {
     assert.deepEqual(retryAsks(run.id), []);
-    assert.equal((recordText(ROOT, askKeyOf(run.id, 'done/retry-implement-2')) ?? ''), written);
+    assert.equal(recordText(ROOT, askKeyOf(run.id, 'done/retry-implement-2')) ?? '', written);
     const second = await tick(run.id);
     assert.deepEqual([second.tried, second.filed, second.checked], [[], [], []]);
   });
@@ -2172,7 +2185,7 @@ describe('a check the machine killed under its own limit is run again by `retrie
     run = await throughCheck(['check: npm test', 'retries: 1'], 'failed', squeezed);
   });
   s.test('one pass runs its check again, and files no session', async () => {
-    const before = (recordText(ROOT, runKey(run.id)) ?? '');
+    const before = recordText(ROOT, runKey(run.id)) ?? '';
     const pass = await tick(run.id);
     assert.deepEqual([pass.tried, pass.checked], [['implement'], ['implement']]);
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no session');

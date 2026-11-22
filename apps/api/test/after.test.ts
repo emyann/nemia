@@ -113,7 +113,10 @@ const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness
 function writeRun(id: string, fields: { after?: string[]; steps?: object; cancelledAt?: string } = {}) {
   const { cancelledAt, ...rest } = fields;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(id),
+    JSON.stringify({
       id,
       repo,
       workspace: repo,
@@ -126,7 +129,8 @@ function writeRun(id: string, fields: { after?: string[]; steps?: object; cancel
       workflow,
       steps: { implement: { taskId: null } },
       ...rest,
-    }));
+    }),
+  );
   if (cancelledAt) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
 }
 

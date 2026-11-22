@@ -12,7 +12,7 @@
  * pure `storeRootRefusal` (`src/start/store-root.test.ts`); an ending after a step starting under a root every rule carries is the
  * start of `mounts.test.ts`'s story.
  */
-import { recordText, runKey, runsNow as filesStoreAt } from '../testing.ts';
+import { recordText, runKey, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -39,7 +39,7 @@ import type { Env } from '../src/config/config.store.ts';
 const ROOT = path.join(scratch('wf-start-judged-'), 'First (Last)');
 fs.mkdirSync(ROOT);
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 const stage = staged({ runWith, main, engineOf, env: ENV });
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
 type Workflow = import('../src/step/step.ts').StepSpec;

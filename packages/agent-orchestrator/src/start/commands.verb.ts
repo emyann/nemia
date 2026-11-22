@@ -278,7 +278,6 @@ export const CONCLUDED: Served<Concluded, typeof ConcludedInput.Type> = {
   ...CONCLUDED_WORDS,
   input: ConcludedInput,
   handler: Effect.fnUntraced(function* (args: typeof ConcludedInput.Type) {
-    const home = yield* StoreRoot;
     const id = args.runId;
     const notId = idRefusal(id, 'read', 'nemia concluded');
     if (notId) throw new Invalid({ message: notId });

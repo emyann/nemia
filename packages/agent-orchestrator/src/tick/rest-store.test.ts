@@ -35,7 +35,7 @@ import { placeOver, unreadBy } from '../../test/place-over.ts';
 import { story } from '../../test/story.ts';
 import * as verbs from '../runner.ts';
 import { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun } from '../runner.ts';
-import { holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir } from '../record/record.store.ts';
+import { holdFile, markCancelled, pruneFile, restStamps, runsDir } from '../record/record.store.ts';
 import { resumePause, putPause } from '../pause/pause.store.ts';
 import { tickRun, freshRestMemo } from './tick.verb.ts';
 import { feedFile } from '../feed/feed.store.ts';
@@ -863,11 +863,7 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
   });
   test('REFUSED: a record in the asks that no reader reads: the stamp reads the asks, not only the record', async () => {
     const s = await small();
-    await s.evicts(
-      'an unread file in the asks',
-      (run) => plantAsk(ROOT, run.id, 'later', 'nothing any reader reads\n'),
-      await withAsks(s),
-    );
+    await s.evicts('an unread file in the asks', (run) => plantAsk(ROOT, run.id, 'later', 'nothing any reader reads\n'), await withAsks(s));
   });
   test("REFUSED: an event on a task's journal alone, what it cost, no file in the store moved: the pass reads the feed", async () => {
     const s = await small();

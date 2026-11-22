@@ -300,11 +300,7 @@ test("words to a step not filed yet are kept for its first try, not delivered: t
   const answer = (await res.json()) as { kept?: true; text: string; attempt: number; after: unknown };
   assert.deepEqual([answer.kept, answer.text, answer.attempt, answer.after], [true, 'Look at the parser first.', 1, null]);
   assert.deepEqual([...standIn().said], before.said, 'no session was told anything');
-  assert.equal(
-    (recordText(root, runKey(R)) ?? ''),
-    before.files[`${R}.json`],
-    "the run's record untouched: the words are kept beside it",
-  );
+  assert.equal(recordText(root, runKey(R)) ?? '', before.files[`${R}.json`], "the run's record untouched: the words are kept beside it");
   assert.deepEqual(
     runsNow(root)
       .runs.read(R)

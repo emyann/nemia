@@ -940,7 +940,9 @@ describe('a blocked step asks questions in two fields, and is answered by their 
   });
   s.test("`--answer 2=a,b` and `3=a` answer them, in the board's words", async (sub) => {
     await printedBy(sub, ['retry', id, 'plan', '--answer', '1=a', '--answer', '2=a,b', '--answer', '3=a']);
-    const asks = askNames(ROOT, id).filter((n) => !n.startsWith('done/')).filter((f) => f !== 'done');
+    const asks = askNames(ROOT, id)
+      .filter((n) => !n.startsWith('done/'))
+      .filter((f) => f !== 'done');
     const ask = JSON.parse(recordText(ROOT, askKeyOf(id, asks[0])) ?? '');
     const expected = answerText(
       [cut, where, when],

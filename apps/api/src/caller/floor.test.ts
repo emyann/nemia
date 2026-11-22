@@ -108,7 +108,11 @@ test('REFUSED 403 waits-on-person: an approval at a gate in a store at auto that
   gatedRun('r-floor-waits');
   const res = await post('/api/namespaces/default/runs/r-floor-waits/steps/plan/approve', { message: 'Go.' }, STORE_WIDE);
   assert.deepEqual(await refusalOf(res), [403, 'waits-on-person']);
-  assert.equal((recordText(root, approvalKey('r-floor-waits', 'plan', 1)) !== undefined), false, 'no approval was written: the step still waits');
+  assert.equal(
+    recordText(root, approvalKey('r-floor-waits', 'plan', 1)) !== undefined,
+    false,
+    'no approval was written: the step still waits',
+  );
 });
 
 test('a rule the person confirmed for the agent lets the same approval through, and it is written', async () => {
@@ -117,7 +121,7 @@ test('a rule the person confirmed for the agent lets the same approval through, 
   gatedRun('r-floor-ruled');
   const res = await post('/api/namespaces/default/runs/r-floor-ruled/steps/plan/approve', { message: 'Go.' }, STORE_WIDE);
   assert.equal(res.status, 202);
-  assert.equal((recordText(root, approvalKey('r-floor-ruled', 'plan', 1)) !== undefined), true);
+  assert.equal(recordText(root, approvalKey('r-floor-ruled', 'plan', 1)) !== undefined, true);
 });
 
 test('REFUSED 403 out-of-reach: a command out of an agent’s reach (a token’s mint), before the route’s own refusal', async () => {

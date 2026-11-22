@@ -18,15 +18,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from 'objects';
-import {
-  decideRun,
-  list,
-  prunedKept,
-  prunedWords,
-  retryRun,
-  roundRun,
-  usedLines,
-} from 'agent-orchestrator';
+import { decideRun, list, prunedKept, prunedWords, retryRun, roundRun, usedLines } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { recordText, retryAskKey, roundAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
@@ -218,7 +210,7 @@ beforeEachTest(() => {
   refusedCheck('t-lint-check', 70);
 });
 
-const record = (recordText(root, recordFile) ?? '');
+const record = recordText(root, recordFile) ?? '';
 
 /** The run object `GET /api/runs/:id` answers. */
 const detail = async (id = R) => objectOf(app(), id);
@@ -246,7 +238,7 @@ const asksDir = path.join(root, 'runs', `${R}.asks`);
 /** Nothing was written: no ask, and the run's record as it was. */
 const nothingWritten = (why: string) => {
   assert.equal(fs.existsSync(asksDir) ? fs.readdirSync(asksDir, { recursive: true }).length : 0, 0, `no ask file: ${why}`);
-  assert.equal((recordText(root, recordFile) ?? ''), record, `the run's record untouched: ${why}`);
+  assert.equal(recordText(root, recordFile) ?? '', record, `the run's record untouched: ${why}`);
 };
 
 /** What the package's `retryRun` refuses `how` for, word for word, given the harness's word as `nemia retry` gives it. */
@@ -590,7 +582,7 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
       const { at: roundWhen, ...roundWritten } = JSON.parse(recordText(root, roundAskKey(R, 'review', 3)) ?? '');
       assert.deepEqual(roundWritten, { step: 'review', round: 3, budget: 3, actor: SEATED });
       assert.ok(!Number.isNaN(Date.parse(roundWhen)), roundWhen);
-      assert.equal((recordText(root, recordFile) ?? ''), record, "the api wrote nothing of the run's record");
+      assert.equal(recordText(root, recordFile) ?? '', record, "the api wrote nothing of the run's record");
 
       const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const run = await detail();

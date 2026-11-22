@@ -108,7 +108,10 @@ const plantedFor = (t: Finishes) =>
 function writeRun(id: string, workflow: object[], steps: Record<string, object>, more: object = {}) {
   const file = runKey(id);
   planted.push(file, path.join(ROOT, 'runs', id));
-  plantRecord(ROOT, file, JSON.stringify({
+  plantRecord(
+    ROOT,
+    file,
+    JSON.stringify({
       id,
       repo: '/repos/one',
       baseRef: 'abc',
@@ -121,7 +124,8 @@ function writeRun(id: string, workflow: object[], steps: Record<string, object>,
       workflow,
       steps,
       ...more,
-    }));
+    }),
+  );
 }
 
 /** The skill `name` as `nemia start` rendered it for `agentName` on the step `step` of the run `id`, with `rules.json` and `applies:`. */

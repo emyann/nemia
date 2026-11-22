@@ -25,7 +25,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { retryRun, runWith, startRun, tickRun } from '../src/runner.ts';
 import { decisionRead } from '../src/decide/decision.verb.ts';
-import { runFile } from '../src/record/record.store.ts';
+
 import { slotsRead } from '../src/cap/slots-read.verb.ts';
 import { readFeed } from '../src/feed/feed.store.ts';
 import { REMOVED } from '../src/feed/feed.ts';

@@ -19,7 +19,10 @@ import { plantRecord, runKey } from 'agent-orchestrator/testing';
 const RUNS = Array.from({ length: 5 }, (_, i) => `r-gz-${i}`);
 for (const id of RUNS) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(id),
+    JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -31,7 +34,8 @@ for (const id of RUNS) {
       createdAt: '2026-11-14T22:10:00.000Z',
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
       steps: { implement: { taskId: null } },
-    }));
+    }),
+  );
 }
 
 test('the run list is gzipped where the request accepts gzip, its body the identity answer once gunzipped, and Vary names it', async () => {

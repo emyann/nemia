@@ -79,7 +79,10 @@ test('the routes these retire answer 404 in the api’s words', async () => {
 /** A record of a run, as a start writes one, `scheduled` where a schedule's fire started it. */
 const writeRun = (id: string, createdAt: string, scheduled?: { factory: string; workflow: string; due: string }) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(id),
+    JSON.stringify({
       id,
       workspace: root,
       brief: 'x',
@@ -88,7 +91,8 @@ const writeRun = (id: string, createdAt: string, scheduled?: { factory: string; 
       steps: {},
       createdAt,
       ...(scheduled ? { scheduled } : {}),
-    }));
+    }),
+  );
 };
 
 /** With the memo's check off: what the memo alone answers, and reads. */

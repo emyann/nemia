@@ -8,7 +8,7 @@
  * is filed under, and the run records a listing reads. Its store is at `ROOT`, given as `ENV` with
  * `WF_VERIFY_REST=0`: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
-import { plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../../testing.ts';
+import { plantRecord, recordText, runKey, runRecord, runsNow } from '../../testing.ts';
 import { afterAll, beforeAll, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -49,7 +49,7 @@ const readInbox = () => atRoot(verbs.readInbox());
 const dropFromInbox = (name: string) => atRoot(verbs.dropFromInbox(name));
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer, ENV);
-const filed = filesStoreAt(ROOT);
+const filed = runsNow(ROOT);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
 /**
  * `nemia`, as a person types it, its commands given this test's place: `start` run on its entry's handler (`typed`), a card of the
@@ -149,7 +149,10 @@ const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => 
 
 /** A run record, as `start()` writes one — only what the listing reads of it matters here. */
 const writeRecord = (id: string, from?: Run['from']) =>
-  plantRecord(ROOT, runKey(id), JSON.stringify({
+  plantRecord(
+    ROOT,
+    runKey(id),
+    JSON.stringify({
       id,
       repo: '/repo',
       workspace: '/repo',
@@ -161,7 +164,8 @@ const writeRecord = (id: string, from?: Run['from']) =>
       steps: {},
       createdAt: '2026-09-16T00:00:00Z',
       ...(from ? { from } : {}),
-    }));
+    }),
+  );
 
 describe('a person parks ideas in the inbox, lists them, starts them and drops them', () => {
   const s = story(test);

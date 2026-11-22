@@ -14,7 +14,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
-import { acceptKey, askNames, plantRecord, readAsks, retryAskKey, roundAskKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { acceptKey, askNames, plantRecord, readAsks, retryAskKey, roundAskKey, runRecord, runsNow } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test, type TestContext } from 'vitest';
@@ -68,7 +68,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: '40', WF_MAX_CONCURRENT: undefined };
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 /** A pass's reader of what a resolve reads, made at this file's store. */
 const aPassRevisions = () => Effect.runSync(passRevisions().pipe(Effect.provideService(StoreRoot, ROOT)));
 
@@ -427,7 +427,9 @@ row(GIT, "a run's asks are listed once a read, and each file in them read once",
   plantRecord(ROOT, acceptKey(id, 'implement', 1), JSON.stringify({ at, message: 'good enough' }));
   plantRecord(ROOT, retryAskKey(id, 'implement', 2), JSON.stringify({ mode: 'fresh', at }));
   plantRecord(ROOT, roundAskKey(id, 'implement', 2), JSON.stringify({ at }));
-  const files = askNames(ROOT, id).filter((n) => !n.startsWith('done/')).filter((f) => /^(approve|accept|retry|round)-/.test(f)).length;
+  const files = askNames(ROOT, id)
+    .filter((n) => !n.startsWith('done/'))
+    .filter((f) => /^(approve|accept|retry|round)-/.test(f)).length;
   assert.equal(files, 4, 'an approval, an acceptance, a retry and a round');
   const asks = (await metered(async () => readAsks(ROOT, id))).tallies!.kinds.asks;
   assert.deepEqual({ calls: asks.calls, reads: asks.reads }, { calls: 1, reads: files }, 'one walk of the folder, each file read once');

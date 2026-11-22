@@ -126,12 +126,16 @@ export function labelled(home: string, run: Run) {
  * That a person asked the run to take the new revisions (`nemia refresh`): `{ at }`, a person's fact in a file of its own for the reason
  * `cancelFile` is. Written by `refresh` alone, exclusively; removed by the pass that takes the revisions it asked for (`removeRefresh`).
  * Never composed onto the record: the pass reads the file itself (`stands`), as a level-triggered reader must.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const refreshFile = (home: string, id: string) => path.join(runsDir(home), `${id}.refresh`);
 
 /**
  * Write down that a person asked this run to take the new revisions, and answer with the ask written — or null, when one already stands.
  * `wx`, so two people asking at once make one ask, and an ask is never edited: the pass that takes the revisions lifts it.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
 export const writeRefresh = (home: string, id: string) => {
   fs.mkdirSync(runsDir(home), { recursive: true });
@@ -145,7 +149,11 @@ export const writeRefresh = (home: string, id: string) => {
   }
 };
 
-/** Lift the refresh ask: whether a file was there. Taken by the pass that wrote the pins it asked for, after the record is written. */
+/**
+ * Lift the refresh ask: whether a file was there. Taken by the pass that wrote the pins it asked for, after the record is written.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
 export const removeRefresh = (home: string, id: string) => {
   try {
     fs.rmSync(refreshFile(home, id));
@@ -159,10 +167,18 @@ export const removeRefresh = (home: string, id: string) => {
 /** The run's files directory, `runs/<id>/artifacts`. */
 const filesDir = (home: string, id: string) => path.join(runsDir(home), id, 'artifacts');
 
-/** The run's files directory while it is a directory and no link; else undefined. */
+/**
+ * The run's files directory while it is a directory and no link; else undefined.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
 export const filesAt = (home: string, id: string) => (lstatOf(filesDir(home, id))?.isDirectory() ? filesDir(home, id) : undefined);
 
-/** Remove the run's files directory: null once it is gone; else the first line of what the filesystem said. */
+/**
+ * Remove the run's files directory: null once it is gone; else the first line of what the filesystem said.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
 export function dropFiles(home: string, id: string) {
   try {
     fs.rmSync(filesDir(home, id), { recursive: true, force: true });
@@ -176,6 +192,9 @@ export function dropFiles(home: string, id: string) {
  * Write the prune marker whole, or remove it for `undefined`, as the machine answers the prune or its taking back on the marks that
  * stand (`runMarkMove`): a prune of a run already pruned writes what it recorded since, and a prune taken back of a run not pruned
  * has nothing to remove.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param marker The prune marker written whole, or undefined to take it back.
  */
 export const writePruned = (home: string, id: string, marker: Pruned | undefined) => {
   const move = runMarkMove(marksAt(home, id), marker ? 'prune' : 'unprune');
@@ -202,13 +221,22 @@ const forgettingIn = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ run: Schema.String, taskIds: Schema.Array(Schema.String) })),
 );
 
-/** The marker of the run `id` written whole, through a hidden file renamed over it, the folder made first. */
+/**
+ * The marker of the run `id` written whole, through a hidden file renamed over it, the folder made first.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ * @param taskIds The engine's tasks of the run, to forget.
+ */
 export function writeForgetting(home: string, id: string, taskIds: readonly string[]) {
   fs.mkdirSync(forgettingDir(home), { recursive: true });
   writeWhole(forgettingFile(home, id), JSON.stringify({ run: id, taskIds: [...taskIds] }, null, 2));
 }
 
-/** The task ids the marker of the run `id` lists, or undefined: none there, or one that does not read as a marker. */
+/**
+ * The task ids the marker of the run `id` lists, or undefined: none there, or one that does not read as a marker.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
 export function readForgetting(home: string, id: string) {
   let text: string;
   try {
@@ -221,7 +249,10 @@ export function readForgetting(home: string, id: string) {
   return Option.isSome(marker) && marker.value.run === id ? [...marker.value.taskIds] : undefined;
 }
 
-/** The runs a marker stands for: each `<id>.json` of the folder, none when there is no folder. */
+/**
+ * The runs a marker stands for: each `<id>.json` of the folder, none when there is no folder.
+ * @param home The store's root folder.
+ */
 export function forgettingRuns(home: string) {
   try {
     return fs
@@ -240,6 +271,9 @@ export function forgettingRuns(home: string) {
  * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. A run that already reads with
  * the pause as it stands, or with none while none does, is the very run given, which the memo knows by identity (`keptOf`). Never
  * written into the record.
+ * @param home The store's root folder.
+ * @param run The run as its record reads.
+ * @param pause The store's pause, read where none is given.
  */
 export function paused(home: string, run: Run, pause: Pause | null = readPause(home)) {
   if (isDeepStrictEqual(run.pause ?? null, pause)) return run;

@@ -271,7 +271,6 @@ const recordsOf = (ids: Iterable<string>, runs: readonly Run[]) =>
  * the store failed with.
  */
 export const standingLive = Effect.fn('standingLive')(function* (runs: readonly Run[]) {
-  const home = yield* StoreRoot;
   const related = yield* recordsOf([...runs.flatMap(waitedOn), ...runs.flatMap((r) => r.context ?? [])], runs);
   return standingReader(yield* standingNow([...runs, ...related], asksOwnOr(runs.map((r) => r.id))));
 });
@@ -287,7 +286,6 @@ export const asksOwnOr = (ids: readonly string[]) => {
 
 /** A reader over where the runs of `ids` the store has stand now, each asked of (`standingLive`): none asked where the store has none. */
 export const standingLiveOf = Effect.fn('standingLiveOf')(function* (ids: readonly string[]) {
-  const home = yield* StoreRoot;
   return yield* standingLive(yield* recordsOf(ids, []));
 });
 

@@ -180,7 +180,7 @@ test('`nemia agents copy` copies a file into yours, said where it came from; `ag
   const started = ok(await store.nemia(['agents', 'run', 'user', 'archivist', '--brief', 'File the notes.']), 'run');
   const id = /^(\S+) {2}a try of archivist started: nemia ls shows how it goes, and its page on the board$/m.exec(started)?.[1];
   assert.ok(id !== undefined, started);
-  assert.ok((recordText(store.root, runKey(id)) !== undefined), 'its run is in the store');
+  assert.ok(recordText(store.root, runKey(id)) !== undefined, 'its run is in the store');
 
   const stale = await store.nemia(['agents', 'rm', 'user', 'archivist', '--version', '0000000000000000']);
   assert.equal(stale.code, 1, `a stale version is the api's Conflict: ${stale.err}`);

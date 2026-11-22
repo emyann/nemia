@@ -11,7 +11,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest, and throws on a difference; `WF_MAX_CONCURRENT` admits sessions enough, and no cap is set on runs.
  */
-import { runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { runRecord, runsNow } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -35,7 +35,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: '10', WF_MAX_RUNS: undefined };
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = () => {

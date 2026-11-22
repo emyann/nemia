@@ -83,7 +83,7 @@ function budgetsLoopRefusal(input: ApproveInput) {
  * `nemia approve` of a loop out of rounds: its form refused first where the run is there to read (`budgetsLoopRefusal`, `loopRefusal`),
  * then the loop accepted as it stands (`acceptRun`), with who accepted it (`actor`) where the caller was handed.
  */
-const loopAccepted = Effect.fnUntraced(function* (input: ApproveInput, home: string) {
+const loopAccepted = Effect.fnUntraced(function* (input: ApproveInput) {
   const { runId, step, message: words, actor } = input;
   const door = (yield* RunDoor).runs;
   const refused = (yield* door.exists(RunId.read(runId))) ? (budgetsLoopRefusal(input) ?? loopRefusal(input)) : null;
@@ -159,7 +159,7 @@ export const APPROVE: Served<
     const { runId, step } = input;
     if (input.off === true) return yield* takenBack(input);
     const words = input.message;
-    if ((yield* approveForm(runId, step)) === 'loop') return yield* loopAccepted(input, home);
+    if ((yield* approveForm(runId, step)) === 'loop') return yield* loopAccepted(input);
     const gated = step ?? '';
     const given = givenBudgets(input);
     if (typeof given === 'string') return yield* Effect.fail(new Invalid({ message: given }));

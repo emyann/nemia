@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
-import { listRuns, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { listRuns, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
@@ -43,7 +43,7 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_RUNS: undefined,
   WF_MAX_CONCURRENT: undefined,
 };
-const filesStore = filesStoreAt(ROOT);
+const filesStore = runsNow(ROOT);
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith } = stage;
 /** `nemia`, as a person types it, its commands given this test's place. */

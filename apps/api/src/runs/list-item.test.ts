@@ -34,7 +34,10 @@ beforeEachTest(() => {
   });
   fs.mkdirSync(path.join(root, 'runs', R, 'artifacts', 'write'), { recursive: true });
   fs.writeFileSync(path.join(root, 'runs', R, 'artifacts', 'write', 'shot.png'), 'png');
-  plantRecord(root, runKey(R), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(R),
+    JSON.stringify({
       id: R,
       place: { kind: 'folder' },
       workspace: path.join(root, 'runs', R, 'work'),
@@ -43,7 +46,8 @@ beforeEachTest(() => {
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'codex', workspace: 'folder' }],
       steps: { write: { taskId: `${R}-write` } },
-    }));
+    }),
+  );
 });
 
 const read = async <T>(address: string) => {

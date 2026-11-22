@@ -87,7 +87,7 @@ const gatedRun = (id: string) => {
   );
   signedOff(`${id}-plan`, PLAN);
   signedOff(`${id}-tokens`, { outcome: 'done', summary: 'Picked them.', needs: null, artifacts: [] });
-  return (recordText(root, runKey(id)) ?? '');
+  return recordText(root, runKey(id)) ?? '';
 };
 
 const R = 'r-gate';
@@ -127,11 +127,7 @@ const asked = (run = R) => {
 /** Nothing was written: no ask nor approval, and the run's record as it was. */
 const nothingWritten = (why: string, run = R) => {
   assert.deepEqual(asked(run), [], `no file beside the run: ${why}`);
-  assert.equal(
-    (recordText(root, runKey(run)) ?? ''),
-    record.replaceAll(R, run),
-    `the run's record untouched: ${why}`,
-  );
+  assert.equal(recordText(root, runKey(run)) ?? '', record.replaceAll(R, run), `the run's record untouched: ${why}`);
 };
 
 /** What the package's `approveRun` refuses, word for word: what `nemia approve` prints. */
@@ -433,7 +429,7 @@ describe('a person approves a gate on the board: the need on the list and the de
         actor: SEATED,
       });
       assert.deepEqual(asked(), ['approve-plan-1']);
-      assert.equal((recordText(root, runKey(R)) ?? ''), record, "the api wrote nothing of the run's record");
+      assert.equal(recordText(root, runKey(R)) ?? '', record, "the api wrote nothing of the run's record");
       assert.equal(standIn().stopped.length, 0, 'and stopped nothing');
     },
   );

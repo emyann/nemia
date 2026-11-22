@@ -26,7 +26,10 @@ const app = eachTest(() => appOver(standIn(), stand(), Layer.succeed(AnswerBound
 
 const RUN = 'r-bound';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-plantRecord(root, runKey(RUN), JSON.stringify({
+plantRecord(
+  root,
+  runKey(RUN),
+  JSON.stringify({
     id: RUN,
     repo: '/code/app',
     workspace: '/code/app',
@@ -38,7 +41,8 @@ plantRecord(root, runKey(RUN), JSON.stringify({
     createdAt: '2026-11-02T06:00:00.000Z',
     workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
     steps: { implement: { taskId: `t-${RUN}` } },
-  }));
+  }),
+);
 beforeEachTest(() => {
   Effect.runSync(engineFor(standIn()).file({ id: `t-${RUN}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(`t-${RUN}`, 'succeeded', {

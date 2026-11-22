@@ -29,18 +29,18 @@ import { RUN_WALKS, aRun } from './run-walks.ts';
 import { RunId } from '../src/record/record.model.ts';
 import { mayFileOf } from '../src/tick/advance.verb.ts';
 import { resumePause, putPause } from '../src/pause/pause.store.ts';
-import { acceptanceIn, approvalIn, askIn, holdFile, markCancelled, pruneFile, roundAskIn, runsDir, writeHold } from '../src/record/record.store.ts';
 import {
-  askKey,
-  asksPrefix,
-  claimKey,
-  keysUnder,
-  plantRecord,
-  recordText,
-  runFilesImported,
-  runKey,
-  runsNow,
-} from '../testing.ts';
+  acceptanceIn,
+  approvalIn,
+  askIn,
+  holdFile,
+  markCancelled,
+  pruneFile,
+  roundAskIn,
+  runsDir,
+  writeHold,
+} from '../src/record/record.store.ts';
+import { askKey, asksPrefix, claimKey, keysUnder, plantRecord, recordText, runFilesImported, runKey, runsNow } from '../testing.ts';
 
 const ROOT = scratch('wf-run-store-');
 const store = runsNow(ROOT);
@@ -402,7 +402,7 @@ describe("a store's run files imported into its keyspace once, moved aside under
     imported(root);
     assert.equal(imported(root), 0);
   });
-  test("a claim whose run is gone, or whose run was started from another card, is stale: moved aside, and no record", () => {
+  test('a claim whose run is gone, or whose run was started from another card, is stale: moved aside, and no record', () => {
     const root = planted();
     fs.writeFileSync(path.join(root, 'started', 'i-gone.json'), JSON.stringify({ run: 'i-nobody' }));
     fs.writeFileSync(path.join(root, 'started', 'i-other.json'), JSON.stringify({ run: 'i-run' }));
@@ -423,7 +423,11 @@ describe("a store's run files imported into its keyspace once, moved aside under
     const root = planted();
     act(
       Effect.flatMap(keyspaceAt(keyspaceFile(root)), (keyspace) =>
-        keyspace.write(runKey('i-run'), { verb: 'create', expected: null, value: JSON.stringify({ ...fromCard('i-run', 'i-card'), brief: 'kept' }) }),
+        keyspace.write(runKey('i-run'), {
+          verb: 'create',
+          expected: null,
+          value: JSON.stringify({ ...fromCard('i-run', 'i-card'), brief: 'kept' }),
+        }),
       ),
     );
     imported(root);
@@ -500,7 +504,6 @@ describe("what `nemia rm` and `nemia prune --artifacts` read of the store: each 
     assert.equal(fs.existsSync(path.join(files, 'implement', 'shot.png')), true);
   });
 });
-
 
 /** The functions of `record.store.ts` that read or write a run's record or a person's files beside it: `runStore` says each. */
 const GUARDED = [
@@ -667,4 +670,3 @@ test('REFUSED: a runsAtOnce(home).runs.read(id) is named with its file', () => {
   };
   assert.deepEqual([...seamUses(planted, UNROOTED_READ)], [['src/disk/disk.verb.ts', 1]]);
 });
-

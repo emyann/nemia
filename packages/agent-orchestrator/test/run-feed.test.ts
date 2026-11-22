@@ -14,7 +14,7 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
-import { rewriteRun, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { rewriteRun, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, beforeEach, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -64,7 +64,7 @@ const RUNS = path.join(ROOT, 'runs');
 const FEED = path.join(ROOT, 'feed.jsonl');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
 const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const AT = '2026-09-22T10:05:00.000Z';

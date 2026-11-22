@@ -66,7 +66,6 @@ export const inboxCards = Effect.fn('inboxCards')(function* () {
  * waits (`waits`): what each card of an `after:` is reads git and the engine, which the queue and the listing read (`waitingOf`).
  */
 export const readInbox = Effect.fn('readInbox')(function* () {
-  const home = yield* StoreRoot;
   const door = yield* CardDoor;
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();

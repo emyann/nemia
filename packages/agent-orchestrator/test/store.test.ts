@@ -9,7 +9,19 @@
  * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a
  * pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
-import { askKeyOf, askNames, dropRecord, listRuns, plantRecord, readAnswers, readAsks, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import {
+  askKeyOf,
+  askNames,
+  dropRecord,
+  listRuns,
+  plantRecord,
+  readAnswers,
+  readAsks,
+  recordText,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -1118,7 +1130,7 @@ async function _viewProgramTypes() {
 
 /** The start program, its face, and what a test of either reads. */
 const startProgram = async () => {
-  const rooted = filesStoreAt(ROOT);
+  const rooted = runsNow(ROOT);
   return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir, rooted };
 };
 

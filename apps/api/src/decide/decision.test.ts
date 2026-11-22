@@ -96,7 +96,10 @@ const workflow = [
 
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(run.id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(run.id),
+    JSON.stringify({
       workspace: run.repo,
       branch: 'main',
       isolate: true,
@@ -105,7 +108,8 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow,
       ...run,
-    }));
+    }),
+  );
 }
 
 /** The decision of `id` as the route answers it: its status and its body. */

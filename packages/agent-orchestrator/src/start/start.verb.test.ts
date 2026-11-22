@@ -3,7 +3,7 @@
  * over them, the typed `--label` edits over those; a key two runs disagree on left out and said by `nemia start`; a malformed or reserved
  * edit refused before any file is written; and no `.labels` file for a run started with none. On the files, with the test place.
  */
-import { runsNow as filesStoreAt } from '../../testing.ts';
+import { runsNow } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import type { Env } from '../config/config.store.ts';
 const ROOT = scratch('wf-start-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const RUNS_DIR = path.join(ROOT, 'runs');
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer, ENV);

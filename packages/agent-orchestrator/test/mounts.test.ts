@@ -183,11 +183,7 @@ describe('mounts on every filing: a factory run whose implement writes one folde
       const run = runRecord(ROOT, id);
       inputs = inputsDir(ROOT, run);
       assert.deepEqual(run.mounts, readOnly(web, docs), 'read back');
-      assert.deepEqual(
-        JSON.parse(recordText(ROOT, runKey(id)) ?? '').mounts,
-        readOnly(web, docs),
-        'as written',
-      );
+      assert.deepEqual(JSON.parse(recordText(ROOT, runKey(id)) ?? '').mounts, readOnly(web, docs), 'as written');
       assert.deepEqual(out.facts.mounts, [web, docs], 'the start says the folders it mounts, in order');
       assert.deepEqual(out.facts.writable, [{ path: web, steps: ['implement'] }], 'and the one implement alone writes');
       assert.equal(out.notMounted, undefined, 'and none left out');

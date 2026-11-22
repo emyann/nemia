@@ -93,7 +93,7 @@ const loopingRun = (id: string, on: number, again: boolean) => {
   const replies = [{ finding: 'src/flag.ts — the flag is not stored', answer: 'fixed', why: 'It is stored now.' }];
   signedOff(`${id}-implement-${on}`, on > 1 ? { ...DONE, replies } : DONE);
   signedOff(`${id}-review-${on}`, { ...DONE, again });
-  return (recordText(root, runKey(id)) ?? '');
+  return recordText(root, runKey(id)) ?? '';
 };
 
 /** Out of rounds: round 2 of 2, and review asked for a third. */
@@ -148,7 +148,7 @@ const asked = (run = R) => {
 /** Nothing was written: no acceptance nor ask, and the run's record as it was. */
 const nothingWritten = (why: string, run = R) => {
   assert.deepEqual(asked(run), [], `no file beside the run: ${why}`);
-  if (run === R) assert.equal((recordText(root, runKey(R)) ?? ''), record, `the run's record untouched: ${why}`);
+  if (run === R) assert.equal(recordText(root, runKey(R)) ?? '', record, `the run's record untouched: ${why}`);
 };
 
 const WHY = 'The findings are follow-up work.';
@@ -257,7 +257,7 @@ describe('a person accepts a loop out of rounds on the board: the acceptance wri
         actor: SEATED,
       });
       assert.deepEqual(asked(), ['accept-review-2']);
-      assert.equal((recordText(root, runKey(R)) ?? ''), record, "the api wrote nothing of the run's record");
+      assert.equal(recordText(root, runKey(R)) ?? '', record, "the api wrote nothing of the run's record");
       assert.deepEqual(standIn().stopped, [], 'and stopped nothing');
     },
   );

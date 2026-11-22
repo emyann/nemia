@@ -2,7 +2,7 @@
  * `nemia ls` and `nemia stats` and a run's labels, on their handlers: `-l` keeps the runs a selector takes, and `stats -l` sums the facts
  * of the runs it takes alone. The labels `nemia ls` prints beside each run are the client's to print (`apps/cli/test/reads.test.ts`).
  */
-import { runRecord, runsNow as filesStoreAt } from '../../testing.ts';
+import { runRecord, runsNow } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,7 +22,7 @@ import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-ls-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
-const filed = filesStoreAt(ROOT);
+const filed = runsNow(ROOT);
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);

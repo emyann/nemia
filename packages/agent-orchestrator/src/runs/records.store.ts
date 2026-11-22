@@ -1,9 +1,9 @@
 /**
  * The Run door's records in the keyspace (`src/keyspace/keyspace.store.ts`): a run's record, the claim it holds on the card it was started
  * from and a person's asks of it, each a record at its key (`run-keys.ts`), each write given a revision. What belongs together is one
- * transaction: a run and its claim (`create`); the pass's record and the asks it answers (`settle`); a run's removal with its claim and asks
- * (`forget`); an approval taken back (`takeBack`). A person's markers beside a run (its cancellation, pruning, hold, labels, what was said
- * before a step was filed, a refresh ask, `nemia rm`'s marker) stay files (`src/record/files.store.ts`), read and written through
+ * transaction: a run and its claim (`create`); the pass's record and the asks it answers (`settle`); a run's removal with its claim and
+ * asks (`forget`); an approval taken back (`takeBack`). A person's markers beside a run (its cancellation, pruning, hold, labels, what was
+ * said before a step was filed, a refresh ask, `nemia rm`'s marker) stay files (`src/record/files.store.ts`), read and written through
  * `fromThrow`, and composed onto each run read.
  *
  * A store kept before its runs were records has its run files, ask files and claims imported the first time a process opens it
@@ -14,7 +14,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Option, Schema, Semaphore } from 'effect';
 import { fromThrow, type DoorOf } from '../door/door.store.ts';
-import { keyspaceAt, keyspaceFile, RECORD_CEILING, type KeyRecord, type Keyspace, type KeyTxn } from '../keyspace/keyspace.store.ts';
+import {
+  keyspaceAt,
+  keyspaceFile,
+  KeyRefused,
+  RECORD_CEILING,
+  type KeyRecord,
+  type Keyspace,
+  type KeyTxn,
+} from '../keyspace/keyspace.store.ts';
 import { mergeSpent } from '../merge/merge.ts';
 import { pauseStands, readPause } from '../pause/pause.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
@@ -223,7 +231,13 @@ const setAside = (tx: KeyTxn, id: string, names: readonly string[], value?: (tex
   });
 
 /** The names of the asks a run's record answers: tries, rounds, approvals and acceptances it spent, merges it took, and the void. */
-function spentNames(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[], waiting: readonly AskEntry[]) {
+function spentNames(
+  run: Run,
+  asks: readonly RetryAsk[],
+  rounds: readonly RoundAsk[],
+  voided: readonly RetryAsk[],
+  waiting: readonly AskEntry[],
+) {
   return [
     ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askName({ of: 'try', step: a.step, n: a.try })),
     ...spentRoundAsks(
@@ -245,258 +259,294 @@ function givenOf(given: Set<Run>, run: Run | undefined) {
   return run;
 }
 
+/** The keyspace a write writes, opened and its files imported. */
+type Opened = Effect.Effect<Keyspace, Refusal>;
+
+/** The keyspace a read reads, or undefined where there is none. */
+type Held = Effect.Effect<Keyspace | undefined, Refusal>;
+
+/** A keyspace's refusal inside a transaction, as the door's `raced` refusal. */
+const racedOn = <A, E, R>(effect: Effect.Effect<A, E | KeyRefused, R>) =>
+  Effect.catchIf(
+    effect,
+    (err): err is KeyRefused => err instanceof KeyRefused,
+    (err) => Effect.fail(raced(err)),
+  );
+
 /**
- * The run store over the keyspace `open` opens at the store's root `home`, a person's markers read and written as files there: the Run
- * door's layer, each method an Effect. `held` is the keyspace a read reads, undefined where the store has none and nothing to import, so a
- * read makes no file.
- * @param home The store's root folder, where a person's markers are.
- * @param open The keyspace a write writes, opened and its files imported.
- * @param held The keyspace a read reads, or undefined where there is none.
+ * The run at `record` with its asks, composed with its markers and the pause: undefined where its record cannot be read, which `said`
+ * says.
  */
-export function runRecords(home: string, open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal>) {
-  const asksOf = (id: string) =>
+const composedOf = (
+  home: string,
+  record: KeyRecord,
+  asks: readonly KeyRecord[],
+  said: (line: string) => void,
+  pause: ReturnType<typeof readPause>,
+) =>
+  Effect.gen(function* () {
+    const id = record.key.slice(RUNS_PREFIX.length);
+    const run = yield* Effect.result(fromThrow(() => composedRun(home, recordIn(id, record.value, record.key), waitingOf(id, asks))));
+    if (run._tag === 'Success') return yield* fromThrow(() => paused(home, labelled(home, run.success), pause));
+    if (!(run.failure instanceof UnreadableRecord)) return yield* Effect.fail(run.failure);
+    said(`left out: ${run.failure.message}`);
+    return undefined;
+  });
+
+/** What one run's reads read from `held`: its record and its asks, each none where the store has no keyspace. */
+const keyReads = (held: Held) => ({
+  asksOf: (id: string) =>
+    Effect.flatMap(held, (ks) => (ks === undefined ? Effect.succeed([]) : Effect.map(ks.list(asksPrefix(id)), (l) => l.records))),
+  recordOf: (id: string) => Effect.flatMap(held, (ks) => (ks === undefined ? Effect.succeed(undefined) : ks.get(runKey(id)))),
+});
+
+/** The records and asks of the runs `due` among `ids`, by id: a whole list where every run is due, else one read per run. */
+const dueRecords = (ks: Keyspace, ids: readonly string[], due: readonly string[]) =>
+  Effect.gen(function* () {
+    const records = new Map<string, KeyRecord>();
+    const asks = new Map<string, KeyRecord[]>();
+    if (due.length === 0) return { records, asks };
+    const all = due.length === ids.length;
+    const listed = all
+      ? (yield* ks.list(RUNS_PREFIX)).records
+      : (yield* Effect.forEach(due, (id) => ks.get(runKey(id)))).filter((r) => r !== undefined);
+    for (const r of listed) records.set(r.key.slice(RUNS_PREFIX.length), r);
+    const askRecords = all
+      ? (yield* ks.list(ASKS_PREFIX)).records
+      : (yield* Effect.forEach(due, (id) => ks.list(asksPrefix(id)))).flatMap((l) => l.records);
+    for (const r of askRecords) {
+      const id = r.key.slice(ASKS_PREFIX.length).split('/')[0] ?? '';
+      asks.set(id, [...(asks.get(id) ?? []), r]);
+    }
+    return { records, asks };
+  });
+
+/** Every run of the store `home`, a run a memo kept (`kept`) taken as kept, one whose record cannot be read said and left out. */
+function listedRuns(home: string, held: Held) {
+  const method: Shape['runs']['list'] = (said = sayOnce, kept) =>
     Effect.gen(function* () {
       const ks = yield* held;
-      return ks === undefined ? [] : (yield* ks.list(asksPrefix(id))).records;
-    });
-  const composed = (record: KeyRecord, asks: readonly KeyRecord[], id: string) =>
-    fromThrow(() => composedRun(home, recordIn(id, record.value, record.key), waitingOf(id, asks)));
-  const recordOf = (id: string) =>
-    Effect.gen(function* () {
-      const ks = yield* held;
-      return ks === undefined ? undefined : yield* ks.get(runKey(id));
-    });
-  const read = (id: string) =>
-    Effect.gen(function* () {
-      const record = yield* recordOf(id);
-      if (record === undefined) return yield* new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
-      const run = yield* composed(record, yield* asksOf(id), id);
-      return yield* fromThrow(() => paused(home, labelled(home, run)));
-    });
-  const found = (id: string, said: (line: string) => void, pause: ReturnType<typeof readPause>) =>
-    Effect.gen(function* () {
-      const record = yield* recordOf(id);
-      if (record === undefined) return undefined;
-      const run = yield* Effect.result(composed(record, yield* asksOf(id), id));
-      if (run._tag === 'Failure') {
-        if (run.failure instanceof UnreadableRecord) {
-          said(`left out: ${run.failure.message}`);
-          return undefined;
-        }
-        return yield* Effect.fail(run.failure);
+      if (ks === undefined) return [];
+      const pause = yield* fromThrow(() => readPause(home));
+      const given = new Set<Run>();
+      const ids = (yield* ks.keys(RUNS_PREFIX)).map((key) => key.slice(RUNS_PREFIX.length));
+      const due = ids.filter((id) => givenOf(given, kept?.(id)) === undefined);
+      const { records, asks } = yield* dueRecords(ks, ids, due);
+      const out: Run[] = [...given].map((run) => paused(home, run, pause));
+      for (const [id, record] of records) {
+        const run = yield* composedOf(home, record, asks.get(id) ?? [], said, pause);
+        if (run !== undefined) out.push(run);
       }
-      return yield* fromThrow(() => paused(home, labelled(home, run.success), pause));
+      return out.sort((a, b) => a.id.localeCompare(b.id));
     });
-  return {
-    runs: {
-      read,
-      find: (id, said = sayOnce) => Effect.flatMap(fromThrow(() => readPause(home)), (pause) => found(id, said, pause)),
-      list: (said = sayOnce, kept) =>
-        Effect.gen(function* () {
-          const ks = yield* held;
-          if (ks === undefined) return [];
-          const pause = yield* fromThrow(() => readPause(home));
-          const given = new Set<Run>();
-          const ids = (yield* ks.keys(RUNS_PREFIX)).map((key) => key.slice(RUNS_PREFIX.length));
-          const due = ids.filter((id) => givenOf(given, kept?.(id)) === undefined);
-          const keptRuns = [...given];
-          const records = new Map<string, KeyRecord>();
-          const asks = new Map<string, KeyRecord[]>();
-          if (due.length > 0) {
-            const all = due.length === ids.length;
-            const listed = all
-              ? (yield* ks.list(RUNS_PREFIX)).records
-              : (yield* Effect.forEach(due, (id) => ks.get(runKey(id)))).filter((r) => r !== undefined);
-            for (const r of listed) records.set(r.key.slice(RUNS_PREFIX.length), r);
-            const askRecords = all
-              ? (yield* ks.list(ASKS_PREFIX)).records
-              : (yield* Effect.forEach(due, (id) => ks.list(asksPrefix(id)))).flatMap((l) => l.records);
-            for (const r of askRecords) {
-              const id = r.key.slice(ASKS_PREFIX.length).split('/')[0] ?? '';
-              asks.set(id, [...(asks.get(id) ?? []), r]);
-            }
-          }
-          const out: Run[] = [];
-          for (const id of ids) {
-            const kept = keptRuns.find((r) => r.id === id);
-            if (kept) {
-              out.push(paused(home, kept, pause));
-              continue;
-            }
-            const record = records.get(id);
-            if (record === undefined) continue;
-            const run = yield* Effect.result(composed(record, asks.get(id) ?? [], id));
-            if (run._tag === 'Failure') {
-              if (run.failure instanceof UnreadableRecord) said(`left out: ${run.failure.message}`);
-              else return yield* Effect.fail(run.failure);
-              continue;
-            }
-            out.push(yield* fromThrow(() => paused(home, labelled(home, run.success), pause)));
-          }
-          return out.sort((a, b) => a.id.localeCompare(b.id));
-        }),
-      create: (run) =>
-        Effect.gen(function* () {
-          const ks = yield* open;
-          const card = run.from?.inbox;
-          const writes = [[runKey(run.id), create(recordValue(run))] as const];
-          const claim = card === undefined ? [] : [[claimKey(card), create(JSON.stringify({ run: run.id }))] as const];
-          yield* ks.txn([...writes, ...claim]).pipe(
-            Effect.catchTag('KeyRefused', (err) =>
-              Effect.gen(function* () {
-                if (err.key === runKey(run.id) && err.refusal === 'exists') return yield* Effect.fail(runTaken(run.id));
-                if (card !== undefined && err.key === claimKey(card) && err.refusal === 'exists') {
-                  const by = yield* ks.get(claimKey(card));
-                  return yield* Effect.fail(cardStartedTwice(card, (by && claimedBy(by.value)) ?? 'another run'));
-                }
-                return yield* Effect.fail(raced(err));
+  return method;
+}
+
+/** The Run door's reads of one run and of every run in `held`, its markers read in `home`. */
+function runReads(home: string, held: Held) {
+  const { asksOf, recordOf } = keyReads(held);
+  const reads: Pick<Shape['runs'], 'read' | 'find' | 'list' | 'exists' | 'taken' | 'ids'> = {
+    read: (id) =>
+      Effect.gen(function* () {
+        const record = yield* recordOf(id);
+        if (record === undefined) return yield* new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
+        const asks = yield* asksOf(id);
+        const run = yield* fromThrow(() => composedRun(home, recordIn(id, record.value, record.key), waitingOf(id, asks)));
+        return yield* fromThrow(() => paused(home, labelled(home, run)));
+      }),
+    find: (id, said = sayOnce) =>
+      Effect.gen(function* () {
+        const pause = yield* fromThrow(() => readPause(home));
+        const record = yield* recordOf(id);
+        return record === undefined ? undefined : yield* composedOf(home, record, yield* asksOf(id), said, pause);
+      }),
+    list: listedRuns(home, held),
+    exists: (id) => Effect.map(recordOf(id), (record) => record !== undefined),
+    taken: (id) =>
+      Effect.gen(function* () {
+        if ((yield* recordOf(id)) !== undefined || (yield* asksOf(id)).length > 0) return true;
+        return yield* fromThrow(() => markerRunIds(home).includes(id));
+      }),
+    ids: () =>
+      Effect.gen(function* () {
+        const ks = yield* held;
+        return ks === undefined ? [] : (yield* ks.keys(RUNS_PREFIX)).map((key) => key.slice(RUNS_PREFIX.length)).sort();
+      }),
+  };
+  return reads;
+}
+
+/** A new run's record and its card's claim written in one transaction, each key taken already said as its refusal. */
+function createdRun(open: Opened) {
+  const method: Shape['runs']['create'] = (run) =>
+    Effect.gen(function* () {
+      const ks = yield* open;
+      const card = run.from?.inbox;
+      const writes = [[runKey(run.id), create(recordValue(run))] as const];
+      const claim = card === undefined ? [] : [[claimKey(card), create(JSON.stringify({ run: run.id }))] as const];
+      yield* ks.txn([...writes, ...claim]).pipe(
+        Effect.catchTag('KeyRefused', (err) =>
+          Effect.gen(function* () {
+            if (err.key === runKey(run.id) && err.refusal === 'exists') return yield* Effect.fail(runTaken(run.id));
+            if (card === undefined || err.key !== claimKey(card) || err.refusal !== 'exists') return yield* Effect.fail(raced(err));
+            const by = yield* ks.get(claimKey(card));
+            return yield* Effect.fail(cardStartedTwice(card, (by && claimedBy(by.value)) ?? 'another run'));
+          }),
+        ),
+      );
+    });
+  return method;
+}
+
+/** The keys of a run's record, the claim it holds and its asks, removed in one transaction of `ks`. */
+const forgottenKeys = (ks: Keyspace, id: string) =>
+  racedOn(
+    ks.within((tx) =>
+      Effect.gen(function* () {
+        const removed: string[] = [];
+        const record = yield* tx.get(runKey(id));
+        const card = record === undefined ? undefined : cardIn(record.value);
+        const claim = card === undefined ? undefined : yield* tx.get(claimKey(card));
+        const keys = [
+          ...(record === undefined ? [] : [runKey(id)]),
+          ...(card !== undefined && claim !== undefined && claimedBy(claim.value) === id ? [claimKey(card)] : []),
+          ...(yield* tx.list(asksPrefix(id))).map((ask) => ask.key),
+        ];
+        for (const key of keys) {
+          yield* tx.write(key, remove);
+          removed.push(key);
+        }
+        return removed;
+      }),
+    ),
+  );
+
+/** The revision of each run's record and asks in `ks`, and the stamps of its markers in `home`, joined by run. */
+const stampsOf = (home: string, held: Held) =>
+  Effect.gen(function* () {
+    const ks = yield* held;
+    const markers = yield* fromThrow(() => restStamps(home));
+    const parts = new Map<string, string[]>();
+    const add = (id: string, part: string) => parts.set(id, [...(parts.get(id) ?? []), part]);
+    if (ks !== undefined) {
+      for (const [key, revision] of yield* ks.revisions(RUNS_PREFIX)) add(key.slice(RUNS_PREFIX.length), `record=${revision}`);
+      for (const [key, revision] of [...(yield* ks.revisions(ASKS_PREFIX))].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+        const rest = key.slice(ASKS_PREFIX.length);
+        const slash = rest.indexOf('/');
+        add(rest.slice(0, slash), `${rest.slice(slash + 1)}=${revision}`);
+      }
+    }
+    for (const [id, stamp] of markers) add(id, stamp);
+    return new Map([...parts].map(([id, p]) => [id, p.join(';')]));
+  });
+
+/** The Run door's writes of a run's record in `open`, and its removal from `held` with its markers in `home`. */
+function runWrites(home: string, open: Opened, held: Held) {
+  const writes: Pick<Shape['runs'], 'create' | 'rewrite' | 'settle' | 'stamps' | 'forget'> = {
+    create: createdRun(open),
+    rewrite: (run) =>
+      Effect.flatMap(open, (ks) =>
+        ks.write(runKey(run.id), overwrite(recordValue(run))).pipe(
+          Effect.as(true),
+          Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(raced(err)))),
+        ),
+      ),
+    settle: (run, spent) =>
+      Effect.flatMap(open, (ks) =>
+        racedOn(
+          ks.within((tx) =>
+            Effect.gen(function* () {
+              if ((yield* tx.get(runKey(run.id))) === undefined) return false;
+              if (spent.write) yield* tx.write(runKey(run.id), overwrite(recordValue(run)));
+              const waiting = waitingOf(run.id, yield* tx.list(asksPrefix(run.id)));
+              yield* setAside(tx, run.id, spentNames(run, spent.asks, spent.rounds, spent.voided ?? [], waiting));
+              return true;
+            }),
+          ),
+        ),
+      ),
+    stamps: () => stampsOf(home, held),
+    forget: (id) =>
+      Effect.gen(function* () {
+        const ks = yield* held;
+        const keys = ks === undefined ? [] : yield* forgottenKeys(ks, id);
+        return [...keys, ...(yield* fromThrow(() => removeMarkerFiles(home, id)))];
+      }),
+  };
+  return writes;
+}
+
+/** A person's ask written at its key in `open`, an ask already there answered with why it is no ask of its kind, if it is not. */
+function askWritten(open: Opened) {
+  const method: Shape['asks']['write'] = (id, person) =>
+    Effect.gen(function* () {
+      const ks = yield* open;
+      const [step, n] =
+        person.of === 'base'
+          ? [person.ask.merge.target, person.ask.merge.try]
+          : [person.ask.step, 'round' in person.ask ? person.ask.round : person.ask.try];
+      const key = askKey(id, { of: person.of, step, n });
+      return yield* ks.write(key, create(JSON.stringify(askHeld(person)))).pipe(
+        Effect.as({ written: true, where: key } satisfies AskWritten as AskWritten),
+        Effect.catchTag('KeyRefused', (err) =>
+          err.refusal !== 'exists'
+            ? Effect.fail(raced(err))
+            : Effect.map(ks.get(key), (there) => {
+                const stray = there === undefined ? null : strayOf(person, there.value, step, n);
+                return { written: false, where: key, stray } satisfies AskWritten as AskWritten;
               }),
-            ),
-          );
-        }),
-      rewrite: (run) =>
-        Effect.gen(function* () {
-          const ks = yield* open;
-          return yield* ks.write(runKey(run.id), overwrite(recordValue(run))).pipe(
-            Effect.as(true),
-            Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(raced(err)))),
-          );
-        }),
-      settle: (run, spent) =>
-        Effect.gen(function* () {
-          const ks = yield* open;
-          return yield* ks
-            .within((tx) =>
-              Effect.gen(function* () {
-                if ((yield* tx.get(runKey(run.id))) === undefined) return false;
-                if (spent.write) yield* tx.write(runKey(run.id), overwrite(recordValue(run)));
-                const waiting = waitingOf(run.id, yield* tx.list(asksPrefix(run.id)));
-                yield* setAside(tx, run.id, spentNames(run, spent.asks, spent.rounds, spent.voided ?? [], waiting));
-                return true;
-              }),
-            )
-            .pipe(Effect.catchTag('KeyRefused', (err) => Effect.fail(raced(err))));
-        }),
-      stamps: () =>
-        Effect.gen(function* () {
-          const ks = yield* held;
-          const markers = yield* fromThrow(() => restStamps(home));
-          const parts = new Map<string, string[]>();
-          const add = (id: string, part: string) => parts.set(id, [...(parts.get(id) ?? []), part]);
-          if (ks !== undefined) {
-            for (const [key, revision] of yield* ks.revisions(RUNS_PREFIX)) add(key.slice(RUNS_PREFIX.length), `record=${revision}`);
-            for (const [key, revision] of [...(yield* ks.revisions(ASKS_PREFIX))].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
-              const rest = key.slice(ASKS_PREFIX.length);
-              const slash = rest.indexOf('/');
-              add(rest.slice(0, slash), `${rest.slice(slash + 1)}=${revision}`);
-            }
-          }
-          for (const [id, stamp] of markers) add(id, stamp);
-          return new Map([...parts].map(([id, p]) => [id, p.join(';')]));
-        }),
-      exists: (id) => Effect.map(recordOf(id), (record) => record !== undefined),
-      taken: (id) =>
-        Effect.gen(function* () {
-          if ((yield* recordOf(id)) !== undefined || (yield* asksOf(id)).length > 0) return true;
-          return yield* fromThrow(() => markerRunIds(home).includes(id));
-        }),
-      calledOff: (id) => fromThrow(() => calledOffByMarker(home, id) || pauseStands(home)),
-      cancel: (id, actor) => fromThrow(() => markCancelled(home, id, actor)),
-      forget: (id) =>
-        Effect.gen(function* () {
-          const ks = yield* held;
-          const keys =
-            ks === undefined
-              ? []
-              : yield* ks
-                  .within((tx) =>
-                    Effect.gen(function* () {
-                      const removed: string[] = [];
-                      const record = yield* tx.get(runKey(id));
-                      if (record !== undefined) {
-                        yield* tx.write(runKey(id), remove);
-                        removed.push(runKey(id));
-                        const card = cardIn(record.value);
-                        const claim = card === undefined ? undefined : yield* tx.get(claimKey(card));
-                        if (card !== undefined && claim !== undefined && claimedBy(claim.value) === id) {
-                          yield* tx.write(claimKey(card), remove);
-                          removed.push(claimKey(card));
-                        }
-                      }
-                      for (const ask of yield* tx.list(asksPrefix(id))) {
-                        yield* tx.write(ask.key, remove);
-                        removed.push(ask.key);
-                      }
-                      return removed;
-                    }),
-                  )
-                  .pipe(Effect.catchTag('KeyRefused', (err) => Effect.fail(raced(err))));
-          return [...keys, ...(yield* fromThrow(() => removeMarkerFiles(home, id)))];
-        }),
-      ids: () =>
-        Effect.gen(function* () {
-          const ks = yield* held;
-          return ks === undefined ? [] : (yield* ks.keys(RUNS_PREFIX)).map((key) => key.slice(RUNS_PREFIX.length)).sort();
-        }),
-      filesAt: (id) => fromThrow(() => filesAt(home, id)),
-      dropFiles: (id) => fromThrow(() => dropFiles(home, id)),
-      prune: (id, marker) => fromThrow(() => writePruned(home, id, marker)),
-      pruned: (id) => fromThrow(() => readPruned(home, id)),
-    },
-    asks: {
-      read: (id) => Effect.map(asksOf(id), (records) => allAsksIn(waitingOf(id, records))),
-      answers: (id) => Effect.map(asksOf(id), (records) => answersIn(allOf(id, records))),
-      write: (id, person) =>
-        Effect.gen(function* () {
-          const ks = yield* open;
-          const [step, n] =
-            person.of === 'base'
-              ? [person.ask.merge.target, person.ask.merge.try]
-              : [person.ask.step, 'round' in person.ask ? person.ask.round : person.ask.try];
-          const key = askKey(id, { of: person.of, step, n });
-          return yield* ks.write(key, create(JSON.stringify(askHeld(person)))).pipe(
-            Effect.as({ written: true, where: key } satisfies AskWritten as AskWritten),
-            Effect.catchTag('KeyRefused', (err) =>
-              err.refusal !== 'exists'
-                ? Effect.fail(raced(err))
-                : Effect.map(ks.get(key), (there) => {
-                    const stray = there === undefined ? null : strayOf(person, there.value, step, n);
-                    return { written: false, where: key, stray } satisfies AskWritten as AskWritten;
-                  }),
-            ),
-          );
-        }),
-      where: (id, key) => Effect.succeed(askKey(id, key)),
-      takeBack: (id, step, n, takenBack) =>
-        Effect.gen(function* () {
-          const ks = yield* open;
-          return yield* ks
-            .within((tx) =>
-              Effect.gen(function* () {
-                const name = askName({ of: 'gate', step, n });
-                const at = yield* tx.get(askKeyOf(id, name));
-                if (at === undefined || typeof approvalIn(at.value, step, n) === 'string') return null;
-                const held = heldText(at.value);
-                const said = 'read' in held && held.read !== null && typeof held.read === 'object' ? held.read : {};
-                const [done] = yield* setAside(tx, id, [name], () => JSON.stringify({ ...said, takenBack }));
-                return done ?? null;
-              }),
-            )
-            .pipe(Effect.catchTag('KeyRefused', (err) => Effect.fail(raced(err))));
-        }),
-      route: (id, step, n, route) =>
-        Effect.gen(function* () {
-          const ks = yield* open;
-          const key = askKeyOf(id, routeAsk(step, n));
-          const value = JSON.stringify(route);
-          yield* ks
-            .within((tx) =>
-              Effect.flatMap(tx.get(key), (there) => tx.write(key, there === undefined ? create(value) : overwrite(value))),
-            )
-            .pipe(Effect.catchTag('KeyRefused', (err) => Effect.fail(raced(err))));
-          return key;
-        }),
-    },
+        ),
+      );
+    });
+  return method;
+}
+
+/** The Run door's asks: read from `held`, written, taken back and routed in `open`. */
+function askMethods(open: Opened, held: Held) {
+  const { asksOf } = keyReads(held);
+  const asks: Shape['asks'] = {
+    read: (id) => Effect.map(asksOf(id), (records) => allAsksIn(waitingOf(id, records))),
+    answers: (id) => Effect.map(asksOf(id), (records) => answersIn(allOf(id, records))),
+    write: askWritten(open),
+    where: (id, key) => Effect.succeed(askKey(id, key)),
+    takeBack: (id, step, n, takenBack) =>
+      Effect.flatMap(open, (ks) =>
+        racedOn(
+          ks.within((tx) =>
+            Effect.gen(function* () {
+              const name = askName({ of: 'gate', step, n });
+              const at = yield* tx.get(askKeyOf(id, name));
+              if (at === undefined || typeof approvalIn(at.value, step, n) === 'string') return null;
+              const held = heldText(at.value);
+              const said = 'read' in held && held.read !== null && typeof held.read === 'object' ? held.read : {};
+              const [done] = yield* setAside(tx, id, [name], () => JSON.stringify({ ...said, takenBack }));
+              return done ?? null;
+            }),
+          ),
+        ),
+      ),
+    route: (id, step, n, route) =>
+      Effect.flatMap(open, (ks) => {
+        const key = askKeyOf(id, routeAsk(step, n));
+        const value = JSON.stringify(route);
+        return racedOn(
+          ks.within((tx) => Effect.flatMap(tx.get(key), (there) => tx.write(key, there === undefined ? create(value) : overwrite(value)))),
+        ).pipe(Effect.as(key));
+      }),
+  };
+  return asks;
+}
+
+/** The Run door's markers beside a run, files in the store's root `home`. */
+function markerMethods(home: string) {
+  const markers: Pick<Shape, 'holds' | 'said' | 'labels' | 'refresh' | 'forgetting'> &
+    Pick<Shape['runs'], 'calledOff' | 'cancel' | 'filesAt' | 'dropFiles' | 'prune' | 'pruned'> = {
+    calledOff: (id) => fromThrow(() => calledOffByMarker(home, id) || pauseStands(home)),
+    cancel: (id, actor) => fromThrow(() => markCancelled(home, id, actor)),
+    filesAt: (id) => fromThrow(() => filesAt(home, id)),
+    dropFiles: (id) => fromThrow(() => dropFiles(home, id)),
+    prune: (id, marker) => fromThrow(() => writePruned(home, id, marker)),
+    pruned: (id) => fromThrow(() => readPruned(home, id)),
     holds: {
       lift: (id, at, actor) => fromThrow(() => removeHold(home, id, at, actor)),
       put: (id, until, said) => fromThrow(() => writeHold(home, id, until, said)),
@@ -516,6 +566,28 @@ export function runRecords(home: string, open: Effect.Effect<Keyspace, Refusal>,
       lift: (id) => fromThrow(() => liftForgetting(home, id)),
       where: (id) => fromThrow(() => forgettingWhere(home, id)),
     },
+  };
+  return markers;
+}
+
+/**
+ * The run store over the keyspace `open` opens at the store's root `home`, a person's markers read and written as files there: the Run
+ * door's layer, each method an Effect. `held` is the keyspace a read reads, undefined where the store has none and nothing to import, so a
+ * read makes no file.
+ * @param home The store's root folder, where a person's markers are.
+ * @param open The keyspace a write writes, opened and its files imported.
+ * @param held The keyspace a read reads, or undefined where there is none.
+ */
+export function runRecords(home: string, open: Opened, held: Held) {
+  const { holds, said, labels, refresh, forgetting, ...markers } = markerMethods(home);
+  return {
+    runs: { ...runReads(home, held), ...runWrites(home, open, held), ...markers },
+    asks: askMethods(open, held),
+    holds,
+    said,
+    labels,
+    refresh,
+    forgetting,
   } satisfies Shape;
 }
 
@@ -623,6 +695,67 @@ const moveAside = (file: string, aside: string) => {
 /** Whether `text` reads as JSON: an ask that does not is left where it is. */
 const isJson = (text: string) => Option.isSome(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
+/** An import's own write raced by another, as a refusal. */
+const importRaced = (err: KeyRefused) =>
+  new Conflict({ message: `${err.key} was written while it was imported: run again.` }) satisfies Refusal as Refusal;
+
+/** Each of a run's files that reads as it should, with its text: an ask that does not read as JSON left out and said in the log. */
+const plantedTexts = (planted: readonly Planted[], record: Planted | undefined) =>
+  Effect.gen(function* () {
+    const read: { planted: Planted; text: string }[] = [];
+    for (const one of planted) {
+      const text = yield* fromThrow(() => textOf(one.file));
+      if (text === undefined) continue;
+      if (one !== record && !isJson(text))
+        yield* Effect.logWarning(`${one.file} was not imported: it is no JSON, so it is no ask; remove it, and ask again`);
+      else read.push({ planted: one, text });
+    }
+    return read;
+  });
+
+/** Write each `read` file at its key in one transaction of `keyspace`, a key already held left as it is; answers how many it wrote. */
+const writtenOnce = (keyspace: Keyspace, read: readonly { planted: Planted; text: string }[]) =>
+  keyspace
+    .within((tx) =>
+      Effect.gen(function* () {
+        let wrote = 0;
+        for (const { planted, text } of read) {
+          if ((yield* tx.get(planted.key)) !== undefined) continue;
+          yield* tx.write(planted.key, create(text));
+          wrote++;
+        }
+        return wrote;
+      }),
+    )
+    .pipe(Effect.catchTag('KeyRefused', (err) => Effect.fail(importRaced(err))));
+
+/** One run's record and asks imported in one transaction, then each file moved aside and its emptied folders removed. */
+const runImported = (home: string, keyspace: Keyspace, run: ReturnType<typeof runFilesOf>['runs'][number]) =>
+  Effect.gen(function* () {
+    const read = yield* plantedTexts([...(run.record ? [run.record] : []), ...run.asks], run.record);
+    const made = yield* writtenOnce(keyspace, read);
+    yield* fromThrow(() => {
+      for (const { planted } of read) moveAside(planted.file, planted.aside);
+      for (const dir of [path.join(runsDir(home), `${run.id}.asks`, 'done'), path.join(runsDir(home), `${run.id}.asks`)])
+        try {
+          fs.rmdirSync(dir);
+        } catch {}
+    });
+    return made;
+  });
+
+/** One claim imported where its run's record says it was started from its card, then moved aside, a stale one unimported. */
+const claimImported = (keyspace: Keyspace, claim: ReturnType<typeof runFilesOf>['claims'][number]) =>
+  Effect.gen(function* () {
+    const text = yield* fromThrow(() => textOf(claim.file));
+    if (text === undefined) return 0;
+    const by = claimedBy(text);
+    const record = by === undefined ? undefined : yield* keyspace.get(runKey(by));
+    const made = record !== undefined && cardIn(record.value) === claim.card ? yield* writtenOnce(keyspace, [{ planted: claim, text }]) : 0;
+    yield* fromThrow(() => moveAside(claim.file, claim.aside));
+    return made;
+  });
+
 /**
  * Import a store's run files into its keyspace, once: each run's record and asks in one transaction, a key already held left as it is, then
  * every file read moved aside under `<root>/imported/`, never deleted; then each claim whose run's record holds that it was started from
@@ -634,61 +767,15 @@ const isJson = (text: string) => Option.isSome(Schema.decodeUnknownOption(Schema
  */
 export const runsImported = Effect.fnUntraced(function* (home: string, keyspace: Keyspace) {
   const { runs, claims } = runFilesOf(home);
-  if (runs.length === 0 && claims.length === 0) return 0;
   const every = [...runs.flatMap((r) => [...(r.record ? [r.record] : []), ...r.asks]), ...claims];
   const over = every.find((f) => (fs.statSync(f.file, { throwIfNoEntry: false })?.size ?? 0) > RECORD_CEILING);
   if (over !== undefined)
-    return yield* Effect.fail(
-      new Invalid({
-        message: `${over.file} is larger than a record of the keyspace holds (${RECORD_CEILING} bytes): nothing was imported or moved; move it aside and run again.`,
-      }),
-    );
-  let made = 0;
-  for (const run of runs) {
-    const read: { planted: Planted; text: string }[] = [];
-    for (const planted of [...(run.record ? [run.record] : []), ...run.asks]) {
-      const text = yield* fromThrow(() => textOf(planted.file));
-      if (text === undefined) continue;
-      if (planted !== run.record && !isJson(text)) {
-        yield* Effect.logWarning(`${planted.file} was not imported: it is no JSON, so it is no ask; remove it, and ask again`);
-        continue;
-      }
-      read.push({ planted, text });
-    }
-    made += yield* keyspace
-      .within((tx) =>
-        Effect.gen(function* () {
-          let wrote = 0;
-          for (const { planted, text } of read)
-            if ((yield* tx.get(planted.key)) === undefined) {
-              yield* tx.write(planted.key, create(text));
-              wrote++;
-            }
-          return wrote;
-        }),
-      )
-      .pipe(Effect.catchTag('KeyRefused', (err) => Effect.fail(new Conflict({ message: `${err.key} was written while it was imported: run again.` }))));
-    yield* fromThrow(() => {
-      for (const { planted } of read) moveAside(planted.file, planted.aside);
-      for (const dir of [path.join(runsDir(home), `${run.id}.asks`, 'done'), path.join(runsDir(home), `${run.id}.asks`)])
-        try {
-          fs.rmdirSync(dir);
-        } catch {}
+    return yield* new Invalid({
+      message: `${over.file} is larger than a record of the keyspace holds (${RECORD_CEILING} bytes): nothing was imported or moved; move it aside and run again.`,
     });
-  }
-  for (const claim of claims) {
-    const text = yield* fromThrow(() => textOf(claim.file));
-    if (text === undefined) continue;
-    const by = claimedBy(text);
-    const record = by === undefined ? undefined : yield* keyspace.get(runKey(by));
-    if (record !== undefined && cardIn(record.value) === claim.card)
-      made += yield* keyspace
-        .within((tx) =>
-          Effect.flatMap(tx.get(claim.key), (there) => (there === undefined ? Effect.as(tx.write(claim.key, create(text)), 1) : Effect.succeed(0))),
-        )
-        .pipe(Effect.catchTag('KeyRefused', (err) => Effect.fail(new Conflict({ message: `${err.key} was written while it was imported: run again.` }))));
-    yield* fromThrow(() => moveAside(claim.file, claim.aside));
-  }
+  let made = 0;
+  for (const run of runs) made += yield* runImported(home, keyspace, run);
+  for (const claim of claims) made += yield* claimImported(keyspace, claim);
   return made;
 });
 
@@ -723,11 +810,13 @@ export const runKeyspace = (home: string) =>
             Effect.flatMap(fromThrow(due), (still) =>
               !still
                 ? Effect.succeed(keyspace)
-                : Effect.flatMap(fromThrow(() => plantedMark(home)), (mark) =>
-                    Effect.map(runsImported(home, keyspace), () => {
-                      IMPORTED.set(home, mark);
-                      return keyspace;
-                    }),
+                : Effect.flatMap(
+                    fromThrow(() => plantedMark(home)),
+                    (mark) =>
+                      Effect.map(runsImported(home, keyspace), () => {
+                        IMPORTED.set(home, mark);
+                        return keyspace;
+                      }),
                   ),
             ),
           ),

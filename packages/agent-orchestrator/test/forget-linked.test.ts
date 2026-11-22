@@ -78,8 +78,6 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
     [forgot.kind, forgot.left, forgot.removed.length, forgot.handedOff.map((h) => h.step)],
     ['forgotten', [], 1, ['implement']],
   );
-  assert.ok(
-    !fs.existsSync(wt) && !fs.existsSync(path.join(ROOT, 'worktrees', run.id)) && recordText(ROOT, runKey(run.id)) === undefined,
-  );
+  assert.ok(!fs.existsSync(wt) && !fs.existsSync(path.join(ROOT, 'worktrees', run.id)) && recordText(ROOT, runKey(run.id)) === undefined);
   assert.equal(git(repo, 'show', '--name-only', '--format=', `wf/${run.id}/${LINE_NAME}`), 'left.txt');
 });

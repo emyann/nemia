@@ -30,7 +30,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { decidedOn } from './screens.ts';
 import { runWith, tickRun } from '../src/runner.ts';
-import { runFile } from '../src/record/record.store.ts';
+
 import { ownDenies } from '../src/workflow/index.ts';
 import { stepPlace } from '../src/workflow.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
@@ -303,7 +303,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
   s.test('`nemia rm` forgets a run of the old store, and the others stay', async () => {
     const forgot = await stage.runWith(b.e, RM.handler({ runId: 'notes' }));
     assert.deepEqual([forgot.id, forgot.removed], ['notes', true]);
-    assert.equal((recordText(ROOT, runKey('notes')) !== undefined), false, 'its record is gone');
+    assert.equal(recordText(ROOT, runKey('notes')) !== undefined, false, 'its record is gone');
     assert.deepEqual(
       listRuns(ROOT, () => {})
         .map((r) => r.id)

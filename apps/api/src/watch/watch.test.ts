@@ -203,7 +203,10 @@ const gatedRun = (t: TestContext, id: string, createdAt = '2026-11-05T06:00:00.0
   t.onTestFinished(() => dropRecord(root, runKey(id)));
   doneTask(`t-${id}`);
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(id), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(id),
+    JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -219,7 +222,8 @@ const gatedRun = (t: TestContext, id: string, createdAt = '2026-11-05T06:00:00.0
       ],
       gates: ['design'],
       steps: { design: { taskId: `t-${id}` }, implement: { taskId: null } },
-    }));
+    }),
+  );
 };
 
 test('a watch of the runs over a store holding one, plain and namespaced, sends it ADDED as a Run carrying a resourceVersion, then a BOOKMARK of Run', async (t) => {

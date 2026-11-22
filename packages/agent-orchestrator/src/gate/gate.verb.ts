@@ -17,7 +17,6 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { aboveTheWorkflow, approvedCaps, ceilingsOf, laterSteps, proposedBudgets, type StepBudget } from '../budget/budget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * What `nemia approve` did: the run, the approval as written, and its file; the caps it set for the steps after the gate, in the order the
@@ -54,7 +53,6 @@ export const approveRun = Effect.fn('approve')(function* (
   given: readonly StepBudget[] = [],
   actor?: Actor,
 ) {
-  const home = yield* StoreRoot;
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({

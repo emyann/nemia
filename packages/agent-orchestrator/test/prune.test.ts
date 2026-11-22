@@ -9,7 +9,7 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
-import { askText, listRuns, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { askText, listRuns, recordText, runKey, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -60,7 +60,7 @@ const ROOT = scratch('wf-prune-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 /** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 /**
  * What the run object says of run `id`'s prune under its line, as its decision read it (`status.pruned.said`, `prunedOf` in
@@ -283,19 +283,16 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.ok(!worktreesOf(repo).includes(wt), 'its place lists it no more');
       assert.ok(hasBranch(repo, branch), 'the branch is kept');
       assert.ok(
-        (recordText(ROOT, runKey(run.id)) !== undefined) &&
+        recordText(ROOT, runKey(run.id)) !== undefined &&
           under('runs', run.id, 'artifacts', 'implement', 'report.md') &&
-          (askText(ROOT, run.id, 'done') !== undefined),
+          askText(ROOT, run.id, 'done') !== undefined,
       );
       const pruned = runRecord(ROOT, run.id).pruned!;
       assert.deepEqual(
         pruned.worktrees.map((w) => w.path),
         [wt],
       );
-      assert.ok(
-        !('pruned' in JSON.parse(recordText(ROOT, runKey(run.id)) ?? '')),
-        'the record itself never holds it',
-      );
+      assert.ok(!('pruned' in JSON.parse(recordText(ROOT, runKey(run.id)) ?? '')), 'the record itself never holds it');
 
       const { row } = await listedOf(b.e, run.id);
       assert.deepEqual([row.run.brief, row.run.pruned?.at], ['add a flag', pruned.at], 'still on the board, with the word beside it');
@@ -352,7 +349,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.ok(!fs.existsSync(files) && !fs.existsSync(run0.wt), 'the files and the worktree are gone');
       assert.equal(fs.readFileSync(path.join(outside, 'precious.png'), 'utf8'), 'keep me\n', 'a link among the files is not followed');
       for (const kept of ['inputs', 'agents']) assert.ok(under('runs', id, kept, 'kept.md'), `${kept} is kept`);
-      assert.ok((recordText(ROOT, runKey(id)) !== undefined) && (askText(ROOT, id, 'done') !== undefined), 'the record and the asks are kept');
+      assert.ok(recordText(ROOT, runKey(id)) !== undefined && askText(ROOT, id, 'done') !== undefined, 'the record and the asks are kept');
       assert.ok(hasBranch(run0.repo, run0.branch), 'and the branch');
       const pruned = runRecord(ROOT, id).pruned!;
       assert.equal(pruned.worktrees.length, 1);

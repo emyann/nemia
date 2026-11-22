@@ -190,12 +190,16 @@ describe('a chain runs to success: plan → implement → review, on one line of
       for (const frozen of [true, false]) {
         const legacyId = `${id}-${frozen ? 'frozen' : 'unfrozen'}`;
         const { workflow, steps, ...rest } = run;
-        plantRecord(ROOT, runKey(legacyId), JSON.stringify({
+        plantRecord(
+          ROOT,
+          runKey(legacyId),
+          JSON.stringify({
             ...rest,
             id: legacyId,
             ...(frozen ? { workflow: folderOrder.map((name) => workflow!.find((x) => x.name === name)) } : {}),
             steps: Object.fromEntries(folderOrder.map((name) => [name, steps[name]])),
-          }));
+          }),
+        );
         const legacy = runRecord(ROOT, legacyId);
         assert.deepEqual([Object.keys(legacy.steps), legacy.workflow?.map((x) => x.name)], [folderOrder, frozen ? folderOrder : undefined]);
         assert.deepEqual(
@@ -430,7 +434,7 @@ describe('a failed step, then a cancelled run', () => {
   });
   s.test("`nemia cancel` stops both — the running check and the queued step — and the mark outlives the pass's write", async () => {
     const file = runKey(id);
-    const before = (recordText(ROOT, file) ?? '');
+    const before = recordText(ROOT, file) ?? '';
     const { plan } = await stage.runWith(stage.board().e, cancelRun(id));
     assert.deepEqual(plan, {
       kind: 'cancel',

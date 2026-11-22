@@ -130,9 +130,7 @@ export const runsNow = (root: string) => {
 
 /** The keyspace of the store `root`, opened at once, its planted run files imported first: what a test's raw writes write through. */
 const keyspaceNow = (root: string) =>
-  Effect.runSync(
-    Effect.tap(keyspaceAt(keyspaceFile(root)), (keyspace) => runsImported(root, keyspace)),
-  );
+  Effect.runSync(Effect.tap(keyspaceAt(keyspaceFile(root)), (keyspace) => runsImported(root, keyspace)));
 
 /**
  * A run as the Run door reads it at the store `root`, at once: what a test reads a run's record by.
@@ -297,3 +295,4 @@ export const readAsks = (root: string, id: string) => runsNow(root).asks.read(id
  * @param id The run's id.
  */
 export const readAnswers = (root: string, id: string) => runsNow(root).asks.answers(id);
+export { RECORD_CEILING } from './src/keyspace/keyspace.store.ts';

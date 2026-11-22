@@ -268,12 +268,18 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
       Effect.flatMap(SqlClient.SqlClient, (sql) =>
         sql.withTransaction(
           body({
-            get: (key) => Effect.orDie(Effect.map(latestRow(key), (row) => (row === undefined || row.deleted !== 0 ? undefined : recordOf(row)))).pipe(Effect.provide(client)),
+            get: (key) =>
+              Effect.orDie(Effect.map(latestRow(key), (row) => (row === undefined || row.deleted !== 0 ? undefined : recordOf(row)))).pipe(
+                Effect.provide(client),
+              ),
             list: (prefix) => Effect.orDie(Effect.provide(liveUnder(prefix), client)),
             write: (key, write) => refusing(Effect.provide(writeOne(key, write), client)),
           }),
         ),
-      ).pipe(Effect.provide(client), Effect.catchTag('SqlError', (err) => Effect.die(err))),
+      ).pipe(
+        Effect.provide(client),
+        Effect.catchTag('SqlError', (err) => Effect.die(err)),
+      ),
     since: (revision, prefix) =>
       Effect.orDie(
         inTxn(

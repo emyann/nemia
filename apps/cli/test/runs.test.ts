@@ -248,7 +248,7 @@ test('nemia cancel stops the run; nemia rm forgets it, its branches deleted, and
   assert.equal(gone.code, 0, `${gone.out}${gone.err}`);
   assert.match(gone.out, new RegExp(`^${id} {2}forgotten: no worktrees; removed runs/${id}\\.json`, 'm'));
   assert.match(gone.out, /^nobody-1 {2}no such run — nothing to forget but what was left under its id: removed runs\/nobody-1\.asks\/$/m);
-  assert.equal((recordText(store.root, runKey(id)) !== undefined), false);
+  assert.equal(recordText(store.root, runKey(id)) !== undefined, false);
   assert.equal(fs.existsSync(asks), false, 'the leftovers of a run with no record are gone');
 });
 

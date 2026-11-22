@@ -15,7 +15,7 @@
  * Its store is its own at `ROOT`, given as `ENV`.
  */
 
-import { askNames, listRuns, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { askNames, listRuns, runRecord, runsNow } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -64,7 +64,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 /** A pass of the tick's over every run of the store, on the git place: where their branches stand, written down for every reader. */
 const aPass = () => runPlaced(passStanding(listRuns(ROOT)));
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
 type Place = import('../src/place/place.store.ts').Place;
 type PlaceRequests = import('../src/place/place.ts').PlaceRequests;

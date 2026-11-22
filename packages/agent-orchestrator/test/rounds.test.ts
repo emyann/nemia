@@ -140,8 +140,7 @@ const toReview = async (id: string, again: boolean, implementSaid: object = ANSW
   stage.board().settle(review, 'succeeded', reviewSays(again));
   return review;
 };
-const asksOf = (id: string, kind: string) =>
-  askNames(ROOT, id).filter((f) => f.startsWith(`${kind}-`));
+const asksOf = (id: string, kind: string) => askNames(ROOT, id).filter((f) => f.startsWith(`${kind}-`));
 /** The JSON under a brief's `heading`. */
 const dataUnder = (brief: string, heading: string) =>
   JSON.parse(new RegExp(`${heading}\\n[\\s\\S]*?\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\``).exec(brief)![1]);
@@ -311,7 +310,11 @@ describe('three rounds, then a person accepts the work as it stands', () => {
   s.test('`nemia retry --round` takes it once more, once: the ask written whole, and no record', async () => {
     const { hints } = await typedOn(['retry', id, 'review', '--round']);
     file = askKeyOf(id, 'round-review-4');
-    assert.deepEqual([recordText(ROOT, file) !== undefined, hints], [true, []], 'the ask `nemia round` wrote, and no hint: this is the spelling to type');
+    assert.deepEqual(
+      [recordText(ROOT, file) !== undefined, hints],
+      [true, []],
+      'the ask `nemia round` wrote, and no hint: this is the spelling to type',
+    );
     const ask = JSON.parse(recordText(ROOT, file) ?? '');
     assert.deepEqual([ask.step, ask.round, ask.budget, taskOf(id, 'implement')], ['review', 4, undefined, `${id}-implement-try4`]);
     assert.deepEqual(asksOf(id, 'round'), ['round-review-4'], "a person's once more is an ask, written whole");
@@ -323,7 +326,7 @@ describe('three rounds, then a person accepts the work as it stands', () => {
     assert.match(specOf(`${id}-implement-try5`).brief, /^## Round 4, past rounds: 3\n/);
     assert.equal(specOf(`${id}-implement-try5`).priority, ASKED_PRIORITY, "a person's round: the turn they wait on goes first");
     assert.deepEqual(asksOf(id, 'round'), [], 'consumed');
-    assert.ok((recordText(ROOT, askKeyOf(id, 'done/round-review-4')) !== undefined), 'moved whole');
+    assert.ok(recordText(ROOT, askKeyOf(id, 'done/round-review-4')) !== undefined, 'moved whole');
     await assert.rejects(over(roundRun(id)), refusedAs('Conflict', "round 4 of review's loop is still running"));
   });
   s.test('an ask a pass filed and wrote down, then died before moving, is spent: it files nothing', async () => {
@@ -351,7 +354,7 @@ describe('three rounds, then a person accepts the work as it stands', () => {
         pass.notes.some((n) => n.includes(why)),
         `${written}: ${pass.notes.join(' | ')}`,
       );
-      assert.equal((recordText(ROOT, accept) ?? ''), written, 'not touched');
+      assert.equal(recordText(ROOT, accept) ?? '', written, 'not touched');
       assert.equal((await over(list(stage.board().e, runRecord(ROOT, id)))).steps[1].message, 'rounds exhausted');
     }
     dropRecord(ROOT, accept);
@@ -364,7 +367,7 @@ describe('three rounds, then a person accepts the work as it stands', () => {
       await assert.rejects(typedOn(['approve', id, 'review']), refusedAs('Invalid', '--message'));
       assert.deepEqual(asksOf(id, 'accept'), [], 'refused without your words: nothing written');
       const { hints } = await typedOn(['approve', id, 'review', '--message', ENOUGH]);
-      assert.deepEqual([(recordText(ROOT, accepted) !== undefined), hints], [true, []], 'the file `nemia accept` wrote, and no hint');
+      assert.deepEqual([recordText(ROOT, accepted) !== undefined, hints], [true, []], 'the file `nemia accept` wrote, and no hint');
       const acceptance = JSON.parse(recordText(ROOT, accepted) ?? '');
       at = acceptance.at;
       assert.deepEqual([acceptance.step, acceptance.try, acceptance.message], ['review', 4, ENOUGH], 'written whole');
@@ -407,7 +410,7 @@ describe('three rounds, then a person accepts the work as it stands', () => {
     assert.deepEqual(offers, [], 'the loop is over');
     namesFor('accepted', accepted.review, `${at.slice(11, 16)}Z`, ENOUGH);
     await typedOn(['approve', id, 'ship', '--message', 'the findings are filed as follow-up']);
-    assert.ok((recordText(ROOT, askKeyOf(id, 'approve-ship-1')) !== undefined), 'the same verb, at a gate: the approval');
+    assert.ok(recordText(ROOT, askKeyOf(id, 'approve-ship-1')) !== undefined, 'the same verb, at a gate: the approval');
     assert.equal((await tick(id)).status, 'succeeded');
   });
 });

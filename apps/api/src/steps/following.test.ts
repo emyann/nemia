@@ -30,7 +30,10 @@ const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried', 'drifte
 /** The run's record, each step of `STEPS` on the task `t-<step>`, but those `moved` names on another. */
 function writeRun(moved: Record<string, string> = {}) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  plantRecord(root, runKey(RUN), JSON.stringify({
+  plantRecord(
+    root,
+    runKey(RUN),
+    JSON.stringify({
       id: RUN,
       repo: '/code/app',
       workspace: '/code/app',
@@ -42,7 +45,8 @@ function writeRun(moved: Record<string, string> = {}) {
       createdAt: '2026-10-07T12:00:00.000Z',
       workflow: STEPS.map((name) => ({ name, after: [], body: `${name} it.` })),
       steps: Object.fromEntries(STEPS.map((name) => [name, { taskId: moved[name] ?? `t-${name}` }])),
-    }));
+    }),
+  );
 }
 writeRun();
 

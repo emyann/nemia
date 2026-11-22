@@ -1,13 +1,17 @@
 /**
  * The keyspace's decisions, proved law by law (contracts/keyspace.contract.ts), each asked by the store (`keyspace.store.ts`) inside the
  * SQLite transaction that read what it is handed: what a write does to its key (`keyspaceWrite`), where a watch starts (`watchStart`),
- * how far a compaction reaches (`compactTo`), and what opening a file asks of its table (`schemaDue`). Pure.
+ * how far a compaction reaches (`compactTo`), what opening a file asks of its table (`schemaDue`), and whether a write's pointers hold
+ * (`pointersHold`). Pure.
  */
-import type { CompactTo, KeyspaceWrite, SchemaDueOf, WatchStartOf } from '../../contracts/keyspace.contract.ts';
+import type { CompactTo, KeyspaceWrite, PointersHold, SchemaDueOf, WatchStartOf } from '../../contracts/keyspace.contract.ts';
 
 export type {
   Held,
   KeyWrite,
+  PointerCheck,
+  PointerDecision,
+  PointerRefusal,
   RowWritten,
   SchemaDue,
   WatchRefusal,
@@ -71,3 +75,13 @@ export const compactTo: CompactTo = (head, compacted, retain) => Math.max(compac
  * @param code The highest migration the code knows.
  */
 export const schemaDue: SchemaDueOf = (file, code) => (file > code ? { refused: 'newer' } : { from: file, to: code });
+
+/**
+ * Whether a write's pointers hold: a delete holds where no live record of another key points to its key, and a create or an update
+ * where every key its record points to is live.
+ * @param check The write's verb, how many of its pointers name no live key, and how many live records of other keys point to its key.
+ */
+export const pointersHold: PointersHold = (check) => {
+  if (check.verb === 'delete') return check.referrers === 0 ? { held: true } : { refused: 'referenced' };
+  return check.dangling === 0 ? { held: true } : { refused: 'dangling' };
+};

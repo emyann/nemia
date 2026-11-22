@@ -104,6 +104,7 @@ const keepsNoMore = [
       name: 'tides.png',
       mediaType: 'image/png',
       size: 1,
+      digest: 'sha256:2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881',
       createdAt: '2026-11-16T10:00:00.000Z',
     };
     return HttpResponse.json(kept, { status: 201 });

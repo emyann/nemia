@@ -5,7 +5,8 @@
  * session's token and a token never minted, each 401 by its word; and a call
  * still pending is told to its caller as progress, every interval, where the caller gave a progress token; and the feed's resources on
  * the modern era: declared subscribable, a listen of a view acknowledged and told of each new line, a read answering it, a URI no view
- * refused -32602 holding nothing, and a closed listen letting its view go. Statuses, refusal words and
+ * refused -32602 holding nothing, and a closed listen letting its view go; a file a tool reads handed over as a link, which a read of
+ * the resource answers. Statuses, refusal words and
  * whether an error carries words are asserted, never a sentence.
  *
  * On the stand-ins: the runtime's test engine and the test place; a run planted as its record alone, nothing of it filed; the tokens
@@ -610,4 +611,32 @@ test('REFUSED -32602: a listen naming nemia:///api/runs, the templates named, no
   assert.equal(answer.error?.code, -32602);
   assert.ok(answer.error?.message?.includes('nemia:///api/events{?labelSelector*}'), 'the refusal names the templates');
   assert.equal(port.liveViews(), 0, 'no view opened');
+});
+
+test("a tool that reads a file hands it over as a resource_link, never its bytes; resources/read of the link answers its text, or a picture's base64", async () => {
+  const id = 'r-port-linked';
+  planted(id);
+  const files = path.join(root, 'runs', id, 'artifacts', 'implement');
+  fs.mkdirSync(files, { recursive: true });
+  const notes = '# Notes\n\nOne fact a line.\n';
+  const picture = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
+  fs.writeFileSync(path.join(files, 'notes.md'), notes);
+  fs.writeFileSync(path.join(files, 'shot.png'), picture);
+  const client = await connected(app);
+  const result = await client.callTool({ name: 'step_artifact', arguments: { runId: id, step: 'implement', file: 'notes.md' } });
+  assert.notEqual(result.isError, true, textOf(result));
+  const content = result.content as { type: string; uri?: string; name?: string; mimeType?: string; text?: string }[];
+  assert.deepEqual(
+    content.map((c) => c.type),
+    ['resource_link'],
+  );
+  const [link] = content;
+  assert.equal(link?.uri, `nemia:///api/runs/${id}/steps/implement/artifacts/notes.md`);
+  assert.equal(link?.name, 'notes.md');
+  assert.equal(JSON.stringify(result).includes('One fact a line'), false, 'no byte of the file in the answer');
+  const read = await client.readResource({ uri: link?.uri ?? '' });
+  assert.equal((read.contents[0] as { text?: string }).text, notes);
+  const shot = await client.readResource({ uri: `nemia:///api/runs/${id}/steps/implement/artifacts/shot.png` });
+  assert.equal((shot.contents[0] as { blob?: string }).blob, picture.toString('base64'));
+  await client.close();
 });

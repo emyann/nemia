@@ -12,6 +12,7 @@
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
+import { ASKED_PRIORITY } from '../src/status/status.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
@@ -439,6 +440,7 @@ describe('a send-back from a gate spends the approval given before it', () => {
     assert.match(brief, /^## Try 2\n\nThe last try signed off, and its handoff waited at this step's gate for a person, who sent it back/);
     assert.ok(brief.includes('## Your answer\n\n```text\nStore the flag before you parse it.\n```'), brief);
     assert.equal(gate.tasks.get(try2())!.spec.resumeFrom, `native-${id}-plan`, 'its session continued');
+    assert.equal(gate.tasks.get(try2())!.spec.priority, ASKED_PRIORITY, "a person's try: the turn they wait on goes first");
   });
   s.test('the approval is spent with the ask, into done/', () => {
     assert.deepEqual([asksOf(id), asksOf(id, 'done')], [[], ['approve-plan-1', 'retry-plan-2']]);

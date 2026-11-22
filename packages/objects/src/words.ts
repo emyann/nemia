@@ -182,6 +182,12 @@ export const SPAN_AT = ['unknown', 'queued', 'starting', 'running', 'ended', 'un
 /** One of `SPAN_AT`. */
 export type SpanAt = (typeof SPAN_AT)[number];
 
+/** Which task of a step waits to start: its session, or its check. */
+export const QUEUED_TASKS = ['session', 'check'] as const;
+
+/** One of `QUEUED_TASKS`. */
+export type QueuedTask = (typeof QUEUED_TASKS)[number];
+
 /** How a raise of a step's cap is asked for: with a try, or with a round. */
 export const RAISE_BY = ['retry', 'round'] as const;
 

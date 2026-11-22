@@ -352,7 +352,7 @@ test('a wait is journalled only when it changes by a grain: passes on a machine 
   assert.equal((await b.journal.read('big')).filter((e) => e.kind === 'waits').length, 2, 'a grain moved: a second');
 });
 
-test('a pass that judges nothing takes a recorded wait off: while the engine is unschedulable, a task waiting for memory says no reason it no longer has', async () => {
+test('a paused engine says why on every queued task, once: while it is unschedulable a task waiting for memory says it waits for that, journalled once, and the judged wait comes back on resume', async () => {
   const machine = { totalBytes: 16 * GI, availableBytes: 3 * GI };
   let paused = false;
   const b = machineBoard('1Gi', machine, 6, () => paused);
@@ -361,15 +361,33 @@ test('a pass that judges nothing takes a recorded wait off: while the engine is 
   assert.equal((await Effect.runPromise(b.engine.view('big'))).waits?.for, 'memory', 'judged: it waits for memory');
   paused = true;
   const pass = await Effect.runPromise(b.engine.tick());
-  assert.equal(pass.views.find((v) => v.id === 'big')?.waits, undefined, 'the pass judged nothing: its view says no wait');
-  assert.equal((await Effect.runPromise(b.engine.view('big'))).waits, undefined, 'nor does the record');
+  assert.equal(pass.views.find((v) => v.id === 'big')?.waits?.for, 'unschedulable', 'paused: its view says so');
+  assert.equal((await Effect.runPromise(b.engine.view('big'))).waits?.for, 'unschedulable', 'and so does the record');
   assert.equal((await Effect.runPromise(b.engine.view('big'))).admission, 'queued', 'still queued');
-  const cleared = (await b.journal.read('big')).filter((e) => e.kind === 'waits').length;
+  const said = (await b.journal.read('big')).filter((e) => e.kind === 'waits').length;
   await Effect.runPromise(b.engine.tick());
-  assert.equal((await b.journal.read('big')).filter((e) => e.kind === 'waits').length, cleared, 'taken off once, never again while paused');
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await b.journal.read('big')).filter((e) => e.kind === 'waits').length, said, 'journalled once while paused');
   paused = false;
   await Effect.runPromise(b.engine.tick());
   assert.equal((await Effect.runPromise(b.engine.view('big'))).waits?.for, 'memory', 'judged again: the wait is back');
+});
+
+test('a pass with no ceiling judges nothing and takes a recorded wait off', async () => {
+  const journal = memoryJournal();
+  await fileAt(journal, 'q', '2026-10-04T09:00:00.000Z');
+  await journal.append('q', { kind: 'waits', at: '2026-10-04T09:00:01.000Z', wait: { for: 'slot', pool: 'a', ceiling: 1 } });
+  const engine = builtEngine(
+    Engine.layer({
+      root: scratch('ae-admission-root-'),
+      journal: asyncStore(journal),
+      harnesses: { a: asyncOps(fake(new Map())) },
+      defaultHarness: 'a',
+    }),
+  );
+  assert.equal((await Effect.runPromise(engine.view('q'))).waits?.for, 'slot', 'on record before the pass');
+  await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view('q'))).waits, undefined, 'taken off: no ceiling judged it');
 });
 
 test('the memory gate under a memo that verifies every task it skips: a pass that journals a wait and an admission skips no change', async () => {
@@ -693,8 +711,20 @@ const admittedNeed = (pass: AdmissionPass, out: Admitted) =>
 const promised = (pass: AdmissionPass) => sumOf(pass.holders.map((h) => h.needBytes));
 const unseen = (pass: AdmissionPass) => sumOf(pass.holders.filter((h) => !h.running).map((h) => h.needBytes));
 const heldInPool = (pass: AdmissionPass, pool: string) => pass.holders.filter((h) => h.pool === pool).length;
-const inPoolAfter = (pass: AdmissionPass, out: Admitted, pool: string) =>
-  heldInPool(pass, pool) + pass.waiting.filter((w) => w.pool === pool && out.admit.includes(w.id)).length;
+const admittedIn = (pass: AdmissionPass, out: Admitted, pool: string, kept?: boolean) =>
+  pass.waiting.filter((w) => w.pool === pool && out.admit.includes(w.id) && (kept === undefined || w.kept === kept)).length;
+const inPoolAfter = (pass: AdmissionPass, out: Admitted, pool: string) => heldInPool(pass, pool) + admittedIn(pass, out, pool);
+const keptHeldIn = (pass: AdmissionPass, pool: string) => pass.holders.filter((h) => h.pool === pool && h.kept).length;
+/** The kept places of `pool` taken: by its kept holders first, then its kept waiters admitted, up to the places kept. */
+const keptTakenAfter = (pass: AdmissionPass, out: Admitted, pool: string) =>
+  Math.min(pass.kept.slots, keptHeldIn(pass, pool) + admittedIn(pass, out, pool, true));
+const underCeilingBefore = (pass: AdmissionPass, pool: string) =>
+  heldInPool(pass, pool) - Math.min(pass.kept.slots, keptHeldIn(pass, pool));
+const underCeilingAfter = (pass: AdmissionPass, out: Admitted, pool: string) =>
+  inPoolAfter(pass, out, pool) - keptTakenAfter(pass, out, pool);
+/** The kept memory still free once the kept holders' needs are counted against it. */
+const keptFreeBefore = (pass: AdmissionPass) =>
+  Math.max(0, pass.kept.bytes - sumOf(pass.holders.filter((h) => h.kept).map((h) => h.needBytes)));
 const roomAfter = (pass: AdmissionPass, m: MachineMemory, out: Admitted) =>
   Math.min(m.totalBytes - m.reservedBytes - promised(pass), m.availableBytes - m.reservedBytes - unseen(pass)) - admittedNeed(pass, out);
 const waitOf = (out: Admitted, id: string) => out.waits.find((x) => x.id === id)?.wait satisfies AdmissionWait | undefined;
@@ -712,8 +742,15 @@ const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean>
       .join(','),
   ceilingKept: (pass, out) =>
     pass.waiting.every(
-      (w) => inPoolAfter(pass, out, w.pool) - heldInPool(pass, w.pool) <= Math.max(0, pass.ceiling - heldInPool(pass, w.pool)),
+      (w) =>
+        underCeilingAfter(pass, out, w.pool) <= Math.max(pass.ceiling, underCeilingBefore(pass, w.pool)) &&
+        admittedIn(pass, out, w.pool, false) <= Math.max(0, pass.ceiling - underCeilingBefore(pass, w.pool)) &&
+        inPoolAfter(pass, out, w.pool) <= Math.max(underCeilingBefore(pass, w.pool), pass.ceiling) + pass.kept.slots,
     ),
+  workLeavesTheKeptMemory: (pass, out) =>
+    pass.machine === null ||
+    pass.waiting.some((w) => w.kept) ||
+    admittedNeed(pass, out) <= Math.max(0, roomOf(pass.machine, pass.holders) - keptFreeBefore(pass)),
   requestsFitTheMachine: (pass, out) =>
     pass.machine === null || admittedNeed(pass, out) <= Math.max(0, pass.machine.totalBytes - pass.machine.reservedBytes - promised(pass)),
   availableCoversTheNewcomers: (pass, out) =>
@@ -723,7 +760,11 @@ const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean>
     pass.waiting.every((w) => {
       const wait = waitOf(out, w.id);
       return (
-        wait?.for !== 'slot' || (wait.pool === w.pool && wait.ceiling === pass.ceiling && inPoolAfter(pass, out, w.pool) >= pass.ceiling)
+        wait?.for !== 'slot' ||
+        (wait.pool === w.pool &&
+          wait.ceiling === pass.ceiling &&
+          underCeilingAfter(pass, out, w.pool) >= pass.ceiling &&
+          (!w.kept || keptTakenAfter(pass, out, w.pool) >= pass.kept.slots))
       );
     }),
   memoryWaitMeansItDidNotFit: (pass, out) =>
@@ -731,8 +772,9 @@ const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean>
       const wait = waitOf(out, w.id);
       if (wait?.for !== 'memory') return true;
       if (pass.machine === null) return false;
-      const left = roomAfter(pass, pass.machine, out);
+      const left = roomAfter(pass, pass.machine, out) - (wait.keptBytes ?? 0);
       return (
+        (wait.keptBytes === undefined || (!w.kept && wait.keptBytes > 0)) &&
         wait.needBytes === w.needBytes &&
         w.needBytes > left &&
         wait.roomBytes >= Math.max(0, left) &&
@@ -744,13 +786,16 @@ const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean>
   stopsAtTheFloorOfAvailableOverTheLimit: (pass, out) => {
     const m = pass.machine;
     const first = pass.waiting[0];
-    if (m === null || first === undefined || pass.holders.length > 0) return true;
+    if (m === null || first === undefined || pass.holders.length > 0 || pass.kept.bytes > 0) return true;
     const need = first.needBytes;
     const alike = pass.waiting.every((w) => w.needBytes === need && w.pool === first.pool);
     if (!alike || need <= 0 || pass.ceiling < pass.waiting.length || m.totalBytes < m.availableBytes) return true;
     return out.admit.length === Math.min(pass.waiting.length, Math.floor(Math.max(0, m.availableBytes - m.reservedBytes) / need));
   },
 };
+
+/** No room kept. */
+const NO_KEPT = { slots: 0, bytes: 0 };
 
 /** A generator of whole numbers from a seed (mulberry32): the same passes on every run. */
 const seeded = (seed: number) => {
@@ -779,15 +824,27 @@ const passes = (seed: number, count: number) => {
   const pick = <T>(xs: readonly T[]) => xs[n(xs.length)] satisfies T;
   const out: AdmissionPass[] = [];
   for (let i = 0; i < count; i++) {
-    const holders: Holder[] = Array.from({ length: n(4) }, () => ({ pool: pick(POOLS), needBytes: pick(NEEDS), running: n(2) === 0 }));
-    const waiting: Waiter[] = Array.from({ length: n(6) }, (_, k) => ({ id: `w${k}`, pool: pick(POOLS), needBytes: pick(NEEDS) }));
-    out.push({ ceiling: 1 + n(3), machine: n(4) === 0 ? null : machine(), holders, waiting });
+    const holders: Holder[] = Array.from({ length: n(4) }, () => ({
+      pool: pick(POOLS),
+      needBytes: pick(NEEDS),
+      running: n(2) === 0,
+      kept: n(3) === 0,
+    }));
+    const waiting: Waiter[] = Array.from({ length: n(6) }, (_, k) => ({
+      id: `w${k}`,
+      pool: pick(POOLS),
+      needBytes: pick(NEEDS),
+      kept: n(3) === 0,
+    }));
+    const kept = n(3) === 0 ? NO_KEPT : { slots: n(3), bytes: n(5) };
+    out.push({ ceiling: 1 + n(3), kept, machine: n(4) === 0 ? null : machine(), holders, waiting });
     const need = 1 + n(4);
     const pool = pick(POOLS);
-    const alike: Waiter[] = Array.from({ length: n(6) }, (_, k) => ({ id: `w${k}`, pool, needBytes: need }));
+    const alike: Waiter[] = Array.from({ length: n(6) }, (_, k) => ({ id: `w${k}`, pool, needBytes: need, kept: false }));
     const m = machine();
     out.push({
       ceiling: alike.length + n(2) + 1,
+      kept: NO_KEPT,
       machine: { ...m, availableBytes: Math.min(m.availableBytes, m.totalBytes) },
       holders: [],
       waiting: alike,
@@ -812,6 +869,8 @@ describe("admitting, the whole pass: each law design wrote of it, and the order 
     assert.ok(answers.some((o) => o.admit.length > 0));
     assert.ok(answers.some((o) => o.waits.some((x) => x.wait.for === 'slot')));
     assert.ok(answers.some((o) => o.waits.some((x) => x.wait.for === 'memory')));
+    assert.ok(answers.some((o) => o.waits.some((x) => x.wait.for === 'memory' && x.wait.keptBytes !== undefined)));
+    assert.ok(all.some((p, i) => p.kept.slots > 0 && p.waiting.some((w) => w.kept && answers[i]?.admit.includes(w.id))));
     assert.ok(all.some((p, i) => p.machine === null && (answers[i]?.admit.length ?? 0) > 0));
     const floorCases = all.filter(
       (p) =>
@@ -840,8 +899,8 @@ describe('admitting and roomOf: the rows a person reads the whole pass by', () =
     }) satisfies MachineMemory;
   test('roomOf: the lesser of the total less the floor and every holder, and the available less the floor and the unseen', () => {
     const holders: Holder[] = [
-      { pool: 'a', needBytes: 3, running: true },
-      { pool: 'b', needBytes: 2, running: false },
+      { pool: 'a', needBytes: 3, running: true, kept: false },
+      { pool: 'b', needBytes: 2, running: false, kept: false },
     ];
     assert.equal(roomOf(machine(16, 11, 1), holders), Math.min(16 - 1 - 5, 11 - 1 - 2));
     assert.equal(roomOf(machine(16, 4, 1), holders), 4 - 1 - 2, 'the available memory the lesser');
@@ -852,13 +911,14 @@ describe('admitting and roomOf: the rows a person reads the whole pass by', () =
   test('a waiter that does not fit is passed by a smaller one behind it, and a need of nothing always fits', () => {
     const out = admitting({
       ceiling: 5,
+      kept: NO_KEPT,
       machine: machine(16, 4, 1),
       holders: [],
       waiting: [
-        { id: 'big', pool: 'a', needBytes: 5 },
-        { id: 'small', pool: 'a', needBytes: 2 },
-        { id: 'next', pool: 'a', needBytes: 2 },
-        { id: 'none', pool: 'a', needBytes: 0 },
+        { id: 'big', pool: 'a', needBytes: 5, kept: false },
+        { id: 'small', pool: 'a', needBytes: 2, kept: false },
+        { id: 'next', pool: 'a', needBytes: 2, kept: false },
+        { id: 'none', pool: 'a', needBytes: 0, kept: false },
       ],
     });
     assert.deepEqual(out.admit, ['small', 'none']);
@@ -870,11 +930,12 @@ describe('admitting and roomOf: the rows a person reads the whole pass by', () =
   test('a full pool says slot before memory, and the room told is never below nothing', () => {
     const out = admitting({
       ceiling: 1,
+      kept: NO_KEPT,
       machine: machine(4, 4, 1),
-      holders: [{ pool: 'a', needBytes: 6, running: true }],
+      holders: [{ pool: 'a', needBytes: 6, running: true, kept: false }],
       waiting: [
-        { id: 'a-1', pool: 'a', needBytes: 1 },
-        { id: 'b-1', pool: 'b', needBytes: 1 },
+        { id: 'a-1', pool: 'a', needBytes: 1, kept: false },
+        { id: 'b-1', pool: 'b', needBytes: 1, kept: false },
       ],
     });
     assert.deepEqual(out.admit, []);
@@ -882,6 +943,121 @@ describe('admitting and roomOf: the rows a person reads the whole pass by', () =
       { id: 'a-1', wait: { for: 'slot', pool: 'a', ceiling: 1 } },
       { id: 'b-1', wait: { for: 'memory', needBytes: 1, roomBytes: 0 } },
     ]);
+  });
+});
+
+describe("toAdmit with room kept for a person's turn: places beyond the ceiling and memory within the room, kept by admission alone", () => {
+  const PERSON = 1000;
+  const working = (id: string, priority?: number, resources?: { requests: { memory: string } }) =>
+    ({
+      id,
+      phase: 'working',
+      state: { harness: 'a', filedAt: at(0), ...(priority !== undefined ? { priority } : {}), ...(resources ? { resources } : {}) },
+    }) satisfies AdmissionView;
+  const asking = (id: string, filed: number, priority?: number, memory?: string) => {
+    const v = queued(id, filed, 'a', priority);
+    return { ...v, state: { ...v.state, ...(memory ? { resources: { requests: { memory } } } : {}) } } satisfies AdmissionView;
+  };
+  const keeping = (ceiling: number, slots: number, bytes = 0, machine?: MachineMemory) =>
+    ({
+      ceiling,
+      poolOf: ownPool,
+      kept: () => ({ priority: PERSON, slots, bytes }),
+      ...(machine ? { machine: () => machine } : {}),
+    }) satisfies AdmissionRule;
+  test("a person's turn takes the kept place beyond a full ceiling; the work behind it waits for a slot", () => {
+    const out = toAdmit([working('w'), asking('work', 1), asking('person', 2, PERSON)], keeping(1, 1));
+    assert.deepEqual(out.admit, ['person']);
+    assert.deepEqual(out.waits, [{ id: 'work', wait: { for: 'slot', pool: 'a', ceiling: 1 } }]);
+  });
+  test("the work keeps its full count while a person's turn runs in the kept place", () => {
+    assert.deepEqual(toAdmit([working('p', PERSON), working('w'), asking('work', 1)], keeping(2, 1)).admit, ['work']);
+  });
+  test("a second person's turn, the kept place taken, waits for a slot but goes ahead of work filed before it", () => {
+    const views = [working('p', PERSON), asking('work', 1), asking('second', 2, PERSON)];
+    const full = toAdmit([...views, working('w')], keeping(1, 1));
+    assert.deepEqual(full.admit, []);
+    assert.deepEqual(
+      full.waits.map((w) => w.id),
+      ['second', 'work'],
+      'in turn: the person first',
+    );
+    assert.deepEqual(toAdmit(views, keeping(1, 1)).admit, ['second'], 'a place under the ceiling free: the person takes it first');
+  });
+  test("the kept memory is withheld from the work and given to a person's turn", () => {
+    const machine = { totalBytes: 64 * GI, availableBytes: 5 * GI, reservedBytes: GI };
+    const rule = keeping(5, 1, 2.5 * GI, machine);
+    const work = toAdmit([asking('work', 1, undefined, '2Gi')], rule);
+    assert.deepEqual(work.waits, [{ id: 'work', wait: { for: 'memory', needBytes: 2 * GI, roomBytes: 1.5 * GI, keptBytes: 2.5 * GI } }]);
+    assert.deepEqual(toAdmit([asking('person', 1, PERSON, '2Gi')], rule).admit, ['person']);
+  });
+  test("a person's turn at work uses the kept memory up first, so the work sees the whole room left", () => {
+    const machine = { totalBytes: 64 * GI, availableBytes: 7.5 * GI, reservedBytes: GI };
+    const views = [working('p', PERSON, { requests: { memory: '2560Mi' } }), asking('work', 1, undefined, '2Gi')];
+    assert.deepEqual(toAdmit(views, keeping(5, 1, 2.5 * GI, machine)).admit, ['work']);
+  });
+  test("the machine's memory all promised to sessions at work and every place free: a person's answer starts on the next pass from the kept room, and the work still waits", () => {
+    const machine = { totalBytes: 16 * GI, availableBytes: 16 * GI, reservedBytes: 2 * GI };
+    const busy = [1, 2, 3].map((k) => working(`w${k}`, 0, { requests: { memory: '3584Mi' } }));
+    const answered = {
+      ...asking('intake', 0, 0, '2Gi'),
+      state: { ...asking('intake', 0, 0, '2Gi').state, inputs: [{ priority: PERSON }] },
+    } satisfies AdmissionView;
+    const out = toAdmit([...busy, asking('build', 1, 1, '2Gi'), answered], keeping(6, 1, 2.5 * GI, machine));
+    assert.deepEqual(out.admit, ['intake']);
+    assert.equal(out.waits.find((w) => w.id === 'build')?.wait.for, 'memory');
+  });
+  test("an answered turn goes at its answer's priority: filed at 0 and answered at a person's, it is admitted before work filed earlier at 1", () => {
+    const answered = { ...queued('held', 5), state: { ...queued('held', 5).state, inputs: [{}, { priority: PERSON }] } };
+    assert.deepEqual(toAdmit([answered, queued('work', 1, 'a', 1)], under(1)).admit, ['held']);
+    const plain = { ...queued('held', 5), state: { ...queued('held', 5).state, inputs: [{ priority: PERSON }, {}] } };
+    assert.deepEqual(toAdmit([plain, queued('work', 1, 'a', 1)], under(1)).admit, ['work'], 'its last answer gave none: its filing');
+  });
+  test('an engine unschedulable says so of every queued task, and with no ceiling it still says nothing', () => {
+    const views = [queued('a-1', 1), queued('a-2', 2), working('w')];
+    const paused = toAdmit(views, { ...under(5), unschedulable: () => true });
+    assert.deepEqual(paused, {
+      admit: [],
+      waits: [
+        { id: 'a-1', wait: { for: 'unschedulable' } },
+        { id: 'a-2', wait: { for: 'unschedulable' } },
+      ],
+    });
+    assert.deepEqual(toAdmit(views, { poolOf: ownPool, unschedulable: () => true }), { admit: [], waits: [] });
+  });
+  test('no room kept, or a rule that answers none: a pass is what it was', () => {
+    const views = [working('p', PERSON), working('w'), asking('work', 1), asking('person', 2, PERSON)];
+    const plain = toAdmit(views, under(2));
+    assert.deepEqual(toAdmit(views, { ...under(2), kept: () => undefined }), plain);
+    assert.deepEqual(toAdmit(views, keeping(2, 0)), plain);
+    assert.deepEqual(plain.admit, []);
+  });
+});
+
+describe('keptRoom: an engine keeps room only as given, and refuses what it cannot hold', () => {
+  const builds = (keptRoom: unknown) => () =>
+    builtEngine(
+      Engine.layer({
+        root: scratch('ae-admission-root-'),
+        journal: asyncStore(memoryJournal()),
+        keptRoom: keptRoom as EngineOptions['keptRoom'],
+      }),
+    );
+  for (const [name, given] of [
+    ['a priority beyond int32', { priority: 2 ** 31, sessions: 1 }],
+    ['a priority not whole', { priority: 1.5, sessions: 1 }],
+    ['sessions below nothing', { priority: 1000, sessions: -1 }],
+    ['a memory no quantity', { priority: 1000, sessions: 1, memory: 'lots' }],
+    ['a key it does not take', { priority: 1000, sessions: 1, slots: 1 }],
+  ] as const) {
+    test(`REFUSED: ${name}`, () => assert.throws(builds(given), (err: Error) => err.message.includes('keptRoom')));
+  }
+  test('held: the rule keeps its places and its memory in bytes', () => {
+    const rule = Effect.runSync(
+      Effect.provide(Effect.service(Admission), admissionOf({ root: '/r', keptRoom: { priority: 1000, sessions: 2, memory: '1Gi' } }, {})),
+    );
+    assert.deepEqual(rule.kept?.(), { priority: 1000, slots: 2, bytes: GI });
+    builds({ priority: 1000, sessions: 0 })();
   });
 });
 

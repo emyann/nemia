@@ -20,6 +20,7 @@
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
+import { MOMENTUM } from '../src/status/status.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -2417,6 +2418,7 @@ describe('`nemia refresh --base` of the base into the work: refused where nothin
       await at.pass(id);
       const unsigned = 'A closeout without it, or with an empty list, is unsigned.';
       assert.ok(tasks.get(`${id}-implement-try2`)!.spec.brief.includes(unsigned), 'round 2 of a round owes its replies');
+      assert.equal(tasks.get(`${id}-implement-try2`)!.spec.priority, MOMENTUM, "a loop's own round goes at its momentum");
       settle(`${id}-implement-try2`, 'succeeded', { ...SIGNED, replies: [{ finding: 'sub', answer: 'fixed', why: 'kept it' }] });
       await at.pass(id);
       settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: true });
@@ -2426,6 +2428,7 @@ describe('`nemia refresh --base` of the base into the work: refused where nothin
       assert.deepEqual((await at.pass(id)).looped, ['review']);
       assert.equal(roundOf(runRecord(ROOT, id), 'review'), 2);
       const brief = tasks.get(`${id}-implement-try3`)!.spec.brief;
+      assert.equal(tasks.get(`${id}-implement-try3`)!.spec.priority, MOMENTUM, 'a merge round goes at its momentum');
       assert.ok(brief.includes('You were handed no findings this round.'), brief);
       assert.ok(!brief.includes(unsigned), brief);
       settle(`${id}-implement-try3`, 'succeeded', { ...SIGNED, replies: [] });

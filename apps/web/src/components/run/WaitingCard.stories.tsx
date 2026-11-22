@@ -50,6 +50,7 @@ const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number)
   approve: null,
   denied: null,
   sessionUnread: null,
+  queuedFor: null,
   lastLine: null,
   gate: null,
   said: [],

@@ -44,6 +44,10 @@ const RUNS = {
     stepOf(CODES.work, [tryOf(1, CODES.refused, true, { ...PLAN, summary: 'A first plan.' }, false), tryOf(2, CODES.work, false, null)]),
   ),
   checked: runOf(checkedBy(stepOf(CODES.refused, [tryOf(1, CODES.refused, true, PLAN)]))),
+  queued: runOf({
+    ...stepOf(CODES.work, [tryOf(1, CODES.work, false, null)]),
+    queuedFor: { task: 'session', wait: { for: 'memory', needBytes: 2 * 2 ** 30, roomBytes: 1.5 * 2 ** 30, keptBytes: 2.5 * 2 ** 30 } },
+  }),
 } as const;
 
 const ROW: CSSProperties = { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 32 };
@@ -114,6 +118,19 @@ export const AtWorkSpending: StoryObj<{ run: RunDetail }> = {
     const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
     await expect(card.querySelector('[data-step-spend="words"]')?.textContent).toMatch(/^Spent\s*\$32\.32 so far/);
     await expect(card.textContent).not.toMatch(/not measured yet/);
+  },
+};
+
+/**
+ * A step filed and waiting to start: its head says why, here memory, with what is kept for a person's turn. Drawn from its args, the
+ * run.
+ */
+export const WaitingToStart: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.queued },
+  render: ({ run }) => <Sizes run={run} />,
+  play: async ({ canvasElement }) => {
+    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
+    for (const fact of ['waits for memory', '2Gi', '1.5Gi', '2.5Gi']) await expect(card.textContent).toContain(fact);
   },
 };
 

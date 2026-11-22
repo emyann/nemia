@@ -352,6 +352,11 @@ the peaks measured, never by guess: `nemia stats` says, for each workflow step, 
 what they asked and how many peaked above it, and a run's step page says each try's peak beside its request and limit. A peak is kept
 only for a session run under a memory limit (`WF_MEMORY_LIMIT`, or a step's `memory:`); Nemia sets no number from it. To size it:
 
+Room is kept for a turn a person waits on: the next turn after they answer a step, a `nemia retry` or `--round` they ask for, and an
+upgrade they start. `WF_KEPT_TURNS` (default 1, 0 for none) keeps that many places per pool beyond `WF_MAX_CONCURRENT`, and as many
+of a session's ask of the memory, which no other work is admitted into, so a person's answer starts on the next pass while builds hold
+the rest. With it, the sessions at once can reach `WF_MAX_CONCURRENT` plus `WF_KEPT_TURNS` per pool; `nemia up` says the bound.
+
 1. **Read whether it fits**: `nemia doctor`. Its `memory-fit` piece says how many sessions fit, and what to set.
 2. **Size it**, either by `nemia service install --size auto`, which writes `WF_MAX_CONCURRENT`, `WF_MEMORY_LIMIT` and
    `WF_MEMORY_REQUEST` for this machine (`--env` keeps what you give it), or by setting `WF_MEMORY_REQUEST` yourself, in the unit's

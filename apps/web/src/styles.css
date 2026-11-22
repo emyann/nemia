@@ -44,7 +44,7 @@
 
 @layer base {
   html {
-    @apply scroll-pt-12;
+    scroll-padding-top: var(--frame-top);
   }
 
   body {
@@ -288,7 +288,8 @@
  * `--frame-top`; under it the frame's lines (a newer release, the setup banner, a refused link), as tall as `--frame-lines`, which the
  * frame measures and sets on the column the page stands in (`__root.tsx`); and at the window's foot the machine bar (`MachineBar.tsx`), as
  * tall as `--frame-foot`. A page that fills the window is `100svh` less the three. What stands in the page's column and is brought into
- * view, by a focus or by `scrollIntoView`, stops above the machine bar, which stays over the window's foot (`scroll-margin-bottom`); a
+ * view, by a focus or by `scrollIntoView`, stops under the page's head, which stays over the window's top (the window's
+ * `scroll-padding-top`, the head's own height), and above the machine bar, which stays over the window's foot (`scroll-margin-bottom`); a
  * popover, portaled over the frame and the bar alike, keeps the window's whole height.
  */
 :root {

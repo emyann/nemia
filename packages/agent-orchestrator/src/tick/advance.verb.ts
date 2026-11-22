@@ -150,9 +150,9 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   `timedOnce`).
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
  *   branch a person deleted after its merge is on the base (`BranchReader.landed`).
- * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
- *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `nemia pause --now` wrote that is
- *   void on this pass (`pauseAsksVoid`) is consumed with them, paused or not.
+ * - writes the record only where the pass changed it and only while it is there, and sets the asks it holds aside under `done/` in the
+ *   same transaction (the Run door's `runs.settle`), never apart: a pass that died before settling leaves both for the next. An ask `nemia
+ *   pause --now` wrote that is void on this pass (`pauseAsksVoid`) is set aside with them, paused or not.
  *
  * A try goes on in the workspace and on the branch the step had, under its next try's id; an ending the work is sent back from moves behind
  * in the same write, so it waits for the work again (`sentBack`). A try of a step whose task has not settled — its session blocked by its

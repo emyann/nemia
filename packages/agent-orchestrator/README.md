@@ -1906,14 +1906,15 @@ retries: 1
   that judges a blocked step compares the engine's `needs-human` exactly (`harnessBlocked`, the api's `needsOf`,
   the board's chip), so only what `wf ls` prints gains the word. A harness that says nothing — codex,
   which reports no blocked session at all — leaves the line as it was.
-- **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
-  exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
-  writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived
-  (`<run>-<step>-try<n>`, `<run>-<step>-try<n>-check`). So a pass that dies after filing a try is adopted by
-  the next, and a pass that dies before consuming the ask leaves the try on the record, where the ask is
-  spent and files nothing. A file at an ask's name that does not read as one (`{}`, a hand edit) is honoured by
-  no pass, and `wf ls` shows nothing asked. So `wf retry` refuses to write over it, and the refusal names the
-  file and says to delete it. `nemia retry --round` does the same.
+- **An ask is a record of the store, beside the run's.** `wf retry` creates the ask `retry-<step>-<n>` among the
+  run's asks in the store's keyspace (`<root>/db/state.db`), never over one there, and never writes the run's
+  record. Every pass reads the run's asks. The next pass files try `n`, then writes the record and sets the ask
+  aside under `done/` in one transaction (the Run door's `settle`). The ask names its try, and a try's ids are
+  derived (`<run>-<step>-try<n>`, `<run>-<step>-try<n>-check`). So a pass that dies after filing a try leaves
+  the ask waiting, and the next pass adopts the try it filed rather than filing another. A record at an ask's
+  name that does not read as one is honoured by no pass, and `wf ls` shows nothing asked. So `wf retry` refuses
+  to write over it, and the refusal names its key. `nemia retry --round` does the same. A store's older ask
+  files are imported once, and one that does not read as an ask stays a file, said in the log.
 - **A step that asks gets an answer: `--message "<answer>"`.** A session nobody sits beside has no
   AskUserQuestion and no plan mode (plan §4 Q), so a step that needs a person asks the run's way: it signs off
   `blocked`, with the question in `needs`, which ends its session and puts the question on the record. The
@@ -2127,7 +2128,7 @@ codex:
 - **At the cap, a person — and they have two answers.** `again: true` on the last round files nothing:
   the step reads `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS
   EXHAUSTED`, prints the last findings and offers both. **Once more** is `nemia retry <run> --round`. Like
-  any try, it writes an ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It
+  any try, it writes an ask, the record `round-<step>-<n>` among the run's asks, which the next tick honours once. It
   is refused while a round is running, while the run would go round itself, on a loop that ended with
   `again: false`, on a step of the loop that stopped (that is a try's, without `--round`), and on a cancelled run.
 - **Enough: `nemia approve <run> [<step>] --message "<why>"`**, the approval of a loop out of rounds. A reviewer that finds anything says `again:
@@ -2135,7 +2136,7 @@ codex:
   judged them follow-up work says so, and the steps that wait on the looping step are filed as if it had
   said `again: false` — so a gated ending goes to its gate, `awaiting approval`, and is approved or not
   as ever. The words are not optional: an acceptance is nothing but its reason. It writes
-  `runs/<id>.asks/accept-<step>-<try>`, whole and exclusively, beside the round asks, and the tick reads
+  the ask `accept-<step>-<try>` among the run's, never over one there, beside the round asks, and the tick reads
   it with the run on every pass and never copies it into the record — level-triggered, like an approval.
   The step is named where a folder has several loops, and guessed where it has one. It is keyed by the
   looping step's *try*, not by its round, so a send-back spends it as it spends an approval: the loop is
@@ -2876,9 +2877,9 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   merging its branch is not the approval. No session runs, no run slot is held (`WF_MAX_RUNS`) and nothing is spent while it
   waits. A step that signs off blocked or unsigned, or that its check refuses, is not at its gate: it reads what it reads. Nor is a
   looping step that asks for another round (`again: true`): the gate is on what comes after it, and a round is its loop's.
-- **`wf approve <run> <step> [--message "<words>"]`** writes `runs/<id>.asks/approve-<step>-<try>`, whole and exclusively, beside
+- **`wf approve <run> <step> [--message "<words>"]`** writes the ask `approve-<step>-<try>` among the run's, never over one there, beside
   the retry asks: the try it approves, the time and the words — and nothing else. The tick reads approvals with the run on every
-  pass, as it reads a cancellation, and never copies one into the record; the file stays where it was written while it opens the
+  pass, as it reads a cancellation, and never copies one into the record; the ask stays where it was written while it opens the
   gate, and the next tick files what waits. Refused by name, exit 2, with nothing written: a run not there, a step the run does not
   have, a cancelled run, a step not gated — naming the gates there are — one not signed off yet, each status with what to do instead,
   the try already approved, empty words, and a send-back already asked for, which would spend the approval at once. A file at the
@@ -4555,10 +4556,9 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 
 | path | what it is | written by | `wf rm` |
 |---|---|---|---|
-| `runs/<id>.json` | the run's record | `wf start`; the tick, while it exists | removed, first of its files |
+| `db/state.db`, its `-wal` and `-shm` | the store's keyspace: each run's record, the claim it holds on its card, and its asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent under `done/` | `wf start`, `wf retry` (and `--round`), `wf approve`; the tick, while the run's record exists | the run's records removed, its record first |
 | `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
 | `runs/<id>.pruned` | when `wf prune` removed its worktrees, and each with its size | `wf prune` | removed |
-| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry` (and `--round`), `wf approve`; the tick moves them | removed |
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
 | `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
@@ -4932,7 +4932,8 @@ for the same reason, and so does the `wf` command.
 
 | path | |
 |---|---|
-| `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds |
+| `db/state.db` | the store's keyspace: a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it the claim it holds on its card and a person's asks — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds; a person's markers stay files in `runs/`: `<id>.cancelled` and the rest |
+| `imported/` | a store's run files from before the keyspace (`runs/<id>.json`, `runs/<id>.asks/`, `started/<card>.json`), moved aside once imported, never deleted |
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`, and `inputs/cards/` for `--card`) and `artifacts/<step>/`, each mounted read-only on the steps of a run handed this one (`--from`); a folder run's (`place: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |

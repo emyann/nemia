@@ -113,7 +113,7 @@ export const INBOX_ADD: Served<{ card: InboxCard; file: string; labelsLeftOut?: 
   handler: ({ idea, label, files, ...keys }) =>
     Effect.gen(function* () {
       const named = ideaFactory(idea);
-      if (named !== undefined && named !== keys.factory)
+      if (named !== undefined && named !== (keys.factory ?? DEFAULT_NAMESPACE))
         return yield* Effect.fail(new Invalid({ message: namespaceRefusal(named, keys.factory) }));
       const kept = files === undefined ? undefined : yield* filesKept(keys.factory ?? DEFAULT_NAMESPACE, files);
       return yield* addToInbox({ text: idea, ...keys, labels: [...(label ?? [])], ...(kept !== undefined ? { files: kept } : {}) });

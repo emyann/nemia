@@ -121,7 +121,7 @@ describe("a card's files reach the run started from it", () => {
     const { run } = await runPlaced(startFromInbox({ name, callerRepo: repo, isolate: false }));
     assert.deepEqual(fs.readFileSync(path.join(inputsDir(ROOT, runRecord(ROOT, run.id)), 'shot.png')), bytes);
   });
-  test('REFUSED: an idea whose factory: is not the namespace it is filed in, nothing filed, naming where to file it', async () => {
+  test('REFUSED: an idea whose factory: is not the namespace it is filed in, nothing filed, naming where to file it; one naming default by name is filed there', async () => {
     const file = kept(Buffer.from('pic'));
     fs.mkdirSync(inboxDir(ROOT), { recursive: true });
     const before = fs.readdirSync(inboxDir(ROOT)).sort();
@@ -135,5 +135,7 @@ describe("a card's files reach the run started from it", () => {
       (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message.includes('/api/namespaces/elsewhere/cards'),
     );
     assert.deepEqual(fs.readdirSync(inboxDir(ROOT)).sort(), before, 'no card is filed');
+    const named = await served(INBOX_ADD.handler({ idea: '---\nfactory: default\n---\nFiled where it says\n' }));
+    assert.equal(named.card.factory ?? 'default', 'default', 'an idea naming the default factory by name is filed in default');
   });
 });

@@ -628,7 +628,7 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
   );
   s.test("the check is handed the step's closeout as a file, flat, a declared field at the top level beside the four", () => {
     const file = b.tasks.get(check1())!.spec.config?.env?.WF_CLOSEOUT ?? '';
-    assert.deepEqual(JSON.parse(recordText(ROOT, file) ?? ''), {
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
       outcome: 'done',
       summary: 'did it',
       artifacts: [],

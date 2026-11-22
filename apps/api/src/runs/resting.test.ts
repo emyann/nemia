@@ -666,7 +666,8 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
           "the route's check that the run's journal reads (`viewsFor`), and no view more: the hold is answered off the runs it is held until",
         );
       } finally {
-        for (const file of ['r-held.json', 'r-held.hold']) fs.rmSync(path.join(root, 'runs', file));
+        dropRecord(root, runKey('r-held'));
+        fs.rmSync(path.join(root, 'runs', 'r-held.hold'));
       }
     },
   );

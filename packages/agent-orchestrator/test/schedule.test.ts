@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
-import { listRuns, runRecord, runsNow } from '../testing.ts';
+import { emptyRuns, listRuns, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
@@ -91,13 +91,14 @@ const aTeamRepo = () => {
 };
 
 /**
- * A store with no runs, cards, tries, pause or factories, then the factory `solo` on a repository of its own, attaching the team's `dev`,
- * and the clock at `now`. The cap as given: `undefined` unsets it.
+ * A store with no runs (their records emptied: the keyspace keeps them), cards, tries, pause or factories, then the factory `solo` on a
+ * repository of its own, attaching the team's `dev`, and the clock at `now`. The cap as given: `undefined` unsets it.
  */
 const aStore = (t: Finishes, now: string, cap?: string) => {
   for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }
+  emptyRuns(ROOT);
   ENV.WF_MAX_RUNS = cap;
   vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
   const repo = aTeamRepo();

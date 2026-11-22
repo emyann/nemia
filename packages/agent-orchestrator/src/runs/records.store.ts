@@ -4,8 +4,7 @@
  * transaction: a run and its claim (`create`); the pass's record and the asks it answers (`settle`); a run's removal with its claim and
  * asks (`forget`); an approval taken back (`takeBack`). A person's markers beside a run (its cancellation, pruning, hold, labels, what was
  * said before a step was filed, a refresh ask, `nemia rm`'s marker) stay files (`src/record/files.store.ts`), read and written through
- * `fromThrow`, and composed onto each run read. A pass's meter counts the record written and the asks set aside each as one `act`, as it
- * counted their files, settled in one transaction all the same.
+ * `fromThrow`, and composed onto each run read.
  *
  * A store kept before its runs were records has its run files, ask files and claims imported the first time a process opens it
  * (`runsImported`, `runKeyspace`): each run's in one transaction, a key already held never written over, every file read then moved
@@ -25,7 +24,6 @@ import {
   type KeyTxn,
 } from '../keyspace/keyspace.store.ts';
 import { mergeSpent } from '../merge/merge.ts';
-import { withinEffect } from '../meter/tally.store.ts';
 import { pauseStands, readPause } from '../pause/pause.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
@@ -55,6 +53,7 @@ import {
   acceptanceIn,
   answersIn,
   askIn,
+  asksCounted,
   roundAskIn,
   approvalIn,
   approvalsIn,
@@ -454,28 +453,22 @@ function runWrites(home: string, open: Opened, held: Held) {
     create: createdRun(open),
     rewrite: (run) =>
       Effect.flatMap(open, (ks) =>
-        withinEffect(
-          'act',
-          ks.write(runKey(run.id), overwrite(recordValue(run))).pipe(
-            Effect.as(true),
-            Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(raced(err)))),
-          ),
+        ks.write(runKey(run.id), overwrite(recordValue(run))).pipe(
+          Effect.as(true),
+          Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(raced(err)))),
         ),
       ),
     settle: (run, spent) =>
       Effect.flatMap(open, (ks) =>
-        withinEffect(
-          'act',
-          racedOn(
-            ks.within((tx) =>
-              Effect.gen(function* () {
-                if ((yield* tx.get(runKey(run.id))) === undefined) return false;
-                if (spent.write) yield* withinEffect('act', tx.write(runKey(run.id), overwrite(recordValue(run))));
-                const waiting = waitingOf(run.id, yield* tx.list(asksPrefix(run.id)));
-                yield* setAside(tx, run.id, spentNames(run, spent.asks, spent.rounds, spent.voided ?? [], waiting));
-                return true;
-              }),
-            ),
+        racedOn(
+          ks.within((tx) =>
+            Effect.gen(function* () {
+              if ((yield* tx.get(runKey(run.id))) === undefined) return false;
+              if (spent.write) yield* tx.write(runKey(run.id), overwrite(recordValue(run)));
+              const waiting = waitingOf(run.id, yield* tx.list(asksPrefix(run.id)));
+              yield* setAside(tx, run.id, spentNames(run, spent.asks, spent.rounds, spent.voided ?? [], waiting));
+              return true;
+            }),
           ),
         ),
       ),
@@ -519,26 +512,23 @@ function askWritten(open: Opened) {
 function askMethods(open: Opened, held: Held) {
   const { asksOf } = keyReads(held);
   const asks: Shape['asks'] = {
-    read: (id) => Effect.map(asksOf(id), (records) => allAsksIn(waitingOf(id, records))),
-    answers: (id) => Effect.map(asksOf(id), (records) => answersIn(allOf(id, records))),
+    read: (id) => asksCounted(Effect.map(asksOf(id), (records) => allAsksIn(waitingOf(id, records)))),
+    answers: (id) => asksCounted(Effect.map(asksOf(id), (records) => answersIn(allOf(id, records)))),
     write: askWritten(open),
     where: (id, key) => Effect.succeed(askKey(id, key)),
     takeBack: (id, step, n, takenBack) =>
       Effect.flatMap(open, (ks) =>
-        withinEffect(
-          'act',
-          racedOn(
-            ks.within((tx) =>
-              Effect.gen(function* () {
-                const name = askName({ of: 'gate', step, n });
-                const at = yield* tx.get(askKeyOf(id, name));
-                if (at === undefined || typeof approvalIn(at.value, step, n) === 'string') return null;
-                const held = heldText(at.value);
-                const said = 'read' in held && held.read !== null && typeof held.read === 'object' ? held.read : {};
-                const [done] = yield* setAside(tx, id, [name], () => JSON.stringify({ ...said, takenBack }));
-                return done ?? null;
-              }),
-            ),
+        racedOn(
+          ks.within((tx) =>
+            Effect.gen(function* () {
+              const name = askName({ of: 'gate', step, n });
+              const at = yield* tx.get(askKeyOf(id, name));
+              if (at === undefined || typeof approvalIn(at.value, step, n) === 'string') return null;
+              const held = heldText(at.value);
+              const said = 'read' in held && held.read !== null && typeof held.read === 'object' ? held.read : {};
+              const [done] = yield* setAside(tx, id, [name], () => JSON.stringify({ ...said, takenBack }));
+              return done ?? null;
+            }),
           ),
         ),
       ),

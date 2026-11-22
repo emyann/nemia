@@ -134,14 +134,14 @@ const asked = (run: string) => {
   return askNames(root, run).sort();
 };
 
-/** A file the run wrote, its words but when and who wrote it (`actorIn`). */
+/** What the run wrote at the key `file`, its words but when and who wrote it (`actorIn`). */
 const written = (file: string) => {
-  const { at: _when, actor: _who, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  const { at: _when, actor: _who, ...rest } = JSON.parse(recordText(root, file) ?? '') as Record<string, unknown>;
   return rest;
 };
 
-/** Who a file the run wrote says wrote it: the caller over the api, none for a verb run in-process. */
-const actorIn = (file: string) => (JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>).actor;
+/** Who what the run wrote at the key `file` says wrote it: the caller over the api, none for a verb run in-process. */
+const actorIn = (file: string) => (JSON.parse(recordText(root, file) ?? '') as Record<string, unknown>).actor;
 
 /** A removal on the board, as its run page sends it. */
 const remove = (id: string) => app.request(`/api/namespaces/default/runs/${id}`, { method: 'DELETE', headers: BOARD, body: '{}' });

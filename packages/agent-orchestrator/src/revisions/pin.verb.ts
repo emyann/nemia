@@ -581,10 +581,13 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
 /**
  * What a pass owes the store once it has decided: the record, written where this pass or the pins changed it, with the asks it answers set
  * aside, in one transaction (`runs.settle`); and then the refresh ask the pins answered, lifted — in that order, so an ask is never spent
- * on a record that was not written.
+ * on a record that was not written. The meter counts the asks set aside as one act and the record written as another, as it counted their
+ * files.
  */
 export const pinsWritten = Effect.fn('pinsWritten')(function* (run: Run, took: PinnedPass, wrote: boolean, spent: Omit<Spent, 'write'>) {
   const door = yield* RunDoor;
-  yield* door.runs.settle(run, { ...spent, write: wrote || took.wrote });
+  const write = wrote || took.wrote;
+  const settled = door.runs.settle(run, { ...spent, write });
+  yield* withinEffect('act', write ? withinEffect('act', settled) : settled);
   if (took.lift) yield* door.refresh.lift(RunId.read(run.id));
 });

@@ -5,7 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
-import { plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import { dropRecord, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -298,5 +298,5 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   const again = await rmTyped(t, b.e, run.id);
   assert.deepEqual([again.printed, again.error?.exitCode], [[`${run.id}  no such run — nothing to forget`], 2]);
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "with no record, still not another stored run's");
-  fs.rmSync(path.join(ROOT, 'runs', `${run.id}-x2.json`));
+  dropRecord(ROOT, runKey(`${run.id}-x2`));
 });

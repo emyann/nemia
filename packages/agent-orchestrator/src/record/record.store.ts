@@ -8,7 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Option, Result, Schema } from 'effect';
+import { Option, Result, Schema, type Effect } from 'effect';
 import { Actor, refusedIn } from 'objects';
 import {
   BY_CAP,
@@ -33,7 +33,7 @@ import { inputsRoot } from './places.store.ts';
 import type { AsksRead, SaidBefore } from './record.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
-import { countRead, countRecord, readText, within } from '../meter/tally.store.ts';
+import { countRead, countRecord, readText, within, withinEffect } from '../meter/tally.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 import { isFilePath } from '../artifacts/artifacts.ts';
@@ -645,6 +645,13 @@ const RetryAskFileSchema = Kept({
   interrupted: Schema.optionalKey(Schema.NonEmptyString),
   at: Schema.optionalKey(Schema.Unknown),
 });
+
+/**
+ * `program`, a read of a run's asks, counted as one call of `asks` while a pass is metered, each ask it reads counted inside it: as their
+ * folder's walk was counted.
+ * @param program The read of the run's asks.
+ */
+export const asksCounted = <A, E, R>(program: Effect.Effect<A, E, R>) => withinEffect('asks', program);
 
 /**
  * An ask's JSON, or why it cannot be read.

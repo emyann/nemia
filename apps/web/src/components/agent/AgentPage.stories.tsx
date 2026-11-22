@@ -1,4 +1,6 @@
 import { Suspense } from 'react';
+import { http, HttpResponse } from 'msw';
+import type { FactoryList } from 'objects';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
@@ -46,5 +48,16 @@ export const Yours: Story = {
   },
 };
 
-/** The repository's: read-only, and copied to yours to be tried. */
-export const Theirs: Story = { args: { from: 'repo', name: 'critic' }, parameters: { a11y: { test: 'todo' } } };
+/** The repository's: read-only, and copied to yours to be tried, no factory listed to read its repository from. */
+export const Theirs: Story = {
+  tags: ['network'],
+  args: { from: 'repo', name: 'critic' },
+  parameters: {
+    a11y: { test: 'todo' },
+    msw: [
+      http.get('/api/factories', () =>
+        HttpResponse.json({ apiVersion: 'nemia/v1', kind: 'FactoryList', metadata: {}, items: [] } satisfies FactoryList),
+      ),
+    ],
+  },
+};

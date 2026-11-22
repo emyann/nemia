@@ -2,21 +2,25 @@
  * Runs every story in the pinned place, compared against its approved picture: `npm run stories [-- [--update] [<file>…]]`, from
  * `apps/web`, which runs `node test/e2e/stories/pinned.ts`.
  *
- * The pinned place is where CI's `e2e-look` job and a step's server both draw: Ubuntu 24.04 on x64, Chromium the build the lockfile's
+ * The pinned place is where CI's `e2e-stories` job and a step's server both draw: Ubuntu 24.04 on x64, Chromium the build the lockfile's
  * `playwright` installs (`npx playwright install chromium`), the board's faces from npm (`@fontsource`), and the stories project's own
  * window, zone, locale, clock and motion (`vitest.config.ts`, `.storybook/compare.ts`). There the stories project compares each story
  * against its approved picture (`STORIES_PINNED=1`, `.storybook/approved.ts`), and `--update` writes the pictures that differ, to commit
  * with the change. Anywhere else a picture would be the machine's and not the change's: on a person's machine or a step's the stories
  * run with no comparison, and this says why first; under CI (`CI` set) it refuses, exit 2, naming the runner to pin, since a CI job
- * that compared nothing would pass green while checking nothing (`placeVerdict`). CI's `e2e-look` job runs on `ubuntu-24.04`, the
- * runner this place names, held by `test/e2e-look.test.ts`.
+ * that compared nothing would pass green while checking nothing (`placeVerdict`). CI's `e2e-stories` job runs on `ubuntu-24.04`, the
+ * runner this place names, held by `test/e2e-look.test.ts`. Before it starts them it says how many story files run at once, the storybook
+ * project's bound (`storiesWorkersOf`, `.storybook/workers.ts`, which `vitest.config.ts` reads too), so a log says what its time was
+ * measured at.
  *
  * Each `<file>` is a story file, from `apps/web`, to run alone. It exits as Vitest exits.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { STORIES_WORKERS, storiesWorkersOf } from '../../../.storybook/workers.ts';
 
 /** The variable that turns the comparison on (`vitest.config.ts`). */
 const PINNED = 'STORIES_PINNED';
@@ -82,9 +86,16 @@ function run() {
     );
     process.exit(2);
   }
-  if (why) console.warn(`stories: compared against no approved picture, since ${why}; CI's e2e-look job compares them`);
+  if (why) console.warn(`stories: compared against no approved picture, since ${why}; CI's e2e-stories job compares them`);
   else if (update)
     console.log('stories: in the pinned place, writing the approved pictures that differ (test/approved): commit them with the change');
+  const cores = os.availableParallelism();
+  const bound = storiesWorkersOf({ ci: Boolean(process.env.CI), asked: process.env[STORIES_WORKERS], cores });
+  if (bound.kind === 'refused') {
+    console.error(`stories: ${bound.message}`);
+    process.exit(2);
+  }
+  console.log(`stories: ${bound.workers} story file${bound.workers === 1 ? '' : 's'} at a time, on a machine of ${cores} cores`);
   const ran = spawnSync('npx', ['vitest', 'run', '--project=storybook', ...files, ...(update && !why ? ['--update'] : [])], {
     cwd: WEB,
     stdio: 'inherit',

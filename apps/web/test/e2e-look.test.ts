@@ -71,7 +71,7 @@ test("the e2e script is the runner alone, so npm appends --pages to it, and the 
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
   assert.match(
     runner,
-    /const plan = planOf\(process\.argv\.slice\(2\), pages\);\s*if \(plan\.look\) await lookTests\(children\);[^]*?build\(\);/,
+    /const plan = planOf\(process\.argv\.slice\(2\), pages\);\s*if \(plan\.look\) await lookTests\(children, plan\.stories\);[^]*?build\(\);/,
   );
 });
 
@@ -80,7 +80,7 @@ test('REFUSED: the old script, which ran every look test past any --pages', () =
   assert.equal(scriptBreaks('vitest run --project=look && node test/e2e/run.ts').length, 1);
 });
 
-test("--look runs the stories' Vitest after the look's node tests, the stories script being the storybook project's run in the pinned place", () => {
+test("a whole run runs the stories' Vitest after the look's tests, --look never, the stories script being the storybook project's run in the pinned place", () => {
   assert.deepEqual(
     LOOK_RUNS.map((run) => run.what),
     ['tests', 'stories'],
@@ -110,10 +110,17 @@ const runnerOf = (workflow: string, job: string) => {
   return /\n    runs-on: (\S+)/.exec(next ? rest.slice(0, next.index) : rest)?.[1] ?? null;
 };
 
-test("CI's e2e-look job runs on the pinned place's runner, and a CI not in the pinned place refuses rather than compare nothing", () => {
+test("CI's e2e-look and e2e-stories jobs run on the pinned place's runner, and a CI not in the pinned place refuses rather than compare nothing", () => {
   const ci = fs.readFileSync(path.join(PACKAGE, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
-  assert.equal(runnerOf(ci, 'e2e-look'), `${SYSTEM.id}-${SYSTEM.version}`);
-  assert.equal(runnerOf(ci.replace(`runs-on: ${SYSTEM.id}-${SYSTEM.version}`, 'runs-on: ubuntu-latest'), 'e2e-look'), 'ubuntu-latest');
+  const pinned = `${SYSTEM.id}-${SYSTEM.version}`;
+  assert.equal(runnerOf(ci, 'e2e-look'), pinned);
+  assert.equal(runnerOf(ci, 'e2e-stories'), pinned);
+  const planted = (job: string) => {
+    const at = ci.indexOf(`\n  ${job}:\n`);
+    return ci.slice(0, at) + ci.slice(at).replace(`runs-on: ${pinned}`, 'runs-on: ubuntu-latest');
+  };
+  assert.equal(runnerOf(planted('e2e-look'), 'e2e-look'), 'ubuntu-latest');
+  assert.equal(runnerOf(planted('e2e-stories'), 'e2e-stories'), 'ubuntu-latest');
   assert.deepEqual(
     [
       placeVerdict(undefined, true),

@@ -101,9 +101,8 @@ const FOOT_CLIP = { clipPath: cutFoot(TABLE_CUT, 1) };
  * row would fill the cut corner square: that row, where it is the kit's interactive row, wears none (`FRAMED_ROW`), and a layer under
  * the table paints them in the cut's shape instead, in the kit's own colours and strengths, standing still while the table scrolls
  * sideways, so the cut stays at the frame's corner. The layer holds nothing and takes no focus; nothing that does is clipped, and the
- * row's focus ring is drawn whole. A table with something under it in its frame (a pager) takes a plain `FRAMED_BOX`.
- *
- * @param props the box's own attributes (its `data-` marks) and `className`, besides what it holds
+ * row's focus ring is drawn whole. A table with something under it in its frame (a pager) takes a plain `FRAMED_BOX`. It takes the
+ * box's own attributes (its `data-` marks) and `className`, besides what it holds.
  */
 export function TableAtCut({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (

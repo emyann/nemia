@@ -8,6 +8,7 @@ import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { Markdown } from '../markdown/Markdown';
 import { Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The runs a run reads as context (the CLI's `start --from`, a card's `from:`): the runs not finished, newest created first, then the
@@ -40,7 +41,7 @@ export function ContextPicker({
         Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not landed, not judged.
       </p>
       {runs.error ? (
-        <p className="text-body-small text-failure">Could not list the runs to read: {runs.error.message}</p>
+        <ReadTrouble what="the runs to read" error={runs.error} className="text-body-small" />
       ) : !listed ? (
         <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
           {[0, 1, 2].map((at) => (
@@ -105,7 +106,7 @@ export function ConcludedPreview({ run }: { run: string }) {
         )}
       </h4>
       {concluded.error ? (
-        <p className="text-body-small text-failure">Could not read what it concluded: {concluded.error.message}</p>
+        <ReadTrouble what="what it concluded" error={concluded.error} className="text-body-small" />
       ) : !concluded.data ? (
         <Reading label="Reading what it concluded…" className="rounded p-2">
           <ReadingLines widths={['w-full', 'w-5/6', 'w-1/2']} className="text-body-small" />

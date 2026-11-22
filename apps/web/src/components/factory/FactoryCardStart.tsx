@@ -15,6 +15,7 @@ import { cardPlace, factoriesOffered, startPlace, type CardPlace } from '../../l
 import { StartRun } from '../run/StartRun';
 import { WorkflowsUnread } from '../workflow/WorkflowOptions';
 import { Reading, ReadingLines } from '@/components/look';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -33,7 +34,7 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
   return (
     <div data-start-card className="space-y-3 border-t border-outline-variant pt-4">
       {factories.error ? (
-        <p className="text-body-small text-failure">Could not read the factories to start it in: {factories.error.message}</p>
+        <ReadTrouble what="the factories to start it in" error={factories.error} className="text-body-small" />
       ) : !place ? (
         <Reading label="Reading the factory…" className="flex flex-col gap-1.5">
           <Skeleton className="w-20 text-label-medium" />
@@ -61,7 +62,7 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
   return (
     <div data-start-card data-start-unassigned className="space-y-3 border-t border-outline-variant pt-4">
       {factories.error ? (
-        <p className="text-body-small text-failure">Could not read the factories to start it in: {factories.error.message}</p>
+        <ReadTrouble what="the factories to start it in" error={factories.error} className="text-body-small" />
       ) : !factories.data || !store ? (
         <Reading label="Reading the factories…" className="flex flex-col gap-1.5">
           <Skeleton className="w-20 text-label-medium" />
@@ -186,9 +187,7 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
 
   if (workflows.error) {
     return (
-      <p className="text-body-small text-failure">
-        Could not read the workflow {code(workflow)} of the factory {code(place.factory)}: {workflows.error.message}
-      </p>
+      <ReadTrouble what={`the workflow ${workflow} of the factory ${place.factory}`} error={workflows.error} className="text-body-small" />
     );
   }
   if (!workflows.data)

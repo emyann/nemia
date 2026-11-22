@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { VolumeStep } from '@/components/welcome/VolumeStep';
 import { factoryNamesQuery } from '@/lib/api/factories';
 import { milestonesQuery } from '@/lib/api/readiness';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The welcome's volume step, at /welcome/volume: `welcome_` draws it on its own, not inside the welcome. Reached by the factory step's
@@ -12,9 +13,6 @@ export const Route = createFileRoute('/welcome_/volume')({
     Promise.all([context.queryClient.ensureQueryData(factoryNamesQuery), context.queryClient.ensureQueryData(milestonesQuery)]),
   component: () => <VolumeStep />,
   errorComponent: ({ error }) => (
-    <p className="p-4 text-body-medium text-failure">
-      Could not read this server&apos;s factories or milestones: {error instanceof Error ? error.message : String(error)}. Open the board at
-      /, or reload the page once the api answers.
-    </p>
+    <ReadTrouble what="this server's factories or milestones" error={error} className="p-4" then="Open the board at /." />
   ),
 });

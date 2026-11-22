@@ -27,6 +27,7 @@ import { container, ringed } from '@/lib/meaning';
 import { atWork, offersReadOf, releaseWord, upgradeOffers, type UpgradeOffers } from '@/lib/upgrade';
 import { useUpgradeFollow } from '@/lib/useUpgradeFollow';
 import { Skeleton } from '@/components/ui/ds';
+import { troubleOf } from '@/lib/api/read';
 
 /** Which of the two presses a confirm or a start is of: Upgrade to the newer release, or Back to the previous one. */
 type Which = 'upgrade' | 'back';
@@ -312,8 +313,8 @@ export function ServerReleaseView({
       )}
       {shown.unread !== undefined && (
         <p role="status" data-upgrades-unread className="text-body-small break-words text-on-surface-variant">
-          Whether an upgrade is at work could not be read, so none is offered here: {shown.unread}. Upgrade at the machine that serves this
-          board, or reload the page once the api answers.
+          Whether an upgrade is at work could not be read, so none is offered here: {shown.unread}
+          {/[.!?]$/.test(shown.unread) ? '' : '.'} Upgrade at the machine that serves this board, or reload the page once the api answers.
         </p>
       )}
       {run}
@@ -388,9 +389,6 @@ function pageRelease(now: Release) {
   return loadedWith;
 }
 
-/** An error's message, whatever was thrown. */
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
 /** What the section shows of the version and the upgrades read, a start being sent or refused, and an upgrades read that failed. */
 function shownOf(
   version: VersionAnswer,
@@ -404,7 +402,7 @@ function shownOf(
     previous: read?.previous ?? null,
     offers: upgradeOffers(offersReadOf(version, read)),
     ...start,
-    ...(read === undefined && upgrades.error != null ? { unread: messageOf(upgrades.error) } : {}),
+    ...(read === undefined && upgrades.error != null ? { unread: troubleOf(upgrades.error).words } : {}),
   };
 }
 
@@ -434,7 +432,9 @@ function ReleaseUnread({ error }: { error: unknown }) {
           <Skeleton shape="rectangle" className="h-10 w-36 rounded-none" />
         </Reading>
       ) : (
-        <p className="text-body-medium break-words text-muted-foreground">The server's release could not be read: {messageOf(error)}</p>
+        <p className="text-body-medium break-words text-muted-foreground">
+          The server's release could not be read: {troubleOf(error).words}
+        </p>
       )}
     </section>
   );

@@ -30,7 +30,7 @@ const meta: Meta = { title: 'Look/Trace' };
 export default meta;
 
 /** Where a trace stands in its story: a panel's width, on the card's ground. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
+const PANEL = { width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)' };
 
 /** One line: its icon, its sentence, its fact, in `status`. */
 function Line({ icon, status, fact, children }: { icon: ReactNode; status?: TraceStatus; fact?: string; children: ReactNode }) {

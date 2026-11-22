@@ -1,0 +1,4 @@
+apps/web/src/components/workflow/WorkflowPage.tsx#text-body-large
+apps/web/src/components/workflow/WorkflowPage.tsx#text-body-medium
+apps/web/src/components/workflow/WorkflowPage.tsx#text-body-small
+apps/web/src/components/workflow/WorkflowPage.tsx#text-label-medium

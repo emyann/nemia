@@ -1,0 +1,4 @@
+apps/web/src/routes/setup.tsx#text-body-medium
+apps/web/src/routes/setup.tsx#text-title-large
+apps/web/src/routes/setup.tsx#text-title-medium
+apps/web/src/routes/setup.tsx#text-title-small

@@ -1,5 +1,6 @@
 /**
- * Where an entry of the board's stories baseline is filed (apps/web, test/baseline.ts, `shardOf`): the baseline is a folder,
+ * Where an entry of the board's baseline is filed (apps/web, test/baseline.ts, `shardOf`), the debts its stories test and its look's
+ * rules (`test/rulebook.test.ts`) hold, each list only shrinking: the baseline is a folder,
  * `test/baseline/<list>/`, with one text file for each source file that still owes something on that list, at that source file's path
  * under `apps/web/src/` with `.txt` after it, holding that file's entries of the list, one a line. So two changes that each cut the
  * entries of different source files delete different files, which git merges clean however near the entries sat in one list, and two
@@ -11,8 +12,22 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** The baseline's lists, each a folder of its own under `test/baseline/`. */
-export type BaselineList = 'storyless' | 'argless' | 'secondSystem' | 'handDrawn' | 'a11yTodo';
+/**
+ * The baseline's lists, each a folder of its own under `test/baseline/`: the five the stories test holds, then the four rules of
+ * `DESIGN.md` the pages do not yet obey, which `test/rulebook.test.ts` holds — a kit accent role written by the board's own parts
+ * (`accentRole`), the retiring `money` meaning (`money`), a raw type class where the kit's primitive belongs (`rawType`) and a surface
+ * role the board's parts write none of (`kitSurface`).
+ */
+export type BaselineList =
+  | 'storyless'
+  | 'argless'
+  | 'secondSystem'
+  | 'handDrawn'
+  | 'a11yTodo'
+  | 'accentRole'
+  | 'money'
+  | 'rawType'
+  | 'kitSurface';
 
 /** The folder every source path of an entry starts with. */
 const SRC = 'apps/web/src/';

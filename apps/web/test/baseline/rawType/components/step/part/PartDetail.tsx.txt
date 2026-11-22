@@ -1,0 +1,2 @@
+apps/web/src/components/step/part/PartDetail.tsx#text-body-small
+apps/web/src/components/step/part/PartDetail.tsx#text-label-medium

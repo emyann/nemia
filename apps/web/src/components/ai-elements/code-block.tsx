@@ -52,7 +52,7 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 const PRE =
-  'overflow-auto [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-body-medium [&_code]:font-mono [&_code]:text-body-medium';
+  'overflow-auto [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-on-surface! [&>pre]:text-body-medium [&_code]:font-mono [&_code]:text-body-medium';
 
 /**
  * A block of `code` in `language`, highlighted once shiki has it: the highlight is kept with the code and language it was made for, and
@@ -81,7 +81,7 @@ export const CodeBlock = ({ code, language, className, children, ...props }: Cod
 
   return (
     <div
-      className={cn('group relative w-full overflow-hidden rounded-md border bg-background text-foreground', className)}
+      className={cn('group relative w-full overflow-hidden rounded-md border bg-background text-on-surface', className)}
       data-language={language}
       {...props}
     >

@@ -206,10 +206,10 @@ export const FORKED: GraphRunFixture = {
 export const UNGRAPHED_RUN: GraphRunFixture = { ...graphRun(AT_WORK), graph: undefined as unknown as RunView['graph'] };
 
 /** A card's ground around a part, as a part stands on a card. */
-export const ON_CARD: CSSProperties = { display: 'inline-block', padding: 16, background: 'var(--card)' };
+export const ON_CARD: CSSProperties = { display: 'inline-block', padding: 16, background: 'var(--md-sys-color-surface-container-low)' };
 
 /** The page's own ground around a part, with room for a glow. */
-export const ON_PLAIN: CSSProperties = { display: 'inline-block', padding: 40, background: 'var(--background)' };
+export const ON_PLAIN: CSSProperties = { display: 'inline-block', padding: 40, background: 'var(--md-sys-color-background)' };
 
 /** A ground unlike the page's and the card's, on which a cut corner painted over is seen. */
 export const ON_OTHER: CSSProperties = { display: 'inline-block', padding: 40, background: 'var(--md-sys-color-inverse-surface)' };

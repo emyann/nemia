@@ -445,7 +445,7 @@ async function visit(page: Page) {
       await idle(starting);
       const kept = cardIn(starting, planned.name);
       await expectVisible(
-        kept.locator(`[data-started-as].text-muted-foreground a[href="/runs/${id}"]`),
+        kept.locator(`[data-started-as].text-on-surface-variant a[href="/runs/${id}"]`),
         `back on the inbox, the card is listed, started as ${id}, linked to the run, in rest: a start is no fault`,
       );
       await expectCount(kept.getByRole('button', { name: 'Start' }), 0, 'and offers no Start: started again, the idea would run twice');

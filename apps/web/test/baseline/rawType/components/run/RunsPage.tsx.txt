@@ -1,0 +1,4 @@
+apps/web/src/components/run/RunsPage.tsx#text-body-large
+apps/web/src/components/run/RunsPage.tsx#text-body-medium
+apps/web/src/components/run/RunsPage.tsx#text-body-small
+apps/web/src/components/run/RunsPage.tsx#text-label-large

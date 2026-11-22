@@ -1,0 +1,2 @@
+apps/web/src/components/step/StepRows.tsx#text-body-medium
+apps/web/src/components/step/StepRows.tsx#text-body-small

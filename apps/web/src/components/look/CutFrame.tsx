@@ -30,7 +30,7 @@ export function CutFrame({
   hue = 'none',
   size = 28,
   fill = false,
-  ground = 'bg-card',
+  ground = 'bg-surface-container-low',
   glow,
   className,
   children,
@@ -44,7 +44,7 @@ export function CutFrame({
   children: ReactNode;
 }) {
   return (
-    <div data-cut-frame={hue} className={cn('relative p-px text-card-foreground', className)}>
+    <div data-cut-frame={hue} className={cn('relative p-px text-on-surface', className)}>
       <span
         aria-hidden="true"
         data-cut-shape

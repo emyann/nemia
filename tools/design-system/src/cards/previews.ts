@@ -107,7 +107,7 @@ export const cardScript = (card: Card, given: CardBuild) =>
   card.files.length === 0 ? Promise.resolve(typeScript(card.name)) : storiesScript(card, given);
 
 const STYLE = [
-  'body { margin: 0; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); font-family: var(--font-chakra-petch); }',
+  'body { margin: 0; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); font-family: var(--font-barlow); }',
   '#root { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 24px 32px; padding: 24px; }',
   '.cell { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }',
   '.cell[data-wide] { flex: 1 1 100%; display: block; }',

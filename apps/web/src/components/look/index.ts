@@ -13,6 +13,7 @@ export { CutIconPress } from './CutIconPress';
 export { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, TableAtCut, type FrameHue } from './CutFrame';
 export { CutTag } from './CutTag';
 export { Marker } from './Marker';
+export { MeaningTag } from './MeaningTag';
 export { Pager } from './Pager';
 export { PageName, Plate, type PlateHue } from './Plate';
 export { Pending } from './Pending';

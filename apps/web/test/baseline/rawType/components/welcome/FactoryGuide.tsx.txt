@@ -1,0 +1,3 @@
+apps/web/src/components/welcome/FactoryGuide.tsx#text-body-medium
+apps/web/src/components/welcome/FactoryGuide.tsx#text-title-medium
+apps/web/src/components/welcome/FactoryGuide.tsx#text-title-small

@@ -1,0 +1,2 @@
+apps/web/src/components/frame/LinkRefusal.tsx#text-body-medium
+apps/web/src/components/frame/LinkRefusal.tsx#text-body-small

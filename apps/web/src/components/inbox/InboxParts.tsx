@@ -35,7 +35,7 @@ import { Pending } from '@/components/look';
  */
 export function CardMeta({ entry }: { entry: InboxEntry }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground">
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
       <span className="font-mono">{entry.name}</span>
       {entry.error !== null ? null : unassigned(entry) ? (
         <span data-unassigned title="It names no factory: Start gives it one.">
@@ -47,7 +47,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
       <LabelTags labels={entry.labels} />
       {entry.workflow && (
         <span data-workflow={entry.workflow} title={entry.workflow}>
-          workflow <span className="font-mono text-foreground">{workflowNameOf(entry.workflow)}</span>
+          workflow <span className="font-mono text-on-surface">{workflowNameOf(entry.workflow)}</span>
         </span>
       )}
       {entry.repo && (
@@ -67,7 +67,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
 export function NoQueue({ entry }: { entry: InboxEntry }) {
   if (!queueNeedsFactory(entry)) return null;
   return (
-    <p data-no-queue className="text-body-small text-muted-foreground">
+    <p data-no-queue className="text-body-small text-on-surface-variant">
       No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.
     </p>
   );
@@ -136,7 +136,7 @@ export function CardStateChip({ state }: { state: CardState }) {
  */
 export function StartedAs({ startedAs, state, after }: { startedAs: readonly string[]; state: CardState | null; after?: ReactNode }) {
   return (
-    <p data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-medium text-muted-foreground">
+    <p data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-medium text-on-surface-variant">
       <span>
         Started as{' '}
         {startedAs.map((id, i) => (
@@ -167,10 +167,10 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
     >
       <div className="flex flex-wrap items-start gap-3 @md/page:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
-          <p data-title className="font-medium break-words text-muted-foreground">
+          <p data-title className="font-medium break-words text-on-surface-variant">
             {entry.title ?? entry.file}
           </p>
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-body-small text-muted-foreground">
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
             <span className="font-mono">{entry.name}</span>
             <span>Gone from the inbox since this page listed it.</span>
           </p>
@@ -194,7 +194,7 @@ export function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<Inbo
   return (
     <p
       data-tried={refused ? 'refused' : 'failed'}
-      className={`rounded border px-3 py-2 text-body-small break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-muted-foreground'}`}
+      className={`rounded border px-3 py-2 text-body-small break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-on-surface-variant'}`}
     >
       {triedLine(entry, instantWords(new Date(entry.tried.at), new Date(now)))}
     </p>
@@ -229,7 +229,7 @@ export function CardQueue({ entry }: { entry: InboxEntry }) {
   return (
     <>
       {entry.queued && (
-        <p className="flex flex-wrap items-baseline gap-x-2 text-body-small text-muted-foreground">
+        <p className="flex flex-wrap items-baseline gap-x-2 text-body-small text-on-surface-variant">
           <span
             data-queued={entry.queued.place ?? ''}
             className="rounded-full border border-outline-variant bg-surface-container-highest px-2 py-0.5 font-medium text-on-surface-variant"

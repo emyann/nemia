@@ -73,12 +73,12 @@ const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined) 
       {calls.join(', ')}
     </span>
     {cause && (
-      <span data-denied-cause={cause.factory} className="text-body-small text-muted-foreground">
+      <span data-denied-cause={cause.factory} className="text-body-small text-on-surface-variant">
         Likely cause: <span className="font-mono break-all">{cause.place.place}</span> is not trusted for {cause.place.harness}, which
         withholds {cause.place.withheld}.{' '}
         {cause.place.never ?? (
           <>
-            Trust it: <code className="font-mono whitespace-nowrap text-foreground">{cause.trust}</code>
+            Trust it: <code className="font-mono whitespace-nowrap text-on-surface">{cause.trust}</code>
           </>
         )}
       </span>
@@ -102,7 +102,7 @@ function useDeniedCause(run: RunDetail, asked: boolean) {
  */
 function FolderFiles({ step }: { step: StepView }) {
   return (
-    <div aria-label="Files" data-files className="text-body-small text-muted-foreground">
+    <div aria-label="Files" data-files className="text-body-small text-on-surface-variant">
       {step.filesError === null ? (
         <>
           Files in its folder:

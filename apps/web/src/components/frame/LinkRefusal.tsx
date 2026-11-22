@@ -16,7 +16,7 @@ export function LinkRefusal() {
   return (
     <div role="alert" data-link-refused={refused.status === 409 ? 'used' : 'unknown'} className="flex flex-col gap-1">
       <p className="text-body-medium text-failure">{WHY[refused.status === 409 ? 'used' : 'unknown']}</p>
-      <p className="text-body-small break-words text-muted-foreground">
+      <p className="text-body-small break-words text-on-surface-variant">
         Ask the server's shell for a new link, or sign in below. The api said: {refused.message}
       </p>
     </div>

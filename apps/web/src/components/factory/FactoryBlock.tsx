@@ -23,29 +23,29 @@ export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
       data-factory={block.name}
       data-inspected={block.inspected || undefined}
       style={BLOCK_SIZE}
-      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-card p-4 text-body-medium text-card-foreground shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-foreground/10 hover:ring-foreground/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
+      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-surface-container-low p-4 text-body-medium text-on-surface shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-on-surface/10 hover:ring-on-surface/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
     >
       <span className="flex items-center gap-2">
-        <FactoryIcon className="size-4 shrink-0 text-muted-foreground" />
+        <FactoryIcon className="size-4 shrink-0 text-on-surface-variant" />
         <span className="truncate text-body-large font-semibold" title={block.name}>
           {block.name}
         </span>
         {block.default && <Tag>default</Tag>}
       </span>
       {block.error ? (
-        <span className="flex gap-2 text-destructive" title={block.error} data-error>
+        <span className="flex gap-2 text-failure" title={block.error} data-error>
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           <span className="line-clamp-4 break-all">Its file does not read: {block.error}</span>
         </span>
       ) : (
         <>
-          <span className="truncate text-muted-foreground" title={repos}>
+          <span className="truncate text-on-surface-variant" title={repos}>
             on {repos || 'no volume to work on'}
           </span>
           <span className="mt-auto font-medium" data-runs>
             {runsOf(block)}
           </span>
-          <span className="text-muted-foreground" data-offer>
+          <span className="text-on-surface-variant" data-offer>
             {offerOf(block)}
           </span>
         </>

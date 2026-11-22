@@ -10,7 +10,14 @@ const meta: Meta = { title: 'Run/Said' };
 export default meta;
 
 /** Where a bubble stands in its story: a panel's width, on the card's ground, laid out as the talk lays its items out. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)', display: 'flex', flexDirection: 'column' as const, gap: 16 };
+const PANEL = {
+  width: 460,
+  padding: 16,
+  background: 'var(--md-sys-color-surface-container-low)',
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: 16,
+};
 
 const AT = '2026-10-15T17:40:00.000Z';
 

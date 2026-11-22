@@ -9,18 +9,19 @@ import {
 } from 'react-aria-components';
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-body-medium font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-body-medium font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-failure aria-invalid:ring-3 aria-invalid:ring-failure/20 dark:aria-invalid:border-failure/50 dark:aria-invalid:ring-failure/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        default: 'bg-primary text-on-primary hover:bg-primary/90',
         outline:
-          'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
+          'border-outline-variant bg-background hover:bg-surface-container-highest hover:text-on-surface aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface dark:border-outline dark:bg-outline/30 dark:hover:bg-outline/50',
         secondary:
-          'bg-surface-container-highest text-on-surface hover:bg-[color-mix(in_oklch,var(--md-sys-color-surface-container-highest),var(--foreground)_5%)] aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface',
-        ghost: 'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50',
+          'bg-surface-container-highest text-on-surface hover:bg-[color-mix(in_oklch,var(--md-sys-color-surface-container-highest),var(--md-sys-color-on-surface)_5%)] aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface',
+        ghost:
+          'hover:bg-surface-container-highest hover:text-on-surface aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface dark:hover:bg-surface-container-highest/50',
         destructive:
-          'bg-failure-container text-on-failure-container hover:bg-failure-container/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
+          'bg-failure-container text-on-failure-container hover:bg-failure-container/90 focus-visible:border-failure/40 focus-visible:ring-failure/20 dark:focus-visible:ring-failure/40',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

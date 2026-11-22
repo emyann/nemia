@@ -13,7 +13,9 @@ const RouterLinkButton = routeLink(LinkButton);
 export function CommandText({ text }: { text: string }) {
   return (
     <div className="flex w-full min-w-0 items-center gap-2">
-      <code className="min-w-0 flex-1 rounded bg-muted px-2 py-1 text-left font-mono text-body-small [overflow-wrap:anywhere]">{text}</code>
+      <code className="min-w-0 flex-1 rounded bg-surface-container-highest px-2 py-1 text-left font-mono text-body-small [overflow-wrap:anywhere]">
+        {text}
+      </code>
       <CopyButton text={text} />
     </div>
   );
@@ -34,20 +36,20 @@ export function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; n
         </Badge>
         {s.tz && <Badge variant="outline">{s.tz}</Badge>}
       </div>
-      <p className="text-body-medium text-muted-foreground">{s.brief}</p>
+      <p className="text-body-medium text-on-surface-variant">{s.brief}</p>
       <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 text-body-medium">
-        <dt className="text-muted-foreground">Next run</dt>
+        <dt className="text-on-surface-variant">Next run</dt>
         <dd data-schedule-next title={s.next ?? undefined}>
           {s.next ? fireWord(new Date(s.next), now) : 'none: its cron never fires'}
         </dd>
-        <dt className="text-muted-foreground">Last run</dt>
+        <dt className="text-on-surface-variant">Last run</dt>
         <dd data-schedule-last>
           {s.last ? (
             <>
               <RouterLinkButton to="/runs/$runId" params={{ runId: s.last.run }} variant="link" size="sm" className="h-auto px-0">
                 {s.last.run}
               </RouterLinkButton>{' '}
-              <span className="text-muted-foreground">{fireWord(new Date(s.last.at), now)}</span>
+              <span className="text-on-surface-variant">{fireWord(new Date(s.last.at), now)}</span>
             </>
           ) : (
             'none yet'

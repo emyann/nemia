@@ -82,13 +82,13 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
     <div
       data-node-kind={node?.kind}
       data-skipped={state === 'skipped' || undefined}
-      className={`w-56 overflow-hidden rounded-md text-foreground ${nodeFrame(state, gate)} ${selected ? 'outline-2 outline-offset-2 outline-foreground' : ''}`}
+      className={`w-56 overflow-hidden rounded-md text-on-surface ${nodeFrame(state, gate)} ${selected ? 'outline-2 outline-offset-2 outline-on-surface' : ''}`}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-label-small uppercase ${gate ? 'text-yours' : 'text-muted-foreground'}`}>
+          <span className={`text-label-small uppercase ${gate ? 'text-yours' : 'text-on-surface-variant'}`}>
             {gate ? 'human gate' : headOf(node, index)}
           </span>
           {running && (
@@ -109,7 +109,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip codes={step} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
-        <span className="font-mono text-body-small text-muted-foreground">
+        <span className="font-mono text-body-small text-on-surface-variant">
           {attemptLine(step.attempts, live, now) ?? unfiledLine(step.taskId, node, spec)}
         </span>
       </div>
@@ -122,7 +122,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
               ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
               : 'What its tries have cost'
           }
-          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small ${over ? 'font-semibold text-money' : 'text-muted-foreground'}`}
+          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small ${over ? 'font-semibold text-money' : 'text-on-surface-variant'}`}
         >
           <span className="font-sans font-normal">cost </span>
           {cost}
@@ -134,7 +134,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
         <p
           data-need={need.kind}
           title={needText(need)}
-          className="truncate border-t border-border bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
+          className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
         >
           {needNodeText(need)}
         </p>
@@ -168,7 +168,7 @@ function RunsOnOrGave({ step, gave, line }: { step: StepNodeData['step']; gave: 
         <PartGave step={step} gave={gave} size="S" />
       </div>
     );
-  return <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{line}</p>;
+  return <p className="mt-0.5 truncate font-mono text-body-small text-on-surface-variant">{line}</p>;
 }
 
 /**
@@ -177,8 +177,10 @@ function RunsOnOrGave({ step, gave, line }: { step: StepNodeData['step']; gave: 
  */
 const nodeFrame = (state: StepState, gate: boolean) => {
   if (state === 'skipped') return 'border border-dashed border-outline bg-background';
-  if (gate) return 'bg-card shadow-sm border-2 border-yours';
-  return state === 'working' ? 'bg-card shadow-sm border border-alive ring-4 ring-alive/25' : 'bg-card shadow-sm border border-outline';
+  if (gate) return 'bg-surface-container-low shadow-sm border-2 border-yours';
+  return state === 'working'
+    ? 'bg-surface-container-low shadow-sm border border-alive ring-4 ring-alive/25'
+    : 'bg-surface-container-low shadow-sm border border-outline';
 };
 
 /** A node's head: its place in the order, after its kind where it is a condition or a workflow node (`condition · step 02`). */
@@ -305,18 +307,18 @@ export function SpecNode({
       data-spec
       data-node-kind={node?.kind}
       data-inspected={inspected || undefined}
-      className={`w-56 cursor-pointer overflow-hidden rounded-md border border-outline bg-card text-foreground shadow-sm ${inspected ? 'ring-2 ring-ring' : 'hover:border-on-surface-variant in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
+      className={`w-56 cursor-pointer overflow-hidden rounded-md border border-outline bg-surface-container-low text-on-surface shadow-sm ${inspected ? 'ring-2 ring-ring' : 'hover:border-on-surface-variant in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
-        <span className="text-label-small uppercase text-muted-foreground">
+        <span className="text-label-small uppercase text-on-surface-variant">
           {node ? `${node.kind} · ${stepLabel(index)}` : stepLabel(index)}
         </span>
         <p className="mt-0.5 truncate text-body-medium font-semibold" title={name}>
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{nodeLine(node, spec)}</p>
+        <p className="mt-0.5 truncate font-mono text-body-small text-on-surface-variant">{nodeLine(node, spec)}</p>
       </div>
 
       {node?.kind === 'condition' && <RouteBand node={node} routes={routes} taken={null} routed={null} />}
@@ -325,8 +327,8 @@ export function SpecNode({
         <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-muted-foreground">{label}</dt>
-              <dd className="line-clamp-3 min-w-0 font-mono break-words text-foreground" title={title}>
+              <dt className="shrink-0 text-on-surface-variant">{label}</dt>
+              <dd className="line-clamp-3 min-w-0 font-mono break-words text-on-surface" title={title}>
                 {value}
               </dd>
             </div>
@@ -342,7 +344,7 @@ export function SpecNode({
 }
 
 /** A handle a person drags from or to while building: a dot on the node's edge, in the colour of the edge it draws. */
-const HANDLE = '!size-3 !border-2 !border-card';
+const HANDLE = '!size-3 !border-2 !border-surface-container-low';
 
 /**
  * The spec node while the builder has it: the same head and lines, with handles a person draws edges with. Drag from the right-hand dot to
@@ -374,9 +376,9 @@ function BuildingNode({
       data-unsaved-step={build.unsaved || undefined}
       data-refused-step={build.refused || undefined}
       className={[
-        'w-56 cursor-pointer rounded-md bg-card text-foreground shadow-sm',
+        'w-56 cursor-pointer rounded-md bg-surface-container-low text-on-surface shadow-sm',
         build.refused ? 'border-2 border-failure' : 'border border-outline',
-        build.selected ? 'outline-2 outline-offset-2 outline-foreground' : '',
+        build.selected ? 'outline-2 outline-offset-2 outline-on-surface' : '',
       ].join(' ')}
     >
       <Handle
@@ -389,7 +391,7 @@ function BuildingNode({
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-label-small uppercase text-muted-foreground">{stepLabel(index)}</span>
+          <span className="text-label-small uppercase text-on-surface-variant">{stepLabel(index)}</span>
           {build.unsaved && (
             <span className="rounded-full bg-yours-container px-1.5 text-label-small text-on-yours-container">unsaved</span>
           )}
@@ -397,15 +399,15 @@ function BuildingNode({
         <p className="mt-0.5 truncate text-body-medium font-semibold" title={name}>
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground">{runsOn(spec)}</p>
+        <p className="mt-0.5 truncate font-mono text-body-small text-on-surface-variant">{runsOn(spec)}</p>
       </div>
 
       {lines.length > 0 && (
         <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-muted-foreground">{label}</dt>
-              <dd className="line-clamp-2 min-w-0 font-mono break-words text-foreground" title={title}>
+              <dt className="shrink-0 text-on-surface-variant">{label}</dt>
+              <dd className="line-clamp-2 min-w-0 font-mono break-words text-on-surface" title={title}>
                 {value}
               </dd>
             </div>
@@ -454,7 +456,7 @@ function RouteBand({
   if (node.kind === 'workflow')
     return routed?.kind === 'sent' ? (
       <p data-sent={routed.card} className="truncate border-t border-outline-variant px-3 py-1 text-body-small">
-        <span className="text-muted-foreground">sent </span>
+        <span className="text-on-surface-variant">sent </span>
         <TextLink to="/inbox/$name" params={{ name: routed.card }} title={`The card ${routed.card}, and the run it started`}>
           {routed.card}
         </TextLink>
@@ -465,7 +467,7 @@ function RouteBand({
     <p
       data-routes
       title={taken ? `It took the route ${taken}.` : proposes ? `It proposes the route ${proposes}.` : 'No route taken yet.'}
-      className="truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small text-muted-foreground"
+      className="truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small text-on-surface-variant"
     >
       {routes.map((route, i) => (
         <span key={route}>
@@ -473,7 +475,7 @@ function RouteBand({
           <span
             data-route={route}
             data-taken={route === taken || undefined}
-            className={route === taken ? 'font-semibold text-foreground' : undefined}
+            className={route === taken ? 'font-semibold text-on-surface' : undefined}
           >
             {route === taken ? `→ ${route}` : route}
             {node.ends?.includes(route) && ' (ends)'}
@@ -491,7 +493,7 @@ function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; sa
     <p
       data-gate-band
       title={need?.said}
-      className="truncate border-t border-border bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
+      className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
     >
       <span className="font-semibold">{word}</span>
       {need && <span data-need={need.kind}>{` · ${need.said}`}</span>}

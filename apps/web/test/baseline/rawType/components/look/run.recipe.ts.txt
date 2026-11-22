@@ -1,0 +1,5 @@
+apps/web/src/components/look/run.recipe.ts#text-body-large
+apps/web/src/components/look/run.recipe.ts#text-body-medium
+apps/web/src/components/look/run.recipe.ts#text-body-small
+apps/web/src/components/look/run.recipe.ts#text-label-small
+apps/web/src/components/look/run.recipe.ts#text-title-medium

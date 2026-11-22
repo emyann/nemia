@@ -1,0 +1,2 @@
+apps/web/src/components/step/StepInspector.tsx#text-body-small
+apps/web/src/components/step/StepInspector.tsx#text-label-medium

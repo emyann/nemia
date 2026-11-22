@@ -1,0 +1,2 @@
+apps/web/src/components/conversation/ConversationBand.tsx#text-body-small
+apps/web/src/components/conversation/ConversationBand.tsx#text-title-small

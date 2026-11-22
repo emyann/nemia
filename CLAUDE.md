@@ -184,7 +184,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   session outside a run by `apps/web/CLAUDE.md`, *shadcn and the kit's skills*; a kit update that adds or renames one names it there; the board's look
   is `apps/web/DESIGN.md`, its generated theme `apps/web/theme/` (`apps/web/CLAUDE.md`, *The design system kit*).
 - `apps/web/src/components/look` — the look's own parts (the cut frame, tag and button, the plate, the sticker and stat tile, the
-  breakdown and its preview, the rail, the scan lines, the pager, the text link, the copy id, the radio tile (the kit's block, copied in), the run at its five sizes, a conversation's trace and its marker) behind one door, each with its stories beside it; Nemia's Storybook
+  breakdown and its preview, the rail, the scan lines, the pager, the text link, the copy id, the radio tile (the kit's block, copied in), the meaning tag (an at-work word in its own violet, at the kit Tag's metrics), the run at its five sizes, a conversation's trace and its marker) behind one door, each with its stories beside it; Nemia's Storybook
   (`npm run storybook`, from `apps/web`) shows them to a person, and `apps/web/CLAUDE.md`, *The look's parts*, says which to take.
 - What Nemia has built in: the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as
   `gitPlaceLayer`), the skills the api lists as builtin

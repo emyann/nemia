@@ -1,0 +1,2 @@
+apps/web/src/routes/factories.$factory_.settings.tsx#text-body-medium
+apps/web/src/routes/factories.$factory_.settings.tsx#text-title-large

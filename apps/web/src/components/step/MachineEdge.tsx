@@ -31,7 +31,7 @@ export function MachineEdge({ data, markerEnd }: EdgeProps<MachineFlowEdge>) {
           data-route={data.id}
           data-taken={data.taken || undefined}
           data-dashed={data.dashed || undefined}
-          className={`absolute overflow-hidden rounded border bg-card ${data.taken ? 'border-alive' : 'border-border'}`}
+          className={`absolute overflow-hidden rounded border bg-surface-container-low ${data.taken ? 'border-alive' : 'border-outline-variant'}`}
           style={{
             width: label.width,
             height: label.height,
@@ -40,7 +40,7 @@ export function MachineEdge({ data, markerEnd }: EdgeProps<MachineFlowEdge>) {
         >
           <ByActionList list={data.edges}>
             {data.verbs.map((verb) => (
-              <div key={verb} data-verb={verb} className="text-muted-foreground italic">
+              <div key={verb} data-verb={verb} className="text-on-surface-variant italic">
                 {verb}
               </div>
             ))}

@@ -25,9 +25,9 @@ export function KindsBehind({ run }: { run: RunDetail }) {
     <section
       aria-label="The revisions this run is behind on"
       data-kinds-behind={kinds.length}
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded border border-outline px-3 py-2 text-body-medium text-foreground"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded border border-outline px-3 py-2 text-body-medium text-on-surface"
     >
-      <p className="text-muted-foreground">
+      <p className="text-on-surface-variant">
         The files have moved past what this run resolved. {run.refresh && <span className="font-mono text-body-medium">{run.refresh}</span>}{' '}
         takes the new revisions for every filing after it.
       </p>

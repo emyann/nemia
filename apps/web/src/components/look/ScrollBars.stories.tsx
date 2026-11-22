@@ -11,7 +11,7 @@ export default meta;
 function Scroller() {
   return (
     <div style={{ minHeight: 1600 }}>
-      <div data-scroller style={{ width: 260, height: 160, overflow: 'auto', background: 'var(--card)' }}>
+      <div data-scroller style={{ width: 260, height: 160, overflow: 'auto', background: 'var(--md-sys-color-surface-container-low)' }}>
         <div style={{ height: 640, padding: 16 }}>A box shorter than what it holds.</div>
       </div>
     </div>

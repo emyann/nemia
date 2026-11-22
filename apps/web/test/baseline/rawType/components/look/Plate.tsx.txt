@@ -1,0 +1,3 @@
+apps/web/src/components/look/Plate.tsx#text-display-small
+apps/web/src/components/look/Plate.tsx#text-headline-small
+apps/web/src/components/look/Plate.tsx#text-label-large

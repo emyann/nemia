@@ -108,13 +108,13 @@ export function SignInView({
           <CutPress pending={pending} isDisabled={pending} onPress={onSignOut}>
             Sign out
           </CutPress>
-          <span className="text-body-small text-muted-foreground">
+          <span className="text-body-small text-on-surface-variant">
             Every session of this factory finds the sign-in, and refreshes it on its own.
           </span>
         </div>
       ) : shown.at === 'waiting' ? (
         <>
-          <p className="text-body-medium text-foreground">
+          <p className="text-body-medium text-on-surface">
             <a data-sign-in-link href={shown.authUrl} target="_blank" rel="noopener noreferrer" className={`${TEXT_LINK} underline`}>
               Open {hostOf(shown.authUrl)} to sign in
             </a>
@@ -127,7 +127,7 @@ export function SignInView({
           <CutPress pending={pending} isDisabled={pending} onPress={onSignIn}>
             {shown.at === 'ended' ? 'Sign in again' : 'Sign in'}
           </CutPress>
-          <span className="text-body-small text-muted-foreground">
+          <span className="text-body-small text-on-surface-variant">
             {shown.at === 'ended' ? shown.why : `Opens ${name}'s sign-in in your browser: you approve there, and type nothing here.`}
           </span>
         </div>

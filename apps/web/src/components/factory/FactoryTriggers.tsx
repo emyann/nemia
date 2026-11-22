@@ -40,7 +40,7 @@ function TriggerRow({
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-title-small">{t.metadata.name}</span>
         <Tag variant="outlined">{cards ? 'cards' : 'time'}</Tag>
-        <span className="text-body-medium text-muted-foreground">
+        <span className="text-body-medium text-on-surface-variant">
           {firesWhen(t)} → {t.spec.target.name}
         </span>
         {t.status.from === 'template' && <Tag variant="outlined">from its template</Tag>}
@@ -56,7 +56,7 @@ function TriggerRow({
         <ScheduleRow schedule={schedule} now={now} />
       )}
       {clashes.map((c) => (
-        <p key={c.card} data-trigger-clash={c.card} className="text-body-medium text-muted-foreground">
+        <p key={c.card} data-trigger-clash={c.card} className="text-body-medium text-on-surface-variant">
           {c.card} waits: triggers {c.with.join(', ')} clash. Change a selector or the card's labels.
         </p>
       ))}
@@ -89,7 +89,7 @@ export function FactoryTriggers({ name, line, scheduleLine }: { name: string; li
     <section aria-label="Triggers" data-factory-triggers={name} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-title-medium">Triggers</h2>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           What starts this factory's work on its own: a cron, or each card whose labels a selector selects, queued in the order filed. A
           trigger spends quota only where something its target reaches runs an agent.
         </p>
@@ -99,7 +99,7 @@ export function FactoryTriggers({ name, line, scheduleLine }: { name: string; li
           <ReadingLines widths={['w-1/2', 'w-3/4']} />
         </Reading>
       ) : data.length === 0 ? (
-        <p data-no-triggers className="text-body-medium text-muted-foreground">
+        <p data-no-triggers className="text-body-medium text-on-surface-variant">
           This factory has no trigger.
         </p>
       ) : (
@@ -119,7 +119,7 @@ export function FactoryTriggers({ name, line, scheduleLine }: { name: string; li
       <CommandText text={line} />
       {schedules?.length === 0 && (
         <div data-no-schedules className="flex flex-col gap-1">
-          <p className="text-body-medium text-muted-foreground">No schedule: to start one of its workflows on a cron, type:</p>
+          <p className="text-body-medium text-on-surface-variant">No schedule: to start one of its workflows on a cron, type:</p>
           <CommandText text={scheduleLine} />
         </div>
       )}

@@ -5,10 +5,10 @@ import { CopyButton } from './CopyButton';
 export function CommandLine({ command: c }: { command: DecideCommand }) {
   return (
     <>
-      {c.said && <p className="text-body-small text-muted-foreground">{c.said.replace(`:  ${c.command}`, '')}</p>}
+      {c.said && <p className="text-body-small text-on-surface-variant">{c.said.replace(`:  ${c.command}`, '')}</p>}
       <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-body-small text-muted-foreground">{c.label}</span>
-        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1 font-mono text-body-small">
+        <span className="w-16 shrink-0 text-body-small text-on-surface-variant">{c.label}</span>
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-surface-container-highest px-2 py-1 font-mono text-body-small">
           {c.command}
         </code>
         <CopyButton text={c.command} />

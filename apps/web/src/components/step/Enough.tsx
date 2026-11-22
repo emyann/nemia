@@ -23,7 +23,7 @@ export function EnoughRow({ runId, offer, line }: { runId: string; offer: Extrac
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}
-      className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
     >
       <p data-said className="break-words">
         <strong>{offer.step}</strong> {words.said}

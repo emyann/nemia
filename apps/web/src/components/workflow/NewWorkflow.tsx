@@ -32,7 +32,7 @@ function PlaceChoice({
         <Radio key={p.place} value={p.place}>
           <span className="flex flex-col gap-0.5">
             <span className="text-body-medium font-medium">{p.label}</span>
-            <span className="text-body-small text-muted-foreground">{p.hint}</span>
+            <span className="text-body-small text-on-surface-variant">{p.hint}</span>
           </span>
         </Radio>
       ))}
@@ -87,7 +87,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
   return (
     <form
       aria-label="New workflow"
-      className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
+      className="space-y-3 rounded-lg border border-outline-variant bg-surface-container-low p-4 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         if (first) create.mutate(first);
@@ -95,7 +95,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
     >
       <div className="space-y-0.5">
         <h2 className="text-title-small">New workflow</h2>
-        <p className="text-body-small text-muted-foreground">
+        <p className="text-body-small text-on-surface-variant">
           A folder of yours, under <code className="font-mono">{folder}/</code>, with its first step. Its page opens in its builder.
         </p>
       </div>

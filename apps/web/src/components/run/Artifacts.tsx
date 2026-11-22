@@ -179,7 +179,7 @@ function Opened({ artifact, href, size, view }: { artifact: Served; href: string
   );
 }
 
-const linkClass = 'font-mono font-medium text-foreground underline underline-offset-2';
+const linkClass = 'font-mono font-medium text-on-surface underline underline-offset-2';
 
 /**
  * The values a closeout handed on beside its files: each its name as a label, then the value, a link opening in a new tab where the api
@@ -191,7 +191,7 @@ export function Values({ values }: { values: readonly StepValue[] }) {
     <ul data-values className="mt-1 flex flex-col gap-1 text-body-small">
       {values.map((v, i) => (
         <li key={`${i}:${v.name}`} data-value={v.name} className="break-all">
-          <span className="text-label-small uppercase text-muted-foreground">{v.name}</span>{' '}
+          <span className="text-label-small uppercase text-on-surface-variant">{v.name}</span>{' '}
           {v.link ? (
             <a href={v.link} target="_blank" rel="noreferrer" className={linkClass}>
               {v.value}

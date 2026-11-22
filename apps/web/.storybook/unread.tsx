@@ -17,7 +17,7 @@ const stillOut = () => new Promise<never>(() => undefined);
 function unreadClient() {
   const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
   const defaulted = client.defaultQueryOptions.bind(client);
-  client.defaultQueryOptions = ((options) => ({ ...defaulted(options), queryFn: stillOut })) as typeof client.defaultQueryOptions;
+  client.defaultQueryOptions = (options) => ({ ...defaulted(options), queryFn: stillOut });
   return client;
 }
 

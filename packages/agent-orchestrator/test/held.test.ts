@@ -29,6 +29,7 @@ import { artifactsDir, readAsks, runRecord, rewriteRun } from '../src/record/rec
 import { phaseOfView } from '../src/views/views-words.ts';
 import { lackedOf } from '../src/record/record.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { ASKED_PRIORITY } from '../src/status/status.ts';
 
 const ROOT = scratch('wf-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -191,6 +192,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
   assert.equal(view.state.inputs.length, 1, 'answered, once');
   assert.match(view.state.inputs[0].text, /the --dry-run flag/, "the person's words, in the turn's brief");
   assert.match(view.state.inputs[0].text, /This is the last try's session, continued/, 'the brief of a nudge that continues the session');
+  assert.equal(view.state.inputs[0].priority, ASKED_PRIORITY, "a person's answer: the turn they wait on goes first");
   const record = runRecord(ROOT, run.id).steps.plan;
   assert.equal(record.taskId, plan, 'the same task');
   assert.deepEqual(

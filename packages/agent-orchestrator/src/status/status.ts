@@ -906,6 +906,14 @@ export const MOMENTUM = 1;
 export const LANDING_MOMENTUM = MOMENTUM + 1;
 
 /**
+ * The priority of a turn a person is waiting on: the next turn after they answered a step, a try or a round they asked for (a `Retry` or
+ * a `Round` `by: 'ask'`), and an upgrade they started. Above every filing of the work (`LANDING_MOMENTUM` and below), below Nemia's own
+ * session, so it goes before every waiting task but hers; and the threshold of the room the engine keeps for such turns (`keptRoom`,
+ * `WF_KEPT_TURNS`), which nothing below it takes. Nothing running is stopped for it, and it is read at admission and nowhere else.
+ */
+export const ASKED_PRIORITY = 1000;
+
+/**
  * The momentum a step's own filing has, filed as its `priority` (`MOMENTUM`): none — 0 — for a run's first steps, which wait on nothing and
  * are filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a
  * check are never a run's first filing, and carry `MOMENTUM` whatever step they are of.

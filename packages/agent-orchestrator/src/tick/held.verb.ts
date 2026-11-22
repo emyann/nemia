@@ -41,11 +41,22 @@ export const closeHeld = Effect.fn('closeHeld')(function* (e: Engine, taskId: st
 
 /**
  * Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one — the turn's own `config`, laid over
- * the filing's by the runtime: undefined once answered, as `closeHeld`. `text` is a continue's brief, which the runtime hands the session
- * it continues as the turn's words; the tools, the model and the fence stay the task's, as filed.
+ * the filing's by the runtime — and the turn's own priority: undefined once answered, as `closeHeld`. `text` is a continue's brief, which
+ * the runtime hands the session it continues as the turn's words; the tools, the model and the fence stay the task's, as filed.
+ * @param e The engine the task is held on.
+ * @param taskId The task held open that waits for a word.
+ * @param text The turn's words: the continue's brief.
+ * @param budgetUsd The turn's cap, or undefined where it has none.
+ * @param priority The turn's priority at admission: a person's turn at `ASKED_PRIORITY`.
  */
-export const answerHeld = Effect.fn('answerHeld')(function* (e: Engine, taskId: string, text: string, budgetUsd: number | undefined) {
-  return yield* refusedWords('answer', e.answer(taskId, text, budgetUsd === undefined ? {} : { config: { budgetUsd } }));
+export const answerHeld = Effect.fn('answerHeld')(function* (
+  e: Engine,
+  taskId: string,
+  text: string,
+  budgetUsd: number | undefined,
+  priority: number,
+) {
+  return yield* refusedWords('answer', e.answer(taskId, text, { ...(budgetUsd === undefined ? {} : { config: { budgetUsd } }), priority }));
 });
 
 /**

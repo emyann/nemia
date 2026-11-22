@@ -197,6 +197,14 @@ describe('`ceilingLines`: sessions at work per pool, and runs in flight — `no 
     for (const fact of ['8Gi', '1024Mi', 'WF_MEMORY_REQUEST']) assert.ok(asksItsLimit[3]?.includes(fact), fact);
     assert.equal(ceilingLines({ sessions: 2, runs: 0, memory: '8Gi' }).length, 3, 'no floor given, no line');
   });
+  test("the room kept for a person's turn, said on a line of its own: the places, the bound it lifts to, and the memory where a floor is given", () => {
+    const line = ceilingLines({ sessions: 2, kept: 1, runs: 0, request: '2560Mi', reserved: '2048Mi' }).at(-1) ?? '';
+    for (const fact of ['1 per pool', 'at most 3', '2560Mi', 'WF_KEPT_TURNS']) assert.ok(line.includes(fact), fact);
+    const places = ceilingLines({ sessions: 2, kept: 2, runs: 0 }).at(-1) ?? '';
+    for (const fact of ['2 per pool', 'at most 4', 'WF_KEPT_TURNS']) assert.ok(places.includes(fact), fact);
+    assert.ok(!places.includes('memory no other work'), 'no floor: places alone');
+    assert.equal(ceilingLines({ sessions: 2, kept: 0, runs: 0 }).length, 2, 'none kept, no line');
+  });
 });
 
 describe('`listing` handed a run slot: the roots of a held run say `waiting for a run slot` where `waiting` would be — never a run that started, was called off or waits on a run', () => {

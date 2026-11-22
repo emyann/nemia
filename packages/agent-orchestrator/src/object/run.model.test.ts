@@ -124,6 +124,7 @@ const unfiled = (name: string) => ({
   approve: null,
   denied: null,
   sessionUnread: null,
+  queuedFor: null,
   lastLine: null,
   gate: null,
   said: [],

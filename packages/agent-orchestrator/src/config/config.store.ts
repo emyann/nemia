@@ -54,6 +54,12 @@ const runs = Config.schema(Schema.String.check(Schema.isPattern(FROM_ZERO)), 'WF
   Config.withDefault(0),
 );
 
+/** `WF_KEPT_TURNS`: the places kept per pool for a person's turn, a whole number from 0; 1 when unset, empty or blank. */
+const keptTurnsConfig = Config.schema(Schema.String.check(Schema.isPattern(FROM_ZERO)), 'WF_KEPT_TURNS').pipe(
+  Config.map((value) => (value.trim() ? Number(value.trim()) : 1)),
+  Config.withDefault(1),
+);
+
 /** `WF_VERIFY_REST`: `1` on, `0` off; off when unset or empty. */
 const verifyRest = Config.schema(Schema.Literals(['0', '1']), 'WF_VERIFY_REST').pipe(
   Config.map((value) => value === '1'),
@@ -152,6 +158,21 @@ export const maxConcurrent = (env: Env) =>
     env,
     (value) =>
       `WF_MAX_CONCURRENT=${value} is not a count from 1. It is the most sessions at work per pool at once, a whole number: WF_MAX_CONCURRENT=4 — or unset, for 2.`,
+  );
+
+/**
+ * `WF_KEPT_TURNS`, the room the engine keeps for a person's turn: as many places per pool beyond `WF_MAX_CONCURRENT`, and as many
+ * sessions' default asks of the machine's memory, which no other work is admitted into. A whole number from 0, 0 keeping none, or 1
+ * when unset, empty or blank.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
+export const keptTurns = (env: Env) =>
+  read(
+    keptTurnsConfig,
+    'WF_KEPT_TURNS',
+    env,
+    (value) =>
+      `WF_KEPT_TURNS=${value} is not a count from 0. It is the turns a person waits on that the daemon keeps room for beyond WF_MAX_CONCURRENT, a whole number: WF_KEPT_TURNS=1 — or 0 to keep none.`,
   );
 
 /**
@@ -417,6 +438,7 @@ export const SERVING_VARIABLES = ['NEMIA_BIND', 'WF_EXPOSED', 'WF_SERVED_NAMES']
 /** Every `WF_` setting a program reads besides the root, each as its reader answers it. */
 export type Settings = {
   readonly maxConcurrent: number;
+  readonly keptTurns: number;
   readonly maxRuns: number;
   readonly verifyRest: boolean;
   readonly keepWorktrees: boolean;
@@ -444,6 +466,9 @@ export const settingsOf = (env: Env) =>
   ({
     get maxConcurrent() {
       return maxConcurrent(env);
+    },
+    get keptTurns() {
+      return keptTurns(env);
     },
     get maxRuns() {
       return maxRuns(env);

@@ -95,8 +95,12 @@ export type KeepOptions = { every: Duration.Input; restAfter: Duration.Input };
 /** The keeper's pace and her rest when it is given none. */
 export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds', restAfter: NEMIA_REST_AFTER };
 
-/** Her priority among the tasks waiting for a slot: above every step, so the person's agent is never queued behind the work. */
-const NEMIA_PRIORITY = 1_000_000;
+/**
+ * Her priority among the tasks waiting for a slot: above every step and above a person's turn (`ASKED_PRIORITY`), so the person's agent
+ * is never queued behind the work, and takes the room kept for a person's turn while she works. Exported only for the test that holds
+ * that order.
+ */
+export const NEMIA_PRIORITY = 1_000_000;
 
 /**
  * What her session is told first, once filed: what she does while the person writes to her, and, while a factory is above `manual`

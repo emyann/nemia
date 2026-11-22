@@ -32,6 +32,7 @@ import {
   budgetUsdFor,
   holdsOpenOn,
   landsOnCheck,
+  ASKED_PRIORITY,
   LANDING_MOMENTUM,
   MOMENTUM,
   sentBack,
@@ -367,7 +368,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
       );
   const brief = composed + heldSaid(pictured);
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
-  if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
+  if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd, askedOrMomentum(r));
   yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told, pictured })));
   return undefined;
 });
@@ -418,7 +419,17 @@ const askingReads = Effect.fnUntraced(function* (f: Filing, r: Retry, resumeFrom
       | undefined;
 });
 
-/** A try filed as a task of its own, in the workspace the step had, with its brief, its session to continue and its cap. */
+/**
+ * The priority a try or a round goes at: a person's (`by: 'ask'`) at `ASKED_PRIORITY`, the turn they wait on, which takes the room
+ * the engine keeps for it; the run's own at `MOMENTUM`.
+ * @param r The try or the round, and on whose word it is filed.
+ */
+const askedOrMomentum = (r: Pick<Retry | Round, 'by'>) => (r.by === 'ask' ? ASKED_PRIORITY : MOMENTUM);
+
+/**
+ * A try filed as a task of its own, in the workspace the step had, with its brief, its session to continue and its cap, at the priority
+ * of the word it was filed on (`askedOrMomentum`).
+ */
 const trySpec = (
   f: Filing,
   r: Retry,
@@ -437,7 +448,7 @@ const trySpec = (
   brief: t.brief,
   cwd: sessionCwd(step, f.run, f.home, record.workspace ?? f.run.workspace),
   harness: step.harness,
-  priority: MOMENTUM,
+  priority: askedOrMomentum(r),
   labels: stepLabels(f.run, step),
   ...localFields(step, () => ({
     config: filedConfig(step, f.reads.steps, f.run, {
@@ -519,7 +530,8 @@ const landingOf = Effect.fnUntraced(function* (f: Filing, r: Round) {
 });
 
 /**
- * A round's target filed under its next try's id: its session continued, told the round — and what the ending's check said of a merged
+ * A round's target filed under its next try's id, at the priority of the word it was filed on (`askedOrMomentum`): its session continued,
+ * told the round — and what the ending's check said of a merged
  * tree it refused (`said.landing`), and for a new session, what recent runs cost (`said.costs`) — with its cap for the round, as the tick
  * tells it (`told`, which its caller yields of `toldOf`).
  */
@@ -567,7 +579,7 @@ function roundSpec(
       ) + heldSaid(pictured),
     cwd: sessionCwd(target, run, f.home, record.workspace ?? run.workspace),
     harness: target.harness,
-    priority: MOMENTUM,
+    priority: askedOrMomentum(r),
     labels: stepLabels(run, target),
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {

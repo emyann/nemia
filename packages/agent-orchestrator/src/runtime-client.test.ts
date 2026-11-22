@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { settingsOf } from './config/config.store.ts';
 import { storeAdmission, storeLimits } from './runtime-client.ts';
+import { ASKED_PRIORITY, LANDING_MOMENTUM, MOMENTUM } from './status/status.ts';
+import { NEMIA_PRIORITY } from './nemia/keep.verb.ts';
 
 const GI = 1024 ** 3;
 
@@ -45,4 +47,30 @@ describe("`storeAdmission`: the floor the engine admits above is WF_MEMORY_RESER
     assert.equal(admission.maxConcurrent, 3);
     assert.equal(admission.unschedulable(), false);
   });
+});
+
+describe("`storeAdmission`: the room kept for a person's turn, WF_KEPT_TURNS places and as many default asks, above `ASKED_PRIORITY`", () => {
+  let root!: string;
+  beforeAll(() => {
+    root = scratch('wf-kept-');
+  });
+  const keptOf = (env: Record<string, string>) => storeAdmission(root, settingsOf(env), () => 16 * GI).keptRoom;
+  test('unset: one turn, and its memory the default request', () =>
+    assert.deepEqual(keptOf({ WF_MEMORY_LIMIT: '8Gi', WF_MEMORY_REQUEST: '2560Mi' }), {
+      priority: ASKED_PRIORITY,
+      sessions: 1,
+      memory: String(2560 * 2 ** 20),
+    }));
+  test('two turns, no request: twice the limit', () =>
+    assert.deepEqual(keptOf({ WF_KEPT_TURNS: '2', WF_MEMORY_LIMIT: '4Gi' }), { priority: ASKED_PRIORITY, sessions: 2, memory: String(8 * GI) }));
+  test('no ask set: places alone', () => assert.deepEqual(keptOf({}), { priority: ASKED_PRIORITY, sessions: 1 }));
+  test('0, or refused: none kept', () => {
+    assert.equal(keptOf({ WF_KEPT_TURNS: '0' }), undefined);
+    assert.equal(keptOf({ WF_KEPT_TURNS: 'x' }), undefined);
+  });
+});
+
+test("`ASKED_PRIORITY` lies above every filing of the work and below Nemia's own session", () => {
+  assert.ok(ASKED_PRIORITY > LANDING_MOMENTUM && LANDING_MOMENTUM > MOMENTUM);
+  assert.ok(ASKED_PRIORITY < NEMIA_PRIORITY);
 });

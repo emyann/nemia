@@ -16,6 +16,7 @@ import { settingsOf } from '../src/config/config.store.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
+import { ASKED_PRIORITY } from '../src/status/status.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -579,7 +580,7 @@ describe('a run keeps its momentum: its first steps are filed with none, and eve
       });
     },
   );
-  s.test('a try `retries:` files, its check, and a try `nemia retry` asks for — each with 1', async () => {
+  s.test("a try `retries:` files and its check each with 1, and a try `nemia retry` asks for with a person's priority", async () => {
     const run = await runPlaced(
       startRun({
         brief: 'add a flag',
@@ -603,7 +604,7 @@ describe('a run keeps its momentum: its first steps are filed with none, and eve
       'implement-check': 1,
       'implement-try2': 1,
       'implement-try2-check': 1,
-      'implement-try3': 1,
+      'implement-try3': ASKED_PRIORITY,
     });
   });
 });
@@ -645,6 +646,9 @@ describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read
     const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`;
     const promise = checkoutPromiseLine(runningRelease());
     const promised = promise ? [`   ${promise}`] : [];
+    const kept = printed.filter((l) => l.includes('(WF_KEPT_TURNS)'));
+    assert.equal(kept.length, 2, "each start says the room kept for a person's turn, WF_KEPT_TURNS unset keeping one");
+    for (const line of kept) assert.match(line, /\b1 per pool\b.*\bat most 5 at once\b/);
     const daemonStarts = printed.filter((l) => / {2}daemon started {2}· /.test(l));
     assert.deepEqual(
       daemonStarts.map((l) => l.replace(/^\d\d:\d\d:\d\d {2}/, '').replace(/at \S+$/, 'at …')),
@@ -652,7 +656,7 @@ describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read
       'each start writes the feed its daemon started line, the second saying when the first stopped',
     );
     assert.deepEqual(
-      printed.filter((l) => !daemonStarts.includes(l)),
+      printed.filter((l) => !daemonStarts.includes(l) && !kept.includes(l)),
       [
         'up — every 4000ms, ^C to stop',
         '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
@@ -676,6 +680,8 @@ describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read
     ['WF_MAX_RUNS=two, by `nemia ls`', { WF_MAX_RUNS: 'two' }, ['ls'], ['WF_MAX_RUNS=two', 'WF_MAX_RUNS=2'], true],
     ['WF_MAX_CONCURRENT=-3, by `nemia up`', { WF_MAX_CONCURRENT: '-3' }, ['up'], ['WF_MAX_CONCURRENT=-3', 'WF_MAX_CONCURRENT=4'], false],
     ['WF_MAX_CONCURRENT=-3, by `nemia tick`', { WF_MAX_CONCURRENT: '-3' }, ['tick'], ['WF_MAX_CONCURRENT=-3', 'WF_MAX_CONCURRENT=4'], true],
+    ['WF_KEPT_TURNS=some, by `nemia up`', { WF_KEPT_TURNS: 'some' }, ['up'], ['WF_KEPT_TURNS=some', 'WF_KEPT_TURNS=1'], false],
+    ['WF_KEPT_TURNS=some, by `nemia tick`', { WF_KEPT_TURNS: 'some' }, ['tick'], ['WF_KEPT_TURNS=some', 'WF_KEPT_TURNS=1'], true],
     ['WF_VERIFY_REST=true, by `nemia up`', { WF_VERIFY_REST: 'true' }, ['up'], ['WF_VERIFY_REST=true', 'WF_VERIFY_REST=1'], false],
     ['WF_VERIFY_REST=true, by `nemia tick`', { WF_VERIFY_REST: 'true' }, ['tick'], ['WF_VERIFY_REST=true', 'WF_VERIFY_REST=1'], false],
     ['WF_VERIFY_REST=true, by a pass', { WF_VERIFY_REST: 'true' }, 'pass', ['WF_VERIFY_REST=true', 'WF_VERIFY_REST=1'], false],

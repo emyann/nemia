@@ -5,7 +5,14 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
-import { DEFAULT_NAMESPACE, DEFINITION_ORIGINS, type DefinitionOrigin, type Workflow, type WorkflowStepStatus } from 'objects';
+import {
+  DEFAULT_NAMESPACE,
+  DEFINITION_ORIGINS,
+  type DefinitionOrigin,
+  type Workflow,
+  type WorkflowList,
+  type WorkflowStepStatus,
+} from 'objects';
 import type { GraphEdge, RunGraph } from './graph.ts';
 import type { StepLayers } from './layers.ts';
 import { files, runs, workflows as served, type Refuse, type StartFiles } from './objects.ts';
@@ -70,6 +77,15 @@ export type WorkflowListing = {
   unfilled: string | null;
 };
 
+/** A step as a list of workflows carries it: a listed step without its file's content — its body, its own note and its layers. */
+export type StepRow = Omit<ListedStep, 'body' | 'own' | 'layers'> & { own: Omit<StepOwn, 'body'> | null };
+
+/**
+ * A workflow as a list carries it: a `WorkflowListing` without its files' content — its README and each step's body, own note and layers —
+ * which a read of the one workflow answers (`workflowQuery`).
+ */
+export type WorkflowRow = Omit<WorkflowListing, 'readme' | 'steps'> & { steps: StepRow[] };
+
 /** Whether `key` is a key a step may set. */
 const isStepKey = (key: string): key is StepKey => (StepKeySchema.literals as readonly string[]).includes(key);
 
@@ -79,14 +95,22 @@ const copied = <T>(list: readonly T[]) => [...list];
 /** A step's keys as the object has them, decoded as the board's every key: a key the api left out refused, one it does not know dropped. */
 const specOf = (keys: WorkflowStepStatus['spec']) => Schema.decodeUnknownSync(WorkflowStepSpecSchema)(keys);
 
-/** A step of a Workflow's status, as the board reads it. */
-const stepOf = (step: WorkflowStepStatus) =>
+/** A step of a listed Workflow's status, as a list of them carries it (`StepRow`). */
+const stepRowOf = (step: WorkflowList['items'][number]['status']['steps'][number]) =>
   ({
     name: step.name,
     spec: specOf(step.spec),
+    own: step.own === null ? null : { keys: step.own.keys.filter(isStepKey) },
+    hired: step.hired,
+    mcp: copied(step.mcp),
+  }) satisfies StepRow as StepRow;
+
+/** A step of a Workflow's status, as the board reads it. */
+const stepOf = (step: WorkflowStepStatus) =>
+  ({
+    ...stepRowOf(step),
     body: step.body,
     own: step.own === null ? null : { keys: step.own.keys.filter(isStepKey), body: step.own.body },
-    hired: step.hired,
     layers:
       step.layers === null
         ? null
@@ -96,21 +120,19 @@ const stepOf = (step: WorkflowStepStatus) =>
             addedSkills: copied(step.layers.addedSkills),
             fence: step.layers.fence.map((f) => ({ ...f })),
           },
-    mcp: copied(step.mcp),
   }) satisfies ListedStep as ListedStep;
 
 /** A graph's edge the board draws: an input's is not drawn, as a run's page draws none (`runView.ts`). */
 const drawnEdge = (edge: Workflow['status']['graph']['edges'][number]): edge is GraphEdge => edge.kind !== 'input';
 
-/** A Workflow, as the board reads it (`WorkflowListing`). */
-const workflowViewOf = (workflow: Workflow) =>
+/** A Workflow of a list, as the board lists it (`WorkflowRow`). */
+const workflowRowOf = (workflow: WorkflowList['items'][number]) =>
   ({
     name: workflow.metadata.name,
     from: workflow.status.origin,
     dir: workflow.status.dir,
     description: workflow.status.description,
-    readme: workflow.status.readmeBody,
-    steps: workflow.status.steps.map(stepOf),
+    steps: workflow.status.steps.map(stepRowOf),
     graph: {
       roots: copied(workflow.status.graph.roots),
       edges: workflow.status.graph.edges.filter(drawnEdge).map((e) => ({ ...e })),
@@ -121,6 +143,14 @@ const workflowViewOf = (workflow: Workflow) =>
     version: workflow.metadata.resourceVersion,
     error: workflow.status.error,
     unfilled: workflow.status.unfilled,
+  }) satisfies WorkflowRow as WorkflowRow;
+
+/** A Workflow read alone, as its page and its builder read it (`WorkflowListing`): its row, its README and its steps whole. */
+const workflowViewOf = (workflow: Workflow) =>
+  ({
+    ...workflowRowOf(workflow),
+    readme: workflow.status.readmeBody,
+    steps: workflow.status.steps.map(stepOf),
   }) satisfies WorkflowListing as WorkflowListing;
 
 /** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
@@ -147,7 +177,7 @@ export const writtenStepOf = (step: StepWritten) => {
 /** Every workflow the default namespace serves: the api's repository's and yours. Not polled: it changes when a person edits a folder. */
 export const workflowsQuery = queryOptions({
   queryKey: ['workflows'],
-  queryFn: async () => (await served.list(DEFAULT_NAMESPACE)).map(workflowViewOf),
+  queryFn: async () => (await served.list(DEFAULT_NAMESPACE)).map(workflowRowOf),
 });
 
 /**
@@ -175,7 +205,7 @@ export const placeQuery = (place?: Place | null) =>
 export const factoryWorkflowsQuery = (place: Place) =>
   queryOptions({
     queryKey: ['factory-workflows', place.factory, place.repo],
-    queryFn: async () => (await served.list(place.factory, { repo: place.repo })).map(workflowViewOf),
+    queryFn: async () => (await served.list(place.factory, { repo: place.repo })).map(workflowRowOf),
   });
 
 /**
@@ -197,6 +227,26 @@ export type { WorkflowStepPage } from 'objects';
 
 /** The place a workflow's or a step's page is read in, as its address carries it: a factory, and a repository where one is named. */
 export type PagePlace = { factory?: string; repo?: string };
+
+/**
+ * One workflow, read whole for its page and its builder — its README, and each step's body, own note and layers, which no list carries —
+ * in `place`, from the origin the page's address names, as `stepQuery` reads it. Keyed under `['workflow']`, which a write reads again
+ * with the lists (`rereadWorkflows`).
+ * @param from The origin the page's address names.
+ * @param workflow The workflow's name.
+ * @param place The factory and repository it is read in; empty for the default namespace on no repository.
+ */
+export const workflowQuery = (from: string, workflow: string, place: PagePlace = {}) =>
+  queryOptions({
+    queryKey: ['workflow', from, workflow, place.factory ?? null, place.repo ?? null],
+    queryFn: async () =>
+      workflowViewOf(
+        await served.get(namespaceOf(place.factory), workflow, {
+          origin: DEFINITION_ORIGINS.find((origin) => origin === from) ?? sourceOf(from),
+          ...(place.repo ? { repo: place.repo } : {}),
+        }),
+      ),
+  });
 
 /**
  * A step of a workflow, for its page, read in `place`: the factory picked and its repository. Read again on each visit, as the Workflows

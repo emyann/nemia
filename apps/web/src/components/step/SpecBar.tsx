@@ -6,7 +6,7 @@
 import { usePagePlace } from '@/components/nav/useSeat';
 import { useQuery } from '@tanstack/react-query';
 import { factoriesQuery } from '@/lib/api/factories';
-import { fromMatches, workflowsInQuery, type WorkflowListing } from '@/lib/api/workflows';
+import { fromMatches, workflowsInQuery, type WorkflowRow } from '@/lib/api/workflows';
 import { fromWord, listPlace, type ListPlace } from '@/lib/factories';
 import { BarPanel } from '../frame/BarPanel';
 import { runsOn, specLines } from './StepNode';
@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/ds';
  * are read it says so; a read that failed, a factory that lists nowhere, and a workflow or a step the api lists none by, are each said in
  * the bar, which stays open until a person closes it.
  */
-export function SpecBar({ from, workflow, step }: { from: WorkflowListing['from']; workflow: string; step: string }) {
+export function SpecBar({ from, workflow, step }: { from: WorkflowRow['from']; workflow: string; step: string }) {
   const address = usePagePlace();
   const factories = useQuery(factoriesQuery);
   const where: ListPlace | null =
@@ -82,7 +82,7 @@ function Unread({ workflow, error, read }: { workflow: string; error: Error | nu
  * written whole, the tools by name where the node counts them; and the steps it waits on, the source of each `after` edge into it in the
  * workflow's order, or that it waits on none. Where it has no such step, or the workflow does not read, it says so.
  */
-export function SpecBody({ listing, step: name }: { listing: WorkflowListing; step: string }) {
+export function SpecBody({ listing, step: name }: { listing: WorkflowRow; step: string }) {
   const step = listing.steps.find((s) => s.name === name);
   if (listing.error)
     return (

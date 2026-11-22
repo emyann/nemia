@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
+import { startRun, type Place, type Started, type WorkflowRow } from '../../lib/api/workflows.ts';
 import type { RunView } from '../../lib/api/judged.ts';
 import { files as startFiles } from '../../lib/api/objects.ts';
 import { startCard } from '../../lib/api/inbox.ts';
@@ -51,7 +51,7 @@ export function StartRun({
   onStarted,
   onRefused,
 }: {
-  workflow: WorkflowListing;
+  workflow: WorkflowRow;
   card?: { name: string; factory: string | null; body: string };
   repo?: string;
   place?: Place;
@@ -206,7 +206,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
  * workflow when none is given, the default factory working on none — and in `factory` when one is named; from the workflow's folder; and,
  * for a card, that it stays in the inbox, listed as started.
  */
-function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; repo?: string; factory?: string; card: boolean }) {
+function Where({ workflow, repo, factory, card }: { workflow: WorkflowRow; repo?: string; factory?: string; card: boolean }) {
   return (
     <span className="min-w-0 text-body-small text-muted-foreground">
       {workflow.folderTeam ? (

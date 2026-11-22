@@ -10,6 +10,7 @@ import {
   DEFAULT_NAMESPACE,
   type Agent,
   type AgentInstructions,
+  type AgentList,
   type AgentSpec,
   type DefinitionOrigin,
 } from 'objects';
@@ -100,18 +101,21 @@ export type AgentListing = {
   untried: { why: string; copy: string | null } | null;
 };
 
-/** An agent's listing, as the Agents page reads it, and the names of the factories it fills a step in, sorted; never the default one. */
-export type LibraryAgent = AgentListing & { factories: string[] };
+/**
+ * An agent's listing, as the Agents page reads it off its list, and the names of the factories it fills a step in, sorted; never the
+ * default one. A list carries no file's content, so it has no instructions, result schema or file as written: `readAgent` reads those.
+ */
+export type LibraryAgent = Omit<AgentListing, 'body' | 'schema' | 'source'> & { factories: string[] };
 
 /** The role keys an agent's `spec.keys` sets, each as its file writes it; one unset left out. */
 const roleKeysOf = (keys: AgentSpec['keys']) =>
   Object.fromEntries(ROLE_KEYS.flatMap((key) => (typeof keys?.[key] === 'string' ? [[key, keys[key]]] : [])));
 
 /**
- * An Agent, as the board reads it (`LibraryAgent`, an `AgentListing` with the factories it fills a step in).
- * @param agent The Agent object the api serves.
+ * An agent of a list, as the Agents page reads it (`LibraryAgent`): every field but its files' content, which a list does not carry.
+ * @param agent The Agent the api's list serves.
  */
-export const agentViewOf = (agent: Agent) => {
+export const agentRowOf = (agent: AgentList['items'][number]) => {
   const { spec, status } = agent;
   return {
     name: agent.metadata.name,
@@ -121,23 +125,32 @@ export const agentViewOf = (agent: Agent) => {
     role: spec.role ?? null,
     description: spec.description ?? null,
     keys: roleKeysOf(spec.keys),
-    body: spec.instructions ?? '',
-    schema: spec.output ? { ...spec.output } : null,
     card: status.card ? status.card.map(cardEntryOf) : null,
     cardError: status.cardError,
     skills: spec.skills ?? null,
     harnessPrompt: spec.harnessPrompt ?? null,
     mcp: spec.mcp ?? null,
     given: status.given.map((g) => ({ ...g, entry: g.entry ? cardEntryOf(g.entry) : null, cost: g.cost ? { ...g.cost } : null })),
-    source: status.source,
     version: agent.metadata.resourceVersion,
     usedBy: status.usedBy.map((u) => ({ ...u })),
     fills: status.fills.map((f) => ({ ...f })),
     error: status.error,
     untried: status.untried ? { ...status.untried } : null,
     factories: [...status.factories],
-  };
+  } satisfies LibraryAgent;
 };
+
+/**
+ * An Agent read alone, as its page reads it (an `AgentListing` with the factories it fills a step in): its row, its instructions, its
+ * result schema and its file as written.
+ * @param agent The Agent object a read of one serves.
+ */
+export const agentViewOf = (agent: Agent) => ({
+  ...agentRowOf(agent),
+  body: agent.spec.instructions ?? '',
+  schema: agent.spec.output ? { ...agent.spec.output } : null,
+  source: agent.status.source,
+});
 
 /**
  * The origins the Agents page reads, each listed whole, shadowed or not: yours, the default namespace working on no repository and Nemia
@@ -148,7 +161,7 @@ const LISTED: readonly DefinitionOrigin[] = ['user'];
 /** Every agent of yours, with the factories each fills a step in, read from disk on each request. */
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
-  queryFn: async () => (await Promise.all(LISTED.map((origin) => served.list(DEFAULT_NAMESPACE, { origin })))).flat().map(agentViewOf),
+  queryFn: async () => (await Promise.all(LISTED.map((origin) => served.list(DEFAULT_NAMESPACE, { origin })))).flat().map(agentRowOf),
 });
 
 /**

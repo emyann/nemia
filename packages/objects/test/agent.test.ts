@@ -1,6 +1,6 @@
 /**
- * The Agent (`src/agent.ts`): an agent as the Api's get answers it, every key kept, and a page of them without its files' content; its origin and a given
- * skill's one of the four words; and the write and try bodies the Api takes, and the card it answers.
+ * The Agent (`src/agent.ts`): an agent as the Api's get answers it, every key kept, and a page of them without its files' content; its
+ * origin and a given skill's one of the four words; and the write and try bodies the Api takes, and the card it answers.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

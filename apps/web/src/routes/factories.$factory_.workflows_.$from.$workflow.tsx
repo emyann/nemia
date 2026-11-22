@@ -9,7 +9,8 @@ import { WorkflowTrail, loadWorkflow, WorkflowPage, workflowSearch } from '../co
 export const Route = createFileRoute('/factories/$factory_/workflows_/$from/$workflow')({
   validateSearch: workflowSearch,
   loaderDeps: ({ search }) => ({ repo: search.repo }),
-  loader: ({ context, deps, params }) => loadWorkflow(context.queryClient, { ...deps, factory: params.factory }, params.from),
+  loader: ({ context, deps, params }) =>
+    loadWorkflow(context.queryClient, { ...deps, factory: params.factory }, params.from, params.workflow),
   component: Page,
   errorComponent: Failed,
 });

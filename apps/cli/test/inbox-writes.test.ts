@@ -155,15 +155,22 @@ test("under this machine's context: a card filed from a file, queued, taken back
   await lifeOfACard((argv) => store.nemia(argv), store.root, ideaFile('here.md'));
 });
 
-test('a card carries the picture its idea file names beside it and a --file; attach, files, --get and detach', async () => {
+test('a card carries the picture its idea file names beside it and a --file, and names the one in a folder it does not; attach, files, --get and detach', async () => {
   const dir = scratch('nemia-inbox-files-');
   const shot = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
   fs.writeFileSync(path.join(dir, 'shot.png'), shot);
-  fs.writeFileSync(path.join(dir, 'idea.md'), 'Fix the header\n\nSee ![it](./shot.png).\n');
+  fs.writeFileSync(path.join(dir, 'idea.md'), 'Fix the header\n\nSee ![it](./shot.png) and ![before](img/before.png).\n');
+  fs.mkdirSync(path.join(dir, 'img'));
+  fs.writeFileSync(path.join(dir, 'img', 'before.png'), shot);
   fs.writeFileSync(path.join(dir, 'notes.txt'), 'notes\n');
   fs.writeFileSync(path.join(dir, 'run.log'), 'a log\n');
   const added = await store.nemia(['inbox', 'add', path.join(dir, 'idea.md'), '--file', path.join(dir, 'notes.txt')]);
   ok(added, 'inbox add --file');
+  assert.match(
+    added.out,
+    /img\/before\.png.*--file \S*img\/before\.png/,
+    'a picture in a folder is named, with the --file that carries it',
+  );
   const name = nameIn(added.out);
   const listed = await store.nemia(['inbox', 'files', name]);
   ok(listed, 'inbox files');

@@ -19,7 +19,7 @@ const addFlag = (flag: string, takes: string) =>
     twice: `${CLI} inbox add takes ${flag} once: a card names one ${ADD_NAMES[flag] ?? 'value'}.`,
   }) satisfies Flag;
 
-/** `nemia inbox add`'s flags: `--workflow` and `--factory`, once each, and `--label`, once per label. */
+/** `nemia inbox add`'s flags: `--workflow` and `--factory`, once each, `--after`, once per card, and `--label`, once per label. */
 const ADD_FLAGS: readonly Flag[] = [
   addFlag('--workflow', `the workflow to start the card on, by its name: ${CLI} inbox add "<idea>" --workflow <name>`),
   addFlag('--factory', `the factory that processes the card: ${CLI} inbox add "<idea>" --factory <name>`),
@@ -29,6 +29,13 @@ const ADD_FLAGS: readonly Flag[] = [
     key: 'label',
     many: true,
     takes: `--label takes a label edit, key=value to set one or key- to drop one its from: runs would give: ${CLI} inbox add "<idea>" --label team=core`,
+  },
+  {
+    flag: '--after',
+    kind: 'text',
+    key: 'after',
+    many: true,
+    takes: `--after takes a card the new card waits on, by its name, once per card: ${CLI} inbox add "<idea>" --after <card>`,
   },
   {
     flag: '--file',
@@ -50,7 +57,7 @@ const ADD_SPEC: Spec = {
     arg === '--repo' || arg.startsWith('--repo=')
       ? ADD_REPO_REFUSAL
       : arg.startsWith('-')
-        ? `${CLI} inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --factory <name>, --label <key=value> once per label and --file <path> once per file.`
+        ? `${CLI} inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --factory <name>, --after <card> once per card, --label <key=value> once per label and --file <path> once per file.`
         : `${CLI} inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — ${CLI} inbox add "<idea>" — or give it as a file: ${CLI} inbox add ./idea.md.`,
   apart: (_value, flag) => ADD_FLAGS.find((f) => f.flag === flag)?.takes ?? '',
   missing: `${CLI} inbox add takes the idea, first: ${CLI} inbox add "<idea>" [--workflow <name>] [--factory <name>], or a file: ${CLI} inbox add ./idea.md. Nothing was filed.`,
@@ -60,11 +67,12 @@ const ADD_SPEC: Spec = {
 export const INBOX_ADD_WORDS = {
   name: 'inbox add',
   served: [{ endpoint: 'cards.create' }],
-  usage: '"<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]... [--file <path>]...',
+  usage: '"<idea>"|<file> [--workflow <name>] [--factory <name>] [--after <card>]... [--label <key=value>]... [--file <path>]...',
   help: [
     'park an idea as a card in the inbox, named from its first line;',
     'each --file is uploaded and carried by the card, as is each file',
-    'beside an idea file that its text names as an image or a link',
+    'beside an idea file that its text names as an image or a link;',
+    'each --after names a card it waits on, and it starts once they land',
   ],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),

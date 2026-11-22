@@ -212,10 +212,11 @@ Its arguments:
 ## inbox_add
 
 ```text
-  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]... [--file <path>]...
+  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--after <card>]... [--label <key=value>]... [--file <path>]...
     park an idea as a card in the inbox, named from its first line;
     each --file is uploaded and carried by the card, as is each file
-    beside an idea file that its text names as an image or a link
+    beside an idea file that its text names as an image or a link;
+    each --after names a card it waits on, and it starts once they land
 ```
 
 Files a new card in the inbox, in the namespace's factory (none, in default), from the CardFile body. Answers the Card filed with a 201, naming any label it left out.
@@ -231,6 +232,7 @@ Its arguments:
 - repo: Retired and refused: the factory places the card's run.
 - factory (--factory at a shell): The factory the card is filed in.
 - label (--label at a shell): The labels the card is filed with, each as `key=value`.
+- after (--after at a shell): The cards it waits on, by name: it is queued and started only once each has landed.
 - files: The files the card carries, each a File uploaded to the card's namespace first, by its id.
 
 ## inbox_queue

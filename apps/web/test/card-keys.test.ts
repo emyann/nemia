@@ -12,13 +12,14 @@ import { cardObject } from './factory.fixture.ts';
 import { apiAnswers } from './network.ts';
 
 describe("cardKeysOf: a Card's keys as the card page's rows, in order, each with its meaning", () => {
-  test('every key set: queued its time, models, from and files comma-joined, labels as a=b,c=d in key order, factory its namespace', () => {
+  test('every key set: queued its time, models, from, after and files comma-joined, labels as a=b,c=d in key order, factory its namespace', () => {
     const card = cardObject({
       metadata: { namespace: 'mill', labels: { team: 'web', area: 'board' } },
       spec: {
         gate: 'design',
         model: { implement: 'fable', review: 'opus' },
         from: ['r-1', 'r-2'],
+        after: ['cache-the-views-k2q9', 'parse-the-flag-1x2y'],
         queued: '2026-09-30T05:01:00.000Z',
         files: [
           { name: 'shot.png', file: `file_${'a'.repeat(32)}` },
@@ -34,6 +35,7 @@ describe("cardKeysOf: a Card's keys as the card page's rows, in order, each with
       { key: 'model', value: 'implement=fable, review=opus', meaning: CARD_KEY_MEANINGS.model },
       { key: 'factory', value: 'mill', meaning: CARD_KEY_MEANINGS.factory },
       { key: 'from', value: 'r-1, r-2', meaning: CARD_KEY_MEANINGS.from },
+      { key: 'after', value: 'cache-the-views-k2q9, parse-the-flag-1x2y', meaning: CARD_KEY_MEANINGS.after },
       { key: 'labels', value: 'area=board,team=web', meaning: CARD_KEY_MEANINGS.labels },
       { key: 'files', value: 'shot.png, run.log', meaning: CARD_KEY_MEANINGS.files },
     ]);
@@ -48,7 +50,7 @@ describe("cardKeysOf: a Card's keys as the card page's rows, in order, each with
     );
     assert.deepEqual(
       rows?.map((row) => row.value),
-      [null, null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null, null, null],
     );
   });
   test('an entry that does not read as a card has no keys', () => {

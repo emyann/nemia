@@ -415,7 +415,7 @@ test("`nemia inbox` prints the server's table of the cards in play, then how to 
   const before = api.said().length;
   const listed = await nemia(['inbox']);
   assert.equal(listed.code, 0, listed.err);
-  assert.match(listed.out, /^NAME +TITLE +WORKFLOW +REPO +FACTORY +QUEUED +STATE +RUNS$/m, "the server's columns");
+  assert.match(listed.out, /^NAME +TITLE +WORKFLOW +REPO +FACTORY +QUEUED +WAITS +STATE +RUNS$/m, "the server's columns");
   assert.match(listed.out, /^hold-the-reads .*waiting on you +r-parity$/m, "a started card's state beside its run");
   assert.match(listed.out, /^notes\.txt /m, 'an entry that is no card is listed too, never hidden');
   assert.doesNotMatch(listed.out, /^called-off /m, 'its run was called off: out of the cards in play');

@@ -21,12 +21,13 @@ export type Filing = {
   repo?: string;
   factory?: string;
   label?: string[];
+  after?: string[];
   files?: CardFileRef[];
 };
 
 /**
- * What a card filed (`POST /api/namespaces/:namespace/cards`) files: its body, its workflow by name, its factory, its labels and its
- * files, each a File uploaded to the card's namespace first, by its id. A card
+ * What a card filed (`POST /api/namespaces/:namespace/cards`) files: its body, its workflow by name, its factory, its labels, the cards it
+ * waits on (`after`) and its files, each a File uploaded to the card's namespace first, by its id. A card
  * names its factory and its workflow, and nothing about repositories: the factory places its run (`nemia factory attach <factory>
  * <workflow> --repo <name>`), so no repository is read here and an api with none of its own files a card all the same.
  *
@@ -45,6 +46,7 @@ export function filingOf(body: CardFile, home: string) {
     ...(body.repo !== undefined ? { repo: body.repo } : {}),
     ...(body.factory !== undefined ? { factory: body.factory } : {}),
     ...(body.label !== undefined ? { label: [...body.label] } : {}),
+    ...(body.after !== undefined ? { after: [...body.after] } : {}),
     ...(body.files !== undefined ? { files: [...body.files] } : {}),
   };
 }

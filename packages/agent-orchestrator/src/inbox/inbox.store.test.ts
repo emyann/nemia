@@ -450,6 +450,21 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
       assert.equal(runRecord(ROOT, started.run.id).after, undefined, 'it waits on none');
     },
   );
+  s.test(
+    "a person's start of a card whose after: names a card not landed starts it all the same, answering the cards it had waited on",
+    async () => {
+      emptyInbox();
+      const repo = aRepoWith('dev');
+      const first = addToInbox({ text: 'Land the first slice', workflow: 'dev' });
+      const second = addToInbox({ text: 'Land the second slice', workflow: 'dev', after: [first.card.name] });
+      assert.match(fs.readFileSync(second.file, 'utf8'), new RegExp(`^after: ${first.card.name}$`, 'm'), 'filed with its after:');
+      const started = await runPlaced(
+        startFromInbox({ name: second.card.name, workflow: 'dev', callerRepo: repo, landed: () => Effect.succeed(false) }),
+      );
+      assert.deepEqual(started.waitedOn, [first.card.name]);
+      assert.equal(runRecord(ROOT, started.run.id).from?.inbox, second.card.name, 'started all the same');
+    },
+  );
 });
 
 describe('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbox rm` — nothing filed, nothing removed', () => {
@@ -457,7 +472,7 @@ describe('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbo
   beforeAll(() => {
     emptyInbox();
     fs.writeFileSync(empty, '\n');
-    fs.writeFileSync(waits, '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n');
+    fs.writeFileSync(waits, '---\nworkflow: dev\nafter: b-1x2y, b-1x2y\n---\nShow the flag.\n');
     fs.writeFileSync(withRepo, `---\nworkflow: dev\nrepo: ${ROOT}\n---\nShow the flag.\n`);
     fs.writeFileSync(byPath, '---\nworkflow: ../workflows/dev\n---\nShow the flag.\n');
     addFactoryAt(ROOT, { name: 'f', volumes: [aRepoWith('dev')].map((r) => `${r}:rw`) });
@@ -474,11 +489,16 @@ describe('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbo
     'an empty idea': [() => add(''), 'the idea has nothing in it', 'nemia inbox add "<idea>"'],
     'an idea of spaces': [() => add('   '), 'the idea has nothing in it', 'nemia inbox add "<idea>"'],
     "an empty file's text": [() => added({ idea: fs.readFileSync(empty, 'utf8') }), 'the idea has nothing in it'],
-    'a file whose card has `after:`': [
+    'a file whose card names a card twice in its `after:`': [
       () => added({ idea: fs.readFileSync(waits, 'utf8') }),
-      '`after`',
-      'nemia start <inbox>/<name>.md --after <runId>',
+      '`after: b-1x2y, b-1x2y`',
+      'names b-1x2y twice',
     ],
+    'an --after naming a card twice, to addToInbox': [
+      () => addToInbox({ text: 'an idea', after: ['b-1x2y', 'b-1x2y'] }),
+      'names b-1x2y twice',
+    ],
+    "an --after that is no card's name, to addToInbox": [() => addToInbox({ text: 'an idea', after: ['../up'] }), '`after: ../up`'],
     'a repo given, to addToInbox': [
       () => addToInbox({ text: 'an idea', repo: ROOT }),
       ROOT,
@@ -558,7 +578,10 @@ describe('REFUSED by name at shipped defaults: `nemia start` of an inbox card, b
     sourced = addToInbox({ text: 'Read the sources', workflow: 'dev' });
     cards = [...[kept, other, loose, nope, sourced].map((c) => c.card.name), 'hand-written-a1b2'].sort();
     await verb('inbox', 'from', sourced.card.name, 'source-a1');
-    fs.writeFileSync(path.join(INBOX, 'hand-written-a1b2.md'), `---\nworkflow: dev\nafter: ${kept.card.name}\n---\nShow the flag\n`);
+    fs.writeFileSync(
+      path.join(INBOX, 'hand-written-a1b2.md'),
+      `---\nworkflow: dev\nafter: ${kept.card.name}, ${kept.card.name}\n---\nShow the flag\n`,
+    );
     fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'Refactor everything.\n');
     fs.mkdirSync(path.join(INBOX, 'drafts'));
     fs.writeFileSync(path.join(INBOX, 'drafts', 'idea.md'), 'Refactor everything.\n');
@@ -652,11 +675,11 @@ describe('REFUSED by name at shipped defaults: `nemia start` of an inbox card, b
       `named nope in ${path.join(repo, 'workflows')}.`,
       'workflows are: dev, ui',
     ],
-    'a card that does not read: `after:`': () => [
+    'a card that does not read: `after:` naming a card twice': () => [
       () => starting(path.join(INBOX, 'hand-written-a1b2.md')),
       'Invalid',
-      'hand-written-a1b2.md: `after`',
-      'nemia start <inbox>/hand-written-a1b2.md --after <runId>',
+      'hand-written-a1b2.md: `after:',
+      `names ${kept.card.name} twice`,
     ],
     'a blank brief, to startFromInbox': () => [
       () => fromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo }),

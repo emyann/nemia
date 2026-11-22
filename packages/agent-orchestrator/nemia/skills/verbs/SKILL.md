@@ -414,10 +414,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --repo is refused: its factory places the run
                                each tool's words: tools.md#start, tools.md#inbox_start
                                on the port: start, inbox_start
-  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]... [--file <path>]...
+  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--after <card>]... [--label <key=value>]... [--file <path>]...
                                park an idea as a card in the inbox, named from its first line;
                                each --file is uploaded and carried by the card, as is each file
-                               beside an idea file that its text names as an image or a link
+                               beside an idea file that its text names as an image or a link;
+                               each --after names a card it waits on, and it starts once they land
                                each tool's words: tools.md#inbox_add
                                on the port: inbox_add
   nemia inbox queue <name> [--workflow <w>] [--off]

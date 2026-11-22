@@ -176,8 +176,11 @@ export {
   CardStatus,
   CardWrite,
   CardEdit,
+  CARD_WAIT_KINDS,
+  CardWait,
   type CardKey,
   type CardState,
+  type CardWaitKind,
 } from './card.ts';
 export { CARD_FILE_REF, CardAttach, CardFileNamed, CardFileRef, CardFileStatus } from './card.ts';
 export {

@@ -7,7 +7,17 @@ import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf } from '../../lib/api/workflows.ts';
 import { type CardState, type InboxEntry } from '../../lib/api/inbox.ts';
-import { clashWords, hasPage, queueable, queuedWord, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../../lib/inbox';
+import {
+  clashWords,
+  waitWords,
+  hasPage,
+  queueable,
+  queuedWord,
+  queueNeedsFactory,
+  triedLine,
+  unassigned,
+  type CardRefusal,
+} from '../../lib/inbox';
 import { instantWords } from '../../lib/instant';
 import { container } from '../../lib/meaning';
 import { CARD_WORDS } from '../../lib/words';
@@ -212,7 +222,8 @@ export function Refused({ refusal }: { refusal: CardRefusal }) {
 
 /**
  * A card's place in the queue — its word, by whom where triggers queue it, and since when — and, on a card two triggers of its factory
- * would send to two workflows, the clash and what to change.
+ * would send to two workflows, the clash and what to change; on a card that waits on cards of its `after:` not landed, each, in the
+ * failure's colours where only a person can release one.
  */
 export function CardQueue({ entry }: { entry: InboxEntry }) {
   return (
@@ -235,6 +246,19 @@ export function CardQueue({ entry }: { entry: InboxEntry }) {
           {clashWords(entry.clash)}
         </p>
       )}
+      {entry.waits?.length ? (
+        <p
+          data-card-waits={entry.waits.map((w) => w.card).join(' ')}
+          data-stalled={entry.waits.some((w) => w.stalled) ? 'true' : 'false'}
+          className={
+            entry.waits.some((w) => w.stalled)
+              ? 'rounded border border-failure bg-failure-container px-3 py-2 text-body-small text-on-failure-container'
+              : 'text-body-small text-on-surface-variant'
+          }
+        >
+          {waitWords(entry.name, entry.waits)}
+        </p>
+      ) : null}
     </>
   );
 }

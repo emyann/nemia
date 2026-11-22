@@ -6,14 +6,13 @@
 /** `nemia inbox --help`: every form of the inbox, what a card is, and what is refused by name. */
 export const INBOX_MANUAL = `nemia inbox [--all]
 nemia inbox -l <key>=<value>... [--all] [--show-labels] [-L <key>]...
-nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...
+nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--after <card>]... [--label <key=value>]...
 nemia inbox queue <name> [--workflow <w>] [--off]
 nemia inbox from <name> <run>... | --off
 nemia inbox rm <name>
 
 An inbox is cards before they are started: \${WF_ROOT:-~/.agent-workflows}/inbox/, one <name>.md per card, beside
-runs/. A card is a plan's card with two differences — its keys optional, and no after:, since what it waits on
-is said at start:
+runs/. A card is a plan's card with two differences — its keys optional, and its after: names cards, not steps:
 
     ---
     workflow: dev              # what runs it, by name, chosen at start when the card does not say
@@ -21,6 +20,7 @@ is said at start:
     gate: review               # the step whose closeout waits for nemia approve in the run it starts
     factory: acme              # the factory it is started in (nemia factory --help); required to start
     from: add-cache-a1b2       # runs its run is handed as context, comma-separated: read, never waited on
+    after: add-a-cache-k2q9    # cards it waits on, comma-separated: queued and started once each has landed
     labels: { team: core }     # a person's labels: what -l selects it by, copied to the run it starts
     ---
     Cache the engine's views between passes.
@@ -28,6 +28,13 @@ is said at start:
 A card names its factory and its workflow, never a repository: its run works on the repository the factory's
 wiring names for the workflow, else on its only one (nemia factory attach <factory> <workflow> --repo <name>).
 An old card's repo: is retired: it still reads and lists, and no start reads it.
+
+A card that names cards in its after: waits on them: no trigger queues it and the tick starts none of it until
+each has landed — its own run, or, for a card a run passed its work on to (a workflow node's card, nemia inbox
+resend), that card's. nemia inbox says waiting on <card>, at the card its work stands at, and its state; a wait
+only a person can release (a card the store does not know, a cycle, a run ended unlanded or a start refused) says
+needs you, with the fix: nemia inbox resend <card>, nemia inbox edit <name> to change after:, or nemia start
+<name>, which starts it all the same and says which cards had not landed.
 
   nemia inbox       lists the cards still in play: its name, the first line of its body, its workflow when set,
                  and started as <runId>, <phase> for a card a run's record says it was started as, the phase
@@ -37,7 +44,8 @@ An old card's repo: is retired: it still reads and lists, and no start reads it.
                  (key=v, key!=v, "key in (a,b)", "key notin (a,b)", key), over its labels, workflow and factory,
                  given again for another; --show-labels adds its labels to its line, -L <key> that key's value.
   nemia inbox add   files an idea, text or a file, named with the slug a run id makes of its first line, suffix and
-                 all; --workflow and --factory write the keys, over a file's own; --label key=value (or
+                 all; --workflow and --factory write the keys, over a file's own; --after <card> writes after:,
+                 once per card it waits on; --label key=value (or
                  key-) edits its labels:, over a file's own and what the runs of its from: agree on.
   nemia inbox queue marks a card to start on its own: each pass, once every run has been advanced and a run slot is
                  free (WF_MAX_RUNS; always, with no cap), the tick starts the oldest queued card, one per pass, on its
@@ -53,7 +61,7 @@ An old card's repo: is retired: it still reads and lists, and no start reads it.
   nemia inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
 
 Refused by name: a key a card does not have, a key set to nothing, a queued: that is not a time or is on a card
-with no workflow:, a gate: naming more than one step or saying true, a factory: that is not a factory's name — and,
+with no workflow:, a gate: naming more than one step or saying true, a factory: that is not a factory's name, an after: naming a card twice or itself — and,
 at start, a gate: naming no step of the workflow, a card that names no factory and is started with no --factory,
 never one taken from its folder, a factory: the store does not have, default, one that does not offer the workflow
 or names it no repository — an add with no idea, with --repo or a repo: line, with a workflow that is a path or one

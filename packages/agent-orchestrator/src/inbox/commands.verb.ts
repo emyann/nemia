@@ -87,6 +87,7 @@ export const InboxAddInput = Schema.Struct({
   repo: Schema.optionalKey(Schema.String),
   factory: Schema.optionalKey(Schema.String),
   label: Schema.optionalKey(Schema.Array(Schema.String)),
+  after: Schema.optionalKey(Schema.Array(Schema.String)),
   files: Schema.optionalKey(Schema.Array(CardFileRef)),
 });
 export type InboxAddInput = typeof InboxAddInput.Type;

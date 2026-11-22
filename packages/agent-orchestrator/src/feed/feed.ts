@@ -350,6 +350,9 @@ const addsKey = (factory: string) => `Adds/${factory}`;
 /** Where the fold keeps what was last said of the card `card` of the factory `factory` clashing: no `Run/` or `Step/` key, as `addsKey`. */
 const clashKey = (factory: string, card: string) => `Clash/${factory}/${card}`;
 
+/** The key the fold keeps the last word said of a card's stalled wait under: per factory and card, never a run's. */
+const waitKey = (factory: string, card: string) => `Wait/${factory}/${card}`;
+
 /** Where the fold keeps the store's readiness last said: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets it. */
 const READINESS_KEY = 'Readiness/store';
 
@@ -438,7 +441,8 @@ function foldStore(fold: FeedFold, l: StoreLine) {
 
 /**
  * A factory's line `l` folded: its conflicts pending or settled, its library adds missing or resolved, and a card of it clashing or
- * settled (by the card its labels name), each kept as the last word said of them, with its reason; any other passed.
+ * settled, or its wait stalled or freed (by the card its labels name), each kept as the last word said of them, with its reason; any
+ * other passed.
  */
 function foldFactory(fold: FeedFold, l: FactoryLine) {
   const reason = reasonOfLine(l, involvedOf(l));
@@ -447,6 +451,8 @@ function foldFactory(fold: FeedFold, l: FactoryLine) {
   const card = l.labels?.card;
   if ((reason === 'TriggersClash' || reason === 'ClashSettled') && card !== undefined)
     fold.said.set(clashKey(l.factory, card), { ...saidOf(l), reason });
+  if ((reason === 'CardWaitStalled' || reason === 'CardWaitFreed') && card !== undefined)
+    fold.said.set(waitKey(l.factory, card), { ...saidOf(l), reason });
 }
 
 /** The word and the note `line` says, as the fold keeps them. */
@@ -864,6 +870,43 @@ function clashLines(fold: FeedFold, at: string, clashes: FeedClashes) {
   return [...begun, ...ended];
 }
 
+/**
+ * Each card whose wait on the cards of its `after:` only a person can release, as a pass read the inbox (`waits`, `cardsListed`): its
+ * factory, its name and what a person reads of each such wait, the fix among it. A caller that did not read the inbox passes nothing,
+ * and the feed says nothing of any.
+ */
+export type FeedWaits = readonly { factory: string; card: string; waits: readonly string[] }[];
+
+/**
+ * The lines the cards' stalled waits owe the feed: `CardWaitStalled` for each card stalled now that the feed did not last say so, its note
+ * the card and each wait with its fix; `CardWaitFreed` for each card the feed last said stalled that is stalled no more — the card it waits
+ * on landed or came back in play, its `after:` edited, started, or removed. Compared by the reason the fold keeps under `waitKey`, never
+ * its note, so a wait that moves along stalled writes no line, and a restarted daemon, whose fold is the whole feed, says none again. Pure.
+ */
+function waitLines(fold: FeedFold, at: string, waits: FeedWaits) {
+  const now = new Set(waits.map(({ factory, card }) => waitKey(factory, card)));
+  const line = (factory: string, card: string, reason: 'CardWaitStalled' | 'CardWaitFreed', note: string) =>
+    upgraded({
+      at,
+      factory,
+      word: LINE_WORDS[reason],
+      note,
+      involved: { kind: 'Factory', name: factory },
+      labels: { factory, card },
+      reason,
+    }) as FactoryLine;
+  const begun = waits
+    .filter(({ factory, card }) => fold.said.get(waitKey(factory, card))?.reason !== 'CardWaitStalled')
+    .map(({ factory, card, waits: said }) => line(factory, card, 'CardWaitStalled', `card ${card} ${said.join('; ')}`));
+  const ended = [...fold.said.entries()].flatMap(([key, said]) => {
+    if (!key.startsWith('Wait/') || said.reason !== 'CardWaitStalled' || now.has(key)) return [];
+    const [factory = '', ...rest] = key.slice('Wait/'.length).split('/');
+    const card = rest.join('/');
+    return [line(factory, card, 'CardWaitFreed', `card ${card} waits on no card only a person can release`)];
+  });
+  return [...begun, ...ended];
+}
+
 /** One call a step's sessions were denied, as the one-shot the feed writes of it: the call in its word and as a field of its own. */
 const denialOnce = (d: FeedDenial) => ({
   step: d.step,
@@ -941,6 +984,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords) {
  * @param resumed Who last lifted the store's pause by hand, and the pause it lifted; undefined where none was left.
  * @param missing Each recorded factory's library adds, or undefined where the pass read none.
  * @param clashes Each card the triggers of its factory clash on, or undefined where the pass read no inbox.
+ * @param waits Each card whose wait only a person can release, or undefined where the pass read no inbox.
  */
 export function feedChanges(
   fold: FeedFold,
@@ -954,6 +998,7 @@ export function feedChanges(
   resumed?: FeedResumed,
   missing?: FeedMissing,
   clashes?: FeedClashes,
+  waits?: FeedWaits,
 ) {
   const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels) =>
     upgraded({
@@ -985,9 +1030,15 @@ export function feedChanges(
     ...out,
     ...storeChanges(fold, at, pause, levels, readiness, resumed),
     ...factoryChanges(fold, at, conflicts, missing),
-    ...(clashes === undefined ? [] : clashLines(fold, at, clashes)),
+    ...cardChanges(fold, at, clashes, waits),
   ];
 }
+
+/** The cards' lines a pass owes: their clashes' where it read them (`clashLines`), their stalled waits' where read (`waitLines`). */
+const cardChanges = (fold: FeedFold, at: string, clashes: FeedClashes | undefined, waits: FeedWaits | undefined) => [
+  ...(clashes === undefined ? [] : clashLines(fold, at, clashes)),
+  ...(waits === undefined ? [] : waitLines(fold, at, waits)),
+];
 
 /** The factories' lines a pass owes: their conflicts' where it read them (`conflictLines`), their adds' where it read them. Pure. */
 const factoryChanges = (fold: FeedFold, at: string, conflicts: FeedConflicts | undefined, missing: FeedMissing | undefined) => [

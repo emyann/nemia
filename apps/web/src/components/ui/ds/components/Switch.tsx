@@ -45,12 +45,12 @@ const styles = tv({
       },
       true: {
         track:
-          "border-primary bg-primary group-data-disabled/sw:border-transparent group-data-disabled/sw:bg-on-surface/12",
+          "border-[color:var(--md-comp-switch-selected-track-color,var(--md-sys-color-primary))] bg-[color:var(--md-comp-switch-selected-track-color,var(--md-sys-color-primary))] group-data-disabled/sw:border-transparent group-data-disabled/sw:bg-on-surface/12",
         target: "left-4",
-        stateLayer: "bg-primary",
+        stateLayer: "bg-[color:var(--md-comp-switch-selected-track-color,var(--md-sys-color-primary))]",
         handle:
-          "size-6 bg-on-primary group-hover/sw:bg-primary-container group-data-focus-visible/sw:bg-primary-container group-data-pressed/sw:size-7 group-data-pressed/sw:bg-primary-container group-data-disabled/sw:bg-surface",
-        icon: "text-on-primary-container group-data-disabled/sw:text-on-surface/38",
+          "size-6 bg-[color:var(--md-comp-switch-selected-handle-color,var(--md-sys-color-on-primary))] group-hover/sw:bg-[color:var(--md-comp-switch-selected-hover-handle-color,var(--md-sys-color-primary-container))] group-data-focus-visible/sw:bg-[color:var(--md-comp-switch-selected-hover-handle-color,var(--md-sys-color-primary-container))] group-data-pressed/sw:size-7 group-data-pressed/sw:bg-[color:var(--md-comp-switch-selected-hover-handle-color,var(--md-sys-color-primary-container))] group-data-disabled/sw:bg-surface",
+        icon: "text-[color:var(--md-comp-switch-selected-icon-color,var(--md-sys-color-on-primary-container))] group-data-disabled/sw:text-on-surface/38",
       },
     },
     hasIcons: {

@@ -245,6 +245,25 @@ body, where the next Tab starts from the top:
 
 ## What a project may change
 
+**Check a part against the spec before you restyle it.** Keep Material's
+guidance and own the identity: follow Material's structure (which part does
+which job, its anatomy, its states, which role goes on which surface), and
+make the values the project's own. So before a kit part is drawn any other
+way than it is:
+
+1. Read its spec (the `ds-spec` skill: its `specs` and `guidelines` pages)
+   and say which of Material's tokens the change departs from.
+2. If the kit has a component token for it (the `ds-theme` skill lists
+   them, and `COMPONENT_TOKENS` in `<kit>/tokens/design-md.mjs`), point the token at the role in `DESIGN.md`'s reference
+   block, and write the departure under `## Where we differ from Material`:
+   the part, the token, the role and why.
+3. If it has none, write the departure there as wanted, and ask the kit for
+   a general seam whose default is Material's, never for one app's look.
+   Until then it is written down, not patched with CSS.
+
+Never restyle a part quietly: no CSS laid over a kit part's markup, and no
+departure that `## Where we differ from Material` does not name.
+
 One rule: **an edit of a kit file is allowed, priced and rarely needed.**
 
 - **Allowed.** The kit's files are in the project's tree, and the project may
@@ -255,7 +274,8 @@ One rule: **an edit of a kit file is allowed, priced and rarely needed.**
   `node <kit>/changed.mjs`, run before the update, lists the kit files the
   project changed; it puts nothing back.
 - **Rarely needed.** First try, in order: a token in `DESIGN.md` (the
-  `ds-theme` skill), a `className` on the component, a class on one of its
+  `ds-theme` skill), a component token there for a part that must take
+  another role, a `className` on the component, a class on one of its
   named parts through `classNames` (on a component whose doc comment lists
   its parts: `Tooltip`, `Card`, `Carousel` and `CarouselItem`, `Table`'s
   `Column` and `Cell`, `IconButton`;
@@ -275,7 +295,8 @@ and the project's identity lives in the first two.
 | **Behaviour**     | every other kit file: the components, `<kit>/utils.ts`, `<kit>/render-props.ts`, `<kit>/icons.tsx` | edit a file, at the price above                              | replaces them, with Material's and accessibility's fixes, keeping no name; the edit is put back by hand |
 
 - **A token change is free.** Colours, type, corners, elevation, motion,
-  state opacities and dark mode all come from `DESIGN.md`. If a look can be
+  state opacities, dark mode and the component tokens all come from
+  `DESIGN.md`. If a look can be
   reached there, reach it there.
 - **A style-module edit costs one merge per update.** Edit
   `<kit>/components/field-styles.ts` when the field anatomy itself must change
@@ -290,7 +311,9 @@ and the project's identity lives in the first two.
   default, an update rewrites them, and a token reaches the same look for
   free: the project's look is its own `DESIGN.md`.
 - What tokens cannot reach today: the disabled alphas (38 % and 12 % are
-  written into the components) and each component's own anatomy.
+  written into the components), each component's own anatomy, and a part's
+  role where the kit has no component token for it yet (ask the kit for
+  one, as above).
 
 ## Adding and updating
 

@@ -142,7 +142,7 @@ const styles = tv({
       selection: "selected",
       isContained: false,
       variant: "standard",
-      class: { icon: "text-primary" },
+      class: { icon: "text-[color:var(--md-comp-icon-button-standard-selected-icon-color,var(--md-sys-color-primary))]" },
     },
     {
       selection: "selected",
@@ -380,7 +380,11 @@ function IconButtonContent({
         isPressed={isPressed}
         isHovered={isHovered}
         isFocusVisible={isFocusVisible}
-        className="rounded-[inherit]"
+        className={
+          !isContained && variant === "standard" && selection === "selected"
+            ? `rounded-[inherit] ${SELECTED_STANDARD_LAYER}`
+            : "rounded-[inherit]"
+        }
       />
       <span data-slot="icon-button-icon" className={icon({ className })}>
         <Icon size={iconSizes[size]} />
@@ -544,6 +548,13 @@ const ToggleIconButton = forwardRef<HTMLButtonElement, ToggleIconButtonProps>(
 );
 
 ToggleIconButton.displayName = "ToggleIconButton";
+
+// A selected, uncontained standard button tints its layer with its icon's
+// component token (`md.comp.icon-button.standard.selected.*`), whose default
+// is the `primary` getStateLayerColor gives: a theme that points the icon
+// elsewhere moves the layer with it.
+const SELECTED_STANDARD_LAYER =
+  "bg-[color:var(--md-comp-icon-button-standard-selected-icon-color,var(--md-sys-color-primary))]";
 
 // The layer tints with the content colour of the state it is drawn in: a
 // primary-coloured layer over a `bg-primary` button would be invisible.

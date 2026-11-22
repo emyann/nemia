@@ -57,7 +57,6 @@ export const WorkflowPicked: Story = {
 
 /** On two repositories: the workflow is picked by name first, in the kit's select. */
 export const TwoRepositories: Story = {
-  parameters: { a11y: { test: 'todo' } },
   args: { factories: [offering(['/work/nemia', '/work/site'])] },
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-pick-workflow]')).not.toBeNull();

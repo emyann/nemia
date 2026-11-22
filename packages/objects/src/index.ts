@@ -405,7 +405,8 @@ export {
   TRANSCRIPT_ROLES,
   type TranscriptRole,
 } from './words.ts';
-export { BaseHold, RunHolding, RunWaiting } from './run.ts';
+export { BaseHold, QueuedFor, RunHolding, RunWaiting } from './run.ts';
+export { QUEUED_FOR, type QueuedForWord, QUEUED_TASKS, type QueuedTask } from './words.ts';
 export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,

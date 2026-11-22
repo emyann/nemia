@@ -9,6 +9,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/ht
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { describedNumber } from './meta.ts';
 import { UPGRADE_PHASES, UPGRADE_STREAM_EVENTS } from './words.ts';
+import { QueuedFor } from './run.ts';
 
 /** `POST /api/upgrades`' body: the release to upgrade the server to, by its tag (`v0.4.0`), as `nemia upgrade <tag>` takes it. */
 export const UpgradeStart = Schema.Struct({
@@ -20,7 +21,8 @@ export type UpgradeStart = typeof UpgradeStart.Type;
 
 /**
  * An upgrade started: its id, the tag it upgrades to, the release the server ran when it started (`from`; left out on code run from a
- * repository), its phase, the tail of what it printed, its exit code once it ended, and when it started (an ISO time).
+ * repository), its phase, the tail of what it printed, its exit code once it ended, when it started (an ISO time), and why it has not
+ * started while it is pending and held (`queuedFor`).
  */
 export const Upgrade = Schema.Struct({
   id: Schema.String.annotate({ description: "The upgrade's id." }),
@@ -35,6 +37,7 @@ export const Upgrade = Schema.Struct({
   output: Schema.String.annotate({ description: 'The tail of what it printed.' }),
   exitCode: Schema.optionalKey(describedNumber('Its exit code once it ended; absent while it runs.')),
   startedAt: Schema.String.annotate({ description: 'When it started, as an ISO 8601 time.' }),
+  queuedFor: Schema.optionalKey(QueuedFor),
 });
 export type Upgrade = typeof Upgrade.Type;
 

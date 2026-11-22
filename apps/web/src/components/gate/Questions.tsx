@@ -1,174 +1,242 @@
 /**
- * A closeout's questions, as data (`StepCloseout.questions`, decoded by agent-orchestrator's question/question.ts): read under a step's
- * output (`Questions`), and answered by choosing (`QuestionFields`) — under a step that signed off blocked asking them (`QuestionsForm`),
- * at the gate of a step that asks them (`Gate`), and on the row that raises a blocked step's budget (`RaiseRow`). Each sends the answers
- * to the api, where they are checked against what the step asks now and written in the package's words.
+ * A closeout's questions, as data (`StepCloseout.questions`, decoded by agent-orchestrator's question/question.ts), drawn by one part, a
+ * series of questions (`QuestionSeries`): each question a section of its own, each option a tile with its label for title and what it
+ * means under it, the agent's recommendation tagged, a question that takes one answer drawn with radio tiles and one that takes several
+ * with check tiles. Answered, it adds the two ways out the board supplies on every question, as the Agent SDK's question tool supplies
+ * "Other" itself: "Something else", which needs the person's words, and "None of these", which stands without them. A box for words
+ * opens only under a way out taken, or once asked for beside a choice. Read-only, it draws the same sections, no control in them.
+ *
+ * It answers under a step that signed off blocked asking them (`QuestionsForm`), at the gate of a step that asks them (`Gate`), and on
+ * the row that raises a blocked step's budget (`RaiseRow`); each sends the answers to the api, where they are checked against what the
+ * step asks now and written in the package's words.
  */
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Question } from '../../lib/api/tries.ts';
 import type { RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, type Answer } from '../../lib/asks';
-import { OFFERS } from '../../lib/words';
+import { OFFERS, SERIES } from '../../lib/words';
+import {
+  answersFrom,
+  chosenDraft,
+  entryOf,
+  recommendedDraft,
+  recommendedOf,
+  unanswered,
+  wayDraft,
+  wordsDraft,
+  type Draft,
+  type WayOut,
+} from '../../lib/question-draft/questionDraft.ts';
 import { MODES, Refusal, useAsk } from './Ask';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';
-import { Button, Checkbox, Radio, RadioGroup, TextField } from '@/components/ui/ds';
-import { Pending } from '@/components/look';
+import { Body, Button, Radio, RadioGroup, Tag, TextField, Title } from '@/components/ui/ds';
+import { CheckTile, CheckTileGroup, CutTag, Pending, RadioTile, RadioTileGroup } from '@/components/look';
 
-/** What a person has said so far of each question, by its title: the labels chosen, and words of their own. */
-export type Draft = Readonly<Record<string, { chose: readonly string[]; own: string }>>;
+/** The value a way out's tile holds in its question's group; an option's is `option:<its place>`, so no label an agent wrote meets it. */
+const WAY_VALUE: Record<WayOut, string> = { else: 'way:else', none: 'way:none' };
 
-const said = (draft: Draft, q: Frozen<Question>) => draft[q.title] ?? { chose: [], own: '' };
+/** The value of the option at `i` in its question's group. */
+const optionValue = (i: number) => `option:${i}`;
 
-/**
- * The labels `q` recommends, as a list: none for null, one for a label, and every label of a list, which a question that takes several
- * may recommend.
- */
-const recommendedOf = (q: Frozen<Question>) =>
-  q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
+/** What a press on the tile of `value` names in `q`: a way out, or an option's label. */
+const pressedOf = (q: Frozen<Question>, value: string) =>
+  (value === WAY_VALUE.else
+    ? { way: 'else' }
+    : value === WAY_VALUE.none
+      ? { way: 'none' }
+      : { label: q.options[Number(value.slice('option:'.length))]?.label ?? '' }) satisfies { way: WayOut } | { label: string } as
+    | { way: WayOut }
+    | { label: string };
 
-/**
- * `draft` with every question that has a recommendation set to it, and their words kept; a question without one is left as it was.
- *
- * @param questions the questions a step asks
- * @param draft what the person chose and wrote so far
- */
-export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: Draft) =>
-  Object.fromEntries([
-    ...Object.entries(draft),
-    ...questions.flatMap((q) => {
-      const chose = recommendedOf(q);
-      return chose.length ? [[q.title, { ...said(draft, q), chose }]] : [];
-    }),
-  ]) satisfies Draft as Draft;
-
-/**
- * `draft` with `label` chosen, or no longer chosen, on `q`: the one choice of a question that takes one, among others of one that takes
- * several.
- *
- * @param draft what the person chose and wrote so far
- * @param q the question the choice is on
- * @param label the option chosen or no longer chosen
- * @param on whether the option is chosen
- */
-export const chosenDraft = (draft: Draft, q: Frozen<Question>, label: string, on: boolean) => {
-  const before = said(draft, q).chose.filter((l) => q.multiple && l !== label);
-  return { ...draft, [q.title]: { ...said(draft, q), chose: on ? [...before, label] : before } };
-};
-
-/**
- * The titles of the questions `draft` leaves with neither a choice nor words, in the order asked.
- *
- * @param questions the questions a step asks, in the order asked
- * @param draft what the person chose and wrote so far
- */
-export const unanswered = (questions: readonly Frozen<Question>[], draft: Draft) =>
-  questions.filter((q) => said(draft, q).chose.length === 0 && !said(draft, q).own.trim()).map((q) => q.title);
-
-/**
- * `draft` as the api takes it: an answer to each question, in the order asked, its own words only where there are any.
- *
- * @param questions the questions a step asks, in the order asked
- * @param draft what the person chose and wrote so far
- */
-export const answersFrom = (questions: readonly Frozen<Question>[], draft: Draft) =>
-  questions.map((q) => {
-    const { chose, own } = said(draft, q);
-    return own.trim() ? { question: q.title, chose, own: own.trim() } : { question: q.title, chose };
-  });
-
-/** One option as a question shows it: its label, what choosing it means, and whether it is recommended. */
-function OptionText({ q, label, meaning }: { q: Frozen<Question>; label: string; meaning: string }) {
+/** An option's title: its label, tagged where the agent recommends it. */
+function OptionTitle({ label, recommended }: { label: string; recommended: boolean }) {
   return (
-    <span className="min-w-0">
-      <strong className="font-medium">{label}</strong> <span className="text-muted-foreground">— {meaning}</span>
-      {recommendedOf(q).includes(label) && (
-        <span data-recommended className="ml-1.5 rounded bg-surface-variant px-1 py-px text-body-small font-medium text-on-surface-variant">
-          recommended
-        </span>
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span>{label}</span>
+      {recommended && (
+        <CutTag>
+          <Tag data-recommended variant="tonal" color="secondary" className="uppercase">
+            {SERIES.recommended}
+          </Tag>
+        </CutTag>
       )}
     </span>
   );
 }
 
-/** The questions of one field of a closeout, read-only: each question, its body, and its options, each recommended one marked. */
-export function Questions({ field, questions }: { field: string; questions: readonly Frozen<Question>[] }) {
+/** A question's head: its number as an eyebrow, its title, its body, and whether it takes one answer or several. */
+function QuestionHead({ q, n }: { q: Frozen<Question>; n: number }) {
   return (
-    <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
-      <h4 className="font-mono text-body-small text-muted-foreground">{field}</h4>
-      <ol className="space-y-3 text-body-medium">
-        {questions.map((q, i) => (
-          <li key={q.title} data-question={q.title} className="space-y-1">
-            <p className="font-medium">
-              {i + 1}. {q.title}
-              {q.multiple && <span className="font-normal text-muted-foreground"> (any of them)</span>}
-            </p>
-            <Markdown className="text-foreground">{q.body}</Markdown>
-            <ul className="list-disc space-y-0.5 pl-5">
-              {q.options.map((o) => (
-                <li key={o.label} data-option={o.label}>
-                  <OptionText q={q} label={o.label} meaning={o.meaning} />
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ol>
-    </section>
+    <>
+      <span className="block font-mono text-label-small uppercase tracking-wide text-on-surface-variant">{SERIES.eyebrow(n)}</span>
+      <Title size="medium" component="span" className="block text-on-surface">
+        {q.title}
+      </Title>
+      <Markdown className="text-foreground">{q.body}</Markdown>
+      <Body component="p" data-takes={q.multiple ? 'any' : 'one'} className="text-on-surface-variant">
+        {q.multiple ? SERIES.takesAny : SERIES.takesOne}
+      </Body>
+    </>
   );
 }
 
-/** One question to answer: its options as radios, or checkboxes where it takes several, and a line for words of the person's own. */
-function QuestionField({ q, n, draft, onDraft }: { q: Frozen<Question>; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
-  const id = useId();
-  const { chose, own } = said(draft, q);
+/** One question read-only: its head, and each option as a tile with no control in it, the recommended ones tagged. */
+function QuestionRead({ q, n }: { q: Frozen<Question>; n: number }) {
   return (
-    <fieldset data-question={q.title} className="space-y-1.5 rounded border border-outline-variant p-2">
-      <legend className="px-1 font-medium">
-        {n}. {q.title}
-        {q.multiple && <span className="font-normal text-muted-foreground"> (choose any)</span>}
-      </legend>
-      <Markdown className="text-foreground">{q.body}</Markdown>
-      {q.multiple ? (
-        <div className="flex flex-col gap-1.5">
-          {q.options.map((o) => (
-            <Checkbox
-              key={o.label}
-              data-option={o.label}
-              value={o.label}
-              isSelected={chose.includes(o.label)}
-              onChange={(checked) => onDraft(chosenDraft(draft, q, o.label, checked))}
-            >
-              <OptionText q={q} label={o.label} meaning={o.meaning} />
-            </Checkbox>
-          ))}
-        </div>
-      ) : (
-        <RadioGroup
-          aria-label={q.title}
-          name={`${id}-choice`}
-          value={chose[0] ?? null}
-          onChange={(label) => onDraft(chosenDraft(draft, q, label, true))}
-          className="gap-1.5"
-        >
-          {q.options.map((o) => (
-            <Radio key={o.label} value={o.label} data-option={o.label}>
-              <OptionText q={q} label={o.label} meaning={o.meaning} />
-            </Radio>
-          ))}
-        </RadioGroup>
-      )}
+    <li data-question={q.title} className="space-y-2">
+      <QuestionHead q={q} n={n} />
+      <ul className="flex flex-col gap-2">
+        {q.options.map((o) => (
+          <li key={o.label} data-option={o.label} className="rounded-shape-medium border border-outline-variant px-4 py-2">
+            <Title size="small" component="span" className="block text-on-surface">
+              <OptionTitle label={o.label} recommended={recommendedOf(q).includes(o.label)} />
+            </Title>
+            <Body component="span" className="text-on-surface-variant">
+              {o.meaning}
+            </Body>
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+/** The tiles of one question: its options, then the two ways out, as radio tiles where it takes one and check tiles where it takes any. */
+function QuestionTiles({ q, draft, onDraft }: { q: Frozen<Question>; draft: Draft; onDraft: (next: Draft) => void }) {
+  const { chose, way } = entryOf(draft, q.title);
+  const recommended = recommendedOf(q);
+  const options = q.options.map((o, i) => ({
+    value: optionValue(i),
+    label: o.label,
+    title: <OptionTitle label={o.label} recommended={recommended.includes(o.label)} />,
+    description: o.meaning,
+    marks: { 'data-option': o.label },
+  }));
+  const ways = (['else', 'none'] as const).map((w) => ({
+    value: WAY_VALUE[w],
+    title: SERIES.ways[w].title,
+    description: SERIES.ways[w].line,
+    marks: { 'data-way': w },
+  }));
+  if (!q.multiple) {
+    return (
+      <RadioTileGroup
+        aria-label={q.title}
+        layout="column"
+        value={way ? WAY_VALUE[way] : (options.find((o) => o.label === chose[0])?.value ?? null)}
+        onChange={(value) => {
+          const pressed = pressedOf(q, value);
+          onDraft('way' in pressed ? wayDraft(draft, q, pressed.way, true) : chosenDraft(draft, q, pressed.label, true));
+        }}
+      >
+        {[...options, ...ways].map((t) => (
+          <RadioTile key={t.value} value={t.value} title={t.title} description={t.description} {...t.marks} />
+        ))}
+      </RadioTileGroup>
+    );
+  }
+  const value = [...options.filter((o) => chose.includes(o.label)).map((o) => o.value), ...(way ? [WAY_VALUE[way]] : [])];
+  return (
+    <CheckTileGroup
+      aria-label={q.title}
+      layout="column"
+      value={value}
+      onChange={(next) => {
+        const added = next.find((v) => !value.includes(v));
+        const changed = added ?? value.find((v) => !next.includes(v));
+        if (changed === undefined) return;
+        const pressed = pressedOf(q, changed);
+        const on = added !== undefined;
+        onDraft('way' in pressed ? wayDraft(draft, q, pressed.way, on) : chosenDraft(draft, q, pressed.label, on));
+      }}
+    >
+      {[...options, ...ways].map((t) => (
+        <CheckTile key={t.value} value={t.value} title={t.title} description={t.description} {...t.marks} />
+      ))}
+    </CheckTileGroup>
+  );
+}
+
+/**
+ * The person's words on one question: a box under a way out taken, or beside a choice once asked for by `Add your words`; else only the
+ * offer to add them.
+ */
+function QuestionWords({ q, draft, onDraft }: { q: Frozen<Question>; draft: Draft; onDraft: (next: Draft) => void }) {
+  const { own, way } = entryOf(draft, q.title);
+  const [asked, setAsked] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (asked) box.current?.querySelector('textarea')?.focus();
+  }, [asked]);
+  if (!way && !asked && own === '') {
+    return (
+      <Button variant="text" data-add-words onPress={() => setAsked(true)}>
+        {SERIES.addWords}
+      </Button>
+    );
+  }
+  const hint = way ? SERIES.ways[way].words : SERIES.beside;
+  return (
+    <div ref={box}>
       <TextField
-        aria-label={`Your own words on ${q.title}`}
+        aria-label={SERIES.words(q.title)}
         data-own
         multiline
         value={own}
-        onChange={(words) => onDraft({ ...draft, [q.title]: { chose, own: words } })}
-        placeholder="In your own words — beside a choice, or instead of one"
-        supportingText="In your own words — beside a choice, or instead of one"
+        onChange={(words) => onDraft(wordsDraft(draft, q, words))}
+        placeholder={hint}
+        supportingText={hint}
       />
+    </div>
+  );
+}
+
+/** One question to answer: its head, its tiles and its ways out, and the person's words where they give some. */
+function QuestionAnswer({ q, n, draft, onDraft }: { q: Frozen<Question>; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
+  return (
+    <fieldset data-question={q.title} className="min-w-0 space-y-3 rounded-shape-medium border border-outline-variant p-3">
+      <legend className="sr-only">{`${SERIES.eyebrow(n)}: ${q.title}`}</legend>
+      <QuestionHead q={q} n={n} />
+      <QuestionTiles q={q} draft={draft} onDraft={onDraft} />
+      <QuestionWords q={q} draft={draft} onDraft={onDraft} />
     </fieldset>
   );
+}
+
+/**
+ * A series of questions, in the order asked, numbered from one: answered where `onDraft` is given, each question with its ways out;
+ * read-only where it is not, under the field's name, with no control in it.
+ */
+export function QuestionSeries({
+  questions,
+  draft = {},
+  onDraft,
+  field,
+}: {
+  questions: readonly Frozen<Question>[];
+  draft?: Draft;
+  onDraft?: (next: Draft) => void;
+  field?: string;
+}) {
+  if (!onDraft) {
+    return (
+      <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
+        {field && <h4 className="font-mono text-body-small text-muted-foreground">{field}</h4>}
+        <ol className="space-y-4 text-body-medium">
+          {questions.map((q, i) => (
+            <QuestionRead key={q.title} q={q} n={i + 1} />
+          ))}
+        </ol>
+      </section>
+    );
+  }
+  return questions.map((q, i) => <QuestionAnswer key={q.title} q={q} n={i + 1} draft={draft} onDraft={onDraft} />);
+}
+
+/** The questions of one field of a closeout, read-only: the series, under the field's name. */
+export function Questions({ field, questions }: { field: string; questions: readonly Frozen<Question>[] }) {
+  return <QuestionSeries field={field} questions={questions} />;
 }
 
 /**
@@ -185,19 +253,6 @@ export function Asks({ step, needs, ...data }: { step?: string; needs: string; '
       <Markdown className="max-h-72 overflow-y-auto pr-1">{needs}</Markdown>
     </div>
   );
-}
-
-/** Each question to answer, in the order asked, numbered from one: the fields every form that answers a step's questions draws. */
-export function QuestionFields({
-  questions,
-  draft,
-  onDraft,
-}: {
-  questions: readonly Frozen<Question>[];
-  draft: Draft;
-  onDraft: (next: Draft) => void;
-}) {
-  return questions.map((q, i) => <QuestionField key={q.title} q={q} n={i + 1} draft={draft} onDraft={onDraft} />);
 }
 
 /**
@@ -287,7 +342,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
           ask.mutate({ mode, answers: answersFrom(offer.questions, draft), ...(note.trim() ? { message: note } : {}) });
         }}
       >
-        <QuestionFields questions={offer.questions} draft={draft} onDraft={setDraft} />
+        <QuestionSeries questions={offer.questions} draft={draft} onDraft={setDraft} />
         <TextField
           aria-label={`A note to ${offer.step} beside the answers`}
           data-note-box

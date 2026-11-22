@@ -363,6 +363,24 @@ export const OFFERS = {
   },
 } as const satisfies Record<OfferCase, OfferWords & Readonly<Record<string, unknown>>>;
 
+/**
+ * The words of a series of questions (`QuestionSeries`): how a question says it takes one answer or several, and the two ways out the
+ * board supplies on every question, as the Agent SDK's question tool supplies "Other" itself: no agent writes them.
+ */
+export const SERIES = {
+  takesOne: 'Choose one',
+  takesAny: 'Choose any',
+  eyebrow: (n: number) => `Question ${n}`,
+  recommended: 'recommended',
+  addWords: 'Add your words',
+  words: (title: string) => `Your own words on ${title}`,
+  ways: {
+    else: { title: 'Something else', line: 'An answer none of these gives. Say it in your words.', words: 'Say it in your words' },
+    none: { title: 'None of these', line: 'None fits. Say why, if you will.', words: 'Why none fits (optional)' },
+  },
+  beside: 'Beside your choice, in your words (optional)',
+} as const;
+
 /** What every offer's words hold (`OFFERS`). */
 interface OfferWords {
   readonly said: string | null | Readonly<Record<string, string>> | ((calls: string | null) => string);

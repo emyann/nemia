@@ -402,21 +402,26 @@ test('a step asking questions as data is answered by choosing: radios where it t
   assert.deepEqual(
     kitChoices([...design.matchAll(/<fieldset data-question[\s\S]*?<\/fieldset>/g)].map((m) => m[0]).join('')),
     [
-      ['a', 'radio', false],
-      ['b', 'radio', false],
-      ['retry', 'checkbox', false],
-      ['gate', 'checkbox', false],
+      ['option:0', 'radio', false],
+      ['option:1', 'radio', false],
+      ['way:else', 'radio', false],
+      ['way:none', 'radio', false],
+      ['option:0', 'checkbox', false],
+      ['option:1', 'checkbox', false],
+      ['way:else', 'checkbox', false],
+      ['way:none', 'checkbox', false],
     ],
-    'nothing is chosen until the person chooses',
+    'nothing is chosen until the person chooses, and each question offers its two ways out after its options',
   );
   assert.equal([...design.matchAll(/data-recommended="true"/g)].length, 1, 'the one recommended option is marked');
-  assert.match(
-    design,
-    /<strong class="font-medium">a<\/strong> <span[^>]*>— The shape and the board first\.<\/span><span data-recommended="true"[^>]*>recommended<\/span>/,
-  );
+  assert.match(design, /data-option="a"[\s\S]*?a<\/span>[\s\S]*?data-recommended="true"[\s\S]*?The shape and the board first\./);
+  for (const way of ['else', 'none'])
+    assert.equal([...design.matchAll(new RegExp(`data-way="${way}"`, 'g'))].length, 2, `${way} on each question`);
   assert.match(design, /<strong>big<\/strong>/, 'a body is its markdown');
   const buttons = kitButtons;
   assert.deepEqual(buttons(design), [
+    ['button', false, 'Add your words'],
+    ['button', false, 'Add your words'],
     ['submit', true, 'Answer and continue'],
     ['button', false, 'Choose the recommended answers'],
   ]);
@@ -425,9 +430,10 @@ test('a step asking questions as data is answered by choosing: radios where it t
     /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*disabled=""/,
     'Approve says on hover what is not answered',
   );
-  assert.equal([...design.matchAll(/<div data-slot="text-field"[^>]*data-own="true"/g)].length, 2, "a line for each question's own words");
+  assert.doesNotMatch(design, /data-own="true"/, 'no box for words until a way out is taken or words are asked for');
+  assert.equal([...design.matchAll(/data-add-words="true"/g)].length, 2, 'each question offers to add words');
   assert.deepEqual(
-    buttons(rows.get('spec')!),
+    buttons(rows.get('spec')!).filter(([, , label]) => label !== 'Add your words'),
     [['submit', true, 'Answer and continue']],
     'no recommended answers to choose where none is recommended',
   );

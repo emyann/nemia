@@ -541,6 +541,9 @@ describe('inputRefusal: what `nemia start --input` refuses, by name', () => {
   });
 });
 
+/** Where a step of a repository run that cuts worktrees finds the run's inputs copied (`inputsGiven`). */
+const COPIED = { at: 'given/inputs', inFolder: false } as const;
+
 describe("inputsLine, inputsNote and composeBrief of a run's inputs", () => {
   test('a run given inputs names them once, under what was asked for, on every brief that carries it — and a run given none composes exactly as before', () => {
     const DIR = '/wf/runs/r-1/inputs';
@@ -564,11 +567,11 @@ describe("inputsLine, inputsNote and composeBrief of a run's inputs", () => {
     );
     assert.equal(
       brief(step('implement'), { ...r, inputs }, STEPS),
-      plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n## Files given with it\n\n${line}\n`),
-      'under a heading of their own, after what was asked for',
+      plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n## Files given with it\n\n${inputsLine(DIR, inputs, COPIED)}\n`),
+      'under a heading of their own, after what was asked for, naming the copy in the worktree its place cuts',
     );
     assert.equal(inputsLine(DIR, inputs), line);
-    assert.equal(inputsLine(DIR, inputs, false, undefined, [], []), line, 'a request that names none of them marks none');
+    assert.equal(inputsLine(DIR, inputs, null, undefined, [], []), line, 'a request that names none of them marks none');
     assert.match(
       brief(step('implement'), { ...r, brief: 'add a flag, as ![the mock](./mock.png) shows', inputs }, STEPS),
       /`mock\.png`, a picture, named in what was asked; `brief notes\.md`, a text file, named nowhere in it\./,
@@ -632,11 +635,15 @@ describe("inputsLine, inputsNote and composeBrief of a run's inputs", () => {
     const mounted = { handed: [], store: [], inputs: [{ path: DIR, readOnly: true }] };
     const told =
       'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. You may read them and must not write them, in `/wf/runs/r-1/inputs`. The folder is mounted read-only; read them with Read, Grep and Glob.';
-    assert.equal(inputsLine(DIR, inputs, false, mounted), told);
-    assert.equal(inputsLine(DIR, inputs, false, { inputs: [] }), inputsLine(DIR, inputs), 'a step filed none, as codex is: named on disk');
-    assert.equal(inputsLine(DIR, [], false, mounted), undefined, 'a run given none');
+    assert.equal(inputsLine(DIR, inputs, null, mounted), told);
+    assert.equal(inputsLine(DIR, inputs, null, { inputs: [] }), inputsLine(DIR, inputs), 'a step filed none, as codex is: named on disk');
+    assert.equal(inputsLine(DIR, [], null, mounted), undefined, 'a run given none');
+    const copiedToo = inputsLine(DIR, inputs, COPIED, mounted)!;
+    assert.ok(copiedToo.startsWith(told), 'a step in a worktree is told the mount first');
+    assert.ok(copiedToo.slice(told.length).includes('`given/inputs`'), 'then the copy in its workspace');
+    assert.ok(inputsLine(DIR, inputs, COPIED)!.includes(`\`${DIR}\``), 'and named on disk where it is filed no mount');
     assert.equal(
-      inputsLine(DIR, inputs, true, mounted),
+      inputsLine(DIR, inputs, { at: 'given/inputs', inFolder: true }, mounted),
       'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are copied into `given/inputs` in this folder.',
       "a folder run's step reads its copy",
     );

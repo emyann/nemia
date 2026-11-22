@@ -57,7 +57,7 @@ const inputsGivenSpec = spec<(run: InputsRun, plan: { readonly kind: CutKind }) 
     },
     worktreesGiven: {
       description:
-        'Every step of an isolated repository run handed files or cards, but on the base, finds them in its worktree\'s given/inputs',
+        "Every step of an isolated repository run handed files or cards, but on the base, finds them in its worktree's given/inputs",
       condition: ({ input: [run, plan], output }) =>
         !(!isFolderRun(run) && run.isolate === true && handedAny(run) && plan.kind !== 'base') || output === 'given/inputs',
     },

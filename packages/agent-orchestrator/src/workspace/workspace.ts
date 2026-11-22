@@ -34,9 +34,11 @@ import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 import type { CheckoutInstallOf } from '../../contracts/checkout-install.contract.ts';
 import type { WorktreeDepsOf } from '../../contracts/worktree-deps.contract.ts';
+import type { InputsGiven } from '../../contracts/inputs-given.contract.ts';
 
 export type { CheckoutInstall, CheckoutSeen } from '../../contracts/checkout-install.contract.ts';
 export type { WorktreeDeps, WorktreeSeen } from '../../contracts/worktree-deps.contract.ts';
+export type { GivenInputs, InputsRun } from '../../contracts/inputs-given.contract.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
 export type DepEntry = { name: string; link?: string };
@@ -391,8 +393,27 @@ export type WorkspacePlan =
   | { kind: 'merge'; from: string; also: string[] }
   | { kind: 'base' };
 
-/** The directory inside a folder step's own folder that holds what the run copied in for it: `given/inputs`, `given/from/<step>`. */
+/**
+ * The directory inside a step's workspace that holds what the run copied in for it: `given/inputs` in a folder step's folder and in a
+ * worktree its place cut (`inputsGiven`), and `given/from/<step>` in a folder step's folder alone.
+ */
 export const GIVEN = 'given';
+
+/**
+ * Where a step finds the run's inputs copied into its own workspace, by the path from it, or null where none is copied: `given/inputs`
+ * for a step of a folder run, and for one of a repository run that cuts worktrees, when the run was handed files or cards and the step
+ * is not on the base. Never in a checkout a person works in: a step on the base, and every step of a repository run without isolation.
+ * Read by the cut, which asks the copy (`folderPlace.make`, the place's `make` with `given`), and by the brief, which names it, so the
+ * brief never names a copy nobody made. Proved by `contracts/inputs-given.contract.ts`.
+ * @param run The run: its place, whether it cuts worktrees, and the files and cards it was handed.
+ * @param plan How the step's workspace comes to be (`workspacePlan`): only whether it is the base is read.
+ */
+export const inputsGiven: InputsGiven = (run, plan) => {
+  if (plan.kind === 'base') return null;
+  if (!run.inputs?.length && !run.cards?.length) return null;
+  if (run.place?.kind !== 'folder' && run.isolate !== true) return null;
+  return 'given/inputs';
+};
 
 /**
  * One thing the run copied into a folder step's folder: the step whose folder it was, where it now sits (from the folder), and where it
@@ -405,7 +426,8 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
 
 /**
  * What the run copies into a folder step's folder as it makes it, and the names its brief calls those copies by — one function, read by
- * both, so the brief never names a path the fence denies.
+ * both, so the brief never names a path the fence denies. Its `inputs` is `inputsGiven`'s, which says the same of a worktree; `from` is a
+ * folder step's alone.
  *
  * A folder team's steps run as jobs, which ask nobody in any mode: a call outside the step's own directory is denied
  * with no prompt, the session reads the refusal and carries on, and nothing says so to anyone. So the run's `inputs/`, and the folders of
@@ -419,9 +441,9 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * @param run The run: its place, its inputs and cards, and its steps.
  * @param plan The step's workspace plan (`workspacePlan`).
  */
-export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'cards' | 'steps'>, plan: WorkspacePlan) {
+export function givenPlan(run: Pick<Run, 'place' | 'isolate' | 'inputs' | 'cards' | 'steps'>, plan: WorkspacePlan) {
   if (placeOf(run) !== 'folder' || plan.kind === 'base') return { inputs: null, from: [] };
-  const inputs = run.inputs?.length || run.cards?.length ? `${GIVEN}/inputs` : null;
+  const inputs = inputsGiven(run, plan);
   if (plan.kind === 'inherit') return { inputs, from: [] };
   const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
   return {

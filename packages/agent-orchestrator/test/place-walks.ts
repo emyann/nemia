@@ -435,6 +435,64 @@ const MAKE: readonly Walk[] = [
     },
     says: [{ refused: true }, { refused: true }, { refused: true }, { refused: true }],
   },
+  {
+    name: 'asked with `given`, the folder is copied whole to `to`, kept out of what the workspace holds uncommitted, and written anew when asked again',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area);
+      const from = path.join(area, 'inputs');
+      fs.mkdirSync(path.join(from, 'cards'), { recursive: true });
+      fs.writeFileSync(path.join(from, 'DESIGN.md'), 'draft\n');
+      fs.writeFileSync(path.join(from, 'cards', 'x.md'), 'card\n');
+      const request = { repo: root, at: path.join(area, 'ws', 'one'), run: 'r', leaf: 'one', from: 'main', also: [] };
+      const asked = { ...request, given: { from, to: 'given/inputs' } };
+      const { notes, ...first } = answerOf(side.place.askNow('make', asked));
+      const copied = filesIn(path.join(request.at, 'given', 'inputs'));
+      const changes = side.world.changes(request.at);
+      fs.rmSync(path.join(from, 'DESIGN.md'));
+      const again = answerOf(side.place.askNow('make', asked)).given;
+      return { first, notes: notes.length, copied, changes, again, after: filesIn(path.join(request.at, 'given', 'inputs')) };
+    },
+    says: {
+      after: { '.gitignore': '*\n', 'cards/x.md': 'card\n' },
+      again: 'given/inputs',
+      changes: [],
+      copied: { '.gitignore': '*\n', 'DESIGN.md': 'draft\n', 'cards/x.md': 'card\n' },
+      first: { branch: 'wf/r/one', conflicts: [], given: 'given/inputs', workspace: '<area>/ws/one' },
+      notes: 1,
+    },
+  },
+  {
+    name: 'REFUSED: a copy `given` over a file the repository holds under `to`, and of a folder with a `.gitignore` at its top',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area, { 'a.txt': 'one\n', 'given/inputs/kept.md': 'kept\n' });
+      const from = path.join(area, 'inputs');
+      fs.mkdirSync(from);
+      fs.writeFileSync(path.join(from, 'DESIGN.md'), 'draft\n');
+      const tracked = side.place.askNow('make', {
+        repo: root,
+        at: path.join(area, 'ws', 'one'),
+        run: 'r',
+        leaf: 'one',
+        from: 'main',
+        also: [],
+        given: { from, to: 'given/inputs' },
+      });
+      fs.mkdirSync(path.join(area, 'other'));
+      const { root: other } = repoIn(side, path.join(area, 'other'));
+      fs.writeFileSync(path.join(from, '.gitignore'), 'handed\n');
+      const ignoring = side.place.askNow('make', {
+        repo: other,
+        at: path.join(area, 'ws', 'two'),
+        run: 'r',
+        leaf: 'two',
+        from: 'main',
+        also: [],
+        given: { from, to: 'given/inputs' },
+      });
+      return { tracked, ignoring, kept: fs.readFileSync(path.join(area, 'ws', 'one', 'given', 'inputs', 'kept.md'), 'utf8') };
+    },
+    says: { ignoring: { refused: true }, kept: 'kept\n', tracked: { refused: true } },
+  },
 ];
 
 const HANDOFF: readonly Walk[] = [

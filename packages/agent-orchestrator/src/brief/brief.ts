@@ -7,7 +7,7 @@ import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/index.ts';
 import { handedSection, type ParentCloseout } from './handed.ts';
-import { depsLines, givenPlan, workspacePlan, type Provisioned } from '../workspace/workspace.ts';
+import { depsLines, givenPlan, inputsGiven, workspacePlan, type Provisioned } from '../workspace/workspace.ts';
 import {
   acceptedSection,
   answeredSection,
@@ -138,6 +138,19 @@ const resumedLook = (tree: readonly string[]) => (tree.length ? ['', '', '## Whe
 /** The files of `run.inputs` its brief names by a markdown image or link (`namedInText`): none for a run given none. */
 const inputsNamed = (run: Run) => namedInText(run.brief, run.inputs ?? []);
 
+/** The line a step's brief says of the run's inputs (`inputsLine`), naming the copy in its workspace where one is made (`inputsGiven`). */
+function inputsSaid(
+  step: StepSpec,
+  run: Run,
+  steps: readonly StepSpec[],
+  inputsDir: string | undefined,
+  folders: Parameters<typeof inputsLine>[3],
+) {
+  const copied = inputsGiven(run, workspacePlan(steps, step));
+  const inFolder = placeOf(run) === 'folder';
+  return inputsLine(inputsDir, run.inputs, copied ? { at: copied, inFolder } : null, folders, run.cards, inputsNamed(run));
+}
+
 /**
  * What a step is told. THE decision about what one step knows of another.
  *
@@ -256,7 +269,7 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards, inputsNamed(run));
+  const inputs = inputsSaid(step, run, steps, inputsDir, folders);
   const request = [run.brief, ...mountsLine(step, run, folders, place.workspace), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
   const parts = [...opening, headingOf('What was asked for'), '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];

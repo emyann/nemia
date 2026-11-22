@@ -46,6 +46,32 @@ export type HarnessConfig = 'claude' | (HarnessSpec & Pooled) | (RemoteAgent & P
 /** The pool a harness brought as an object counts its sessions in, when not its own: a name of one or more characters. */
 export type Pooled = { pool?: string };
 
+/** The room an engine keeps for the turns of a priority or higher (`EngineOptions.keptRoom`). */
+export type KeptRoomOption = { priority: number; sessions: number; memory?: string };
+
+/** The largest priority the kept room names: a Pod's priority is an int32. */
+const KEPT_PRIORITY_MOST = 2 ** 31 - 1;
+
+/**
+ * Why `keptRoom` cannot be held, or `undefined`: anything but `{ priority, sessions, memory? }`, a `priority` not a whole number in
+ * int32, `sessions` not a whole number from 0, a `memory` `memoryBytesOf` does not read.
+ */
+const keptRoomRefusalOf = (given: unknown) => {
+  if (given === undefined) return undefined;
+  const fix = "Give `{ priority: 1000, sessions: 1, memory: '4Gi' }`, or leave it out to keep none.";
+  if (!Predicate.isObject(given) || Object.keys(given).some((k) => k !== 'priority' && k !== 'sessions' && k !== 'memory'))
+    return `\`keptRoom: ${JSON.stringify(given) ?? typeof given}\` is not a kept room. ${fix}`;
+  const { priority, sessions, memory } = given;
+  if (typeof priority !== 'number' || !Number.isInteger(priority) || priority < -KEPT_PRIORITY_MOST - 1 || priority > KEPT_PRIORITY_MOST)
+    return `\`keptRoom.priority: ${JSON.stringify(priority) ?? typeof priority}\` is not a priority. Give a whole number from ${-KEPT_PRIORITY_MOST - 1} to ${KEPT_PRIORITY_MOST}: the turns at it or above take the kept room.`;
+  if (typeof sessions !== 'number' || !Number.isInteger(sessions) || sessions < 0)
+    return `\`keptRoom.sessions: ${JSON.stringify(sessions) ?? typeof sessions}\` is not a count of places. Give a whole number from 0, the places kept in each pool beyond \`maxConcurrent\`.`;
+  if (memory === undefined) return undefined;
+  if (typeof memory !== 'string') return `\`keptRoom.memory: ${JSON.stringify(memory)}\` is not a quantity. ${fix}`;
+  const words = memoryQuantityRefusal(memory);
+  return words ? `\`keptRoom.memory\`: ${words}` : undefined;
+};
+
 /**
  * What `Engine.layer` builds an engine from. `maxConcurrent` is the engine's ceiling: how many sessions of each pool may be at work at
  * once, a whole number from 1. With it, a pass admits the tasks filed `queued` while their pool has room, the highest `priority`
@@ -88,6 +114,15 @@ export type EngineOptions = {
   cgroupParent?: string;
   /** The sessions at work at once in each pool: a whole number from 1. Absent: no ceiling, and nothing is admitted but by `admit`. */
   maxConcurrent?: number;
+  /**
+   * The room kept for the turns of `priority` or higher (a task's filed priority, or its turn's, given with an answer): `sessions`
+   * places in each pool beyond `maxConcurrent`, and `memory`, a Kubernetes quantity, of the machine's room while `reserved` is given,
+   * which no turn below `priority` is admitted into — as a ResourceQuota scoped to a PriorityClass bounds the other classes, kept by
+   * admission alone, since nothing running is stopped for it. A turn that may take it takes a kept place before a place under the
+   * ceiling. Refused at `Engine.layer` for a `priority` that is not a whole number in int32, `sessions` that is not a whole number from
+   * 0, and a `memory` `memoryBytesOf` does not read. Absent: none is kept.
+   */
+  keptRoom?: KeptRoomOption;
   /**
    * Asked on every pass before it admits: while it says true the pass admits no queued task, as a node marked `unschedulable` takes no
    * new Pod; what is at work goes on, `admit` still admits, and a task filed unqueued still starts. Absent: always schedulable.
@@ -515,7 +550,7 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig) => {
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the options as
  * handed in, untyped, and refuses, in this order: a `sayTimeoutMs`, which no harness reads now; a `maxConcurrent` that is not a whole
- * number from 1; a harness named by a word other than `'claude'`, or brought as an object whose `pool` is not a name; a spec whose `can`
+ * number from 1; a `keptRoom` it cannot hold (`keptRoomRefusalOf`); a harness named by a word other than `'claude'`, or brought as an object whose `pool` is not a name; a spec whose `can`
  * cannot be read, or that carries a boolean `can` replaced (`specRefusalOf`); a remote agent's entry `remoteConfigRefusal` refuses, its
  * `pool` aside; a `holder` entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a `missingCredential` that is not a
  * function; and a `telemetry` that names no collector.
@@ -525,7 +560,7 @@ export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>) => {
   if (Object.hasOwn(options, 'sayTimeoutMs')) {
     return "`sayTimeoutMs` bounded a `say` to a Claude Code `--bg` session's inbox, and this runtime runs no such session: a job and a held session take words on their own input. Leave `sayTimeoutMs` out.";
   }
-  const ceiling = ceilingRefusalOf(options.maxConcurrent);
+  const ceiling = ceilingRefusalOf(options.maxConcurrent) ?? keptRoomRefusalOf(options.keptRoom);
   if (ceiling) return ceiling;
   const limits = limitsRefusalOf(options);
   if (limits) return limits;
@@ -562,7 +597,21 @@ const machineOf = (options: EngineOptions) => {
 };
 
 /**
- * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, its `unschedulable`, the machine it reads while
+ * The room an engine keeps, as a pass holds it (`AdmissionRule.kept`): the priority, the places per pool and the memory in bytes,
+ * nothing where none is given.
+ */
+const keptOf = (room: KeptRoomOption | undefined) =>
+  room === undefined
+    ? undefined
+    : {
+        priority: room.priority,
+        slots: room.sessions,
+        bytes: room.memory === undefined ? 0 : (memoryBytesOf(room.memory) ?? 0),
+      };
+
+/**
+ * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, its `keptRoom` (`keptOf`), its `unschedulable`, the
+ * machine it reads while
  * `reserved` is given (`machineOf`), the pool each of `harnesses` counts in — the `pool` it names, else its own name; a task with
  * no harness counts in `default` — and the defaults a task with no resources of its own runs under (`defaultsOf`): `defaultLimits`
  * and `defaultRequests`, for a harness of `harnesses` that runs a process here, never a remote agent's, whose process the other
@@ -572,6 +621,7 @@ const machineOf = (options: EngineOptions) => {
  */
 export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) => {
   const machine = machineOf(options);
+  const kept = keptOf(options.keptRoom);
   const { defaultLimits, defaultRequests } = options;
   const defaults: TaskResources | undefined =
     defaultLimits === undefined && defaultRequests === undefined
@@ -584,6 +634,7 @@ export const admissionOf = (options: EngineOptions, harnesses: Record<string, Ha
     ...(options.maxConcurrent !== undefined ? { ceiling: options.maxConcurrent } : {}),
     ...(options.unschedulable !== undefined ? { unschedulable: options.unschedulable } : {}),
     ...(machine !== undefined ? { machine } : {}),
+    ...(kept !== undefined ? { kept: () => kept } : {}),
     poolOf: (harness) => {
       const h = harness !== undefined && Object.hasOwn(harnesses, harness) ? harnesses[harness] : undefined;
       return typeof h === 'object' && h !== null && typeof h.pool === 'string' ? h.pool : (harness ?? 'default');

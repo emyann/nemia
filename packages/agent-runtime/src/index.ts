@@ -69,7 +69,7 @@ export type {
   McpSignInStarted,
   McpSignInState,
 } from './service/index.ts';
-export type { EngineOptions, HarnessConfig, Pooled, Resources, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
+export type { EngineOptions, HarnessConfig, KeptRoomOption, Pooled, Resources, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
 /**
  * A memory limit's bytes, read off its Kubernetes quantity, and words for one the runtime does not read: for a caller that checks a
  * limit before it files it. And whether this host can hold one at all (a scope of systemd's user manager), in words that say what to
@@ -92,7 +92,10 @@ export { file, FileRefused, StopRefused, answer, close, InputRefused, admit, Adm
 export { view, viewOfState, tick, TickRefused, reconcile, settleTask, ReconcileRefused, GRACE_MS } from './core/engine/index.ts';
 export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
-/** Why a pass left a queued task waiting, as its view says it (`TaskView.waits`): its pool's ceiling, or the machine's memory. */
+/**
+ * Why a pass left a queued task waiting, as its view says it (`TaskView.waits`): its pool's ceiling, the machine's memory (with the
+ * memory kept for higher turns, `keptBytes`), or the engine `unschedulable`.
+ */
 export type { AdmissionWait } from './core/admission.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
 

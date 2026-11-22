@@ -259,9 +259,17 @@ const answerVerbOf = (tasks: Map<string, TestTask>) =>
     Effect.gen(function* () {
       const t = tasks.get(taskId);
       const config = options?.config;
-      const refused = answerOptionsRefusalOf(options ?? {}) ?? answerRefusalOf(taskId, t ? stateOf(taskId, t) : undefined, text, config);
+      const priority = options?.priority;
+      const refused =
+        answerOptionsRefusalOf(options ?? {}) ??
+        answerRefusalOf(taskId, t ? stateOf(taskId, t) : undefined, text, config, priority);
       if (refused !== undefined || !t) return yield* Effect.fail(new InputRefused({ message: refused ?? unknownTask(taskId) }));
-      const input: Input = { at: new Date().toISOString(), text, ...(config ? { config } : {}) };
+      const input: Input = {
+        at: new Date().toISOString(),
+        text,
+        ...(config ? { config } : {}),
+        ...(priority !== undefined ? { priority } : {}),
+      };
       t.inputs.push(input);
       t.phase = 'between-attempts';
       return input;

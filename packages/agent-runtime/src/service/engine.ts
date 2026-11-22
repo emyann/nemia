@@ -452,18 +452,23 @@ export type EngineShape = {
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
    * the task's next turn: an attempt that continues the session that ended (`--resume`), told `text` in place of the
-   * brief, with `config` laid over the task's own if given. A turn gives its own spend cap and nothing else
+   * brief, with `config` laid over the task's own if given, and admitted at `priority` if given — the turn's own, as a Pod's, which
+   * goes before the waiting turns below it and takes the room kept for it (`keptRoom`) — else at the task's filing's. A turn gives its own spend cap and nothing else
    * (`config: { budgetUsd }`, `TURN_ARGS`): the rest of its configuration is the session's it continues. Nothing is
    * sent to any session: none is running.
    *
    * Refused — `InputRefused`, and nothing journalled — for an empty `text`; a `config`
    * with any key but `budgetUsd`, or a `budgetUsd` that is not dollars above 0, or one its harness would not keep (as
-   * `file` refuses one); a `budgetUsd` given beside `config` rather than in it, naming where it goes; a task this engine has no
+   * `file` refuses one); a `priority` that is not a whole number in int32; a `budgetUsd` given beside `config` rather than in it, naming where it goes; a task this engine has no
    * record of; one not filed to be held open; one settled, closed or asked to stop; and one not waiting — an attempt
    * running (`say` reaches it), between attempts, not started, or answered already and its next turn not yet begun.
    * Two answers journalled before the next turn begins are told to it both, in order.
    */
-  readonly answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Effect.Effect<Input, InputRefused | JournalError>;
+  readonly answer: (
+    taskId: string,
+    text: string,
+    options?: { config?: HarnessArgs; priority?: number },
+  ) => Effect.Effect<Input, InputRefused | JournalError>;
   /**
    * Settle a task held open that waits for an answer: journalled as a `closed` entry, and settled `succeeded`, note
    * `closed`, by the next tick. Refused — `InputRefused`, nothing journalled — as `answer` is, for a task
@@ -935,18 +940,22 @@ const make = (options: EngineOptions) =>
       return (yield* go(transcriptOf(nameFor(taskId, last.n), after === start ? undefined : after))) ?? nothing;
     });
 
-    const answerVerb = Effect.fn('Engine.answer')(function* (taskId: string, text: string, options: { config?: HarnessArgs } = {}) {
+    const answerVerb = Effect.fn('Engine.answer')(function* (
+      taskId: string,
+      text: string,
+      options: { config?: HarnessArgs; priority?: number } = {},
+    ) {
       const refuse = (message: string) => Effect.fail(new InputRefused({ message }));
       const misplaced = answerOptionsRefusalOf(options);
       if (misplaced) return yield* refuse(misplaced);
-      const { config } = options;
+      const { config, priority } = options;
       const events = yield* read(taskId);
       const state = events.length ? fold(taskId, events) : undefined;
       const refused =
-        answerRefusalOf(taskId, state, text, config) ??
+        answerRefusalOf(taskId, state, text, config, priority) ??
         (state && config ? harnessRefusalOf({ ...filingOf(state, config), harness: harnessOf(state).name }, harnesses) : undefined);
       if (refused) return yield* refuse(refused);
-      return yield* go(answer(taskId, text, config));
+      return yield* go(answer(taskId, text, config, priority));
     });
 
     const feedVerb = (after: Cursor = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after)));

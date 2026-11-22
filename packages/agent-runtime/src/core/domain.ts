@@ -182,7 +182,12 @@ export function fold(taskId: string, events: readonly Event[]) {
         s.said.push({ at: e.at, attempt: e.attempt, text: e.text, after: e.after ?? null });
         break;
       case 'input':
-        s.inputs.push({ at: e.at, text: e.text, ...(e.config ? { config: e.config } : {}) });
+        s.inputs.push({
+          at: e.at,
+          text: e.text,
+          ...(e.config ? { config: e.config } : {}),
+          ...(e.priority !== undefined ? { priority: e.priority } : {}),
+        });
         break;
       case 'closed':
         s.closed = true;

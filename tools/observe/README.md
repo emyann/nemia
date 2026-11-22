@@ -427,12 +427,12 @@ Measured 2026-10-11 on Claude Code 2.1.296, over the 7 days this stack held:
 Read off a daemon exporting to this stack (2026-10-06), and a step's session (2026-10-07):
 
 - **Prometheus**: a metric's dots become underscores. A histogram has `_bucket`, `_count` and `_sum` (`pass_duration_bucket`); a gauge
-  takes `_ratio`, from the unit `1` the exporter gives it (`machine_load_ratio`); a counter that only grows (`incremental: true`) takes
+  takes no suffix (`machine_load`): effect 4.1.3 exports a metric with no unit with an empty unit, where 4.1.2 gave it `1`, which took
+  `_ratio` (read from the library's release note and `OtlpMetrics.ts`, not yet measured on the stack); a counter that only grows (`incremental: true`) takes
   `_total` (`step_cost_total`); any other counter is a gauge with no suffix (`subscription_wakes`, `nemia_acts`). Every series carries
   `job` and `service_name`, both the service's name. The step metrics carry `factory`, `workflow`, `step`, `agent` and `outcome`, the
-  phases `phase`, the api's reads `route`, and the disk's `part`, `kind` (on `disk_bytes_ratio`) and, for a part kept by run or by
-  task, `factory`: `disk_bytes_ratio`,
-  `disk_free_ratio` and `disk_size_ratio` are bytes, whatever the suffix says. A run's id is never a label.
+  phases `phase`, the api's reads `route`, and the disk's `part`, `kind` (on `disk_bytes`) and, for a part kept by run or by
+  task, `factory`: `disk_bytes`, `disk_free` and `disk_size` are bytes. A run's id is never a label.
 - **Tempo**: the resource attribute `service.name`; the span attributes `run`, `step`, `task`, `kind` and `attempt`, as `span.run` and so
   on. An `append` made outside a filing (a session's end) carries its task and kind but no run. Two spans are named `tick`: the
   orchestrator's tick and the runtime engine's tick inside it, so a query on `name="tick"` mixes them. Read a pass from `pass`. A step's

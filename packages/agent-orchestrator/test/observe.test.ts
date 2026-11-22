@@ -4,7 +4,7 @@
  *
  * The names are read from the code, never listed by hand. The metrics are scanned from both `src` trees (`Metric.histogram`, `gauge`,
  * `counter`) and named as Prometheus shows them through the collector, as measured on the stack: dots become underscores, a histogram
- * gets `_bucket`, `_count` and `_sum`, a gauge `_ratio`, a counter that only grows `_total` and any other counter nothing. The spans,
+ * gets `_bucket`, `_count` and `_sum`, a counter that only grows `_total`, and a gauge and any other counter nothing. The spans,
  * their attributes and the logs' annotations come from a pass of the tick traced over the runtime's engine as the client builds it
  * (`engineOf`), the orchestrator's own `Effect.fn` names, the waits' spans (`WAIT_SPANS`) with their own keys (`WAIT_SPAN_KEYS`) and a
  * denied call's (`DENIED_SPAN`, `DENIED_SPAN_KEYS`), each with its step's attributes, and a finished run's timeline's (`TIMELINE_SPAN`,
@@ -237,7 +237,7 @@ function scannedMetrics(text: string) {
       kind === 'histogram'
         ? [`${base}_bucket`, `${base}_count`, `${base}_sum`]
         : kind === 'gauge'
-          ? [`${base}_ratio`]
+          ? [base]
           : /incremental:\s*true/.test(options)
             ? [`${base}_total`]
             : [base];
@@ -247,6 +247,9 @@ function scannedMetrics(text: string) {
 }
 
 const METRICS = scannedMetrics(SOURCE_TEXT);
+
+/** The ids of the metrics the sources define as gauges, which Prometheus shows by their bare name as it does a counter that may fall. */
+const GAUGES = new Set([...SOURCE_TEXT.matchAll(/Metric\.gauge\(\s*'([^']+)'/g)].map(([, id]) => id));
 
 /** The attribute keys each `Metric.withAttributes` in `text` gives in an object written there. */
 const attributeKeys = (text: string) =>
@@ -733,7 +736,7 @@ test("the scan reads the code's metrics, and the traced pass the spans the dashb
     [],
   );
   assert.deepEqual(METRICS.get('step.cost'), ['step_cost_total']);
-  assert.deepEqual(METRICS.get('machine.load'), ['machine_load_ratio']);
+  assert.deepEqual(METRICS.get('machine.load'), ['machine_load'], 'a gauge with no unit takes no suffix');
   assert.deepEqual(METRICS.get('subscription.wakes'), ['subscription_wakes'], 'a counter that is not incremental is a gauge, no suffix');
   for (const span of ['tick', 'pass', 'advancePass', 'fileReady', 'file', 'append']) assert.ok(TRACED.spans.has(span), span);
   assert.deepEqual([...TRACED.shared], ['tick'], "the orchestrator's tick, and the runtime engine's inside it");
@@ -1050,9 +1053,9 @@ test('REFUSED: a by-kind description that leaves a kind unsaid, and a seed of on
 
 test('REFUSED: a Disk panel asking a misspelt gauge, one kept by run, a largest-runs panel of one sweep, and a seed of one large run', () => {
   const system = () => dashboardTitled('System');
-  const misspelt = withQuery(system(), 'prometheus', 'disk_bytes_ratio', 'disk_byte_ratio');
-  assert.deepEqual(unknownNames(misspelt, KNOWN), ['disk_byte_ratio']);
-  const byRun = withQuery(system(), 'prometheus', 'sum by (part) (disk_bytes_ratio', 'sum by (run) (disk_bytes_ratio');
+  const misspelt = withQuery(system(), 'prometheus', 'disk_bytes', 'disk_byte');
+  assert.deepEqual(unknownNames(misspelt, KNOWN), ['disk_byte']);
+  const byRun = withQuery(system(), 'prometheus', 'sum by (part) (disk_bytes', 'sum by (run) (disk_bytes');
   assert.deepEqual(unknownNames(byRun, KNOWN), ['run'], 'no metric carries a run');
   const renamed = withQuery(system(), 'tempo', `name="${DISK_SPAN}"`, 'name="disk.runs"');
   assert.deepEqual(unknownNames(renamed, KNOWN), ['disk.runs']);
@@ -1429,14 +1432,10 @@ const spansUnder = (spans: readonly SpanSeed[]): SpanSeed[] => spans.flatMap((sp
 /** A log field as Loki shows a log attribute: its dots underscores. */
 const lokiField = (key: string) => key.replace(/\./g, '_');
 
-/** The form Prometheus shows of a seeded metric of `kind`, among the forms of the code's metric. */
-const formOf = (forms: readonly string[], kind: string) =>
-  forms.find((form) =>
-    kind === 'histogram'
-      ? form.endsWith('_bucket')
-      : kind === 'gauge'
-        ? form.endsWith('_ratio')
-        : form.endsWith('_total') === (kind === 'total'),
+/** The form Prometheus shows of a seeded metric of `kind`, among the forms of the code's metric `id`. */
+const formOf = (id: string, kind: string) =>
+  (METRICS.get(id) ?? []).find((form) =>
+    kind === 'histogram' ? form.endsWith('_bucket') : kind === 'gauge' ? GAUGES.has(id) : form.endsWith('_total') === (kind === 'total'),
   ) satisfies string | undefined;
 
 /** Every name `seed` sends that `known` does not hold or the code gives another kind, each once. */
@@ -1446,7 +1445,7 @@ function seedUnknown(seed: readonly ServiceSeed[], known: Known) {
   for (const said of seed) {
     check([said.service], new Set([DEFAULT_SERVICE_NAME, CLAUDE_SERVICE]));
     for (const metric of said.metrics) {
-      if (formOf(METRICS.get(metric.name) ?? [], metric.kind) === undefined) unknown.add(metric.name);
+      if (formOf(metric.name, metric.kind) === undefined) unknown.add(metric.name);
       check(
         metric.series.flatMap(([attributes]) => Object.keys(attributes)),
         known.labels,
@@ -1489,7 +1488,7 @@ function seeded(seed: readonly ServiceSeed[]) {
   const spans = seed.flatMap((said) => spansUnder(said.spans));
   const metrics = new Map<string, Record<string, string | number>[]>();
   for (const metric of seed.flatMap((said) => said.metrics)) {
-    const base = formOf(METRICS.get(metric.name) ?? [], metric.kind)?.replace(/_bucket$/, '') ?? metric.name;
+    const base = formOf(metric.name, metric.kind)?.replace(/_bucket$/, '') ?? metric.name;
     const forms = metric.kind === 'histogram' ? [`${base}_bucket`, `${base}_count`, `${base}_sum`] : [base];
     for (const form of forms)
       metrics.set(

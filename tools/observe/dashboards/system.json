@@ -438,7 +438,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "store_runs_ratio{service_name=\"$service\"}",
+          "expr": "store_runs{service_name=\"$service\"}",
           "legendFormat": "runs"
         }
       ],
@@ -490,7 +490,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sessions_admitted_ratio{service_name=\"$service\"}",
+          "expr": "sessions_admitted{service_name=\"$service\"}",
           "legendFormat": "admitted"
         },
         {
@@ -499,7 +499,7 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "sessions_queued_ratio{service_name=\"$service\"}",
+          "expr": "sessions_queued{service_name=\"$service\"}",
           "legendFormat": "queued"
         }
       ],
@@ -551,7 +551,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "admission_wait_ratio{service_name=\"$service\"}",
+          "expr": "admission_wait{service_name=\"$service\"}",
           "legendFormat": "oldest queued"
         }
       ],
@@ -603,7 +603,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "machine_load_ratio{service_name=\"$service\"}",
+          "expr": "machine_load{service_name=\"$service\"}",
           "legendFormat": "load"
         }
       ],
@@ -668,7 +668,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (part) (disk_bytes_ratio{service_name=\"$service\"})",
+          "expr": "sum by (part) (disk_bytes{service_name=\"$service\"})",
           "legendFormat": "{{part}}"
         }
       ],
@@ -721,7 +721,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (factory) (disk_bytes_ratio{service_name=\"$service\", factory!=\"\"})",
+          "expr": "sum by (factory) (disk_bytes{service_name=\"$service\", factory!=\"\"})",
           "legendFormat": "{{factory}}"
         }
       ],
@@ -774,7 +774,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "disk_free_ratio{service_name=\"$service\"}",
+          "expr": "disk_free{service_name=\"$service\"}",
           "legendFormat": "free"
         },
         {
@@ -783,7 +783,7 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "disk_size_ratio{service_name=\"$service\"}",
+          "expr": "disk_size{service_name=\"$service\"}",
           "legendFormat": "size"
         }
       ],
@@ -836,7 +836,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (part) (disk_unread_ratio{service_name=\"$service\"})",
+          "expr": "sum by (part) (disk_unread{service_name=\"$service\"})",
           "legendFormat": "{{part}}"
         }
       ],
@@ -889,7 +889,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (part, kind) (disk_bytes_ratio{service_name=\"$service\"})",
+          "expr": "sum by (part, kind) (disk_bytes{service_name=\"$service\"})",
           "legendFormat": "{{part}}: {{kind}}"
         }
       ],
@@ -1958,7 +1958,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "feed_followers_ratio{service_name=\"$service\"}",
+          "expr": "feed_followers{service_name=\"$service\"}",
           "legendFormat": "readers"
         }
       ],
@@ -2453,7 +2453,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max by (window) (quota_used_ratio{service_name=\"$service\"})",
+          "expr": "max by (window) (quota_used{service_name=\"$service\"})",
           "legendFormat": "{{window}}"
         }
       ],
@@ -2505,7 +2505,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max by (window) (quota_resets_at_ratio{service_name=\"$service\"}) - time()",
+          "expr": "max by (window) (quota_resets_at{service_name=\"$service\"}) - time()",
           "legendFormat": "{{window}}"
         }
       ],

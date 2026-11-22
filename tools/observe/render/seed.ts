@@ -23,9 +23,9 @@ export type SpanSeed = { name: string; ago: number; took: number; attributes: Sp
 export type LogSeed = { body: string; ago: number; attributes: Record<string, string> };
 
 /**
- * A metric of the seed, by the name the code gives it: a `histogram`, a `gauge` (unit `1`), a `total` (a sum that only grows) or a
- * `counter` (any other sum); each series its attributes and the value it reaches, or for a histogram the one value it observes; and
- * `restarted` for a series a daemon births at zero once it holds the store, seeded across a restart of its process.
+ * A metric of the seed, by the name the code gives it: a `histogram`, a `gauge` (no unit, as the code's), a `total` (a sum that only
+ * grows) or a `counter` (any other sum); each series its attributes and the value it reaches, or for a histogram the one value it
+ * observes; and `restarted` for a series a daemon births at zero once it holds the store, seeded across a restart of its process.
  */
 export type MetricSeed = {
   name: string;
@@ -499,7 +499,7 @@ function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value:
 /** One metric of the seed as OTLP's, stamped against `now`. */
 function metricOf(metric: MetricSeed, now: number): object {
   const dataPoints = metric.series.flatMap(([attributes, value]) => pointsOf(metric, attributes, value, now));
-  if (metric.kind === 'gauge') return { name: metric.name, unit: '1', gauge: { dataPoints } };
+  if (metric.kind === 'gauge') return { name: metric.name, gauge: { dataPoints } };
   if (metric.kind === 'histogram') return { name: metric.name, histogram: { aggregationTemporality: 2, dataPoints } };
   return { name: metric.name, sum: { aggregationTemporality: 2, isMonotonic: metric.kind === 'total', dataPoints } };
 }

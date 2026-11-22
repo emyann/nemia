@@ -920,7 +920,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(quota_used_ratio{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"})",
+          "expr": "max(quota_used{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"})",
           "instant": true,
           "range": false
         }
@@ -973,7 +973,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "100 * (1 - (max(quota_resets_at_ratio{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) - time()) / 604800)",
+          "expr": "100 * (1 - (max(quota_resets_at{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) - time()) / 604800)",
           "instant": true,
           "range": false
         }
@@ -1026,7 +1026,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(quota_resets_at_ratio{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) - time()",
+          "expr": "max(quota_resets_at{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) - time()",
           "instant": true,
           "range": false
         }
@@ -1079,7 +1079,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(quota_used_ratio{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"})",
+          "expr": "max(quota_used{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"})",
           "instant": true,
           "range": false
         }
@@ -1132,7 +1132,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(quota_used_ratio{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) and on () (max(quota_resets_at_ratio{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) > time())",
+          "expr": "max(quota_used{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) and on () (max(quota_resets_at{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) > time())",
           "legendFormat": "used"
         },
         {
@@ -1141,7 +1141,7 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "100 * (1 - (max(quota_resets_at_ratio{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) - time()) / 604800)",
+          "expr": "100 * (1 - (max(quota_resets_at{service_name=\"$service\", harness=\"claude\", window=\"seven_day\"}) - time()) / 604800)",
           "legendFormat": "even pace"
         }
       ],
@@ -1227,7 +1227,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(quota_used_ratio{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"}) and on () (max(quota_resets_at_ratio{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"}) > time())",
+          "expr": "max(quota_used{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"}) and on () (max(quota_resets_at{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"}) > time())",
           "legendFormat": "used"
         },
         {
@@ -1236,7 +1236,7 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "100 * (1 - (max(quota_resets_at_ratio{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"}) - time()) / 18000)",
+          "expr": "100 * (1 - (max(quota_resets_at{service_name=\"$service\", harness=\"claude\", window=\"five_hour\"}) - time()) / 18000)",
           "legendFormat": "even pace"
         }
       ],

@@ -20,6 +20,7 @@ import { workedOn, type Factory } from '../factory.ts';
 import { volumesFromRepos, type FileVolume } from '../from-repos/from-repos.ts';
 import { CardDoor } from '../../cards/cards.store.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
+import { ProposalDoor } from '../../proposal/proposal.store.ts';
 import { CardName } from '../../inbox/inbox.model.ts';
 import { cardsListed, parseInboxCard } from '../../inbox/index.ts';
 import { ARCHIVE_LIMIT, packArchive, unpackArchive } from '../../archive/archive.ts';
@@ -29,7 +30,7 @@ import { cloned } from '../clones/clones.verb.ts';
 import { volumeRefusal } from '../volume/volume.ts';
 import { isDirectory, runId } from '../../record/record.store.ts';
 import { firstPiece } from '../../piece/piece.ts';
-import { cardMoved, factoryOnTarget, fileTextOf, folderOnTarget, renamedFolders, repoOnTarget, volumeKey, volumeOnTarget } from './move.ts';
+import { FOLDER_STAYS, cardMoved, factoryOnTarget, fileTextOf, folderOnTarget, renamedFolders, repoOnTarget, volumeKey, volumeOnTarget } from './move.ts';
 
 /** The top folder a factory's folder is packed under: a fixed word, since an archive's top is a name a factory's need not be. */
 const PACKED_AS = 'factory';
@@ -40,8 +41,9 @@ const leftWhy = (runs: readonly string[]) =>
 
 /**
  * `GET /api/factories/<name>/export`: the factory `name` as its store holds it, for another store to file — its file's text, its folder
- * packed but what stays with this store (`stays`), its template as a request gives one (`templateGiven`), its instruction's words where
- * they are kept in a folder of this machine that no clone carries, and, unless `cards` is `stay`, its cards in play no run was started
+ * packed but what stays with this store (`stays`, its proposals named too where the Proposal door holds any of the factory's), its
+ * template as a request gives one (`templateGiven`), its instruction's words where they are kept in a folder of this machine that no
+ * clone carries, and, unless `cards` is `stay`, its cards in play no run was started
  * from (`cards`) and those a run keeps (`left`). Nothing is written. Refused: the default factory (`Conflict`), which has no folder to
  * move; a factory not filed (`Missing`); a folder past what an archive holds and a template that cannot be packed (`Invalid`).
  */
@@ -56,6 +58,7 @@ export const factoryExported = Effect.fn('factoryExported')(function* (name: str
   const template = record.template === undefined ? undefined : yield* templateGiven(record.template.source);
   const instruction = yield* instructionCarried(record);
   const { cards, left } = how.cards === 'stay' ? { cards: [], left: [] } : yield* cardsOf(name);
+  const proposals = yield* (yield* ProposalDoor).proposals.list(name);
   return {
     name,
     file: fileTextOf(record),
@@ -64,7 +67,7 @@ export const factoryExported = Effect.fn('factoryExported')(function* (name: str
     ...(instruction === undefined ? {} : { instruction }),
     cards,
     left,
-    stays: [...folder.stays],
+    stays: FOLDER_STAYS.filter((kept) => folder.stays.includes(kept) || (kept === 'proposals' && proposals.length > 0)),
   } satisfies FactoryExport;
 });
 

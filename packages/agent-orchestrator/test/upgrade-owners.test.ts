@@ -102,13 +102,13 @@ async function upgraded(t: TestContext, name: string, change: (tree: string, tem
   written(at, 'skills/review-a-change/notes/how.md', 'Name the file.\n');
   written(at, 'carried/land.ts', 'export const land = 1;\n');
   await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
-  reconciled(factory(name));
+  await reconciled(factory(name));
   edit(at, 'nemia.yaml', (spec) => {
     spec.version = '0.2.0';
   });
   change(treeDir(ROOT, name), at);
   await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
-  return (reconciled(factory(name)).upgrade?.conflicts ?? []).map((c) => c.at);
+  return ((await reconciled(factory(name))).upgrade?.conflicts ?? []).map((c) => c.at);
 }
 
 describe("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved by its proposal, and a carried file's by a choice", () => {
@@ -171,8 +171,8 @@ describe("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved 
       ['Hire', 'dev.review', { workflow: 'dev', step: 'review', agent: 'implementer' }],
     );
   });
-  s.test('while they wait the status names each conflict’s proposal; the carried file’s choice has settled it', () => {
-    const waiting = reconciled(factory('owners'));
+  s.test('while they wait the status names each conflict’s proposal; the carried file’s choice has settled it', async () => {
+    const waiting = await reconciled(factory('owners'));
     assert.equal(waiting.version, '0.1.0');
     const kept = Object.fromEntries((waiting.upgrade?.conflicts ?? []).map((c) => [c.at, c.proposal?.name]));
     assert.deepEqual(kept, { [at(AGENT)]: proposed.agent, [at(HOW)]: proposed.skill, [HIRE]: proposed.hire });
@@ -181,9 +181,9 @@ describe("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved 
     for (const name of [proposed.hire, proposed.agent, proposed.skill]) {
       const applied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'owners', name ?? '', PLACE));
       assert.equal(applied.status.phase, 'applied', name);
-      reconciled(factory('owners'));
+      await reconciled(factory('owners'));
     }
-    const merged = reconciled(factory('owners'));
+    const merged = await reconciled(factory('owners'));
     assert.equal(merged.version, '0.2.0');
     assert.equal(merged.upgrade, undefined);
     assert.match(textIn(tree(), AGENT), /Write nothing into it, not a byte\./);

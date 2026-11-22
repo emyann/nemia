@@ -58,6 +58,11 @@ export function templated(root: string, builtins?: string) {
     if (Exit.isSuccess(exit)) return exit.value satisfies A;
     throw Cause.squash(exit.cause);
   };
+  const runned = async <A>(program: Effect.Effect<A, unknown, StoreRoot>) => {
+    const exit = await Effect.runPromiseExit(Effect.provideService(withBuiltins(program, builtins), StoreRoot, root));
+    if (Exit.isSuccess(exit)) return exit.value satisfies A;
+    throw Cause.squash(exit.cause);
+  };
   const read = (source: string) =>
     run(
       Effect.gen(function* () {
@@ -70,9 +75,9 @@ export function templated(root: string, builtins?: string) {
     /** The template at `source`, read through the door and opened for a render. */
     openTemplate: (source: string) => openedTree(source, read(source), packageSkillNames()),
     /** One pass of the factory controller over `factory`: the status it observed. */
-    reconciled: (factory: Parameters<typeof reconcileFactory>[0]) => run(reconcileFactory(factory)),
+    reconciled: (factory: Parameters<typeof reconcileFactory>[0]) => runned(reconcileFactory(factory)),
     /** One pass of the factory controller over `factory` on a clock seeded at `at` (ISO): the status it observed. */
     reconciledAt: (factory: Parameters<typeof reconcileFactory>[0], at: string) =>
-      run(Effect.provideService(reconcileFactory(factory), Clock.Clock, seededClock(Date.parse(at)))),
+      runned(Effect.provideService(reconcileFactory(factory), Clock.Clock, seededClock(Date.parse(at)))),
   };
 }

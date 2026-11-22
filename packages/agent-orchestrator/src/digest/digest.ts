@@ -1,9 +1,10 @@
 /**
  * The one recipe of a `resourceVersion` that is a digest (`versionDigest`): the sha256 of a text, cut to 16 hex characters — the same
  * text, the same word, across a restart too. A value's is the digest of its JSON (`valueVersion`). Every kind whose version says what it
- * holds takes it here: a card's text, a run, a factory's part, a proposal, an agent's files, a skill held in memory. An event's and a
- * delegation's `resourceVersion` are no digest but a position — the byte after the event's line in the feed (`feedPosition`), when the
- * delegation was written (`writtenPosition`) — and are named so where they are made. Pure.
+ * holds takes it here: a card's text, a run, a factory's part, an agent's files, a skill held in memory. An event's, a delegation's and
+ * a proposal's `resourceVersion` are no digest but a position — the byte after the event's line in the feed (`feedPosition`), when the
+ * delegation was written (`writtenPosition`), the revision of the proposal's record in the keyspace (`src/keyspace/keyspace.store.ts`)
+ * — and are named so where they are made. Pure.
  */
 import { createHash } from 'node:crypto';
 

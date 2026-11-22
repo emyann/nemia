@@ -1,49 +1,22 @@
 /**
- * The Proposal door's memory stand-in: a fresh layer of `ProposalDoor` per call, its proposals held in a map, built by `proposalDoorOver`
- * as the files layer is. A test's alone: no file of `src` imports it (`test/boundary.test.ts`, `STAND_INS`).
+ * The Proposal door's memory stand-in: a fresh layer of `ProposalDoor` per call, its proposals held in a keyspace of its own in memory
+ * (`:memory:`), opened when a method first runs and kept, and built by `proposalDoorOver` over `proposalRecords` as the rooted door is,
+ * so the walks hold one code. A test's alone: no file of `src` imports it (`test/boundary.test.ts`, `STAND_INS`).
  */
-import { Layer } from 'effect';
-import type { Proposal } from 'objects';
-import { factoryNameRefusal } from '../factory/factory.ts';
-import { Invalid } from '../refusal/refusal.ts';
-import { factoryOf, noProposal, proposalDoorOver, ProposalDoor, proposalNamed, takenProposal } from './proposal.store.ts';
+import { Effect, Layer } from 'effect';
+import { keyspaceAt, type Keyspace } from '../keyspace/keyspace.store.ts';
+import { proposalDoorOver, ProposalDoor, proposalRecords } from './proposal.store.ts';
 
-/** A fresh Proposal door over a map: no proposal made. */
+/** A fresh Proposal door over a keyspace in memory: no proposal made. */
 export function proposalDoorMemory() {
-  const held = new Map<string, Proposal>();
-  const key = (factory: string, name: string) => {
-    proposalNamed(factory, name);
-    return `${factory}/${name}`;
-  };
-  const inFactory = (factory: string) =>
-    [...held.values()]
-      .filter((p) => p.metadata.namespace === factory)
-      .sort((a, b) => (a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0));
-  return Layer.succeed(ProposalDoor)(
-    proposalDoorOver({
-      proposals: {
-        factories: () => [...new Set([...held.values()].map((p) => p.metadata.namespace ?? ''))].filter(Boolean).sort(),
-        list: (factory) => {
-          const bad = factoryNameRefusal(factory);
-          if (bad !== undefined) throw new Invalid({ message: bad });
-          return inFactory(factory);
-        },
-        read: (factory, name) => held.get(key(factory, name)),
-        create: (proposal) => {
-          const factory = factoryOf(proposal);
-          const at = key(factory, proposal.metadata.name);
-          if (held.has(at)) throw takenProposal(factory, proposal.metadata.name);
-          held.set(at, proposal);
-          return proposal;
-        },
-        write: (proposal) => {
-          const factory = factoryOf(proposal);
-          const at = key(factory, proposal.metadata.name);
-          if (!held.has(at)) throw noProposal(factory, proposal.metadata.name);
-          held.set(at, proposal);
-          return proposal;
-        },
-      },
-    }),
+  let held: Keyspace | undefined;
+  const open = Effect.suspend(() =>
+    held === undefined
+      ? Effect.map(keyspaceAt(':memory:'), (keyspace) => {
+          held ??= keyspace;
+          return held;
+        })
+      : Effect.succeed(held),
   );
+  return Layer.succeed(ProposalDoor)(proposalDoorOver(proposalRecords(open)));
 }

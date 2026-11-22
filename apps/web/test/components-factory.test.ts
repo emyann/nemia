@@ -477,13 +477,17 @@ test("a factory's Proposals page lists its rows, what waits first; a read that f
     seed(client);
     return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(FactoryProposals, { factory: 'acme' })));
   };
-  const rows = drawn((client) =>
-    client.setQueryData(proposalsQuery('acme').queryKey, [
-      { name: 'p-applied', phase: 'applied', widens: false, why: '', creationTimestamp: '2026-11-02T00:00:00Z' },
-      { name: 'p-waiting', phase: 'waiting', widens: true, why: 'Hire a reviewer.', creationTimestamp: '2026-11-01T00:00:00Z' },
-    ]),
-  );
-  assert.ok(rows.indexOf('data-factory-proposal="p-waiting"') < rows.indexOf('data-factory-proposal="p-applied"'));
+  const rows = await routedWith(createElement(FactoryProposals, { factory: 'acme' }), [
+    [
+      proposalsQuery('acme').queryKey,
+      [
+        { name: 'p-applied', phase: 'applied', widens: false, why: '', creationTimestamp: '2026-11-02T00:00:00Z' },
+        { name: 'p-waiting', phase: 'waiting', widens: true, why: 'Hire a reviewer.', creationTimestamp: '2026-11-01T00:00:00Z' },
+      ],
+    ],
+  ]);
+  const waitingAt = rows.indexOf('data-factory-proposal="p-waiting"');
+  assert.ok(waitingAt >= 0 && waitingAt < rows.indexOf('data-factory-proposal="p-applied"'));
   assert.match(rows, /Hire a reviewer\./);
   const failed = (error: Error) =>
     drawn((client) =>

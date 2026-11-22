@@ -314,7 +314,7 @@ test("a proposal's row carries none of its objects, however large, and a long wh
       }),
     ]),
   );
-  assert.ok(JSON.stringify(table).length < WHY_CELL_MOST + 1_000);
+  assert.ok(JSON.stringify(table.rows).length < WHY_CELL_MOST + 1_000);
   assert.deepEqual(table.rows[0]?.object, { kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata: meta('big') });
   const why = String(cellsOf(table, 0).Why);
   assert.equal(why.length, WHY_CELL_MOST);

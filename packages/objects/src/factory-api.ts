@@ -334,7 +334,11 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
  * once for every factory that adds one, beside those Nemia offers.
  */
 export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
-  HttpApiEndpoint.get('listLibrary', '/api/mcpservers', { query: listQuery, success: McpServerListObject, error: objectErrors }).annotate(
+  HttpApiEndpoint.get('listLibrary', '/api/mcpservers', {
+    query: listQuery,
+    success: [McpServerListObject, Table],
+    error: objectErrors,
+  }).annotate(
     OpenApi.Description,
     "The store's library of MCP servers: the person's, recorded once for every factory that adds one, beside those Nemia offers, each with the factories that add it.",
   ),
@@ -422,11 +426,11 @@ export class SchedulesGroup extends HttpApiGroup.make('schedules').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/schedules', {
     params: namespaceParams,
     query: listQuery,
-    success: ScheduleListObject,
+    success: [ScheduleListObject, Table],
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's schedules in its namespace, a page at a time, each with the runs it fired. Answers a ScheduleList.",
+    "Lists a factory's schedules in its namespace, a page at a time, each with the runs it fired. Answers a ScheduleList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/schedules/:name', {
     params: cardParams,
@@ -463,11 +467,11 @@ export class TriggersGroup extends HttpApiGroup.make('triggers').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/triggers', {
     params: namespaceParams,
     query: listQuery,
-    success: TriggerListObject,
+    success: [TriggerListObject, Table],
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's triggers in its namespace, a page at a time, each with whether it can spend quota and what it does now: the cards it queues, or its next fire. Answers a TriggerList.",
+    "Lists a factory's triggers in its namespace, a page at a time, each with whether it can spend quota and what it does now: the cards it queues, or its next fire. Answers a TriggerList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/triggers/:name', {
     params: cardParams,
@@ -501,11 +505,11 @@ export class HiresGroup extends HttpApiGroup.make('hires').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/hires', {
     params: namespaceParams,
     query: listQuery,
-    success: HireListObject,
+    success: [HireListObject, Table],
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's hires in its namespace, a page at a time, one per step it offers, each named <workflow>.<step>. Answers a HireList.",
+    "Lists a factory's hires in its namespace, a page at a time, one per step it offers, each named <workflow>.<step>. Answers a HireList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/hires/:name', {
     params: cardParams,
@@ -542,7 +546,7 @@ export class LibraryAddsGroup extends HttpApiGroup.make('libraryadds').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/libraryadds', {
     params: namespaceParams,
     query: listQuery,
-    success: LibraryAddListObject,
+    success: [LibraryAddListObject, Table],
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
@@ -576,11 +580,11 @@ export class VolumesGroup extends HttpApiGroup.make('volumes').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/volumes', {
     params: namespaceParams,
     query: listQuery,
-    success: VolumeListObject,
+    success: [VolumeListObject, Table],
     error: objectErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's volumes in its namespace, a page at a time, each with the runs in play that mount it. Answers a VolumeList.",
+    "Lists a factory's volumes in its namespace, a page at a time, each with the runs in play that mount it. Answers a VolumeList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/volumes/:name', {
     params: cardParams,

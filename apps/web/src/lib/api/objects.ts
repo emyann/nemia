@@ -696,7 +696,8 @@ const AGENT_COPY_WRITTEN = "The copy may be written: read the library's agents a
  * adds; and each kind's items with the factories that add each, every page.
  */
 export const library = {
-  mcpServers: () => everyPage((asked) => call((c) => c.mcpservers.listLibrary({ query: asked }), read(McpServerList))),
+  mcpServers: () =>
+    everyPage((asked) => call((c) => c.mcpservers.listLibrary({ query: asked }).pipe(Effect.flatMap(listed)), read(McpServerList))),
   skills: () =>
     everyPage((asked) => call((c) => c.skills.listLibrary({ query: asked }).pipe(Effect.flatMap(listed)), read(SkillList))).then((l) => [
       ...l.items,
@@ -706,7 +707,9 @@ export const library = {
       ...l.items,
     ]),
   workflows: () =>
-    everyPage((asked) => call((c) => c.workflows.listLibrary({ query: asked }), read(WorkflowList))).then((l) => [...l.items]),
+    everyPage((asked) => call((c) => c.workflows.listLibrary({ query: asked }).pipe(Effect.flatMap(listed)), read(WorkflowList))).then(
+      (l) => [...l.items],
+    ),
   agentSources: () => call((c) => c.agents.sources({ query: {} }), read(AgentSources)),
   copyAgent: (file: string) => call((c) => c.agents.copyLibrary({ payload: { file } }), write(AgentCopied, AGENT_COPY_WRITTEN)),
 };
@@ -717,9 +720,9 @@ const ADD_WRITTEN = "The add may be written: read the factory's adds again befor
 /** What a factory has added from the library, each a LibraryAdd named `<kind>.<name>` with its state. */
 export const libraryAdds = {
   list: (namespace: string) =>
-    everyPage((asked) => call((c) => c.libraryadds.list({ params: { namespace }, query: asked }), read(LibraryAddList))).then((l) => [
-      ...l.items,
-    ]),
+    everyPage((asked) =>
+      call((c) => c.libraryadds.list({ params: { namespace }, query: asked }).pipe(Effect.flatMap(listed)), read(LibraryAddList)),
+    ).then((l) => [...l.items]),
   add: (namespace: string, name: string) => call((c) => c.libraryadds.put({ params: { namespace, name } }), write(LibraryAdd, ADD_WRITTEN)),
   remove: (namespace: string, name: string) =>
     call((c) => c.libraryadds.delete({ params: { namespace, name } }), write(LibraryAdd, ADD_WRITTEN)),
@@ -729,7 +732,9 @@ export const libraryAdds = {
 export const schedules = {
   /** Every schedule of the factory `namespace`, every page. */
   list: (namespace: string) =>
-    everyPage((asked) => call((c) => c.schedules.list({ params: { namespace }, query: asked }), read(ScheduleList))),
+    everyPage((asked) =>
+      call((c) => c.schedules.list({ params: { namespace }, query: asked }).pipe(Effect.flatMap(listed)), read(ScheduleList)),
+    ),
   get: (namespace: string, name: string) => call((c) => c.schedules.get({ params: { namespace, name } }), read(Schedule)),
   put: (namespace: string, name: string, schedule: ScheduleWrite) =>
     call(
@@ -750,9 +755,9 @@ const TRIGGER_WRITTEN = "The factory's triggers may be changed: read them again 
 export const triggers = {
   /** Every trigger of the factory `namespace`, every page. */
   list: (namespace: string) =>
-    everyPage((asked) => call((c) => c.triggers.list({ params: { namespace }, query: asked }), read(TriggerList))).then((l) => [
-      ...l.items,
-    ]),
+    everyPage((asked) =>
+      call((c) => c.triggers.list({ params: { namespace }, query: asked }).pipe(Effect.flatMap(listed)), read(TriggerList)),
+    ).then((l) => [...l.items]),
   put: (namespace: string, name: string, trigger: TriggerWrite) =>
     call((c) => c.triggers.put({ params: { namespace, name }, payload: trigger }), write(Trigger, TRIGGER_WRITTEN)),
   delete: (namespace: string, name: string) =>
@@ -772,7 +777,8 @@ const HIRE_WRITTEN = "The factory's hires may be changed: read the step's page a
 /** A factory's hires, one per step of each workflow it offers, each named `<workflow>.<step>` (`hireName`). */
 export const hires = {
   /** Every hire of the factory `namespace`, every page. */
-  list: (namespace: string) => everyPage((asked) => call((c) => c.hires.list({ params: { namespace }, query: asked }), read(HireList))),
+  list: (namespace: string) =>
+    everyPage((asked) => call((c) => c.hires.list({ params: { namespace }, query: asked }).pipe(Effect.flatMap(listed)), read(HireList))),
   get: (namespace: string, name: string) => call((c) => c.hires.get({ params: { namespace, name } }), read(Hire)),
   /** The agent `agent` hired into the step the hire `name` is of: answers the hire as it then reads. */
   put: (namespace: string, name: string, agent: string) =>
@@ -825,7 +831,9 @@ const DELEGATION_WRITTEN = "The factory's delegations may be changed: read its s
 export const delegations = {
   /** Every delegation of the factory `namespace`, every page. */
   list: (namespace: string) =>
-    everyPage((asked) => call((c) => c.delegations.list({ params: { namespace }, query: asked }), read(DelegationList))),
+    everyPage((asked) =>
+      call((c) => c.delegations.list({ params: { namespace }, query: asked }).pipe(Effect.flatMap(listed)), read(DelegationList)),
+    ),
   /** The delegation of the agent `name` written whole as `spec`: answers it as it then reads. */
   put: (namespace: string, name: string, spec: DelegationWrite) =>
     call((c) => c.delegations.put({ params: { namespace, name }, payload: spec }), write(Delegation, DELEGATION_WRITTEN)),
@@ -857,8 +865,11 @@ export const workflows = {
   /** Every workflow the namespace serves, every page of it. */
   list: (namespace: string, at?: DefinitionRead) =>
     everyPage((asked) =>
-      call((c) => c.workflows.list({ params: { namespace }, query: { ...originOf(at), ...asked } }), read(WorkflowList, repoOf(at))),
-    ).then((list) => [...list.items]) satisfies Promise<Workflow[]>,
+      call(
+        (c) => c.workflows.list({ params: { namespace }, query: { ...originOf(at), ...asked } }).pipe(Effect.flatMap(listed)),
+        read(WorkflowList, repoOf(at)),
+      ),
+    ).then((list) => [...list.items]) satisfies Promise<WorkflowList['items'][number][]>,
   get: (namespace: string, name: string, at?: DefinitionRead) =>
     call((c) => c.workflows.get({ params: { namespace, name }, query: originOf(at) }), read(Workflow, repoOf(at))),
   create: (body: WorkflowCreate, refuse?: Refuse) =>

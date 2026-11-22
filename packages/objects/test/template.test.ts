@@ -6,8 +6,8 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Template } from 'objects';
-import { answered } from './served.ts';
+import { API_VERSION, Template, LISTED_WITHOUT } from 'objects';
+import { answered, listedPage } from './served.ts';
 
 const full = {
   apiVersion: API_VERSION,
@@ -46,7 +46,7 @@ test("the Api's get answers a template and its list a page of them, every key ke
   assert.deepEqual(answered('templates', 'get', full), full);
   assert.deepEqual(answered('templates', 'get', broken), broken);
   const page = { apiVersion: API_VERSION, kind: 'TemplateList', metadata: {}, items: [full, broken] };
-  assert.deepEqual(answered('templates', 'listAll', page), page);
+  assert.deepEqual(answered('templates', 'listAll', page), listedPage(LISTED_WITHOUT.Template, page));
   assert.equal(answered('templates', 'get', { ...full, kind: 'Factory' }), undefined);
   assert.equal(answered('templates', 'listAll', { ...page, kind: 'FactoryList' }), undefined);
 });

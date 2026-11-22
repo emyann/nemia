@@ -4,7 +4,7 @@ import type { Locator, Page } from 'playwright';
 import { photograph, reachClock, themeOf, rowsAnswered } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
 import type { RunLines } from '../../../src/lib/api/run.ts';
-import { agentViewOf } from '../../../src/lib/api/agents.ts';
+import { agentRowOf } from '../../../src/lib/api/agents.ts';
 import { agentOf } from '../../../src/lib/api/judged.ts';
 import { runDetailOf } from '../../../src/lib/runView.ts';
 import { stepCardOf, type StepCardFacts } from '../../../src/lib/stepCard.ts';
@@ -153,7 +153,7 @@ async function expected(page: Page, run: string, step: string) {
     rowsAnswered(page),
     answer<RunObject.Run>(page, at),
     answer<RunLines>(page, `${at}/lines`),
-    answer<RunObject.AgentList>(page, '/api/namespaces/default/agents?origin=user').then((list) => list.items.map(agentViewOf)),
+    answer<RunObject.AgentList>(page, '/api/namespaces/default/agents?origin=user').then((list) => list.items.map(agentRowOf)),
   ]);
   const row = runs.find((r) => r.id === run);
   if (!row) throw new Refused(`the api lists the run in flight ${run}`);

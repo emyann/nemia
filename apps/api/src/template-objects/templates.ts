@@ -10,7 +10,17 @@
  * since the store holds none of a template's, so each of its hires fills its step as in a factory applied from it. Each program runs over
  * the request's own services (`inRequest`), so the builtin folder and the folder of renders are the app's.
  */
-import { templateList, templateObject, templateTree, type Factory } from 'agent-orchestrator';
+import {
+  agentTable,
+  skillTable,
+  templateList,
+  templateObject,
+  templateTable,
+  templateTree,
+  workflowTable,
+  type Factory,
+} from 'agent-orchestrator';
+import { listOrTable } from '../objects/table.ts';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
 import { agentObjectsOf, treeAgentsHeld } from '../agents/index.ts';
@@ -51,13 +61,21 @@ const theOne = <T>([one]: readonly T[], doc: string) => {
 
 export const templatesHandlers = readsBounded(Api, 'templates', (handlers) =>
   handlers
-    .handle('listAll', ({ query }) => answered((s) => s.inRequest(templateList(queryOf(query)))))
+    .handle('listAll', ({ query }) =>
+      listOrTable(
+        answered((s) => s.inRequest(templateList(queryOf(query)))),
+        templateTable,
+      ),
+    )
     .handle('get', ({ params: { name } }) => answered((s) => s.inRequest(templateObject(name))))
     .handle('workflows', ({ params: { name }, query }) =>
-      answeredWrite(async (s) => {
-        const at = await renderedIn(s, name);
-        return listed('Workflow', await workflowObjectsOf(at, servedOf(treeWorkflowsHeld(at, 'builtin'), undefined)), queryOf(query));
-      }),
+      listOrTable(
+        answeredWrite(async (s) => {
+          const at = await renderedIn(s, name);
+          return listed('Workflow', await workflowObjectsOf(at, servedOf(treeWorkflowsHeld(at, 'builtin'), undefined)), queryOf(query));
+        }),
+        workflowTable,
+      ),
     )
     .handle('workflow', ({ params: { name, doc } }) =>
       answeredWrite(async (s) => {
@@ -67,10 +85,13 @@ export const templatesHandlers = readsBounded(Api, 'templates', (handlers) =>
       }),
     )
     .handle('agents', ({ params: { name }, query }) =>
-      answeredWrite(async (s) => {
-        const at = await renderedIn(s, name);
-        return listed('Agent', await agentObjectsOf(at, servedOf(await treeAgentsHeld(at, 'builtin'), undefined)), queryOf(query));
-      }),
+      listOrTable(
+        answeredWrite(async (s) => {
+          const at = await renderedIn(s, name);
+          return listed('Agent', await agentObjectsOf(at, servedOf(await treeAgentsHeld(at, 'builtin'), undefined)), queryOf(query));
+        }),
+        agentTable,
+      ),
     )
     .handle('agent', ({ params: { name, doc } }) =>
       answeredWrite(async (s) => {
@@ -80,10 +101,13 @@ export const templatesHandlers = readsBounded(Api, 'templates', (handlers) =>
       }),
     )
     .handle('skills', ({ params: { name }, query }) =>
-      answeredWrite(async (s) => {
-        const at = await renderedIn(s, name);
-        return listed('Skill', await skillObjectsOf(at, servedOf(await treeSkillsHeld(at, 'builtin'), undefined)), queryOf(query));
-      }),
+      listOrTable(
+        answeredWrite(async (s) => {
+          const at = await renderedIn(s, name);
+          return listed('Skill', await skillObjectsOf(at, servedOf(await treeSkillsHeld(at, 'builtin'), undefined)), queryOf(query));
+        }),
+        skillTable,
+      ),
     )
     .handle('skill', ({ params: { name, doc } }) =>
       answeredWrite(async (s) => {

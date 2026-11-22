@@ -7,9 +7,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
-import { factoryWorkflowsQuery, type Place, type Started } from '../../lib/api/workflows.ts';
+import { factoryWorkflowsQuery, type Place, type Started, type WorkflowRow } from '../../lib/api/workflows.ts';
 import { storeQuery } from '../../lib/api/store.ts';
-import { type InboxEntry } from '../../lib/api/inbox.ts';
+import { cardBodyQuery, type InboxEntry } from '../../lib/api/inbox.ts';
 import { startRepo } from '../../lib/factories';
 import { cardPlace, factoriesOffered, startPlace, type CardPlace } from '../../lib/inbox';
 import { StartRun } from '../run/StartRun';
@@ -207,9 +207,27 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
       The factory {code(place.factory)} lists no workflow {code(workflow)} on {code(place.repo)}.
     </p>
   ) : (
+    <StartCard entry={entry} workflow={read} place={place} onStarted={onStarted} onRefused={onRefused} />
+  );
+}
+
+/**
+ * The start of `entry` as a run of `workflow`, its brief prefilled with the card's body, which no list of cards carries: read with the one
+ * card (`cardBodyQuery`) before the start is drawn.
+ */
+function StartCard({ entry, workflow, place, onStarted, onRefused }: { entry: InboxEntry; workflow: WorkflowRow; place: Place } & Told) {
+  const body = useQuery(cardBodyQuery(entry.name));
+  if (body.error) return <ReadTrouble what={`the card ${entry.name}`} error={body.error} className="text-body-small" />;
+  if (body.data === undefined)
+    return (
+      <Reading label="Reading the card…" className="flex flex-col gap-2">
+        <ReadingLines widths={['w-2/3']} className="text-body-small" />
+      </Reading>
+    );
+  return (
     <StartRun
-      workflow={read}
-      card={{ name: entry.name, factory: entry.factory, body: entry.body ?? '' }}
+      workflow={workflow}
+      card={{ name: entry.name, factory: entry.factory, body: body.data }}
       repo={place.repo}
       place={place}
       onStarted={onStarted}

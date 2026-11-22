@@ -59,7 +59,7 @@ const SkillMade = SkillObject.pipe(Schema.annotate({ httpApiStatus: 201 }));
 export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
   HttpApiEndpoint.get('listLibrary', '/api/workflows', {
     query: { ...listQuery, ...originQuery },
-    success: WorkflowListObject,
+    success: [WorkflowListObject, Table],
     error: definitionErrors,
   }).annotate(
     OpenApi.Description,
@@ -103,11 +103,11 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/workflows', {
     params: namespaceParams,
     query: { ...listQuery, ...originQuery },
-    success: WorkflowListObject,
+    success: [WorkflowListObject, Table],
     error: definitionErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a namespace's workflows, a page at a time: in default, the api's repository and your library; in a factory's, the workflows attached to it. Each name is served once, the first origin that holds it, unless ?origin= reads one origin's. Answers a WorkflowList.",
+    "Lists a namespace's workflows, a page at a time: in default, the api's repository and your library; in a factory's, the workflows attached to it. Each name is served once, the first origin that holds it, unless ?origin= reads one origin's. Answers a WorkflowList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,

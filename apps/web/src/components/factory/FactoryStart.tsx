@@ -8,7 +8,7 @@ import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, PlusIcon, Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
-import { factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/api/workflows';
+import { factoryWorkflowsQuery, type Place, type WorkflowRow } from '@/lib/api/workflows';
 import { floorPlace, startRepo, whyNotStarted } from '@/lib/factories';
 import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
@@ -285,7 +285,7 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
  * One workflow the factory offers, a tile of the group: its name and whether it is yours, its description, and why it cannot start, the
  * tile then disabled.
  */
-function WorkflowTile({ workflow }: { workflow: WorkflowListing }) {
+function WorkflowTile({ workflow }: { workflow: WorkflowRow }) {
   const key = workflowKey(workflow);
   const why = whyNotStarted(workflow);
   return (

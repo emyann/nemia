@@ -5,8 +5,8 @@
  * own) — a fresh low-level `Server` for each request (`portServer`), serving the tools generated from the command table (`portTools`,
  * tools.ts) in its order. A call of a tool is a request to the endpoint its verb links, presenting the caller's own `Authorization`, handed
  * to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and nothing of tokens or refusals is said
- * again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`; anything else is the tool's error, in the api's own
- * words, which say what to do next.
+ * again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`, and a file the api serves as its bytes as a
+ * `resource_link` to it, never its bytes (links.ts); anything else is the tool's error, in the api's own words, which say what to do next.
  *
  * What a host reads is held here (`bound.ts`): a list is asked a page of `PORT_PAGE` where a call gives no `limit`, with the defaults
  * its link sends (`PortTool.defaults`); a list that answers a `Table` is asked for it and answered as its lines, printed by `objects`'
@@ -41,6 +41,7 @@ import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, type ReadBound, READS, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, narrowingOf, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
 import { FILES_EXTENSION, inlined } from './files.ts';
+import { fileRead, fileUriOf, linkOf } from './links.ts';
 import { PORT_INSTRUCTIONS } from './instructions.ts';
 import { FEED_TEMPLATES, type FeedView, viewOf } from './resources.ts';
 import { type PortTool, portTools } from './tools.ts';
@@ -168,23 +169,32 @@ const sizeOf = (result: CallToolResult) =>
   result.content.reduce((n, c) => n + (c.type === 'text' ? c.text.length : 0), 0) +
   (result.structuredContent === undefined ? 0 : JSON.stringify(result.structuredContent).length);
 
+/** A 2xx's `text`, read as `json`, as `tool`'s result: a `Table` as its lines alone, any other JSON as text and as `structuredContent`. */
+const answered = (tool: PortTool, args: Readonly<Record<string, unknown>>, text: string, json: unknown) => {
+  if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] } satisfies CallToolResult;
+  const structured = Array.isArray(json) ? { items: json } : Predicate.isObject(json) ? json : undefined;
+  return {
+    content: [{ type: 'text', text }],
+    ...(structured === undefined ? {} : { structuredContent: structured }),
+  } satisfies CallToolResult;
+};
+
 /**
- * One answer of `app` to `tool` with `args`, as a tool's result: a 2xx's `Table` as its lines alone (`tableText`), any other JSON as text
+ * One answer of `app` to `tool` with `args`, as a tool's result: a 2xx's file (a `bytes` read) as a link to it alone (`linkOf`), never its
+ * bytes; a 2xx's `Table` as its lines alone (`tableText`), any other JSON as text
  * and as `structuredContent` (a list as `{ items }`), or its text alone where it is not JSON; anything else the tool's error, the body's
  * `error` sentence its text.
  */
 async function answerOf(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, app: Fetching, signal?: AbortSignal) {
-  const res = await app.fetch(requestOf(tool, args, from, signal));
+  const request = requestOf(tool, args, from, signal);
+  const res = await app.fetch(request);
+  if (res.ok && readOf(tool)?.shape === 'bytes') {
+    await res.body?.cancel();
+    return { content: [linkOf(new URL(request.url), res.headers)] } satisfies CallToolResult;
+  }
   const text = await res.text();
   const json = jsonOf(text);
-  if (res.ok) {
-    if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] } satisfies CallToolResult;
-    const structured = Array.isArray(json) ? { items: json } : Predicate.isObject(json) ? json : undefined;
-    return {
-      content: [{ type: 'text', text }],
-      ...(structured === undefined ? {} : { structuredContent: structured }),
-    } satisfies CallToolResult;
-  }
+  if (res.ok) return answered(tool, args, text, json);
   const said = Predicate.isObject(json) && typeof json.error === 'string' ? json.error : undefined;
   return failed(
     said ?? `${tool.method} ${tool.path} answered ${res.status}${text === '' ? '' : `: ${text}`}`,
@@ -245,9 +255,10 @@ type Era = McpRequestContext['era'];
 /**
  * The feed's resources on `server`: none listed by name (`resources/list` is empty: the feed is its templates), the templates read off
  * the `Api` (`FEED_TEMPLATES`, resources.ts), and a read of a view answered from `views` (its newest events, under `ANSWER_BOUND`), a URI
- * that names none refused as a resource not found, in words naming the templates, and one the api refuses with its words.
+ * that names none refused as a resource not found, in words naming the templates, and one the api refuses with its words. A URI of a file
+ * a tool handed over as a link (links.ts) is read through the app `appOf` gives, with the caller's token.
  */
-function servesFeed(server: Server, views: FeedViews) {
+function servesFeed(server: Server, views: FeedViews, appOf: () => Fetching) {
   const templates = FEED_TEMPLATES.map(({ uriTemplate, name, title, description, mimeType }) => ({
     uriTemplate,
     name,
@@ -258,11 +269,18 @@ function servesFeed(server: Server, views: FeedViews) {
   server.setRequestHandler('resources/list', () => ({ resources: [] }));
   server.setRequestHandler('resources/templates/list', () => ({ resourceTemplates: templates }));
   server.setRequestHandler('resources/read', async ({ params }, ctx) => {
+    const file = fileUriOf(params.uri);
     const named = viewOf(params.uri);
-    if (named.kind === 'none') throw new ResourceNotFoundError(params.uri, named.message);
+    if (file === undefined && named.kind === 'none') throw new ResourceNotFoundError(params.uri, named.message);
     const from = ctx.http?.req;
     if (from === undefined)
       throw new ProtocolError(INVALID_PARAMS, `${params.uri} is read over HTTP alone: POST the read to the api's /mcp`);
+    if (file !== undefined) {
+      const read = await fileRead(params.uri, file, from, appOf());
+      if (read.kind === 'refused') throw new ProtocolError(INVALID_PARAMS, read.message);
+      return { contents: [read.content] };
+    }
+    if (named.kind === 'none') throw new ResourceNotFoundError(params.uri, named.message);
     const text = await views.read(named.view, from);
     if (typeof text !== 'string') throw new ProtocolError(INVALID_PARAMS, text.refused);
     return { contents: [{ uri: params.uri, mimeType: 'application/json', text }] };
@@ -300,7 +318,7 @@ export function portServer(
       'resources/read': { ttlMs: 0, cacheScope: 'private' },
     },
   });
-  if (feed !== undefined) servesFeed(server, feed.views);
+  if (feed !== undefined) servesFeed(server, feed.views, appOf);
   server.setRequestHandler('tools/list', () => ({ tools: list }));
   server.setRequestHandler('tools/call', async ({ params }, ctx) => {
     const tool = byName.get(params.name);

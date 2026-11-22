@@ -40,7 +40,6 @@ export const inboxEntry = (extra: Partial<InboxEntry> = {}) =>
     startedAs: ['r-0'],
     state: 'succeeded',
     error: null,
-    body: 'Decode the reads\n',
     filedAt: '2026-09-30T05:00:00.000Z',
     queued: { at: '2026-09-30T05:01:00.000Z', place: 1 },
     tried: { at: '2026-09-30T05:02:00.000Z', repo: '/work/repo', why: 'the workflow is gone', refused: true },

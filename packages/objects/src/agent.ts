@@ -7,7 +7,7 @@
  *
  * Beside it, the bodies a write is sent (`AgentWrite`, `AgentTry`) and what a try and a card answer. Plain Schemas of JSON.
  */
-import { Schema } from 'effect';
+import { Schema, Struct } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { CardSkill, SkillCost, WriteMeta, definitionStatus } from './definition.ts';
 import { AGENT_SOURCE_PLACES, DEFINITION_ORIGINS } from './words.ts';
@@ -145,8 +145,29 @@ export const Agent = Schema.Struct({
 });
 export type Agent = typeof Agent.Type;
 
-/** A page of a namespace's agents. */
-export const AgentList = listOf('Agent', Agent);
+/** An agent as a list serves it: its object without its files' content — its instructions, its output schema's text, its file's text. */
+export const AgentListed = Schema.Struct({
+  ...Agent.fields,
+  spec: AgentSpec.mapFields((fields) => ({
+    ...Struct.omit(fields, ['instructions']),
+    output: Schema.optionalKey(
+      Schema.NullOr(
+        Schema.Struct({ file: Schema.String.annotate({ description: 'The file of the schema its `output:` line names.' }) }),
+      ).annotate({
+        description: 'The file of the schema its `output:` line names, its text read with the agent; null where it names none.',
+      }),
+    ),
+  })).annotate({
+    description: "The agent as its file says it, without its instructions or its output schema's text, which a read of the agent answers.",
+  }),
+  status: AgentStatus.mapFields(Struct.omit(['source'])).annotate({
+    description: "What Nemia reads of the agent, without its file's text, which a read of the agent answers.",
+  }),
+}).annotate({ description: "An agent as a list serves it, without its files' content (LISTED_WITHOUT)." });
+export type AgentListed = typeof AgentListed.Type;
+
+/** A page of a namespace's agents, each without its files' content. */
+export const AgentList = listOf('Agent', AgentListed);
 export type AgentList = typeof AgentList.Type;
 
 /**

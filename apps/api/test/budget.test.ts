@@ -617,10 +617,8 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
 });
 
 describe('steps past their budget on their own work: one that signed off blocked is answered with its raise on the same ask — refused without one, or below the spend — and one refused by its check is rechecked with neither, as `nemia decide` offers them', () => {
-  let asks!: string;
   beforeAll(() => {
     const t = teardowns();
-    asks = path.join(root, 'runs', `${R2}.asks`);
     return t.end;
   });
   const s = story(test);
@@ -670,7 +668,7 @@ describe('steps past their budget on their own work: one that signed off blocked
         assert.ok(error.startsWith(start), error);
         for (const fact of facts) assert.ok(error.includes(fact), `${fact} in ${error}`);
       }
-      assert.equal(fs.existsSync(asks), false, 'nothing is written on a refusal');
+      assert.equal(keysUnder(root, asksPrefix(R2)).length, 0, 'nothing is written on a refusal');
     },
   );
   s.test('the answer and the raise, as the board sends them, are one ask, 202; the refused check is rechecked with no budget', async () => {
@@ -705,6 +703,6 @@ describe('steps past their budget on their own work: one that signed off blocked
     );
     assert.deepEqual(after.status.waitingOnYou, [], 'and neither waited on');
     assert.deepEqual(after.status.waitingOnYou, words.waitingOnYou);
-    fs.rmSync(asks, { recursive: true, force: true });
+    for (const key of keysUnder(root, asksPrefix(R2))) dropRecord(root, key);
   });
 });

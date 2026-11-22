@@ -171,7 +171,7 @@ test('DELETE ?whole=true of a run with no record forgets what was left under its
     body: '{}',
   });
   assert.equal(gone.status, 404, await gone.clone().text());
-  assert.match(((await gone.json()) as { error: string }).error, /runs\/ghost-abcd\.asks/);
+  assert.match(((await gone.json()) as { error: string }).error, /\/registry\/asks\/ghost-abcd\/implement\.json/);
   assert.equal(fs.existsSync(left), false, 'what was left under its id is gone');
   const alone = await app().request('/api/namespaces/default/runs/ghost-abcd', { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
   assert.equal(alone.status, 404, 'a try alone of no record is still no such run');

@@ -53,6 +53,7 @@ const FILES = [
   'components/factory/FactoryTag.tsx',
   'components/field/FilePage.tsx',
   'components/field/widgets/FieldWidgetView.tsx',
+  'components/frame/ReadTrouble.tsx',
   'components/gate/Ask.tsx',
   'components/gate/Decide.tsx',
   'components/gate/Gate.tsx',

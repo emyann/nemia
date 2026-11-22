@@ -37,8 +37,8 @@ const countOf = (line: PlaceLine | undefined) =>
 /**
  * What a place of the pane says under its name: Runs how many wait on the person, off the frame's one count of the runs (`frameRunsQuery`),
  * and the Inbox how many cards are not started, each count on its badge (`counted`); Proposals how many proposals wait on the person, asked
- * of the api by phase (`waitingProposalsQuery`) and never as the whole list, read for a factory a person made alone, the default factory
- * having none; none for any other place, or before they are read.
+ * of the api by phase as the rows of their Table (`waitingProposalsQuery`) and never as the whole list, read for a factory a person made
+ * alone, the default factory having none; none for any other place, or before they are read.
  */
 function usePlaceLines(path: string, factory: string) {
   const runs = useQuery(frameRunsQuery(path)).data;

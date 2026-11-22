@@ -5,20 +5,15 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { PROPOSABLE_KINDS, PROPOSAL_PHASES, RESOURCE_PLURALS, type Proposal, type ProposalPhase } from 'objects';
+import { PROPOSABLE_KINDS, PROPOSAL_PHASES, RESOURCE_PLURALS, type ProposalPhase } from 'objects';
+import type { ProposalRow } from '../src/lib/api/proposals.ts';
 import { proposalLinkOf } from '../src/lib/proposalLink.ts';
 import { DELEGABLE, proposalsInOrder, widensHue } from '../src/lib/proposals.ts';
 import { PROPOSAL_WORDS } from '../src/lib/words.ts';
 
-/** A proposal named `name` in `phase`, made at `at`. */
+/** A proposal's row named `name` in `phase`, made at `at`. */
 const proposal = (name: string, phase: ProposalPhase, at: string) =>
-  ({
-    apiVersion: 'nemia/v1',
-    kind: 'Proposal',
-    metadata: { name, namespace: 'acme', resourceVersion: '1', creationTimestamp: at },
-    spec: { objects: [] },
-    status: { phase, proposedBy: { agent: 'nemia' }, changes: [], widens: false },
-  }) satisfies Proposal;
+  ({ name, phase, widens: false, why: '', creationTimestamp: at }) satisfies ProposalRow;
 
 test('a proposal link is read as its factory and its name, each decoded', () => {
   assert.deepEqual(proposalLinkOf('/factories/acme/proposals/nemia-ab12c'), { factory: 'acme', name: 'nemia-ab12c' });
@@ -45,7 +40,7 @@ test('the factory lists what waits first, the newer of each kind first', () => {
     proposal('new-waiting', 'waiting', '2026-11-04T00:00:00Z'),
   ];
   assert.deepEqual(
-    proposalsInOrder(list).map((p) => p.metadata.name),
+    proposalsInOrder(list).map((p) => p.name),
     ['new-waiting', 'old-waiting', 'new-applied', 'old-applied'],
   );
 });

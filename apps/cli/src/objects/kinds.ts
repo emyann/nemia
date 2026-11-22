@@ -271,7 +271,7 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     get: { all: (name) => (c) => c.subscriptions.get({ params: { name } }) },
   },
   Proposal: {
-    list: { in: (namespace, s) => (c) => everyPage((page) => c.proposals.list({ params: { namespace }, query: query(s, page) })) },
+    list: { in: (namespace, s) => (c) => pageOf(everyPage((page) => c.proposals.list({ params: { namespace }, query: query(s, page) }))) },
     get: { in: (namespace, name) => (c) => c.proposals.get({ params: { namespace, name } }) },
     writes: writable(
       Schema.decodeUnknownSync(ProposalSpec),

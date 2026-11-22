@@ -30,7 +30,7 @@ export const NoneChosen: Story = {
     await expect(boxes.map((b) => b.checked)).toEqual([false, false, false]);
     await expect(boxes[2]).toBeDisabled();
     const tiles = [...canvasElement.querySelectorAll<HTMLElement>('[data-slot="checkbox"]')];
-    await expect(getComputedStyle(tiles[2]!).borderTopColor).not.toBe(getComputedStyle(tiles[0]!).borderTopColor);
+    await expect(getComputedStyle(tiles[2]).borderTopColor).not.toBe(getComputedStyle(tiles[0]).borderTopColor);
     await userEvent.tab();
     await expect(boxes[0]).toHaveFocus();
     await userEvent.keyboard(' ');
@@ -47,7 +47,7 @@ export const TwoChosen: Story = {
     const tiles = [...canvasElement.querySelectorAll<HTMLElement>('[data-slot="checkbox"]')];
     await expect(tiles[0]).toHaveAttribute('data-selected', 'true');
     await expect(tiles[1]).toHaveAttribute('data-selected', 'true');
-    await userEvent.click(tiles[0]!);
+    await userEvent.click(tiles[0]);
     await expect(tiles[0]).not.toHaveAttribute('data-selected');
     await expect(tiles[1]).toHaveAttribute('data-selected', 'true');
   },

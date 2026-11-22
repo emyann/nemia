@@ -68,14 +68,14 @@ export const Picked: Story = {
     await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-delegation-agent] [data-slot="combo-box-trigger"]')!);
     const listed = await body.findAllByRole('option');
     await expect(listed.map((o) => o.textContent)).toEqual([
-      'Criticcode reviewer · critic',
-      'KeeperNo role yet · keeper',
-      'Plannerplans the work · planner',
-      'Scribewrites the notes · scribe',
+      'Critic code reviewer · critic',
+      'Keeper No role yet · keeper',
+      'Planner plans the work · planner',
+      'Scribe writes the notes · scribe',
     ]);
     await userEvent.click(field);
     await userEvent.type(field, 'sc');
-    await waitFor(() => expect(body.getAllByRole('option').map((o) => o.textContent)).toEqual(['Scribewrites the notes · scribe']));
+    await waitFor(() => expect(body.getAllByRole('option').map((o) => o.textContent)).toEqual(['Scribe writes the notes · scribe']));
     await userEvent.click(body.getByRole('option', { name: /Scribe/ }));
     await expect(field).toHaveValue('scribe');
     await expect(field).not.toHaveAttribute('aria-invalid');

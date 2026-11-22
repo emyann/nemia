@@ -23,7 +23,7 @@ import { runWith } from '../../test/builtin-place.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runsAtOnce, settingsOf } from 'agent-orchestrator';
-import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, parseWorkflow, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testing';
 /**
  * The scratch repository, a git repository, as `nemia start` reads its HEAD: read in the default factory by `?repo=`, which the factory
@@ -1063,5 +1063,43 @@ describe("a Workflow's spec carries its README whole, its needs and instruction 
     const replaced = await put({ metadata: { resourceVersion: kept.metadata.resourceVersion }, spec: { ...kept.spec, readme } });
     assert.equal(replaced.status, 200, await replaced.clone().text());
     assert.deepEqual(((await replaced.json()) as import('objects').Workflow).status.needs, [other]);
+  });
+});
+
+describe("a step's named checks are served as the text a step's key takes, and a read then a write keeps them as the file wrote them", () => {
+  const STEP =
+    '---\nplace: git\nchecks:\n  - name: test\n    run: npm test\n  - name: lint\n    run: npm run lint\n    after: [test]\n---\nBuild it.\n';
+  let dir!: string;
+  let read!: Awaited<ReturnType<typeof got>>;
+  beforeAll(async () => {
+    const t = teardowns();
+    dir = path.join(root, 'workflows', 'checked');
+    write(path.join(dir, 'implement.md'), STEP);
+    t.onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
+    read = await got();
+    return t.end;
+  });
+  const url = '/api/namespaces/default/workflows/checked';
+  const got = async () => (await (await app.request(`${url}?origin=user`)).json()) as import('objects').Workflow;
+  const put = (body: unknown) =>
+    app.request(url.replace('/api/namespaces/default/', '/api/'), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  test('GET serves the step, its checks the JSON text of the list its file writes', () => {
+    const [implement] = read.spec.steps;
+    assert.equal(implement?.name, 'implement');
+    assert.equal(typeof implement?.keys.checks, 'string');
+    assert.deepEqual(JSON.parse(String(implement?.keys.checks)), [
+      { name: 'test', run: 'npm test' },
+      { name: 'lint', run: 'npm run lint', after: ['test'] },
+    ]);
+  });
+  test('PUT of the Workflow as it was read is taken, and the step it writes runs the same checks', async () => {
+    const res = await put({ metadata: { resourceVersion: read.metadata.resourceVersion }, spec: read.spec });
+    assert.equal(res.status, 200, await res.clone().text());
+    const written = fs.readFileSync(path.join(dir, 'implement.md'), 'utf8');
+    assert.deepEqual(parseWorkflow('implement', written).checks, parseWorkflow('implement', STEP).checks);
   });
 });

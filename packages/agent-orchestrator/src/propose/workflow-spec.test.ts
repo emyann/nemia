@@ -76,6 +76,24 @@ describe("a key the loader reads as text though it holds a map is carried as rea
   });
 });
 
+describe("a step's named checks, a list of maps, are carried as readKeys' JSON text, flow or block, and written back run the same checks", () => {
+  const rows: [string, string][] = [
+    ['a flow list', 'checks: [ { name: test, run: npm test }, { name: lint, run: npm run lint, after: [test] } ]\n'],
+    ['a block list', 'checks:\n  - name: test\n    run: npm test\n  - name: lint\n    run: npm run lint\n    after: [test]\n'],
+  ];
+  for (const [form, lines] of rows)
+    test(form, () => {
+      const text = `---\nplace: git\nretries: 2\n${lines}---\nDo it.\n`;
+      const [step] = workflowSpecOf([{ name: 'implement.md', text }]).steps;
+      const read = readKeys('implement', splitFrontmatter('implement', text).block ?? '', () => undefined, MAP_KEYS).meta;
+      assert.equal(typeof step?.keys.checks, 'string', 'text, as a step key takes it');
+      assert.equal(step?.keys.checks, read.checks, "readKeys' text");
+      assert.ok(Schema.is(StepKeys)(step?.keys), "objects' StepKeys, as it stands");
+      const written = renderStep({ name: 'implement', body: step?.body ?? '', ...step?.keys } as never);
+      assert.deepEqual(parseWorkflow('implement', written).checks, parseWorkflow('implement', text).checks);
+    });
+});
+
 test("a harness's block is read into its fence keys as the parser reads it, written back as the block, and a key no step has stays to be refused", () => {
   const text = '---\nplace: git\nclaude:\n  fence:\n    disallowedTools: Bash(*:4318*), Bash(*:4317*)\n---\nDo it.\n';
   const [step] = workflowSpecOf([{ name: 'design.md', text }]).steps;

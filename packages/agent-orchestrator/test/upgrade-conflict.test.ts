@@ -45,6 +45,7 @@ import { factoryTyped } from './factory-typed.ts';
 import type { StartedAnswer } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { parseWorkflow } from '../src/workflow/index.ts';
 
 const ROOT = scratch('wf-upgrade-conflict-');
 const FACTORIES = path.join(ROOT, 'factories');
@@ -577,6 +578,65 @@ describe('a workflow whose step writes checkFailurePolicy as a block map: a conf
     assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
     assert.equal(textIn(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.composed);
     assert.equal(textIn(treeDir(ROOT, name), IMPLEMENT), applied, 'the block map stays a block map');
+  });
+});
+
+describe("an upgrade onto a version whose step writes named checks: the tree's own `check:` in conflict, resolved, proposed, approved, and merged with the template's `checks:`", () => {
+  const s = story(test);
+  const name = 'checked';
+  const IMPLEMENT_FILE = 'workflows/dev/implement.md';
+  const CHECK = `${IMPLEMENT_FILE}#check`;
+  const CHECKS = [
+    { name: 'test', run: 'npm test' },
+    { name: 'lint', run: 'npm run lint', after: ['test'] },
+  ];
+  let proposed = '';
+  s.test("a factory whose tree changes implement's `check:`, upgraded onto a template that replaces it with `checks:`", async (t) => {
+    const repo = scratch(`wf-upgrade-conflict-${name}-repo-`);
+    fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+    stage.place().world.repository(repo, {});
+    stage.place().world.commit(repo, 'base');
+    const at = path.join(scratch(`wf-upgrade-conflict-${name}-`), 'team');
+    exportTemplate({ dir: at, from: repo });
+    await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
+    reconciled(factory(name));
+    rewrite(treeDir(ROOT, name), IMPLEMENT_FILE, 'check: npm test && npm run typecheck && npm run lint', 'check: npm test --mine');
+    edit(at, 'nemia.yaml', (spec) => {
+      spec.version = '0.2.0';
+    });
+    edit(at, 'workflows/dev/workflow.yaml', (spec) => {
+      const implement = spec.steps.find((step: { name: string }) => step.name === 'implement');
+      delete implement.check;
+      implement.checks = CHECKS;
+    });
+    await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
+    assert.deepEqual(
+      reconciled(factory(name)).upgrade?.conflicts.map((c) => c.at),
+      [CHECK],
+    );
+  });
+  s.test("resolved with the template's side, the workflow is proposed, its checks the text a step's key takes", async (t) => {
+    await printedBy(t, 'factory', 'resolve', name, CHECK, '--theirs');
+    proposed = recordedFor(name, 'Workflow/dev') ?? '';
+    assert.deepEqual(proposalsOf(name), [proposed]);
+    const implement = proposalIn(name, proposed).spec.objects[0].spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.equal(typeof implement.keys.checks, 'string', "StepKeys' text, as readKeys keeps it");
+    assert.equal('check' in implement.keys, false, "the tree's `check:` gone, as the template's side has it");
+  });
+  s.test("approved, the upgrade applies, and the applied implement runs the template's checks", async () => {
+    const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
+    assert.equal(approved.status.phase, 'applied', approved.status.message);
+    const merged = reconciled(factory(name));
+    assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
+    const step = parseWorkflow('implement', textIn(treeDir(ROOT, name), IMPLEMENT_FILE));
+    assert.equal(step.check, undefined);
+    assert.deepEqual(
+      step.checks?.map((c) => [c.name, c.run, c.after]),
+      [
+        ['test', 'npm test', []],
+        ['lint', 'npm run lint', ['test']],
+      ],
+    );
   });
 });
 

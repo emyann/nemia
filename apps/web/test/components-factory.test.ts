@@ -473,7 +473,7 @@ test("a factory's Proposals page lists its rows, what waits first; a read that f
   const { proposalsQuery } = await import('../src/lib/api/proposals.ts');
   const { ReadRefusal, UnreadAnswer } = await import('../src/lib/api/read.ts');
   const drawn = (seed: (client: InstanceType<typeof QueryClient>) => void) => {
-    const client = new QueryClient();
+    const client = new QueryClient({ defaultOptions: { queries: { retryOnMount: false } } });
     seed(client);
     return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(FactoryProposals, { factory: 'acme' })));
   };

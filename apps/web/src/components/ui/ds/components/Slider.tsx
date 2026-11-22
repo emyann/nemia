@@ -49,11 +49,11 @@ const styles = tv({
   },
   variants: {
     isDisabled: {
-      false: { thumb: "bg-primary" },
+      false: { thumb: "bg-[color:var(--md-comp-slider-active-handle-color,var(--md-sys-color-primary))]" },
       true: { thumb: "bg-on-surface/38" },
     },
     active: {
-      true: { segment: "bg-primary", stop: "bg-on-primary" },
+      true: { segment: "bg-[color:var(--md-comp-slider-active-track-color,var(--md-sys-color-primary))]", stop: "bg-[color:var(--md-comp-slider-active-stop-indicator-container-color,var(--md-sys-color-on-primary))]" },
       false: {
         segment: "bg-secondary-container",
         stop: "bg-on-secondary-container",

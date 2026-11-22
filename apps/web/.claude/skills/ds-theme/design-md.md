@@ -146,8 +146,9 @@ the file says what it means.
 
 ## The body: one reference block
 
-Elevation, motion and state have no place in the format's front matter, so
-they are written in the body, under a heading the kit knows:
+Elevation, motion, state and Material's component tokens have no place in
+the format's front matter, so they are written in the body, under a heading
+the kit knows:
 
 ````markdown
 ## Reference CSS
@@ -179,10 +180,54 @@ first top-level `:root` rule. The names are the theme's own, 27 of them:
   (`ease-out`, `linear`), `cubic-bezier()`, `steps()` or `linear()`.
 - **`--md3-duration-{short,medium,long}-{1,2,3,4}`**: milliseconds (`200ms`).
 
+The same rule may point a part at another colour role through one of
+Material's **component tokens**, named as Material names it (`md.comp.<name>`
+written `--md-comp-<name>`). Fourteen of the fifteen default to the role
+Material's spec gives them, and the switch's selected icon defaults to what
+the kit draws today, `on-primary-container`, where the spec gives `primary`,
+until its own fix card. The kit declares none, so a part whose token is not
+written is drawn with that default. These 15 are the ones the kit reads; Material has
+hundreds, and the rest are added to the kit as projects ask for them:
+
+| Part | Token | Default role | What reads it |
+| :--- | :--- | :--- | :--- |
+| Switch | `--md-comp-switch-selected-track-color` | `primary` | the selected track and its state layer |
+| Switch | `--md-comp-switch-selected-handle-color` | `on-primary` | the selected handle at rest |
+| Switch | `--md-comp-switch-selected-hover-handle-color` | `primary-container` | the selected handle on hover, focus and press |
+| Switch | `--md-comp-switch-selected-icon-color` | `on-primary-container` | the selected handle's icon |
+| Checkbox | `--md-comp-checkbox-selected-container-color` | `primary` | the selected box, its state layer, the unselected pressed state layer |
+| Checkbox | `--md-comp-checkbox-selected-icon-color` | `on-primary` | the check and the dash |
+| Radio | `--md-comp-radio-button-selected-icon-color` | `primary` | the selected ring and dot, its state layer, the unselected pressed state layer |
+| Slider | `--md-comp-slider-active-track-color` | `primary` | the active segment |
+| Slider | `--md-comp-slider-active-handle-color` | `primary` | the handle |
+| Slider | `--md-comp-slider-active-stop-indicator-container-color` | `on-primary` | a stop on the active segment |
+| Tabs, primary | `--md-comp-primary-navigation-tab-active-indicator-color` | `primary` | the active indicator |
+| Tabs, primary | `--md-comp-primary-navigation-tab-with-label-text-active-label-text-color` | `primary` | the active label, its state layer, the inactive pressed state layer |
+| Tabs, primary | `--md-comp-primary-navigation-tab-with-icon-active-icon-color` | `primary` | the active icon |
+| Button, `text` | `--md-comp-button-text-label-text-color` | `primary` | the label, the icon and the state layer |
+| IconButton, selected `standard` | `--md-comp-icon-button-standard-selected-icon-color` | `primary` | the icon and the state layer of an uncontained one |
+
+The table is `COMPONENT_TOKENS` in `<kit>/tokens/design-md.mjs`. A token's
+value is one of the 49 roles, by its variable, and nothing else:
+
+```css
+:root {
+  --md-comp-switch-selected-track-color: var(--md-sys-color-on-surface);
+}
+```
+
+The generator writes each token the rule writes into both scheme blocks of
+`theme.css` (`:root` and the dark block), so the part takes the role of the
+scheme it is drawn in, on a `.dark` subtree too. Disabled and error colours
+are not component tokens and do not move. Each one is a departure from
+Material: say it, with its reason, under the project's
+`## Where we differ from Material` (the skill's step 2).
+
 A name the rule leaves out gets the kit's own value (Material's: the table
 `REFERENCE_DEFAULTS` in `<kit>/tokens/design-md.mjs`), never what a previous
 run left in `theme.v4.css`. Any other declaration in the rule (`--shadow`,
-`--md-sys-color-primary`) is ignored and listed as a warning; so is a second
+`--md-sys-color-primary`, a `--md-comp-*` that is not in the table) is ignored
+and listed as a warning; so is a second
 `css` fence under the heading. Beside a `:root` rule the kit read, the other
 rules of the block, `css` fences under other headings and all prose
 (`## Elevation & Depth`, `## Motion`, …) are for readers: never read, never
@@ -195,7 +240,9 @@ and lists nothing. A reference value holds one value of its kind and nothing
 after it: no `;`, brace, quote, comment or `url()`, and `var()` or `calc()`
 only in an elevation. One that is not (a state opacity that is not a
 percentage, a duration that is not in `ms`, an easing written as a `var()`, an
-elevation with a quote in it) is refused. Disabled opacities and reduced
+elevation with a quote in it, a component token that is not exactly
+`var(--md-sys-color-<role>)`: a hex, another variable, a fallback, an
+`!important`) is refused. Disabled opacities and reduced
 motion are handled inside the components; the theme has no variable for them.
 
 ## Dark: by class or by the system setting
@@ -224,7 +271,7 @@ theme, for:
 
 - a name it does not know inside `colors`, `typography` or `rounded`
   (`colors.brand-pink`, `typography.h1`, `rounded.pill`), or inside the
-  reference rule;
+  reference rule (a component token the kit has no entry for among them);
 - what it **assumed**: a `scheme` read from the ground, a `seed` read from
   `primary`, each with the token it was read from and the line to write to
   say it;
@@ -250,7 +297,7 @@ no front matter, no `scheme` and no ground to read one from, no `seed` and no
 colour under a name it knows that
 is not a hex, a type size, line height, tracking, weight or corner that is not
 one value of its kind, a family that cannot be a name (the mono face's
-included), or a reference value in a form it refuses. The message names the token and says what the kit reads
+included), or a reference value or a component token in a form it refuses. The message names the token and says what the kit reads
 there.
 
 ## Fonts go through a hook
@@ -342,7 +389,8 @@ Written back beside the generated theme, for agents: the project's front
 matter with every role of the written scheme, the whole type scale and the
 corners filled in; its prose verbatim, with the reference block's `:root` rule
 written complete (the dark choice, the 27 values the theme was written with,
-then the declarations the kit does not read) and added when the project wrote
+the component tokens the project wrote, then the declarations the kit does
+not read) and added when the project wrote
 none; a table of both schemes that says how dark is switched; and the
 warnings, when there are any. Where the kit read no rule under the project's
 `## Reference CSS`, that section is left as written and the complete rule goes

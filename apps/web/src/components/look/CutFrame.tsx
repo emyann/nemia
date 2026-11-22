@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { paint } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
-import { cutPoints, cutShape, type CutSize } from './cut';
+import { cutFoot, cutPoints, cutShape, type CutSize } from './cut';
 
 /** The hue of a cut frame's edge: what waits on a person, a session at work, what failed, or none, a quiet outline. */
 export type FrameHue = 'yours' | 'alive' | 'failure' | 'none';
@@ -74,7 +74,47 @@ export const FRAMED_BOX = 'overflow-x-auto overflow-y-hidden';
  * What that box wears besides where it ends its frame, a frame cut 24 pixels: its sideways scroll bar starts past the bottom-left
  * cut, where its thumb would be painted in the cut corner. A box with something under it in the frame is not at the cut.
  */
-export const FRAMED_END = '[&::-webkit-scrollbar-track:horizontal]:ml-6';
+const FRAMED_END = '[&::-webkit-scrollbar-track:horizontal]:ml-6';
+
+/** The cut of the frame a table ends at: a table's. */
+const TABLE_CUT = 24;
+
+/**
+ * The state layer of the interactive row at the foot of a table that ends its frame: laid over that row (its anchor, `--framed-foot`,
+ * which `FRAMED_ROW` names), as wide as the box and still while the table scrolls sideways, clipped to the frame's bottom-left cut,
+ * and painted in the kit's colours and strengths for the row's states: `on-surface` at 8% under the pointer, 10% pressed and focused.
+ */
+const FOOT_LAYER = [
+  'pointer-events-none absolute inset-x-0 [top:anchor(--framed-foot_top)] [bottom:anchor(--framed-foot_bottom)]',
+  'transition-colors duration-short-4',
+  '[@media(hover:hover)]:group-has-[tbody>tr[data-interactive]:last-child:hover:not([data-pressed],[data-focus-visible])]/foot:bg-on-surface/8',
+  'group-has-[tbody>tr[data-interactive][data-pressed]:last-child]/foot:bg-on-surface/10',
+  'group-has-[tbody>tr[data-interactive][data-focus-visible]:last-child]/foot:bg-on-surface/10',
+].join(' ');
+
+/** Its clip: the frame's diagonal, for a box one pixel inside a frame cut `TABLE_CUT`. */
+const FOOT_CLIP = { clipPath: cutFoot(TABLE_CUT, 1) };
+
+/**
+ * The box around a table that ends its cut frame, a frame cut 24 pixels: `FRAMED_BOX`, its scroll bar past the bottom-left cut, and
+ * the state layer of the row at its foot. The kit paints a row's hover, pressed and focus states as its ground, which over the last
+ * row would fill the cut corner square: that row, where it is the kit's interactive row, wears none (`FRAMED_ROW`), and a layer under
+ * the table paints them in the cut's shape instead, in the kit's own colours and strengths, standing still while the table scrolls
+ * sideways, so the cut stays at the frame's corner. The layer holds nothing and takes no focus; nothing that does is clipped, and the
+ * row's focus ring is drawn whole. A table with something under it in its frame (a pager) takes a plain `FRAMED_BOX`.
+ *
+ * @param props the box's own attributes (its `data-` marks) and `className`, besides what it holds
+ */
+export function TableAtCut({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className="group/foot relative [anchor-scope:--framed-foot]">
+      <span aria-hidden="true" data-framed-foot className={FOOT_LAYER} style={FOOT_CLIP} />
+      <div data-framed-end {...props} className={cn('relative', FRAMED_BOX, FRAMED_END, className)}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 /**
  * What a table in a cut frame wears: nothing it holds is laid out past its own box, where a control's touch target under the last
@@ -84,6 +124,14 @@ export const FRAMED_TABLE = 'overflow-clip';
 
 /**
  * What a row of a table in a cut frame wears: no ground of its own, which would paint a cut corner over, and no line under the last
- * row, where the frame's own edge closes the table.
+ * row, where the frame's own edge closes the table. The last row of a table that ends its frame (`TableAtCut`), where it is the kit's
+ * interactive row, takes its hover, pressed and focus states off its ground and names itself the anchor (`--framed-foot`) of the
+ * layer `TableAtCut` paints them on, in the kit's colours and strengths, clipped to the frame's cut.
  */
-export const FRAMED_ROW = 'bg-transparent last:border-b-0';
+export const FRAMED_ROW = [
+  'bg-transparent last:border-b-0',
+  '[[data-framed-end]_&]:last:data-[interactive]:[anchor-name:--framed-foot]',
+  '[[data-framed-end]_&]:last:data-[interactive]:hover:bg-transparent',
+  '[[data-framed-end]_&]:last:data-[interactive]:data-pressed:bg-transparent',
+  '[[data-framed-end]_&]:last:data-[interactive]:data-focus-visible:bg-transparent',
+].join(' ');

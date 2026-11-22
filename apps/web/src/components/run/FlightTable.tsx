@@ -7,7 +7,7 @@ import { ink } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { previewBar } from '../step/StepPreview';
 import { RunActions } from './RunActions';
-import { CopyId, CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Run, TextLink } from '../look';
+import { CopyId, CutFrame, FRAMED_ROW, FRAMED_TABLE, Run, TableAtCut, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
@@ -84,7 +84,7 @@ export function FlightTable({
 }) {
   return (
     <CutFrame size={24}>
-      <div data-table-box className={cn(FRAMED_BOX, FRAMED_END)}>
+      <TableAtCut data-table-box>
         <RunActions runOf={(target) => rowRunOf(runs, target)} className="contents">
           <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
@@ -112,7 +112,7 @@ export function FlightTable({
             </TableBody>
           </Table>
         </RunActions>
-      </div>
+      </TableAtCut>
     </CutFrame>
   );
 }

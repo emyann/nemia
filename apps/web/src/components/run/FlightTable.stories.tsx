@@ -39,7 +39,8 @@ const rowOf = (canvas: HTMLElement, id: string) => canvas.querySelector<HTMLElem
 
 /**
  * Three judged runs and one the list could not judge: a press on a label inside a row follows the label, not the row; the pointer on a
- * row lights it and Enter opens its run, the judged row and the unjudged alike.
+ * row lights it and Enter opens its run, the judged row and the unjudged alike. The last row, at the frame's foot, is lit by the layer
+ * `TableAtCut` lays on it in the cut's shape, which the look's browser test reads in pixels (`test/e2e/cuts.test.ts`).
  */
 export const InFlight: Story = {
   play: async ({ canvasElement, userEvent }) => {
@@ -49,6 +50,9 @@ export const InFlight: Story = {
     await waitFor(() => expect(standing(lgll), 'the label is followed, not the row').toBe('/labels/area/api'));
     await userEvent.unhover(label);
     await rowOpens(userEvent, lgll, `/runs/${TARGET_RUNS.lgll.metadata.name}`);
-    await rowOpens(userEvent, rowOf(canvasElement, UNJUDGED.id), `/runs/${UNJUDGED.id}`);
+    const foot = rowOf(canvasElement, UNJUDGED.id);
+    const [layer, row] = [canvasElement.querySelector('[data-framed-foot]')!.getBoundingClientRect(), foot.getBoundingClientRect()];
+    await expect([layer.top, layer.bottom], "the foot's state layer lies on the last row").toEqual([row.top, row.bottom]);
+    await rowOpens(userEvent, foot, `/runs/${UNJUDGED.id}`);
   },
 };

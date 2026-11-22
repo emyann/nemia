@@ -92,3 +92,15 @@ export function cutHold(cut: number, inset: number) {
     `${px(-REACH)} ${far(reach)}`,
   ].join(', ')})`;
 }
+
+/**
+ * The clip of a layer as wide as a box set `inset` pixels inside a frame cut by `cut`, lying at the box's foot: the layer whole but
+ * its bottom-left corner, cut along the frame's own diagonal there.
+ *
+ * @param cut how long the frame's cut is along each side, in pixels
+ * @param inset how far inside the frame the box stands, in pixels: the width of the frame's edge
+ */
+export function cutFoot(cut: number, inset: number) {
+  const c = px(cut - inset * GROWN);
+  return `polygon(0 0, 100% 0, 100% 100%, ${c} 100%, 0 calc(100% - ${c}))`;
+}

@@ -4,7 +4,7 @@ import { durationWords } from '@/lib/duration';
 import { waitSentence } from '@/lib/runWords';
 import { ENDED } from '@/lib/words';
 import { CopyId } from './CopyId';
-import { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
+import { CutFrame, FRAMED_ROW, FRAMED_TABLE, TableAtCut } from './CutFrame';
 import { StepGraph } from './StepGraph';
 import { AT_WORK, CARD, GATE, graphRun, ON_OTHER, ON_PLAIN, REFUSED } from './stories.fixture';
 import { TextLink } from './TextLink';
@@ -123,7 +123,7 @@ function Framed({ name, rows, width }: { name: string; rows: readonly string[]; 
     <div data-ground="other" data-framed={name} style={ON_OTHER}>
       <div style={{ width }}>
         <CutFrame size={24}>
-          <div data-table-box className={`${FRAMED_BOX} ${FRAMED_END}`}>
+          <TableAtCut data-table-box>
             <Table aria-label={`A framed table: ${name}`} density="dense" className={FRAMED_TABLE} style={{ minWidth: 520 }}>
               <TableHeader>
                 <Column id="run" isRowHeader>
@@ -144,7 +144,7 @@ function Framed({ name, rows, width }: { name: string; rows: readonly string[]; 
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableAtCut>
         </CutFrame>
       </div>
     </div>

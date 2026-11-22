@@ -58,7 +58,6 @@ export const factoryView = (name: string, isDefault = false) => ({
   workflows: ['build'],
   hires: {},
   error: null,
-  schedules: [],
   commands: {
     attach: `nemia factory attach ${name} <workflow>`,
     rm: `nemia factory rm ${name}`,

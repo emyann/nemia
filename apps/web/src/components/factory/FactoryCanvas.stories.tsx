@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor } from 'storybook/test';
 import { factoriesQuery } from '@/lib/api/factories';
-import { inboxQuery, type InboxEntry } from '@/lib/api/inbox';
+import { factoryInboxQuery, type InboxEntry } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
 import { openOf, undecidedRunsQuery } from '@/lib/api/runs';
 import { forgetFactoryLayout, forgetFactoryOpen, saveFactoryOpen } from '@/lib/canvas';
@@ -11,8 +11,8 @@ import { FACTORY, factoryView, openRuns, queuedCard, seeded } from '../../../.st
 import { onTheFloor, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 
 /**
- * The floor of `factory` with no run on it, the inbox's cards `cards` read under the one key every reader of a page shares
- * (`inboxQuery`), so its queue draws what the pane counts.
+ * The floor of `factory` with no run on it, its cards in play `cards` read under the one key every reader of its page shares
+ * (`factoryInboxQuery`), so its queue draws what the pane counts.
  */
 const drawn = (
   args: Parameters<typeof FactoryCanvas>[0],
@@ -22,7 +22,7 @@ const drawn = (
   <QueryClientProvider
     client={seeded([
       [factoriesQuery.queryKey, [factoryView(FACTORY)]],
-      [inboxQuery.queryKey, cards],
+      [factoryInboxQuery(args.factory.name).queryKey, cards],
       [undecidedRunsQuery(args.factory.name).queryKey, []],
       ...read.map((four) => [runObjectQuery(TARGET_RUNS[four].metadata.name).queryKey, TARGET_RUNS[four]] as const),
     ])}

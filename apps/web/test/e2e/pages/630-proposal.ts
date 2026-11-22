@@ -69,10 +69,10 @@ function appliedBeside(name: string, applied: string) {
 }
 
 /**
- * The floor of FACTORY, loaded whole beside an applied proposal written next to the one that waits (`appliedBeside`), asks the inbox's
- * cards once as it mounts (`mountReads`), and the pane's Proposals line asks the proposals that wait (`WAITING_SELECTOR`), never the whole
- * list, and counts the one: the floor's readers of the cards share one read, and only the proposals page reads every proposal whole.
- * The applied proposal is taken back.
+ * The floor of FACTORY, loaded whole beside an applied proposal written next to the one that waits (`appliedBeside`), asks its factory's
+ * cards in play once as it mounts (`mountReads`), never every card of every factory, and the pane's Proposals line asks the proposals that
+ * wait (`WAITING_SELECTOR`), never the whole list, and counts the one: the floor's readers of the cards share one read, and only the
+ * proposals page reads every proposal whole. The applied proposal is taken back.
  * @param page The page.
  * @param name The proposal that waits.
  */
@@ -88,11 +88,17 @@ async function floorReads(page: Page, name: string) {
         "the floor's pane counts the proposal that waits, and not the one applied beside it",
       );
     });
-    const cards = mountReads(heard.filter((r) => pathOf(r) === '/api/cards'));
+    const every = heard.filter((r) => pathOf(r) === '/api/cards');
+    if (every.length > 0)
+      throw new Refused(`the floor never asks every card of every factory — it asked ${every.map((r) => r.url()).join(', ')}`);
+    const cards = mountReads(heard.filter((r) => pathOf(r) === `/api/namespaces/${FACTORY}/cards`));
     if (cards.length !== 1)
       throw new Refused(
-        `the floor asks the inbox's cards once as it mounts — it asked ${cards.length} times: ${cards.map((r) => r.url()).join(', ')}`,
+        `the floor asks its factory's cards once as it mounts — it asked ${cards.length} times: ${cards.map((r) => r.url()).join(', ')}`,
       );
+    const selector = new URL(cards[0]?.url() ?? '').searchParams.get('fieldSelector');
+    if (selector !== 'status.inPlay=true')
+      throw new Refused(`the floor asks the api for its cards in play (status.inPlay=true) — it asked with ${selector}`);
     const asked = heard.filter((r) => pathOf(r) === proposals).map((r) => new URL(r.url()));
     if (!asked.some((url) => url.searchParams.get('fieldSelector') === WAITING_SELECTOR))
       throw new Refused(`the pane asks ${proposals} for the proposals that wait (${WAITING_SELECTOR}) — it asked none`);
@@ -187,7 +193,7 @@ async function proposalsLit(page: Page, where: string) {
 
 /**
  * Waiting, the proposal is listed on the factory's proposals page, and the pane's Proposals counts it as one that waits on you; the floor
- * draws no proposal and no template, and asks the cards once and no whole list of proposals (`floorReads`).
+ * draws no proposal and no template, and asks its cards once and no whole list of proposals (`floorReads`).
  */
 async function listedWaiting(page: Page, name: string) {
   await floorReads(page, name);

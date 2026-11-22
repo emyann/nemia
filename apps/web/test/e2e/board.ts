@@ -3,16 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Locator, Page } from 'playwright';
 import { expectCount, expectNone, expectTexts, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import {
-  type Card,
-  CARD_KEY_MEANINGS,
-  CARD_KEYS,
-  type FactoryCommands,
-  type FactoryList,
-  LIST_PAGE,
-  type RunList,
-  type ScheduleList,
-} from 'objects';
+import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, LIST_PAGE, type RunList } from 'objects';
 import { FINISHED_SELECTOR, FINISHED_SIZE, finishedOf, OPEN_SELECTOR, openOf, rowsOf } from '../../src/lib/api/runs.ts';
 import { judged } from '../../src/lib/api/judged.ts';
 import { factoryViewOf } from '../../src/lib/api/factories.ts';
@@ -756,21 +747,14 @@ export const isRunStart = (pathname: string) => /^\/api\/namespaces\/[^/]+\/runs
 
 /**
  * The factories as the board's pages draw them, read apart from the page: the api's `FactoryList` (a page of the most a page holds),
- * each factory's lines and, but for the default factory, its schedules, made the board's view as the board makes it (`factoryViewOf`).
+ * each factory's lines, made the board's view as the board makes it (`factoryViewOf`).
  */
 export async function factoriesAnswered(page: Page) {
   const listed = await answered<FactoryList>(page, `/api/factories?limit=${LIST_PAGE.most}`);
   return Promise.all(
-    listed.items.map(async (factory) => {
-      const name = encodeURIComponent(factory.metadata.name);
-      const [commands, scheduled] = await Promise.all([
-        answered<FactoryCommands>(page, `/api/factories/${name}/commands`),
-        factory.metadata.name === 'default'
-          ? Promise.resolve({ items: [] })
-          : answered<ScheduleList>(page, `/api/namespaces/${name}/schedules`),
-      ]);
-      return factoryViewOf(factory, commands, scheduled.items);
-    }),
+    listed.items.map(async (factory) =>
+      factoryViewOf(factory, await answered<FactoryCommands>(page, `/api/factories/${encodeURIComponent(factory.metadata.name)}/commands`)),
+    ),
   );
 }
 

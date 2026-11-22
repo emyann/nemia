@@ -70,7 +70,6 @@ import {
   McpServer,
   McpServerList,
   Proposal,
-  ProposalList,
   type McpServerWrite,
   Run,
   RunApproved,
@@ -97,7 +96,8 @@ import {
   SignInStarted,
   SignInState,
   StepTold,
-  type Table,
+  Table,
+  TABLE_ACCEPT,
   StepTries,
   Skill,
   SkillFiles,
@@ -251,11 +251,11 @@ export const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<
   ...(query ? { query } : {}),
 });
 
-/** Whether a list's answer is the `Table` it answers when asked for one (`TABLE_ACCEPT`), which the board never asks for. */
+/** Whether a list's answer is the `Table` it answers when asked for one (`TABLE_ACCEPT`), which the board asks of the proposals alone. */
 const isTable = (answer: unknown): answer is Table =>
   typeof answer === 'object' && answer !== null && Reflect.get(answer, 'kind') === 'Table';
 
-/** A list endpoint's answer, its list: a `Table`, never asked for, is a defect of the api's. */
+/** A list endpoint's answer, its list: a `Table` where none was asked for is a defect of the api's. */
 const listed = <L>(answer: L | Table) =>
   isTable(answer)
     ? Effect.die(new Error('The api answered a Table the board did not ask for: restart the api (npm run dev).'))
@@ -776,14 +776,22 @@ const PROPOSAL_JUDGED = 'The proposal may be judged: read it again on its page b
 
 /** A factory's proposals, each a change to its definitions waiting on, or judged by, an approval. */
 export const proposals = {
-  /** Every proposal of the factory `namespace` that `fieldSelector` keeps (`status.phase=<phase>`), or every one for none, every page. */
-  list: (namespace: string, fieldSelector?: string) =>
-    everyPage((asked) =>
-      call(
-        (c) => c.proposals.list({ params: { namespace }, query: fieldSelector === undefined ? asked : { ...asked, fieldSelector } }),
-        read(ProposalList),
-      ),
-    ),
+  /**
+   * Every proposal of the factory `namespace` that `fieldSelector` keeps (`status.phase=<phase>`), or every one for none, as the rows of
+   * its `Table` (`TABLE_ACCEPT`), every page: a row's cells and metadata, none of its objects. A list answered whole is an `UnreadAnswer`.
+   */
+  table: (namespace: string, fieldSelector?: string) =>
+    everyPage(async (asked) => {
+      const { metadata, columnDefinitions, rows } = await call(
+        (c) =>
+          Effect.filterOrFail(
+            c.proposals.list({ params: { namespace }, query: fieldSelector === undefined ? asked : { ...asked, fieldSelector } }),
+            isTable,
+          ),
+        { ...read(Table), headers: { accept: TABLE_ACCEPT } },
+      );
+      return { metadata, columnDefinitions, items: rows };
+    }),
   get: (namespace: string, name: string) => call((c) => c.proposals.get({ params: { namespace, name } }), read(Proposal)),
   /** The proposal `name` approved, the person's: answers it as it then reads, applied where it applies at approval. */
   approve: (namespace: string, name: string) =>

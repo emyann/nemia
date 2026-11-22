@@ -1,12 +1,15 @@
 /**
  * A factory's proposals and delegations, as the board reads and judges them (`apps/api/src/proposals/`): the factory's proposals
- * (`proposalsQuery`), those that wait (`waitingProposalsQuery`), one proposal (`proposalQuery`), its approval and its decline, the
+ * (`proposalsQuery`) and those that wait (`waitingProposalsQuery`), each a row of the list's `Table` (`ProposalRow`), none of its objects,
+ * so the list reads whatever their number and size; one proposal whole (`proposalQuery`), its approval and its decline, the
  * person's; and the factory's delegations (`delegationsQuery`), each written whole and removed by the person alone. The board sends no
  * session token, so every write is the person's.
  */
 import { queryOptions } from '@tanstack/react-query';
-import type { DelegationWrite } from 'objects';
+import { Schema } from 'effect';
+import { PROPOSAL_PHASES, type DelegationWrite, type ProposalPhase, type TableColumnDefinition } from 'objects';
 import { pace } from '../feed.ts';
+import { decoded } from './read.ts';
 import { retryUnlessGone } from './gone.ts';
 import { agents, delegations, proposals } from './objects.ts';
 
@@ -32,6 +35,50 @@ const waitingProposalsKey = (factory: string) => [...proposalsKey(factory), 'wai
  */
 export const proposalKey = (factory: string, name: string) => ['proposal', factory, name] as const;
 
+/** A proposal as its list's row: its name, its phase, whether it widens access, the first line of why, and when it was made. */
+export type ProposalRow = {
+  readonly name: string;
+  readonly phase: ProposalPhase;
+  readonly widens: boolean;
+  readonly why: string;
+  readonly creationTimestamp: string;
+};
+
+/** What the board reads of a row: its cells by their column's name, and its object's metadata. */
+const ProposalRowRead = Schema.Struct({
+  Name: Schema.String,
+  Phase: Schema.Literals(PROPOSAL_PHASES),
+  Widens: Schema.Boolean,
+  Why: Schema.String,
+  metadata: Schema.Struct({ creationTimestamp: Schema.String }),
+});
+
+/** A row's object as the board reads it: where it carries metadata, that metadata. */
+const metadataOf = (object: unknown) => (typeof object === 'object' && object !== null ? Reflect.get(object, 'metadata') : undefined);
+
+/**
+ * The rows of the factory `factory`'s proposals that `fieldSelector` keeps, every one for none, each decoded (`decoded`): a row the board
+ * does not read is an `UnreadAnswer` naming its key.
+ */
+async function proposalRows(factory: string, fieldSelector?: string) {
+  const route = `GET /api/namespaces/${factory}/proposals`;
+  const table = await proposals.table(factory, fieldSelector);
+  return table.items.map((row, at) => {
+    const value = Object.fromEntries([
+      ...table.columnDefinitions.map((column: TableColumnDefinition, i) => [column.name, row.cells[i]] as const),
+      ['metadata', metadataOf(row.object)],
+    ]);
+    const read = decoded(`${route} (row ${at})`, ProposalRowRead, value);
+    return {
+      name: read.Name,
+      phase: read.Phase,
+      widens: read.Widens,
+      why: read.Why,
+      creationTimestamp: read.metadata.creationTimestamp,
+    } satisfies ProposalRow;
+  });
+}
+
 /**
  * The proposals of the factory `factory`, in the api's order: polled, since an agent proposes and a run's end applies.
  * @param factory The factory's name.
@@ -39,19 +86,19 @@ export const proposalKey = (factory: string, name: string) => ['proposal', facto
 export const proposalsQuery = (factory: string) =>
   queryOptions({
     queryKey: proposalsKey(factory),
-    queryFn: async () => (await proposals.list(factory)).items,
+    queryFn: () => proposalRows(factory),
     refetchInterval: () => pace(15_000),
   });
 
 /**
- * The proposals of the factory `factory` that wait on an approval (`WAITING_SELECTOR`), asked of the api by phase so a reader that counts
- * them never reads the whole list, each proposal's objects and status whole: the factory pane's line. Polled as the whole list is.
+ * The proposals of the factory `factory` that wait on an approval (`WAITING_SELECTOR`), asked of the api by phase, as rows of the list's
+ * `Table`, so a reader that counts them never reads a proposal's objects: the factory pane's line. Polled as the whole list is.
  * @param factory The factory's name.
  */
 export const waitingProposalsQuery = (factory: string) =>
   queryOptions({
     queryKey: waitingProposalsKey(factory),
-    queryFn: async () => (await proposals.list(factory, WAITING_SELECTOR)).items,
+    queryFn: () => proposalRows(factory, WAITING_SELECTOR),
     refetchInterval: () => pace(15_000),
   });
 

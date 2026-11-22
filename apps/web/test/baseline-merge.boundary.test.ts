@@ -85,6 +85,10 @@ const BASE: Lists = {
   secondSystem: seconds(['command/CopyButton.tsx', ...CONVERSATION, ...FACTORY, 'field/FilePage.tsx']),
   handDrawn: [`${src('field/FilePage.tsx')}#<button>`],
   a11yTodo: [],
+  accentRole: [],
+  money: [],
+  rawType: [],
+  kitSurface: [],
 };
 
 const OURS: Lists = {

@@ -1,0 +1,2 @@
+apps/web/src/components/gate/GateBudgets.tsx#text-body-small
+apps/web/src/components/gate/GateBudgets.tsx#text-label-medium

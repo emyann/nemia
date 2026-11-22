@@ -1,0 +1,4 @@
+apps/web/src/components/nemia/chat/ChatAsk.tsx#text-body-small
+apps/web/src/components/nemia/chat/ChatAsk.tsx#text-label-large
+apps/web/src/components/nemia/chat/ChatAsk.tsx#text-label-small
+apps/web/src/components/nemia/chat/ChatAsk.tsx#text-title-small

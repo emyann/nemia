@@ -1,0 +1,1 @@
+apps/web/src/components/step/CheckOutput.tsx#text-body-small

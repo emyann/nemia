@@ -1,0 +1,3 @@
+apps/web/src/components/step/SpecBar.tsx#text-body-medium
+apps/web/src/components/step/SpecBar.tsx#text-label-medium
+apps/web/src/components/step/SpecBar.tsx#text-title-medium

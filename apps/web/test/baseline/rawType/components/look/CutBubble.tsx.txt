@@ -1,0 +1,1 @@
+apps/web/src/components/look/CutBubble.tsx#text-body-medium

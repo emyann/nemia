@@ -1,0 +1,1 @@
+apps/web/src/routes/factories.$factory.tsx#text-body-medium

@@ -1,0 +1,4 @@
+apps/web/src/components/run/FinishedTable.tsx#text-body-large
+apps/web/src/components/run/FinishedTable.tsx#text-body-medium
+apps/web/src/components/run/FinishedTable.tsx#text-body-small
+apps/web/src/components/run/FinishedTable.tsx#text-label-small

@@ -1,0 +1,2 @@
+apps/web/src/components/step/session/SessionComposer.tsx#text-body-small
+apps/web/src/components/step/session/SessionComposer.tsx#text-title-small

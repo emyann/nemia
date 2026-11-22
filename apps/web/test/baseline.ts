@@ -1,15 +1,25 @@
 /**
- * The board's stories baseline as the tree holds it (`test/baseline/`, held by `stories.test.ts`): one folder per list, and in each one
- * text file per source file that still owes something on that list, at that source file's path under `apps/web/src/` with `.txt`
- * after it, one entry a line. A change that mends a source file deletes its file, so two changes' cuts never meet in one file and git
- * merges them clean (`contracts/baseline-shard.contract.ts`). Paths are from the workspace root.
+ * The board's baseline as the tree holds it (`test/baseline/`, held by `stories.test.ts` and `rulebook.test.ts`): one folder per
+ * list, and in each one text file per source file that still owes something on that list, at that source file's path under
+ * `apps/web/src/` with `.txt` after it, one entry a line. A change that mends a source file deletes its file, so two changes' cuts
+ * never meet in one file and git merges them clean (`contracts/baseline-shard.contract.ts`). Paths are from the workspace root.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Astray, BaselineList, Filed, IsAstray, Misfiled, ShardOf } from '../contracts/baseline-shard.contract.ts';
 
-/** The baseline's lists, in the order the stories test holds them. */
-export const LISTS: readonly BaselineList[] = ['storyless', 'argless', 'secondSystem', 'handDrawn', 'a11yTodo'];
+/** The baseline's lists: the stories test's, in the order it holds them, then the rulebook's (`rulebook.test.ts`). */
+export const LISTS: readonly BaselineList[] = [
+  'storyless',
+  'argless',
+  'secondSystem',
+  'handDrawn',
+  'a11yTodo',
+  'accentRole',
+  'money',
+  'rawType',
+  'kitSurface',
+];
 
 /** The baseline's folder, from the workspace root. */
 export const FOLDER = 'apps/web/test/baseline/';

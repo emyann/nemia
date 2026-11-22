@@ -12,7 +12,7 @@ import { test } from 'vitest';
 import { files, REPO } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
 import { FOLDER, LISTS, misfiled, readBaseline, shardOf } from './baseline.ts';
-import type { BaselineList } from '../contracts/baseline-shard.contract.ts';
+import { against, heldTo } from './held.ts';
 import { DESTINATIONS, EXEMPT } from './destinations.ts';
 import { a11yTodos, argless, handDrawn, mapGaps, offCategory, secondSystem, seenOnceFound, storyless, storyModuleOf } from './stories.ts';
 
@@ -27,29 +27,6 @@ const storyModules = (all: readonly string[]) =>
   all
     .filter((file) => /^apps\/web\/src\/components\/.+\.stories\.tsx$/.test(file) && !/\/components\/(ui|ai-elements)\//.test(file))
     .map((file) => ({ file, module: storyModuleOf(textOf(file)) }));
-
-/** What `found` holds that `listed` does not (`added`), and what `listed` holds that `found` no longer does (`stale`). */
-const against = (found: readonly string[], listed: readonly string[]) => ({
-  added: found.filter((one) => !listed.includes(one)),
-  stale: listed.filter((one) => !found.includes(one)),
-});
-
-/** The entries the tree's baseline lists on `list`, every file's lines together. */
-const listed = (list: BaselineList) => readBaseline(REPO).lists[list].flatMap(({ entries }) => entries);
-
-/**
- * Asserts `found` is the baseline's `list` exactly, naming what to add a story for, and for each mended entry the file it is cut
- * from: the line, or the whole file where it is the last.
- */
-const heldTo = (found: readonly string[], list: BaselineList) => {
-  const { added, stale } = against(found, listed(list));
-  assert.deepEqual(added, [], `mend each of these, never add it to ${FOLDER}${list}/`);
-  assert.deepEqual(
-    stale.map((entry) => `${shardOf(list, entry)}: ${entry}`),
-    [],
-    'each of these is mended: cut its line from the file named, and delete the file where it is the last line (git rm <file>)',
-  );
-};
 
 /** Writes each of `planted` under `root`, by its path from the workspace root, with its text. */
 const plant = (root: string, planted: Readonly<Record<string, string>>) => {

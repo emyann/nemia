@@ -4,9 +4,11 @@
  * The vendored kit (`src/components/ui/ds`) is another repository's and stays out; the few sizes no role gives are `OUTSIDE`, each
  * in its file alone, with its reason.
  *
- * The table, by what the text is: 12px is `text-body-small`, 14px `text-body-medium`, 16px `text-body-large`; a text in capitals is
- * a label role and `uppercase` (`text-label-small uppercase`), with no weight or tracking written beside it; a heading is a title
- * role (`text-title-small` 14px, `text-title-medium` 16px, `text-title-large` 22px); mono text takes a body role whole.
+ * The table, by what the text is (DESIGN.md, *Sizes*): 13px is the small body role, 15px the medium, 16px the large; a text in
+ * capitals is a label role and `uppercase`, with no weight or tracking written beside it; a heading is a title role (14px, 16px,
+ * 22px); mono text takes a body role whole. Each is set through the kit's primitive (`<Body size="small">`, `<Label size="small">`,
+ * `<Title size="medium">`, DESIGN.md's *How text is written*); a raw role class (`text-body-small`) is a debt `rulebook.test.ts`
+ * holds to its list, `rawType`.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -19,7 +21,7 @@ const WEB = path.resolve(import.meta.dirname, '..');
 
 /** What to write instead, said by every refusal. */
 const TABLE =
-  'give the text a role of the theme: text-body-small (12px), text-body-medium (14px), text-body-large (16px); a label role and uppercase for small caps; a title role for a heading; a body role for mono';
+  'give the text a role of the theme through the kit\'s primitive: <Body size="small"> (13px), <Body size="medium"> (15px), <Body size="large"> (16px); a <Label> and uppercase for small caps; a <Title> for a heading; a body role for mono';
 
 /** The ways a size is written by hand, each a family the rule needs: a pattern over a source text, by its name. */
 export const FAMILIES: Record<string, RegExp> = {

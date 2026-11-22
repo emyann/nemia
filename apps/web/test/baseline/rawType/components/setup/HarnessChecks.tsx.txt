@@ -1,0 +1,4 @@
+apps/web/src/components/setup/HarnessChecks.tsx#text-body-medium
+apps/web/src/components/setup/HarnessChecks.tsx#text-body-small
+apps/web/src/components/setup/HarnessChecks.tsx#text-label-medium
+apps/web/src/components/setup/HarnessChecks.tsx#text-title-small

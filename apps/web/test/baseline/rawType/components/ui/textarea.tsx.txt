@@ -1,0 +1,2 @@
+apps/web/src/components/ui/textarea.tsx#text-body-large
+apps/web/src/components/ui/textarea.tsx#text-body-medium

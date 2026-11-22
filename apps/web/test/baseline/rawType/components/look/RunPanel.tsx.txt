@@ -1,0 +1,4 @@
+apps/web/src/components/look/RunPanel.tsx#text-body-large
+apps/web/src/components/look/RunPanel.tsx#text-body-medium
+apps/web/src/components/look/RunPanel.tsx#text-body-small
+apps/web/src/components/look/RunPanel.tsx#text-label-small

@@ -1,0 +1,1 @@
+apps/web/src/routes/factories.$factory_.inbox.tsx#text-body-medium

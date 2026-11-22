@@ -441,6 +441,7 @@ export {
   agentTable,
   factoryTable,
   mcpServerTable,
+  proposalTable,
   skillTable,
 } from './kind-table/kind-table.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';

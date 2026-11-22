@@ -92,6 +92,7 @@ const PINNED: Record<string, string[]> = {
     'agentTable',
     'factoryTable',
     'mcpServerTable',
+    'proposalTable',
     'skillTable',
     'SAY',
     'SHOW',

@@ -12,28 +12,12 @@ import { type StepSpec } from '../step/step.ts';
 import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
 import { fieldsOf, itemsOf, knownSchemas, sameSchema } from '../shape/shape.ts';
 import { isObject } from 'effect/Predicate';
+import type { Answer, AnswerRefusal, Question, QuestionOption, RefusalWords } from '../../contracts/answer.contract.ts';
 
-/** One option of a question: its label, which an answer names, and what choosing it means. */
-export type QuestionOption = { label: string; meaning: string };
-
-/**
- * One question: its `title`, which an answer names and which is unique among its field's questions; its `body`; its `options`, at least
- * one, each label unique; what it `recommended`, as the agent wrote it — one label or null, or on a question that takes `multiple`
- * options a list of labels — and whether `multiple` options may be chosen together. `recommendedOf` reads it as a list.
- */
-export type Question = {
-  title: string;
-  body: string;
-  options: QuestionOption[];
-  recommended: string | string[] | null;
-  multiple: boolean;
-};
+export type { Answer, Question, QuestionOption } from '../../contracts/answer.contract.ts';
 
 /** A question field of a closeout that decoded: the field's name, and its questions, in the order the agent gave them. */
 export type Asked = { field: string; questions: Question[] };
-
-/** A person's answer to one question, named by its title: the labels they `chose`, and their `own` words, either or both. */
-export type Answer = { question: string; chose: readonly string[]; own?: string };
 
 /** The marker an output schema writes for a field of questions: `{ "x-shape": "questions", "description": "…" }`. */
 export const SHAPE_KEY = 'x-shape';
@@ -327,46 +311,86 @@ export const closeoutRefusals = (step: StepSpec | undefined, said: Closeout, ste
 /** Words that say to read the step again, for an answer that does not fit the questions it asks now. */
 const READ_AGAIN = "Read the step's questions again and answer those.";
 
-/** Why one answer does not fit its question, or null. */
-function oneAnswerRefusal(q: Question, a: Answer) {
-  const labels = q.options.map((o) => o.label);
-  const stray = a.chose.find((label) => !labels.includes(label));
+/** Why `title` is refused as not answered, naming each way to answer it. */
+const NOT_ANSWERED = (title: string) =>
+  `"${title}" is not answered: choose an option, answer it in your own words, or say that none of its options fits (\`none\`).`;
+
+/** Whether `label` is an option of the question of `asked` that `a` answers. */
+const offers = (asked: readonly Question[], a: Answer, label: string) =>
+  asked.some((q) => q.title === a.question && q.options.some((o) => o.label === label));
+
+/** The labels of the question of `asked` titled `title`, each quoted. */
+const labelsOf = (asked: readonly Question[], title: string) =>
+  asked
+    .filter((q) => q.title === title)
+    .flatMap((q) => q.options.map((o) => JSON.stringify(o.label)))
+    .join(', ');
+
+/** The labels `a` chose, each quoted, joined by `and`. */
+const choseWords = (a: Answer) => a.chose.map((l) => JSON.stringify(l)).join(' and ');
+
+/** Whether `a` carries words of the person's own: text that is not blank. */
+const hasWords = (a: Answer) => a.own !== undefined && a.own.trim() !== '';
+
+/** Whether `a` chooses several labels of a question of `asked` that takes one. */
+const severalOfOne = (asked: readonly Question[], a: Answer) =>
+  a.chose.length > 1 && asked.some((q) => q.title === a.question && !q.multiple);
+
+/** Whether `a` says something: a choice, words of the person's own, or that none of the options fits. */
+const saysSomething = (a: Answer) => a.chose.length > 0 || hasWords(a) || a.none === true;
+
+/**
+ * Why `answers` do not answer `asked`, the first rule one of them breaks named: called only where they do not (`answerRefusal`), and typed
+ * by its own spec, so the refusal's laws are proved on its decision and never on these words.
+ */
+const whyNot: RefusalWords = (asked, answers) => {
+  const unasked = answers.find((a) => !asked.some((q) => q.title === a.question));
+  if (unasked !== undefined) return `The step does not ask "${unasked.question}" now. ${READ_AGAIN}`;
+  const twice = answers.find((a, i) => answers.some((b, j) => j !== i && b.question === a.question));
+  if (twice !== undefined) return `"${twice.question}" is answered twice: answer each question once.`;
+  const stray = answers.find((a) => !a.chose.every((label) => offers(asked, a, label)));
   if (stray !== undefined) {
-    return `"${q.title}" offers no ${JSON.stringify(stray)}: its options are ${labels.map((l) => JSON.stringify(l)).join(', ')}. ${READ_AGAIN}`;
+    const label = stray.chose.find((l) => !offers(asked, stray, l)) ?? '';
+    return `"${stray.question}" offers no ${JSON.stringify(label)}: its options are ${labelsOf(asked, stray.question)}. ${READ_AGAIN}`;
   }
-  if (!q.multiple && a.chose.length > 1) {
-    return `"${q.title}" takes one option, and the answer chose ${a.chose.map((l) => JSON.stringify(l)).join(' and ')}: choose one, or say the rest in your own words.`;
+  const several = answers.find((a) => severalOfOne(asked, a));
+  if (several !== undefined) {
+    return `"${several.question}" takes one option, and the answer chose ${choseWords(several)}: choose one, or say the rest in your own words.`;
   }
-  if (!a.chose.length && !a.own?.trim()) return `"${q.title}" is not answered: choose an option, or answer it in your own words.`;
-  return null;
-}
+  const both = answers.find((a) => a.none === true && a.chose.length > 0);
+  if (both !== undefined) {
+    return `"${both.question}" is answered both with ${choseWords(both)} and with none of its options: choose, or say none fits, not both.`;
+  }
+  const silent = answers.find((a) => !saysSomething(a));
+  if (silent !== undefined) return NOT_ANSWERED(silent.question);
+  const left = asked.find((q) => !answers.some((a) => a.question === q.title));
+  return NOT_ANSWERED(left?.title ?? '');
+};
 
 /**
  * Why `answers` do not answer `asked`, or null: answers, even none, to a step that asks no questions now; an answer to a question not
- * asked, two to one question, a label its question does not offer, several labels where one is taken, and a question left with neither
- * a choice nor words of the person's own.
+ * asked, two to one question, a label its question does not offer, several labels where one is taken, a choice beside saying that none
+ * of the options fits (`none`), and a question left with no choice, no words of the person's own and no `none`.
  *
  * @param asked The questions the step asks now.
  * @param answers The person's answers, each naming its question by title.
  * @param instead How a person says what they mean to a step that asks none, as the refusal names it: in words, without `answers`, on the
  *   board's side; with `--message`, without `--answer`, at the terminal.
  */
-export function answerRefusal(asked: readonly Question[], answers: readonly Answer[], instead = 'in words, without `answers`') {
+export const answerRefusal: AnswerRefusal = (asked, answers, instead = 'in words, without `answers`') => {
   if (!asked.length) {
     return `The step asks no questions now, so there is nothing to answer. Read the step again, and say what you mean ${instead}.`;
   }
-  const seen = new Set<string>();
-  for (const a of answers) {
-    const q = asked.find((one) => one.title === a.question);
-    if (!q) return `The step does not ask "${a.question}" now. ${READ_AGAIN}`;
-    if (seen.has(a.question)) return `"${a.question}" is answered twice: answer each question once.`;
-    seen.add(a.question);
-    const wrong = oneAnswerRefusal(q, a);
-    if (wrong) return wrong;
-  }
-  const left = asked.find((q) => !seen.has(q.title));
-  return left ? `"${left.title}" is not answered: choose an option, or answer it in your own words.` : null;
-}
+  const kept =
+    answers.every((a, i) => answers.every((b, j) => i === j || b.question !== a.question)) &&
+    answers.length >= asked.length &&
+    answers.every((a) => asked.some((q) => q.title === a.question)) &&
+    answers.every((a) => a.chose.every((label) => offers(asked, a, label))) &&
+    answers.every((a) => !severalOfOne(asked, a)) &&
+    answers.every((a) => !(a.none === true && a.chose.length > 0)) &&
+    answers.every(saysSomething);
+  return kept ? null : whyNot(asked, answers);
+};
 
 /**
  * Who answered, in the words a person reads after `Answered by: ` — objects' `actorWords` of the caller who sent the answers (the person
@@ -382,15 +406,16 @@ const ON_THE_BOARD: AnsweredBy = 'the person, on the board';
 const answeredLine = (by: AnsweredBy) => `Answered by: ${by}`;
 
 /**
- * Each question in the order asked, what was chosen with what it means, and the person's own words; then `note`; then who answered
- * (`by`).
+ * Each question in the order asked, what was chosen with what it means, that none of its options fits where the person said so, and the
+ * person's own words; then `note`; then who answered (`by`).
  */
 function answerBlocks(asked: readonly Question[], answers: readonly Answer[], note: string | undefined, by: AnsweredBy) {
   const blocks = asked.map((q, i) => {
     const a = answers.find((one) => one.question === q.title);
     const chose = (a?.chose ?? []).map((label) => `   Chose: ${label} — ${q.options.find((o) => o.label === label)?.meaning ?? ''}`);
+    const none = a?.none === true ? ['   None of these: none of the options fits.'] : [];
     const own = a?.own?.trim() ? [`   In my own words: ${a.own.trim()}`] : [];
-    return [`${i + 1}. ${q.title}`, ...chose, ...own].join('\n');
+    return [`${i + 1}. ${q.title}`, ...chose, ...none, ...own].join('\n');
   });
   const noted = note?.trim() ? [`Note: ${note.trim()}`] : [];
   return [...blocks, ...noted, answeredLine(by)];

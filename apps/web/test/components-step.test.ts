@@ -97,7 +97,7 @@ const facts = await import('../src/components/step/Facts.tsx');
 type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 type StepSpec = import('../src/lib/api/judged.ts').StepSpecView;
 type StepFiled = import('../src/lib/api/judged.ts').StepFiledView;
-const { answersFrom, chosenDraft, recommendedDraft, unanswered } = await import('../src/components/gate/Questions.tsx');
+const { answersFrom, chosenDraft, recommendedDraft, unanswered, wayDraft } = await import('../src/lib/question-draft/questionDraft.ts');
 const Closeouts = await import('../src/components/step/Closeout.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 const Gates = await import('../src/components/gate/Gate.tsx');
@@ -1340,6 +1340,7 @@ test('a questions field is drawn as its questions, read-only, the recommended ma
   );
   assert.equal([...open.matchAll(/data-recommended="true"/g)].length, 1);
   assert.doesNotMatch(open, /<input|<button/, 'read-only: nothing to choose');
+  assert.doesNotMatch(open, /data-way=/, 'read-only: no way out offered');
 });
 
 test("a try that ended with no statement says the machine's reason in its detail, unsigned, in a sentence", async () => {
@@ -1773,30 +1774,41 @@ test("a step's node says how many calls its current try was denied, whole, and w
   assert.doesNotMatch(nodeMarkup(needing('unverified · done', {}, { waitingOnYou: [] })), /data-denied/);
 });
 
-test('Choose the recommended answers chooses each recommended option, keeps words already written, and leaves a question with none as it was', () => {
+test('Choose the recommended answers chooses each recommended option, keeps words already written, takes back None of these, and leaves a question with none as it was', () => {
   assert.deepEqual(unanswered([cut, where], {}), [cut.title, where.title], 'nothing is answered before the person answers');
-  const typed = { [cut.title]: { chose: ['b'], own: 'Mine.' } };
+  const typed = { [cut.title]: { chose: ['b'], own: 'Mine.', way: null } };
   const filled = recommendedDraft([cut, where], typed);
-  assert.deepEqual(filled, { [cut.title]: { chose: ['a'], own: 'Mine.' } });
+  assert.deepEqual(filled, { [cut.title]: { chose: ['a'], own: 'Mine.', way: null } });
   assert.deepEqual(unanswered([cut, where], filled), [where.title], 'a question without a recommendation still waits for the person');
   assert.deepEqual(recommendedDraft([where], {}), {});
   const many = { ...where, recommended: ['retry', 'gate'] };
-  assert.deepEqual(recommendedDraft([many], {}), { [where.title]: { chose: ['retry', 'gate'], own: '' } }, 'a list chooses each label');
+  assert.deepEqual(
+    recommendedDraft([many], {}),
+    { [where.title]: { chose: ['retry', 'gate'], own: '', way: null } },
+    'a list chooses each label',
+  );
+  const refused = wayDraft({}, cut, 'none', true);
+  assert.deepEqual(recommendedDraft([cut], refused), { [cut.title]: { chose: ['a'], own: '', way: null } }, 'None of these is taken back');
 });
 
 test('choosing takes the one option of a question that takes one, and adds or drops one of a question that takes several; the answers go as the api takes them', () => {
   const one = chosenDraft(chosenDraft({}, cut, 'a', true), cut, 'b', true);
-  assert.deepEqual(one[cut.title].chose, ['b']);
+  assert.deepEqual(one[cut.title]?.chose, ['b']);
   const both = chosenDraft(chosenDraft({}, where, 'retry', true), where, 'gate', true);
-  assert.deepEqual(both[where.title].chose, ['retry', 'gate']);
-  assert.deepEqual(chosenDraft(both, where, 'retry', false)[where.title].chose, ['gate']);
-  const draft = { ...one, [where.title]: { chose: [], own: '  Neither.  ' } };
+  assert.deepEqual(both[where.title]?.chose, ['retry', 'gate']);
+  assert.deepEqual(chosenDraft(both, where, 'retry', false)[where.title]?.chose, ['gate']);
+  const draft = { ...one, [where.title]: { chose: [], own: '  Neither.  ', way: 'else' as const } };
   assert.deepEqual(unanswered([cut, where], draft), []);
   assert.deepEqual(answersFrom([cut, where], draft), [
     { question: cut.title, chose: ['b'] },
     { question: where.title, chose: [], own: 'Neither.' },
   ]);
-  assert.deepEqual(unanswered([where], { [where.title]: { chose: [], own: '   ' } }), [where.title], 'blank words answer nothing');
+  assert.deepEqual(
+    unanswered([where], { [where.title]: { chose: [], own: '   ', way: null } }),
+    [where.title],
+    'blank words answer nothing',
+  );
+  assert.deepEqual(answersFrom([cut], wayDraft(one, cut, 'none', true)), [{ question: cut.title, chose: [], none: true }]);
 });
 
 test('the part says `your answer` above the closeout of the try shown, where a person answered that try', async () => {
@@ -2528,7 +2540,7 @@ test("a gate in its step's part draws no closeout of its own: what it approves i
 });
 
 test("what a gate's approval sends: every answer in the order asked and the note beside them, left out when empty; a gate that asks nothing, its words alone", () => {
-  const draft = { [where.title]: { chose: ['gate'], own: '' }, [cut.title]: { chose: [], own: ' Three ways. ' } };
+  const draft = { [where.title]: { chose: ['gate'], own: '', way: null }, [cut.title]: { chose: [], own: ' Three ways. ', way: null } };
   assert.deepEqual(Gates.approvalBody([cut, where], draft, ' Go. '), {
     answers: [
       { question: cut.title, chose: [], own: 'Three ways.' },
@@ -2547,9 +2559,9 @@ test("what a gate's approval sends: every answer in the order asked and the note
 });
 
 test("a send-back carries the gate's answers all or none: every one answered goes with it, none goes without, some is held — and a send-back to another step carries none", () => {
-  const all = { [cut.title]: { chose: ['a'], own: '' }, [where.title]: { chose: ['retry'], own: '' } };
-  const some = { [cut.title]: { chose: ['a'], own: '' } };
-  const back = (to: string, draft: Record<string, { chose: string[]; own: string }>, objection: string) =>
+  const all = { [cut.title]: { chose: ['a'], own: '', way: null }, [where.title]: { chose: ['retry'], own: '', way: null } };
+  const some = { [cut.title]: { chose: ['a'], own: '', way: null } };
+  const back = (to: string, draft: Record<string, { chose: string[]; own: string; way: null }>, objection: string) =>
     Gates.sendBackBody({ step: 'design', to, mode: 'continue', objection, questions: [cut, where], draft });
   assert.deepEqual(back('design', all, ''), {
     mode: 'continue',
@@ -2562,7 +2574,7 @@ test("a send-back carries the gate's answers all or none: every one answered goe
   assert.deepEqual(back('design', all, 'Smaller.'), { ...back('design', all, ''), message: 'Smaller.' });
   assert.deepEqual(back('design', {}, 'Smaller.'), { mode: 'continue', message: 'Smaller.', step: 'design' });
   assert.deepEqual(back('plan', all, 'Redo it.'), { mode: 'continue', message: 'Redo it.', step: 'plan' });
-  const waits = (to: string, draft: Record<string, { chose: string[]; own: string }>) =>
+  const waits = (to: string, draft: Record<string, { chose: string[]; own: string; way: null }>) =>
     Gates.sendBackWaits({ step: 'design', to, questions: [cut, where], draft });
   assert.deepEqual(waits('design', some), [where.title], 'some answered: held until the rest are');
   assert.equal(waits('design', {}).length, 0, 'none answered: the words go alone');
@@ -2571,7 +2583,7 @@ test("a send-back carries the gate's answers all or none: every one answered goe
 });
 
 test("what a raise's try sends: the budget typed, and for a step asking questions as data its answers in the order asked, the note left out when empty", () => {
-  const draft = { [where.title]: { chose: ['retry', 'gate'], own: '' }, [cut.title]: { chose: ['b'], own: '' } };
+  const draft = { [where.title]: { chose: ['retry', 'gate'], own: '', way: null }, [cut.title]: { chose: ['b'], own: '', way: null } };
   const asked = { mode: 'continue' as const, amount: '3', asks: true, questions: [cut, where], draft };
   const answers = [
     { question: cut.title, chose: ['b'] },

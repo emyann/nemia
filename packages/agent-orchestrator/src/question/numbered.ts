@@ -52,7 +52,7 @@ const questionBlock = (q: DecisionQuestion) => [
         .map((line) => `     ${line}`)
     : []),
   ...q.options.map((o) => `     ${o.letter}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${o.recommended ? '  (recommended)' : ''}`),
-  `     ${q.multiple ? 'choose one or more' : 'choose one'}, or answer in your own words`,
+  `     ${q.multiple ? 'choose one or more' : 'choose one'}, answer in your own words, or none (${q.number}=none)`,
 ];
 
 /**
@@ -83,18 +83,28 @@ export const answersOr = (step: StepSpec | undefined, said: Closeout | { error: 
 };
 
 /** The forms an `--answer` takes, as its refusal says them. */
-const FORMS = "`n=a`, `n=a,c` where the question takes several, `n=a: words` or `n: words`, n the question's number";
+const FORMS =
+  "`n=a`, `n=a,c` where the question takes several, `n=a: words` or `n: words`, `n=none` or `n=none: words` where none of its options fits, n the question's number";
 
-/** One `--answer` value read: the question's number, the letters chosen, and the person's own words. */
-type Typed = { n: number; letters: string[]; own?: string };
+/** What an `--answer` types for "none of the options fits", in place of its letters. */
+const NONE = 'none';
 
-/** An `--answer` value read (`1=a`, `2=a,c`, `3=b: words`, `3: words`), or null where it takes no form of them. */
+/** One `--answer` value read: the question's number, the letters chosen, whether none fits, and the person's own words. */
+type Typed = { n: number; letters: string[]; none: boolean; own?: string };
+
+/**
+ * An `--answer` value read (`1=a`, `2=a,c`, `3=b: words`, `3: words`, `4=none`, `4=none: words`), or null where it takes no form of them:
+ * `none` stands alone, never beside a letter.
+ */
 function typedOf(value: string) {
   const m = /^\s*(\d+)\s*(?:=\s*([a-z]+(?:\s*,\s*[a-z]+)*))?\s*(?::([\s\S]*))?$/i.exec(value);
   if (!m) return null;
   const own = m[3]?.trim();
   if (m[2] === undefined && !own) return null;
-  return { n: Number(m[1]), letters: m[2] ? m[2].split(',').map((l) => l.trim().toLowerCase()) : [], ...(own ? { own } : {}) };
+  const letters = m[2] ? m[2].split(',').map((l) => l.trim().toLowerCase()) : [];
+  const none = letters.includes(NONE);
+  if (none && letters.length > 1) return null;
+  return { n: Number(m[1]), letters: none ? [] : letters, none, ...(own ? { own } : {}) };
 }
 
 /** `typed` resolved against question `q`: its letters as the labels they name, or why one names none. */
@@ -111,17 +121,17 @@ function resolved(q: Question, typed: Typed, value: string) {
     const option = q.options[letters.indexOf(l)];
     return option === undefined ? [] : [option.label];
   });
-  return { question: q.title, chose, ...(typed.own ? { own: typed.own } : {}) } satisfies Answer | { error: string } as
+  return { question: q.title, chose, ...(typed.none ? { none: true } : {}), ...(typed.own ? { own: typed.own } : {}) } satisfies
     | Answer
-    | { error: string };
+    | { error: string } as Answer | { error: string };
 }
 
 /**
  * Each `--answer` value `typed` names, resolved against the questions a step asks now, numbered as `questionLines` numbers them: the
- * question's title, the labels its letters name and the person's own words, as the board sends an answer; or why one cannot be read — a
- * value in no form of them, a number past the questions asked or below 1, a letter its question does not offer. None for a step that asks
- * none, which `answerRefusal` says itself. What is left to refuse — a question answered twice or not at all, several labels where one is
- * taken — is `answerRefusal`'s.
+ * question's title, the labels its letters name, whether none of its options fits (`n=none`) and the person's own words, as the board
+ * sends an answer; or why one cannot be read — a value in no form of them, `none` beside a letter among them, a number past the
+ * questions asked or below 1, a letter its question does not offer. None for a step that asks none, which `answerRefusal` says itself.
+ * What is left to refuse — a question answered twice or not at all, several labels where one is taken — is `answerRefusal`'s.
  *
  * @param questions The questions the step asks now, numbered as `questionLines` numbers them.
  * @param typed The `--answer` values typed, in the order given.

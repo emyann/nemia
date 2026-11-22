@@ -85,20 +85,18 @@ export function afterCycle(name: string, afterOf: (name: string) => readonly str
   const cameFrom = new Map<string, string>();
   const queue = [...afterOf(name)];
   for (const next of queue) if (!cameFrom.has(next)) cameFrom.set(next, name);
-  for (let i = 0; i < queue.length; i++) {
-    const at = queue[i];
-    if (at === undefined) break;
-    if (at === name) {
-      const route = [name];
-      for (let back = cameFrom.get(name); back !== undefined && back !== name; back = cameFrom.get(back)) route.unshift(back);
-      route.unshift(name);
-      return route;
-    }
-    for (const next of afterOf(at)) {
-      if (cameFrom.has(next)) continue;
-      cameFrom.set(next, at);
-      queue.push(next);
-    }
+  for (const at of queue) {
+    if (at === name) return routeBack(name, cameFrom);
+    const fresh = afterOf(at).filter((next) => !cameFrom.has(next));
+    for (const next of fresh) cameFrom.set(next, at);
+    queue.push(...fresh);
   }
   return undefined;
+}
+
+/** The route from `name` back to itself, `[name, …, name]`, read back through where each card on it was reached from. */
+function routeBack(name: string, cameFrom: ReadonlyMap<string, string>) {
+  const route = [name];
+  for (let back = cameFrom.get(name); back !== undefined && back !== name; back = cameFrom.get(back)) route.unshift(back);
+  return [name, ...route];
 }

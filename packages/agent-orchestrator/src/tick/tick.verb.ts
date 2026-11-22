@@ -55,7 +55,7 @@ import { sameJudgement } from '../summary/judgement.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { passParents, reportedEngine } from '../views/views.verb.ts';
-import { inboxNow, landedThrough, startQueued } from '../inbox/inbox.verb.ts';
+import { inboxNow, landedThrough, startQueued, type RunLanded } from '../inbox/inbox.verb.ts';
 import { startDue } from '../factory/schedule/schedule.verb.ts';
 import type { ScheduleStarted } from '../factory/schedule/schedule.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
@@ -310,9 +310,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const landed = landedThrough(e, passParents(standingReader(standing)));
-  const inbox = yield* inboxNow(runs, landed, (id) => phaseOfStatus(judging.done.get(id)?.status)).pipe(
-    Effect.orElseSucceed(() => undefined),
-  );
+  const inbox = yield* inboxOfPass(runs, landed, judging);
   if (informer) yield* informed(e, informer, runs, judging, verify);
   yield* withinEffect('act', (yield* ProposalsAct)(runs, judging.done));
   const queue =
@@ -331,7 +329,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
       runs,
       judging,
       queue,
-      yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness, clashes: inbox?.clashes, waits: inbox?.stuck }),
+      yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness, ...inbox }),
     ),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
@@ -421,6 +419,16 @@ const informed = Effect.fnUntraced(function* (
     () => runs,
   );
 });
+
+/**
+ * What the inbox owes the feed on this pass (`inboxNow`): its cards' clashes and their stuck waits, each run's landing read through the
+ * pass's `landed` and its phase as the pass judged it; none of either where the inbox does not read.
+ */
+const inboxOfPass = (runs: readonly Run[], landed: RunLanded, { done }: Judging) =>
+  inboxNow(runs, landed, (id) => phaseOfStatus(done.get(id)?.status)).pipe(
+    Effect.map(({ clashes, stuck }) => ({ clashes, waits: stuck }) satisfies { clashes?: FeedClashes; waits?: FeedWaits }),
+    Effect.orElseSucceed(() => ({}) satisfies { clashes?: FeedClashes; waits?: FeedWaits }),
+  );
 
 /**
  * A run's phase as its word on the pass says it (`Assessment.status`), as a card's state reads it: `awaiting approval` waits on a person
@@ -521,8 +529,8 @@ const feedErrorOf = (
     conflicts: FeedConflicts | undefined;
     missing: FeedMissing | undefined;
     readiness: (() => FeedReadiness | undefined) | undefined;
-    clashes: FeedClashes | undefined;
-    waits: FeedWaits | undefined;
+    clashes?: FeedClashes | undefined;
+    waits?: FeedWaits | undefined;
   },
 ) =>
   Effect.exit(

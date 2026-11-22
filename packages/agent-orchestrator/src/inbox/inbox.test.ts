@@ -889,7 +889,11 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     assert.deepEqual(card.after, ['a-1x2y', 'b-3z4w']);
     assert.match(fromText(card, ['r-1']), /^after: a-1x2y, b-3z4w$/m);
     assert.equal(Object.hasOwn(read('---\nworkflow: dev\n---\nx\n'), 'after'), false, 'none unless it says so');
-    assert.deepEqual(parseInboxCard('d.md', ideaCard('the idea', 'Show it.', { after: ['a-1x2y'] }).text).after, ['a-1x2y'], 'given at a filing');
+    assert.deepEqual(
+      parseInboxCard('d.md', ideaCard('the idea', 'Show it.', { after: ['a-1x2y'] }).text).after,
+      ['a-1x2y'],
+      'given at a filing',
+    );
   });
 
   test('a hand-queued card whose named card has not landed is listed waiting on it, at no place in the queue, and the tick starts none of it', () => {
@@ -951,7 +955,7 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
     );
   });
 
-  test('a door-routed card waits at the card its run passed the work on to, with that card\'s state', () => {
+  test("a door-routed card waits at the card its run passed the work on to, with that card's state", () => {
     const routed = waitingOver(
       { 'a-1x2y': { runs: [{ id: 'a-run', landed: false }], onward: ['a2-7q8r'] }, 'a2-7q8r': {} },
       { 'a-run': 'succeeded' },
@@ -965,7 +969,10 @@ describe('`after:` names the cards a card waits on: read, written back, listed w
 
   test('`nemia inbox` says each wait: the card, where its work stands and its state, and what to type where only a person can release it', () => {
     const lineOf = (w: ListedWait) => inboxLines([{ ...inboxListing([files[1]], [])[0], waits: [w] }])[0];
-    assert.match(lineOf({ card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'running', stuck: false }), /waiting on a-1x2y at a2-7q8r \(running\)/);
+    assert.match(
+      lineOf({ card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'running', stuck: false }),
+      /waiting on a-1x2y at a2-7q8r \(running\)/,
+    );
     assert.doesNotMatch(lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'running', stuck: false }), /needs you/);
     const stuck = lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'failed', stuck: true });
     assert.match(stuck, /needs you/);

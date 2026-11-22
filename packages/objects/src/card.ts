@@ -168,7 +168,7 @@ export const CardWait = Schema.Struct({
   at: Schema.optionalKey(
     Schema.String.annotate({
       description:
-        'The card where the named card\'s work stands now, where it is another: the card its run passed the work on to. Absent where it is the named card itself.',
+        "The card where the named card's work stands now, where it is another: the card its run passed the work on to. Absent where it is the named card itself.",
     }),
   ),
   state: Schema.optionalKey(
@@ -178,7 +178,7 @@ export const CardWait = Schema.Struct({
   ),
   cycle: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
-      description: "On a cycle only: the route of `after:` lines from this card back to itself, by name, the card first and last.",
+      description: 'On a cycle only: the route of `after:` lines from this card back to itself, by name, the card first and last.',
     }),
   ),
   stuck: Schema.Boolean.annotate({

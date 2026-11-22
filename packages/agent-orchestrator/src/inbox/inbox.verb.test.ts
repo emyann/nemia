@@ -64,7 +64,7 @@ test('a stale try that cannot be removed is ignored, and logged first', async ()
   assert.match(logged[0]?.cause ?? '', /EACCES/, 'and the failure it ignored, as its cause');
 });
 
-test("a queued card that waits on a card whose run has not landed is not started; on the pass after that run lands, it is the card taken", async () => {
+test('a queued card that waits on a card whose run has not landed is not started; on the pass after that run lands, it is the card taken', async () => {
   const first: Run = { ...aRun('a-run-k2q9'), from: { inbox: 'a-1x2y' } };
   const pass = (landed: boolean) =>
     Effect.runPromise(

@@ -9,11 +9,13 @@ import assert from 'node:assert/strict';
 import { afterCycle, cardWaitsOf, type CardLook } from './waits.ts';
 
 /** A look over `cards`, by name: a card not among them is unknown; each look counted in `looks`. */
-const lookOver = (cards: Readonly<Record<string, Partial<CardLook>>>, looks: string[] = []) => (name: string) => {
-  looks.push(name);
-  const c = cards[name];
-  return c === undefined ? { known: false, runs: [], onward: [] } : { known: true, runs: c.runs ?? [], onward: c.onward ?? [] };
-};
+const lookOver =
+  (cards: Readonly<Record<string, Partial<CardLook>>>, looks: string[] = []) =>
+  (name: string) => {
+    looks.push(name);
+    const c = cards[name];
+    return c === undefined ? { known: false, runs: [], onward: [] } : { known: true, runs: c.runs ?? [], onward: c.onward ?? [] };
+  };
 
 describe('cardWaitsOf', () => {
   test('a card routed by a door, its own run not landed, has landed once the card it was routed as has', () => {

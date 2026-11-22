@@ -441,7 +441,8 @@ function foldStore(fold: FeedFold, l: StoreLine) {
 
 /**
  * A factory's line `l` folded: its conflicts pending or settled, its library adds missing or resolved, and a card of it clashing or
- * settled, or its wait stuck or freed (by the card its labels name), each kept as the last word said of them, with its reason; any other passed.
+ * settled, or its wait stuck or freed (by the card its labels name), each kept as the last word said of them, with its reason; any
+ * other passed.
  */
 function foldFactory(fold: FeedFold, l: FactoryLine) {
   const reason = reasonOfLine(l, involvedOf(l));
@@ -1029,10 +1030,15 @@ export function feedChanges(
     ...out,
     ...storeChanges(fold, at, pause, levels, readiness, resumed),
     ...factoryChanges(fold, at, conflicts, missing),
-    ...(clashes === undefined ? [] : clashLines(fold, at, clashes)),
-    ...(waits === undefined ? [] : waitLines(fold, at, waits)),
+    ...cardChanges(fold, at, clashes, waits),
   ];
 }
+
+/** The cards' lines a pass owes: their clashes' where it read them (`clashLines`), their stuck waits' where it read them (`waitLines`). */
+const cardChanges = (fold: FeedFold, at: string, clashes: FeedClashes | undefined, waits: FeedWaits | undefined) => [
+  ...(clashes === undefined ? [] : clashLines(fold, at, clashes)),
+  ...(waits === undefined ? [] : waitLines(fold, at, waits)),
+];
 
 /** The factories' lines a pass owes: their conflicts' where it read them (`conflictLines`), their adds' where it read them. Pure. */
 const factoryChanges = (fold: FeedFold, at: string, conflicts: FeedConflicts | undefined, missing: FeedMissing | undefined) => [

@@ -250,9 +250,7 @@ export const waitWords = (name: string, waits: readonly CardWait[]) => {
   };
   const stuck = waits.filter((w) => w.stuck);
   const said = `Waiting on ${waits.map(one).join('; ')}.`;
-  return stuck.length
-    ? `Needs you: ${said} Send the work on (nemia inbox resend), change ${name}'s after:, or start it by hand.`
-    : said;
+  return stuck.length ? `Needs you: ${said} Send the work on (nemia inbox resend), change ${name}'s after:, or start it by hand.` : said;
 };
 
 /**

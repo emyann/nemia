@@ -141,9 +141,10 @@ function refuse(why: string): never {
 }
 
 /**
- * One inbox card, from its file's text — or refused, naming the file and the fix: a key an inbox card does not have,
- * an `after:` with a blank entry, a name that is no card's, a card named twice or the card itself (`afterCards`), a key set twice or to nothing, a `queued:` that is not an
- * ISO time or is on a card with no `workflow:` — nothing would say what starts it — a `gate:` that names more than one step or is a step's
+ * One inbox card, from its file's text — or refused, naming the file and the fix: a key an inbox card does not have, an `after:` with a
+ * blank entry, a name that is no card's, a card named twice or the card itself (`afterCards`), a key set twice or to nothing, a `queued:`
+ * that is not an ISO time or is on a card with no `workflow:` — nothing would say what starts it — a `gate:` that names more than one
+ * step or is a step's
  * `true`, a `factory:` that is not a factory's name (`factoryNameRefusal`), an empty body, and a frontmatter that never closes.
  * @param file The card's file name in the inbox, with its `.md`: its name, and what a refusal names.
  * @param text The file's text, frontmatter and body.
@@ -227,7 +228,8 @@ function afterCards(file: string, name: string, after: string) {
       `${file}: \`after: ${after}\` — ${refused ?? ''}\`after:\` names the cards it waits on, by name as nemia inbox lists them, comma-separated: \`after: add-a-cache-k2q9, parse-the-flag-1x2y\`. Correct the line.`,
     );
   const twice = cards.find((c, i) => cards.indexOf(c) !== i);
-  if (twice !== undefined) refuse(`${file}: \`after: ${after}\` names ${twice} twice, and a card waits on another once. Name each card once.`);
+  if (twice !== undefined)
+    refuse(`${file}: \`after: ${after}\` names ${twice} twice, and a card waits on another once. Name each card once.`);
   if (cards.includes(name))
     refuse(`${file}: \`after: ${after}\` names the card itself, which would wait on itself for ever. Take ${name} off the line.`);
   return cards;
@@ -612,76 +614,75 @@ export function cardsListed(
     > as Pick<InboxListing, 'tried'>;
   };
   const shown = files.filter((f) => !f.file.startsWith('.') && !isReadme(f.file)).sort((a, b) => a.file.localeCompare(b.file));
-  const reads = new Map(shown.filter((f) => f.file.endsWith('.md')).map((f) => [f.file.slice(0, -'.md'.length), cardOrWhy(f.file, f.text)]));
+  const reads = new Map(
+    shown.filter((f) => f.file.endsWith('.md')).map((f) => [f.file.slice(0, -'.md'.length), cardOrWhy(f.file, f.text)]),
+  );
   const afterOf = (name: string) => {
     const read = reads.get(name);
     return (read !== undefined && 'card' in read ? read.card.after : undefined) ?? [];
   };
   const listed = shown.map<CardListing>(({ file, text }) => {
-      if (!file.endsWith('.md')) {
-        return {
-          name: file,
-          file,
-          title: null,
-          workflow: null,
-          repo: null,
-          factory: null,
-          from: [],
-          after: [],
-          startedAs: [],
-          labels: {},
-          factoryRepo: null,
-          error: `${file}: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.`,
-        };
-      }
-      const name = file.slice(0, -'.md'.length);
-      const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
-      const read = reads.get(name) ?? cardOrWhy(file, text);
-      if ('card' in read) {
-        const { card } = read;
-        const listing: CardListing = {
-          name,
-          file,
-          title: headline(card.body),
-          workflow: card.workflow ?? null,
-          repo: card.repo ?? null,
-          factory: card.factory ?? null,
-          ...(card.gate !== undefined ? { gate: card.gate } : {}),
-          ...(card.model !== undefined ? { model: card.model } : {}),
-          from: card.from ?? [],
-          after: card.after ?? [],
-          startedAs,
-          labels: card.labels ?? {},
-          ...(card.files !== undefined ? { files: card.files } : {}),
-          factoryRepo: factoryRepoOf({ workflow: card.workflow ?? null, factory: card.factory ?? null }, factories),
-          error: null,
-          ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
-          ...waitsOf(name, card.after, startedAs, waiting, afterOf),
-        };
-        const triggered = triggeredOf(listing, triggering);
-        return 'queued' in triggered ? { ...listing, ...triggered, ...triedOf(name, text) } : { ...listing, ...triggered };
-      }
-      return {
+    if (!file.endsWith('.md'))
+      return unread(
+        file,
+        file,
+        [],
+        `${file}: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.`,
+      );
+    const name = file.slice(0, -'.md'.length);
+    const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
+    const read = reads.get(name) ?? cardOrWhy(file, text);
+    if ('card' in read) {
+      const { card } = read;
+      const listing: CardListing = {
         name,
         file,
-        title: null,
-        workflow: null,
-        repo: null,
-        factory: null,
-        from: [],
-        after: [],
+        title: headline(card.body),
+        workflow: card.workflow ?? null,
+        repo: card.repo ?? null,
+        factory: card.factory ?? null,
+        ...(card.gate !== undefined ? { gate: card.gate } : {}),
+        ...(card.model !== undefined ? { model: card.model } : {}),
+        from: card.from ?? [],
+        after: card.after ?? [],
         startedAs,
-        labels: {},
-        factoryRepo: null,
-        error: read.why,
+        labels: card.labels ?? {},
+        ...(card.files !== undefined ? { files: card.files } : {}),
+        factoryRepo: factoryRepoOf({ workflow: card.workflow ?? null, factory: card.factory ?? null }, factories),
+        error: null,
+        ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
+        ...waitsOf(name, card.after, startedAs, waiting, afterOf),
       };
-    });
+      const triggered = triggeredOf(listing, triggering);
+      return 'queued' in triggered ? { ...listing, ...triggered, ...triedOf(name, text) } : { ...listing, ...triggered };
+    }
+    return unread(name, file, startedAs, read.why);
+  });
   if (waiting !== undefined) statesOfWaits(listed, runs, waiting.phaseOf);
   queueOrder(listed).forEach((l, i) => {
     if (l.queued) l.queued.place = i + 1;
   });
   return listed satisfies CardListing[];
 }
+
+/**
+ * An entry of the inbox that does not read as a card, listed with why (`error`): its name, its file and the runs started from it.
+ */
+const unread = (name: string, file: string, startedAs: string[], error: string) =>
+  ({
+    name,
+    file,
+    title: null,
+    workflow: null,
+    repo: null,
+    factory: null,
+    from: [],
+    after: [],
+    startedAs,
+    labels: {},
+    factoryRepo: null,
+    error,
+  }) satisfies CardListing;
 
 /**
  * The cards of a card's `after:` that have not landed (`cardWaitsOf`), each a `ListedWait` with no state yet: a wait on a card on a cycle
@@ -905,7 +906,9 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}, ${phaseSaid(l.state)}` : '';
     const by = l.queued?.by?.length ? ` by ${l.queued.by.join(', ')}${l.workflow ? '' : ` on ${l.queued.workflow ?? ''}`}` : '';
     const clash = l.clash?.length ? `  waiting: triggers ${l.clash.join(', ')} clash` : '';
-    const queued = `${l.queued?.place ? `  queued ${l.queued.place} of ${inLine}${by}` : ''}${clash}${waitsSaid(l).map((w) => `  ${w}`).join('')}`;
+    const queued = `${l.queued?.place ? `  queued ${l.queued.place} of ${inLine}${by}` : ''}${clash}${waitsSaid(l)
+      .map((w) => `  ${w}`)
+      .join('')}`;
     const tried = triedClause(l, unfactoredStarts);
     const labelled = labelSegments(cardLabels(l), show);
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}${labelled}`;

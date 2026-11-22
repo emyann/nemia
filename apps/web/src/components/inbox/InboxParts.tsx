@@ -7,7 +7,17 @@ import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf } from '../../lib/api/workflows.ts';
 import { type CardState, type InboxEntry } from '../../lib/api/inbox.ts';
-import { clashWords, waitWords, hasPage, queueable, queuedWord, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../../lib/inbox';
+import {
+  clashWords,
+  waitWords,
+  hasPage,
+  queueable,
+  queuedWord,
+  queueNeedsFactory,
+  triedLine,
+  unassigned,
+  type CardRefusal,
+} from '../../lib/inbox';
 import { instantWords } from '../../lib/instant';
 import { container } from '../../lib/meaning';
 import { CARD_WORDS } from '../../lib/words';

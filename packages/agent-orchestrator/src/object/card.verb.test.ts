@@ -390,7 +390,9 @@ test("a card's after: is served on its spec, and the cards of it not landed on i
     over(
       cards,
       Effect.flatMap(CardDoor, (door) =>
-        Effect.flatMap(door.cards.entries(), (entries) => cardObjectOf(inboxListing(entries, [], new Map(), new Map(), undefined, waiting), 'b-3z4w', 'default')),
+        Effect.flatMap(door.cards.entries(), (entries) =>
+          cardObjectOf(inboxListing(entries, [], new Map(), new Map(), undefined, waiting), 'b-3z4w', 'default'),
+        ),
       ),
     ),
   );

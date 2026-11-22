@@ -45,8 +45,7 @@ const firstWaiting = (onward: readonly CardLanding[]) => onward.find((o) => o.ki
 const firstMissing = (onward: readonly CardLanding[]) => onward.find((o) => o.kind === 'missing');
 
 /** Whether the card is known and nothing of it, nor of where its work went, has landed. */
-const knownUnlanded = (card: WaitedCard, onward: readonly CardLanding[]) =>
-  card.known && !ownRunLanded(card) && !onwardLanded(onward);
+const knownUnlanded = (card: WaitedCard, onward: readonly CardLanding[]) => card.known && !ownRunLanded(card) && !onwardLanded(onward);
 
 const cardLandedSpec = spec<(card: WaitedCard, onward: readonly CardLanding[]) => CardLanding>({
   ensures: {
@@ -78,7 +77,8 @@ const cardLandedSpec = spec<(card: WaitedCard, onward: readonly CardLanding[]) =
       },
     },
     goneOnward: {
-      description: 'A card not landed whose work went on to a card that is gone, and to none that waits, is missing, by the first card gone',
+      description:
+        'A card not landed whose work went on to a card that is gone, and to none that waits, is missing, by the first card gone',
       condition: ({ input: [card, onward], output }) => {
         const gone = firstMissing(onward);
         return (

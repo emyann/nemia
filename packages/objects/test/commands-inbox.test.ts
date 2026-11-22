@@ -77,7 +77,21 @@ test("the group is the ten writes and the card's files' read, in the order the h
 
 test('`nemia inbox add` takes the idea, then --workflow and --factory once each, --after once per card and --label once per label', () => {
   assert.deepEqual(
-    read(INBOX_ADD_WORDS, ['an idea', '--workflow', 'dev', '--factory', 'f', '--after', 'a-1', '--after', 'b-2', '--label', 'a=b', '--label', 'c-']),
+    read(INBOX_ADD_WORDS, [
+      'an idea',
+      '--workflow',
+      'dev',
+      '--factory',
+      'f',
+      '--after',
+      'a-1',
+      '--after',
+      'b-2',
+      '--label',
+      'a=b',
+      '--label',
+      'c-',
+    ]),
     {
       idea: 'an idea',
       workflow: 'dev',

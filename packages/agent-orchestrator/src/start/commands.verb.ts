@@ -38,9 +38,10 @@ import { RunId } from '../record/record.model.ts';
 import { settingsNamed } from '../harness-settings/harness-settings.ts';
 
 /**
- * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, and a `repo:` the
- * start did not take, and the cards of its `after:` that had not landed (`waitedOn`); for a brief, the `--repo` that only found the factory, where its wiring placed the run on another
- * (`repoFoundFactory`, as typed); the store's pause as it stood once the run was written (`pausedRead`), while one stands; `landed`, the
+ * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, a `repo:` the
+ * start did not take, and the cards of its `after:` that had not landed (`waitedOn`); for a brief, the `--repo` that only found the
+ * factory, where its wiring placed the run on another (`repoFoundFactory`, as typed); the store's pause as it stood once the run was
+ * written (`pausedRead`), while one stands; `landed`, the
  * runs it is handed as context that had landed when it started; and `hints`, a line for each file of its folder that still writes a former
  * spelling, read through the Workflow door (`hints`), where any does.
  */

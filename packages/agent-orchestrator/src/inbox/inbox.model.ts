@@ -48,9 +48,7 @@ export const Card = Schema.Struct({
     Schema.makeFilter(
       (card) => new Set(card.after ?? []).size === (card.after ?? []).length || '`after:` names a card twice: name each card once',
     ),
-    Schema.makeFilter(
-      (card) => !(card.after ?? []).includes(card.name) || '`after:` names the card itself: take it off the line',
-    ),
+    Schema.makeFilter((card) => !(card.after ?? []).includes(card.name) || '`after:` names the card itself: take it off the line'),
   )
   .annotate({ identifier: 'Card' });
 export type Card = typeof Card.Type;

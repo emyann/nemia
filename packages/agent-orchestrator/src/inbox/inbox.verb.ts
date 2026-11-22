@@ -264,7 +264,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const context = cardContext(card, opts, (id) => ids.has(id));
 
   const cardFiles = cardFilesAt(yield* StoreRoot, card);
-  const waitedOn = opts.landed === undefined || !card.after?.length ? [] : yield* waitedOnNow(card, opts.landed);
+  const waitedOn = yield* waitedOnNow(card, opts.landed);
 
   const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,
@@ -283,17 +283,21 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     ...(factory !== undefined ? { factory } : {}),
     labels: { ...(card.labels !== undefined ? { card: card.labels } : {}), edits: opts.labels ?? [] },
   });
-  const ignoredRepo = card.repo !== undefined ? { ignoredRepo: card.repo } : {};
   const queueLeft = card.queued === undefined ? undefined : yield* takeQueueOff(name, file);
+  return startedOf(run, card, queueLeft, waitedOn);
+});
+
+/** What `startFromInbox` answers of the run started from `card`: what is said beside it, each where there is something to say. */
+const startedOf = (run: StartedRun, card: InboxCard, queueLeft: string | undefined, waitedOn: readonly string[]) => {
   const out: InboxStarted = {
     run,
     card,
-    ...ignoredRepo,
+    ...(card.repo !== undefined ? { ignoredRepo: card.repo } : {}),
     ...(queueLeft !== undefined ? { queueLeft } : {}),
-    ...(waitedOn.length ? { waitedOn } : {}),
+    ...(waitedOn.length ? { waitedOn: [...waitedOn] } : {}),
   };
   return out;
-});
+};
 
 /**
  * A started card's `queued:` line taken off, so the tick never starts it again — read again first, so a card gone since is not written
@@ -515,9 +519,10 @@ export const waitingOf = Effect.fnUntraced(function* (
 /**
  * The cards of `card`'s `after:` that have not landed, by name, as the inbox lists them now: what a start by hand answers on `waitedOn`.
  * @param card The card started.
- * @param landed Whether a run has landed.
+ * @param landed Whether a run has landed; none read, and no card answered, where not given.
  */
-const waitedOnNow = Effect.fnUntraced(function* (card: InboxCard, landed: RunLanded) {
+const waitedOnNow = Effect.fnUntraced(function* (card: InboxCard, landed: RunLanded | undefined) {
+  if (landed === undefined || !card.after?.length) return [];
   const door = yield* CardDoor;
   const files = yield* door.cards.entries();
   const runs = yield* (yield* RunDoor).runs.list();

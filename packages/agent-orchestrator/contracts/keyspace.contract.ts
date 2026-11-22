@@ -207,7 +207,7 @@ const compactToSpec = spec<(head: number, compacted: number, retain: number) => 
 
 /**
  * `compactTo`'s type, which `src/keyspace/keyspace.ts` takes: the revision a compaction removes superseded rows up to, as Kine's
- * `safeCompactRev` keeps `compactMinRetain` revisions.
+ * compaction keeps its minimum of retained revisions.
  */
 export type CompactTo = Implementation<typeof compactToSpec>;
 

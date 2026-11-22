@@ -1,12 +1,14 @@
 /**
  * A store's fingerprint, and what a worker's pages left in it: each page that writes to the store takes its write back before it ends,
  * so a worker's store after its last page is the store it seeded, file for file. `fingerprint` reads every file under the store with the
- * digest of its bytes, but what `unprinted` leaves out: what the api and git write as they serve, which no page wrote. `leftOver` says
- * which files differ, or nothing. Held by `e2e-print.test.ts`.
+ * digest of its bytes, but what `unprinted` leaves out: what the api and git write as they serve, which no page wrote. The keyspace
+ * (`db/state.db`) is read by its live records instead (`liveRecords`), since a write taken back there is a new row, never the old bytes.
+ * `leftOver` says which files differ, or nothing. Held by `e2e-print.test.ts`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 /**
  * The files of a store no page answers for, by their path in it: a repository's own `.git` (git packs and logs what a page's take-back
@@ -20,7 +22,32 @@ export const unprinted = (rel: string) =>
  * (`quiet/` under the engine's root), the feed its passes write of the runs they judged (`feed.jsonl` beside `runs/`), and the revisions
  * ledger a pass appends to for every kind a run of the seed resolves (`revisions/`, one file per kind and name).
  */
-const UNPRINTED: readonly RegExp[] = [/^engine\/quiet\//, /^feed\.jsonl$/, /^revisions\//];
+const UNPRINTED: readonly RegExp[] = [/^engine\/quiet\//, /^feed\.jsonl$/, /^revisions\//, /^db\/state\.db-(wal|shm)$/];
+
+/** The orchestrator's keyspace, by its path in the store: printed by its live records, not its bytes. */
+const KEYSPACE = 'db/state.db';
+
+/**
+ * The digest of the live records of the keyspace `file`: each key's last row that is no tombstone, by key, with its value; undefined
+ * where it holds none, so a keyspace whose every write was taken back prints as no keyspace at all.
+ * @param file The keyspace's SQLite file.
+ */
+export function liveRecords(file: string) {
+  const db = new DatabaseSync(file, { readOnly: true });
+  try {
+    const rows = db
+      .prepare(
+        "SELECT k.name, k.value FROM kine k JOIN (SELECT name, MAX(id) AS id FROM kine WHERE name != 'compact_rev_key' GROUP BY name) last ON last.id = k.id WHERE k.deleted = 0 ORDER BY k.name",
+      )
+      .all();
+    if (!rows.length) return undefined;
+    const hash = createHash('sha1');
+    for (const row of rows) hash.update(`${String(row.name)}\0${String(row.value)}\0`);
+    return `records ${hash.digest('hex')}`;
+  } finally {
+    db.close();
+  }
+}
 
 /** Every file under `root` but those `skip` leaves out, by its path in `root`, with the digest of its bytes; a link by where it leads. */
 export function fingerprint(root: string, skip: (rel: string) => boolean = unprinted) {
@@ -31,7 +58,10 @@ export function fingerprint(root: string, skip: (rel: string) => boolean = unpri
     const file = path.join(root, rel);
     const stat = fs.lstatSync(file, { throwIfNoEntry: false });
     if (stat?.isSymbolicLink()) print.set(posix, `-> ${fs.readlinkSync(file)}`);
-    else if (stat?.isFile()) print.set(posix, createHash('sha1').update(fs.readFileSync(file)).digest('hex'));
+    else if (posix === KEYSPACE && stat?.isFile()) {
+      const live = liveRecords(file);
+      if (live !== undefined) print.set(posix, live);
+    } else if (stat?.isFile()) print.set(posix, createHash('sha1').update(fs.readFileSync(file)).digest('hex'));
   }
   return print satisfies Map<string, string>;
 }

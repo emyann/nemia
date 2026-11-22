@@ -120,7 +120,13 @@ test('the keyspace is copied as one snapshot SQLite takes, what its log holds in
     assert.equal(copied.files, 1);
     const copy = new DatabaseSync(path.join(to, 'db', 'state.db'), { readOnly: true });
     try {
-      assert.deepEqual(copy.prepare('SELECT name FROM kine').all(), [{ name: '/registry/proposals/acme/a' }]);
+      assert.deepEqual(
+        copy
+          .prepare('SELECT name FROM kine')
+          .all()
+          .map((row) => ({ ...row })),
+        [{ name: '/registry/proposals/acme/a' }],
+      );
     } finally {
       copy.close();
     }

@@ -157,17 +157,21 @@ function refusedAs(err: KeyRefused, proposal: Proposal, factory: string) {
 
 /**
  * The proposals of the keyspace `open` opens when a method runs, as the door's shape: each read decoded, each write the record of the
- * proposal at its key, made (`create`) or changed from the revision its `resourceVersion` names (`update`).
+ * proposal at its key, made (`create`) or changed from the revision its `resourceVersion` names (`update`). A read asks `held`, and
+ * answers no proposal where it answers no keyspace, so a store read is not a store made.
  * @param open Opens the keyspace the proposals are held in, refused as opening it is.
+ * @param held The keyspace a read reads, or undefined where the store holds none yet; `open` where every read may make it.
  */
-export function proposalRecords(open: Effect.Effect<Keyspace, Refusal>) {
+export function proposalRecords(open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal> = open) {
   const listed = (factory: string) =>
     Effect.gen(function* () {
       yield* fromThrow(() => {
         const bad = factoryNameRefusal(factory);
         if (bad !== undefined) throw new Invalid({ message: bad });
       });
-      const { records, revision } = yield* (yield* open).list(factoryPrefix(factory));
+      const keyspace = yield* held;
+      if (keyspace === undefined) return { items: [] as Proposal[], revision: 0 };
+      const { records, revision } = yield* keyspace.list(factoryPrefix(factory));
       const items: Proposal[] = [];
       for (const record of records) items.push(yield* fromThrow(() => proposalOf(record)));
       return { items, revision };
@@ -186,7 +190,9 @@ export function proposalRecords(open: Effect.Effect<Keyspace, Refusal>) {
     proposals: {
       factories: () =>
         Effect.gen(function* () {
-          const { records } = yield* (yield* open).list(PREFIX);
+          const keyspace = yield* held;
+          if (keyspace === undefined) return [];
+          const { records } = yield* keyspace.list(PREFIX);
           return [...new Set(records.map((r) => firstPiece(r.key.slice(PREFIX.length), '/')))].sort();
         }),
       list: (factory) => Effect.map(listed(factory), (l) => l.items),
@@ -194,7 +200,8 @@ export function proposalRecords(open: Effect.Effect<Keyspace, Refusal>) {
       read: (factory, name) =>
         Effect.gen(function* () {
           yield* fromThrow(() => proposalNamed(factory, name));
-          const record = yield* (yield* open).get(keyOf(factory, name));
+          const keyspace = yield* held;
+          const record = keyspace === undefined ? undefined : yield* keyspace.get(keyOf(factory, name));
           return record === undefined ? undefined : yield* fromThrow(() => proposalOf(record));
         }),
       create: (proposal) => written(proposal, 'create'),
@@ -333,7 +340,18 @@ export const proposalKeyspace = (home: string) =>
         ),
   );
 
+/**
+ * The keyspace of the store `home` a read reads: undefined where the store has no keyspace file and no proposal file to import, so a
+ * read makes no file; else `proposalKeyspace`'s.
+ * @param home The store's root folder.
+ */
+const proposalKeyspaceHeld = (home: string) =>
+  Effect.suspend(() =>
+    !fs.existsSync(keyspaceFile(home)) && proposalFilesOf(home).length === 0 ? Effect.succeed(undefined) : proposalKeyspace(home),
+  );
+
 /** The Proposal door, as the service a program yields: rooted, refused `Invalid` where the program was given no store root. */
 export const ProposalDoor = Context.Reference<ProposalDoorShape>('agent-orchestrator/ProposalDoor', {
-  defaultValue: () => rootedDoor((root) => proposalDoorOver(proposalRecords(proposalKeyspace(root))), 'Proposal door'),
+  defaultValue: () =>
+    rootedDoor((root) => proposalDoorOver(proposalRecords(proposalKeyspace(root), proposalKeyspaceHeld(root))), 'Proposal door'),
 });

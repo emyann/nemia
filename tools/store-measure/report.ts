@@ -54,7 +54,7 @@
  *   factory of its own. `libraryAddList`: `GET /api/namespaces/:name/libraryadds` of that factory, the same way: its adds, recorded or
  *   derived from what its workflows resolve. `proposalList`, `proposalWaiting`: `GET /api/namespaces/:name/proposals` of that factory,
  *   the api's default page of proposals whole, and the same asked `?fieldSelector=status.phase=waiting` (the factory pane's line): a
- *   baseline before `s15` asked `?limit=500`, which a factory's proposals whole pass the api's bound at (`nemia`'s, 13.8 MB in 69).
+ *   baseline before s15.json asked `?limit=500`, which a factory's proposals whole pass the api's bound at (`nemia`'s, 13.8 MB in 69).
  *   `cardList`: `GET /api/namespaces/:name/cards?limit=500`, the factory's cards, as `inbox` reads every card.
  *   `libraryAgents`, `librarySkills`: `GET /api/agents` and `/api/skills` at the store's level, over apps as `runList` is, each item
  *   with the factories that use it, the library's reverse lookup over every factory.

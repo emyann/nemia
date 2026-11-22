@@ -1014,7 +1014,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/record/files.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/pause/pause.store.ts, src/config/config.store.ts, src/whole-file/whole-file.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/record/record.store.ts', 'src/workspace/worktree.store.ts')), [
-    'src/record/record.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/whole-file/whole-file.store.ts, src/process/alive.store.ts, src/folder/folder.store.ts, src/revisions/revisions.store.ts',
+    'src/record/record.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/whole-file/whole-file.store.ts, src/process/alive.store.ts, src/keyspace/keyspace.store.ts, src/folder/folder.store.ts, src/revisions/revisions.store.ts',
   ]);
   assert.ok('src/place/place.store.ts' in packageSources());
   assert.deepEqual(treeBreaks(adding('src/place/place.store.ts', 'src/branches/branches.store.ts')), [

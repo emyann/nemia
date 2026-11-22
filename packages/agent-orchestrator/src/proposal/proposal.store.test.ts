@@ -121,3 +121,12 @@ test('REFUSED: a file larger than a record holds stops the import before anythin
   assert.equal(fs.existsSync(small), true);
   assert.deepEqual(under(path.join(root, 'imported')), []);
 });
+
+test('a store with no keyspace and no proposal file is read as holding no proposal, and the read makes no file', async () => {
+  const root = scratch('wf-proposal-unmade-');
+  const door = rootedAt(root);
+  assert.deepEqual(await settled(door.proposals.listed('acme')), { items: [], revision: 0 });
+  assert.deepEqual(await settled(door.proposals.factories()), []);
+  assert.equal(await settled(door.proposals.read('acme', 'implementer-aaaaa')), undefined);
+  assert.deepEqual(fs.readdirSync(root), []);
+});

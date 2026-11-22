@@ -77,14 +77,16 @@ export const ListMeta = Schema.Struct({
 export type ListMeta = typeof ListMeta.Type;
 
 /**
- * A page of a list of one kind: `<Kind>List`, its metadata, and its items, each an object of that kind.
+ * A page of a list of one kind: `<Kind>List`, its metadata, and its items, each an object of that kind without its files' content.
  * @param kind The kind of the list's items, which names the list.
- * @param item The schema of one item.
+ * @param item The schema of one item: the kind's listed one where it leaves a file's content out (`LISTED_WITHOUT`).
  */
 export const listOf = <const Kind extends string, Item extends Schema.Constraint>(kind: Kind, item: Item) =>
   Schema.Struct({
     apiVersion: Schema.Literal(API_VERSION).annotate({ description: `The version the list is served under, ${API_VERSION}.` }),
     kind: Schema.Literal(`${kind}List`).annotate({ description: `What the object is: ${kind}List, a page of a list of ${kind}.` }),
     metadata: ListMeta,
-    items: Schema.Array(item).annotate({ description: `The ${kind} objects of this page, each whole.` }),
+    items: Schema.Array(item).annotate({
+      description: `The ${kind} objects of this page, each without its files' content, which a read of one answers.`,
+    }),
   });

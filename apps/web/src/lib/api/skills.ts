@@ -3,7 +3,7 @@
  * page as a `SkillDetail` — a builtin skill copied into your library, and one of yours written on the board, through the Skill object.
  */
 import { queryOptions } from '@tanstack/react-query';
-import { DEFAULT_NAMESPACE, type DefinitionOrigin, type Skill } from 'objects';
+import { DEFAULT_NAMESPACE, type DefinitionOrigin, type Skill, type SkillList } from 'objects';
 import { skills as served, type Refuse } from './objects.ts';
 import { namespaceOf } from './namespace.ts';
 import { cardEntryOf, originWord, type AgentSkill, type SkillCost, type SkillSource } from './library.ts';
@@ -31,7 +31,7 @@ export type SkillPlace = { from: SkillSource; dir: string | null; skills: SkillR
 const parentOf = (dir: string) => dir.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '');
 
 /** A Skill, as the picker lists it (`SkillRow`). */
-const skillRowOf = (skill: Skill) => ({
+const skillRowOf = (skill: SkillList['items'][number]) => ({
   name: skill.metadata.name,
   from: skill.status.origin,
   dir: skill.status.dir,

@@ -6,13 +6,14 @@
  * routes Hono serves itself are exactly the three of the OpenAPI document (`META`, kept outside the `Api` as Kubernetes keeps
  * `/openapi/v3` out of its own), the MCP port (`/mcp`, a protocol host whose tools call the `Api`'s own endpoints) and the board's
  * pages (`GET /*`, src/board/board.ts: host content, no object kind). Every read the `Api` serves is bounded (`objects`' `readsUnbounded`),
- * and a retired read (`/api/listing`) is no route.
+ * and a retired read (`/api/listing`) is no route. Every page answers a `Table` where it is asked one (`TABLE_ACCEPT`), each row the
+ * item's metadata alone.
  */
 import './harness.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
-import { Api, readsUnbounded } from 'objects';
+import { Api, type ApiGetName, READS, readsUnbounded, TABLE_ACCEPT } from 'objects';
 import { app } from '../src/app.ts';
 import { BOARD_ROUTE } from '../src/board/board.ts';
 import { MOUNT } from '../src/objects/index.ts';
@@ -117,4 +118,25 @@ test("/api/listing, retired with nemia ls's whole answer, is the api's 404 for n
     assert.equal(res.status, 404, url);
     assert.ok(saysNoRoute(await res.json()), `${url}: the 404 for no route`);
   }
+});
+
+/** The names a page's path is filled with where it lists what an object holds: the default factory, and a template Nemia builds in. */
+const PAGE_NAMES: Readonly<Record<string, string>> = { namespace: 'default', name: 'sdlc' };
+
+test('every page of the Api answers a Table where it is asked one, each row the metadata of its item alone', async () => {
+  const pages = Object.values(Api.groups).flatMap((group) =>
+    Object.entries(group.endpoints)
+      .filter(([name, e]) => e.method === 'GET' && READS[`${group.identifier}.${name}` as ApiGetName]?.shape === 'page')
+      .map(([name, e]) => ({ group: group.identifier, name, path: e.path })),
+  );
+  assert.ok(pages.length >= 25, `${pages.length} pages read off the Api`);
+  const untabled: string[] = [];
+  for (const { group, name, path } of pages) {
+    const url = path.replace(/:([A-Za-z]+)/g, (_: string, key: string) => PAGE_NAMES[key] ?? 'nothing-here');
+    const res = await app.request(url, { headers: { accept: TABLE_ACCEPT } });
+    const body = (await res.json()) as { kind?: string; rows?: { object?: { kind?: string } }[] };
+    if (res.status !== 200 || body.kind !== 'Table' || body.rows?.some((row) => row.object?.kind !== 'PartialObjectMetadata'))
+      untabled.push(`${group}.${name}: GET ${url} answered ${res.status} ${String(body.kind)}`);
+  }
+  assert.deepEqual(untabled, []);
 });

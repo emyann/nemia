@@ -2909,6 +2909,7 @@ Its arguments:
 - selector: The retired spelling of labelSelector, read the same.
 - resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
 
+- On the port: Answers a line per item, as `library -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
 
 ## library_workflows
@@ -2934,6 +2935,7 @@ Its arguments:
 - resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
 - origin: The one origin asked for, whose definitions are served shadowed or not, each saying what shadows it; absent, every origin.
 
+- On the port: Answers a line per item, as `library -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
 
 ## library_adds
@@ -2959,6 +2961,7 @@ Its arguments:
 - selector: The retired spelling of labelSelector, read the same.
 - resourceVersion: With watch=true on a list of events, the resourceVersion of the last event or bookmark a reader was sent, or of a page's metadata, to resume the stream from; a watch of any other list refuses one.
 
+- On the port: Answers a line per item, as `library -o wide` prints them.
 - On the port: Answers 20 at most unless limit is given; a last line or metadata.continue names the token for the next page.
 
 ## library_skill

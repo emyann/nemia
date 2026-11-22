@@ -344,7 +344,13 @@ free`. A server already installed keeps the settings its person wrote: nothing r
 session asks its whole limit, so a machine sized for its sessions' limits may admit fewer than `WF_MAX_CONCURRENT`. A step's check asks
 its step's `checkMemory:` where it names one: sdlc's land steps name the factory's `landingCheckMemory` parameter, empty by default, so a
 factory that lands on GitHub, whose landing's check only waits on CI, sets it at its upgrade, `nemia factory upgrade <factory> --to
-<version> --set landingCheckMemory=256Mi`, and its landing's check is admitted while sessions wait. To size it:
+<version> --set landingCheckMemory=256Mi`, and its landing's check is admitted while sessions wait. A step's sessions ask its
+`memoryRequest:` where it names one, apart from its limit: sdlc's light steps (front-door's door and answer, intake, the janitor's argus,
+and both lands), whose sessions run no test, build or typecheck, name the factory's `lightMemoryRequest` parameter, `1Gi` by default, so
+a routing call is admitted while heavy sessions wait; `--set lightMemoryRequest=` asks the daemon's default again. Pick each number from
+the peaks measured, never by guess: `nemia stats` says, for each workflow step, the median, p90 and highest peak its sessions reached,
+what they asked and how many peaked above it, and a run's step page says each try's peak beside its request and limit. A peak is kept
+only for a session run under a memory limit (`WF_MEMORY_LIMIT`, or a step's `memory:`); Nemia sets no number from it. To size it:
 
 Room is kept for a turn a person waits on: the next turn after they answer a step, a `nemia retry` or `--round` they ask for, and an
 upgrade they start. `WF_KEPT_TURNS` (default 1, 0 for none) keeps that many places per pool beyond `WF_MAX_CONCURRENT`, and as many

@@ -350,6 +350,23 @@ export {
   ProposedObject,
 } from './proposal.ts';
 export { Delegation, DelegationList, DelegationRule, DelegationSpec, DelegationWrite } from './delegation.ts';
+export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked, pagesWithoutTable } from './table.ts';
+export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
+export { Gone, ReadFailed, TooLarge, UnsupportedMediaType } from './api-errors.ts';
+export { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, PICTURE_TYPES, type PictureMediaType } from './file.ts';
+export { FILE_ID_PREFIX, FILE_KEPT_FOR, FILE_LIMIT, FileObject } from './file.ts';
+export {
+  LifecycleEdge,
+  LifecycleGraph,
+  LifecycleTransition,
+  LifecycleVerb,
+  StepFile,
+  StepPath,
+  StepsGroup,
+  StepStreamEvent,
+  StepTranscript,
+  TranscriptEvent,
+} from './step-api.ts';
 export {
   PROPOSAL_PHASES,
   type ProposalPhase,
@@ -379,25 +396,6 @@ export {
   type GuardRefusal,
   TABLE_COLUMN_TYPES,
   type TableColumnType,
-} from './words.ts';
-export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked } from './table.ts';
-export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
-export { Gone, ReadFailed, TooLarge, UnsupportedMediaType } from './api-errors.ts';
-export { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, PICTURE_TYPES, type PictureMediaType } from './file.ts';
-export { FILE_ID_PREFIX, FILE_KEPT_FOR, FILE_LIMIT, FileObject } from './file.ts';
-export {
-  LifecycleEdge,
-  LifecycleGraph,
-  LifecycleTransition,
-  LifecycleVerb,
-  StepFile,
-  StepPath,
-  StepsGroup,
-  StepStreamEvent,
-  StepTranscript,
-  TranscriptEvent,
-} from './step-api.ts';
-export {
   LIFECYCLE_STATES,
   type LifecycleState,
   TRANSCRIPT_ORIGINS,
@@ -796,7 +794,8 @@ export { BOARD_LINK_WORDS, OPEN_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS
 export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest-tokens.ts';
 export { Actor, actorWords, Token, TokenList, TokenMint, TokenMinted, TokensGroup } from './token.ts';
 export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-rest-stats.ts';
-export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';
+export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow, memoryBytesWord } from './stats-read.ts';
 export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
 export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
 export { refusedIn, type RefusedPlace } from './refused.ts';
+export { LISTED_WITHOUT, filesHeld, filesLeftOut } from './listed.ts';

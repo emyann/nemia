@@ -5,7 +5,7 @@
  */
 import type { GraphEdge } from './api/graph.ts';
 import type { KeyField, KeyForm } from './api/builder.ts';
-import type { ListedStep, StepWritten, WorkflowListing } from './api/workflows.ts';
+import type { ListedStep, StepWritten, WorkflowListing, WorkflowRow } from './api/workflows.ts';
 import type { WorkflowStepSpec } from './api/library.ts';
 import { COLUMN_WIDTH, layout, stepsOf } from './layout.ts';
 
@@ -68,6 +68,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   remote: null,
   deadlineSeconds: null,
   memory: null,
+  memoryRequest: null,
   budget: null,
   check: null,
   checks: null,
@@ -96,7 +97,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
 const hiredRefusal = (steps: readonly ListedStep[]) => {
   const hired = steps.find((s) => s.hired !== null);
   return hired
-    ? `The step ${hired.name} is listed with ${hired.hired}, the agent its factory hires into it, which its file does not write: the builder drafts a folder as its files write it. Open the builder on the folder as the default namespace serves it, read in no factory (workflowsQuery).`
+    ? `The step ${hired.name} is listed with ${hired.hired}, the agent its factory hires into it, which its file does not write: the builder drafts a folder as its files write it. Open the builder on the folder as the default namespace serves it, read in no factory (workflowQuery).`
     : null;
 };
 
@@ -527,7 +528,7 @@ export const contextText = (tokens: number) => (tokens % 1_000 === 0 ? `${tokens
  * @param list The page's listing, or undefined before it is read.
  * @param written The folder as the write returned it.
  */
-export function listedWith(list: readonly WorkflowListing[] | undefined, written: WorkflowListing) {
+export function listedWith(list: readonly WorkflowRow[] | undefined, written: WorkflowRow) {
   const others = (list ?? []).filter((w) => !(w.from === written.from && w.name === written.name));
   return [...others, written].sort((a, b) =>
     a.from === b.from ? (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) : a.from === 'repo' ? -1 : 1,

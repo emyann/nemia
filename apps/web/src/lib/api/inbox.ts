@@ -32,9 +32,9 @@ import { type KeyRow } from './library.ts';
 export { CARD_STATES, type CardState } from 'objects';
 
 /**
- * A card as the board's pages draw it — or an entry of the inbox that does not read as one, `error` saying why — with its body, the brief
- * a start is prefilled with, and when its file was written, which the page orders the cards by. Made of a `Card` (`entryOf`), on the list
- * and on a card's page (`cardQuery`) alike.
+ * A card as the board's pages draw it — or an entry of the inbox that does not read as one, `error` saying why — and when its file was
+ * written, which the page orders the cards by. Made of a `Card` (`entryOf`), on the list and on a card's page (`cardQuery`) alike; its
+ * body, the brief a start is prefilled with, is file content no list carries, and comes with the read of the one card (`cardQuery`).
  */
 export type InboxEntry = {
   name: string;
@@ -55,7 +55,6 @@ export type InboxEntry = {
   /** Its life, closed (`CardState`): what the page offers on it and how it draws it. */
   state: CardState;
   error: string | null;
-  body: string | null;
   filedAt: string | null;
   /**
    * On a queued card only (the CLI's `inbox queue`, or a card trigger of its factory, `by`): when it was queued — a triggered card when it
@@ -89,9 +88,9 @@ export type InboxEntry = {
  * as every card listed is; its factory its namespace, none for `default`; `null` where the card says nothing. `factoryRepo` is null:
  * the Card does not say which repository its factory picks for it, so the page reads that off the factories (`factoryRepoOf`,
  * lib/inbox.ts).
- * @param card The Card as the api serves it.
+ * @param card The Card as the api serves it, on a list or alone.
  */
-export const entryOf = (card: Card) => {
+export const entryOf = (card: CardList['items'][number]) => {
   const { metadata, spec, status } = card;
   const entry: InboxEntry = {
     name: metadata.name,
@@ -105,7 +104,6 @@ export const entryOf = (card: Card) => {
     startedAs: [...status.runs],
     state: status.state,
     error: status.error ?? null,
-    body: spec.body ?? null,
     filedAt: metadata.creationTimestamp,
     ...(spec.queued !== undefined
       ? { queued: { at: spec.queued, place: status.place ?? null } }
@@ -251,8 +249,8 @@ export const cardKeysOf = (card: Card) =>
   card.status.error === undefined ? CARD_KEYS.map((key) => ({ key, value: keyValue(card, key), meaning: CARD_KEY_MEANINGS[key] })) : null;
 
 /**
- * A card, for its page: the Card read by its name, whichever factory holds it (`cards.getAll`). Read again on each visit, as the inbox
- * is.
+ * A card, for its page: the Card read by its name, whichever factory holds it (`cards.getAll`), with its body and its file as written,
+ * which no list carries. Read again on each visit, as the inbox is.
  * @param name The card's name.
  */
 export const cardQuery = (name: string) =>
@@ -260,8 +258,27 @@ export const cardQuery = (name: string) =>
     queryKey: ['inbox', name],
     queryFn: async () => {
       const card = await cards.getAll(name);
-      return { ...entryOf(card), source: card.status.source ?? '', keys: cardKeysOf(card), files: [...(card.status.files ?? [])] };
+      return {
+        ...entryOf(card),
+        body: card.spec.body ?? null,
+        source: card.status.source ?? '',
+        keys: cardKeysOf(card),
+        files: [...(card.status.files ?? [])],
+      };
     },
+  });
+
+/**
+ * The body of a card, the brief its start is prefilled with, read by its name (`cards.getAll`) each time a start opens, since no list
+ * carries it. Keyed apart from the inbox's reads, which a start reads again: those must not read again a card the start took away.
+ * @param name The card's name.
+ */
+export const cardBodyQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['card-body', name],
+    queryFn: async () => (await cards.getAll(name)).spec.body ?? '',
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 
 /** A card as a verb names it: its name, and its factory, which is its namespace (`namespaceOf`). */

@@ -10,7 +10,15 @@ import { WorkflowBuilder } from './WorkflowBuilder';
 import { WorkflowCanvas } from './WorkflowCanvas';
 import { FromBadge, NoBuilder, Unplaced } from './WorkflowParts';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
-import { fromMatches, workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '@/lib/api/workflows';
+import {
+  fromMatches,
+  workflowQuery,
+  workflowsInQuery,
+  workflowsQuery,
+  type PagePlace,
+  type Place,
+  type WorkflowListing,
+} from '@/lib/api/workflows';
 import { storeQuery } from '@/lib/api/store';
 import { specStep, barOf } from '@/lib/bar';
 import { listPlace, pagePlaceOf, whyNotStarted, workflowFactories } from '@/lib/factories';
@@ -33,7 +41,7 @@ export const workflowSearch = (search: Record<string, unknown>) =>
 
 /**
  * What a workflow's page loads before it draws, in `place`: the list it is read from (`loadWorkflowsIn`), the store, and for one of yours
- * the list read with no factory too, which its builder drafts from.
+ * the list read with no factory too. The workflow read whole waits on the list, which says whether it is there to read, and as what.
  * @param client The board's query client.
  * @param place The factory and the repository the page is read in.
  * @param from Where the workflow is read from.
@@ -91,8 +99,14 @@ type Asked = { from: string; name: string; address: PagePlace; building: boolean
 /** The workflow `name` read from `from` with no factory, tagged with the factories it is in; or that none is listed by that name. */
 function Everywhere({ from, name, address, building, factories }: Asked & { factories: readonly Factory[] | undefined }) {
   const { data: all } = useSuspenseQuery(workflowsQuery);
-  const workflow = all.find((w) => fromMatches(w.from, from) && w.name === name);
-  if (!workflow) return <NotListed from={from} name={name} />;
+  const listed = all.find((w) => fromMatches(w.from, from) && w.name === name);
+  if (!listed) return <NotListed from={from} name={name} />;
+  return <EverywhereWhole from={listed.from} name={name} address={address} building={building} factories={factories} />;
+}
+
+/** The workflow `name` listed with no factory, read whole (`workflowQuery`): its README and each step's body and layers. */
+function EverywhereWhole({ from, name, address, building, factories }: Asked & { factories: readonly Factory[] | undefined }) {
+  const { data: workflow } = useSuspenseQuery(workflowQuery(from, name));
   const tags = workflowFactories(workflow, factories ?? []);
   return (
     <Workflow
@@ -130,14 +144,23 @@ function StartsInFactory({ name, factories }: { name: string; factories: readonl
  */
 function InFactory({ from, name, address, place, building, factory }: Asked & { place: Place; factory: Factory | undefined }) {
   const { data: listed } = useSuspenseQuery(workflowsInQuery(place));
-  const { data: plain } = useQuery({ ...workflowsQuery, enabled: from === 'user' });
-  const workflow = listed.find((w) => fromMatches(w.from, from) && w.name === name);
-  if (!workflow) return <NotOffered from={from} name={name} place={place} address={address} attach={factory?.commands.attach} />;
+  const row = listed.find((w) => fromMatches(w.from, from) && w.name === name);
+  if (!row) return <NotOffered from={from} name={name} place={place} address={address} attach={factory?.commands.attach} />;
+  return <InFactoryWhole from={row.from} name={name} address={address} place={place} building={building} />;
+}
+
+/**
+ * The workflow `name` the factory lists, read whole there (`workflowQuery`), and for one of yours read whole with no factory too, which
+ * its builder drafts from.
+ */
+function InFactoryWhole({ from, name, address, place, building }: Asked & { place: Place }) {
+  const { data: workflow } = useSuspenseQuery(workflowQuery(from, name, place));
+  const { data: plain } = useQuery({ ...workflowQuery(from, name), enabled: from === 'user' });
   const why = whyNotStarted(workflow);
   return (
     <Workflow
       workflow={workflow}
-      own={from === 'user' ? plain?.find((w) => w.from === from && w.name === name) : undefined}
+      own={from === 'user' ? plain : undefined}
       address={address}
       building={building}
       tags={[place.factory]}

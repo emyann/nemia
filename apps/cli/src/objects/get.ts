@@ -5,14 +5,18 @@
  * namespace holds is listed whole. One object by its name is read in the namespace `-n` names, else across all by its store-wide name
  * where the api reads it so (the Run, the Card, the Event), else in `default`.
  *
- * A table prints NAMESPACE (with `-A`), NAME, STATE (`status.phase`, else `status.state`) and AGE; `-o json` and `-o yaml` print the
- * object or the page as the api answered it, which `nemia apply -f` reads back; `-o name` prints `<plural>/<name>`. An empty list says so
- * on stderr and exits 0.
+ * A list prints the table the api prints of its kind (`objects`' `Table`, asked by `AS_TABLE`), by `tableLines`: the client keeps no
+ * printer of a list of its own. One object prints NAMESPACE (with `-A`), NAME, STATE (`status.phase`, else `status.state`) and AGE.
+ * `-o json` and `-o yaml` print the object or the page as the api answered it — a page's items without their files' content, which a
+ * list never carries, so `nemia apply -f` refuses a page's objects and reads back one object's — and `-o name` prints
+ * `<plural>/<name>`. An empty list says so on stderr and exits 0.
  */
-import { type APIResource, DEFAULT_NAMESPACE } from 'objects';
+import { type APIResource, DEFAULT_NAMESPACE, READ_BOUND_MS, type Table, tableLines } from 'objects';
 import { stringify } from 'yaml';
+import { isObject } from 'effect/Predicate';
 import { asked, discovered, resourceFor } from '../objects.ts';
 import { Refused } from '../refused.ts';
+import { AS_TABLE, tableOf as askedTable } from '../reads/table.ts';
 import { KIND_CALLS, type Served } from './kinds.ts';
 
 /** How `get` prints what it read. */
@@ -172,13 +176,43 @@ async function getList(resource: APIResource, typed: GetAsked) {
     throw new Refused(
       `nemia get: the api lists ${resource.name} in one namespace at a time: \`nemia get ${resource.name} -n <namespace>\``,
     );
-  const page = await asked('get', call);
+  if (typed.output === 'table') {
+    const answered = askedTable('get', await asked('get', call, process.env, READ_BOUND_MS, AS_TABLE));
+    const table = typed.all && resource.namespaced ? withNamespace(answered) : answered;
+    const lines = tableLines(table, { wide: false, showLabels: false, columns: [] });
+    if (lines.length === 0) process.stderr.write(`${noneFound(resource, typed)}\n`);
+    for (const line of lines) process.stdout.write(`${line}\n`);
+    return 0;
+  }
+  const page = pageAnswered(await asked('get', call));
   if (typed.output === 'json' || typed.output === 'yaml') process.stdout.write(printed(page, typed.output));
   else if (page.items.length === 0) process.stderr.write(`${noneFound(resource, typed)}\n`);
-  else if (typed.output === 'name') for (const o of page.items) process.stdout.write(`${resource.name}/${o.metadata.name}\n`);
-  else for (const line of tableOf(page.items, typed.all && resource.namespaced)) process.stdout.write(`${line}\n`);
+  else for (const o of page.items) process.stdout.write(`${resource.name}/${o.metadata.name}\n`);
   return 0;
 }
+
+/** The namespace a table's row's object says it is in (`metadata.namespace`), `''` where it says none. */
+const namespaceOf = (object: unknown) => {
+  const metadata = isObject(object) ? object.metadata : undefined;
+  return isObject(metadata) && typeof metadata.namespace === 'string' ? metadata.namespace : '';
+};
+
+/** `table` with a NAMESPACE column first, each row's read off its object, as `kubectl get -A` prints one. */
+const withNamespace = (table: Table) =>
+  ({
+    ...table,
+    columnDefinitions: [
+      { name: 'Namespace', type: 'string', format: '', description: 'The namespace the object is in.', priority: 0 },
+      ...table.columnDefinitions,
+    ],
+    rows: table.rows.map((row) => ({ ...row, cells: [namespaceOf(row.object), ...row.cells] })),
+  }) satisfies Table;
+
+/** A list's answer as its page, refused where the api answered a `Table` to a list asked for its objects. */
+const pageAnswered = <P extends { readonly items: readonly Served[] }>(answer: P | Table) => {
+  if ('items' in answer) return answer;
+  throw new Refused('nemia get: the api answered a Table to a list asked for its objects: restart it, `nemia service restart`');
+};
 
 /**
  * `nemia get <resource> [<name>]`, on the words after `get`: the object, or the list, printed as asked; answers the exit code,

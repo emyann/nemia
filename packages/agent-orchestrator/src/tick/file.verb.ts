@@ -100,11 +100,20 @@ import { StoreRoot } from '../config/root.store.ts';
 type Spec = Parameters<Engine['file']>[0];
 
 /**
- * What a step's session is limited by, a container's `resources`: its `memory:` as `limits.memory`, or nothing, where the engine's
- * default stands (`WF_MEMORY_LIMIT`). On a session alone, inside `localFields`, since the runtime refuses a limit on a remote agent; a
- * check is filed without it, asking its step's `checkMemory:` instead (`checkRequestOf`).
+ * What a step's session runs with, a container's `resources`: its `memory:` as `limits.memory` and its `memoryRequest:` as
+ * `requests.memory`, either or both, or nothing, where the engine's defaults stand (`WF_MEMORY_LIMIT`, `WF_MEMORY_REQUEST`). The runtime
+ * gives a request alone the engine's default limit beside it. On a session alone, inside `localFields`, since the runtime refuses
+ * resources on a remote agent; a check is filed without them, asking its step's `checkMemory:` instead (`checkRequestOf`).
  */
-const limitsOf = (step: StepSpec) => (step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } });
+const resourcesOf = (step: StepSpec) =>
+  step.memory === undefined && step.memoryRequest === undefined
+    ? {}
+    : {
+        resources: {
+          ...(step.memory === undefined ? {} : { limits: { memory: step.memory } }),
+          ...(step.memoryRequest === undefined ? {} : { requests: { memory: step.memoryRequest } }),
+        },
+      };
 
 /**
  * What a step's check asks of the machine, a container's `resources`: its `checkMemory:` as `requests.memory` alone, or nothing, where
@@ -463,7 +472,7 @@ const trySpec = (
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
     closeoutSchema: closeoutSchemaOf(step, f.reads.steps),
-    ...limitsOf(step),
+    ...resourcesOf(step),
   })),
   deadlineSeconds: step.deadlineSeconds,
 });
@@ -597,7 +606,7 @@ function roundSpec(
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
       closeoutSchema: closeoutSchemaOf(target, reads.steps),
-      ...limitsOf(target),
+      ...resourcesOf(target),
     })),
     deadlineSeconds: target.deadlineSeconds,
   } satisfies Spec as Spec;
@@ -897,7 +906,7 @@ function readySpec(
        * The engine hands it to the harness and records the answer without reading it: what the fields mean is this package's (`Closeout`).
        */
       closeoutSchema: closeoutSchemaOf(step, reads.steps),
-      ...limitsOf(step),
+      ...resourcesOf(step),
     })),
   };
 }

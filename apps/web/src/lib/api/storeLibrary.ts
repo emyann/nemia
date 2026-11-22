@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
-import type { Agent, AgentSource, LibraryAdd, McpServer, Skill, Workflow } from 'objects';
+import type { AgentList, AgentSource, LibraryAdd, McpServer, SkillList, WorkflowList } from 'objects';
 import { library, libraryAdds } from './objects.ts';
 
 /** The kinds the store's library holds, in the order its page draws them. */
@@ -56,10 +56,10 @@ const serverItem = (one: McpServer) =>
  * @param workflows the library's workflows
  */
 export function libraryItemsOf(
-  skills: readonly Skill[],
-  agents: readonly Agent[],
+  skills: readonly SkillList['items'][number][],
+  agents: readonly AgentList['items'][number][],
   servers: readonly McpServer[],
-  workflows: readonly Workflow[],
+  workflows: readonly WorkflowList['items'][number][],
 ) {
   const byName = (a: LibraryItem, b: LibraryItem) => a.name.localeCompare(b.name);
   return [

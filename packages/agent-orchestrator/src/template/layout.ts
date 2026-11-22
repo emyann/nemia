@@ -131,6 +131,11 @@ export type Step = {
    * whose empty value writes no line, so the check asks the daemon's default.
    */
   checkMemory?: string;
+  /**
+   * The memory the step's sessions ask of the machine, a Kubernetes quantity (`1Gi`), as its line writes it: often a parameter's value,
+   * whose empty value writes no line, so the sessions ask the daemon's default.
+   */
+  memoryRequest?: string;
   loop?: string;
   rounds?: number;
   /** A condition's routes, how it answers them, and those on which the run ends; a node's routes; a workflow node's workflow. */
@@ -348,6 +353,7 @@ const STEP: Shape = {
     checks: { list: { fields: { name: 'string', run: 'words', after: 'strings', enabled: 'boolean' }, required: ['name', 'run'] } },
     run: 'words',
     checkMemory: 'string',
+    memoryRequest: 'string',
     loop: 'string',
     rounds: 'number',
     routes: 'strings',

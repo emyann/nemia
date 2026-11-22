@@ -58,6 +58,11 @@
       "type": "ListMeta"
     },
     {
+      "term": "File content",
+      "meaning": "a field of an object that is a file's text — an agent's instructions and source, a skill's body, a workflow's README and its steps' notes, a template's instruction and rules, a proposal's objects' specs, a card's idea: left out of every list's items (each kind's `<Kind>Listed`) and served by a read of one object, each file reached by a path of its own (`LISTED_WITHOUT`, `filesLeftOut`, `packages/objects/src/listed.ts`).",
+      "type": "LISTED_WITHOUT"
+    },
+    {
       "term": "continue",
       "meaning": "the opaque word a page of a list hands back to ask for the next, absent on the last page; a reader sends it back as it is and never builds one (`ListMeta`, `packages/objects/src/meta.ts`)."
     },

@@ -79,7 +79,7 @@ export const agent = (extra: Partial<AgentListing> = {}) =>
 
 /** `agent` as the Agents page lists it, filling a step in the factory nemia; `factories` puts other names in its place. */
 export const listedAgent = (extra: Partial<AgentListing> = {}, factories = ['nemia']) =>
-  ({ ...agent(extra), factories }) satisfies LibraryAgent;
+  ({ ...agent(extra), factories }) satisfies LibraryAgent & AgentListing;
 
 /** The skills of one place. */
 export const skillPlace = (extra: Partial<SkillPlace> = {}) =>
@@ -142,6 +142,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}) =>
     checks: null,
     run: null,
     checkMemory: null,
+    memoryRequest: null,
     retries: 1,
     checkFailurePolicy: null,
     gate: true,
@@ -265,7 +266,7 @@ export const workflowObject = (listing: WorkflowListing = workflow(), namespace 
   }) satisfies Workflow;
 
 /** `listed` as the Agent object the api serves in `namespace`: its view is `listed`. */
-export const agentObject = (listed: LibraryAgent = listedAgent(), namespace = 'default') =>
+export const agentObject = (listed: LibraryAgent & AgentListing = listedAgent(), namespace = 'default') =>
   ({
     apiVersion: 'nemia/v1',
     kind: 'Agent',

@@ -142,6 +142,7 @@ const object = () =>
           filed: {
             model: 'm',
             askedModel: null,
+            memory: null,
             effort: null,
             contextTokens: null,
             fence: 'bypassPermissions',

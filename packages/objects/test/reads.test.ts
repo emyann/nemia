@@ -2,7 +2,7 @@
  * How each read is bounded (`src/reads.ts`): every GET endpoint of the `Api` has an entry in `READS` whose page takes `limit` and
  * `continue` and whose narrowing keys its query takes (`readsUnbounded`), and an Api that gains a read with none, or a page with no
  * `limit`, is refused by name. A closeout and a decision answer their summary unless their parts are asked (`closeoutNarrowed`,
- * `decisionNarrowed`).
+ * `decisionNarrowed`). Every page answers a `Table` where it is asked one (`pagesWithoutTable`).
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -12,6 +12,8 @@ import {
   Api,
   BODY_PAGE,
   closeoutNarrowed,
+  pagesWithoutTable,
+  Table,
   decisionNarrowed,
   READS,
   readsUnbounded,
@@ -40,6 +42,21 @@ test('REFUSED: a GET the Api gains with no entry in READS, a page whose query ta
     'planted.list': { shape: 'page', narrow: ['limit', 'tail'] },
   });
   assert.equal(noLimitAndTwoKeysItLacks.length, 3);
+});
+
+test('every page of the Api answers a Table where it is asked one', () => {
+  assert.deepEqual(pagesWithoutTable(Api), []);
+});
+
+test('REFUSED: a page whose success holds its list alone is named; one beside a Table is not', () => {
+  const planted = HttpApiGroup.make('planted').add(
+    HttpApiEndpoint.get('list', '/api/planted', { query: { limit: Schema.optionalKey(Schema.String) }, success: Schema.String }),
+    HttpApiEndpoint.get('tabled', '/api/tabled', { success: [Schema.String, Table] }),
+  );
+  const reads = { ...READS, 'planted.list': { shape: 'page' }, 'planted.tabled': { shape: 'page' } } as const;
+  const named = pagesWithoutTable(withGroup(planted) as Parameters<typeof pagesWithoutTable>[0], reads);
+  assert.equal(named.length, 1);
+  assert.match(named[0] ?? '', /^planted\.list .*Table/);
 });
 
 /** A closeout with a short output field, a long one and a body of `body` characters. */

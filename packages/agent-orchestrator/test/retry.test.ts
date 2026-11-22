@@ -531,6 +531,7 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
       'check: npm test && npm run typecheck',
       'retries: 1',
       'memory: 4Gi',
+      'memoryRequest: 1Gi',
       'checkMemory: 64Mi',
     ]);
     fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(DECLARED));
@@ -549,8 +550,8 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
   s.test("implement's session is told the run's labels as its check will be, by the pass that filed it", () => {
     assert.equal(b.tasks.get(`${id()}-implement`)?.spec.config?.env?.WF_LABELS, '{"work":"fix"}');
   });
-  s.test("implement's session is filed under the step's `memory:`, a container's limit", () => {
-    assert.deepEqual(b.tasks.get(`${id()}-implement`)?.spec.resources, { limits: { memory: '4Gi' } });
+  s.test("implement's session is filed under the step's `memory:`, a container's limit, asking its `memoryRequest:`", () => {
+    assert.deepEqual(b.tasks.get(`${id()}-implement`)?.spec.resources, { limits: { memory: '4Gi' }, requests: { memory: '1Gi' } });
   });
   s.test(
     'implement signs off, and the run files its check itself: the frozen command, in its workspace, on the check harness, the follower unfiled',
@@ -584,7 +585,7 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
       assert.deepEqual(
         [spec.resources, spec.priority],
         [{ requests: { memory: '64Mi' } }, 1],
-        "the check asks its step's `checkMemory:` alone, the step's `memory:` binding its session alone, at a step's momentum",
+        "the check asks its step's `checkMemory:` alone, the step's `memory:` and `memoryRequest:` its session's alone, at a step's momentum",
       );
       const { WF_SESSION_TOKEN: token, ...env } = spec.config?.env ?? {};
       assert.deepEqual(
@@ -637,7 +638,11 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
       const pass = await tick(id());
       assert.deepEqual([pass.tried, pass.filed, pass.unreachable, pass.status], [['implement'], [], [], 'running']);
       const spec = b.tasks.get(try2())!.spec;
-      assert.deepEqual(spec.resources, { limits: { memory: '4Gi' } }, "a try is filed under the step's `memory:` as its first was");
+      assert.deepEqual(
+        spec.resources,
+        { limits: { memory: '4Gi' }, requests: { memory: '1Gi' } },
+        "a try is filed under the step's `memory:` and `memoryRequest:` as its first was",
+      );
       assert.equal(spec.priority, MOMENTUM, "the run's own try goes at its momentum, below a person's turn");
       assert.deepEqual(
         { cwd: spec.cwd, resumeFrom: spec.resumeFrom, harness: spec.harness },

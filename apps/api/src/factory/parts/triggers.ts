@@ -13,7 +13,9 @@ import {
   Invalid as Refused,
   triggerList,
   triggerObject,
+  triggerTable,
 } from 'agent-orchestrator';
+import { listOrTable } from '../../objects/table.ts';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { factoryNamed, queryOf } from './parts.ts';
@@ -27,10 +29,13 @@ const triggerIn = (s: Served, namespace: string, name: string) =>
 export const triggersHandlers = readsBounded(Api, 'triggers', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/namespaces/${namespace}/triggers`, namespace);
-        return s.inRequest(triggerList(s.home, namespace, queryOf(query), s.memo.records.factories));
-      }),
+      listOrTable(
+        answered((s) => {
+          factoryNamed(`GET /api/namespaces/${namespace}/triggers`, namespace);
+          return s.inRequest(triggerList(s.home, namespace, queryOf(query), s.memo.records.factories));
+        }),
+        triggerTable,
+      ),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered(async (s) => {

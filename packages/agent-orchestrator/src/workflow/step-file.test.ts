@@ -225,6 +225,15 @@ describe('each key a step has: read as written, and refused blank, twice or with
     ),
     refuses('checkMemory: with no check to ask it for', 'land', 'checkMemory: 256Mi', '`check: <command>`'),
 
+    ...['1Gi', '768Mi', '1G'].map((q) => reads(`memoryRequest: ${q}, as written`, 'intake', `memoryRequest: ${q}`, { memoryRequest: q })),
+    reads('memoryRequest: at its own memory:', 'intake', 'memory: 2Gi\nmemoryRequest: 2Gi', { memoryRequest: '2Gi', memory: '2Gi' }),
+    reads('memoryRequest: under its own memory:', 'intake', 'memory: 4Gi\nmemoryRequest: 1Gi', { memoryRequest: '1Gi', memory: '4Gi' }),
+    reads("memoryRequest: none, the daemon's default", 'intake', 'memory: 4Gi', { memoryRequest: undefined }),
+    ...['1 GB', 'lots', '0', '1.5Gi', '100m'].map((bad) =>
+      refuses(`memoryRequest: ${bad}, which the runtime does not read`, 'intake', `memoryRequest: ${bad}`, `\`memoryRequest: ${bad}\``),
+    ),
+    refuses('memoryRequest: above its own memory:', 'intake', 'memory: 2Gi\nmemoryRequest: 4Gi', '`memoryRequest: 4Gi`', '`memory: 2Gi`'),
+
     ...(
       [
         ['5', 5],
@@ -946,6 +955,7 @@ const EVERY: Record<
   remote: 'true',
   deadlineSeconds: '900',
   memory: '4Gi',
+  memoryRequest: '1Gi',
   budget: '2.50',
   check: `'npm test && node -e "console.log(1 ? 2 : 3)"'`,
   checkMemory: '256Mi',
@@ -1013,6 +1023,7 @@ describe('`renderStep`: the parser run backwards, in one canonical form, and ref
             'remote: true',
             'deadlineSeconds: 900',
             'memory: 4Gi',
+            'memoryRequest: 1Gi',
             'budget: 2.5',
             `check: 'npm test && node -e "console.log(1 ? 2 : 3)"'`,
             'checkMemory: 256Mi',

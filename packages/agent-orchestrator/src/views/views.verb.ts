@@ -42,7 +42,7 @@ import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { verbOf } from '../engine-verbs/engine-verbs.verb.ts';
 import { blockedWord, currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
-import { outOfMemory } from '../out-of-memory/out-of-memory.ts';
+import { outOfMemory } from '../out-of-memory/index.ts';
 import type { CheckKillOf } from '../retry/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';

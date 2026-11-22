@@ -149,6 +149,7 @@ export const step = (extra: Partial<Step> = {}) =>
     filed: {
       model: 'opus',
       askedModel: null,
+      memory: null,
       effort: 'high',
       contextTokens: null,
       fence: 'dontAsk',

@@ -205,6 +205,7 @@ const firstTry = (step: {
 const filedBare = {
   model: null,
   askedModel: null,
+  memory: null,
   effort: null,
   contextTokens: null,
   fence: null,
@@ -2496,6 +2497,7 @@ describe("what a step runs with: the workflow's effort, context and tools, the m
         {
           model: null,
           askedModel: null,
+          memory: null,
           effort: 'high',
           contextTokens: 200_000,
           fence: null,

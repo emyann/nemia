@@ -7,7 +7,7 @@
  *
  * Beside it, the body a write is sent (`SkillWrite`). Plain Schemas of JSON.
  */
-import { Schema } from 'effect';
+import { Schema, Struct } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { CardSkill, SkillCost, WriteMeta, definitionStatus } from './definition.ts';
 
@@ -84,7 +84,24 @@ export const Skill = Schema.Struct({
 export type Skill = typeof Skill.Type;
 
 /** A page of a namespace's skills. */
-export const SkillList = listOf('Skill', Skill);
+export const SkillListed = Schema.Struct({
+  ...Skill.fields,
+  spec: SkillSpec.mapFields((fields) => ({
+    ...Struct.omit(fields, ['body', 'files']),
+    files: Schema.optionalKey(
+      Schema.Array(
+        Schema.Struct({ path: Schema.String.annotate({ description: "The file's path in the skill's folder, with / between folders." }) }),
+      ).annotate({ description: "The folder's other text files, by path alone: a read of the skill answers their text." }),
+    ),
+  })).annotate({
+    description:
+      "The skill as its SKILL.md says it, without its body or its files' text, which a read of the skill answers: its title, description, tags, examples, whether it is preloaded, and its folder's other files by path.",
+  }),
+}).annotate({ description: "A skill as a list serves it, without its files' content (LISTED_WITHOUT)." });
+export type SkillListed = typeof SkillListed.Type;
+
+/** A page of skills, each without its files' content. */
+export const SkillList = listOf('Skill', SkillListed);
 export type SkillList = typeof SkillList.Type;
 
 /**

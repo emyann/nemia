@@ -39,6 +39,7 @@ import {
   workflowSpecReadme,
   workflowVersion,
   type FolderLoaded,
+  workflowTable,
 } from 'agent-orchestrator';
 import { WorkflowError } from 'agent-orchestrator/workflow';
 import {
@@ -83,6 +84,7 @@ import {
   type Origin,
 } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
+import { listOrTable } from '../objects/table.ts';
 
 /** A folder of a workflow, where it is: the source word the api's own reads give it, and its path. */
 type Folder = { from: WorkflowSource; dir: string };
@@ -361,11 +363,14 @@ async function libraryReplaced(s: Served, name: string, payload: WorkflowWrite) 
 export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answeredWriteIn(namespace, async (s) => {
-        const { origin, ...page } = query;
-        const items = await workflowObjectsOf(s, servedOf(heldIn(s), originIn(s, origin)), namespace);
-        return listed('Workflow', items, queryOf(page));
-      }),
+      listOrTable(
+        answeredWriteIn(namespace, async (s) => {
+          const { origin, ...page } = query;
+          const items = await workflowObjectsOf(s, servedOf(heldIn(s), originIn(s, origin)), namespace);
+          return listed('Workflow', items, queryOf(page));
+        }),
+        workflowTable,
+      ),
     )
     .handle('get', ({ params: { namespace, name }, query }) =>
       answeredWriteIn(namespace, (s) => workflowAt(s, namespace, name, originIn(s, query.origin))),
@@ -386,10 +391,13 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
       }),
     )
     .handle('listLibrary', ({ query }) =>
-      answeredWriteIn(LIBRARY, async (s) => {
-        const { origin, ...page } = query;
-        return listed('Workflow', await libraryObjectsOf(s, servedOf(libraryHeld(s), originIn(s, origin))), queryOf(page));
-      }),
+      listOrTable(
+        answeredWriteIn(LIBRARY, async (s) => {
+          const { origin, ...page } = query;
+          return listed('Workflow', await libraryObjectsOf(s, servedOf(libraryHeld(s), originIn(s, origin))), queryOf(page));
+        }),
+        workflowTable,
+      ),
     )
     .handle('getLibrary', ({ params: { name }, query }) => answeredWriteIn(LIBRARY, (s) => libraryAt(s, name, originIn(s, query.origin))))
     .handle('createLibrary', ({ payload }) => answeredWriteIn(LIBRARY, (s) => libraryCreated(s, payload)))

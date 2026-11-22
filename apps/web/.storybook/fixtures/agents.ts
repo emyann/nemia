@@ -5,7 +5,10 @@
  * rules for Auto (`policyList`), each typed by the board's own reads of `objects`, so a key the api renames fails the typecheck here first.
  * Each story seeds its own query client with them (`seeded`, `proposals.ts`), its queries never asked of the network.
  */
-import type { LibraryAgent } from '../../src/lib/api/agents';
+import type { AgentListing } from '../../src/lib/api/agents';
+
+/** An agent read whole, with the factories it fills a step in: what its page reads, and every key its list row has besides. */
+type WholeAgent = AgentListing & { factories: string[] };
 import type { SkillDetail, SkillPlace, SkillRow } from '../../src/lib/api/skills';
 import type { NemiaLevel, NemiaMemory } from '../../src/lib/api/nemia';
 import type { PolicyList, PolicyRule } from '../../src/lib/api/policy';
@@ -33,7 +36,7 @@ const skillRow = (name: string, from: SkillRow['from'], usedBy: string[] = []) =
 }) satisfies SkillRow;
 
 /** An agent of yours that writes a change's notes, giving one skill and leaving `Skill` out of its tools. */
-export const scribe: LibraryAgent = {
+export const scribe: WholeAgent = {
   name: 'scribe',
   from: 'user',
   dir: '/store/agents',
@@ -69,7 +72,7 @@ export const scribe: LibraryAgent = {
 };
 
 /** The repository's agent, read and not written: its form drawn read-only. */
-export const critic: LibraryAgent = {
+export const critic: WholeAgent = {
   ...scribe,
   name: 'critic',
   from: 'repo',

@@ -235,7 +235,11 @@ test("the light steps' sessions ask the memory the factory sets, 1Gi where it se
     assert.equal(asked('plain'), '1Gi', `plain: ${workflow}/${step}`);
     assert.equal(asked('set'), '768Mi', `set: ${workflow}/${step}`);
     assert.equal(asked('own'), undefined, `own: ${workflow}/${step}`);
-    assert.equal(Object.hasOwn(stepIn(treeOf('own'), workflow, step).front, 'memoryRequest'), false, `own: ${workflow}/${step} writes no line`);
+    assert.equal(
+      Object.hasOwn(stepIn(treeOf('own'), workflow, step).front, 'memoryRequest'),
+      false,
+      `own: ${workflow}/${step} writes no line`,
+    );
   }
   for (const [workflow, step] of [
     ['build', 'design'],
@@ -244,7 +248,11 @@ test("the light steps' sessions ask the memory the factory sets, 1Gi where it se
     ['quick', 'implement'],
     ['quick', 'review'],
   ])
-    assert.equal(loaded('plain', workflow).find((one) => one.name === step)?.memoryRequest, undefined, `${workflow}/${step} asks the default`);
+    assert.equal(
+      loaded('plain', workflow).find((one) => one.name === step)?.memoryRequest,
+      undefined,
+      `${workflow}/${step} asks the default`,
+    );
 });
 
 /** The steps of `workflow` in the factory `name`'s tree, loaded as a start of it in the factory loads them: with the factory's hires. */

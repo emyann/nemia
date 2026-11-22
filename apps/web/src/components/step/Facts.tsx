@@ -136,9 +136,7 @@ export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null)
         [fenceLabel(spec), modeRow(spec.sandbox ?? spec.fence, filed)],
         ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
         ['deadline', ranWith(deadlineWord(spec.deadlineSeconds), filed, (f) => deadlineWord(f.deadlineSeconds), 'no limit')],
-        ...(filed?.memory
-          ? ([['memory', <MemoryWords key="memory" memory={filed.memory} />]] satisfies Array<[string, ReactNode]>)
-          : []),
+        ...(filed?.memory ? ([['memory', <MemoryWords key="memory" memory={filed.memory} />]] satisfies Array<[string, ReactNode]>) : []),
         ...(filed?.bridge
           ? ([['reach', <BridgeWords key="reach" bridge={filed.bridge} data-step-bridge />]] satisfies Array<[string, ReactNode]>)
           : []),

@@ -1,9 +1,9 @@
 /**
- * The stats in words, off `GET /api/stats`' answer, its groups read by `objects`' `StatsGroup` and its health by `StatsHealth`: the
- * tiles, a row per landing check that passed in more than half its deadline, a row per day, a row per change to what the runs froze, a
- * row per step, a row per workflow step's memory peaks against what it asks, a row per call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, a row per day
- * and count a step declares (`tally:`), and the one line the morning recap quotes. A number with nothing measured under it reads `—`,
- * never 0. Pure.
+ * The stats in words, off `GET /api/stats`' answer, its groups read by `objects`' `StatsGroup` and its health by `StatsHealth`: the tiles,
+ * a row per landing check that passed in more than half its deadline, a row per day, a row per change to what the runs froze, a row per
+ * step, a row per workflow step's memory peaks against what it asks, a row per call a step was refused, a row per skill a step loaded, a
+ * row per rule a step's skills declare, a row per day and count a step declares (`tally:`), and the one line the morning recap quotes. A
+ * number with nothing measured under it reads `—`, never 0. Pure.
  */
 import { memoryBytesWord, type StatsGroup, type StatsHeadline, type StatsHealth, type StatsStepRow } from 'objects';
 
@@ -145,7 +145,7 @@ function memoryLines(memory: StatsGroup['memory']) {
   if (!memory?.length) return [];
   const unmeasured = memory.some((m) => m.measured < m.tries);
   return [
-    'memory each step peaked at, against what it asks (set a step\'s memoryRequest: from these; Nemia sets none)',
+    "memory each step peaked at, against what it asks (set a step's memoryRequest: from these; Nemia sets none)",
     ...table([
       ['workflow', 'step', 'tries', 'measured', 'median', 'p90', 'max', 'asks', 'above it'],
       ...memory.map((m) => [

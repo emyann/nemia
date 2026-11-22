@@ -14,20 +14,29 @@ describe('`memoryFiledOf`: what a try asked of the memory, its limit, and the pe
     assert.deepEqual(
       memoryFiledOf({
         attempts: [
-          { resources: { limits: { memory: '6Gi' }, requests: { memory: '1Gi' } }, memory: { limitBytes: 6 * GI, peakBytes: 812 * MI, oomKills: 0 } },
-          { resources: { limits: { memory: '6Gi' }, requests: { memory: '1Gi' } }, memory: { limitBytes: 6 * GI, peakBytes: 700 * MI, oomKills: 0 } },
+          {
+            resources: { limits: { memory: '6Gi' }, requests: { memory: '1Gi' } },
+            memory: { limitBytes: 6 * GI, peakBytes: 812 * MI, oomKills: 0 },
+          },
+          {
+            resources: { limits: { memory: '6Gi' }, requests: { memory: '1Gi' } },
+            memory: { limitBytes: 6 * GI, peakBytes: 700 * MI, oomKills: 0 },
+          },
         ],
       }),
       { request: '1Gi', limit: '6Gi', askedBytes: GI, peakBytes: 812 * MI, peakLimitBytes: 6 * GI },
     ));
   test('a limit alone is what admission counts, and a peak not measured is null', () =>
-    assert.deepEqual(memoryFiledOf({ attempts: [{ resources: { limits: { memory: '2Gi' } }, memory: { limitBytes: 2 * GI, oomKills: 0 } }] }), {
-      request: null,
-      limit: '2Gi',
-      askedBytes: 2 * GI,
-      peakBytes: null,
-      peakLimitBytes: null,
-    }));
+    assert.deepEqual(
+      memoryFiledOf({ attempts: [{ resources: { limits: { memory: '2Gi' } }, memory: { limitBytes: 2 * GI, oomKills: 0 } }] }),
+      {
+        request: null,
+        limit: '2Gi',
+        askedBytes: 2 * GI,
+        peakBytes: null,
+        peakLimitBytes: null,
+      },
+    ));
   test('an attempt an older runtime started ran under the resources its task was filed with', () =>
     assert.deepEqual(memoryFiledOf({ resources: { requests: { memory: '512Mi' } }, attempts: [{}] }), {
       request: '512Mi',

@@ -278,6 +278,9 @@ function landingDeadlineOf(r: RunRead, step: StepSpec, t: TimelineTry) {
   return seconds === null ? null : seconds * 1000;
 }
 
+/** A try's session's memory (`TryFact.memory`), on a try that ran a session of its own; nothing on a recheck's or an answer's. */
+const ownMemoryOf = (r: RunRead, t: TimelineTry) => (t.session && t.turn === undefined ? { memory: r.memoryOf(t.session.taskId) } : {});
+
 /** A fact per try of `r`'s run that ended (`TryFact`). */
 function tryFactsOf(r: RunRead) {
   const keys = keysOf(r.run);
@@ -309,7 +312,7 @@ function tryFactsOf(r: RunRead) {
           landingDeadlineMs: landingDeadlineOf(r, step, t),
           checks: checkFactsOf(r, t),
           pictures: t.try === 1 ? picturesHanded(r.run.steps[step.name]?.pictures) : null,
-          ...(t.session && t.turn === undefined ? { memory: r.memoryOf(t.session.taskId) } : {}),
+          ...ownMemoryOf(r, t),
         },
       ];
     }),

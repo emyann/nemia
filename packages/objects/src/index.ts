@@ -599,7 +599,6 @@ export {
 export { PreviousRelease, Upgrade, UpgradeStart, UpgradeStreamEvent, UpgradesGroup, UpgradesRead } from './upgrade.ts';
 export { FolderNames, FoldersGroup, RepositoryMade, RepositoryMake, RepositoryNew } from './folders.ts';
 export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
-export { memoryBytesWord } from './memory.ts';
 export { HarnessCheck, HarnessTurn, MilestoneRead, Milestones, TurnStart, missingSaid, readinessSaid, runsWait } from './readiness.ts';
 export { HARNESS_CHECKS, HARNESS_CHECK_STATES, MILESTONES, MILESTONE_STATES, TURN_FAILURES } from './words.ts';
 export type { HarnessCheckName, HarnessCheckState, Milestone, MilestoneState, TurnFailure } from './words.ts';
@@ -797,7 +796,7 @@ export { BOARD_LINK_WORDS, OPEN_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS
 export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest-tokens.ts';
 export { Actor, actorWords, Token, TokenList, TokenMint, TokenMinted, TokensGroup } from './token.ts';
 export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-rest-stats.ts';
-export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';
+export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow, memoryBytesWord } from './stats-read.ts';
 export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
 export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
 export { refusedIn, type RefusedPlace } from './refused.ts';

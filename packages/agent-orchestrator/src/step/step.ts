@@ -187,9 +187,9 @@ export type StepSpec = {
   memory?: string;
   /**
    * `memoryRequest: 1Gi`: the memory the step's sessions ask of the machine, a container's `resources.requests.memory` — a Kubernetes
-   * quantity the runtime reads, refused at load where it reads none, and refused above the step's own `memory:`. Filed beside the session's
-   * limit: the runtime admits the session by it and gives a request alone the engine's default limit beside it. Absent: the engine's default
-   * request (`WF_MEMORY_REQUEST`), else the limit. Refused on a remote agent, whose process is not ours.
+   * quantity the runtime reads, refused at load where it reads none, and refused above the step's own `memory:`. Filed beside the
+   * session's limit: the runtime admits the session by it and gives a request alone the engine's default limit beside it. Absent: the
+   * engine's default request (`WF_MEMORY_REQUEST`), else the limit. Refused on a remote agent, whose process is not ours.
    */
   memoryRequest?: string;
   /**

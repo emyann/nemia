@@ -324,6 +324,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     remote: 'true',
     deadlineSeconds: '900',
     memory: '4Gi',
+    memoryRequest: '1Gi',
     budget: '2.50',
     check: 'npm test && npm run typecheck',
     checkMemory: '256Mi',

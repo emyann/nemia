@@ -9,8 +9,8 @@
  * stats and the board can say "not measured" and why; a try one of whose attempts does has the largest of them, with the limit that
  * attempt ran under beside it.
  *
- * The runtime carries the record and judges nothing of it; Nemia reads it, shows it, and sets no request from it (the owner's decision:
- * the numbers are picked by a person from these measures). `TryPeak` is what the stats' fact of a try carries (`TryFact`, src/stats/stats.ts)
+ * The runtime carries the record and judges nothing of it; Nemia reads it, shows it, and sets no request from it (the owner's decision: the
+ * numbers are picked by a person from these measures). `TryPeak` is what the stats' fact of a try carries (`TryFact`, src/stats/stats.ts)
  * and what the step's filing says to the board (`StepFiled.memory`, src/resource/told.verb.ts); both import it from here.
  */
 import { type Implementation, spec } from '@emyann/tsverify';

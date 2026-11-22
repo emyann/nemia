@@ -1,10 +1,27 @@
 /**
  * What a reader of `GET /api/stats` reads off a group and the health it answers as JSON (`Stats`' `all`, `groups` and `health`): the
- * headline numbers, a row per day, per step, per change and per tally, the landing checks over half their deadline, and the system's
- * health over the range. `nemia stats` decodes its answer's groups by these to print them; the `Stats` answer keeps them as JSON, so
- * these say what a reader takes of it and never narrow what the api sends. A number nothing measured is null, never 0. Pure.
+ * headline numbers, a row per day, per step, per change and per tally, the landing checks over half their deadline, each workflow
+ * step's memory peaks, and the system's health over the range; and bytes as a person writes a memory quantity (`memoryBytesWord`),
+ * which the peaks are said in here and on a step's filing. `nemia stats` decodes its answer's groups by these to print them; the `Stats`
+ * answer keeps them as JSON, so these say what a reader takes of it and never narrow what the api sends. A number nothing measured is
+ * null, never 0. Pure.
  */
 import { Schema } from 'effect';
+
+const KI = 1024;
+const MI = KI * KI;
+const GI = MI * KI;
+
+/**
+ * A number of bytes as a Kubernetes binary quantity a person can type back into `memory:`: a whole number of `Gi` as `4Gi`, one decimal at
+ * or past 1Gi (`3.7Gi`), whole `Mi` below that, rounded, and whole `Ki` below 1Mi, rounded up.
+ * @param n The number of bytes.
+ */
+export const memoryBytesWord = (n: number) => {
+  if (n >= GI) return Number.isInteger(n / GI) ? `${n / GI}Gi` : `${(Math.round((n / GI) * 10) / 10).toString()}Gi`;
+  if (n >= MI) return `${Math.round(n / MI)}Mi`;
+  return `${Math.ceil(n / KI)}Ki`;
+};
 
 /** A number, or null where nothing measured it. */
 const Measured = Schema.NullOr(Schema.Number);
@@ -140,7 +157,7 @@ export const StatsGroup = Schema.Struct({
         maxBytes: Schema.NullOr(Schema.Number).annotate({ description: 'The highest peak, in bytes; null where none was measured.' }),
         askedBytes: Schema.NullOr(Schema.Number).annotate({
           description:
-            "What admission counted the latest of those sessions at, in bytes: its request, else its limit; null where it does not say.",
+            'What admission counted the latest of those sessions at, in bytes: its request, else its limit; null where it does not say.',
         }),
         aboveAsked: Schema.Number.annotate({ description: 'How many measured sessions peaked above what admission counted them at.' }),
       }),

@@ -46,7 +46,10 @@ base (refused at once, naming the merge of the base, since GitHub runs no CI on 
 for it to start, `WHOLE_SECONDS` whole, both in `exec.ts`), reading only the latest run of each check on the head, so a failure a later run of the same check
 superseded is neither judged nor listed: CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
 refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
-reads it for them. A red the context judged is first re-run, once: the failed jobs of its workflow run, with the jobs that need them
+reads it for them. A red the context judged is first told apart by the logs of its red jobs: where a job GitHub concluded failed
+has a log that names a line that failed it (a test, a type error, a lint rule), the change's, which a second run of the same commit would
+fail again, the red is refused at once, never re-run, and the refusal says so, naming each red job and whose it was. Any other red — a job
+timed out or started up wrong, a failure whose log names no failing line or gave none — is first re-run, once: the failed jobs of its workflow run, with the jobs that need them
 (`gh run rerun <id> --failed`), waited on within the same whole bound, and only a run on its first attempt is re-run, as GitHub says, so a
 head is never re-run twice; a job red again is the change's, and the pass or the refusal names each job re-run and how it ended the
 second time. A re-run still running at the bound is a refusal the next try answers by changing nothing, its check reading the re-run's
@@ -56,7 +59,7 @@ run's own workflow dispatched once on the branch (`gh workflow run <file> --ref 
 said in the pass or the refusal; a dispatched run checks the branch head, not the merge ref, so the landing's wait on the base's own
 context stays the last word. A dispatch GitHub refuses is a person's refusal at once, naming the stuck run and the dispatch to type, with
 `-f` for each input the workflow requires, then the retry. A dispatched run's red, whose entry links its run rather than a job, is
-re-run and read as any other: its failing jobs and their lines are read from the run. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
+told apart, re-run and read as any other: its failing jobs and their lines are read from the run. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
 the base's jobs that did not pass, so a failure that is the base's is not read as the change's; it stays the try's refusal. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
 those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
 `gh`.
@@ -114,8 +117,8 @@ commit that landed. It runs no suite: CI judged the head the review read, and th
 the factory's `landingWaitsOnCi` is true (the default), the receipt waits on the CI context at the merge commit on the base branch
 (`receipt --run <id> --check <name> --wait-on-ci <true|false>`; up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS`
 while another check there still runs, and `WHOLE_SECONDS` in all, the bounds the implement step's wait keeps in `exec.ts`, inside the
-landing check's own deadline). Green passes. A red is first re-run, once, as the implement step's wait re-runs one (`rerun.ts`, which
-both scripts import): the failed jobs of each red workflow run at the merge, only a run GitHub says is on its first attempt, so a retry
+landing check's own deadline). Green passes. A red is first re-run, once, any red it judged, failing lines or not, where the implement step's wait first reports one whose job's
+log names a failing line (`rerun.ts`, which both scripts import): the failed jobs of each red workflow run at the merge, only a run GitHub says is on its first attempt, so a retry
 of the land step never re-runs it twice, waited on within the same bound; green the second time passes, naming each job re-run and how
 it ended. Red still fails the step though the merge stands — nothing is taken back — naming the jobs that did not pass and each job
 re-run: red twice is a real break of the base, and the refusal says so and points at the merge commit's checks, where a person lands a

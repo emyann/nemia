@@ -509,7 +509,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  * theme waiting at its gate, an ending, on you.
  */
 function summaryRun() {
-  const none = { needs: null, waitingFor: null, approve: null, denied: null, sessionUnread: null };
+  const none = { needs: null, waitingFor: null, approve: null, denied: null, sessionUnread: null, queuedFor: null };
   const step = (name: string, status: Word, extra = {}) => ({
     name,
     taskId: `t-${name}`,

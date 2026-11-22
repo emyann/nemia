@@ -177,12 +177,14 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
   said: (e) => `  to attempt ${e.attempt}: ${firstLine(e.text.trim()).slice(0, 160)}`,
   waits: ({ wait }) =>
     wait === undefined
-      ? '  no longer judged: admission is paused or has no ceiling'
-      : wait.for === 'slot'
-        ? `  for a slot of ${wait.pool}: ${wait.ceiling} at work (maxConcurrent)`
-        : `  for memory: needs ${gib(wait.needBytes)}, ${gib(wait.roomBytes)} free`,
+      ? '  no longer judged: admission has no ceiling'
+      : wait.for === 'unschedulable'
+        ? '  for the engine to be schedulable again: it admits nothing while unschedulable'
+        : wait.for === 'slot'
+          ? `  for a slot of ${wait.pool}: ${wait.ceiling} at work (maxConcurrent)`
+          : `  for memory: needs ${gib(wait.needBytes)}, ${gib(wait.roomBytes)} free${wait.keptBytes === undefined ? '' : `, ${gib(wait.keptBytes)} kept (keptRoom)`}`,
   input: (e) =>
-    `  ${firstLine(e.text.trim()).slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}`,
+    `  ${firstLine(e.text.trim()).slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}${e.priority !== undefined ? `  (priority ${e.priority})` : ''}`,
 };
 
 /**

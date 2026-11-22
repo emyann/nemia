@@ -70,3 +70,22 @@ test("REFUSED: a step whose session alone is unread says why in the runtime's wo
   assert.equal(needsOf(run, 'build', new Map([['t-build', working('t-build')]]), judged).sessionUnread, null, 'the next look reads it');
   assert.equal(needsOf(run, 'build', new Map(), judged).sessionUnread, null, 'a step whose task no view has: none');
 });
+
+test("a step whose task waits to start says why, its session's wait before its check's, and the engine unschedulable as paused", () => {
+  const queued = (taskId: string, waits?: TaskView['waits']) =>
+    ({ ...working(taskId), phase: 'pending', admission: 'queued', ...(waits ? { waits } : {}) }) satisfies TaskView;
+  const withCheck = {
+    id: 'r-queued',
+    steps: { build: { taskId: 't-build', check: { taskId: 'c-build' } } },
+  } as unknown as Run;
+  const slot = { for: 'slot', pool: 'claude', ceiling: 2 } as const;
+  assert.deepEqual(needsOf(withCheck, 'build', new Map([['t-build', queued('t-build', slot)]]), judged).queuedFor, {
+    task: 'session',
+    wait: slot,
+  });
+  assert.deepEqual(needsOf(withCheck, 'build', new Map([['c-build', queued('c-build', { for: 'unschedulable' })]]), judged).queuedFor, {
+    task: 'check',
+    wait: { for: 'paused' },
+  });
+  assert.equal(needsOf(withCheck, 'build', new Map([['t-build', queued('t-build')]]), judged).queuedFor, null, 'no wait: none');
+});

@@ -12,6 +12,7 @@ import {
   cgroupParent,
   exposedStore,
   keepsWorktrees,
+  keptTurns,
   maxConcurrent,
   maxRuns,
   memoryLimit,
@@ -42,6 +43,12 @@ describe('REFUSED at shipped defaults: each WF_ variable set to what it does not
       'WF_MAX_CONCURRENT',
       ['-3', '0', '00', '1.5', 'two', '0x2', '1e3', '2 sessions'],
       'WF_MAX_CONCURRENT=4',
+    ],
+    'WF_KEPT_TURNS not a whole count — a word, a negative, a fraction, hex': [
+      keptTurns,
+      'WF_KEPT_TURNS',
+      ['x', '-1', '1.5', '0x2'],
+      'WF_KEPT_TURNS=1',
     ],
     'WF_MAX_RUNS not a whole count — a word, a negative, a fraction, a unit, hex, an exponent': [
       maxRuns,
@@ -162,6 +169,12 @@ describe('each WF_ variable reads its default unset, empty or blank, and the val
       'WF_MAX_CONCURRENT a whole number from 1, padded or not',
       () => ['1', '3', ' 3 ', '50', '07'].map((value) => maxConcurrent({ WF_MAX_CONCURRENT: value })),
       [1, 3, 3, 50, 7],
+    ],
+    [
+      'WF_KEPT_TURNS: one turn kept unset, empty or blank, none at 0, and a whole count as written',
+      () =>
+        [{}, { WF_KEPT_TURNS: '' }, { WF_KEPT_TURNS: ' ' }, { WF_KEPT_TURNS: '0' }, { WF_KEPT_TURNS: ' 2 ' }].map((env) => keptTurns(env)),
+      [1, 1, 1, 0, 2],
     ],
     ['WF_MAX_RUNS a whole count', () => ['  ', '0', '2', ' 3 '].map((value) => maxRuns({ WF_MAX_RUNS: value })), [0, 0, 2, 3]],
     ['WF_VERIFY_REST 1 or 0', () => ['1', '0'].map((value) => verifiesRest({ WF_VERIFY_REST: value })), [true, false]],

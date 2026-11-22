@@ -71,7 +71,7 @@ with: one that renders and freezes a template's carried folder and reads a `{ pa
    pull request of it is at the commit the check judges, and labels that pull request from the run's labels by the factory's
    `pullRequestLabels` rules (`<key>=<value>:<label>`; empty, the default, labels nothing), as `build`'s README says, and as
    the implement step's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`
-   parameter, `ci` by default) on that head, reading only the latest run of each check, and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log, once it has re-run the failed jobs of a red one once (only a workflow run on its first attempt, within the same bound) and named each job re-run and how it ended the second time; where the context is still absent at half its start bound and the head has a run GitHub queued and never started, it dispatches that run's workflow once on the branch, as `build`'s README says; where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names the base's jobs that did not pass, and stays the try's.
+   parameter, `ci` by default) on that head, reading only the latest run of each check, and refuses a red, cancelled or missing one with the Actions URL, the failing jobs and a tail of their log, at once where a red job's log names a line that failed it, the change's, saying so, and otherwise once it has re-run the failed jobs of a red one once (only a workflow run on its first attempt, within the same bound) and named each job re-run and how it ended the second time; where the context is still absent at half its start bound and the head has a run GitHub queued and never started, it dispatches that run's workflow once on the branch, as `build`'s README says; where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names the base's jobs that did not pass, and stays the try's.
 
 When the implement step's check refuses, at any clause and either way, the run tries implement again on its own, up to twice a round
 (`retries: 2`), continuing its session, each try under the step's `budget:`, and hands the try the check's verdict as data: the command,
@@ -95,7 +95,7 @@ and the check merges that head once CI is green at it, as `build`'s README says:
 in the files `landingDerives` names. Main has one guard, whatever the workflow: the required CI context on the head the review read, and
 a merge that refuses anything but this run's own green pull request. Where the factory's `landingWaitsOnCi` is true (the default), the
 receipt then waits on the CI context at the merge commit on the base branch, as `build`'s README says: a red there is re-run once
-first, as the round's wait re-runs one, and a merge still red, the base turned red, fails the land step though the merge stands, unless the base's tip holds it and is green there, which passes a merge whose own run was
+first, any red it judged, failing lines or not, and a merge still red, the base turned red, fails the land step though the merge stands, unless the base's tip holds it and is green there, which passes a merge whose own run was
 cancelled or never reported too; set it false (`--set landingWaitsOnCi=false`) where CI does not run on pushes to the base.
 
 ## The review

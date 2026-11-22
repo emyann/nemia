@@ -24,6 +24,9 @@ layout gives a place sits inside a template's folder: the workspace's own files 
   the version is what a factory pins and upgrades by, and a digest no version names would let a change ship unnoticed. The version a
   branch writes is cut again at its landing, from the base as it is then (`released.ts cut`, which the factory's `landingRefresh`
   names; `landedVersion`, proved by `contracts/version.contract.ts`), so the second of two such runs takes the next version on its own.
+  `contracts/second-run.contract.ts` proves `ci-log.ts`'s `toldOf` and `rerunDue`, whether the implement wait re-runs a red CI context
+  once or reports it at once; `ci-log.ts` takes its types by a whole `import type`, which the run's type stripping erases from the frozen
+  copy, where no `contracts/` sits.
 
 ## Traps
 

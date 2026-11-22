@@ -47,7 +47,8 @@ const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
  * limit a task with none of its own is filed under and the slice its scope is made in (`storeLimits`), each absent when unset. `request`
  * (`WF_MEMORY_REQUEST`, `memoryRequest`) and `reserved` (`WF_MEMORY_RESERVED`, `memoryReserved`, else an eighth of the machine's
  * `totalBytes`, 1 GiB at least: `reservedFor`) are what the runtime admits a session by against the machine's memory (`storeLimits`,
- * `storeAdmission`), `request` absent when unset. A refusal of any of them is thrown, so the pass that reads them refuses itself, and
+ * `storeAdmission`), `request` absent when unset; `kept` (`WF_KEPT_TURNS`, `keptTurns`) the turns a person waits on that the engine keeps
+ * room for beyond the ceiling (`storeAdmission`). A refusal of any of them is thrown, so the pass that reads them refuses itself, and
  * so does the daemon's start.
  * @param config The settings the daemon is given, each read as its reader answers it.
  * @param totalBytes Reads the machine's memory in bytes, for the default floor; `os.totalmem` by default.
@@ -58,6 +59,7 @@ export const ceilings = (config: Settings, totalBytes: () => number = os.totalme
   const request = config.memoryRequest;
   return {
     sessions: config.maxConcurrent,
+    kept: config.keptTurns,
     runs: config.maxRuns,
     ...(memory === undefined ? {} : { memory }),
     ...(parent === undefined ? {} : { cgroupParent: parent }),

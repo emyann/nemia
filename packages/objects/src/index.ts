@@ -326,7 +326,7 @@ export { Skill, SkillFile, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillU
 export { Template, TemplateList, TemplateParameter, TemplateSpec, TemplateStatus, TemplateText } from './template.ts';
 export { Subscription, SubscriptionList, SubscriptionScope, SubscriptionSpec, SubscriptionStatus } from './subscription.ts';
 export { Event, EventInvolved, EventList } from './event.ts';
-export { WATCH_EVENT_TYPES, type WatchEventType, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
+export { WATCH_EVENT_TYPES, type WatchEventType, RESOURCE_VERBS, type ResourceVerb, QUEUED_TASKS, type QueuedTask } from './words.ts';
 export { AnyObjectList, BookmarkObject, WatchedObject, watchEventOf } from './watch.ts';
 export {
   APIResource,
@@ -403,7 +403,7 @@ export {
   TRANSCRIPT_ROLES,
   type TranscriptRole,
 } from './words.ts';
-export { BaseHold, RunHolding, RunWaiting } from './run.ts';
+export { BaseHold, QueuedFor, RunHolding, RunWaiting } from './run.ts';
 export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,

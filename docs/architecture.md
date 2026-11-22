@@ -158,7 +158,11 @@ base moved since and a check that did not finish). While a merge is asked, `nemi
 
 **In the runtime since platform slice 3**: session admission and pools. The runtime admits a queued task under the engine's ceiling
 and its harness's pool, the highest priority first (`agent-runtime/src/core/admission.ts`); the orchestrator hands it the ceiling
-(`WF_MAX_CONCURRENT`) and files each step's momentum as its task's priority, and keeps its run slots (`src/cap/cap.ts`, `WF_MAX_RUNS`).
+(`WF_MAX_CONCURRENT`) and files each step's momentum as its task's priority, and keeps its run slots (`src/cap/cap.ts`, `WF_MAX_RUNS`). A
+turn carries a priority of its own where its answer gives one (`Engine.answer`'s `priority`), and the engine keeps room for the turns
+at a priority or above (`keptRoom`: places beyond the ceiling, memory within the machine's room), kept by admission alone; while it is
+`unschedulable`, every queued task's wait says so. Which turn is a person's, and the room's size (`ASKED_PRIORITY`, `WF_KEPT_TURNS`),
+is the orchestrator's (`storeAdmission`, `src/runtime-client.ts`).
 
 **A call's admission** is split: running a command before a session's call and rendering it per harness is the runtime's
 (`config.callAdmission`, `agent-runtime/src/harness/admission.ts`; Claude Code's hook, `ae admission`), as a probe's `exec` is the

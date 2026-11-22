@@ -36,12 +36,14 @@ import {
   type TranscriptEvent,
   Engine as RuntimeEngine,
   refusalWords,
+  memoryBytesOf,
   type EngineShape,
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { type Env, type Settings, settingsOf, wfRoot } from './config/config.store.ts';
 import { toolsBinDir } from './config/root.store.ts';
 import { pauseStands } from './pause/pause.store.ts';
+import { ASKED_PRIORITY } from './status/status.ts';
 import { servesOnStore } from './daemon/daemon.store.ts';
 import { reservedFor } from './service/index.ts';
 import { declarationOf, HARNESSES as STEP_HARNESSES, REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
@@ -368,18 +370,40 @@ export const awaited = <A>(read: () => Promise<A>) => Effect.tryPromise({ try: r
 /**
  * What the store's engine admits under, as `engine()` hands it to the runtime: its ceiling (`ceilingOf`), `unschedulable`, asked by the
  * runtime's pass before it admits, true while the store's pause's file is there (`pauseStands`), whatever it holds, as `readPause` reads a
- * file that is there as a pause, and the floor of the machine's memory no session is admitted into (`reserved`, `floorOf`), which turns
- * the runtime's admission by memory on.
+ * file that is there as a pause, the floor of the machine's memory no session is admitted into (`reserved`, `floorOf`), which turns
+ * the runtime's admission by memory on, and the room kept for a person's turn (`keptRoom`, `keptOf`).
  *
  * @param root The store's root folder, where its pause's file is.
- * @param config The store's settings: its ceiling and its memory floor.
+ * @param config The store's settings: its ceiling, its memory floor, the turns kept and the default ask.
  * @param totalBytes The machine's memory, read for the default floor alone: `os.totalmem`, a test's planted total.
  */
 export const storeAdmission = (root: string, config: Settings, totalBytes: () => number = os.totalmem) => ({
   unschedulable: () => pauseStands(root),
   ...ceilingOf(config),
   ...floorOf(config, totalBytes),
+  ...keptOf(config),
 });
+
+/**
+ * The room the engine keeps for a person's turn, the turns at `ASKED_PRIORITY` or above: `WF_KEPT_TURNS` places in each pool beyond the
+ * ceiling, and as many of a session's default ask of the machine's memory (`WF_MEMORY_REQUEST`, else `WF_MEMORY_LIMIT`), or places alone
+ * where neither is set. None where `WF_KEPT_TURNS` is 0, or where a variable it reads is refused, as `ceilingOf` gives no ceiling: the tick
+ * refuses its pass on the same read.
+ */
+const keptOf = (config: Settings) => {
+  try {
+    const sessions = config.keptTurns;
+    if (sessions === 0) return {};
+    const ask = config.memoryRequest ?? config.memoryLimit;
+    const bytes = ask === undefined ? undefined : memoryBytesOf(ask);
+    return {
+      keptRoom: { priority: ASKED_PRIORITY, sessions, ...(bytes === undefined ? {} : { memory: String(sessions * bytes) }) },
+    };
+  } catch (err) {
+    if (isRefusal(err)) return {};
+    throw err;
+  }
+};
 
 /**
  * The floor of the machine's memory the engine keeps for the daemon and the machine: `WF_MEMORY_RESERVED` as written, else an eighth of

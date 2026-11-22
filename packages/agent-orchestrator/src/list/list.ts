@@ -40,6 +40,7 @@ import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
 import { staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
+import type { QueuedFor } from 'objects';
 import type { ScheduleListed } from '../factory/schedule/schedule.ts';
 
 export type Listing = {
@@ -260,19 +261,35 @@ export function listing(input: ListingInput) {
  */
 export type HeldBack =
   | { readonly for: 'slot'; readonly pool: string; readonly ceiling: number }
-  | { readonly for: 'memory'; readonly needBytes: number; readonly roomBytes: number };
+  | { readonly for: 'memory'; readonly needBytes: number; readonly roomBytes: number; readonly keptBytes?: number }
+  | { readonly for: 'unschedulable' };
+
+/**
+ * Why a queued task waits, as the api serves it (`QueuedFor`): memory with its need, its room and the memory kept for a person's turn
+ * (null where none was withheld), a slot with its pool and ceiling, or `paused` for the engine `unschedulable` — which the store's pause
+ * makes it (`storeAdmission`, runtime-client.ts). Null where it waits for nothing. Pure.
+ * @param wait What the runtime says the task waits for, or undefined where it says nothing.
+ */
+export const queuedForOf = (wait: HeldBack | undefined) => {
+  if (wait === undefined) return null;
+  if (wait.for === 'unschedulable') return { for: 'paused' } satisfies QueuedFor;
+  if (wait.for === 'slot') return { for: 'slot', pool: wait.pool, ceiling: wait.ceiling } satisfies QueuedFor;
+  return { for: 'memory', needBytes: wait.needBytes, roomBytes: wait.roomBytes, keptBytes: wait.keptBytes ?? null } satisfies QueuedFor;
+};
 
 /**
  * What a queued task the runtime holds waits for, in the words the run cap's wait is said in (`slotWord`): what it waits for, and the
- * number that decides it — `waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: <pool> has 4 at work
- * (WF_MAX_CONCURRENT)`. Pure.
- * @param wait What the task waits for: memory, with the bytes it needs and the bytes free, or a session slot, with its pool and its
- * ceiling.
+ * number that decides it — `waits for memory: needs 2.5Gi, 1Gi free, 2Gi kept for a person's turn (WF_KEPT_TURNS)`, `waits for a
+ * session slot: <pool> has 4 at work (WF_MAX_CONCURRENT)`, or `waits for the store to resume: paused (nemia resume)`. Pure.
+ * @param wait What the task waits for: memory, with the bytes it needs, the bytes free and the bytes kept, a session slot, with its
+ * pool and its ceiling, or the engine unschedulable.
  */
 export const admissionWords = (wait: HeldBack) =>
-  wait.for === 'memory'
-    ? `waits for memory: needs ${memoryBytesWord(wait.needBytes)}, ${memoryBytesWord(wait.roomBytes)} free`
-    : `waits for a session slot: ${wait.pool} has ${wait.ceiling} at work (WF_MAX_CONCURRENT)`;
+  wait.for === 'unschedulable'
+    ? 'waits for the store to resume: paused (nemia resume)'
+    : wait.for === 'memory'
+      ? `waits for memory: needs ${memoryBytesWord(wait.needBytes)}, ${memoryBytesWord(wait.roomBytes)} free${wait.keptBytes === undefined ? '' : `, ${memoryBytesWord(wait.keptBytes)} kept for a person's turn (WF_KEPT_TURNS)`}`
+      : `waits for a session slot: ${wait.pool} has ${wait.ceiling} at work (WF_MAX_CONCURRENT)`;
 
 /**
  * Each step's note with why the runtime holds its task or its check's queued (`admissionWords`), after the note's own words: read off

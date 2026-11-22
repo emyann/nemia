@@ -41,6 +41,7 @@ import { renamedIn } from 'objects';
 import type { RunsListed } from '../src/list/list.ts';
 import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { ASKED_PRIORITY } from '../src/status/status.ts';
 
 const ROOT = scratch('wf-rounds-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -320,6 +321,7 @@ describe('three rounds, then a person accepts the work as it stands', () => {
   s.test('the next pass files round 4, past the cap, and spends the ask; a round is refused while it runs', async () => {
     assert.deepEqual((await tick(id)).looped, ['review']);
     assert.match(specOf(`${id}-implement-try5`).brief, /^## Round 4, past rounds: 3\n/);
+    assert.equal(specOf(`${id}-implement-try5`).priority, ASKED_PRIORITY, "a person's round: the turn they wait on goes first");
     assert.deepEqual(asksOf(id, 'round'), [], 'consumed');
     assert.ok(fs.existsSync(path.join(asksDir(ROOT, id), 'done', 'round-review-4')), 'moved whole');
     await assert.rejects(over(roundRun(id)), refusedAs('Conflict', "round 4 of review's loop is still running"));

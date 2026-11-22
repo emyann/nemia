@@ -456,6 +456,18 @@ describe("a store's run files imported into its keyspace once, moved aside under
     assert.equal(fs.readFileSync(path.join(root, 'runs', 'i-run.asks', 'retry-implement-2'), 'utf8'), 'not json');
     assert.equal(recordText(root, askKey('i-run', { of: 'try', step: 'implement', n: 2 })), undefined);
   });
+  test('an ask that is JSON but no ask of the kind its name says stays where it is, so it never holds its name in the keyspace', () => {
+    const root = planted();
+    const stray = JSON.stringify({ mode: 'recheck', message: 'a message a recheck files no session to read' });
+    fs.writeFileSync(path.join(root, 'runs', 'i-run.asks', 'retry-implement-2'), stray);
+    imported(root);
+    assert.equal(fs.readFileSync(path.join(root, 'runs', 'i-run.asks', 'retry-implement-2'), 'utf8'), stray);
+    assert.equal(recordText(root, askKey('i-run', { of: 'try', step: 'implement', n: 2 })), undefined);
+    assert.ok(
+      recordText(root, askKey('i-run', { of: 'gate', step: 'implement', n: 1 })) !== undefined,
+      'and the asks that read are imported',
+    );
+  });
   test('a store with no run file makes no keyspace file when it is read', async () => {
     const root = scratch('run-import-empty-');
     await runFilesImported(root);

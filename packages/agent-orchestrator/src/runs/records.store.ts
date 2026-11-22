@@ -81,7 +81,7 @@ import {
 } from '../record/record.store.ts';
 import type { AskWritten, PersonRequest, Run, RunStore } from '../record/record.ts';
 import type { RunId } from '../record/record.model.ts';
-import { askDoneKey, askKey, askKeyOf, askName, asksPrefix, ASKS_PREFIX, claimKey, runKey, RUNS_PREFIX } from './run-keys.ts';
+import { ASK_WORDS, askDoneKey, askKey, askKeyOf, askName, asksPrefix, ASKS_PREFIX, claimKey, runKey, RUNS_PREFIX } from './run-keys.ts';
 
 /** The Run door's shape: each method of the run store answering an Effect, a run's id taken as `RunId`. */
 type Shape = DoorOf<RunStore, RunId>;
@@ -716,15 +716,31 @@ const isJson = (text: string) => Option.isSome(Schema.decodeUnknownOption(Schema
 const importRaced = (err: KeyRefused) =>
   new Conflict({ message: `${err.key} was written while it was imported: run again.` }) satisfies Refusal as Refusal;
 
-/** Each of a run's files that reads as it should, with its text: an ask that does not read as JSON left out and said in the log. */
+/**
+ * Why the waiting ask at `key` is no ask of the kind its name says, read as the tick reads it (`strayOf`): null where it reads as one, is
+ * spent, or has a name no kind of ask has, which nothing reads and so blocks no ask.
+ */
+const strayPlanted = (key: string, text: string) => {
+  const name = key.slice(key.indexOf('/', ASKS_PREFIX.length) + 1);
+  const [, word, step, n] = /^([a-z]+)-(.+)-(\d+)$/.exec(name) ?? [];
+  const of = (Object.keys(ASK_WORDS) as PersonRequest['of'][]).find((kind) => ASK_WORDS[kind] === word);
+  if (of === undefined || step === undefined || n === undefined) return null;
+  const read = ASK_READERS[of](text, step, Number(n));
+  return typeof read === 'string' ? read : null;
+};
+
+/**
+ * Each of a run's files that reads as it should, with its text: an ask that does not read as JSON, or as the ask its name says, left where
+ * it is and said in the log, so no stray ask is ever a record that holds its name.
+ */
 const plantedTexts = (planted: readonly Planted[], record: Planted | undefined) =>
   Effect.gen(function* () {
     const read: { planted: Planted; text: string }[] = [];
     for (const one of planted) {
       const text = yield* fromThrow(() => textOf(one.file));
       if (text === undefined) continue;
-      if (one !== record && !isJson(text))
-        yield* Effect.logWarning(`${one.file} was not imported: it is no JSON, so it is no ask; remove it, and ask again`);
+      const stray = one === record ? null : !isJson(text) ? 'it is no JSON, so it is no ask' : strayPlanted(one.key, text);
+      if (stray !== null) yield* Effect.logWarning(`${one.file} was not imported: ${stray}; remove it (rm ${one.file}), and ask again`);
       else read.push({ planted: one, text });
     }
     return read;
@@ -776,9 +792,9 @@ const claimImported = (keyspace: Keyspace, claim: ReturnType<typeof runFilesOf>[
 /**
  * Import a store's run files into its keyspace, once: each run's record and asks in one transaction, a key already held left as it is, then
  * every file read moved aside under `<root>/imported/`, never deleted; then each claim whose run's record holds that it was started from
- * its card, a stale one (its run gone, or from another card) moved aside unimported. An ask that does not read as JSON stays where it is,
- * and is said in the log. A record or an ask larger than a record holds stops the import before anything moves: `Invalid`, naming the
- * file. Answers how many records it made.
+ * its card, a stale one (its run gone, or from another card) moved aside unimported. An ask that does not read as JSON, or as the ask its
+ * name says, stays where it is, and is said in the log. A record or an ask larger than a record holds stops the import before anything
+ * moves: `Invalid`, naming the file. Answers how many records it made.
  * @param home The store's root folder.
  * @param keyspace The store's keyspace.
  */

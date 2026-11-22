@@ -17,8 +17,10 @@
  * 4. A transaction across several records: each write of it decided in turn against the head the one before it left, in one SQLite
  *    transaction, rolled back whole on the first refusal. Its rows take consecutive revisions committed together, as Kine's rows do,
  *    where etcd assigns a transaction one revision: the owner's choice. Held by the store's tests, not by a law.
- * 5. Small records: a record over the ceiling is never written (`overCeilingNeverWritten`); what is larger is a file a record points to,
- *    a later card's.
+ * 5. Small records that point to their files: a record over the ceiling is never written (`overCeilingNeverWritten`); what is larger
+ *    is a file whose own record (a File's, `/registry/files/<namespace>/<id>`) the record names by a pointer. A write says the keys its
+ *    record points to, kept beside Kine's table in `kine_pointers`, and a pointer never dangles (`pointersHold`): a record that names a
+ *    key not live is never written (`danglingNeverWritten`), and a key a live record names is never deleted (`referencedNeverDeleted`).
  * 6. A write that was answered is on disk: the file in write-ahead-log mode with `synchronous=FULL`, held by the store's tests.
  *
  * The table changes over releases by Effect's Migrator (`SqliteMigrator.run`, its table `effect_sql_migrations`), which applies the
@@ -159,6 +161,51 @@ const keyspaceWriteSpec = spec<(held: Held | null, write: KeyWrite, head: number
 
 /** `keyspaceWrite`'s type, which `src/keyspace/keyspace.ts` takes and `src/keyspace/keyspace.store.ts` asks before each row it appends. */
 export type KeyspaceWrite = Implementation<typeof keyspaceWriteSpec>;
+
+/**
+ * Why a write is refused for its pointers: its record names a key that is not live (`dangling`, the door's `Missing`, naming the
+ * file to upload again), or it deletes a key another live record names (`referenced`, the door's `Conflict`, naming that record).
+ */
+export type PointerRefusal = 'dangling' | 'referenced';
+
+/**
+ * What the pointers of a write are judged on, read in the write's transaction once `keyspaceWrite` has written it: its verb, how many
+ * of the keys its record points to are not live (`dangling`, 0 for a delete, which names none), and how many live records of other
+ * keys point to its key (`referrers`).
+ */
+export type PointerCheck = { readonly verb: WriteVerb; readonly dangling: number; readonly referrers: number };
+
+/** A write's pointers judged: they hold, or why the write is refused. */
+export type PointerDecision = { readonly held: true } | { readonly refused: PointerRefusal };
+
+const pointersHoldSpec = spec<(check: PointerCheck) => PointerDecision>({
+  requires: ({ input: [check] }) =>
+    whole(check.dangling) && whole(check.referrers) && (check.verb !== 'delete' || check.dangling === 0),
+  ensures: {
+    danglingNeverWritten: {
+      description: 'A create or an update whose record points to a key that is not live is refused dangling',
+      condition: ({ input: [check], output }) =>
+        check.verb === 'delete' || check.dangling === 0 || ('refused' in output && output.refused === 'dangling'),
+    },
+    referencedNeverDeleted: {
+      description: 'A delete of a key a live record of another key points to is refused referenced',
+      condition: ({ input: [check], output }) =>
+        check.verb !== 'delete' || check.referrers === 0 || ('refused' in output && output.refused === 'referenced'),
+    },
+    heldExactlyWhenNothingDangles: {
+      description:
+        'A write holds exactly when it deletes a key no other live record points to, or makes or changes a record every pointer of which names a live key',
+      condition: ({ input: [check], output }) =>
+        'held' in output === (check.verb === 'delete' ? check.referrers === 0 : check.dangling === 0),
+    },
+  },
+});
+
+/**
+ * `pointersHold`'s type, which `src/keyspace/keyspace.ts` takes and `src/keyspace/keyspace.store.ts` asks for each write `keyspaceWrite`
+ * wrote, before its row is appended, so the pointer and the record are judged in one step.
+ */
+export type PointersHold = Implementation<typeof pointersHoldSpec>;
 
 /** Why a watch cannot start where it asks: its revision is compacted away (`gone`, the api's 410) or past the head (`ahead`). */
 export type WatchRefusal = 'gone' | 'ahead';

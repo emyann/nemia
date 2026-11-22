@@ -1,10 +1,10 @@
 /**
  * The keyspace's decisions (agent-orchestrator, src/keyspace/keyspace.ts): what the store of records — one SQLite file at
- * `<store>/db/state.db`, opened through Effect's SQL client (`@effect/sql-sqlite-node`, over `node:sqlite`), one table laid out as Kine
- * lays it out (`kine`: `id`, `name`, `created`, `deleted`, `create_revision`, `prev_revision`, `lease`, `value`, `old_value`) — does with
- * a write, with a watch's start, with a compaction, and with a file as it is opened. Each is asked by `src/keyspace/keyspace.store.ts`
- * inside the SQLite transaction (`sql.withTransaction`, which begins `BEGIN IMMEDIATE`) that read what it is handed, so the check and
- * the write are one step.
+ * `<store>/db/state.db`, held by one `node:sqlite` `DatabaseSync` per file per process, one table laid out as Kine lays it out (`kine`:
+ * `id`, `name`, `created`, `deleted`, `create_revision`, `prev_revision`, `lease`, `value`, `old_value`) — does with a write, with a
+ * watch's start, with a compaction, and with a file as it is opened. Each is asked by `src/keyspace/keyspace.store.ts` inside the
+ * SQLite transaction (`BEGIN IMMEDIATE`, run with its reads and its writes as one synchronous call, so nothing of the process comes
+ * between them) that read what it is handed, so the check and the write are one step.
  *
  * The six guarantees as etcd and Kubernetes state them, and which law holds each here:
  *
@@ -21,9 +21,9 @@
  *    a later card's.
  * 6. A write that was answered is on disk: the file in write-ahead-log mode with `synchronous=FULL`, held by the store's tests.
  *
- * The table changes over releases by Effect's Migrator (`SqliteMigrator.run`, its table `effect_sql_migrations`), which applies the
- * code's migrations the file has not recorded and, of a file a newer release wrote, applies none and carries on: `schemaDue` is what
- * refuses that file, asked by the Migrator's loader inside the Migrator's own transaction.
+ * The table changes over releases by the keyspace's migrations, recorded in the table Effect's Migrator keeps (`effect_sql_migrations`:
+ * `migration_id`, `name`, `created_at`), so a file an earlier release migrated through Effect's Migrator opens as it is: `schemaDue`
+ * says which migrations a file lacks, and refuses a file a newer release wrote, asked inside the transaction that applies them.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -213,9 +213,9 @@ export type CompactTo = Implementation<typeof compactToSpec>;
 
 /**
  * What opening the file asks of its table: the migrations of the code to apply, those whose id is after the highest the file has
- * recorded (`effect_sql_migrations`, 0 for a new file) up to the code's highest, which the Migrator then runs in its transaction; or a
+ * recorded (`effect_sql_migrations`, 0 for a new file) up to the code's highest, which the opening then runs in its transaction; or a
  * refusal, where the file has recorded a migration the code does not know, written by a newer release (`newer`: the door's `Invalid`,
- * naming `nemia upgrade`), which the loader raises as the Migrator's `MigrationError` so the transaction leaves the file as it is.
+ * naming `nemia upgrade`), on which the transaction is rolled back and the file left as it is.
  */
 export type SchemaDue = { readonly from: number; readonly to: number } | { readonly refused: 'newer' };
 
@@ -233,5 +233,5 @@ const schemaDueSpec = spec<(file: number, code: number) => SchemaDue>({
   },
 });
 
-/** `schemaDue`'s type, which `src/keyspace/keyspace.ts` takes and the Migrator's loader in `src/keyspace/keyspace.store.ts` asks. */
+/** `schemaDue`'s type, which `src/keyspace/keyspace.ts` takes and the opening of a file in `src/keyspace/keyspace.store.ts` asks. */
 export type SchemaDueOf = Implementation<typeof schemaDueSpec>;

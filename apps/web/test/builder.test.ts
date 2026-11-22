@@ -451,7 +451,7 @@ describe("a step with an agent: what it owns, what its agent gives it, and the k
       (err: Error) =>
         err.message.includes('The step implement') &&
         err.message.includes('with ada') &&
-        err.message.includes('read in no factory (workflowsQuery)'),
+        err.message.includes('read in no factory (workflowQuery)'),
     );
     const unhired = toPut(draftOf(hiredIn(null)));
     assert.equal('hired' in unhired[0], false, 'a step put carries no hire');

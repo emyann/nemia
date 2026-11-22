@@ -5,7 +5,7 @@
  */
 import { Effect } from 'effect';
 import { HttpServerRequest } from 'effect/http';
-import { TABLE_ACCEPT } from 'objects';
+import { TABLE_ACCEPT, type Table } from 'objects';
 
 /**
  * Whether `accept`, an `Accept` header's value, names `TABLE_ACCEPT` among its comma-separated values.
@@ -19,3 +19,12 @@ export const wantsTable: Effect.Effect<boolean, never, HttpServerRequest.HttpSer
   const request = yield* HttpServerRequest.HttpServerRequest;
   return acceptsTable(request.headers['accept']);
 });
+
+/**
+ * `list`, the effect that answers a list's page, as the request asks it: the page itself, or `print`'s table of it where the request asks
+ * for a `Table` (`wantsTable`).
+ * @param list The effect that answers the page.
+ * @param print The kind's table of a page (the orchestrator's `<kind>Table`).
+ */
+export const listOrTable = <L, E, R>(list: Effect.Effect<L, E, R>, print: (page: L) => Table) =>
+  Effect.flatMap(wantsTable, (table) => Effect.map(list, (page) => (table ? print(page) : page)));

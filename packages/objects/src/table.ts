@@ -7,6 +7,7 @@
  */
 import { Schema } from 'effect';
 import { describedNumber, describedOne } from './meta.ts';
+import { READS, type ReadBound } from './reads.ts';
 import { TABLE_COLUMN_TYPES } from './words.ts';
 
 /** The `Accept` value that asks a list for a `Table`, as `kubectl get` asks it. */
@@ -90,3 +91,49 @@ export function tableLines(table: Table, asked: TableAsked) {
       .trimEnd(),
   );
 }
+
+/** What an Api is read as by `pagesWithoutTable`: its groups, each its endpoints by name, with their method and successes. */
+type ApiSuccesses = {
+  readonly groups: Readonly<
+    Record<
+      string,
+      {
+        readonly identifier: string;
+        readonly endpoints: Readonly<Record<string, { readonly method: string; readonly success: ReadonlySet<unknown> }>>;
+      }
+    >
+  >;
+};
+
+/** Whether `value` can hold keys: an object, or a function, which a Schema is. */
+const keyed = (value: unknown): value is object => (typeof value === 'object' && value !== null) || typeof value === 'function';
+
+/** The Schema a success of an endpoint holds: HttpApi keeps each as a `{ schema, ast }`, the Schema declared under `schema`. */
+const declared = (success: unknown) => (keyed(success) && 'schema' in success ? success.schema : success);
+
+/**
+ * Whether `success` declares the `Table`: the Table itself, or a union one of whose members is (`Schema.Union([RunList, Table])`).
+ * @param success One success of an endpoint, as its set holds it.
+ */
+const answersTable = (success: unknown) => {
+  const schema = declared(success);
+  return schema === Table || (keyed(schema) && 'members' in schema && Array.isArray(schema.members) && schema.members.includes(Table));
+};
+
+/**
+ * Each GET endpoint of `api` that `reads` calls a list's page (`page`) and whose successes hold no `Table`, in words naming the fix: a
+ * list that cannot be asked for its table makes a client print it by a printer of its own. Empty for an Api every page of which answers
+ * one. Pure.
+ * @param api The Api whose GET endpoints are read.
+ * @param reads How each read is bounded, by group and endpoint name; READS by default.
+ */
+export const pagesWithoutTable = (api: ApiSuccesses, reads: Readonly<Record<string, ReadBound>> = READS) =>
+  Object.values(api.groups).flatMap((group) =>
+    Object.entries(group.endpoints)
+      .filter(([name, endpoint]) => endpoint.method === 'GET' && reads[`${group.identifier}.${name}`]?.shape === 'page')
+      .filter(([, endpoint]) => ![...endpoint.success].some(answersTable))
+      .map(
+        ([name]) =>
+          `${group.identifier}.${name} is a page that answers no Table: declare \`[<Kind>List, Table]\` as its success and answer the kind's table where \`wantsTable\``,
+      ),
+  );

@@ -6,8 +6,8 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Delegation, Proposal } from 'objects';
-import { answered, taken } from './served.ts';
+import { API_VERSION, Delegation, Proposal, LISTED_WITHOUT } from 'objects';
+import { answered, listedPage, taken } from './served.ts';
 
 const meta = { name: 'p-7f3a', namespace: 'mill', creationTimestamp: '2026-11-05T00:00:00.000Z', resourceVersion: 'r1' };
 
@@ -63,7 +63,7 @@ test("the Api's get answers a proposal, its list a page of them, its create take
   assert.deepEqual(answered('proposals', 'get', applied), applied);
   assert.deepEqual(answered('proposals', 'get', waiting), waiting);
   const page = { apiVersion: API_VERSION, kind: 'ProposalList', metadata: {}, items: [applied, waiting] };
-  assert.deepEqual(answered('proposals', 'list', page), page);
+  assert.deepEqual(answered('proposals', 'list', page), listedPage(LISTED_WITHOUT.Proposal, page));
   assert.deepEqual(taken('proposals', 'create', applied.spec), applied.spec);
   assert.equal(answered('proposals', 'get', delegation), undefined);
   assert.equal(answered('proposals', 'list', { ...page, kind: 'DelegationList' }), undefined);

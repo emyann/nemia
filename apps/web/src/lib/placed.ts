@@ -25,11 +25,12 @@ export async function loadWorkflowsIn(queryClient: QueryClient, address: PagePla
 
 /**
  * Reads again every list of workflows `queryClient` keeps, after a write of a folder of yours: the list read with no factory, alone under
- * its key, and each factory's, which lists the folder where it attaches it. Resolves once they are marked.
+ * its key, and each factory's, which lists the folder where it attaches it; and each workflow read whole. Resolves once they are marked.
  * @param queryClient The board's query client, whose lists are marked to read again.
  */
 export const rereadWorkflows = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true }),
     queryClient.invalidateQueries({ queryKey: ['factory-workflows'] }),
+    queryClient.invalidateQueries({ queryKey: ['workflow'] }),
   ]);

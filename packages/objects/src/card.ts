@@ -8,7 +8,7 @@
  * (`CardEdit`), a card started (`CardStart`) and its labels edited (`LabelEdit`), each as the api is sent it. Plain Schemas of JSON, as
  * every object of this package is.
  */
-import { Schema } from 'effect';
+import { Schema, Struct } from 'effect';
 import { API_VERSION, DEFAULT_NAMESPACE, ObjectMeta, describedNumber, listOf } from './meta.ts';
 import { startExtras } from './run-actions.ts';
 
@@ -295,8 +295,21 @@ export const Card = Schema.Struct({
 });
 export type Card = typeof Card.Type;
 
-/** A page of the inbox's cards. */
-export const CardList = listOf('Card', Card);
+/** A card as a list serves it: its object without its idea's markdown or its file's text, its title kept as data. */
+export const CardListed = Schema.Struct({
+  ...Card.fields,
+  spec: CardSpec.mapFields(Struct.omit(['body'])).annotate({
+    description:
+      'What a person wrote on the card, without its body, which a read of the card answers: the workflow that runs it, its gate, its models, the runs whose conclusions it is handed and when it was queued.',
+  }),
+  status: CardStatus.mapFields(Struct.omit(['source'])).annotate({
+    description: "What Nemia read of the card, its title among it, without its file's text, which a read of the card answers.",
+  }),
+}).annotate({ description: "A card as a list serves it, without its files' content (LISTED_WITHOUT)." });
+export type CardListed = typeof CardListed.Type;
+
+/** A page of the inbox's cards, each without its body. */
+export const CardList = listOf('Card', CardListed);
 export type CardList = typeof CardList.Type;
 
 /**

@@ -4,7 +4,8 @@
  * factory's own, or `missing` from the library) — an item added (`PUT`, which takes no body: the name says it) and its add taken off
  * (`DELETE`), each written through the package's program (`libraryAddWritten`), which records the factory's adds whole on its first write.
  */
-import { libraryAddList, libraryAddNamed, libraryAddWritten } from 'agent-orchestrator';
+import { libraryAddList, libraryAddNamed, libraryAddTable, libraryAddWritten } from 'agent-orchestrator';
+import { listOrTable } from '../../objects/table.ts';
 import { Api } from 'objects';
 import { factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
@@ -16,10 +17,13 @@ const routeOf = (method: string, namespace: string, name: string) => `${method} 
 export const libraryAddsHandlers = readsBounded(Api, 'libraryadds', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/namespaces/${namespace}/libraryadds`, namespace);
-        return s.inRequest(libraryAddList(s.home, namespace, queryOf(query)));
-      }),
+      listOrTable(
+        answered((s) => {
+          factoryNamed(`GET /api/namespaces/${namespace}/libraryadds`, namespace);
+          return s.inRequest(libraryAddList(s.home, namespace, queryOf(query)));
+        }),
+        libraryAddTable,
+      ),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered(async (s) => {

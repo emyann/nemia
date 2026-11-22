@@ -1,12 +1,12 @@
 /**
- * The Agent (`src/agent.ts`): an agent and a page of them as the Api's endpoints answer them, every key kept; its origin and a given
- * skill's one of the four words; and the write and try bodies the Api takes, and the card it answers.
+ * The Agent (`src/agent.ts`): an agent as the Api's get answers it, every key kept, and a page of them without its files' content; its
+ * origin and a given skill's one of the four words; and the write and try bodies the Api takes, and the card it answers.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Agent, AgentCard } from 'objects';
-import { answered, taken } from './served.ts';
+import { API_VERSION, Agent, AgentCard, LISTED_WITHOUT } from 'objects';
+import { answered, listedPage, taken } from './served.ts';
 
 const entry = { id: 'git', name: 'git', description: 'Keep your work.', tags: ['git'] };
 
@@ -20,7 +20,7 @@ const agent = {
     keys: { model: 'opus' },
     skills: 'git',
     mcp: null,
-    output: null,
+    output: { file: 'architect.schema.json', text: '{}' },
     instructions: 'Design.',
   },
   status: {
@@ -42,11 +42,11 @@ const agent = {
   },
 } as const;
 
-test("the Api's get answers an agent and its list a page of them, every key kept; another kind refused", () => {
+test("the Api's get answers an agent every key kept, and its list a page of them without their files' content; another kind refused", () => {
   assert.deepEqual(answered('agents', 'get', agent), agent);
   assert.equal(answered('agents', 'get', { ...agent, kind: 'Skill' }), undefined);
   const page = { apiVersion: API_VERSION, kind: 'AgentList', metadata: { continue: 'c' }, items: [agent] };
-  assert.deepEqual(answered('agents', 'list', page), page);
+  assert.deepEqual(answered('agents', 'list', page), listedPage(LISTED_WITHOUT.Agent, page));
   assert.equal(answered('agents', 'list', { ...page, kind: 'SkillList' }), undefined);
 });
 

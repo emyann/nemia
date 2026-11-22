@@ -7,14 +7,15 @@ import { workflowsQuery } from './api/workflows.ts';
 
 /**
  * What an agent's write changes on the board: the agents, each read from disk again; the workflows, whose version covers the agents their
- * nodes name; the step form's agents, which a node's agent is picked from; and the skills, each listed — and each on its page — with the
- * agents that give it.
+ * nodes name, and each read whole, whose layers say its agents' instructions; the step form's agents, which a node's agent is picked
+ * from; and the skills, each listed — and each on its page — with the agents that give it.
  * @param queryClient The board's query client, whose reads are invalidated.
  */
 export const invalidateAgents = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: agentsQuery.queryKey }),
     queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true }),
+    queryClient.invalidateQueries({ queryKey: ['workflow'] }),
     queryClient.invalidateQueries({ queryKey: keyFormQuery.queryKey, exact: true }),
     queryClient.invalidateQueries({ queryKey: skillsQuery.queryKey }),
   ]);
@@ -28,13 +29,15 @@ export const invalidateSkills = (queryClient: QueryClient) => invalidateAgents(q
 
 /**
  * What a hire or a fire changes on the board: every workflow and step read, which say the agent hired into each step; a factory's
- * workflows, read with its hires; the agents, each listed with the steps it fills; and the factories, each with its hires.
+ * workflows, read with its hires, and each read whole; the agents, each listed with the steps it fills; and the factories, each with its
+ * hires.
  * @param queryClient The board's query client, whose reads are invalidated.
  */
 export const invalidateHires = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey }),
     queryClient.invalidateQueries({ queryKey: ['factory-workflows'] }),
+    queryClient.invalidateQueries({ queryKey: ['workflow'] }),
     queryClient.invalidateQueries({ queryKey: agentsQuery.queryKey }),
     queryClient.invalidateQueries({ queryKey: factoriesQuery.queryKey }),
   ]);

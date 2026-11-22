@@ -24,13 +24,14 @@ import {
   DEFAULT_NAMESPACE,
   Missing,
   type ObjectMeta,
+  type Table,
   ProposalSpec,
   ScheduleSpec,
   TriggerSpec,
   SkillSpec,
   WorkflowSpec,
 } from 'objects';
-import { everyPage, type ObjectsClient, type PageAsked, pageOf } from '../objects.ts';
+import { everyPage, type ObjectsClient, type PageAsked } from '../objects.ts';
 
 /** What every kind's metadata carries: a Run served before it had one carries no `resourceVersion`. */
 export type ServedMeta = Pick<ObjectMeta, 'name' | 'namespace' | 'labels' | 'creationTimestamp'> & {
@@ -81,11 +82,14 @@ export type Writes = {
   readonly prepared: (spec: unknown, served: Served | null) => Prepared | string;
 };
 
-/** How a kind is called: listed and read, in a namespace and across all where the api has each, and written where it takes a write. */
+/**
+ * How a kind is called: listed (its page, or its `Table` where the request asks one: `AS_TABLE`) and read, in a namespace and across
+ * all where the api has each, and written where it takes a write.
+ */
 export type KindCalls = {
   readonly list: {
-    readonly in?: (namespace: string, labelSelector: readonly string[]) => Call<Page>;
-    readonly all?: (labelSelector: readonly string[]) => Call<Page>;
+    readonly in?: (namespace: string, labelSelector: readonly string[]) => Call<Page | Table>;
+    readonly all?: (labelSelector: readonly string[]) => Call<Page | Table>;
   };
   readonly get: {
     readonly in?: (namespace: string, name: string) => Call<Served>;
@@ -141,8 +145,8 @@ const params = ({ namespace, name }: Applied) => ({ params: { namespace, name } 
 export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
   Run: {
     list: {
-      in: (namespace, s) => (c) => pageOf(everyPage((page) => c.runs.list({ params: { namespace }, query: query(s, page) }))),
-      all: (s) => (c) => pageOf(everyPage((page) => c.runs.listAll({ query: query(s, page) }))),
+      in: (namespace, s) => (c) => everyPage((page) => c.runs.list({ params: { namespace }, query: query(s, page) })),
+      all: (s) => (c) => everyPage((page) => c.runs.listAll({ query: query(s, page) })),
     },
     get: {
       in: (namespace, name) => (c) => c.runs.get({ params: { namespace, name } }),
@@ -151,8 +155,8 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
   },
   Card: {
     list: {
-      in: (namespace, s) => (c) => pageOf(everyPage((page) => c.cards.list({ params: { namespace }, query: query(s, page) }))),
-      all: (s) => (c) => pageOf(everyPage((page) => c.cards.listAll({ query: query(s, page) }))),
+      in: (namespace, s) => (c) => everyPage((page) => c.cards.list({ params: { namespace }, query: query(s, page) })),
+      all: (s) => (c) => everyPage((page) => c.cards.listAll({ query: query(s, page) })),
     },
     get: {
       in: (namespace, name) => (c) => c.cards.get({ params: { namespace, name } }),
@@ -178,11 +182,11 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     ),
   },
   Factory: {
-    list: { all: (s) => (c) => pageOf(everyPage((page) => c.factories.listAll({ query: query(s, page) }))) },
+    list: { all: (s) => (c) => everyPage((page) => c.factories.listAll({ query: query(s, page) })) },
     get: { all: (name) => (c) => c.factories.get({ params: { name } }) },
   },
   McpServer: {
-    list: { in: (namespace, s) => (c) => pageOf(everyPage((page) => c.mcpservers.list({ params: { namespace }, query: query(s, page) }))) },
+    list: { in: (namespace, s) => (c) => everyPage((page) => c.mcpservers.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.mcpservers.get({ params: { namespace, name } }) },
     writes: writable(Schema.decodeUnknownSync(McpServerSpec), { create: false, update: true, upsert: true, labels: false }, (spec) => ({
       update: (a) => (c) => c.mcpservers.put({ ...params(a), payload: spec }),
@@ -235,7 +239,7 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     })),
   },
   Agent: {
-    list: { in: (namespace, s) => (c) => pageOf(everyPage((page) => c.agents.list({ params: { namespace }, query: query(s, page) }))) },
+    list: { in: (namespace, s) => (c) => everyPage((page) => c.agents.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.agents.get({ params: { namespace, name }, query: {} }) },
     writes: writable(Schema.decodeUnknownSync(AgentSpec), { create: true, update: true, upsert: false, labels: false }, (spec) => ({
       create: (a) => (c) =>
@@ -249,7 +253,7 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     })),
   },
   Skill: {
-    list: { in: (namespace, s) => (c) => pageOf(everyPage((page) => c.skills.list({ params: { namespace }, query: query(s, page) }))) },
+    list: { in: (namespace, s) => (c) => everyPage((page) => c.skills.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.skills.get({ params: { namespace, name }, query: {} }) },
     writes: writable(Schema.decodeUnknownSync(SkillSpec), { create: true, update: true, upsert: false, labels: false }, (spec) => ({
       create: (a) => (c) =>
@@ -271,7 +275,7 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     get: { all: (name) => (c) => c.subscriptions.get({ params: { name } }) },
   },
   Proposal: {
-    list: { in: (namespace, s) => (c) => pageOf(everyPage((page) => c.proposals.list({ params: { namespace }, query: query(s, page) }))) },
+    list: { in: (namespace, s) => (c) => everyPage((page) => c.proposals.list({ params: { namespace }, query: query(s, page) })) },
     get: { in: (namespace, name) => (c) => c.proposals.get({ params: { namespace, name } }) },
     writes: writable(
       Schema.decodeUnknownSync(ProposalSpec),

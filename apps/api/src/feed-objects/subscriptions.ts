@@ -13,7 +13,15 @@
  *   (`Missing`). Its 200 is `{ name }`.
  */
 import { Effect } from 'effect';
-import { SUBSCRIBE, subscriptionList, subscriptionNameRefusal, subscriptionObject, UNSUBSCRIBE } from 'agent-orchestrator';
+import {
+  SUBSCRIBE,
+  subscriptionList,
+  subscriptionNameRefusal,
+  subscriptionObject,
+  subscriptionTable,
+  UNSUBSCRIBE,
+} from 'agent-orchestrator';
+import { listOrTable } from '../objects/table.ts';
 import { Api, BadRequest } from 'objects';
 import { queryOf } from '../factory/parts/parts.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
@@ -27,7 +35,12 @@ const misnamed = (name: string) => {
 
 export const subscriptionsHandlers = readsBounded(Api, 'subscriptions', (handlers) =>
   handlers
-    .handle('listAll', ({ query }) => answered((s) => s.inRequest(subscriptionList(queryOf(query)))))
+    .handle('listAll', ({ query }) =>
+      listOrTable(
+        answered((s) => s.inRequest(subscriptionList(queryOf(query)))),
+        subscriptionTable,
+      ),
+    )
     .handle('get', ({ params: { name } }) => answered((s) => s.inRequest(subscriptionObject(name))))
     .handle('subscribe', ({ params: { name }, payload }) =>
       Effect.andThen(

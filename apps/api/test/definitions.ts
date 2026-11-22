@@ -1,7 +1,9 @@
 /**
  * The definitions as the api's tests read them: a Workflow, an Agent or a Skill object (definitions/) laid out as the listing its tests
  * assert on — its name, its origin as `from`, its version, and its status beside its spec — so a test re-pointed from a retired route keeps
- * its assertions. Read over `on`, an app, in the namespace `ns` (`default` unless named).
+ * its assertions. Read over `on`, an app, in the namespace `ns` (`default` unless named). A list never carries a file's content
+ * (`LISTED_WITHOUT`), and the retired listings did, so each object listed is read again by its get, with the list's query, and laid out
+ * whole.
  */
 type Requesting = { request: (url: string, init?: RequestInit) => Response | Promise<Response> };
 type Obj = { metadata: { name: string; resourceVersion: string }; spec: Record<string, unknown>; status: Record<string, unknown> };
@@ -57,12 +59,25 @@ export const asAgentListing = (o: Obj) => {
   };
 };
 
-/** The objects of `plural` in `ns`, each as its listing, `query` the list's (`origin=user`, `repo=…`). */
-export async function listedIn<T = Record<string, unknown>>(on: Requesting, plural: string, query = '', ns = 'default') {
-  const res = await on.request(`/api/namespaces/${ns}/${plural}${query ? `?${query}` : ''}`);
+/** The items of the page at `list`, each read whole by its get at `<list's path>/<name>` with the list's query. */
+async function wholeItems(on: Requesting, list: string) {
+  const res = await on.request(list);
   const body = (await res.json()) as { items?: Obj[]; error?: string };
-  if (!body.items) throw new Error(`GET ${plural} answered ${res.status}: ${body.error}`);
-  return body.items.map(
+  if (!body.items) return { ok: false as const, status: res.status, body };
+  const [at = '', query] = list.split('?');
+  const items: Obj[] = [];
+  for (const listed of body.items) {
+    const one = await on.request(`${at}/${encodeURIComponent(listed.metadata.name)}${query === undefined ? '' : `?${query}`}`);
+    items.push(one.ok ? ((await one.json()) as Obj) : listed);
+  }
+  return { ok: true as const, status: res.status, items };
+}
+
+/** The objects of `plural` in `ns`, each read whole and as its listing, `query` the list's (`origin=user`, `repo=…`). */
+export async function listedIn<T = Record<string, unknown>>(on: Requesting, plural: string, query = '', ns = 'default') {
+  const read = await wholeItems(on, `/api/namespaces/${ns}/${plural}${query ? `?${query}` : ''}`);
+  if (!read.ok) throw new Error(`GET ${plural} answered ${read.status}: ${read.body.error}`);
+  return read.items.map(
     (o) => (plural === 'workflows' ? asWorkflowListing(o) : plural === 'agents' ? asAgentListing(o) : asListing(o)) as T,
   );
 }
@@ -86,12 +101,12 @@ export async function workflowsListed<T = ReturnType<typeof asWorkflowListing>>(
   const repo = asked.get('repo');
   const out: T[] = [];
   for (const origin of ['factory', 'repo', 'user']) {
-    const res = await on.request(
+    const read = await wholeItems(
+      on,
       `/api/namespaces/${encodeURIComponent(ns)}/workflows?origin=${origin}${repo === null ? '' : `&repo=${encodeURIComponent(repo)}`}`,
     );
-    const body = (await res.json()) as { items?: Obj[] };
-    if (!body.items) return { status: res.status, body: body as never } satisfies { status: number; body: T[] };
-    out.push(...body.items.filter((o) => o.status.shadowedBy !== 'factory').map((o) => asWorkflowListing(o) as T));
+    if (!read.ok) return { status: read.status, body: read.body as never } satisfies { status: number; body: T[] };
+    out.push(...read.items.filter((o) => o.status.shadowedBy !== 'factory').map((o) => asWorkflowListing(o) as T));
   }
   return { status: 200, body: out } satisfies { status: number; body: T[] };
 }

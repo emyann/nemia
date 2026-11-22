@@ -270,6 +270,7 @@ const WIRING = [
   'budget',
   'deadlineSeconds',
   'memory',
+  'memoryRequest',
   'tally',
   'routes',
   'route',

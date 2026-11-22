@@ -17,7 +17,19 @@
  * (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon. `endings(stage, root)` copies the team's agents and skills
  * beside every folder made under `root`, since the team's `ship.md` names `agent: shipper`.
  */
-import { askKeyOf, askNames, askText, plantAsk, plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import {
+  askDoneKey,
+  askKeyOf,
+  askNames,
+  askText,
+  dropAsk,
+  plantAsk,
+  plantRecord,
+  recordText,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -912,8 +924,12 @@ const blockedClean = async () => {
  */
 const checkedDecision = async (exitCode: number | undefined) => {
   const { repo, id, checkId } = await at.stagedAndSigned();
-  const approval = path.join(ROOT, 'runs', `${id}.asks`, 'approve-ship-1');
-  fs.writeFileSync(approval, JSON.stringify({ ...JSON.parse(fs.readFileSync(approval, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
+  plantAsk(
+    ROOT,
+    id,
+    'approve-ship-1',
+    JSON.stringify({ ...JSON.parse(askText(ROOT, id, 'approve-ship-1') ?? ''), at: '2026-09-17T08:00:00.000Z' }),
+  );
   at.photographed(id, { count: 2, bytes: 10 });
   stage.board().settle(checkId, 'failed', undefined, exitCode);
   if (exitCode !== undefined) stage.board().tasks.get(checkId)!.printed = { stdout: '' };
@@ -2112,7 +2128,7 @@ describe('an ending that stopped on the base branch sends the work back through 
         refusedNaming(`try 2 of ship is asked for (--continue, at ${ask.at})`, 'a send-back would take that try back'),
         'the two ways on take the same try of the ending: one asked refuses the other, each way round',
       );
-      fs.rmSync(path.join(ROOT, 'runs', `${id}.asks`, 'retry-ship-2'));
+      dropAsk(ROOT, id, 'retry-ship-2');
       const sending = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main' }));
       const sentBack = `the work is being sent back from ship (nemia retry ${id} review, at ${sending.ask.at})`;
       const wait = `Wait for it: nemia ls ${id}.`;
@@ -2305,7 +2321,7 @@ describe('a loop out of rounds before its ending: accepted as it stands, sent ba
       const sent = await at.pass(id);
       assert.deepEqual([sent.tried, sent.filed], [['review'], []]);
       assert.equal(runRecord(ROOT, id).acceptances, undefined, 'spent by the try after it, as an approval is');
-      assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'done', 'accept-review-1')), 'and moved whole');
+      assert.ok(recordText(ROOT, askDoneKey(id, 'accept-review-1')) !== undefined, 'and moved whole');
       assert.doesNotMatch(tasks.get(`${id}-review-try2`)!.spec.brief, /## Accepted/, 'the reviewer is not told its own loop was ended');
       await assert.rejects(
         stage.runWith(e(), acceptRun(id, 'review', ENOUGH)),

@@ -38,7 +38,7 @@ import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 import type { RunList } from 'objects';
-import { plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
+import { plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
 const NOWHERE = scratch('nemia-api-nowhere-');
 
@@ -1340,12 +1340,12 @@ describe("GET /api/runs/:id and a step's log refuse: an unknown run or step is a
     assert.match(error, /No run 'no-such-run'/);
     assert.match(error, /GET \/api\/runs/);
   });
-  test('a run id cannot name a file outside the run store', async () => {
+  test('a run id cannot name a key outside its own: one holding a `/` names no run, though a record is held at the key it spells', async () => {
     writeRun({ ...r2, id: '../escape' });
     assert.equal(
-      runsNow(root).runs.read('../escape').id,
+      (JSON.parse(recordText(root, runKey('../escape')) ?? '{}') as { id?: string }).id,
       '../escape',
-      'the file is a readable run, one directory up: reading the id as a path serves it',
+      'a record is held at the key the id spells: reading the id as a key serves it',
     );
 
     const res = await app.request('/api/runs/..%2Fescape');
@@ -1544,9 +1544,7 @@ function seedLoop(id: string, round: number, again: boolean) {
 
 /** A person's ask, as `nemia retry` and `nemia retry --round` leave one: a file of its own beside the run's record, named for its ask. */
 function askFor(id: string, name: string, ask: object) {
-  const dir = path.join(root, 'runs', `${id}.asks`);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, name), `${JSON.stringify({ ...ask, at: later }, null, 2)}\n`);
+  plantAsk(root, id, name, `${JSON.stringify({ ...ask, at: later }, null, 2)}\n`);
 }
 
 /** A step row as the list and the detail both carry it. */

@@ -17,7 +17,8 @@ import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
  */
 export const mergesOf = Effect.fnUntraced(function* (place: Place, runId: string, branches: readonly string[]) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
-  if (!isRepositoryRun(run)) return {} satisfies Record<string, StandingMerge> as Record<string, StandingMerge>;
+  const none: Record<string, StandingMerge> = {};
+  if (!isRepositoryRun(run)) return none;
   const { trials } = yield* tried(() =>
     trialMerges(
       run.repo,
@@ -25,12 +26,13 @@ export const mergesOf = Effect.fnUntraced(function* (place: Place, runId: string
       place,
     ),
   );
-  return Object.fromEntries(
+  const merges: Record<string, StandingMerge> = Object.fromEntries(
     branches.map((branch, i) => {
       const merge = mergeWordOf(trials[i] ?? { unknown: `the place answered no trial of ${branch}` });
       return [branch, { ...merge, said: mergeWord(merge, run.branch) }];
     }),
-  ) satisfies Record<string, StandingMerge> as Record<string, StandingMerge>;
+  );
+  return merges;
 });
 
 /**

@@ -14,7 +14,7 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
-import { rewriteRun, runRecord, runsNow } from '../testing.ts';
+import { dropRecord, emptyRuns, rewriteRun, runKey, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, beforeEach, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -123,6 +123,7 @@ const ended = (id: string, reasons: readonly string[]) => {
 /** A store with no runs and no feed. */
 const emptyStore = () => {
   for (const dir of [RUNS, FEED, path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS, { recursive: true });
 };
 
@@ -543,7 +544,7 @@ describe("a person's acts and the runtime's faults on a run, each said once off 
     );
   });
   s.test('a run gone from the store writes one `removed`, with no line for its steps, then nothing, a restart included', async () => {
-    fs.rmSync(path.join(RUNS, `${other.id}.json`));
+    dropRecord(ROOT, runKey(other.id));
     fs.rmSync(path.join(RUNS, `${other.id}.pruned`), { force: true });
     const before = lines().length;
     await ticks(3);

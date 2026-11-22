@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import { askNames, dropAsk, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
@@ -42,7 +42,7 @@ fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
 plantRecord(root, runKey(GATED), JSON.stringify(record(GATED, ['implement'])));
 plantRecord(root, runKey(AT_WORK), JSON.stringify(record(AT_WORK)));
 beforeEachTest(() => {
-  fs.rmSync(path.join(root, 'runs', `${GATED}.asks`), { recursive: true, force: true });
+  askNames(root, GATED).forEach((name) => dropAsk(root, GATED, name));
   Effect.runSync(engine().file({ id: `t-${GATED}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(`t-${GATED}`, 'succeeded', {
     exitCode: 0,

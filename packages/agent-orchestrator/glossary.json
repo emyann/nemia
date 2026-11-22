@@ -28,6 +28,10 @@
               "why": "the record's names for what a loop's end writes, as the files on disk are named"
             },
             {
+              "path": "packages/agent-orchestrator/src/runs/run-keys.ts",
+              "why": "an ask's key keeps the name its file had, `accept-<step>-<n>`, so a store's ask files import at their own names"
+            },
+            {
               "path": "packages/agent-orchestrator/src/record/record.model.ts",
               "why": "the doc of the run's `acceptances` names the file a loop's end writes, `accept-<step>-<try>`, as it is named on disk"
             },
@@ -953,7 +957,7 @@
     },
     {
       "term": "Run records",
-      "meaning": "a run's record, its card's claim and its asks as records of the store's keyspace (`runRecords`, `packages/agent-orchestrator/src/runs/records.store.ts`): the layer under the Run door, which writes what belongs together in one transaction, and imports a store's run files once each, moving them aside under `imported/`.",
+      "meaning": "a run's record, its card's claim and its asks as records of the store's keyspace (`runRecords`, `packages/agent-orchestrator/src/runs/records.store.ts`): the layer under the Run door, which writes what belongs together in one transaction, and imports a store's run files once each, moving them aside under the store's `imported` folder.",
       "type": "RunsLayer",
       "retired": [
         {

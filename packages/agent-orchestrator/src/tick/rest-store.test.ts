@@ -14,7 +14,7 @@
  * after, so a store of forty runs is built in a few passes. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ.
  */
-import { acceptKey, approvalKey, listRuns, plantAsk, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
+import { acceptKey, approvalKey, emptyRuns, listRuns, plantAsk, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
 import { storeGiven } from '../../test/config-given.ts';
 import type { StoreRoot } from '../config/root.store.ts';
 import { type Env, type StoreConfig, verifiesRest } from '../config/config.store.ts';
@@ -172,6 +172,7 @@ const places = (c: PassCost) => c.phases.place.calls;
  */
 const storeOf = () => {
   fs.rmSync(runsDir(ROOT), { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(runsDir(ROOT), { recursive: true });
   const h = engine();
   const memo = freshRestMemo();

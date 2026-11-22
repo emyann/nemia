@@ -23,7 +23,19 @@ import { linesOf, listedOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { listedIn, workflowsListed } from '../../test/definitions.ts';
 import { addToInbox, loadWorkflows, readInbox, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
-import { addFactory, attachWorkflow, clearSchedule, hireAgent, removeFactory, runsNow, setSchedule } from 'agent-orchestrator/testing';
+import {
+  addFactory,
+  attachWorkflow,
+  clearSchedule,
+  dropRecord,
+  hireAgent,
+  keysUnder,
+  plantRecord,
+  removeFactory,
+  runKey,
+  runsNow,
+  setSchedule,
+} from 'agent-orchestrator/testing';
 import { Effect } from 'effect';
 import { TABLE_ACCEPT, tableLines } from 'objects';
 
@@ -90,7 +102,11 @@ const get = async <T>(url: string) => {
 };
 const said = (body: unknown) => (body as { error: string }).error;
 const names = (listings: WorkflowListing[]) => listings.map((w) => w.name);
-const runFiles = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
+const runFiles = () =>
+  [
+    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
+    ...keysUnder(root, '/registry/runs/'),
+  ].sort();
 
 const post = (url: string, body: unknown) =>
   app.request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -665,8 +681,9 @@ describe('a person schedules a workflow in a factory: listed with its next fire 
     async () => {
       vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-08T12:00:00Z') });
       setSchedule({ factory: 'solo', workflow: 'alpha', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
-      const record = path.join(root, 'runs', 'r-scheduled.json');
-      write(
+      const record = runKey('r-scheduled');
+      plantRecord(
+        root,
         record,
         JSON.stringify({
           id: 'r-scheduled',
@@ -704,7 +721,7 @@ describe('a person schedules a workflow in a factory: listed with its next fire 
         for (const name of ['default', 'hired', 'pair']) assert.deepEqual(await schedulesOf(name), [], `${name} answers no schedule`);
       } finally {
         clearSchedule({ factory: 'solo', workflow: 'alpha' });
-        fs.rmSync(record);
+        dropRecord(root, record);
         vi.useRealTimers();
       }
     },

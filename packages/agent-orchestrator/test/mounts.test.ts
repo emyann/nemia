@@ -14,7 +14,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import { keysUnder, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -131,7 +131,11 @@ async function typed(argv: string[]) {
 }
 
 /** The runs in the store, by file. */
-const runFiles = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+const runFiles = () =>
+  [
+    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+    ...keysUnder(ROOT, '/registry/runs/'),
+  ].sort();
 
 /**
  * The folders a filing mounts that its brief does not name as it mounts them: a writable one on the line that says it may be written, a

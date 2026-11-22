@@ -26,7 +26,7 @@ import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { approvalKey, recordText, retryAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import { approvalKey, askNames, plantRecord, recordText, retryAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 
@@ -56,8 +56,9 @@ const PLAN = { outcome: 'done', summary: '## The plan\n\n- parse the flag\n- sto
  * off and not gated, and `sketch`, gated by its own `gate: true` and not filed.
  */
 const gatedRun = (id: string) => {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',
@@ -120,8 +121,7 @@ const ask = (step: string, body: unknown, run = R) =>
 
 /** Every file under a run's asks directory, waiting or consumed. */
 const asked = (run = R) => {
-  const dir = path.join(root, 'runs', `${run}.asks`);
-  return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
+  return askNames(root, run).sort();
 };
 
 /** Nothing was written: no ask nor approval, and the run's record as it was. */
@@ -184,8 +184,9 @@ const where: Question = {
 
 /** A run of `design → implement`, started `--gate design`, whose design signed off asking `cut` and `where`: it waits at its gate. */
 const askingRun = (id: string) => {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',

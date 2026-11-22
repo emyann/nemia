@@ -66,7 +66,7 @@ export type StoreMeasure = {
   from: string;
   engine: string;
   copy: { files: number; bytes: number; ms: number; leftOut: string[] };
-  /** The copy's run files imported into its keyspace before any read: how long, the records made, and its largest run record. */
+  /** The copy's run files imported into its keyspace before any read: how long, the run files read into records, its largest record. */
   keyspace?: { ms: number; records: number; largest: { id: string; bytes: number; ceiling: number } | null };
   counts: {
     runs: number;

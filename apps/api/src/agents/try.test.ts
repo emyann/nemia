@@ -26,7 +26,7 @@ import { scratch } from 'test-kit/scratch';
 import { startRun, tryFolder } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { addFactory, testPlace } from 'agent-orchestrator/testing';
+import { addFactory, dropRecord, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { listedRuns, objectOf } from '../../test/run-reads.ts';
@@ -151,13 +151,13 @@ let first = '';
 
 /** A try ended, as a tick and the engine leave it: its step filed, and signed off. */
 function ended(id: string) {
-  const file = path.join(RUNS, `${id}.json`);
-  const run = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const file = runKey(id);
+  const run = JSON.parse(recordText(root, file) ?? '');
   const cwd = path.join(run.workspace, 'try');
   fs.mkdirSync(cwd, { recursive: true });
   signedOff(`t-${id}`, cwd);
   run.steps = { try: { taskId: `t-${id}`, workspace: cwd } };
-  fs.writeFileSync(file, JSON.stringify(run));
+  plantRecord(root, file, JSON.stringify(run));
 }
 
 const idOf = async (res: Response) => {
@@ -192,7 +192,7 @@ describe('a person tries an agent of theirs: a folder run fenced with a dollar, 
     );
     assert.ok(text.includes(`# version ${agent.version}`), "and records the agent's version it was written at");
 
-    const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8'));
+    const run = JSON.parse(recordText(root, runKey(first)) ?? '');
     assert.deepEqual(run.place, { kind: 'folder' }, 'a folder run');
     assert.equal(run.repo, undefined, 'with no repository');
     assert.equal(run.workflowDir, path.join(TRIES, 'scribe'));
@@ -248,12 +248,12 @@ describe('a person tries an agent of theirs: a folder run fenced with a dollar, 
     const body = (await res.json()) as { error: string };
     assert.equal(res.status, 409);
     assert.match(body.error, new RegExp(`nemia cancel ${id}`));
-    assert.ok(fs.existsSync(path.join(RUNS, `${id}.json`)), 'and it is still there');
+    assert.ok(recordText(root, runKey(id)) !== undefined, 'and it is still there');
     ended(id);
     assert.equal((await remove(id)).status, 200);
   });
   s.test('the board removes a try: its record and the folders it worked in', async () => {
-    const workspace = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8')).workspace;
+    const workspace = JSON.parse(recordText(root, runKey(first)) ?? '').workspace;
     assert.ok(fs.existsSync(workspace));
     const res = await remove(first);
     assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
@@ -264,7 +264,7 @@ describe('a person tries an agent of theirs: a folder run fenced with a dollar, 
       [[`t-${first}`], []],
       "and the engine's records of its task, forgotten and named",
     );
-    assert.ok(!fs.existsSync(path.join(RUNS, `${first}.json`)), 'the record is gone');
+    assert.ok(recordText(root, runKey(first)) === undefined, 'the record is gone');
     assert.ok(!fs.existsSync(workspace), 'and its folders');
     assert.ok(!(await listed()).some((r) => r.id === first), 'and the list has it no more');
     const gone = await remove(first);
@@ -284,7 +284,7 @@ describe('what a try refuses, and what it is fenced to: the default factory, rul
     });
     fs.writeFileSync(path.join(YOURS, 'shipped.md'), '---\nmodel: sonnet\n---\nSay what you see.\n');
     const id = await idOf(await tryIt('shipped', { brief: 'Say what is in the folder.' }));
-    const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8'));
+    const run = JSON.parse(recordText(root, runKey(id)) ?? '');
     assert.deepEqual([run.factory, run.repo, run.place], [undefined, undefined, { kind: 'folder' }]);
   });
   test("REFUSED: a try never runs with its agent's rules outside its folder — an agent whose mode asks first keeps only those inside it", async () => {
@@ -299,7 +299,7 @@ describe('what a try refuses, and what it is fenced to: the default factory, rul
         `${name}: dontAsk, or its own mode where narrower: ${lines.join('\n')}`,
       );
       assert.ok(lines.includes(`    allowedTools: ${rules.join(', ')}`), `${name}: its rules inside the folder alone: ${lines.join('\n')}`);
-      const step = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8')).workflow[0];
+      const step = JSON.parse(recordText(root, runKey(id)) ?? '').workflow[0];
       assert.equal(step.permissionMode, mode);
       assert.deepEqual(step.allowedTools, rules, "the try's list replaces the agent's");
       ended(id);
@@ -332,9 +332,9 @@ describe('what a try refuses, and what it is fenced to: the default factory, rul
       assert.equal(res.status, 409, "the board removes only a try: another run is `nemia rm`'s, which says what it leaves");
       assert.match(body.error, /only a try/);
       assert.match(body.error, new RegExp(`nemia rm ${run.id}`));
-      assert.ok(fs.existsSync(path.join(RUNS, `${run.id}.json`)), 'and it is still there');
+      assert.ok(recordText(root, runKey(run.id)) !== undefined, 'and it is still there');
     } finally {
-      fs.rmSync(path.join(RUNS, `${run.id}.json`));
+      dropRecord(root, runKey(run.id));
       fs.rmSync(path.join(RUNS, run.id), { recursive: true, force: true });
     }
   });

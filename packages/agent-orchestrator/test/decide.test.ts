@@ -9,7 +9,7 @@
  *
  * The test's store is its own, at `ROOT`, given as `ENV`.
  */
-import { listRuns, recordText, runKey, runRecord } from '../testing.ts';
+import { keysUnder, listRuns, plantAsk, recordText, runKey, runRecord } from '../testing.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import { beforeAll, describe, test } from 'vitest';
@@ -223,12 +223,7 @@ const decideSaid = ({ run, listing }: { run: Run; listing: Listing }) => listing
 
 /** An approval as `nemia approve` writes one: a file of a person's beside the retry asks. */
 const approveByHand = (id: string, step: string, n: number) => {
-  const dir = path.join(ROOT, 'runs', `${id}.asks`);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, `approve-${step}-${n}`),
-    `${JSON.stringify({ step, try: n, at: '2026-09-17T10:00:00.000Z' }, null, 2)}\n`,
-  );
+  plantAsk(ROOT, id, `approve-${step}-${n}`, `${JSON.stringify({ step, try: n, at: '2026-09-17T10:00:00.000Z' }, null, 2)}\n`);
 };
 
 describe('a run waiting on you, read and landed: its screens, and what approving its ending does', () => {
@@ -718,7 +713,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
     async () => {
       const repo = aRepo();
       const dir = ending('ship', 'Ship it.\n');
-      const before = fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+      const before = keysUnder(ROOT, '/registry/runs/').length;
       await assert.rejects(
         stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
         (err: Error & { exitCode?: number; _tag?: string }) => {
@@ -728,7 +723,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
           return true;
         },
       );
-      assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length, before, 'nothing written');
+      assert.equal(keysUnder(ROOT, '/registry/runs/').length, before, 'nothing written');
       assert.ok(await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir })), 'with worktrees, it starts');
     },
   );

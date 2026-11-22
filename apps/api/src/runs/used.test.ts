@@ -10,11 +10,10 @@ import { root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { recordText, runKey, testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { objectOf, stepOf } from '../../test/run-reads.ts';
 
@@ -25,10 +24,6 @@ const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-19T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
 const done = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
 
 /** A step's task whose attempts each ended with the usage given; an attempt after the first continued the session before it. */
@@ -91,8 +86,9 @@ const USAGE = {
   plan: { toolCalls: 6, inputTokens: 50_000, outputTokens: 2_000 },
 };
 const R = 'r-read';
-write(
-  path.join(root, 'runs', `${R}.json`),
+plantRecord(
+  root,
+  runKey(R),
   JSON.stringify({
     id: R,
     repo: '/code/app',
@@ -169,8 +165,9 @@ describe("a run's object says what its sessions read: each step's classes, peak 
 
       const R2 = 'r-read-all';
       const record = JSON.parse(recordText(root, runKey(R)) ?? '');
-      write(
-        path.join(root, 'runs', `${R2}.json`),
+      plantRecord(
+        root,
+        runKey(R2),
         JSON.stringify({
           ...record,
           id: R2,
@@ -207,8 +204,9 @@ describe("a run's object says what its sessions read: each step's classes, peak 
       };
       const RC = 'r-read-compacted';
       const run = (id: string, reviewPeak: number) => {
-        write(
-          path.join(root, 'runs', `${id}.json`),
+        plantRecord(
+          root,
+          runKey(id),
           JSON.stringify({
             id,
             repo: '/code/app',

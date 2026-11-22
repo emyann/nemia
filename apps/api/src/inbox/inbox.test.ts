@@ -14,7 +14,17 @@ import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
 import { addToInbox, fromNote, inboxDir, startFromInbox, engine, StoreRoot } from 'agent-orchestrator';
-import { addFactory, attachWorkflow, hireAgent, removeFactory, runsNow } from 'agent-orchestrator/testing';
+import {
+  addFactory,
+  attachWorkflow,
+  emptyRuns,
+  hireAgent,
+  keysUnder,
+  plantRecord,
+  removeFactory,
+  runKey,
+  runsNow,
+} from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { TEAM } from '../../test/team.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
@@ -71,7 +81,11 @@ hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
 const inbox = path.join(root, 'inbox');
 const cards = () => (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []);
-const runFiles = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
+const runFiles = () =>
+  [
+    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
+    ...keysUnder(root, '/registry/runs/'),
+  ].sort();
 const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** The factory a card's namespace names: none for `default`. */
@@ -144,6 +158,7 @@ const listed = async (address = '/api/cards') => {
 const clear = () => {
   fs.rmSync(inbox, { recursive: true, force: true });
   fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
+  emptyRuns(root);
 };
 
 /** The inbox folder as it is: each file's name and text, to show a read wrote nothing. */
@@ -332,7 +347,7 @@ describe('POST /api/runs with `card`: what a start of a card refuses, writing no
   test('a card started already is a 409, a blank brief, a card that does not read and a run it cannot wait on are 422s — and nothing is written or removed', async () => {
     clear();
     const { card: started } = onStore(addToInbox({ text: 'Started once' }));
-    write(path.join(root, 'runs', 'started-once-k2q9.json'), startedFrom('started-once-k2q9', started.name));
+    plantRecord(root, runKey('started-once-k2q9'), startedFrom('started-once-k2q9', started.name));
     const { card } = onStore(addToInbox({ text: 'Not started' }));
     write(path.join(inbox, 'broken.md'), '---\nafer: dev\n---\nMisspelt.\n');
     const before = runFiles();
@@ -569,7 +584,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       write(path.join(inbox, 'broken.md'), '---\nafter: broken\n---\nWait for it.\n');
       write(path.join(inbox, 'notes.txt'), 'not a card\n');
       const { card } = onStore(addToInbox({ text: 'Started at the command line' }));
-      write(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', card.name));
+      plantRecord(root, runKey('started-run-k2q9'), startedFrom('started-run-k2q9', card.name));
 
       const entries = await listed();
       const broken = entries.find((e) => e.name === 'broken')!;
@@ -712,7 +727,7 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
   test("a card read by a name that is not a card's is a 422, and one that is not there a 404 — and nothing is read outside the inbox or written", async () => {
     clear();
     const { card } = onStore(addToInbox({ text: 'Keep this one' }));
-    write(path.join(root, 'runs', 'r-1.json'), '{"id":"r-1"}');
+    plantRecord(root, runKey('r-1'), '{"id":"r-1"}');
     const before = inboxFiles();
 
     for (const sent of ['.hidden', '..%2Fruns%2Fr-1', 'a%2Fb', 'a%5Cb']) {
@@ -728,6 +743,7 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
 
     assert.deepEqual(inboxFiles(), before);
     fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
+    emptyRuns(root);
   });
   test("a card's page for a name that is not there, in an inbox holding more than cards, names the cards as the package does — a card that does not read among them, a stray file and a folder not — and a card is found before a stray file of its name", async () => {
     clear();

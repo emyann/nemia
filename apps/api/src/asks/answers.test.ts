@@ -13,11 +13,10 @@
 import { root, SEATED } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { recordText, retryAskKey, testPlace } from 'agent-orchestrator/testing';
+import { askNames, plantRecord, recordText, retryAskKey, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
@@ -28,11 +27,6 @@ import { actorWords } from 'objects';
 
 const T0 = Date.parse('2026-09-30T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
-
 const standIn = eachTest(testEngine);
 const stand = eachTest(testPlace);
 const app = eachTest(() => appOver(standIn(), stand()));
@@ -78,8 +72,9 @@ const where: Question = {
 
 const R = 'r-answers';
 const closeout = (outcome: string, open: unknown) => ({ outcome, summary: 'Half.', needs: 'Two questions.', artifacts: [], open });
-write(
-  path.join(root, 'runs', `${R}.json`),
+plantRecord(
+  root,
+  runKey(R),
   JSON.stringify({
     id: R,
     repo: '/code/app',
@@ -117,8 +112,7 @@ beforeEachTest(() => {
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' };
 const ask = (step: string, body: unknown) =>
   app().request(`/api/namespaces/default/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
-const asksDir = path.join(root, 'runs', `${R}.asks`);
-const asked = () => (fs.existsSync(asksDir) ? (fs.readdirSync(asksDir, { recursive: true }) as string[]).sort() : []);
+const asked = () => askNames(root, R).sort();
 const refused = async (res: Response, status: number) => {
   assert.equal(res.status, status, await res.clone().text());
   return (await res.json()) as { error: string; field?: string };

@@ -7,7 +7,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { recordText, runKey, runRecord } from '../testing.ts';
+import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -297,7 +297,7 @@ test("a worktree whose main packages could only be linked — its store on anoth
 
 test('nemia start refuses a .worktreeinclude line outside the repository, by name, before a run is written', async () => {
   const repo = aNodeRepo('/.env.local\n../x\nC:\\x\n.git/hooks\n');
-  const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
+  const runs = keysUnder(ROOT, '/registry/runs/').length;
   await assert.rejects(
     () => isolated(repo),
     (err: Error & { exitCode?: number }) => {
@@ -310,7 +310,7 @@ test('nemia start refuses a .worktreeinclude line outside the repository, by nam
       return true;
     },
   );
-  assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs);
+  assert.equal(keysUnder(ROOT, '/registry/runs/').length, runs);
   assert.ok(
     await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false })),
     '--no-worktree cuts nothing and copies nothing, so it has nothing to refuse',
@@ -403,7 +403,7 @@ const oneStep = () => {
   return dir;
 };
 
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** A card's text: its frontmatter keys, and its body. */
 const cardText = (keys: string, body: string) => `---\n${keys}\n---\n${body}\n`;

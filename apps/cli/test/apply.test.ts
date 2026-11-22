@@ -4,6 +4,7 @@
  * changed Run, which the api writes no way (`nemia explain`), an `apiVersion` other than `nemia/v1`, and a list's objects, which lack
  * their files (`nemia get <resource> <name> -o yaml`).
  */
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,8 +13,9 @@ import { servedStore, write } from './served.ts';
 
 const store = await servedStore('nemia-cli-apply-', (root) => {
   write(path.join(root, 'inbox', 'cache-the-views.md'), '---\nlabels:\n  team: core\n---\nCache the views.\n');
-  write(
-    path.join(root, 'runs', 'r-done.json'),
+  plantRecord(
+    root,
+    runKey('r-done'),
     JSON.stringify({
       id: 'r-done',
       place: { kind: 'folder' },

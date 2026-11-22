@@ -2,7 +2,7 @@
  * `nemia ls` and `nemia stats` and a run's labels, on their handlers: `-l` keeps the runs a selector takes, and `stats -l` sums the facts
  * of the runs it takes alone. The labels `nemia ls` prints beside each run are the client's to print (`apps/cli/test/reads.test.ts`).
  */
-import { runRecord, runsNow } from '../../testing.ts';
+import { emptyRuns, runRecord, runsNow } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -52,6 +52,7 @@ const listedBy = async (...argv: string[]) => {
 
 test("nemia ls selects by -l, two of them either; the labels it prints beside each run are the client's (apps/cli/test/reads.test.ts)", async () => {
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });
+  emptyRuns(ROOT);
   const core = await started('the core one');
   const bare = await started('the bare one');
   filed.labels.put(core.id, { team: 'core', tier: 'gold' });
@@ -75,6 +76,7 @@ test('REFUSED by kind: nemia ls -l of no selector, by its handler, before anythi
 
 test('nemia stats -l sums the facts of the runs the selector takes alone', async () => {
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });
+  emptyRuns(ROOT);
   const ended = async (brief: string) => {
     const run = await started(brief);
     await runWith(noEngine(), advanceRun(runRecord(ROOT, run.id)));

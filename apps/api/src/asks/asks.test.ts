@@ -16,13 +16,22 @@
 import { root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { list } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import type { RunList } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { recordText, retryAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import {
+  askDoneKey,
+  asksPrefix,
+  keysUnder,
+  plantRecord,
+  recordText,
+  retryAskKey,
+  runKey,
+  runsNow,
+  testPlace,
+} from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
@@ -40,11 +49,6 @@ type RetryHow = import('agent-orchestrator').RetryHow;
 
 const T0 = Date.parse('2026-09-14T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
-const write = (file: string, text: string) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
-};
-
 /** A task filed on `harness` and left in `phase`, with `end` laid over its attempt. */
 const task = (
   taskId: string,
@@ -66,9 +70,9 @@ const blocked = {
   artifacts: [],
 };
 
-fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
 const recordFile = runKey(R);
-fs.writeFileSync(
+plantRecord(
+  root,
   recordFile,
   JSON.stringify({
     id: R,
@@ -139,10 +143,11 @@ const ask = (step: string, body: unknown, headers: Record<string, string> = BOAR
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 
-/** Every file under the run's asks directory, waiting or consumed. */
+/** Every ask of the run by its name under the run's prefix, waiting or spent (`done/<name>`). */
 const asked = (run = R) => {
-  const dir = path.join(root, 'runs', `${run}.asks`);
-  return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
+  return keysUnder(root, asksPrefix(run))
+    .map((key) => key.slice(asksPrefix(run).length))
+    .sort();
 };
 
 /** Nothing was written: no ask, and the run's record as it was. */
@@ -416,8 +421,9 @@ describe('a person answers a blocked step, rechecks a refused check and continue
     "a try a person answered carries the answer and who gave it, as `nemia decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none",
     async () => {
       const A = 'r-answered';
-      write(
-        path.join(root, 'runs', `${A}.json`),
+      plantRecord(
+        root,
+        runKey(A),
         JSON.stringify({
           id: A,
           repo: '/code/app',
@@ -444,11 +450,12 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       signedOff('t-a-implement-try2', { outcome: 'done', summary: 'Used Postgres.', artifacts: [] });
       signedOff('t-a-plan', blocked);
       signedOff('t-a-plan-try2', { outcome: 'done', summary: 'Planned it.', artifacts: [] });
-      write(
-        path.join(root, 'runs', `${A}.asks`, 'done', 'retry-implement-2'),
+      plantRecord(
+        root,
+        askDoneKey(A, 'retry-implement-2'),
         JSON.stringify({ mode: 'continue', message: 'Postgres.', at: at(30), actor: SEATED }),
       );
-      write(path.join(root, 'runs', `${A}.asks`, 'done', 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30), actor: SEATED }));
+      plantRecord(root, askDoneKey(A, 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30), actor: SEATED }));
 
       const run = await object(A);
       const implement = stepOf(run, 'implement');

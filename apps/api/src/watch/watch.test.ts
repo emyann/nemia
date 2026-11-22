@@ -140,8 +140,9 @@ test('a card started arrives as MODIFIED, its status.runs moved though its file,
     const sent = initial.find((e) => named(e) === 'st-1');
     assert.ok(sent && sent.type !== 'BOOKMARK');
     fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, 'runs', 'r-started-st-1.json'),
+    plantRecord(
+      root,
+      runKey('r-started-st-1'),
       JSON.stringify({
         id: 'r-started-st-1',
         repo: '/code/app',
@@ -164,7 +165,7 @@ test('a card started arrives as MODIFIED, its status.runs moved though its file,
     assert.deepEqual((modified.object.status as { runs: string[] }).runs, ['r-started-st-1'], 'its status names the run');
   } finally {
     await w.stop();
-    fs.rmSync(path.join(root, 'runs', 'r-started-st-1.json'), { force: true });
+    dropRecord(root, runKey('r-started-st-1'));
   }
 });
 

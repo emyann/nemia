@@ -355,7 +355,7 @@ describe("a card's claim: a record at /registry/claims/<card>, written with its 
 
 /** A store of its own with run files planted as a store before the keyspace keeps them. */
 const planted = () => {
-  const root = scratch('wf-run-import-');
+  const root = scratch('run-import-');
   fs.mkdirSync(path.join(root, 'runs', 'i-run.asks', 'done'), { recursive: true });
   fs.writeFileSync(path.join(root, 'runs', 'i-run.json'), JSON.stringify(fromCard('i-run', 'i-card'), null, 2));
   fs.writeFileSync(path.join(root, 'runs', 'i-run.asks', 'approve-implement-1'), JSON.stringify({ step: 'implement', try: 1, at }));
@@ -372,7 +372,8 @@ const imported = (root: string) => act(Effect.flatMap(keyspaceAt(keyspaceFile(ro
 /** Every file under `dir`, relative to it, sorted. */
 const filesUnder = (dir: string) =>
   fs.existsSync(dir)
-    ? (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+    ? fs
+        .readdirSync(dir, { recursive: true, withFileTypes: true })
         .filter((e) => e.isFile())
         .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
         .sort()
@@ -452,7 +453,7 @@ describe("a store's run files imported into its keyspace once, moved aside under
     assert.equal(recordText(root, askKey('i-run', { of: 'try', step: 'implement', n: 2 })), undefined);
   });
   test('a store with no run file makes no keyspace file when it is read', async () => {
-    const root = scratch('wf-run-import-empty-');
+    const root = scratch('run-import-empty-');
     await runFilesImported(root);
     assert.deepEqual(runsNow(root).runs.ids(), []);
     assert.equal(fs.existsSync(keyspaceFile(root)), false);

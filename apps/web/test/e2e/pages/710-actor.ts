@@ -28,7 +28,7 @@ export default {
   expect: async (page) => {
     try {
       writeRegated(store!, Date.now());
-      const approved = JSON.parse(storedAsks(REGATED.id)['approve-plan-1']!) as Record<string, unknown>;
+      const approved = JSON.parse(storedAsks(REGATED.id)['approve-plan-1']) as Record<string, unknown>;
       storeAsk(REGATED.id, 'approve-plan-1', `${JSON.stringify({ ...approved, actor: APPROVER })}\n`);
       fs.writeFileSync(
         holdFile(),

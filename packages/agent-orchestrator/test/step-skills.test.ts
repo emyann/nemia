@@ -12,7 +12,7 @@
  * by name, with no run left. The link rule itself is held beside its code (`src/skills/read.store.test.ts`), the shipped build
  * folder's kit skills in `skill-folders.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
-import { runRecord } from '../testing.ts';
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -64,7 +64,11 @@ function written(dir: string, files: Record<string, string>) {
 }
 
 /** The runs the store holds, by what their folder lists. */
-const runsNow = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+const runsNow = () =>
+  [
+    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+    ...keysUnder(ROOT, '/registry/runs/'),
+  ].sort();
 
 /** The skill `name` of the folder `folder` of `repo`, where a session there finds it; the repository's own for `.`. */
 const nested = (repo: string, folder: string, name: string) => path.join(repo, folder, '.claude', 'skills', name);

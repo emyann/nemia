@@ -19,7 +19,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
-import { recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import { keysUnder, plantRecord, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -55,8 +55,9 @@ beforeEachTest(() => {
 });
 
 const record = (id: string, steps: Record<string, { taskId: string | null }>) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',
@@ -98,6 +99,7 @@ const written = () => ({
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(root, 'runs', f), 'utf8')]),
   ),
+  records: Object.fromEntries(keysUnder(root, '/registry/').map((key) => [key, recordText(root, key)])),
   said: [...standIn().said],
 });
 

@@ -24,7 +24,7 @@ import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, settingsOf } from 'agent-orchestrator';
 import { AGENTS_FOLDER, parseWorkflow, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
-import { addFactory, attachWorkflow, hireAgent, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, hireAgent, keysUnder, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 /**
  * The scratch repository, a git repository, as `nemia start` reads its HEAD: read in the default factory by `?repo=`, which the factory
  * `bench`, filed on it, lets the api read (`placeFor`); a start there runs in `bench`, the one factory that holds it, which offers `good`
@@ -167,7 +167,11 @@ const tells = (said: string, head: string, facts: string[]) => {
 };
 
 /** The files in the store's runs directory: a record per run, and anything else anyone wrote there. */
-const runFiles = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
+const runFiles = () =>
+  [
+    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
+    ...keysUnder(root, '/registry/runs/'),
+  ].sort();
 
 /** The tasks filed with the engine: a journal each. */
 const filedTasks = () => (fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : []);
@@ -558,7 +562,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
       assert.match(id, /^add-a-cache-keep-it-small-[a-z0-9]+$/);
       assert.equal(res.headers.get('location'), `/api/runs/${id}`);
 
-      assert.deepEqual(runFiles(), [id, `${id}.json`], "the record, and the run's own folder beside it");
+      assert.deepEqual(runFiles(), [runKey(id), id], "the record, and the run's own folder beside it");
       const run = runsNow(root).runs.read(id);
       assert.deepEqual(
         fs.readdirSync(path.join(root, 'runs', id)),
@@ -607,7 +611,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
   s.test(
     "a start as the board sends it is not refused: same-origin through vite's `/api` proxy, which rewrites Host to the api's and leaves the origin header the board's page; and one from a client outside a browser, which sends no Sec-Fetch-Site",
     async () => {
-      const records = () => runFiles().filter((f) => f.endsWith('.json')).length;
+      const records = () => keysUnder(root, '/registry/runs/').length;
       const before = records();
       for (const headers of [
         { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' },
@@ -694,8 +698,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
         steps: { review: { taskId: `${id}-review` } },
         createdAt: at,
       });
-      const put = (id: string, at: string, dir?: string) =>
-        fs.writeFileSync(path.join(runs, `${id}.json`), JSON.stringify(record(id, at, dir)));
+      const put = (id: string, at: string, dir?: string) => plantRecord(root, runKey(id), JSON.stringify(record(id, at, dir)));
       put('r-of-good', '2099-10-16T00:00:00.000Z');
 
       const { records } = await runtime.runPromise(ReadMemo.useSync((memo) => memo));
@@ -911,8 +914,9 @@ describe('POST /api/namespaces/default/runs: what a start refuses, writing nothi
 function parentRun(id: string, cancelledAt?: string) {
   if (recordText(root, runKey(id)) !== undefined) return;
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo,

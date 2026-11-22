@@ -68,7 +68,7 @@ const beat = (f: ReturnType<typeof files>) =>
  * the prompt.
  */
 function written(f: ReturnType<typeof files>) {
-  const neighbour = storedRecord(NEIGHBOUR.id) as Record<string, unknown>;
+  const neighbour = storedRecord(NEIGHBOUR.id);
   const at = new Date().toISOString();
   const run = {
     ...neighbour,

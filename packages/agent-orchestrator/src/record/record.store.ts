@@ -407,8 +407,8 @@ export type AskEntry = { readonly name: string; readonly text: string; readonly 
  * pause's, the run's labels and what was said before a step was filed (`pause`, `labels`, `saidBefore`, which the Run door composes)
  * with them. The frozen steps are read under the names their keys have now (`asNamed`), and written back under them, in their place among
  * the record's keys; a try's former `then` is read as its `cause` (`upgradeTries`), and a step's record written before `declared` was kept
- * is given it where its schema has not moved (`keptDeclared`). Counted as one record read (`countRecord`). Refused: a record that does not
- * read as a run (`UnreadableRecord`).
+ * is given it where its schema has not moved (`keptDeclared`). Counted as one record read (`countRecord`), its bytes as read (`countRead`).
+ * Refused: a record that does not read as a run (`UnreadableRecord`).
  * @param id The run's id.
  * @param text The record's text.
  * @param where Where a person finds the record: its key.
@@ -416,6 +416,7 @@ export type AskEntry = { readonly name: string; readonly text: string; readonly 
 export const recordIn = (id: string, text: string, where: string) =>
   within('records', () => {
     countRecord();
+    countRead(Buffer.byteLength(text, 'utf8'));
     let raw: unknown;
     try {
       raw = upgradeTries(JSON.parse(text));
@@ -427,7 +428,7 @@ export const recordIn = (id: string, text: string, where: string) =>
     const read = { ...raw };
     for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
     const { workflow, ...unfrozen } = read;
-    return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run as Run;
+    return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run;
   });
 
 /**
@@ -460,7 +461,7 @@ export const composedRun = (home: string, run: Run, asks: readonly AskEntry[]) =
     ...(saidBefore ? { saidBefore } : {}),
     ...(standing.length ? { approvals: standing } : {}),
     ...(acceptances.length ? { acceptances } : {}),
-  } satisfies Run as Run;
+  } satisfies Run;
 };
 
 /**

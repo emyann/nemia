@@ -3,6 +3,7 @@
  * both declarers, and no run is written. The test's store is its own, at `ROOT`, handed to `main` as `ENV`, and a start
  * outside a factory is allowed, with no daemon started, whether or not the test setup's preload ran.
  */
+import { keysUnder } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -46,7 +47,7 @@ function twice() {
   return dir;
 }
 
-const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0);
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 test('REFUSED: nemia start of a step declaring a field its agent declares exits 2, naming the field and both declarers, and writes no run', async () => {
   const dir = twice();

@@ -102,7 +102,9 @@ const planted: string[] = [];
 /** Takes out, once the story `t` ends, every run it planted: the next story reads a store with none of them. */
 const plantedFor = (t: Finishes) =>
   t.onTestFinished(() => {
-    for (const file of planted.splice(0)) dropRecord(ROOT, file);
+    for (const file of planted.splice(0))
+      if (file.startsWith('/registry/')) dropRecord(ROOT, file);
+      else fs.rmSync(file, { recursive: true, force: true });
   });
 
 function writeRun(id: string, workflow: object[], steps: Record<string, object>, more: object = {}) {

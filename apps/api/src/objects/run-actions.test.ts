@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { TABLE_ACCEPT } from 'objects';
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -59,8 +59,9 @@ for (const name of ['plan', 'implement', 'nudged', 'talk', 'review'])
  * `card` where one is named.
  */
 const record = (id: string, steps: Record<string, string | null>, more: { gated?: string; factory?: string; card?: string } = {}) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',

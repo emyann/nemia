@@ -38,7 +38,6 @@ function keptByTheOldRelease(name: string) {
 /** A run planted as its record alone, one step and nothing of it filed: something a person holds. */
 function planted(id: string) {
   const file = runKey(id);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   plantRecord(
     root,
     file,

@@ -12,7 +12,7 @@
  * the switch out of `ENV` for a checkpoint.
 
  */
-import { recordText, runKey, runRecord } from '../testing.ts';
+import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -72,7 +72,11 @@ async function refusedBy(act: () => unknown, tag: 'Missing' | 'Invalid' | 'Confl
 }
 
 /** The runs written under the store: none after a refusal. */
-const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []) satisfies string[];
+const runsWritten = () =>
+  [
+    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+    ...keysUnder(ROOT, '/registry/runs/'),
+  ] satisfies string[];
 
 /** `refusedBy`, and no run written by it. */
 async function startRefused(act: () => unknown, tag: 'Missing' | 'Invalid', ...facts: string[]) {

@@ -293,11 +293,17 @@ const composedOf = (
     return undefined;
   });
 
-/** What one run's reads read from `held`: its record and its asks, each none where the store has no keyspace. */
+/** Whether `id` names a key of its own under the prefix: one holding a `/` would name another's, or an ask's, so names no run. */
+const ownKey = (id: string) => id !== '' && !id.includes('/');
+
+/** What one run's reads read from `held`: its record and its asks, each none where the store has no keyspace or `id` names no key. */
 const keyReads = (held: Held) => ({
   asksOf: (id: string) =>
-    Effect.flatMap(held, (ks) => (ks === undefined ? Effect.succeed([]) : Effect.map(ks.list(asksPrefix(id)), (l) => l.records))),
-  recordOf: (id: string) => Effect.flatMap(held, (ks) => (ks === undefined ? Effect.succeed(undefined) : ks.get(runKey(id)))),
+    Effect.flatMap(held, (ks) =>
+      ks === undefined || !ownKey(id) ? Effect.succeed([]) : Effect.map(ks.list(asksPrefix(id)), (l) => l.records),
+    ),
+  recordOf: (id: string) =>
+    Effect.flatMap(held, (ks) => (ks === undefined || !ownKey(id) ? Effect.succeed(undefined) : ks.get(runKey(id)))),
 });
 
 /** The records and asks of the runs `due` among `ids`, by id: a whole list where every run is due, else one read per run. */
@@ -493,7 +499,7 @@ function askWritten(open: Opened) {
             ? Effect.fail(raced(err))
             : Effect.map(ks.get(key), (there) => {
                 const stray = there === undefined ? null : strayOf(person, there.value, step, n);
-                return { written: false, where: key, stray } satisfies AskWritten as AskWritten;
+                return { written: false, where: key, stray } satisfies AskWritten;
               }),
         ),
       );

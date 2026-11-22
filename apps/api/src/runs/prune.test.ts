@@ -23,7 +23,7 @@ import { runWith } from '../../test/builtin-place.ts';
 import { listedRuns, objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, prune, prunedKept, prunedWords } from 'agent-orchestrator';
-import { runsNow } from 'agent-orchestrator/testing';
+import { asksPrefix, keysUnder, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const git = (...args: string[]) =>
   execFileSync(
@@ -86,8 +86,9 @@ function repositoryRun(id: string, { merge, working: busy = false }: { merge: bo
   const taskId = `${id}-implement`;
   if (busy) working(taskId);
   else signedOff(taskId);
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo,
@@ -119,8 +120,9 @@ journal('p-failed-merged-implement', [
 
 signedOff('p-direct-implement');
 write(path.join(filesDir('p-direct'), 'implement', 'shot.png'), 'a picture');
-write(
-  path.join(root, 'runs', 'p-direct.json'),
+plantRecord(
+  root,
+  runKey('p-direct'),
   JSON.stringify({
     id: 'p-direct',
     repo,
@@ -139,8 +141,9 @@ write(
 const work = path.join(root, 'folders', 'p-folder');
 fs.mkdirSync(path.join(work, 'write'), { recursive: true });
 signedOff('p-folder-write');
-write(
-  path.join(root, 'runs', 'p-folder.json'),
+plantRecord(
+  root,
+  runKey('p-folder'),
   JSON.stringify({
     id: 'p-folder',
     place: { kind: 'folder' },
@@ -191,6 +194,7 @@ const stateOf = (id: string) => ({
       .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
       .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')]),
   ),
+  records: Object.fromEntries([runKey(id), ...keysUnder(root, asksPrefix(id))].map((key) => [key, recordText(root, key)])),
   files: fs.existsSync(filesDir(id)),
   worktree: fs.existsSync(worktreeOf(id)),
   branches: git('branch', '--list', '--format=%(refname:short) %(objectname)').split('\n').filter(Boolean).sort(),
@@ -251,7 +255,7 @@ describe('a finished run pruned on the board as `nemia prune` prunes it: what it
       assert.equal(fs.existsSync(filesDir('p-merged')), false, 'its files are gone');
       assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.pruned')), 'it is marked pruned');
       assert.ok(hasBranch(branchOf('p-merged')), 'its branch is kept');
-      assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.json')), 'its record is kept');
+      assert.ok(recordText(root, runKey('p-merged')) !== undefined, 'its record is kept');
 
       const pruned = runsNow(root).runs.read('p-merged').pruned!;
       assert.ok(pruned.artifacts, 'the marker says the files went');
@@ -356,11 +360,11 @@ describe('POST /api/namespaces/:namespace/runs/:runId/prune refuses, touching no
   });
   test('REFUSED at shipped defaults: a prune of a run the store has not — none by that id, an id no run can have — is a 404, and nothing is written', async () => {
     for (const id of ['no-such-run', 'Not_A_Run']) {
-      const before = fs.readdirSync(path.join(root, 'runs')).sort();
+      const before = [...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort();
       const res = await pruneOn(id, { artifacts: true });
       assert.equal(res.status, 404, id);
       assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
-      assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
+      assert.deepEqual([...fs.readdirSync(path.join(root, 'runs')), ...keysUnder(root, '/registry/')].sort(), before, id);
     }
   });
   test('REFUSED at shipped defaults: a body `RunPrune` does not read is a 400 naming the key, before the run is read, and nothing is touched', async () => {

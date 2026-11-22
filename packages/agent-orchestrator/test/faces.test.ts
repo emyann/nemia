@@ -13,7 +13,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, and no cap is set on runs or sessions.
  */
-import { askKeyOf, asksPrefix, dropRecord, keysUnder, runRecord, runsNow } from '../testing.ts';
+import { askKeyOf, asksPrefix, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -309,7 +309,7 @@ describe("each verb's program, given its services, answers what its plain face a
       vi.useFakeTimers({ toFake: ['Date'], now: at });
       try {
         const ran = await program();
-        if ('file' in ran) fs.rmSync(String(ran.file));
+        if ('file' in ran) dropRecord(ROOT, String(ran.file));
         assert.deepStrictEqual(ran, await face(), what);
       } finally {
         vi.useRealTimers();
@@ -403,7 +403,7 @@ describe("each verb's program, given its services, answers what its plain face a
   });
   test("REFUSED as a typed failure: a record the store refuses to read is each program's `Invalid`, not a defect", async () => {
     const e = stage.board().e;
-    fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
+    plantRecord(ROOT, runKey('garbled'), '{ not json');
     try {
       const programs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>]> = [
         ['nemia retry --round', roundRun('garbled')],
@@ -419,7 +419,7 @@ describe("each verb's program, given its services, answers what its plain face a
         'nothing written',
       );
     } finally {
-      fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
+      dropRecord(ROOT, runKey('garbled'));
     }
   });
   test('a journal that does not read is a defect of each program, which no `Effect.catch` recovers, and its plain face rejects with it; nothing written', async () => {

@@ -25,6 +25,7 @@ import {
   setInstructionAt,
   setScheduleAt,
 } from './src/factory/factory.store.ts';
+import fs from 'node:fs';
 import { wfRoot } from './src/config/config.store.ts';
 import { Effect } from 'effect';
 import { StoreRoot } from './src/config/root.store.ts';
@@ -132,6 +133,12 @@ export const runsNow = (root: string) => {
 const keyspaceNow = (root: string) =>
   Effect.runSync(Effect.tap(keyspaceAt(keyspaceFile(root)), (keyspace) => runsImported(root, keyspace)));
 
+/** The keyspace of the store `root` a read reads, its planted files imported: undefined where it has no keyspace and none planted. */
+const keyspaceRead = (root: string) => {
+  const { runs, claims } = runFilesOf(root);
+  return !fs.existsSync(keyspaceFile(root)) && runs.length === 0 && claims.length === 0 ? undefined : keyspaceNow(root);
+};
+
 /**
  * A run as the Run door reads it at the store `root`, at once: what a test reads a run's record by.
  * @param root The store's root folder.
@@ -177,14 +184,20 @@ export const rewriteRun = (root: string, run: Run) =>
  * @param root The store's root folder.
  * @param key The record's key (`runKey`, `askKey`, `claimKey`).
  */
-export const recordText = (root: string, key: string) => Effect.runSync(keyspaceNow(root).get(key))?.value;
+export const recordText = (root: string, key: string) => {
+  const keyspace = keyspaceRead(root);
+  return keyspace === undefined ? undefined : Effect.runSync(keyspace.get(key))?.value;
+};
 
 /**
  * The keys under `prefix` in the store `root`: what a test reads a run's asks by.
  * @param root The store's root folder.
  * @param prefix The keys' prefix (`asksPrefix`).
  */
-export const keysUnder = (root: string, prefix: string) => Effect.runSync(keyspaceNow(root).keys(prefix));
+export const keysUnder = (root: string, prefix: string) => {
+  const keyspace = keyspaceRead(root);
+  return keyspace === undefined ? [] : Effect.runSync(keyspace.keys(prefix));
+};
 
 /**
  * Text planted at a key of the store `root`, over what is there: a test's raw ask or record, written as no verb would write it.
@@ -202,6 +215,18 @@ export const plantRecord = (root: string, key: string, text: string) =>
       ),
     ),
   );
+
+/**
+ * Every run's record, claim and ask of the store `root` deleted: what a test that empties its store between stories runs beside removing
+ * `runs/`, since the keyspace keeps them.
+ * @param root The store's root folder.
+ */
+export const emptyRuns = (root: string) => {
+  const keyspace = keyspaceRead(root);
+  if (keyspace === undefined) return;
+  for (const prefix of ['/registry/runs/', '/registry/claims/', '/registry/asks/'])
+    for (const key of Effect.runSync(keyspace.keys(prefix))) dropRecord(root, key);
+};
 
 /**
  * A key of the store `root` deleted, there or not.
@@ -242,7 +267,7 @@ export const roundAskKey = (id: string, step: string, n: number) => askKey(id, {
 export const approvalKey = (id: string, step: string, n: number) => askKey(id, { of: 'gate', step, n });
 
 /**
- * The key an acceptance of the loop `step`'s try `n` is written at, as `nemia accept` answers it.
+ * The key an acceptance of the loop `step`'s try `n` is written at, as `nemia approve` of a loop out of rounds answers it.
  * @param id The run's id.
  * @param step The loop's step.
  * @param n The try accepted.

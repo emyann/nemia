@@ -67,7 +67,13 @@ export default {
         );
       const took = (await response.json()) as { step?: unknown; try?: unknown; at?: unknown; message?: unknown; file?: unknown };
       const file = `accept-${step}-3`;
-      if (took.step !== step || took.try !== 3 || typeof took.at !== 'string' || took.message !== message || took.file !== file) {
+      if (
+        took.step !== step ||
+        took.try !== 3 ||
+        typeof took.at !== 'string' ||
+        took.message !== message ||
+        took.file !== `/registry/asks/${id}/${file}`
+      ) {
         throw new Refused(
           `the api answers with the step, the try accepted, when, the words and the acceptance's file — it answered ${JSON.stringify(took)}`,
         );

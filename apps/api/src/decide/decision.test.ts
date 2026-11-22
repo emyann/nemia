@@ -15,7 +15,7 @@ import { prunedKept, prunedWords } from 'agent-orchestrator';
 import type { Decidable, DecideCommand, RunDecision } from 'objects';
 import { app } from '../app.ts';
 import { objectOf } from '../../test/run-reads.ts';
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
+import { plantAsk, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -280,12 +280,7 @@ describe("a run's decision on the api, and the run object beside it: one reading
         ],
         'before a person accepts, no step of the run says an approval',
       );
-      const asks = path.join(root, 'runs', 'r-d9.asks');
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(
-        path.join(asks, 'accept-review-1'),
-        JSON.stringify({ at: '2026-09-20T01:00:00.000Z', message: 'spent: of the try before' }),
-      );
+      plantAsk(root, 'r-d9', 'accept-review-1', JSON.stringify({ at: '2026-09-20T01:00:00.000Z', message: 'spent: of the try before' }));
       assert.deepEqual(
         (await stepsOf()).map((s) => [s.name, s.gate?.approval ?? null]),
         [
@@ -294,8 +289,10 @@ describe("a run's decision on the api, and the run object beside it: one reading
         ],
         'the looping step is on its second try, one round behind it: an acceptance of try 1 is spent, and said of nothing',
       );
-      fs.writeFileSync(
-        path.join(asks, 'accept-review-2'),
+      plantAsk(
+        root,
+        'r-d9',
+        'accept-review-2',
         JSON.stringify({ at: '2026-09-20T02:00:00.000Z', message: 'the findings are follow-up work' }),
       );
       assert.deepEqual(
@@ -365,9 +362,7 @@ describe("a run's decision on the api, and the run object beside it: one reading
         'its files are kept: a plain prune removes the worktrees alone',
       );
       assert.deepEqual(page.status.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
-      const asks = path.join(root, 'runs', 'r-d10.asks');
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
+      plantAsk(root, 'r-d10', 'retry-implement-2', JSON.stringify({ mode: 'continue' }));
       const asked = await detailOf('r-d10');
       assert.equal(
         asked.status.steps.find((s) => s.name === 'implement')?.asked,

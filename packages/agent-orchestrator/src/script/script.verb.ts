@@ -44,7 +44,7 @@ export type ScriptFiling = {
 
 /**
  * Copy each table condition's route onto its record, once for the try it is on (`StepRecord.route`, `by: 'table'`), where its table
- * answers one and nothing is there for the try: a person's (`routeFile`) or one copied before. Answers with the conditions written. The
+ * answers one and nothing is there for the try: a person's (`routeAsk`) or one copied before. Answers with the conditions written. The
  * pass reads the route afresh either way (`answeredRoute`); the copy, written with the record when the pass writes it — as it does on the
  * pass that files the route's first node — keeps what the run took after the producer's closeout is pruned.
  * @param f The pass's filing: the run, whose records are written, and its reads of each step's word and closeout.

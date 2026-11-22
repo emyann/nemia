@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`, whose `WF_DEFAULT_FACTORY_STARTS` starts runs in repositories no factory holds.
 
  */
-import { askNames, askText, dropRecord, listRuns, plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import { askNames, askText, dropRecord, listRuns, plantAsk, plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -611,10 +611,10 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       const live = await aParent(aRepo());
       const id = live.run.id;
       markCancelled(ROOT, id);
-      const asks = path.join(ROOT, 'runs', `${id}.asks`);
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(
-        path.join(asks, 'retry-implement-2'),
+      plantAsk(
+        ROOT,
+        id,
+        'retry-implement-2',
         JSON.stringify({ step: 'implement', try: 2, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
       );
       for (const suffix of ['.json', '.cancelled', '.asks']) {
@@ -658,10 +658,10 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
           ),
         );
       names(String(await recovered(e(), '../x')), '"../x"', 'nemia rm add-a-flag-x1y2');
-      fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
+      plantRecord(ROOT, runKey('garbled'), '{ not json');
       names(String(await recovered(e(), 'garbled')), 'is not JSON');
       assert.ok(under('runs', 'garbled.json'), 'and nothing removed');
-      fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
+      dropRecord(ROOT, runKey('garbled'));
 
       const run = await stage.runPlaced(startRun({ brief: 'its journal will not read', repo: aRepo(), workflowDir: folder() }));
       await pass(run.id);
@@ -905,8 +905,8 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
     '`runsForgetting` says of a run whose record does not read that it was not counted, and why, and counts the other runs',
     async () => {
       const p = await aParent(aRepo(), { work: 'c.txt' });
-      const file = path.join(ROOT, 'runs', 'garbled-c3d4.json');
-      fs.writeFileSync(file, '{ not json');
+      const file = runKey('garbled-c3d4');
+      plantRecord(ROOT, file, '{ not json');
       try {
         const { counted, uncounted } = await stage.runWith(e(), runsForgetting(['garbled-c3d4', p.run.id]));
         assert.deepEqual([...counted.keys()], [p.run.id]);
@@ -915,7 +915,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
         names(uncounted[0].text, 'garbled-c3d4', 'nemia rm', 'not counted');
         assert.ok(uncounted[0].text.length > 'garbled-c3d4: '.length + 60, 'and why');
       } finally {
-        fs.rmSync(file);
+        dropRecord(ROOT, file);
       }
       await stage.runWith(e(), forgetRun(p.run.id));
       assert.deepEqual(

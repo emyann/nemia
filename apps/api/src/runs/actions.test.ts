@@ -16,7 +16,7 @@ import { app } from '../app.ts';
 import { COMMANDS, engine, parseArgv, RM, triesDir } from 'agent-orchestrator';
 import { forgottenOf } from '../objects/forgotten.ts';
 import { runWith } from '../../test/builtin-place.ts';
-import { approvalKey, recordText, runKey } from 'agent-orchestrator/testing';
+import { approvalKey, askNames, plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -44,8 +44,9 @@ const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, requ
 
 /** A run's record, with what every run here shares. */
 const runRecord = (id: string, workflow: object[], steps: object, more: object = {}) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',
@@ -130,8 +131,7 @@ async function asTyped(name: string, argv: string[]) {
 
 /** Every file under a run's asks directory, waiting or consumed. */
 const asked = (run: string) => {
-  const dir = path.join(root, 'runs', `${run}.asks`);
-  return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
+  return askNames(root, run).sort();
 };
 
 /** A file the run wrote, its words but when and who wrote it (`actorIn`). */
@@ -242,7 +242,7 @@ describe('an action on its endpoint answers what its `nemia` entry answers: the 
       loopingRun(id);
       signedOff(`${id}-review-1`, { ...DONE, again: false });
       const record = JSON.parse(recordText(root, runKey(id)) ?? '') as object;
-      write(path.join(root, 'runs', `${id}.json`), JSON.stringify({ ...record, repo, workspace: repo, baseRef: base }));
+      plantRecord(root, runKey(id), JSON.stringify({ ...record, repo, workspace: repo, baseRef: base }));
     }
     const typed = await asTyped('refresh', ['r-cli-base', '--base']);
     const res = await post('/api/namespaces/default/runs/r-api-base/refresh', { base: true });
@@ -292,7 +292,7 @@ describe('an action on its endpoint answers what its `nemia` entry answers: the 
       git('branch', '--list', 'wf/r-*-rm/implement', '--format=%(refname:short)'),
       'wf/r-api-rm/implement\nwf/r-cli-rm/implement',
     );
-    assert.ok(!fs.existsSync(path.join(root, 'runs', 'r-api-rm.json')) && !fs.existsSync(path.join(root, 'runs', 'r-cli-rm.json')));
+    assert.ok(recordText(root, runKey('r-api-rm')) === undefined && recordText(root, runKey('r-cli-rm')) === undefined);
   });
   test("REFUSED at shipped defaults: a try whose repository its place cannot read — no git repository — is a 409 in `nemia rm`'s words, never removed as one with nothing left, and its record kept", async () => {
     const plain = fs.mkdtempSync(path.join(root, 'plain-'));
@@ -311,7 +311,7 @@ describe('an action on its endpoint answers what its `nemia` entry answers: the 
       said.endsWith('nothing was touched, as nothing says what is there: nemia rm r-api-unread again once the place reads it'),
       said,
     );
-    assert.ok(fs.existsSync(path.join(root, 'runs', 'r-api-unread.json')) && fs.existsSync(path.join(root, 'runs', 'r-cli-unread.json')));
+    assert.ok(recordText(root, runKey('r-api-unread')) !== undefined && recordText(root, runKey('r-cli-unread')) !== undefined);
   });
 });
 
@@ -347,7 +347,7 @@ describe('what an action ignores of its body, and the removals the board will no
     const said = ((await res.json()) as { error: string }).error;
     for (const fact of ['only a try', `a run of ${path.join(root, 'no-such-workflow')}`, '`nemia rm r-no-try`'])
       assert.ok(said.includes(fact), `${fact} in ${said}`);
-    assert.ok(fs.existsSync(path.join(root, 'runs', 'r-no-try.json')), 'the record is kept');
+    assert.ok(recordText(root, runKey('r-no-try')) !== undefined, 'the record is kept');
   });
   test('REFUSED at shipped defaults: a try whose worktree its place will not remove — held — is a 409 naming the worktree, how to let it go and `nemia rm`, and its record kept', async () => {
     const id = 'r-held-try';
@@ -379,7 +379,7 @@ describe('POST …/cancel stops a run as `nemia cancel` does, so a seat that sta
   test('REFUSED: a run the store has not is a 404, nothing written', async () => {
     const res = await post('/api/namespaces/default/runs/r-no-such/cancel', {});
     assert.equal(res.status, 404);
-    assert.equal(fs.existsSync(path.join(root, 'runs', 'r-no-such.json')), false);
+    assert.equal(recordText(root, runKey('r-no-such')) !== undefined, false);
   });
 });
 
@@ -423,7 +423,7 @@ describe('POST …/steps/:step/route routes a condition as `nemia route` does, w
     assert.equal((await post('/api/namespaces/mill/runs/r-route-plan/steps/triage/route', { route: 'build' })).status, 404);
     assert.deepEqual(asked('r-route-plan'), []);
     assert.equal((await post('/api/namespaces/default/runs/r-no-such/steps/triage/route', { route: 'build' })).status, 404);
-    assert.equal(fs.existsSync(path.join(root, 'runs', 'r-no-such.asks')), false);
+    assert.equal(askNames(root, 'r-no-such').length > 0, false);
   });
   test('REFUSED: a body with no route is a 400', async () => {
     conditionRun('r-route-none');

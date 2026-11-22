@@ -8,7 +8,7 @@
  * record, both through the Factory door at the root the handler is given as it is typed (`StoreRoot`, `storeConfigLayer` of the
  * process's environment), which is what that test pins. `default` has a record and no file, so the test plants only the record.
  */
-import { runRecord, writeRun } from '../../testing.ts';
+import { recordText, runRecord, writeRun } from '../../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -348,5 +348,5 @@ test('nemia approve of a loop out of rounds: what it accepted, and the file it w
     file: string;
   };
   assert.deepEqual([approved.step, approved.try, approved.message, approved.loop], ['review', 1, 'as it stands', true]);
-  assert.ok(fs.existsSync(approved.file), approved.file);
+  assert.ok(recordText(ROOT, approved.file) !== undefined, approved.file);
 });

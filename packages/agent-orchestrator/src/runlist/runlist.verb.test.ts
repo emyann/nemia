@@ -9,7 +9,7 @@
  * On a store of its own at `ROOT`, given as `ENV`; each test empties the store's runs first, and a test that compares two answers, or
  * orders runs by time, seeds `Date`.
  */
-import { listRuns, runRecord } from '../../testing.ts';
+import { emptyRuns, listRuns, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
 import { beforeEach, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -49,6 +49,7 @@ const e = () => engineOf(engine().layer);
 
 beforeEach(() => {
   fs.rmSync(RUNS_DIR, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS_DIR, { recursive: true });
 });
 
@@ -93,7 +94,7 @@ const aFinished = async () => {
  */
 const anUndecided = async () => {
   const id = await started({ work: null }, [], true);
-  const record = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, `${id}.json`), 'utf8')) as { steps: { work: { workspace: string } } };
+  const record = JSON.parse(recordText(ROOT, runKey(id)) ?? '') as { steps: { work: { workspace: string } } };
   const { workspace } = record.steps.work;
   fs.writeFileSync(path.join(workspace, 'result.txt'), 'the work\n');
   stand().world.commit(workspace, 'the work');
@@ -268,9 +269,9 @@ test('a plain list carries no counts, no asOf and no frame key, and answers each
 test('a run left unjudged is named in unjudged with its state on a list asked by state: in flight, as the whole list counts it', async (t) => {
   seeded(t);
   const id = await aWaiting();
-  const record = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, `${id}.json`), 'utf8')) as Record<string, unknown>;
+  const record = JSON.parse(recordText(ROOT, runKey(id)) ?? '') as Record<string, unknown>;
   delete record.workflow;
-  fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), `${JSON.stringify({ ...record, workflowDir: path.join(ROOT, 'no-such-folder') })}\n`);
+  plantRecord(ROOT, runKey(id), `${JSON.stringify({ ...record, workflowDir: path.join(ROOT, 'no-such-folder') })}\n`);
   const answer = await list({ fieldSelector: 'status.state!=finished' });
   assert.deepEqual(
     answer.unjudged?.map((one) => [one.name, one.state]),
@@ -474,7 +475,7 @@ test('the finished runs page by when their work stopped, not by when they were c
 const copies = (text: string, n: number) => {
   for (let i = 0; i < n; i++) {
     const id = `cp-${String(i).padStart(3, '0')}`;
-    fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), `${JSON.stringify({ ...JSON.parse(text), id })}\n`);
+    plantRecord(ROOT, runKey(id), `${JSON.stringify({ ...JSON.parse(text), id })}\n`);
   }
 };
 
@@ -492,7 +493,7 @@ test('a warm read by state costs the records of the runs still moving alone: as 
   };
 
   const few = await warm();
-  copies(fs.readFileSync(path.join(RUNS_DIR, `${model}.json`), 'utf8'), 200);
+  copies(recordText(ROOT, runKey(model)) ?? '', 200);
   const many = await warm();
   assert.equal(few, 1, 'the run in flight alone, which is at rest in no memo: no record is read again for a clock');
   assert.equal(many, few, "a warm read reads no finished run's record, however many there are");

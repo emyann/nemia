@@ -3,6 +3,7 @@
  * counting down, and refuses a limit or a token that is not one; the namespaces are the cards' factories, `default` those that name none;
  * `labelSelector` and its retired spelling select alike. The guard before every write is `test/guarded.test.ts`'s.
  */
+import { dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { root } from '../../test/harness.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -137,8 +138,9 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   const runs = path.join(root, 'runs');
   fs.mkdirSync(runs, { recursive: true });
   const run = (id: string, from?: string) =>
-    fs.writeFileSync(
-      path.join(runs, `${id}.json`),
+    plantRecord(
+      root,
+      runKey(id),
       JSON.stringify({
         id,
         repo: '/code/app',
@@ -160,7 +162,7 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   run('started-b2', 'w-started');
   t.onTestFinished(() => {
     for (const name of ['w-1', 'w-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
-    for (const id of ['ctx-a1', 'started-b2']) fs.rmSync(path.join(runs, `${id}.json`), { force: true });
+    for (const id of ['ctx-a1', 'started-b2']) dropRecord(root, runKey(id));
   });
   const at = '/api/namespaces/default/cards/w-1';
   const read = (await (await app.request(at)).json()) as typeof Card.Type;
@@ -192,8 +194,9 @@ test("PUT a card's text to its source: the name kept, the text's body and keys; 
   fs.mkdirSync(runs, { recursive: true });
   card('e-1', { team: 'core' });
   card('e-started');
-  fs.writeFileSync(
-    path.join(runs, 'started-e3.json'),
+  plantRecord(
+    root,
+    runKey('started-e3'),
     JSON.stringify({
       id: 'started-e3',
       repo: '/code/app',
@@ -211,7 +214,7 @@ test("PUT a card's text to its source: the name kept, the text's body and keys; 
   );
   t.onTestFinished(() => {
     for (const name of ['e-1', 'e-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
-    fs.rmSync(path.join(runs, 'started-e3.json'), { force: true });
+    dropRecord(root, runKey('started-e3'));
   });
   const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers, body: JSON.stringify(body) });
   const at = '/api/namespaces/default/cards/e-1/source';
@@ -244,8 +247,9 @@ test("a card filed from runs that disagree on a label says the key it left out, 
   const runs = path.join(root, 'runs');
   fs.mkdirSync(runs, { recursive: true });
   const run = (id: string, team: string) => {
-    fs.writeFileSync(
-      path.join(runs, `${id}.json`),
+    plantRecord(
+      root,
+      runKey(id),
       JSON.stringify({
         id,
         repo: '/code/app',
@@ -332,8 +336,9 @@ test('POST a started card to resend: filed as <run>-resent in its namespace, han
   const runs = path.join(root, 'runs');
   fs.mkdirSync(runs, { recursive: true });
   const run = (id: string, from: string) =>
-    fs.writeFileSync(
-      path.join(runs, `${id}.json`),
+    plantRecord(
+      root,
+      runKey(id),
       JSON.stringify({
         id,
         repo: '/code/app',

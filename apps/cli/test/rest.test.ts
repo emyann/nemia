@@ -6,6 +6,7 @@
  *
  * Each refusal asserts its exit code and the command or the name it names, never its sentence.
  */
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,8 +22,9 @@ const journal = (root: string, taskId: string, events: object[]) =>
 
 /** The store: a run whose `build` ran and settled and whose `review` is not filed, a long-lived task at work, and a fact Nemia keeps. */
 const store = await servedStore('nemia-rest-', (root) => {
-  write(
-    path.join(root, 'runs', 'r-done.json'),
+  plantRecord(
+    root,
+    runKey('r-done'),
     JSON.stringify({
       id: 'r-done',
       place: { kind: 'folder' },

@@ -6,6 +6,7 @@
  * the harness's scratch ones (`root`, `config`). A live step followed as its session writes, and the stream let go once its reader
  * leaves, are `following.test.ts`'s.
  */
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { config, root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
@@ -97,8 +98,9 @@ const runningTask = (taskId: string) => journal(taskId, started);
 
 const RUN = 'r-talk';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${RUN}.json`),
+plantRecord(
+  root,
+  runKey(RUN),
   JSON.stringify({
     id: RUN,
     repo: '/code/app',

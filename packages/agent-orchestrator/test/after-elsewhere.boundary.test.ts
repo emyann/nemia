@@ -6,7 +6,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
-import { recordText, runKey, runRecord } from '../testing.ts';
+import { keysUnder, recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -235,7 +235,7 @@ const aParent = async (
   return { run, wt, branch: `wf/${run.id}/implement` };
 };
 
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 test("REFUSED at `nemia start`, before a run is written: --after an unknown run, a run given twice, another repository's run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>", async () => {

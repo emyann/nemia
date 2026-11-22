@@ -16,8 +16,7 @@ import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
 import type { AskKey, AskOf, AskWritten, Hold, PersonRequest, Pruned, Run, SaidBefore, TakenBack, Unheld } from '../record/record.ts';
-import { routeAsk, unrouted, withRoutes } from '../route/index.ts';
-import type { PersonRoute } from '../route/person-route.ts';
+import { routeAsk, unrouted, withRoutes, type PersonRoute } from '../route/index.ts';
 import { askDoneKey, askKeyOf, askName, claimKey, runKey } from './run-keys.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
@@ -27,7 +26,7 @@ import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
 export const MEMORY_ROOT = '/memory';
 
-/** The ask's key: the step and number its file is named by (`askWhere`). */
+/** The ask's key: the step and number its name is made of (`askKey`, `run-keys.ts`). */
 const keyOf = (person: PersonRequest) =>
   (person.of === 'base'
     ? { of: 'base', step: person.ask.merge.target, n: person.ask.merge.try }
@@ -209,8 +208,8 @@ function runsOf(st: State) {
 }
 
 /**
- * The name an ask set aside is kept under once another is written at its name, as a file in `done/` is never written over (`doneWith`):
- * its name with `.2`, `.3`, … after it, the first not held.
+ * The name an ask set aside is kept under once another is written at its name, as a key under `done/` is never written over
+ * (`setAside`, `records.store.ts`): its name with `.2`, `.3`, … after it, the first not held.
  */
 const keptAside = (held: ReadonlyMap<string, Held>, name: string) => {
   let n = 2;
@@ -218,7 +217,7 @@ const keptAside = (held: ReadonlyMap<string, Held>, name: string) => {
   return `${name}.${n}`;
 };
 
-/** Set aside each ask of `of` named by `spent` (its step and number): consumed, never edited, as `doneWith` moves a file. */
+/** Set aside each ask of `of` named by `spent` (its step and number): consumed, never edited, as `setAside` moves a key. */
 function spend(st: State, id: string, of: AskOf, spent: ReadonlyArray<{ step: string; n: number }>) {
   for (const { step, n } of spent) {
     const held = asksOf(st, id).get(nameOf({ of, step, n }));
@@ -282,12 +281,12 @@ function asksGroup(st: State) {
       const where = askKeyOf(id, name);
       const held = st.asks.get(id) ?? new Map<string, Held>();
       const before = held.get(name);
-      if (before && !before.done) return { written: false, where, stray: null } satisfies AskWritten as AskWritten;
+      if (before && !before.done) return { written: false, where, stray: null } satisfies AskWritten;
       if (before) held.set(keptAside(held, name), before);
       held.set(name, { person: structuredClone(person), done: false });
       st.asks.set(id, held);
       touch(st, id);
-      return { written: true, where } satisfies AskWritten as AskWritten;
+      return { written: true, where } satisfies AskWritten;
     },
     where: (id, key) => askKeyOf(id, nameOf(key)),
     takeBack: (id, step, n, takenBack) => {

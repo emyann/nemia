@@ -58,7 +58,6 @@ const agentToken = door((d) => d.persons.mint('port-ops', { kind: 'agent', agent
 /** A run planted as its record alone: one step, nothing of it filed yet. */
 const planted = (id: string) => {
   const file = runKey(id);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   plantRecord(
     root,
     file,
@@ -84,7 +83,6 @@ const planted = (id: string) => {
  */
 const askingAtGate = (id: string) => {
   const file = runKey(id);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   const design = parseWorkflow('design', '---\nplace: git\noutput: spec.schema.json\n---\nDesign it.\n', () =>
     JSON.stringify({
       type: 'object',

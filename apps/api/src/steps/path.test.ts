@@ -5,6 +5,7 @@
  * At shipped defaults: the api's own engine over the harness's store (`root`), which this file seeds, and its fake `claude` first on PATH.
  * The path is read off the journal alone, so no harness is asked.
  */
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { root } from '../../test/harness.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
@@ -43,8 +44,9 @@ const turn = (n: number, s: number) => [
 
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 const writeRun = (id: string, steps: Record<string, object>) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: root,

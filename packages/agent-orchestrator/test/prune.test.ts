@@ -9,7 +9,7 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
-import { askText, listRuns, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import { askKeyOf, askText, dropAsk, listRuns, plantAsk, recordText, runKey, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -598,16 +598,14 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
       assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
 
       const landed = await aFinished(b, { merged: true });
-      const asks = path.join(ROOT, 'runs', `${landed.run.id}.asks`);
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
+      plantAsk(ROOT, landed.run.id, 'retry-implement-2', JSON.stringify({ mode: 'continue' }));
       await aPass(b.e);
       assert.equal((await runWith(b.e, decideRun(landed.run.id))).decision.kind, 'landed');
       const asked = await runWith(b.e, prune(landed.run.id, { yes: true }));
       assert.equal(asked.kind, 'refused', 'a retry asked of a step that landed, which no pass files: the ask alone holds it');
-      names(asked.refusal, 'try 2 of implement', `nemia prune ${landed.run.id}`, `rm ${path.join(asks, 'retry-implement-2')}`);
+      names(asked.refusal, 'try 2 of implement', `nemia prune ${landed.run.id}`, `rm ${askKeyOf(landed.run.id, 'retry-implement-2')}`);
       assert.ok(fs.existsSync(landed.wt) && !under('runs', `${landed.run.id}.pruned`));
-      fs.rmSync(path.join(asks, 'retry-implement-2'));
+      dropAsk(ROOT, landed.run.id, 'retry-implement-2');
       assert.equal((await runWith(b.e, prune(landed.run.id, { yes: true }))).kind, 'pruned', 'until the ask is taken back');
 
       assert.equal((await typed(b.e, 'cancel', run.id)).error, undefined);
@@ -709,9 +707,7 @@ describe('after a prune: a retry, a round, an approval and an acceptance are ref
       assert.deepEqual([d.retrying, d.rounding, d.offers, d.answering], [[], [], [], {}], 'and nothing is offered');
       assert.equal(waitsOnYou((await listedOf(b.e, run.id)).listing), false, 'and `nemia ls` waits on nobody');
 
-      const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
+      plantAsk(ROOT, run.id, 'retry-implement-2', JSON.stringify({ mode: 'continue' }));
       const filings = [...b.filings];
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(b.filings, filings, 'nothing filed of an ask written by hand: the pass is the guard that holds');

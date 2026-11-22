@@ -8,7 +8,7 @@
  * is filed under, and the run records a listing reads. Its store is at `ROOT`, given as `ENV` with
  * `WF_VERIFY_REST=0`: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
-import { plantRecord, recordText, runKey, runRecord, runsNow } from '../../testing.ts';
+import { dropRecord, keysUnder, plantRecord, recordText, runKey, runRecord, runsNow } from '../../testing.ts';
 import { afterAll, beforeAll, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -145,7 +145,7 @@ const aRepoWith = (...workflows: string[]) => {
   return repo;
 };
 
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** A run record, as `start()` writes one — only what the listing reads of it matters here. */
 const writeRecord = (id: string, from?: Run['from']) =>
@@ -253,8 +253,8 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
         lines.some((l) => /^broken-a1b2 +broken-a1b2\.md: `harness` is not a key an inbox card has\./.test(l)),
         lines.join('\n'),
       );
-      fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
-      fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
+      dropRecord(ROOT, runKey('show-the-flag-on-the-settin-zz99'));
+      dropRecord(ROOT, runKey('an-unrelated-run-yy88'));
     },
   );
   s.test(
@@ -552,11 +552,11 @@ describe('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbo
         writeRecord('r-outside');
       }
       await assert.rejects(async () => await refused(), refusedWith('Invalid', ...named));
-      assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
+      assert.ok(recordText(ROOT, runKey('r-outside')) !== undefined, 'the record outside the inbox is still there');
       assert.ok(fs.existsSync(file), 'and so is the card');
     });
   afterAll(() => {
-    fs.rmSync(path.join(ROOT, 'runs', 'r-outside.json'));
+    dropRecord(ROOT, runKey('r-outside'));
   });
 });
 
@@ -718,7 +718,7 @@ describe('REFUSED by name at shipped defaults: `nemia start` of an inbox card, b
       assert.deepEqual(inbox(), there, 'every card still in the inbox');
     });
   afterAll(() => {
-    fs.rmSync(path.join(ROOT, 'runs', 'source-a1.json'));
+    dropRecord(ROOT, runKey('source-a1'));
   });
 });
 test.skipIf(process.getuid?.() === 0 && 'root writes a folder it may not write')(

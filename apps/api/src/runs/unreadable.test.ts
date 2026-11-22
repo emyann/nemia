@@ -20,7 +20,7 @@ import { app } from '../app.ts';
 import { engine, passStanding } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { runListOf } from '../../test/run-reads.ts';
-import { runsNow } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -79,8 +79,9 @@ const MISWRITTEN = { kind: 'measured', at, attempt: 1, usage: { responses: 'thre
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
 function writeRun(id: string, steps: Record<string, object>, more: object = {}) {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo,

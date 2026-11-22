@@ -41,7 +41,6 @@ function repoOf() {
 /** A repository run `id` on `repo`, branched from `main`, its record written as `nemia start` would. */
 function runOn(id: string, repo: string) {
   const file = runKey(id);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   plantRecord(
     ROOT,
     file,

@@ -20,7 +20,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { app } from '../app.ts';
 import { floorEntryOf } from './floor.ts';
-import { approvalKey, recordText } from 'agent-orchestrator/testing';
+import { approvalKey, plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -43,8 +43,9 @@ const BOUND_TO_A = agentToken('floor-in-a', 'a', null);
 
 /** A run of `plan → implement`, started `--gate plan`, whose plan signed off: it waits at its gate. */
 const gatedRun = (id: string) => {
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',

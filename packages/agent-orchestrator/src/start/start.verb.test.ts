@@ -3,7 +3,7 @@
  * over them, the typed `--label` edits over those; a key two runs disagree on left out and said by `nemia start`; a malformed or reserved
  * edit refused before any file is written; and no `.labels` file for a run started with none. On the files, with the test place.
  */
-import { runsNow } from '../../testing.ts';
+import { recordText, runKey, runsNow } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -65,7 +65,7 @@ test("a start copies the labels its --after and --from runs agree on, the card's
   assert.deepEqual(run.labels, want, "the card's tier beats the runs', and area- drops an inherited one");
   assert.equal(run.labelsLeftOut, undefined, 'nothing left out');
   assert.deepEqual(JSON.parse(fs.readFileSync(labelsFile(run.id), 'utf8')), want, 'written beside the record');
-  assert.equal('labels' in JSON.parse(fs.readFileSync(path.join(RUNS_DIR, `${run.id}.json`), 'utf8')), false, 'never in it');
+  assert.equal('labels' in JSON.parse(recordText(ROOT, runKey(run.id)) ?? ''), false, 'never in it');
 });
 
 test('a key two named runs disagree on is left out, and `nemia start` answers it, with the runs and their values', async () => {

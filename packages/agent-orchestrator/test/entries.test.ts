@@ -409,6 +409,7 @@ const PINNED: Record<string, string[]> = {
     'isMarkdown',
     'BUILTIN_SKILLS',
     'keptRuns',
+    'RECORD_CEILING',
     'RunDoor',
     'runFound',
     'lastCeilings',

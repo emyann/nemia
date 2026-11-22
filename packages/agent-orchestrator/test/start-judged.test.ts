@@ -12,7 +12,7 @@
  * pure `storeRootRefusal` (`src/start/store-root.test.ts`); an ending after a step starting under a root every rule carries is the
  * start of `mounts.test.ts`'s story.
  */
-import { recordText, runKey, runsNow } from '../testing.ts';
+import { keysUnder, recordText, runKey, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -73,15 +73,11 @@ function aRepo(allow?: readonly string[]) {
   return repo;
 }
 
-/** The runs on disk, by id. */
+/** The runs the store holds, by id. */
 const runsWritten = () =>
-  fs.existsSync(path.join(ROOT, 'runs'))
-    ? fs
-        .readdirSync(path.join(ROOT, 'runs'))
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => f.slice(0, -5))
-        .sort()
-    : [];
+  keysUnder(ROOT, '/registry/runs/')
+    .map((key) => key.slice('/registry/runs/'.length))
+    .sort();
 
 /** Whether the run `id` is written to disk. */
 const written = (id: string) => runsWritten().includes(id);
@@ -408,7 +404,11 @@ describe("nemia start copies the workflow folder whole into the run's own, read-
   test('REFUSED: a link in the folder, named, and neither a run directory nor a record is left', async () => {
     const dir = folder('linked', lines({ implement: '' }));
     fs.symlinkSync(path.join(ROOT, 'notes.md'), path.join(dir, 'helper.ts'));
-    const dirs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+    const dirs = () =>
+      [
+        ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+        ...keysUnder(ROOT, '/registry/runs/'),
+      ].sort();
     const before = dirs();
     await refused(() => started(dir), path.join(dir, 'helper.ts'));
     assert.deepEqual(dirs(), before, 'no run directory either');

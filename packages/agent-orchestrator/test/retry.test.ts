@@ -1437,7 +1437,7 @@ describe('a blocked step answered with `nemia retry --message`', () => {
     const record = storedText(run.id);
     const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', message: answer }));
     ask = asked.ask;
-    assert.deepEqual(JSON.parse(fs.readFileSync(asked.file, 'utf8')), {
+    assert.deepEqual(JSON.parse(recordText(ROOT, asked.file) ?? ''), {
       step: 'implement',
       try: 2,
       mode: 'continue',
@@ -1655,7 +1655,7 @@ describe('telling a running step something with `nemia say`, and the try that co
     await tick(run.id);
     ended(taskId(), 'working');
     record = storedText(run.id);
-    beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
+    beside = [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
     const told = await stage.runWith(
       b.e,
       SAY.handler({ runId: run.id, step: 'implement', text: 'Widen the scope to apps/api too.', caller: PERSON }),
@@ -1666,7 +1666,11 @@ describe('telling a running step something with `nemia say`, and the try that co
   });
   s.test('it writes nothing of its own: the record untouched, no file beside it', () => {
     assert.equal(storedText(run.id), record);
-    assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), beside, 'the engine journal is the record');
+    assert.deepEqual(
+      [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort(),
+      beside,
+      'the engine journal is the record',
+    );
   });
   s.test('`nemia ls` notes the step said to, once and then twice', async () => {
     assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0], {

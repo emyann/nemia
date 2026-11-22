@@ -18,7 +18,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. Each row leaves a step held at work on its agent, so the
  * file sets `WF_MAX_CONCURRENT` on it itself, since a check the run executes inherits the daemon's ceiling.
  */
-import { runRecord } from '../testing.ts';
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, type TestContext, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -548,13 +548,13 @@ describe(
           const ticked = await own(['tick']);
           if (why !== undefined) assert.match(ticked.err, why);
           assert.ok(runRecord(ROOT, local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(ROOT, local).steps)}`);
-          const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
+          const runs = keysUnder(ROOT, '/registry/runs/').length;
           await assert.rejects(
             start(REMOTE),
             (err: Error & { exitCode?: number }) => err.exitCode === 2 && (why === undefined || why.test(err.message)),
             "nemia start of a step on the agent is refused, in the file's words",
           );
-          assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs, 'no run was written');
+          assert.equal(keysUnder(ROOT, '/registry/runs/').length, runs, 'no run was written');
 
           fs.writeFileSync(FILE, good);
           await own(['tick']);

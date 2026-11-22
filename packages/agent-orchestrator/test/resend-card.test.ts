@@ -8,7 +8,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its cards name no factory.
  */
-import { runRecord } from '../testing.ts';
+import { plantRecord, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -234,8 +234,9 @@ describe('a card of a factory sent on to a workflow its factory does not offer i
     b = stage.board();
     addFactoryAt(ROOT, { name: 'acme', volumes: [`${aRepo()}:rw`] });
     fs.writeFileSync(path.join(inboxAt(ROOT), 'tidy-the-docs-m3n8.md'), '---\nfactory: acme\n---\nTidy the docs.\n');
-    fs.writeFileSync(
-      path.join(ROOT, 'runs', 'tidy-the-docs-m3n8-r1.json'),
+    plantRecord(
+      ROOT,
+      runKey('tidy-the-docs-m3n8-r1'),
       JSON.stringify({
         id: 'tidy-the-docs-m3n8-r1',
         repo: '/code/app',

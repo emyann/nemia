@@ -18,7 +18,7 @@ import path from 'node:path';
 import type { Acceptance } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { acceptKey, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import { acceptKey, askNames, dropAsk, plantRecord, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from 'objects';
 import { acceptRun, list, roundRun } from 'agent-orchestrator';
@@ -63,8 +63,9 @@ const loopingRun = (id: string, on: number, again: boolean) => {
     branch: `wf/${id}/implement`,
     ...(on > 1 ? { tries: tries(name) } : {}),
   });
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',
@@ -141,8 +142,7 @@ const acceptRefuses = async (step: string, message?: string, run = R) => {
 
 /** Every file under a run's asks directory. */
 const asked = (run = R) => {
-  const dir = path.join(root, 'runs', `${run}.asks`);
-  return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
+  return askNames(root, run).sort();
 };
 
 /** Nothing was written: no acceptance nor ask, and the run's record as it was. */
@@ -219,7 +219,7 @@ describe('POST …/approve of a loop: what it refuses — a body, a run or step 
       assert.match(error, /^round 3 of review's loop is already asked for \(at [^)]+\)/);
       assert.deepEqual(asked(), [path.basename(file)], 'the round ask alone');
     } finally {
-      fs.rmSync(path.join(root, 'runs', `${R}.asks`), { recursive: true, force: true });
+      askNames(root, R).forEach((name) => dropAsk(root, R, name));
     }
     nothingWritten('a loop about to go round again');
   });
@@ -249,7 +249,7 @@ describe('a person accepts a loop out of rounds on the board: the acceptance wri
         },
       );
       assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
-      assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), {
+      assert.deepEqual(JSON.parse(recordText(root, took.file) ?? ''), {
         step: 'review',
         try: 2,
         at: took.at,

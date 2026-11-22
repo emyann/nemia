@@ -10,7 +10,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds. No story leaves a run the tick of another would read: each passes only the runs it started.
  */
-import { askKeyOf, askNames, recordText, rewriteRun, runKey, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, keysUnder, recordText, rewriteRun, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -773,7 +773,7 @@ describe('REFUSED at `nemia start`, before a run is written — exit 2, by kind 
     }
     fs.rmSync(path.join(noSchema, 'review.schema.json'));
   });
-  const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
+  const runs = () => keysUnder(ROOT, '/registry/runs/').length;
   const given = fs.mkdtempSync(path.join(ROOT, 'given-'));
   const a = path.join(given, 'a', 'notes.md');
   const declaring = (respond: string) =>

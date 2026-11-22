@@ -15,7 +15,7 @@ import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
 import { type Said, servedStore, write } from './served.ts';
-import { recordText, runKey } from 'agent-orchestrator/testing';
+import { keysUnder, recordText, runKey } from 'agent-orchestrator/testing';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const TEAM = path.join(import.meta.dirname, '..', '..', '..', 'packages', 'agent-orchestrator', 'test', 'fixtures', 'team');
@@ -158,11 +158,11 @@ test('REFUSED, exit 2, nothing sent: an --input past the cap, naming it, before 
   fs.writeFileSync(small, 'x');
   const files = path.join(store.root, 'files');
   const keptBefore = fs.existsSync(files) ? fs.readdirSync(files, { recursive: true }).length : 0;
-  const before = fs.readdirSync(path.join(store.root, 'runs')).length;
+  const before = keysUnder(store.root, '/registry/runs/').length;
   const said = await store.nemia(['start', 'Add a cache.', '--workflows', 'dev', '--factory', 'acme', '--input', small, '--input', huge]);
   assert.equal(said.code, 2, said.err);
   assert.match(said.err, /huge\.png/);
-  assert.equal(fs.readdirSync(path.join(store.root, 'runs')).length, before);
+  assert.equal(keysUnder(store.root, '/registry/runs/').length, before);
   assert.equal(fs.existsSync(files) ? fs.readdirSync(files, { recursive: true }).length : 0, keptBefore, 'no file was uploaded');
 });
 
@@ -185,7 +185,7 @@ test('nemia start of an inbox card by its name starts its body (cards.start), an
 });
 
 test('REFUSED, exit 2, nothing started: a folder, a workflow as a path, no workflow named, --brief for no card, a stray card key', async () => {
-  const before = fs.readdirSync(path.join(store.root, 'runs')).length;
+  const before = keysUnder(store.root, '/registry/runs/').length;
   const stray = path.join(DRAFTS, 'stray.md');
   write(stray, '---\nworkflow: dev\nrepo: /elsewhere\n---\nA card of the inbox.\n');
   for (const [argv, named] of [
@@ -200,7 +200,7 @@ test('REFUSED, exit 2, nothing started: a folder, a workflow as a path, no workf
     assert.equal(said.code, 2, `nemia ${argv.join(' ')}: ${said.out}${said.err}`);
     assert.match(said.err, named, argv.join(' '));
   }
-  assert.equal(fs.readdirSync(path.join(store.root, 'runs')).length, before);
+  assert.equal(keysUnder(store.root, '/registry/runs/').length, before);
 });
 
 test('nemia start typed in a repository with no --repo nor --factory starts there: in the factory on it, on it', async () => {
@@ -216,11 +216,11 @@ test('nemia start typed in a repository with no --repo nor --factory starts ther
 });
 
 test('REFUSED, exit 2, nothing started: nemia start typed in a folder of no repository, naming the factory that would serve it', async () => {
-  const before = fs.readdirSync(path.join(store.root, 'runs')).length;
+  const before = keysUnder(store.root, '/registry/runs/').length;
   const said = await nemia(['start', 'Add a cache, nowhere.', '--workflows', 'dev'], store.env, DRAFTS);
   assert.equal(said.code, 2, `${said.out}${said.err}`);
   assert.match(said.err, /nemia factory add/);
-  assert.equal(fs.readdirSync(path.join(store.root, 'runs')).length, before);
+  assert.equal(keysUnder(store.root, '/registry/runs/').length, before);
 });
 
 test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a step not filed yet', async () => {
@@ -246,8 +246,11 @@ test('nemia cancel stops the run; nemia rm forgets it, its branches deleted, and
   write(path.join(asks, 'implement.json'), '{}');
   const gone = await store.nemia(['rm', id, 'nobody-1', '--delete-branches']);
   assert.equal(gone.code, 0, `${gone.out}${gone.err}`);
-  assert.match(gone.out, new RegExp(`^${id} {2}forgotten: no worktrees; removed runs/${id}\\.json`, 'm'));
-  assert.match(gone.out, /^nobody-1 {2}no such run — nothing to forget but what was left under its id: removed runs\/nobody-1\.asks\/$/m);
+  assert.match(gone.out, new RegExp(`^${id} {2}forgotten: no worktrees; removed /registry/runs/${id}, `, 'm'));
+  assert.match(
+    gone.out,
+    /^nobody-1 {2}no such run — nothing to forget but what was left under its id: removed \/registry\/asks\/nobody-1\/implement\.json$/m,
+  );
   assert.equal(recordText(store.root, runKey(id)) !== undefined, false);
   assert.equal(fs.existsSync(asks), false, 'the leftovers of a run with no record are gone');
 });

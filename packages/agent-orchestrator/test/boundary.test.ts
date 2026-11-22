@@ -117,26 +117,22 @@ const STORE_BOTTOM = [
  * store's pause on the bottom,
  * the schedules' cron and tries on the run store, a templated factory's tree, base and status on it (`applied.store.ts`), the factories on
  * the run store and both, and the run store's files on them and on the configuration (`record/files.store.ts`, whose `keptRuns` reads
- * `WF_VERIFY_REST`), the door's pattern on the store's root (`door.store.ts`) and each door on it and the stores it is over — the Run
- * door on the run store's files, the Factory door on the factories and a factory's level, rules and servers, each on the run store, and
- * its folder whole (`folder.store.ts`, on no store file), the
- * Workflow door on the folders, their versions (`version.store.ts`, on the skills read and the Agent and Skill doors it reads a
- * folder's agents and skills through), the folder written and the Agent and Skill doors
- * it finds a workflow's agents and skills through, and
- * the Template door on the pattern alone, a template being a folder outside the store, the Ledger door on the pattern and the
- * configuration, the Feed door on the pattern beside the feed's own two, and the Subscription door on the pattern, the feed's file, the
- * run store, the tally and the configuration —
- * what a place is and how its processes are stopped, on no store file (`place.store.ts`), then a step's workspace, cut by the place, a
- * workflow folder written on the run store, the two reads, the folders and the factories, and
- * where a run looks and a place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as
- * the place says, on the place (`changes.store.ts`), a step's own agent read for a hire (`own-agent.store.ts`), on no store file, and
- * where the branches stood on the run store and the place
- * (`standing.store.ts`), and a run's result branches (`branches.store.ts`), which a landing reads beside its place (`landing.store.ts`);
- * and the feed's file on the run store and the tally (`feed.store.ts`), whose one schema for a line of it the deliverer's file decodes a
- * kept digest with, so the two cannot drift; and the releases' folders, on no store file (`release.store.ts`), which an archive's
- * download and the store's floor are kept beside (`archive.store.ts`). No
- * other store file is imported by another, so the tree has no cycle; outside the store, the client and the controllers beneath the CLI
- * alone import them.
+ * `WF_VERIFY_REST`), the door's pattern on the store's root (`door.store.ts`) and each door on it and the stores it is over — the Run door
+ * on its records in the keyspace (`runs/records.store.ts`, on the pattern, the keyspace, the pause, the run store and its files), the
+ * Factory door on the factories and a factory's level, rules and servers, each on the run store, and its folder whole (`folder.store.ts`,
+ * on no store file), the Workflow door on the folders, their versions (`version.store.ts`, on the skills read and the Agent and Skill doors
+ * it reads a folder's agents and skills through), the folder written and the Agent and Skill doors it finds a workflow's agents and skills
+ * through, and the Template door on the pattern alone, a template being a folder outside the store, the Ledger door on the pattern and the
+ * configuration, the Feed door on the pattern beside the feed's own two, and the Subscription door on the pattern, the feed's file, the run
+ * store, the tally and the configuration — what a place is and how its processes are stopped, on no store file (`place.store.ts`), then a
+ * step's workspace, cut by the place, a workflow folder written on the run store, the two reads, the folders and the factories, and where a
+ * run looks and a place's workflow folders (`lookup.store.ts`) on the run store and the skills read; what a branch changed, as the place
+ * says, on the place (`changes.store.ts`), a step's own agent read for a hire (`own-agent.store.ts`), on no store file, and where the
+ * branches stood on the run store and the place (`standing.store.ts`), and a run's result branches (`branches.store.ts`), which a landing
+ * reads beside its place (`landing.store.ts`); and the feed's file on the run store and the tally (`feed.store.ts`), whose one schema for a
+ * line of it the deliverer's file decodes a kept digest with, so the two cannot drift; and the releases' folders, on no store file
+ * (`release.store.ts`), which an archive's download and the store's floor are kept beside (`archive.store.ts`). No other store file is
+ * imported by another, so the tree has no cycle; outside the store, the client and the controllers beneath the CLI alone import them.
  */
 const STORE_SHARED: Record<string, readonly string[]> = {
   'src/record/places.store.ts': [],
@@ -193,7 +189,14 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/feed/feed.store.ts': ['src/record/record.store.ts', 'src/meter/tally.store.ts', 'src/door/door.store.ts'],
   'src/standing/standing.store.ts': ['src/record/record.store.ts', 'src/place/place.store.ts', 'src/whole-file/whole-file.store.ts'],
   'src/door/door.store.ts': ['src/config/root.store.ts'],
-  'src/runs/runs.store.ts': ['src/door/door.store.ts', 'src/record/files.store.ts'],
+  'src/runs/records.store.ts': [
+    'src/door/door.store.ts',
+    'src/keyspace/keyspace.store.ts',
+    'src/pause/pause.store.ts',
+    'src/record/files.store.ts',
+    'src/record/record.store.ts',
+  ],
+  'src/runs/runs.store.ts': ['src/door/door.store.ts', 'src/runs/records.store.ts'],
   'src/level/level.store.ts': ['src/record/record.store.ts', 'src/whole-file/whole-file.store.ts'],
   'src/factory/rules/rules.store.ts': ['src/record/record.store.ts'],
   'src/factory/servers/servers.store.ts': ['src/record/record.store.ts', 'src/whole-file/whole-file.store.ts'],

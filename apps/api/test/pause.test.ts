@@ -21,7 +21,7 @@ import { engine } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 import type { PauseNowRead } from 'objects';
-import { dropRecord, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
+import { askNames, dropAsk, dropRecord, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
@@ -198,7 +198,7 @@ describe('the board pauses the store and lifts it, refused a second of each; the
       assert.deepEqual({ pause: again.body.pause, kept: again.body.kept }, { pause, kept: true }, 'the pause kept as it was put');
       assert.deepEqual(JSON.parse(fs.readFileSync(FILE, 'utf8')), pause);
       assert.deepEqual(await asked('DELETE', undefined, BOARD, on), { status: 200, body: { pause } });
-      fs.rmSync(path.join(root, 'runs', `${id}.asks`), { recursive: true, force: true });
+      askNames(root, id).forEach((name) => dropAsk(root, id, name));
       dropRecord(root, runKey(id));
     },
   );

@@ -13,7 +13,7 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { runRecord } from '../testing.ts';
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -80,7 +80,11 @@ const promptOf = (run: Parameters<typeof agentFilesDir>[1], step: string) =>
   fs.readFileSync(path.join(agentFilesDir(ROOT, run, step), 'prompt.md'), 'utf8');
 
 /** The runs written under the store. */
-const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []) satisfies string[];
+const runsWritten = () =>
+  [
+    ...(fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []),
+    ...keysUnder(ROOT, '/registry/runs/'),
+  ] satisfies string[];
 
 /** `nemia factory rules` run with `args`, as the CLI and the api run it. */
 const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.runWith(stage.board().e, FACTORY_RULES.handler(args));

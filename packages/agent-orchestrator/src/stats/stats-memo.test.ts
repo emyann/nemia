@@ -11,6 +11,7 @@
  * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run of its
  * store, at `ROOT`.
  */
+import { dropRecord, plantRecord, runKey } from '../../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import { story } from 'test-kit/checkpoints';
@@ -129,7 +130,7 @@ async function journalled(taskId: string, costUsd: number, settled: boolean) {
   for (const event of events) await journal.append(taskId, event as Event);
 }
 
-const recordFile = (id: string) => path.join(ROOT, 'runs', `${id}.json`);
+const recordFile = (id: string) => runKey(id);
 
 /**
  * A run of one step, its workflow frozen on its record unless `unfrozen` names the folder it reads, its step's task journalled as
@@ -138,7 +139,8 @@ const recordFile = (id: string) => path.join(ROOT, 'runs', `${id}.json`);
 async function aRun(id: string, costUsd: number, settled = true, unfrozen?: string, body = 'Implement it.') {
   await journalled(`${id}-implement`, costUsd, settled);
   const workflow = [{ name: 'implement', after: [], body, harness: 'codex' }];
-  fs.writeFileSync(
+  plantRecord(
+    ROOT,
     recordFile(id),
     JSON.stringify({
       id,
@@ -218,7 +220,7 @@ describe("A serving process's memo: each call reads again only the runs whose in
     await aRun('s-gone', 7);
     await through(memo);
     assert.equal(memo.runs.has('s-gone'), true);
-    fs.rmSync(recordFile('s-gone'));
+    dropRecord(ROOT, recordFile('s-gone'));
     const answer = await through(memo);
     assert.equal(memo.runs.has('s-gone'), false);
     assert.deepStrictEqual(answer, await afresh());
@@ -236,7 +238,7 @@ describe("A serving process's memo: each call reads again only the runs whose in
       viewedRuns();
       await through(memo);
       assert.deepEqual(viewedRuns(), ['s-moving', 's-unfrozen']);
-      fs.rmSync(recordFile('s-unfrozen'));
+      dropRecord(ROOT, recordFile('s-unfrozen'));
       await through(memo);
       viewedRuns();
     },
@@ -260,7 +262,7 @@ describe("A serving process's memo: each call reads again only the runs whose in
       assert.deepEqual(viewedRuns(), ['s-moving', 's-spoiled']);
       assert.deepEqual(healed.unreadable, []);
       assert.deepStrictEqual(healed, await afresh());
-      fs.rmSync(recordFile('s-spoiled'));
+      dropRecord(ROOT, recordFile('s-spoiled'));
       await through(memo);
       viewedRuns();
     },

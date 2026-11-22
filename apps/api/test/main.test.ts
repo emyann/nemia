@@ -1,3 +1,4 @@
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import './harness.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -512,8 +513,9 @@ function signedOffRun(root: string) {
       .map((e) => `${JSON.stringify(e)}\n`)
       .join(''),
   );
-  fs.writeFileSync(
-    path.join(root, 'runs', 'r-hub.json'),
+  plantRecord(
+    root,
+    runKey('r-hub'),
     JSON.stringify({
       id: 'r-hub',
       place: { kind: 'folder' },

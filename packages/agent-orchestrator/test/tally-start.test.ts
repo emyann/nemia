@@ -3,7 +3,7 @@
  * file, its schema's and the field, and no run is written; one it can hold is frozen on the run record with the step, which is what
  * `nemia stats` counts the run by. Its store is its own at `ROOT`, given as `ENV`.
  */
-import { runRecord } from '../testing.ts';
+import { keysUnder, runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -52,7 +52,7 @@ async function started(dir: string) {
   return id;
 }
 
-const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0);
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 describe('nemia start of a step that declares a tally: refused where its closeout cannot hold it, frozen on the run where it can', () => {
   test('REFUSED: a tally its closeout cannot hold exits 2, naming the file, the schema and the field, and writes no run', async () => {

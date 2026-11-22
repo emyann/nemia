@@ -17,7 +17,7 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { CLI_VERBS, Informer, informerMemo, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { Api, type ApiGetName, READS } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -74,14 +74,15 @@ const CARD_BODY = (name: string) => words(3_000, `the body of ${name}`);
 const LONG_CLOSEOUT = 'r-long-closeout';
 const WIDE_CLOSEOUT = 'r-wide-closeout';
 
-for (const id of BIG_RUNS) write(path.join(root, 'runs', `${id}.json`), JSON.stringify(record(id, 8, 20_000, false)));
+for (const id of BIG_RUNS) plantRecord(root, runKey(id), JSON.stringify(record(id, 8, 20_000, false)));
 for (const name of [...PARKED, ...ENDED]) write(path.join(root, 'inbox', `${name}.md`), `# ${name}\n\n${CARD_BODY(name)}\n`);
 for (const name of ENDED) write(path.join(root, 'runs', `r-${name}.json`), JSON.stringify(record(`r-${name}`, 1, 100, true, name)));
-write(path.join(root, 'runs', `${LONG_CLOSEOUT}.json`), JSON.stringify(record(LONG_CLOSEOUT, 1, 100, true)));
+plantRecord(root, runKey(LONG_CLOSEOUT), JSON.stringify(record(LONG_CLOSEOUT, 1, 100, true)));
 /** A step whose output declares two fields, `plan` long and `budget` short, as a design's closeout carries them. */
 const wide = record(WIDE_CLOSEOUT, 1, 100, true);
-write(
-  path.join(root, 'runs', `${WIDE_CLOSEOUT}.json`),
+plantRecord(
+  root,
+  runKey(WIDE_CLOSEOUT),
   JSON.stringify({
     ...wide,
     workflow: wide.workflow.map((step) => ({

@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
-import { runsNow, testPlace } from 'agent-orchestrator/testing';
+import { keysUnder, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { Api, FILE_LIMIT, type FileObject, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
@@ -86,7 +86,7 @@ const kept = () => {
 };
 
 /** The run directories of the store now. */
-const runCount = () => fs.readdirSync(path.join(root, 'runs')).length;
+const runCount = () => keysUnder(root, '/registry/runs/').length;
 
 test('three pictures of 3 MB in all, each uploaded, start a card whose run holds each byte for byte, past the 1 MiB of an object write', async () => {
   const pictures = [

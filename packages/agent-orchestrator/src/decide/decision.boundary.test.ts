@@ -5,7 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
-import { plantRecord, runKey, runsNow } from '../../testing.ts';
+import { plantAsk, plantRecord, runKey, runsNow } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -534,9 +534,7 @@ describe('the commands a decision offers are bare `nemia` lines, by the state th
         },
       },
     });
-    const asks = path.join(root, 'runs', 'r-d20.asks');
-    fs.mkdirSync(asks, { recursive: true });
-    fs.writeFileSync(path.join(asks, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+    plantAsk(root, 'r-d20', 'approve-ship-1', JSON.stringify({ at, message: 'Merge it.' }));
 
     const body = await decidable('r-d20');
     const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
@@ -800,7 +798,7 @@ test("a run whose approved ending waits for the repository's checkout, which ano
   ];
   const approve = (id: string) => {
     fs.mkdirSync(path.join(root, 'runs', `${id}.asks`), { recursive: true });
-    fs.writeFileSync(path.join(root, 'runs', `${id}.asks`, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+    plantAsk(root, id, 'approve-ship-1', JSON.stringify({ at, message: 'Merge it.' }));
   };
   settledTask('t-d14-implement', done);
   settledTask('t-d14-notes', done);

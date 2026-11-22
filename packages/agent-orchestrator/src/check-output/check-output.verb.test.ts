@@ -7,7 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`; each test empties the store's runs first.
  */
-import { runRecord } from '../../testing.ts';
+import { emptyRuns, runRecord } from '../../testing.ts';
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,6 +36,7 @@ const e = () => engineOf(engine().layer);
 
 beforeEach(() => {
   fs.rmSync(RUNS_DIR, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS_DIR, { recursive: true });
 });
 

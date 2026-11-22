@@ -319,20 +319,24 @@ const loader = Effect.gen(function* () {
   return yield* SqliteMigrator.fromRecord(KEYSPACE_MIGRATIONS);
 });
 
-/** The keyspace over a client already opened and migrated. */
+/**
+ * The keyspace over a client already opened and migrated. A read makes no span, as a file read made none: a list that reads a record per
+ * run keeps its trace bounded whatever the number of runs; a write is traced.
+ */
 function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
   const inTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
     Effect.provide(
       Effect.flatMap(SqlClient.SqlClient, (sql) => sql.withTransaction(effect)),
       client,
     );
-  const read = <A>(effect: Effect.Effect<A, SqlError.SqlError, SqlClient.SqlClient>) => Effect.orDie(Effect.provide(effect, client));
+  const read = <A>(effect: Effect.Effect<A, SqlError.SqlError, SqlClient.SqlClient>) =>
+    Effect.withTracerEnabled(Effect.orDie(Effect.provide(effect, client)), false);
   const refusing = <A>(effect: Effect.Effect<A, KeyRefused | SqlError.SqlError>) =>
     Effect.catchTag(effect, 'SqlError', (err) => Effect.die(err));
   return {
     head: read(headNow),
     get: (key) => read(Effect.map(latestRow(key), (row) => (row === undefined || row.deleted !== 0 ? undefined : recordOf(row)))),
-    list: (prefix) => Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))),
+    list: (prefix) => Effect.withTracerEnabled(Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))), false),
     keys: (prefix) => read(keysUnder(prefix)),
     revisions: (prefix) => read(revisionsUnder(prefix)),
     write: (key, write) => refusing(inTxn(writeOne(key, write))),

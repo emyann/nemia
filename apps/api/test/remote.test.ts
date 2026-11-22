@@ -12,7 +12,7 @@ import path from 'node:path';
 import { needsOf } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor } from './placed.ts';
 import { objectOf } from './run-reads.ts';
 
@@ -49,7 +49,7 @@ const oneStep = (id: string, harness: string, taskId: string) => {
     workflow: [{ name: 'ask', after: [], body: 'Ask it.', harness, workspace: 'folder' }],
     steps: { ask: { taskId } },
   };
-  write(path.join(root, 'runs', `${id}.json`), JSON.stringify(run));
+  plantRecord(root, runKey(id), JSON.stringify(run));
   return run as unknown as Run;
 };
 

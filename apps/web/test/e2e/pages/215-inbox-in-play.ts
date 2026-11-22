@@ -150,7 +150,7 @@ export default {
       await load(other, '/inbox?cards=ended');
       await expectVisible(cardIn(other, CARD), 'Ended is kept in the address: a load of ?cards=ended lists it again');
 
-      const gated = storedRecord(GATED.id) as Record<string, unknown>;
+      const gated = storedRecord(GATED.id);
       fs.writeFileSync(path.join(inbox, `${WAITING}.md`), 'Wait on the plan\n\nA card whose run waits at its gate.\n');
       storeRecord(WAITING_RUN, JSON.stringify({ ...gated, id: WAITING_RUN, from: { inbox: WAITING } }));
       await load(other, '/inbox');

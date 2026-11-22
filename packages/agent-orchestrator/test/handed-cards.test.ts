@@ -7,7 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { runRecord } from '../testing.ts';
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -76,7 +76,7 @@ const startedBy = async (argv: string[]) => factsOf((await stage.main(argv)) as 
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** The store's runs, by their directory: what a refused start must leave as it was. */
-const runsNow = () => fs.readdirSync(path.join(ROOT, 'runs')).sort() satisfies string[];
+const runsNow = () => [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort() satisfies string[];
 
 /** The refusal's kind and exit code, never its sentence. */
 const refusedAs = (tag: string) => (err: Error & { _tag?: string; exitCode?: number }) => {

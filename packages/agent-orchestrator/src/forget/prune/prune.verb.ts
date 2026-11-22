@@ -341,7 +341,7 @@ const marked = Effect.fnUntraced(function* (ready: Sized, now: string) {
         : {}),
   };
   yield* door.prune(id, mine);
-  return { ...ready, now, base, mine } satisfies Marked as Marked;
+  return { ...ready, now, base, mine } satisfies Marked;
 });
 
 /**

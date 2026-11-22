@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
-import { runsNow, testPlace } from 'agent-orchestrator/testing';
+import { keysUnder, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest } from '../../test/placed.ts';
 
 import { TEAM } from '../../test/team.ts';
@@ -99,7 +99,7 @@ test('`noWorktree` reaches the start: a workflow that ends by merging its result
 });
 
 test('REFUSED: an input whose name holds a folder, and one sent both as text and as bytes, are refused, nothing started', async () => {
-  const before = fs.readdirSync(path.join(root, 'runs')).length;
+  const before = keysUnder(root, '/registry/runs/').length;
   for (const input of [
     { name: '../escape.md', text: 'x' },
     { name: 'both.md', text: 'x', base64: 'eA==' },
@@ -108,7 +108,7 @@ test('REFUSED: an input whose name holds a folder, and one sent both as text and
     assert.equal(res.status, 422, `${JSON.stringify(input)}: ${await res.clone().text()}`);
     assert.match(((await res.json()) as { error: string }).error, /--input/);
   }
-  assert.equal(fs.readdirSync(path.join(root, 'runs')).length, before);
+  assert.equal(keysUnder(root, '/registry/runs/').length, before);
 });
 
 test('DELETE a run of a workflow: refused as a try alone, removed whole with ?whole=true, and --force-unmerged alone refused', async () => {

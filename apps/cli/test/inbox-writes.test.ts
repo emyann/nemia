@@ -8,6 +8,7 @@
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -37,7 +38,7 @@ const RUN = JSON.stringify({
 });
 
 /** A store with the run `r-ctx` on it, where a card that names no factory may start in the default one. */
-const seeded = (root: string) => write(path.join(root, 'runs', 'r-ctx.json'), RUN);
+const seeded = (root: string) => plantRecord(root, runKey('r-ctx'), RUN);
 const STARTS = { WF_DEFAULT_FACTORY_STARTS: '1' };
 
 const store = await servedStore('nemia-inbox-', seeded, STARTS);
@@ -254,7 +255,7 @@ test('`nemia label run` edits a run of the store, a line per key, then its label
 
 test('`nemia inbox resend` files a started card again as <run>-resent, queued on the workflow named and handed its run', async () => {
   write(path.join(store.root, 'inbox', 'sent-card.md'), 'Cache the engine views\n');
-  write(path.join(store.root, 'runs', 'r-sent.json'), JSON.stringify({ ...JSON.parse(RUN), id: 'r-sent', from: { inbox: 'sent-card' } }));
+  plantRecord(store.root, runKey('r-sent'), JSON.stringify({ ...JSON.parse(RUN), id: 'r-sent', from: { inbox: 'sent-card' } }));
   write(path.join(store.root, 'runs', 'r-sent.cancelled'), '2026-11-05T01:00:00.000Z');
   const sent = await store.nemia(['inbox', 'resend', 'sent-card', '--workflow', 'dev']);
   ok(sent, 'inbox resend');

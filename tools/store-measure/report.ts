@@ -654,17 +654,43 @@ export function largestRecord(wf: string, ceiling: number) {
   return largest === null ? null : { ...largest, ceiling };
 }
 
+/** The files of the folder `dir`, by name; none where it is not there. */
+const plainFilesOf = (dir: string) =>
+  fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isFile() ? [d.name] : [])) : [];
+
 /**
- * The copy at `wf` imported into its keyspace, as the store's first open after the upgrade imports it (`runFilesImported`): how long it
- * took, the records it made, and the largest run record it read. Before the fence is armed: the import writes the copy's keyspace and
- * moves its files aside under `imported/`, which is the copy's alone.
+ * How many run files of the copy at `wf` an import reads into records: each `runs/<id>.json`, each ask under `runs/<id>.asks/` and its
+ * `done/`, and each claim of `started/`.
+ * @param wf The copy of the workflows' store.
+ */
+export function runFilesIn(wf: string) {
+  const runs = path.join(wf, 'runs');
+  const asks = filesOf(runs, '.asks').flatMap((dir) => [
+    ...plainFilesOf(path.join(runs, dir)),
+    ...plainFilesOf(path.join(runs, dir, 'done')),
+  ]);
+  return filesOf(runs, '.json').length + asks.length + filesOf(path.join(wf, 'started'), '.json').length;
+}
+
+/**
+ * The copy at `wf` imported into its keyspace, as the store's first open after the upgrade imports it: its Run door opened at its root
+ * (`RunDoor`, `StoreRoot`) and its runs listed. How long it took, the run files it read into records, and the largest run record it
+ * read. Before the fence is armed: the import writes the copy's keyspace and moves its files aside under `imported/`, which is the
+ * copy's alone.
  * @param wf The copy of the workflows' store.
  */
 async function keyspaceImported(wf: string) {
-  const { RECORD_CEILING, runFilesImported } = await import('agent-orchestrator/testing');
+  const { RECORD_CEILING, RunDoor, StoreRoot } = await import('agent-orchestrator');
   const largest = largestRecord(wf, RECORD_CEILING);
+  const records = runFilesIn(wf);
   const t0 = performance.now();
-  const records = await runFilesImported(wf);
+  await Effect.runPromise(
+    Effect.provideService(
+      Effect.flatMap(RunDoor, (door) => door.runs.ids()),
+      StoreRoot,
+      wf,
+    ),
+  );
   return { ms: performance.now() - t0, records, largest };
 }
 

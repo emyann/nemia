@@ -17,7 +17,7 @@ import { metered } from '../meter/tally.store.ts';
 import { keptRuns } from '../runs/runs.store.ts';
 import { RUNS_PREFIX } from '../runs/run-keys.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { dropRecord, keysUnder, plantRecord, recordText, runKey, runsNow } from '../../testing.ts';
+import { dropRecord, emptyRuns, keysUnder, plantRecord, recordText, runKey, runsNow } from '../../testing.ts';
 import type { Run } from './record.ts';
 
 const ROOT = scratch('wf-files-store-');
@@ -40,6 +40,7 @@ const put = (id: string, record: unknown = aRecord(id)) =>
 beforeEach(() => {
   for (const key of keysUnder(ROOT, RUNS_PREFIX)) dropRecord(ROOT, key);
   fs.rmSync(runsDir(ROOT), { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(runsDir(ROOT), { recursive: true });
 });
 

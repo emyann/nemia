@@ -21,7 +21,18 @@ import type { RunDecision } from 'objects';
 import { decideRun, list, prunedKept, prunedWords, retryRun, roundRun, usedLines } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { recordText, retryAskKey, roundAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import {
+  asksPrefix,
+  dropRecord,
+  keysUnder,
+  plantRecord,
+  recordText,
+  retryAskKey,
+  roundAskKey,
+  runKey,
+  runsNow,
+  testPlace,
+} from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf } from './run-reads.ts';
@@ -92,7 +103,8 @@ const USAGE = {
 const R = 'r-cost';
 const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
 const recordFile = runKey(R);
-write(
+plantRecord(
+  root,
   recordFile,
   JSON.stringify({
     id: R,
@@ -153,8 +165,9 @@ beforeEachTest(() => {
 
 /** A run nobody priced: one Codex step, done. */
 const FREE = 'r-free';
-write(
-  path.join(root, 'runs', `${FREE}.json`),
+plantRecord(
+  root,
+  runKey(FREE),
   JSON.stringify({
     id: FREE,
     repo: '/code/app',
@@ -179,8 +192,9 @@ beforeEachTest(() => {
  */
 const R2 = 'r-cost-own';
 const PALETTE_NEEDS = 'Warm colours, or cool ones?';
-write(
-  path.join(root, 'runs', `${R2}.json`),
+plantRecord(
+  root,
+  runKey(R2),
   JSON.stringify({
     id: R2,
     repo: '/code/app',
@@ -234,10 +248,9 @@ const askTry = (step: string, body: unknown, headers?: Record<string, string>, r
 const askRound = ({ step = 'review', ...how }: { step?: string; budget?: unknown; round?: unknown }, run = R) =>
   post(`/api/namespaces/default/runs/${run}/steps/${step}/retry`, { mode: 'continue', round: true, ...how });
 
-const asksDir = path.join(root, 'runs', `${R}.asks`);
 /** Nothing was written: no ask, and the run's record as it was. */
 const nothingWritten = (why: string) => {
-  assert.equal(fs.existsSync(asksDir) ? fs.readdirSync(asksDir, { recursive: true }).length : 0, 0, `no ask file: ${why}`);
+  assert.equal(keysUnder(root, asksPrefix(R)).length, 0, `no ask: ${why}`);
   assert.equal(recordText(root, recordFile) ?? '', record, `the run's record untouched: ${why}`);
 };
 
@@ -598,7 +611,7 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
         !run.status.waitingOnYou.includes('tokens') && !run.status.waitingOnYou.includes('review'),
         run.status.waitingOnYou.join(', '),
       );
-      fs.rmSync(asksDir, { recursive: true, force: true });
+      for (const key of keysUnder(root, asksPrefix(R))) dropRecord(root, key);
     },
   );
 });

@@ -37,7 +37,7 @@ import {
 import { agentDraftOf, skillDraftOf } from '../src/workflow.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { recordText, runKey } from '../testing.ts';
+import { keysUnder, recordText, runKey } from '../testing.ts';
 
 const ROOT = scratch('wf-writers-cli-');
 process.env.NEMIA_DAEMON_START = 'off';
@@ -318,7 +318,7 @@ describe('a person writes their library: an agent, a skill and a workflow, each 
       assert.equal(run.brief, 'Taste the soup.');
       assert.equal(run.workflowDir, path.join(ROOT, 'tries', 'taster'));
       assert.equal(run.workflow[0].agent.name, 'taster');
-      const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).sort();
+      const runs = () => [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
       const before = runs();
       await refusedAs(sub, 'Conflict', ['agents', 'try', 'user', 'taster', '--brief', 'Once more.'], `still running (${id})`);
       await refusedAs(

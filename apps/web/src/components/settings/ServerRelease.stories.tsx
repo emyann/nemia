@@ -105,14 +105,56 @@ export const Upgrading: StoryObj = {
   ),
 };
 
-/** Filed, waiting for a slot under the server's ceiling. */
+/** Filed, waiting for a slot under the server's ceiling, every kept place taken. */
 export const WaitingForASlot: StoryObj = {
   render: () => (
     <div style={WIDE}>
       <ServerReleaseView
         shown={{ ...BARE, latest: NEWER }}
         onStart={none}
-        run={<UpgradeRun tag="v0.4.0" phase="pending" output="" reconnecting={false} />}
+        run={
+          <UpgradeRun
+            tag="v0.4.0"
+            phase="pending"
+            output=""
+            reconnecting={false}
+            queuedFor={{ for: 'slot', pool: 'command', ceiling: 2 }}
+          />
+        }
+      />
+    </div>
+  ),
+};
+
+/** Filed, waiting for memory: what it needs and what is free. */
+export const WaitingForMemory: StoryObj = {
+  render: () => (
+    <div style={WIDE}>
+      <ServerReleaseView
+        shown={{ ...BARE, latest: NEWER }}
+        onStart={none}
+        run={
+          <UpgradeRun
+            tag="v0.4.0"
+            phase="pending"
+            output=""
+            reconnecting={false}
+            queuedFor={{ for: 'memory', needBytes: 2 ** 30, roomBytes: 512 * 2 ** 20, keptBytes: null }}
+          />
+        }
+      />
+    </div>
+  ),
+};
+
+/** Filed while the server is paused: it starts once the server resumes. */
+export const WaitingWhilePaused: StoryObj = {
+  render: () => (
+    <div style={WIDE}>
+      <ServerReleaseView
+        shown={{ ...BARE, latest: NEWER }}
+        onStart={none}
+        run={<UpgradeRun tag="v0.4.0" phase="pending" output="" reconnecting={false} queuedFor={{ for: 'paused' }} />}
       />
     </div>
   ),

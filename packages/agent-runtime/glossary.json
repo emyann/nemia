@@ -24,8 +24,13 @@
     },
     {
       "term": "Admission wait",
-      "meaning": "why a pass left a queued task waiting, journalled as a `waits` entry when it changes and said on its view while it is queued: its pool at the ceiling (`slot`, with the pool and the ceiling) or the machine's memory (`memory`, with its need and the room there was), as a Pod's PodScheduled condition says Unschedulable. A status: no rule reads it (`packages/agent-runtime/src/core/admission.ts`, `packages/agent-runtime/src/core/engine/engine.ts`).",
+      "meaning": "why a pass left a queued task waiting, journalled as a `waits` entry when it changes and said on its view while it is queued: its pool at the ceiling (`slot`, with the pool and the ceiling), the machine's memory (`memory`, with its need, the room there was and the kept memory withheld from it), or the engine `unschedulable`, said of every queued task while it admits nothing, as a Pod's PodScheduled condition says Unschedulable. A status: no rule reads it (`packages/agent-runtime/src/core/admission.ts`, `packages/agent-runtime/src/core/engine/engine.ts`).",
       "type": "AdmissionWait"
+    },
+    {
+      "term": "Kept room",
+      "meaning": "the room an engine keeps for the turns of a priority or higher (`keptRoom`): places in each pool beyond its ceiling and memory within the machine's room, which no lower turn is admitted into, kept by admission alone since nothing running is stopped for it, as a ResourceQuota scoped to a PriorityClass bounds the other classes. A turn's priority is its last answer's where that answer gave one, else its filing's (`packages/agent-runtime/contracts/admission.contract.ts`, `packages/agent-runtime/src/core/admission.ts`).",
+      "type": "KeptRoom"
     },
     {
       "term": "Append refusal",

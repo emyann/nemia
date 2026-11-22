@@ -7,6 +7,7 @@ import type {
   LatestRelease,
   PreviousRelease,
   Readiness,
+  QueuedFor,
   Release,
   Upgrade,
   UpgradePhase,
@@ -26,6 +27,7 @@ import { versionWords } from '@/lib/footer';
 import { container, ringed } from '@/lib/meaning';
 import { atWork, offersReadOf, releaseWord, upgradeOffers, type UpgradeOffers } from '@/lib/upgrade';
 import { useUpgradeFollow } from '@/lib/useUpgradeFollow';
+import { queuedSaid } from '@/lib/queued';
 import { Skeleton } from '@/components/ui/ds';
 import { troubleOf } from '@/lib/api/read';
 
@@ -75,19 +77,22 @@ function PhaseTag({ phase }: { phase: keyof typeof PHASE }) {
 /**
  * An upgrade as it runs: its phase — waiting for a slot on the server, upgrading, or restarting while the daemon that serves the board
  * restarts onto the new release (`reconnecting`) — the tag it goes to, and what it printed so far, which stays shown while the daemon
- * restarts. `unread` is an end the board could not read.
+ * restarts. While it waits, `queuedFor` says why (`queuedSaid`): memory, a slot or the server paused; with none said yet, that it starts
+ * on the engine's next pass. `unread` is an end the board could not read.
  */
 export function UpgradeRun({
   tag,
   phase,
   output,
   reconnecting,
+  queuedFor,
   unread,
 }: {
   tag: string;
   phase: UpgradePhase;
   output: string;
   reconnecting: boolean;
+  queuedFor?: QueuedFor;
   unread?: string;
 }) {
   const shown = reconnecting ? 'restarting' : phase;
@@ -102,7 +107,9 @@ export function UpgradeRun({
           {reconnecting
             ? `The server is restarting onto ${tag}: this page reads it again once it answers.`
             : phase === 'pending'
-              ? 'The upgrade is filed and waits for a slot under the server’s ceiling: it starts once a session ends.'
+              ? queuedFor === undefined
+                ? 'The upgrade is filed: it goes before the work, and starts on the server’s next pass.'
+                : queuedSaid(queuedFor, 'The upgrade')
               : `The release is fetched and checked beside the one the server runs; then the daemon restarts onto ${tag}.`}
         </p>
         <Output output={output} empty="Nothing printed yet." />
@@ -333,6 +340,7 @@ function FollowedUpgrade({ upgrade }: { upgrade: Upgrade }) {
       phase={followed.phase}
       output={followed.output}
       reconnecting={followed.reconnecting}
+      {...(upgrade.queuedFor === undefined ? {} : { queuedFor: upgrade.queuedFor })}
       {...(followed.unread === undefined ? {} : { unread: followed.unread })}
     />
   );

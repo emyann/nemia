@@ -677,6 +677,23 @@ const ANSWER_TURN: readonly Walk[] = [
     },
     says: [...Array.from({ length: 7 }, () => ({ refused: 'InputRefused' })), ['go']],
   },
+  {
+    name: "an answer given a priority keeps it on its input, the turn's own; one that is no whole number in int32 is refused and keeps nothing",
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(heldOpen('a')));
+      await settle('a', 'succeeded', { exitCode: 0 });
+      const halves = await asked(engine.answer('a', 'make it smaller', { priority: 1.5 }));
+      const beyond = await asked(engine.answer('a', 'make it smaller', { priority: 2 ** 31 }));
+      const given = await asked(engine.answer('a', 'make it smaller', { priority: 1000 }));
+      return [halves, beyond, given, (await turnOf(engine, 'a')).inputs];
+    },
+    says: [
+      { refused: 'InputRefused' },
+      { refused: 'InputRefused' },
+      { ...INPUT, priority: 1000 },
+      [{ ...INPUT, priority: 1000 }],
+    ],
+  },
 ];
 
 /** A server a factory might record, remote and plain: what the state read is handed. */

@@ -530,6 +530,16 @@ it. `WF_MAX_CONCURRENT` still bounds each pool. A step held back says why in its
 `waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: claude has 4 at work (WF_MAX_CONCURRENT)`. A landing's
 check holds the repository's checkout from its filing, queued or not, so it is filed one above every other step's
 (`LANDING_MOMENTUM`): when room frees, it is admitted before the sessions filed ahead of it, and lets the checkout go sooner.
+
+**A turn a person waits on goes first, into room kept for it.** The next turn after a person answers a step, a try or a round they ask
+for (`nemia retry`, `--round` among it: a `Retry` or a `Round` `by: 'ask'`) and an upgrade they start are filed, or answered, at
+`ASKED_PRIORITY` (`status.ts`), above every filing of the work and below Nemia's own session; the run's own tries, a loop's `again`, a
+merge's round and every check keep their momentum. The engine keeps room for that priority (`keptRoom`, `storeAdmission`): `WF_KEPT_TURNS`
+places per pool beyond `WF_MAX_CONCURRENT` (1 when unset, 0 for none), and as many of a session's default ask of the machine's memory
+(`WF_MEMORY_REQUEST`, else `WF_MEMORY_LIMIT`), which no other work is admitted into. Nothing running is stopped for it. A queued step or
+upgrade says why it waits, served as closed words (`queuedFor`: memory, a slot, or the store paused) and said in `nemia ls`'s note:
+`waits for memory: needs 2Gi, 1.5Gi free, 2.5Gi kept for a person's turn (WF_KEPT_TURNS)`, or `waits for the store to resume: paused
+(nemia resume)`.
 `nemia service install --size auto` writes a request that fits the machine; `nemia doctor` says when the settings a daemon runs under
 cannot fit it (`memory-fit`). Admission bounds what starts, not what grows, so on systemd `--size auto` also writes
 `<name>-sessions.slice` beside the unit, its `MemoryMax=` at what the machine allocates (its memory less the floor), and points

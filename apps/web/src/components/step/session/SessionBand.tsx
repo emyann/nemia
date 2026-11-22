@@ -1,11 +1,11 @@
 /**
  * The lines over a step's session that are about the session itself, each the shared band both conversations draw
- * (`conversation/ConversationBand.tsx`): the session the api is reading again on a beat, the session the board cannot read at all, and
+ * (`conversation/ConversationBand.tsx`): the session or its check waiting to start, the session the api is reading again on a beat, the session the board cannot read at all, and
  * the session that has ended, which is where a person is told there is nobody left to say anything to.
  *
  * The frame is the family's; the words are a step's alone, which is why they live here and not in the family's folder.
  */
-import { CircleXIcon, PauseIcon, RefreshCwIcon } from 'lucide-react';
+import { CircleXIcon, HourglassIcon, PauseIcon, RefreshCwIcon } from 'lucide-react';
 import { ConversationBand } from '@/components/conversation/ConversationBand';
 
 /**
@@ -37,6 +37,18 @@ export function SessionUnreadableBand({ why }: { why: string }) {
 export function SessionStoppedBand({ why }: { why: string }) {
   return (
     <ConversationBand role="status" what="stopped" icon={<PauseIcon />} title="Nothing more arrives here">
+      {why}
+    </ConversationBand>
+  );
+}
+
+/**
+ * The step's session, or its check, filed and not yet started, `why` the one sentence that says what it waits for (`stepQueuedSaid`):
+ * memory, a slot, or the server paused. A quiet note: nothing is wrong, and it goes of itself once the task starts.
+ */
+export function SessionQueuedBand({ why }: { why: string }) {
+  return (
+    <ConversationBand role="status" what="queued" icon={<HourglassIcon />} title="Waiting to start">
       {why}
     </ConversationBand>
   );

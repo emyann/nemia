@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { StepPart } from '@/components/step/part/StepPart';
-import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/step/session/SessionBand';
+import {
+  SessionQueuedBand,
+  SessionRetryingBand,
+  SessionStoppedBand,
+  SessionUnreadableBand,
+} from '@/components/step/session/SessionBand';
+import { stepQueuedSaid } from '@/lib/queued';
 import { SessionComposer } from '@/components/step/session/SessionComposer';
 import { SessionQuiet, SessionTalk } from '@/components/step/session/SessionTalk';
 import { SessionReading } from '@/components/step/session/SessionReading';
@@ -120,6 +126,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
           <div className="shrink-0">
             <StepPart view={run} step={step.name} size="L" agents={agents.data} here />
           </div>
+          {step.queuedFor !== null && <SessionQueuedBand why={stepQueuedSaid(step.queuedFor)} />}
           {following.retrying !== null && <SessionRetryingBand why={following.retrying} />}
           {following.error !== null && <SessionUnreadableBand why={following.error} />}
           {!say.open && <SessionStoppedBand why={say.why} />}

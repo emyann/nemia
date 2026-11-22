@@ -81,6 +81,7 @@ export type Keyspace = {
   readonly head: Effect.Effect<number>;
   readonly get: (key: string) => Effect.Effect<KeyRecord | undefined>;
   readonly list: (prefix: string) => Effect.Effect<{ readonly records: readonly KeyRecord[]; readonly revision: number }>;
+  readonly keys: (prefix: string) => Effect.Effect<readonly string[]>;
   readonly write: (key: string, write: KeyWriteOf) => Effect.Effect<KeyRecord, KeyRefused>;
   readonly txn: (writes: readonly (readonly [key: string, write: KeyWriteOf])[]) => Effect.Effect<readonly KeyRecord[], KeyRefused>;
   readonly since: (revision: number, prefix: string) => Effect.Effect<Since>;
@@ -158,6 +159,18 @@ const writeOne = (key: string, write: KeyWriteOf) =>
  */
 const byKey = (a: KeyRecord, b: KeyRecord) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 
+/** The live keys that begin with `prefix`, by key, no value read: what a reader that asks only which keys there are pays. */
+const keysUnder = (prefix: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{ readonly name: string }>`SELECT kv.name FROM kine AS kv
+      JOIN (SELECT MAX(mkv.id) AS id FROM kine AS mkv WHERE mkv.name >= ${prefix} AND mkv.name < ${pastPrefix(prefix)} GROUP BY mkv.name) AS maxkv
+      ON maxkv.id = kv.id
+      WHERE kv.deleted = 0
+      ORDER BY kv.name`;
+    return rows.map((row) => row.name);
+  });
+
 /** The live records whose key begins with `prefix`, by key, each its latest row that deletes nothing. */
 const liveUnder = (prefix: string) =>
   Effect.gen(function* () {
@@ -227,6 +240,7 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
     head: read(headNow),
     get: (key) => read(Effect.map(latestRow(key), (row) => (row === undefined || row.deleted !== 0 ? undefined : recordOf(row)))),
     list: (prefix) => Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))),
+    keys: (prefix) => read(keysUnder(prefix)),
     write: (key, write) => refusing(inTxn(writeOne(key, write))),
     txn: (writes) => refusing(inTxn(Effect.forEach(writes, ([key, write]) => writeOne(key, write)))),
     since: (revision, prefix) =>

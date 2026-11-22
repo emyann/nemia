@@ -127,7 +127,7 @@ describe('the keyspace on disk', () => {
     );
   });
 
-  test('a list answers the live keys under its prefix, by key, no tombstone, at the revision it read', async () => {
+  test('a list answers the live keys under its prefix, by key, no tombstone, at the revision it read, and its keys alone the same keys', async () => {
     const ks = await Effect.runPromise(keyspaceAt(fileOf()));
     await Effect.runPromise(ks.write('/registry/t/b', create('b')));
     await Effect.runPromise(ks.write('/registry/t/a', create('a')));
@@ -143,6 +143,7 @@ describe('the keyspace on disk', () => {
       ],
     );
     assert.equal(revision, await Effect.runPromise(ks.head));
+    assert.deepEqual(await Effect.runPromise(ks.keys('/registry/t/')), ['/registry/t/a', '/registry/t/b']);
   });
 
   test('a watch replays every change after its revision; past a compaction it is gone, past the head ahead', async () => {

@@ -192,8 +192,8 @@ export function proposalRecords(open: Effect.Effect<Keyspace, Refusal>, held: Ef
         Effect.gen(function* () {
           const keyspace = yield* held;
           if (keyspace === undefined) return [];
-          const { records } = yield* keyspace.list(PREFIX);
-          return [...new Set(records.map((r) => firstPiece(r.key.slice(PREFIX.length), '/')))].sort();
+          const keys = yield* keyspace.keys(PREFIX);
+          return [...new Set(keys.map((key) => firstPiece(key.slice(PREFIX.length), '/')))].sort();
         }),
       list: (factory) => Effect.map(listed(factory), (l) => l.items),
       listed,

@@ -4,17 +4,27 @@ import { expect, waitFor, within } from 'storybook/test';
 import { DEFAULT_NAMESPACE, type Proposal } from 'objects';
 import { factoriesQuery, factoryPlacesQuery } from '@/lib/api/factories';
 import { factoryInboxQuery } from '@/lib/api/inbox';
-import { waitingProposalsQuery } from '@/lib/api/proposals';
+import { type ProposalRow, waitingProposalsQuery } from '@/lib/api/proposals';
 import { frameRunsQuery } from '../nav/nav';
 import { FactoryPane } from './FactoryPane';
 import { FACTORY, factoryView, openRuns, proposal, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
+
+/** A proposal as its list's row, which the pane's read answers. */
+const rowOf = ({ metadata, spec, status }: Proposal) =>
+  ({
+    name: metadata.name,
+    phase: status.phase,
+    widens: status.widens,
+    why: spec.why ?? '',
+    creationTimestamp: metadata.creationTimestamp,
+  }) satisfies ProposalRow;
 
 /** What a pane's reads answer: the proposals that wait, the cards not started, the runs waiting. */
 type Reads = { waiting: readonly Proposal[]; cards: number; runs: number };
 
 /**
  * The pane of `factory` at `path`, its reads seeded under the keys the pane asks them by: its Proposals line reads the proposals that
- * wait (`waitingProposalsQuery`), never the whole list.
+ * wait (`waitingProposalsQuery`), as rows of their list's Table, never the whole list.
  */
 /** The badge `place`'s line ends on, if it draws one. */
 const badgeOf = (canvasElement: HTMLElement, place: string) =>
@@ -33,7 +43,7 @@ const drawn = ({ path, search, factory, lit }: Parameters<typeof FactoryPane>[0]
       ],
       [factoryInboxQuery(factory).queryKey, Array.from({ length: reads.cards }, (_, i) => unstartedCard(`card-${i + 1}`, factory))],
       [frameRunsQuery(path).queryKey, openRuns(reads.runs)],
-      [waitingProposalsQuery(factory).queryKey, reads.waiting],
+      [waitingProposalsQuery(factory).queryKey, reads.waiting.map(rowOf)],
     ])}
   >
     <FactoryPane path={path} search={search} factory={factory} lit={lit} inDrawer />

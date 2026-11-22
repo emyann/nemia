@@ -10,13 +10,15 @@
  * `Api`'s 403 with its reason, as every refusal is answered by its kind (`refusedAs`); a write the disk refused is `Failed`, a 500 in its
  * own words.
  */
-import { approveProgram, declineProgram, proposalGet, proposalsList, proposeProgram } from 'agent-orchestrator';
+import { approveProgram, declineProgram, proposalGet, proposalsList, proposalTable, proposeProgram } from 'agent-orchestrator';
+import { Effect } from 'effect';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answeredWriteIn } from '../objects/refused.ts';
 import { listed } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
+import { wantsTable } from '../objects/table.ts';
 
 /**
  * Where a proposal is judged and applied: the store's root, whose factories say their own repositories.
@@ -27,8 +29,11 @@ export const placeOf = (s: Served) => ({ home: s.home });
 export const proposalsHandlers = readsBounded(Api, 'proposals', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answeredWriteIn(namespace, async (s) =>
-        listed('Proposal', await s.inRequest(proposalsList(namespace, query.fieldSelector)), queryOf(query)),
+      Effect.flatMap(wantsTable, (table) =>
+        answeredWriteIn(namespace, async (s) => {
+          const list = listed('Proposal', await s.inRequest(proposalsList(namespace, query.fieldSelector)), queryOf(query));
+          return table ? proposalTable(list) : list;
+        }),
       ),
     )
     .handle('get', ({ params: { namespace, name } }) => answeredWriteIn(namespace, (s) => s.inRequest(proposalGet(namespace, name))))

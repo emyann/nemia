@@ -1,7 +1,9 @@
 /**
  * A factory's Proposals and Delegations served (src/proposals/), and who calls (src/caller/caller.ts): a forged bearer, or a header that is
  * not one, refused 401 on any route; a live session's token naming its agent, run and step in the proposal it files; the person's approval
- * applying the proposal into the factory's tree; a delegation written by the person and refused an agent's session (403). The guard before
+ * applying the proposal into the factory's tree; a delegation written by the person and refused an agent's session (403); the list asked
+ * as a Table answers a row per proposal and none of its objects, so it opens where proposals too large for the answer's bound refuse
+ * the list of objects. The guard before
  * every write is `test/guarded.test.ts`'s. Kinds, statuses and reasons are asserted, never a sentence.
  *
  * On the stand-ins: the runtime's test engine, the session's task filed on it and left working, and the test place; the factory `pmill`
@@ -13,17 +15,21 @@ import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
-import type { Delegation, Proposal } from 'objects';
+import { TABLE_ACCEPT, type Delegation, type Proposal, type Table } from 'objects';
+import { AnswerBound } from '../layer.ts';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
 const engine = () => engineFor(standIn());
 const app = eachTest(() => appOver(standIn(), stand()));
+/** The most characters of JSON the bounded app answers: less than one large proposal, more than a Table of several. */
+const BOUND = 6_000;
+const bounded = eachTest(() => appOver(standIn(), stand(), Layer.succeed(AnswerBound)(BOUND)));
 
 const FACTORY = 'pmill';
 const RUN = 'pr-run';
@@ -381,4 +387,39 @@ test("a delegation is the person's: written, read, listed and removed by them, a
   assert.equal(removed.status, 200);
   assert.equal(((await removed.json()) as Delegation).metadata.name, 'implementer', 'the removal answers what it removed');
   assert.equal((await ask(`${ns}/delegations/implementer`, 'DELETE', {})).status, 404, 'none is there to remove');
+});
+
+describe('the proposals asked as a Table: a row per proposal, none of its objects, answered where the list of objects passes the bound', () => {
+  const names: string[] = [];
+  beforeAll(async () => {
+    for (const body of ['a'.repeat(BOUND), 'b'.repeat(BOUND)]) {
+      const res = await ask(`${ns}/proposals`, 'POST', { objects: [await devChanged(body)], why: 'Plan at length.\nMore.' });
+      assert.equal(res.status, 201);
+      names.push(((await res.json()) as Proposal).metadata.name);
+    }
+  });
+  const asTable = (where: string, from = app) => from().request(`${ns}/proposals${where}`, { headers: { accept: TABLE_ACCEPT } });
+  test('the waiting ones as a Table, a row each, its cells by the columns', async () => {
+    const res = await asTable(`?fieldSelector=${encodeURIComponent('status.phase=waiting')}`);
+    assert.equal(res.status, 200);
+    const table = (await res.json()) as Table;
+    assert.equal(table.kind, 'Table');
+    const at = (column: string) => table.columnDefinitions.findIndex((c) => c.name === column);
+    for (const row of table.rows) assert.equal(row.cells[at('Phase')], 'waiting');
+    const mine = table.rows.filter((row) => names.includes(String(row.cells[at('Name')])));
+    assert.equal(mine.length, names.length);
+    for (const row of mine) assert.equal(row.cells[at('Why')], 'Plan at length.');
+  });
+  test('REGRESSION: proposals each past the bound refuse the list of objects 422, and answer the Table 200 with every row', async () => {
+    assert.equal((await bounded().request(`${ns}/proposals`)).status, 422);
+    const res = await asTable('', bounded);
+    assert.equal(res.status, 200);
+    const table = (await res.json()) as Table;
+    const at = table.columnDefinitions.findIndex((c) => c.name === 'Name');
+    for (const name of names)
+      assert.ok(
+        table.rows.some((row) => row.cells[at] === name),
+        name,
+      );
+  });
 });

@@ -227,8 +227,8 @@ export type RunStartedFacts = typeof RunStartedFacts.Type;
  * the store's pause as it stood once the run was written (`paused`), the runs handed as context that had landed (`landed`), a line for
  * each file of its folder that still writes a former spelling (`hints`), the factory's repositories and volumes left out of its mounts,
  * being no directory (`notMounted`, `notVolumes`), and the `?repo=` that only found the factory, its wiring placing the run on another
- * (`repoFoundFactory`). Of an inbox card's start, the card, why its `queued:` line is still on it (`queueLeft`), and a `repo:` the start
- * did not take (`ignoredRepo`).
+ * (`repoFoundFactory`). Of an inbox card's start, the card, why its `queued:` line is still on it (`queueLeft`), a `repo:` the start
+ * did not take (`ignoredRepo`), and the cards of its `after:` that had not landed, which a start by hand goes ahead of (`waitedOn`).
  */
 export const RunStarted = Schema.Struct({
   id: Schema.String.annotate({ description: "The new run's id." }),
@@ -238,6 +238,12 @@ export const RunStarted = Schema.Struct({
   ),
   ignoredRepo: Schema.optionalKey(
     Schema.String.annotate({ description: 'A repo: line of the card the start did not take, since the factory places the run.' }),
+  ),
+  waitedOn: Schema.optionalKey(
+    Strings.annotate({
+      description:
+        "The cards of the card's after: that had not landed, by name, on a card's start by hand: the run was started all the same, from the base as it is now.",
+    }),
   ),
   paused: Schema.optionalKey(
     Paused.annotate({ description: "The store's pause as it stood once the run was written; absent where it is not paused." }),

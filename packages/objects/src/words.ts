@@ -521,6 +521,8 @@ export const EVENT_REASONS = [
   'AddsResolved',
   'TriggersClash',
   'ClashSettled',
+  'CardWaitStuck',
+  'CardWaitFreed',
   'LeftEnded',
 ] as const;
 

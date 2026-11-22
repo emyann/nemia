@@ -272,7 +272,12 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       const { run, repo, wt, branch } = await aFinished(b, { merged: true });
       fs.mkdirSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'), { recursive: true });
       fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement', 'report.md'), 'report\n');
-      fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
+      plantAsk(
+        ROOT,
+        run.id,
+        'done/retry-implement-1',
+        JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
+      );
       const done = await typed(b.e, 'prune', run.id, '--yes');
       assert.equal(done.error, undefined);
       assert.match(
@@ -285,7 +290,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.ok(
         recordText(ROOT, runKey(run.id)) !== undefined &&
           under('runs', run.id, 'artifacts', 'implement', 'report.md') &&
-          askText(ROOT, run.id, 'done') !== undefined,
+          askText(ROOT, run.id, 'done/retry-implement-1') !== undefined,
       );
       const pruned = runRecord(ROOT, run.id).pruned!;
       assert.deepEqual(

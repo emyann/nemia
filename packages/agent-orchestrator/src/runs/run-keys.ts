@@ -51,10 +51,7 @@ export const askDoneKey = (id: string, name: string) => `${asksPrefix(id)}done/$
 /** Each kind of ask by the word its name begins with, as its file was named. */
 export const ASK_WORDS: Record<AskOf, string> = { try: 'retry', round: 'round', gate: 'approve', loop: 'accept', base: 'merge' };
 
-/**
- * The name of an ask: its kind's word, its step and its number.
- * @param key Which ask: its kind, its step and its number.
- */
+/** The name of an ask, given which it is: its kind's word, its step and its number. */
 export const askName = ({ of, step, n }: AskKey) => `${ASK_WORDS[of]}-${step}-${n}`;
 
 /**

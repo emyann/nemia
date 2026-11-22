@@ -964,6 +964,7 @@ const PINNED: Record<string, string[]> = {
     'recordText',
     'keysUnder',
     'plantRecord',
+    'emptyRuns',
     'dropRecord',
     'askDoneKey',
     'askKey',

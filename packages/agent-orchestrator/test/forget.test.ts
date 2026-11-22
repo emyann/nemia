@@ -660,7 +660,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       names(String(await recovered(e(), '../x')), '"../x"', 'nemia rm add-a-flag-x1y2');
       plantRecord(ROOT, runKey('garbled'), '{ not json');
       names(String(await recovered(e(), 'garbled')), 'is not JSON');
-      assert.ok(under('runs', 'garbled.json'), 'and nothing removed');
+      assert.ok(recordText(ROOT, runKey('garbled')) !== undefined, 'and nothing removed');
       dropRecord(ROOT, runKey('garbled'));
 
       const run = await stage.runPlaced(startRun({ brief: 'its journal will not read', repo: aRepo(), workflowDir: folder() }));

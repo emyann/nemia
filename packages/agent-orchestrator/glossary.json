@@ -991,6 +991,10 @@
               "why": "`RunsLayer = RunStore`, the store's interface"
             },
             {
+              "path": "packages/agent-orchestrator/src/runs/records.store.ts",
+              "why": "`DoorOf<RunStore, RunId>`, the keyspace layer typed by the store's interface"
+            },
+            {
               "path": "packages/agent-orchestrator/src/rest/kept.ts",
               "why": "names `RunStore.runs.find`, the interface's method"
             }

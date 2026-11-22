@@ -57,14 +57,14 @@
   --md-sys-color-on-primary: hsl(0 0% 100%);
   --md-sys-color-primary-container: hsl(56 92% 53%);
   --md-sys-color-on-primary-container: hsl(56 100% 15%);
-  --md-sys-color-secondary: hsl(265 69% 52%);
+  --md-sys-color-secondary: hsl(220 3% 37%);
   --md-sys-color-on-secondary: hsl(0 0% 100%);
-  --md-sys-color-secondary-container: hsl(267 100% 93%);
-  --md-sys-color-on-secondary-container: hsl(269 100% 38%);
-  --md-sys-color-tertiary: hsl(33 71% 31%);
+  --md-sys-color-secondary-container: hsl(230 11% 89%);
+  --md-sys-color-on-secondary-container: hsl(214 5% 28%);
+  --md-sys-color-tertiary: hsl(228 3% 37%);
   --md-sys-color-on-tertiary: hsl(0 0% 100%);
-  --md-sys-color-tertiary-container: hsl(28 100% 87%);
-  --md-sys-color-on-tertiary-container: hsl(35 100% 20%);
+  --md-sys-color-tertiary-container: hsl(240 7% 89%);
+  --md-sys-color-on-tertiary-container: hsl(216 3% 28%);
   --md-sys-color-error: hsl(355 67% 43%);
   --md-sys-color-on-error: hsl(0 0% 100%);
   --md-sys-color-error-container: hsl(3 100% 92%);
@@ -102,14 +102,14 @@
   --md-sys-color-on-primary-fixed: hsl(54 100% 6%);
   --md-sys-color-primary-fixed-dim: hsl(56 100% 42%);
   --md-sys-color-on-primary-fixed-variant: hsl(56 100% 15%);
-  --md-sys-color-secondary-fixed: hsl(267 100% 93%);
-  --md-sys-color-on-secondary-fixed: hsl(267 100% 17%);
-  --md-sys-color-secondary-fixed-dim: hsl(263 100% 86%);
-  --md-sys-color-on-secondary-fixed-variant: hsl(269 100% 38%);
-  --md-sys-color-tertiary-fixed: hsl(28 100% 87%);
-  --md-sys-color-on-tertiary-fixed: hsl(30 100% 9%);
-  --md-sys-color-tertiary-fixed-dim: hsl(30 96% 72%);
-  --md-sys-color-on-tertiary-fixed-variant: hsl(35 100% 20%);
+  --md-sys-color-secondary-fixed: hsl(230 11% 89%);
+  --md-sys-color-on-secondary-fixed: hsl(210 11% 11%);
+  --md-sys-color-secondary-fixed-dim: hsl(230 5% 78%);
+  --md-sys-color-on-secondary-fixed-variant: hsl(214 5% 28%);
+  --md-sys-color-tertiary-fixed: hsl(240 7% 89%);
+  --md-sys-color-on-tertiary-fixed: hsl(216 9% 11%);
+  --md-sys-color-tertiary-fixed-dim: hsl(240 4% 78%);
+  --md-sys-color-on-tertiary-fixed-variant: hsl(216 3% 28%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -122,14 +122,14 @@
     --md-sys-color-on-primary: hsl(57 100% 4%);
     --md-sys-color-primary-container: hsl(56 100% 15%);
     --md-sys-color-on-primary-container: hsl(56 92% 53%);
-    --md-sys-color-secondary: hsl(259 100% 83%);
-    --md-sys-color-on-secondary: hsl(192 29% 7%);
-    --md-sys-color-secondary-container: hsl(261 61% 34%);
-    --md-sys-color-on-secondary-container: hsl(261 100% 93%);
-    --md-sys-color-tertiary: hsl(31 68% 62%);
-    --md-sys-color-on-tertiary: hsl(31 70% 6%);
-    --md-sys-color-tertiary-container: hsl(35 100% 20%);
-    --md-sys-color-on-tertiary-container: hsl(28 100% 87%);
+    --md-sys-color-secondary: hsl(220 3% 78%);
+    --md-sys-color-on-secondary: hsl(210 7% 6%);
+    --md-sys-color-secondary-container: hsl(216 5% 19%);
+    --md-sys-color-on-secondary-container: hsl(80 5% 89%);
+    --md-sys-color-tertiary: hsl(220 3% 78%);
+    --md-sys-color-on-tertiary: hsl(210 7% 6%);
+    --md-sys-color-tertiary-container: hsl(216 5% 19%);
+    --md-sys-color-on-tertiary-container: hsl(80 5% 89%);
     --md-sys-color-error: hsl(0 100% 73%);
     --md-sys-color-on-error: hsl(358 79% 9%);
     --md-sys-color-error-container: hsl(350 99% 29%);
@@ -163,25 +163,26 @@
     --md-sys-color-on-primary-fixed: hsl(54 100% 6%);
     --md-sys-color-primary-fixed-dim: hsl(56 100% 42%);
     --md-sys-color-on-primary-fixed-variant: hsl(56 100% 15%);
-    --md-sys-color-secondary-fixed: hsl(267 100% 93%);
-    --md-sys-color-on-secondary-fixed: hsl(267 100% 17%);
-    --md-sys-color-secondary-fixed-dim: hsl(263 100% 86%);
-    --md-sys-color-on-secondary-fixed-variant: hsl(269 100% 38%);
-    --md-sys-color-tertiary-fixed: hsl(28 100% 87%);
-    --md-sys-color-on-tertiary-fixed: hsl(30 100% 9%);
-    --md-sys-color-tertiary-fixed-dim: hsl(30 96% 72%);
-    --md-sys-color-on-tertiary-fixed-variant: hsl(35 100% 20%);
+    --md-sys-color-secondary-fixed: hsl(230 11% 89%);
+    --md-sys-color-on-secondary-fixed: hsl(210 11% 11%);
+    --md-sys-color-secondary-fixed-dim: hsl(230 5% 78%);
+    --md-sys-color-on-secondary-fixed-variant: hsl(214 5% 28%);
+    --md-sys-color-tertiary-fixed: hsl(240 7% 89%);
+    --md-sys-color-on-tertiary-fixed: hsl(216 9% 11%);
+    --md-sys-color-tertiary-fixed-dim: hsl(240 4% 78%);
+    --md-sys-color-on-tertiary-fixed-variant: hsl(216 3% 28%);
   }
 }
 
-/* Typeface. The type scale is set in Michroma and Chakra Petch, as DESIGN.md writes it.
-   `--font-michroma` and `--font-chakra-petch` is the hook a host app fills with its own loaded face (Next:
+/* Typeface. The type scale is set in Michroma and Barlow and Chakra Petch, as DESIGN.md writes it.
+   `--font-michroma` and `--font-barlow` and `--font-chakra-petch` is the hook a host app fills with its own loaded face (Next:
    `localFont({ variable: "--font-…" })` on <body> wins over this root default
    by inheritance); without one, the named family resolves to a locally
    installed or web-loaded face, then the stack behind it.
-   The mono face, which `font-mono` gives, is Share Tech Mono, on `--font-share-tech-mono`. */
+   The mono face, which `font-mono` gives, is JetBrains Mono, on `--font-jetbrains-mono`. */
 :root {
   --font-michroma: "Michroma", ui-sans-serif, system-ui, sans-serif;
+  --font-barlow: "Barlow", ui-sans-serif, system-ui, sans-serif;
   --font-chakra-petch: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
-  --font-share-tech-mono: "Share Tech Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-jetbrains-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

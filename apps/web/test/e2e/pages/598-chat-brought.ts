@@ -106,7 +106,6 @@ export default {
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
       dropStoredRun(ASKING.id);
-      fs.rmSync(path.join(store!, 'runs', `${id}.asks`), { recursive: true, force: true });
       fed(id, 'removed');
     }
   },

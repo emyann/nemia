@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, openFold, photograph, stepBar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storedRecordText, storeRecord } from '../world.ts';
+import { OUT, storedRecordText, storeRecord } from '../world.ts';
 
 export default {
   /**

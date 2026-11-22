@@ -211,6 +211,33 @@ export function dropStoredAsks(id: string) {
   );
 }
 
+/** Where the keyspace keeps every run's record and every run's asks (`runKey`, `askKeyOf`). */
+const RUN_PREFIXES = ['/registry/runs/', '/registry/asks/'];
+
+/**
+ * Every run's record and every ask of the seeded store, each text by its key: what a page that lets the api write to many runs keeps, to
+ * put back (`restoreRunKeys`).
+ */
+export function storedRunKeys() {
+  return JSON.parse(
+    inApi(
+      `import { keysUnder, recordText } from 'agent-orchestrator/testing'; const root = process.env.WF_ROOT; process.stdout.write(JSON.stringify(Object.fromEntries(${JSON.stringify(RUN_PREFIXES)}.flatMap((prefix) => keysUnder(root, prefix)).map((key) => [key, recordText(root, key) ?? '']))));`,
+    ),
+  ) as Record<string, string>;
+}
+
+/**
+ * The seeded store's runs' records and asks put back as `before` held them: each key written since taken out, and each one changed or
+ * taken out written again.
+ * @param before What `storedRunKeys` read before the page wrote.
+ */
+export function restoreRunKeys(before: Record<string, string>) {
+  inApi(
+    `import { dropRecord, keysUnder, plantRecord, recordText } from 'agent-orchestrator/testing'; import fs from 'node:fs'; const root = process.env.WF_ROOT; const before = JSON.parse(fs.readFileSync(0, 'utf8')); for (const key of ${JSON.stringify(RUN_PREFIXES)}.flatMap((prefix) => keysUnder(root, prefix))) if (!(key in before)) dropRecord(root, key); for (const [key, text] of Object.entries(before)) if (recordText(root, key) !== text) plantRecord(root, key, text);`,
+    JSON.stringify(before),
+  );
+}
+
 /**
  * The run `id` taken out of the seeded store, its record and every ask of it, there or not: what a page that wrote a run takes back.
  * @param id The run's id.

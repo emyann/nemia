@@ -1,11 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, openFold, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storedRecordText, storeRecord } from '../world.ts';
+import { OUT, storedRecordText, storeRecord } from '../world.ts';
 
 export default {
   /**

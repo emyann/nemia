@@ -4,7 +4,7 @@ import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredRun, OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedAsks, storedRecordText, storeRecord } from '../world.ts';
 
 export default {
   /**
@@ -18,8 +18,6 @@ export default {
   expect: async (page) => {
     const written = writeAsking(store!);
     const { id, gated, cut, where } = ASKING;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
-    const recordFile = path.join(store!, 'runs', `${id}.json`);
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
@@ -42,10 +40,10 @@ export default {
         `${cut.title} and ${where.title} answered`,
       );
 
-      const record = JSON.parse(fs.readFileSync(recordFile, 'utf8')) as { workflow: { name: string; output?: unknown }[] };
+      const record = JSON.parse(storedRecordText(id)) as { workflow: { name: string; output?: unknown }[] };
       const plain = { type: 'object', properties: { open: { type: 'string' } }, required: ['open'], additionalProperties: false };
       for (const step of record.workflow) if (step.name === gated) step.output = { file: 'open.schema.json', schema: plain };
-      fs.writeFileSync(recordFile, JSON.stringify(record, null, 2));
+      storeRecord(id, JSON.stringify(record, null, 2));
 
       const [answered] = await Promise.all([
         refused.waitForResponse(
@@ -66,8 +64,8 @@ export default {
         throw new Refused(
           `the refusal is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`,
         );
-      if (fs.existsSync(asks))
-        throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
+      if (Object.keys(storedAsks(id)).length > 0)
+        throw new Refused(`nothing is written on a refusal — the run's asks hold ${Object.keys(storedAsks(id)).join(', ')}`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `gate-questions-refused-shown-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);

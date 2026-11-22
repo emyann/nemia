@@ -6,7 +6,7 @@ import { fed, openFold, partOf, photograph, sidebar, stepBar, themeOf, isRunActi
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { dropStoredRun, OUT, store } from '../world.ts';
+import { dropStoredAsks, dropStoredRun, OUT, store, storedAsks } from '../world.ts';
 
 /** The labels chosen on the question titled `title`, in `where`: the options' tiles selected, by the label each names. */
 const chosenOn = (where: Locator, title: string) =>
@@ -14,9 +14,9 @@ const chosenOn = (where: Locator, title: string) =>
     .locator(`fieldset[data-question="${title}"] label[data-option][data-selected]`)
     .evaluateAll((tiles) => tiles.map((tile) => tile.getAttribute('data-option') ?? '')) satisfies Promise<string[]>;
 
-/** The JSON of the ask `file`, or nothing where it is not there. */
-const askIn = (file: string) =>
-  (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as {
+/** The JSON of ASKING's ask `name`, or nothing where the store holds none. */
+const askIn = (name: string) =>
+  JSON.parse(storedAsks(ASKING.id)[name] ?? '{}') as {
     message?: string;
     mode?: string;
     step?: string;
@@ -57,7 +57,6 @@ export default {
     await sidebar(page);
     const written = writeAsking(store!);
     const { id, gated, cut, where } = ASKING;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
     try {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
@@ -114,7 +113,7 @@ export default {
         `1. ${cut.title}\n   Chose: ${cut.recommended} — ${cut.options[0].meaning}`,
         `2. ${where.title}\n   Chose: ${where.options[1].label} — ${where.options[1].meaning}`,
       ];
-      const approval = askIn(path.join(asks, `approve-${gated}-1`));
+      const approval = askIn(`approve-${gated}-1`);
       const answeredBy = (actor: Actor | undefined) => `Answered by: ${actor ? actorWords(actor) : 'nobody'}`;
       const words = [`The person's answers to ${gated}'s questions:`, ...blocks, `Note: ${ASKING.note}`, answeredBy(approval.actor)];
       if (!approval.actor || approval.message !== words.join('\n\n'))
@@ -126,7 +125,7 @@ export default {
         `the approval shows in ${gated}'s Detail, its words the answers`,
       );
 
-      fs.rmSync(asks, { recursive: true, force: true });
+      dropStoredAsks(id);
       fed(id, gated, 'awaiting approval');
       await expectVisible(asked, `with the approval taken back, ${gated} asks its questions again`);
       await answer(page, gate);
@@ -134,7 +133,7 @@ export default {
       const [sent] = await Promise.all([page.waitForResponse(posted('retry'), { timeout: WAIT_MS }), sendBack.click()]);
       if (sent.status() !== 202)
         throw new Refused(`the api takes the send-back with its answers — it answered ${sent.status()}: ${await sent.text()}`);
-      const back = askIn(path.join(asks, `retry-${gated}-2`));
+      const back = askIn(`retry-${gated}-2`);
       const told = ['Answers to your questions:', ...blocks, `Note: ${ASKING.objection}`, answeredBy(back.actor)];
       if (back.mode !== 'continue' || !back.actor || back.message !== told.join('\n\n'))
         throw new Refused(`the send-back carries the answers, the objection their note — it holds ${JSON.stringify(back)}`);

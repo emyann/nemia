@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, partOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store, storedRecordText, storeRecord } from '../world.ts';
+import { OUT, storedRecordText, storeRecord } from '../world.ts';
 
 /** A repository no place can read: where a branch of it stands is asked and not answered. */
 const NOWHERE = '/code/no-such-repository';

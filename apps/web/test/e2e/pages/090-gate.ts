@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectRendered, fed, openFold, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storedAsks, storedRecordText, storeRecord } from '../world.ts';
 import { SEAT_TOKEN } from '../served.ts';
 
 /** Who the board's write is, as the approval records it: the person, under the seat's token, which the browser presents as its cookie. */
@@ -46,9 +45,7 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     const { id, gated } = GATED;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
-    const recordFile = path.join(store!, 'runs', `${id}.json`);
-    const seededRecord = fs.readFileSync(recordFile, 'utf8');
+    const seededRecord = storedRecordText(id);
     const approved = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${gated}/approve`);
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
@@ -197,7 +194,7 @@ export default {
       await idle(refused);
       await expectVisible(approveOf(refused), 'Approve, on a page of its own whose every read of the run is held as it was first read');
       const { gates: _gates, ...ungated } = JSON.parse(seededRecord) as { gates?: string[] };
-      fs.writeFileSync(recordFile, JSON.stringify(ungated, null, 2));
+      storeRecord(id, JSON.stringify(ungated, null, 2));
       await wordsOf(refused).fill(GATED.words);
       const [answered] = await Promise.all([refused.waitForResponse(approved, { timeout: WAIT_MS }), approveOf(refused).click()]);
       const { error } = (await answered.json()) as { error?: string };
@@ -220,8 +217,8 @@ export default {
         );
       if ((await wordsOf(refused).inputValue()) !== GATED.words)
         throw new Refused('the words stay in the box after a refusal, to approve with again');
-      if (fs.existsSync(asks))
-        throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
+      if (Object.keys(storedAsks(id)).length > 0)
+        throw new Refused(`nothing is written on a refusal — the run's asks hold ${Object.keys(storedAsks(id)).join(', ')}`);
       await settled(refused);
       await photograph(refused, path.join(OUT, `gate-refused-${await themeOf(refused)}.png`), { fullPage: true });
       const expected = `request answered 409: POST ${answered.url()}`;
@@ -235,7 +232,7 @@ export default {
         );
     } finally {
       await refused.close();
-      fs.writeFileSync(recordFile, seededRecord);
+      storeRecord(id, seededRecord);
       fed(id, gated, 'awaiting approval');
     }
 
@@ -247,23 +244,23 @@ export default {
         `the api takes the approval, through the board's proxy — it answered ${response.status()}: ${await response.text()}`,
       );
     const took = (await response.json()) as { try?: unknown; at?: unknown; message?: unknown; file?: unknown };
-    const file = path.join(asks, `approve-${gated}-1`);
-    if (took.try !== 1 || typeof took.at !== 'string' || took.message !== GATED.words || took.file !== file) {
+    const file = `approve-${gated}-1`;
+    if (took.try !== 1 || typeof took.at !== 'string' || took.message !== GATED.words || took.file !== `/registry/asks/${id}/${file}`) {
       throw new Refused(
-        `the api answers with the try approved, when, the words and the approval's file — it answered ${JSON.stringify(took)}`,
+        `the api answers with the try approved, when, the words and the approval's key — it answered ${JSON.stringify(took)}`,
       );
     }
-    const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+    const written = JSON.parse(storedAsks(id)[file] ?? 'null');
     if (
       JSON.stringify(written) !== JSON.stringify({ step: gated, try: 1, at: took.at, message: GATED.words, actor: SEATED }) ||
-      fs.readdirSync(asks).length !== 1
+      Object.keys(storedAsks(id)).length !== 1
     ) {
       throw new Refused(
-        `the approval is written as wf approve writes it beside who sent it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`,
+        `the approval is written as wf approve writes it beside who sent it, and nothing else — the run's asks hold ${Object.keys(storedAsks(id)).join(', ')}, and ${file} holds ${JSON.stringify(written)}`,
       );
     }
-    if (fs.readFileSync(recordFile, 'utf8') !== seededRecord)
-      throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
+    if (storedRecordText(id) !== seededRecord)
+      throw new Refused(`the api writes nothing of the run's record — the store's record of ${id} changed`);
 
     const approval = (await openFold(section, 'detail')).locator(`section[aria-label="The approval of ${gated}"]`);
     await expectVisible(approval, `the approval shows under ${gated} once the run is read again`);
@@ -276,17 +273,17 @@ export default {
     await settled(page);
     await photograph(page, path.join(OUT, `gate-approved-${await themeOf(page)}.png`), { fullPage: true });
 
-    fs.rmSync(asks, { recursive: true, force: true });
+    dropStoredAsks(id);
     fed(id, gated, 'awaiting approval');
     await expectVisible(approveOf(page), `with the approval taken back, ${gated} waits at its gate again once the run is read again`);
     await expectCount(approval, 0, 'and its approval is gone from under it');
     await objection.fill(GATED.objection);
     const [sent] = await Promise.all([page.waitForResponse(retried, { timeout: WAIT_MS }), sendBack.click()]);
     if (sent.status() !== 202) throw new Refused(`the api takes the send-back — it answered ${sent.status()}: ${await sent.text()}`);
-    const ask = path.join(asks, `retry-${gated}-2`);
-    const asked = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
+    const ask = `retry-${gated}-2`;
+    const asked = JSON.parse(storedAsks(id)[ask] ?? 'null');
     if (asked?.step !== gated || asked?.try !== 2 || asked?.mode !== 'continue' || asked?.message !== GATED.objection) {
-      throw new Refused(`the send-back is written as wf retry --message writes it — ${ask} holds ${JSON.stringify(asked)}`);
+      throw new Refused(`the send-back is written as wf retry --message writes it — the run's ask ${ask} holds ${JSON.stringify(asked)}`);
     }
     const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
     await expectVisible(
@@ -297,7 +294,7 @@ export default {
     await settled(page);
     await photograph(page, path.join(OUT, `gate-sent-back-${await themeOf(page)}.png`), { fullPage: true });
 
-    fs.rmSync(asks, { recursive: true, force: true });
+    dropStoredAsks(id);
     fed(id, gated, 'awaiting approval');
     await expectVisible(approveOf(page), `with the send-back taken back, ${gated} waits at its gate again, and the page ends as it began`);
     await settled(page);

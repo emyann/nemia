@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
 import { fed, photograph, themeOf, stepBar, isRunAction } from '../board.ts';
@@ -6,7 +5,7 @@ import { cardOf, expectClearOfEachOther, expectClearOfPanels, gateApprove } from
 import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storedAsks } from '../world.ts';
 
 export default {
   /**
@@ -21,7 +20,6 @@ export default {
   route: '/factories/default',
   expect: async (page) => {
     const { id, gated } = GATED;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
     const approved = (r: Response) =>
       r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${gated}/approve`);
     await expectCount(page.getByRole('switch', { name: 'Show finished', checked: false }), 1, 'Show finished is off');
@@ -71,10 +69,12 @@ export default {
       const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), gateApprove(card).click()]);
       if (response.status() !== 202)
         throw new Refused(`the api takes the approval — it answered ${response.status()}: ${await response.text()}`);
-      const file = path.join(asks, `approve-${gated}-1`);
-      const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+      const file = `approve-${gated}-1`;
+      const written = JSON.parse(storedAsks(id)[file] ?? 'null');
       if (written?.step !== gated || written?.try !== 1 || 'message' in written) {
-        throw new Refused(`the approval is written as wf approve writes it, with no words — ${file} holds ${JSON.stringify(written)}`);
+        throw new Refused(
+          `the approval is written as wf approve writes it, with no words — the run's ask ${file} holds ${JSON.stringify(written)}`,
+        );
       }
       await expectVisible(
         card.locator('[data-taken]', { hasText: `approved — the next pass files what waits on ${gated}` }),
@@ -83,7 +83,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-mid-gate-approved-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
-      fs.rmSync(asks, { recursive: true, force: true });
+      dropStoredAsks(id);
       fed(id, gated, 'awaiting approval');
     }
     await expectVisible(gateApprove(card), 'with the approval taken back, the card offers the gate again, and the page ends as it began');

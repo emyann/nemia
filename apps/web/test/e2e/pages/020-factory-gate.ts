@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
 import { LIST_PAGE } from 'objects';
@@ -7,7 +6,7 @@ import { cardOf, expectClearOfEachOther, gateAnswer, gateApprove, showFinished }
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING, FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storeAsk, storedAsks } from '../world.ts';
 
 export default {
   /**
@@ -22,7 +21,6 @@ export default {
   route: '/factories/default',
   expect: async (page) => {
     const { id, ending, back } = ENDING;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
     const approved = (r: Response) =>
       r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${ending}/approve`);
     const retried = (r: Response) => r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, id, `/steps/${back}/retry`);
@@ -50,8 +48,7 @@ export default {
       await refused.goto(page.url(), { waitUntil: 'load' });
       await idle(refused);
       await expectVisible(approveOf(refused), 'Approve on the card, on a page of its own that holds the list as the card read it');
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, `approve-${ending}-1`), JSON.stringify({ step: ending, try: 1, at: new Date().toISOString() }));
+      storeAsk(id, `approve-${ending}-1`, JSON.stringify({ step: ending, try: 1, at: new Date().toISOString() }));
       await gateAnswer(refused, cardOf(refused, id), ending, 'Approve with words…');
       await expectVisible(approval(refused), 'Approve with words… opens a popover to confirm it in');
       await approval(refused)
@@ -82,10 +79,10 @@ export default {
       );
       if (!seen.includes(expected) || others.length)
         throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
-      fs.rmSync(asks, { recursive: true, force: true });
+      dropStoredAsks(id);
       fed(id, ending, 'awaiting approval');
     } finally {
-      fs.rmSync(asks, { recursive: true, force: true });
+      dropStoredAsks(id);
       await refused.close();
     }
     await expectVisible(approveOf(page), 'the gate is on the card again once the approval is taken back');
@@ -151,11 +148,11 @@ export default {
     const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), runNow(page).click()]);
     if (response.status() !== 202)
       throw new Refused(`the api takes the approval — it answered ${response.status()}: ${await response.text()}`);
-    const file = path.join(asks, `approve-${ending}-1`);
-    const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
-    if (written?.step !== ending || written?.try !== 1 || 'message' in written || fs.readdirSync(asks).length !== 1) {
+    const file = `approve-${ending}-1`;
+    const written = JSON.parse(storedAsks(id)[file] ?? 'null');
+    if (written?.step !== ending || written?.try !== 1 || 'message' in written || Object.keys(storedAsks(id)).length !== 1) {
       throw new Refused(
-        `the approval is written as wf approve writes it, with no words, and nothing else — ${file} ${JSON.stringify(written)}`,
+        `the approval is written as wf approve writes it, with no words, and nothing else — the run's ask ${file} holds ${JSON.stringify(written)}, beside ${Object.keys(storedAsks(id)).join(', ')}`,
       );
     }
     await expectCount(approval(page), 0, 'the popover closes');
@@ -166,7 +163,7 @@ export default {
     await expectCount(approveOf(page), 0, 'and offers the gate no more');
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-approved-${await themeOf(page)}.png`), { fullPage: true });
-    fs.rmSync(asks, { recursive: true, force: true });
+    dropStoredAsks(id);
     fed(id, ending, 'awaiting approval');
     await expectVisible(approveOf(page), 'with the approval taken back, the card offers the gate again');
     await expectCount(card.locator('[data-taken]'), 0, 'and says nothing of the answer taken back');
@@ -185,10 +182,10 @@ export default {
     const [sent] = await Promise.all([page.waitForResponse(retried, { timeout: WAIT_MS }), send.click()]);
     if (sent.status() !== 202)
       throw new Refused(`the api takes the send-back to ${back} — it answered ${sent.status()}: ${await sent.text()}`);
-    const ask = path.join(asks, `retry-${back}-2`);
-    const retry = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
+    const ask = `retry-${back}-2`;
+    const retry = JSON.parse(storedAsks(id)[ask] ?? 'null');
     if (retry?.step !== back || retry?.mode !== 'continue' || retry?.message !== ENDING.objection) {
-      throw new Refused(`the send-back is written as wf retry --message writes it — ${ask} holds ${JSON.stringify(retry)}`);
+      throw new Refused(`the send-back is written as wf retry --message writes it — the run's ask ${ask} holds ${JSON.stringify(retry)}`);
     }
     await expectVisible(
       card.locator('[data-taken]', { hasText: `sent back to ${back} — try 2 asked` }),
@@ -196,7 +193,7 @@ export default {
     );
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), { fullPage: true });
-    fs.rmSync(asks, { recursive: true, force: true });
+    dropStoredAsks(id);
     fed(id, ending, 'awaiting approval');
     await expectVisible(approveOf(page), 'with the send-back taken back, the card offers the gate again, and the page ends as it began');
 

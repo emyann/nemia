@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
 import { expectRendered, fed, openFold, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storedAsks } from '../world.ts';
 
 export default {
   /**
@@ -18,7 +17,6 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     const { id, ending, back } = ENDING;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
     const said = `${ENDING.says} — nemia approve ${id} ${ending}`;
     const banner = page.locator('section[aria-label="Asks of you"]');
     const decision = banner.locator(`li[data-ask="decide"][data-step="${ending}"]`, { hasText: said });
@@ -122,12 +120,15 @@ export default {
     ]);
     if (sent.status() !== 202)
       throw new Refused(`the api takes the send-back to ${back} — it answered ${sent.status()}: ${await sent.text()}`);
-    const ask = path.join(asks, `retry-${back}-2`);
-    const asked = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
+    const ask = `retry-${back}-2`;
+    const asked = JSON.parse(storedAsks(id)[ask] ?? 'null');
     if (asked?.step !== back || asked?.try !== 2 || asked?.mode !== 'continue' || asked?.message !== ENDING.objection) {
-      throw new Refused(`the send-back is written as wf retry --message writes it, for ${back} — ${ask} holds ${JSON.stringify(asked)}`);
+      throw new Refused(
+        `the send-back is written as wf retry --message writes it, for ${back} — the run's ask ${ask} holds ${JSON.stringify(asked)}`,
+      );
     }
-    if (fs.readdirSync(asks).length !== 1) throw new Refused(`and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
+    if (Object.keys(storedAsks(id)).length !== 1)
+      throw new Refused(`and nothing else — the run's asks hold ${Object.keys(storedAsks(id)).join(', ')}`);
     const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
     await expectVisible(
       page.locator(`section[aria-label="Asks of you"] [data-ask="asked"][data-step="${back}"]`, { hasText: note }),
@@ -150,7 +151,7 @@ export default {
     await settled(page);
     await photograph(page, path.join(OUT, `decide-sent-back-${await themeOf(page)}.png`), { fullPage: true });
 
-    fs.rmSync(asks, { recursive: true, force: true });
+    dropStoredAsks(id);
     fed(id, ending, 'awaiting approval');
     await expectVisible(decision, 'with the send-back taken back, the gate holds again once the run is read again');
     await expectVisible(gate, `and ${ending} waits at it`);

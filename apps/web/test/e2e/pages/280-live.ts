@@ -1,10 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, openFold, partOf, photograph, sidebar, themeOf, railPlace, runPath } from '../board.ts';
 import { expectCount, expectVisible, FEED_STREAM, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredAsks, OUT, storedAsks } from '../world.ts';
 
 /** How long a change on the feed may take to show: well under the minute the board polls at while it follows the feed, and under 5 s. */
 const LIVE_MS = 3_000;
@@ -25,9 +24,10 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     const { id, gated } = GATED;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
-    if (fs.existsSync(asks))
-      throw new Refused(`the store is as seeded before the page approves anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
+    if (Object.keys(storedAsks(id)).length > 0)
+      throw new Refused(
+        `the store is as seeded before the page approves anything — the run's asks hold ${Object.keys(storedAsks(id)).join(', ')}`,
+      );
     const footer = page.locator('footer[data-machine-bar] [data-gauges-button][data-feed]');
     await feedAnswered(page);
     await expectVisible(footer.and(page.locator('[data-feed="open"]')), 'the gauges button says the feed is followed (data-feed="open")');
@@ -82,7 +82,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `live-approved-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
-      fs.rmSync(asks, { recursive: true, force: true });
+      dropStoredAsks(id);
       fed(id, gated, 'awaiting approval');
     }
     await expectVisible(

@@ -16,7 +16,8 @@ export type CardName = Id<'CardName'>;
 
 /**
  * A card as `parseInboxCard` reads it (`InboxCard`). Its invariants are its reader's: its name is its file's minus `.md` (inbox.ts:106),
- * a queued card names its workflow (inbox.ts:122), and `from:` names each run once (inbox.ts:152).
+ * a queued card names its workflow (inbox.ts:122), `from:` names each run once (inbox.ts:152), and `after:`
+ * names each card once and never the card itself (`afterCards`).
  */
 export const Card = Schema.Struct({
   name: CardName.OnRead,
@@ -28,6 +29,8 @@ export const Card = Schema.Struct({
   model: Schema.optional(Schema.Record(StepName.OnRead, Schema.String)),
   factory: Schema.optional(FactoryName.OnRead),
   from: Schema.optional(Schema.Array(RunId.OnRead)),
+  /** The cards it waits on (`after:`), each a card's name, none named twice nor the card itself: its reader's invariants. */
+  after: Schema.optional(Schema.Array(CardName.OnRead)),
   /** A person's labels on the card (`labels:`), each pair as `labelRefusal` takes one: its reader's invariant. */
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   body: Schema.String,
@@ -41,6 +44,12 @@ export const Card = Schema.Struct({
     ),
     Schema.makeFilter(
       (card) => new Set(card.from ?? []).size === (card.from ?? []).length || '`from:` names a run twice: name each run once',
+    ),
+    Schema.makeFilter(
+      (card) => new Set(card.after ?? []).size === (card.after ?? []).length || '`after:` names a card twice: name each card once',
+    ),
+    Schema.makeFilter(
+      (card) => !(card.after ?? []).includes(card.name) || '`after:` names the card itself: take it off the line',
     ),
   )
   .annotate({ identifier: 'Card' });

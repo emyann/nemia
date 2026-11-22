@@ -180,8 +180,8 @@ const STORE_LINES: readonly Case[] = [
 ];
 
 /**
- * The six words a factory's lines say, spelled by hand as the owner named them: its conflicts', each with its `ConflictsPending`
- * condition's message, its library adds', and a card's clash, begun and ended.
+ * The eight words a factory's lines say, spelled by hand as the owner named them: its conflicts', each with its `ConflictsPending`
+ * condition's message, its library adds', a card's clash, begun and ended, and a card's stuck wait, begun and ended.
  */
 const FACTORY_LINES: readonly Case[] = [
   { kind: 'Factory', word: 'conflicts pending', note: 'agents/coder.md: choose one', reason: 'ConflictsPending' },
@@ -190,6 +190,8 @@ const FACTORY_LINES: readonly Case[] = [
   { kind: 'Factory', word: 'library adds resolved', reason: 'AddsResolved' },
   { kind: 'Factory', word: 'triggers clash', note: 'card both-ways waits: triggers bugs, ready', reason: 'TriggersClash' },
   { kind: 'Factory', word: 'clash settled', note: 'card both-ways clashes no more', reason: 'ClashSettled' },
+  { kind: 'Factory', word: 'card wait stuck', note: 'card b-2 waits on a-1, which is missing', reason: 'CardWaitStuck' },
+  { kind: 'Factory', word: 'card wait freed', note: 'card b-2 waits on no card a person must free', reason: 'CardWaitFreed' },
 ];
 
 /** A parked step's words (`pausedWord`): paused between two calls, after the call it stopped after, or with the call it cut. */
@@ -274,10 +276,10 @@ describe('reasonOf names a reason for every word the package writes, only of a k
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
     assert.equal(
       entries.length,
-      56,
-      "the table the owner named has 56 entries: a factory's library adds two of them, and a card its triggers clash on two more (TriggersClash, ClashSettled)",
+      58,
+      "the table the owner named has 58 entries: a factory's library adds two of them, a card its triggers clash on two more (TriggersClash, ClashSettled), and a card's stuck wait two more (CardWaitStuck, CardWaitFreed)",
     );
-    assert.equal(REASON_CODES.length, 45, 'of 45 distinct codes');
+    assert.equal(REASON_CODES.length, 47, 'of 47 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

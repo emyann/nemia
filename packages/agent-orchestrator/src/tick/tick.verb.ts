@@ -19,6 +19,8 @@ import {
   type TaskView,
 } from '../runtime-client.ts';
 import type { QueueStarted } from '../inbox/index.ts';
+import type { RunStatusWord } from 'objects';
+import type { RunPhase } from '../phase/phase.ts';
 import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
@@ -34,7 +36,7 @@ import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
-import type { FeedClashes, FeedConflicts, FeedMissing, FeedReadiness } from '../feed/index.ts';
+import type { FeedClashes, FeedConflicts, FeedMissing, FeedReadiness, FeedWaits } from '../feed/index.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { conflictsNow } from '../factory/applied/applied.verb.ts';
@@ -52,8 +54,8 @@ import { informedJudgements, Informer, type InformerMemo, informerRead, passStar
 import { sameJudgement } from '../summary/judgement.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
-import { reportedEngine } from '../views/views.verb.ts';
-import { clashesNow, startQueued } from '../inbox/inbox.verb.ts';
+import { passParents, reportedEngine } from '../views/views.verb.ts';
+import { inboxNow, landedThrough, startQueued } from '../inbox/inbox.verb.ts';
 import { startDue } from '../factory/schedule/schedule.verb.ts';
 import type { ScheduleStarted } from '../factory/schedule/schedule.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
@@ -302,17 +304,20 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
   const conflicts = yield* conflictsNow().pipe(Effect.orElseSucceed(() => undefined));
   const missing = yield* tried(() => addsMissingNow(home)).pipe(Effect.orElseSucceed(() => undefined));
-  const clashes = yield* clashesNow(runs).pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
   const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
+  const landed = landedThrough(e, passParents(standingReader(standing)));
+  const inbox = yield* inboxNow(runs, landed, (id) => phaseOfStatus(judging.done.get(id)?.status)).pipe(
+    Effect.orElseSucceed(() => undefined),
+  );
   if (informer) yield* informed(e, informer, runs, judging, verify);
   yield* withinEffect('act', (yield* ProposalsAct)(runs, judging.done));
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
-      ? yield* withinEffect('act', startQueued(repo, runs))
+      ? yield* withinEffect('act', startQueued(repo, runs, landed))
       : undefined;
   const scheduled =
     !(queue && 'run' in queue) && slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
@@ -326,7 +331,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
       runs,
       judging,
       queue,
-      yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness, clashes }),
+      yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, missing, readiness, clashes: inbox?.clashes, waits: inbox?.stuck }),
     ),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
@@ -417,6 +422,23 @@ const informed = Effect.fnUntraced(function* (
   );
 });
 
+/**
+ * A run's phase as its word on the pass says it (`Assessment.status`), as a card's state reads it: `awaiting approval` waits on a person
+ * as `waiting` does. Undefined for a run the pass did not judge.
+ */
+const phaseOfStatus = (status: RunStatusWord | undefined) =>
+  (status === undefined ? undefined : STATUS_PHASE[status]) satisfies RunPhase | undefined;
+
+/** Each word a pass judges a run with (`RunStatusWord`), as the phase a card's state reads. */
+const STATUS_PHASE: Readonly<Record<RunStatusWord, RunPhase>> = {
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  cancelled: 'cancelled',
+  'awaiting approval': 'waiting',
+  waiting: 'waiting',
+};
+
 /** What a pass has judged so far: each run it advanced, and each run it left unjudged with why (`Unjudged`). */
 type Judging = { done: Map<string, Advanced>; unjudged: Map<string, Pick<Unjudged, 'why' | 'by'>> };
 
@@ -493,12 +515,14 @@ const feedErrorOf = (
     missing,
     readiness,
     clashes,
+    waits,
   }: {
     levels: readonly FactoryLevel[] | undefined;
     conflicts: FeedConflicts | undefined;
     missing: FeedMissing | undefined;
     readiness: (() => FeedReadiness | undefined) | undefined;
     clashes: FeedClashes | undefined;
+    waits: FeedWaits | undefined;
   },
 ) =>
   Effect.exit(
@@ -510,6 +534,7 @@ const feedErrorOf = (
       ...(conflicts === undefined ? {} : { conflicts }),
       ...(missing === undefined ? {} : { missing }),
       ...(clashes === undefined ? {} : { clashes }),
+      ...(waits === undefined ? {} : { waits }),
       ...readOf(readiness?.()),
     }),
   ).pipe(

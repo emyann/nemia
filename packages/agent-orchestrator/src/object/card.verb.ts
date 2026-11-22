@@ -73,11 +73,15 @@ const bodyOf = (l: InboxListing, text: string) => {
   }
 };
 
-/** What the listed card `l`'s status says of the queue: its place, the triggers that queue it, and those that clash on it. */
+/**
+ * What the listed card `l`'s status says of the queue: its place, the triggers that queue it, those that clash on it, and the cards of its
+ * `after:` not landed that keep it out of the queue (`waitingOn`).
+ */
 const queueStatusOf = (l: InboxListing) => ({
   ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
   ...(l.queued?.by !== undefined ? { queuedBy: [...l.queued.by] } : {}),
   ...(l.clash !== undefined ? { clash: [...l.clash] } : {}),
+  ...(l.waits?.length ? { waitingOn: l.waits.map((w) => ({ ...w, ...(w.cycle === undefined ? {} : { cycle: [...w.cycle] }) })) } : {}),
 });
 
 /** The keys of the listed card `l` its spec says, each where the card sets it. */
@@ -87,6 +91,7 @@ const specKeysOf = (l: InboxListing) => ({
   ...(l.gate !== undefined ? { gate: l.gate } : {}),
   ...(l.model !== undefined ? { model: { ...l.model } } : {}),
   ...(l.from.length ? { from: [...l.from] } : {}),
+  ...(l.after.length ? { after: [...l.after] } : {}),
   ...(l.queued !== undefined && l.queued.by === undefined ? { queued: l.queued.at } : {}),
   ...(l.files !== undefined && l.files.length ? { files: l.files.map((f) => ({ ...f })) } : {}),
 });

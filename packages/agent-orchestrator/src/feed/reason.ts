@@ -99,6 +99,8 @@ export const LINE_WORDS = {
   AddsResolved: 'library adds resolved',
   TriggersClash: 'triggers clash',
   ClashSettled: 'clash settled',
+  CardWaitStuck: 'card wait stuck',
+  CardWaitFreed: 'card wait freed',
   RevisionsBehind: 'revisions behind',
   LeftEnded: 'left running, ended',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
@@ -154,6 +156,8 @@ export const REASONS = {
   AddsResolved: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   TriggersClash: { kinds: ['Factory'], type: 'Warning', source: 'tick' },
   ClashSettled: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
+  CardWaitStuck: { kinds: ['Factory'], type: 'Warning', source: 'tick' },
+  CardWaitFreed: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   LeftEnded: { kinds: ['Store'], type: 'Warning', source: 'daemon' },
 } as const satisfies Record<string, Entry>;
 
@@ -294,7 +298,8 @@ const STORE_WORDS: readonly Rule[] = [
  * until its `ConflictsPending` condition turns (`conflictLines`), both `Normal`: a wait on a person, not a fault; and an add of its
  * record the library no longer holds, a `Warning` that stands until none is missing (`addsLines`), and its `Normal` end; and a card of
  * it that its card triggers would send to two workflows, a `Warning` that stands per card until the clash ends (`clashLines`), and its
- * `Normal` end.
+ * `Normal` end; and a card of it whose wait on the cards of its `after:` only a person can release, a `Warning` that stands per card until
+ * it is released (`waitLines`), and its `Normal` end.
  */
 const FACTORY_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.ConflictsPending, reason: 'ConflictsPending' },
@@ -303,6 +308,8 @@ const FACTORY_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.AddsResolved, reason: 'AddsResolved' },
   { is: LINE_WORDS.TriggersClash, reason: 'TriggersClash' },
   { is: LINE_WORDS.ClashSettled, reason: 'ClashSettled' },
+  { is: LINE_WORDS.CardWaitStuck, reason: 'CardWaitStuck' },
+  { is: LINE_WORDS.CardWaitFreed, reason: 'CardWaitFreed' },
 ];
 
 /** Whether `rule` recognises `word`: the whole word, or its beginning. */

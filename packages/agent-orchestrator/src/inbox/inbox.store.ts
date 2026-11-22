@@ -62,7 +62,8 @@ export const inboxCards = Effect.fn('inboxCards')(function* () {
  * records are read for their `from`, so a card a run was started from is out of the queue; the tick's tries, so a queued card whose start
  * was refused, or failed, says why; and the factories that read, so a card says the repository its factory works on for its workflow
  * (`factoryRepo`).
- * `nemia inbox` lists the cards with their state through `inboxJudged` (inbox.verb.ts), which reads each run's phase.
+ * `nemia inbox` lists the cards with their state through `inboxJudged` (inbox.verb.ts), which reads each run's phase. No card here
+ * waits (`waits`): what each card of an `after:` is reads git and the engine, which the queue and the listing read (`waitingOf`).
  */
 export const readInbox = Effect.fn('readInbox')(function* () {
   const home = yield* StoreRoot;
@@ -107,6 +108,10 @@ export const filedNames = () =>
  * workflow's name (`cardWorkflowRefusal`); and in a factory filed, a workflow it does not attach (`unattachedRefusal`, naming the attach).
  * A factory not filed is the start's to refuse.
  *
+ * `after` names the cards it waits on (`--after`), written over the text's own `after:`: whether each is a card is the listing's to say,
+ * every pass, never the filing's — a card named may be filed later, and one the store does not know is listed as a wait only a person
+ * releases. Refused, `Invalid`, as the card's reader refuses it: a card named twice, the card itself, a name that is no card's.
+ *
  * `labels` are label edits (`--label`, `key=value` / `key-`), refused `Invalid` before anything is written where one does not parse
  * (`parseLabelEdits`). The card is filed with the labels its `from:` runs agree on, its text's own `labels:` over them, and the edits over
  * those (`inheritedLabels`); a key two of those runs disagree on is left out, and answered on `labelsLeftOut`.
@@ -119,6 +124,8 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   repo?: string;
   factory?: string;
   labels?: readonly string[];
+  /** The cards it waits on (`after:`), by name, written over the text's own: none named twice, nor the card itself. */
+  after?: readonly string[];
   /** The files it carries, each a File uploaded to its namespace first, with its name and the size of the File kept (`filesKept`). */
   files?: readonly CardFileGiven[];
 }) {
@@ -127,7 +134,12 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   if (opts.repo !== undefined)
     return yield* Effect.fail(new Invalid({ message: `repository ${opts.repo}: ${retiredRepoRefusal('Nothing was filed.')}` }));
   const files = opts.files?.length ? yield* cardFilesJudged('filed', opts.files, [], false) : undefined;
-  const given = { workflow: opts.workflow, factory: opts.factory, ...(files !== undefined ? { files } : {}) };
+  const given = {
+    workflow: opts.workflow,
+    factory: opts.factory,
+    ...(files !== undefined ? { files } : {}),
+    ...(opts.after?.length ? { after: opts.after } : {}),
+  };
   const idea = ideaCard(opts.from ?? 'the idea', opts.text, given);
   const { body } = idea;
   const read = parseInboxCard(opts.from ?? 'the idea', idea.text);

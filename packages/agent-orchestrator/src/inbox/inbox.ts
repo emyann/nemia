@@ -10,8 +10,10 @@
  *     Cache the engine's views between passes.
  *
  * A card in a plan's format (plan.ts), with two differences. `workflow:` is optional: an idea often does not know what will run it, and
- * that is chosen at start; it is a workflow's name, the folder its factory offers. And an inbox card has no `after:`: what it waits on is
- * said at start, when the runs it could wait on are known.
+ * that is chosen at start; it is a workflow's name, the folder its factory offers. And an inbox card's `after:` names cards, not steps: the
+ * cards it waits on, by name, since a card has no run before it starts. While any of them has not landed (`cardWaitsOf`, waits.ts) no
+ * trigger queues it and the tick starts none of it (`queueOrder`), and it is listed with each (`waits`), read on every pass and never
+ * written on the card; a start by hand still starts it, saying which had not landed. `nemia start --after <run>` still waits on runs.
  *
  * `repo:` is retired: a card names its factory and its workflow, never a repository, and the factory's wiring places its run (`nemia
  * factory attach <factory> <workflow> --repo <name>`). A new one is refused where a card is filed or written whole; an old card's still
@@ -64,6 +66,7 @@ import {
 import { labelRefusal, labelsText, type Labels } from '../labels/labels.ts';
 import { FILE_ID_PREFIX } from 'objects';
 import { cardTriggered, matchingTriggers, triggerCardOf, type SelectingTrigger } from './triggered.ts';
+import { afterCycle, cardWaitsOf, waitStuck, type CardLook } from './waits.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `nemia inbox rm` and a start name it by. */
@@ -90,6 +93,8 @@ export type InboxCard = {
   factory?: string;
   /** The runs its run is handed as context (`from:`), by id, in the order written: absent on a card that names none. */
   from?: string[];
+  /** The cards it waits on (`after:`), by name, in the order written: absent on a card that names none. */
+  after?: string[];
   /** A person's labels on it (`labels:`), a key to its value: absent on a card that carries none. */
   labels?: Labels;
   /** The files it carries (`files:`), each its name in the card and the File it names, in the order written: absent on a card with none. */
@@ -98,7 +103,7 @@ export type InboxCard = {
   body: string;
 };
 
-/** Every key an inbox card may set, each optional. Anything else is refused by name — `after:` with where it is said instead. */
+/** Every key an inbox card may set, each optional. Anything else is refused by name. */
 export const INBOX_KEYS = CARD_KEYS;
 
 /** A key an inbox card may set. */
@@ -136,8 +141,8 @@ function refuse(why: string): never {
 }
 
 /**
- * One inbox card, from its file's text — or refused, naming the file and the fix: a key an inbox card does not have (`after:` among them),
- * a key set twice or to nothing, a `queued:` that is not an
+ * One inbox card, from its file's text — or refused, naming the file and the fix: a key an inbox card does not have,
+ * an `after:` with a blank entry, a name that is no card's, a card named twice or the card itself (`afterCards`), a key set twice or to nothing, a `queued:` that is not an
  * ISO time or is on a card with no `workflow:` — nothing would say what starts it — a `gate:` that names more than one step or is a step's
  * `true`, a `factory:` that is not a factory's name (`factoryNameRefusal`), an empty body, and a frontmatter that never closes.
  * @param file The card's file name in the inbox, with its `.md`: its name, and what a refusal names.
@@ -146,7 +151,7 @@ function refuse(why: string): never {
 export function parseInboxCard(file: string, text: string) {
   const { block, body } = splitFrontmatter(file, text);
   const keys = block === null ? {} : inboxKeys(file, block);
-  const { workflow, queued, gate, model, factory, from } = keys;
+  const { workflow, queued, gate, model, factory, from, after } = keys;
   const name = file.slice(0, -'.md'.length);
   if (queued !== undefined && !isInstant(queued)) {
     refuse(
@@ -169,13 +174,14 @@ export function parseInboxCard(file: string, text: string) {
     );
   }
   if (factory !== undefined) refuseFactoryKey(file, factory);
-  const { from: _, model: __, ...rest } = keys;
+  const { from: _, model: __, after: ___, ...rest } = keys;
   return {
     name,
     file,
     ...rest,
     ...(model !== undefined ? { model: cardModels(file, model) } : {}),
     ...(from !== undefined ? { from: fromRuns(file, from) } : {}),
+    ...(after !== undefined ? { after: afterCards(file, name, after) } : {}),
     body: bodyOf(file, body),
   };
 }
@@ -208,6 +214,26 @@ function fromRuns(file: string, from: string) {
 }
 
 /**
+ * A card's `after:` as the cards it waits on, comma-separated, in the order written: refused, naming the file and the fix, where one is
+ * blank, is no card's name (`inboxNameRefusal`), is named twice, or is the card itself. Whether each is a card is the listing's to say,
+ * every pass: a name the store does not know is listed as a wait only a person can release.
+ */
+function afterCards(file: string, name: string, after: string) {
+  const cards = after.split(',').map((c) => c.trim());
+  const blank = cards.some((c) => !c || /\s/.test(c));
+  const refused = blank ? undefined : cards.map(inboxNameRefusal).find((why) => why !== undefined);
+  if (blank || refused !== undefined)
+    refuse(
+      `${file}: \`after: ${after}\` — ${refused ?? ''}\`after:\` names the cards it waits on, by name as nemia inbox lists them, comma-separated: \`after: add-a-cache-k2q9, parse-the-flag-1x2y\`. Correct the line.`,
+    );
+  const twice = cards.find((c, i) => cards.indexOf(c) !== i);
+  if (twice !== undefined) refuse(`${file}: \`after: ${after}\` names ${twice} twice, and a card waits on another once. Name each card once.`);
+  if (cards.includes(name))
+    refuse(`${file}: \`after: ${after}\` names the card itself, which would wait on itself for ever. Take ${name} off the line.`);
+  return cards;
+}
+
+/**
  * One inbox card as `parseInboxCard` reads it, or why it does not read (`why`, the refusal's words, which name the file and the fix): what
  * the inbox's listing shows a card it cannot read with. A failure that is no refusal is no reason a card gives, and is thrown.
  * @param file The card's file name in the inbox, with its `.md`.
@@ -229,6 +255,12 @@ export function cardOrWhy(file: string, text: string) {
  */
 export const fromLine = (runs: readonly string[] | undefined) => (runs?.length ? runs.join(', ') : undefined);
 
+/**
+ * A card's `after:` line's value, written as `parseInboxCard` reads it back.
+ * @param cards The cards it waits on, none where it names none.
+ */
+export const afterLine = (cards: readonly string[] | undefined) => (cards?.length ? cards.join(', ') : undefined);
+
 /** Refuses a card's `factory:` that is not a factory's name (`factoryNameRefusal`), naming the file and the fix. */
 function refuseFactoryKey(file: string, factory: string) {
   const refused = factoryNameRefusal(factory);
@@ -249,12 +281,8 @@ export function unfactoredCardRefusal(file: string, names: readonly string[], fi
   return `${file}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder, which can be two factories'. Write \`factory: <name>\` in its frontmatter — ${which}${atStart}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
 }
 
-/**
- * An inbox card's frontmatter as key → value: each of its keys at most once, to something; any other key refused by name.
- * `filing` is true for a file `nemia inbox add` is given, which is not a card yet: `after:`'s refusal then says to file it before the start
- * that gives the wait, since `file` is where the idea is now, and no card's path.
- */
-function inboxKeys(file: string, block: string, filing = false) {
+/** An inbox card's frontmatter as key → value: each of its keys at most once, to something; any other key refused by name. */
+function inboxKeys(file: string, block: string) {
   const all = readFrontmatter(file, block).entries;
   const entries = all.filter((entry) => entry.key === 'labels');
   const fileEntries = all.filter((entry) => entry.key === 'files');
@@ -263,7 +291,7 @@ function inboxKeys(file: string, block: string, filing = false) {
   const labels = labelsOf(file, entries);
   const files = filesOf(file, fileEntries);
   return {
-    ...flatKeys(file, flatBlock, filing),
+    ...flatKeys(file, flatBlock),
     ...(labels !== undefined ? { labels } : {}),
     ...(files !== undefined ? { files } : {}),
   };
@@ -321,13 +349,13 @@ function labelsOf(file: string, entries: readonly FrontmatterEntry[]) {
 }
 
 /** A card's frontmatter but its `labels:`, as key → one line of text. */
-function flatKeys(file: string, block: string, filing: boolean) {
-  return frontmatterKeys(file, block, FLAT_KEYS, (key) =>
-    key === 'after'
-      ? filing
-        ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card nemia inbox add names: nemia start <inbox>/<name>.md --after <runId>.`
-        : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>/${file} --after <runId>. Delete the line.`
-      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, an old card's retired repository, when it was queued to start on its own, the step its run waits at for a person, the model a step runs on in its run, the factory that processes it, the runs it is handed as context, a person's labels on it, and the files it carries; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
+function flatKeys(file: string, block: string) {
+  return frontmatterKeys(
+    file,
+    block,
+    FLAT_KEYS,
+    (key) =>
+      `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, an old card's retired repository, when it was queued to start on its own, the step its run waits at for a person, the model a step runs on in its run, the factory that processes it, the runs it is handed as context, the cards it waits on, a person's labels on it, and the files it carries; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
   );
 }
 
@@ -403,6 +431,14 @@ export type InboxListing = {
   model?: Record<string, string>;
   /** The runs its run is handed as context (`from:`): none on a card that names none, and on an entry that does not read as a card. */
   from: string[];
+  /** The cards it waits on (`after:`): none on a card that names none, and on an entry that does not read as a card. */
+  after: string[];
+  /**
+   * On a card not started whose `after:` names cards that have not landed, as the listing was handed what the store and git say
+   * (`Waiting`): each, with where its work stands and whether only a person can release it. No trigger queues it and the tick starts none
+   * of it while any is listed (`queueOrder`).
+   */
+  waits?: ListedWait[];
   /** The runs whose record's `from` names this card: the runs it was started as. */
   startedAs: string[];
   /** A person's labels on the card (`labels:`): none, `{}`, on a card that carries none and on an entry that does not read as a card. */
@@ -490,6 +526,30 @@ export const CARD_IN_PLAY: Readonly<Record<CardState, boolean>> = {
  */
 export const cardInPlay = (l: Pick<InboxListing, 'state'>) => CARD_IN_PLAY[l.state];
 
+/**
+ * One card a card waits on that has not landed, as the listing says it: the card named; `waiting` at the card its work stands at (`at`,
+ * where it is another), `missing` where the store knows nothing of it, or `cycle` where its `after:` leads back to the waiting card, by
+ * the route (`cycle`); the state of the card the work stands at as listed, where it was read; and whether only a person can release it
+ * (`waitStuck`). The objects' `CardWait`.
+ */
+export type ListedWait = {
+  card: string;
+  kind: 'waiting' | 'missing' | 'cycle';
+  at?: string;
+  state?: CardState;
+  cycle?: string[];
+  stuck: boolean;
+};
+
+/**
+ * What the listing reads of the cards a card waits on, handed by the verb that read the store and git (`waitingOf`, inbox.verb.ts):
+ * what each card named, or one its runs passed work on to, is (`look`), and the phase of a run as read now, where it was (`phaseOf`).
+ */
+export type Waiting = {
+  readonly look: (name: string) => CardLook;
+  readonly phaseOf: (run: string) => RunPhase | undefined;
+};
+
 /** An entry as the inbox lists it before its runs' phases are read: everything but its `state` (`cardsListed`). */
 export type CardListing = Omit<InboxListing, 'state'>;
 
@@ -501,16 +561,18 @@ export type Triggering = { readonly triggers: readonly SelectingTrigger[]; reado
 
 /**
  * What the card triggers do with a card the listing read, as `cardTriggered` decides: the listing's `queued` or `clash`, or nothing.
- * @param entry The card: its name, labels, workflow and factory, whether it is queued by hand and the runs it was started as.
+ * @param entry The card: its name, labels, workflow and factory, whether it is queued by hand, the runs it was started as, and the cards
+ *   of its `after:` not landed.
  * @param triggering The card triggers of every factory, and when each card was filed.
  */
 function triggeredOf(
-  entry: Pick<CardListing, 'name' | 'labels' | 'workflow' | 'factory' | 'queued' | 'startedAs'>,
+  entry: Pick<CardListing, 'name' | 'labels' | 'workflow' | 'factory' | 'queued' | 'startedAs' | 'waits'>,
   triggering: Triggering | undefined,
 ) {
   if (triggering === undefined || entry.queued !== undefined || entry.startedAs.length) return {};
   const matching = matchingTriggers(cardLabels(entry), triggering.triggers);
-  const card = triggerCardOf({ factory: entry.factory, workflow: entry.workflow, queued: false, started: false, readable: true });
+  const waiting = (entry.waits?.length ?? 0) > 0;
+  const card = triggerCardOf({ factory: entry.factory, workflow: entry.workflow, queued: false, started: false, readable: true, waiting });
   const did = cardTriggered(card, matching);
   if (did.kind === 'clash') return { clash: [...did.by] } satisfies Pick<CardListing, 'clash'>;
   if (did.kind === 'none') return {};
@@ -531,6 +593,8 @@ function triggeredOf(
  * @param factories The store's factories that read, by name; none where none is handed.
  * @param triggering The card triggers of every factory and when each card was filed: a card one selects is listed queued by it, or with
  *   its clash (`cardTriggered`); none where none is handed.
+ * @param waiting What the store and git say of the cards a card waits on: a card not started whose `after:` names one not landed is
+ *   listed with its `waits`, queued by no trigger and started by no tick; none where none is handed, and then no card waits.
  */
 export function cardsListed(
   files: readonly PlanFile[],
@@ -538,6 +602,7 @@ export function cardsListed(
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
   triggering?: Triggering,
+  waiting?: Waiting,
 ) {
   const triedOf = (name: string, text: string) => {
     const t = tries.get(name);
@@ -546,10 +611,13 @@ export function cardsListed(
       'tried'
     > as Pick<InboxListing, 'tried'>;
   };
-  const listed = files
-    .filter((f) => !f.file.startsWith('.') && !isReadme(f.file))
-    .sort((a, b) => a.file.localeCompare(b.file))
-    .map<CardListing>(({ file, text }) => {
+  const shown = files.filter((f) => !f.file.startsWith('.') && !isReadme(f.file)).sort((a, b) => a.file.localeCompare(b.file));
+  const reads = new Map(shown.filter((f) => f.file.endsWith('.md')).map((f) => [f.file.slice(0, -'.md'.length), cardOrWhy(f.file, f.text)]));
+  const afterOf = (name: string) => {
+    const read = reads.get(name);
+    return (read !== undefined && 'card' in read ? read.card.after : undefined) ?? [];
+  };
+  const listed = shown.map<CardListing>(({ file, text }) => {
       if (!file.endsWith('.md')) {
         return {
           name: file,
@@ -559,6 +627,7 @@ export function cardsListed(
           repo: null,
           factory: null,
           from: [],
+          after: [],
           startedAs: [],
           labels: {},
           factoryRepo: null,
@@ -567,7 +636,7 @@ export function cardsListed(
       }
       const name = file.slice(0, -'.md'.length);
       const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
-      const read = cardOrWhy(file, text);
+      const read = reads.get(name) ?? cardOrWhy(file, text);
       if ('card' in read) {
         const { card } = read;
         const listing: CardListing = {
@@ -580,12 +649,14 @@ export function cardsListed(
           ...(card.gate !== undefined ? { gate: card.gate } : {}),
           ...(card.model !== undefined ? { model: card.model } : {}),
           from: card.from ?? [],
+          after: card.after ?? [],
           startedAs,
           labels: card.labels ?? {},
           ...(card.files !== undefined ? { files: card.files } : {}),
           factoryRepo: factoryRepoOf({ workflow: card.workflow ?? null, factory: card.factory ?? null }, factories),
           error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
+          ...waitsOf(name, card.after, startedAs, waiting, afterOf),
         };
         const triggered = triggeredOf(listing, triggering);
         return 'queued' in triggered ? { ...listing, ...triggered, ...triedOf(name, text) } : { ...listing, ...triggered };
@@ -598,16 +669,65 @@ export function cardsListed(
         repo: null,
         factory: null,
         from: [],
+        after: [],
         startedAs,
         labels: {},
         factoryRepo: null,
         error: read.why,
       };
     });
+  if (waiting !== undefined) statesOfWaits(listed, runs, waiting.phaseOf);
   queueOrder(listed).forEach((l, i) => {
     if (l.queued) l.queued.place = i + 1;
   });
   return listed satisfies CardListing[];
+}
+
+/**
+ * The cards of a card's `after:` that have not landed (`cardWaitsOf`), each a `ListedWait` with no state yet: a wait on a card on a cycle
+ * of `after:` lines back to this card (`afterCycle`) said as the cycle. Nothing for a card started, one that names none, or where no
+ * `waiting` is handed.
+ */
+function waitsOf(
+  name: string,
+  after: readonly string[] | undefined,
+  startedAs: readonly string[],
+  waiting: Waiting | undefined,
+  afterOf: (name: string) => readonly string[],
+) {
+  if (waiting === undefined || !after?.length || startedAs.length) return {};
+  const cycle = afterCycle(name, afterOf);
+  const waits = cardWaitsOf(after, waiting.look).map<ListedWait>(({ card, landing }) => {
+    if (cycle !== undefined && cycle[1] === card) return { card, kind: 'cycle', cycle, stuck: true };
+    if (landing.kind === 'missing') return { card, kind: 'missing', ...(landing.card === card ? {} : { at: landing.card }), stuck: true };
+    return { card, kind: 'waiting', ...(landing.card === card ? {} : { at: landing.card }), stuck: false };
+  });
+  return (waits.length ? { waits } : {}) satisfies Pick<CardListing, 'waits'>;
+}
+
+/**
+ * Each wait of `listed` given the state of the card its work stands at — that card's as listed (`cardState`, off the phases of its runs
+ * as `phaseOf` read them), or off the runs started from it where the inbox no longer has it, none where a phase was not read — and
+ * whether only a person can release it (`waitStuck`). Writes the waits in place, as the queue's places are written.
+ */
+function statesOfWaits(listed: readonly CardListing[], runs: readonly Pick<Run, 'id' | 'from'>[], phaseOf: Waiting['phaseOf']) {
+  const byName = new Map(listed.map((l) => [l.name, l]));
+  const stateOf = (name: string) => {
+    const l = byName.get(name);
+    const ids = l?.startedAs ?? runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
+    const phases = ids.flatMap((id) => phaseOf(id) ?? []);
+    if (ids.length > 0 && phases.length < ids.length) return null;
+    if (l === undefined && ids.length === 0) return null;
+    return cardState({ queued: l?.queued, tried: l?.tried, phases });
+  };
+  for (const l of listed) {
+    for (const w of l.waits ?? []) {
+      if (w.kind === 'cycle') continue;
+      const state = stateOf(w.at ?? w.card);
+      if (state !== null) w.state = state;
+      w.stuck = waitStuck({ kind: w.kind, state });
+    }
+  }
 }
 
 /**
@@ -618,6 +738,8 @@ export function cardsListed(
  * @param tries The tick's last try of each queued card's start, by card name; none where none is handed.
  * @param factories The store's factories that read, by name; none where none is handed.
  * @param triggering The card triggers of every factory and when each card was filed; none where none is handed.
+ * @param waiting What the store and git say of the cards a card waits on, each run's phase read off `runs` before its own; none where
+ *   none is handed.
  */
 export function inboxListing(
   files: readonly PlanFile[],
@@ -625,9 +747,11 @@ export function inboxListing(
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
   triggering?: Triggering,
+  waiting?: Waiting,
 ) {
   const phases = new Map(runs.map((r) => [r.id, r.phase] as const));
-  return cardsListed(files, runs, tries, factories, triggering).map((l) => ({
+  const phased = waiting && { look: waiting.look, phaseOf: (id: string) => phases.get(id) ?? waiting.phaseOf(id) };
+  return cardsListed(files, runs, tries, factories, triggering, phased).map((l) => ({
     ...l,
     state: cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) }),
   })) satisfies InboxListing[] as InboxListing[];
@@ -635,13 +759,14 @@ export function inboxListing(
 
 /**
  * The queued cards in the order the tick starts them: by when each was queued, then by name — a card a run was started from left out
- * (`startedAs`), since it is never started again, even one whose `queued:` line its start could not take off. Pure. A card whose start was
- * refused keeps its place, and the tick passes over it (`nextQueued`).
+ * (`startedAs`), since it is never started again, even one whose `queued:` line its start could not take off, and a card that waits on a
+ * card of its `after:` not landed (`waits`), which takes its place once the last of them lands. Pure. A card whose start was refused
+ * keeps its place, and the tick passes over it (`nextQueued`).
  * @param listing The inbox's entries.
  */
-export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs'>>(listing: readonly L[]) =>
+export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs' | 'waits'>>(listing: readonly L[]) =>
   listing
-    .flatMap((l) => (l.queued && !l.startedAs.length ? [{ l, at: l.queued.at }] : []))
+    .flatMap((l) => (l.queued && !l.startedAs.length && !l.waits?.length ? [{ l, at: l.queued.at }] : []))
     .sort((a, b) => a.at.localeCompare(b.at) || a.l.name.localeCompare(b.l.name))
     .map(({ l }) => l);
 
@@ -692,7 +817,7 @@ export function queueRepo(
  * @param repo The repository the daemon runs in.
  * @param factories The store's factories that read, by name; none where none is handed.
  */
-export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs' | 'tried' | 'workflow' | 'factory'>>(
+export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs' | 'tried' | 'workflow' | 'factory' | 'waits'>>(
   listing: readonly L[],
   repo: string,
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
@@ -780,13 +905,39 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}, ${phaseSaid(l.state)}` : '';
     const by = l.queued?.by?.length ? ` by ${l.queued.by.join(', ')}${l.workflow ? '' : ` on ${l.queued.workflow ?? ''}`}` : '';
     const clash = l.clash?.length ? `  waiting: triggers ${l.clash.join(', ')} clash` : '';
-    const queued = `${l.queued?.place ? `  queued ${l.queued.place} of ${inLine}${by}` : ''}${clash}`;
+    const queued = `${l.queued?.place ? `  queued ${l.queued.place} of ${inLine}${by}` : ''}${clash}${waitsSaid(l).map((w) => `  ${w}`).join('')}`;
     const tried = triedClause(l, unfactoredStarts);
     const labelled = labelSegments(cardLabels(l), show);
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}${labelled}`;
     return `${l.name.padEnd(width)}  ${(l.title ?? '').slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo} (retired)` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.model ? `  model: ${modelsText(l.model)}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}${labelled}`;
   });
 }
+
+/**
+ * What a person reads of one wait of the card `name`: the card it waits on, at the card its work stands at and that card's state, or that
+ * the store has no such card, or the cycle's route; and, where only a person can release it, what to type. Pure.
+ * @param name The waiting card, by name, which the fix names.
+ * @param w The wait.
+ */
+export function waitSaid(name: string, w: ListedWait) {
+  const where =
+    w.kind === 'missing'
+      ? w.at === undefined
+        ? '(no such card)'
+        : `at ${w.at} (no such card)`
+      : w.kind === 'cycle'
+        ? `(a cycle: ${(w.cycle ?? []).join(' → ')})`
+        : `${w.at === undefined ? '' : `at ${w.at} `}(${w.state ?? 'not read'})`;
+  const resend = w.kind === 'waiting' && w.state !== 'refused' ? `nemia inbox resend ${w.at ?? w.card}, ` : '';
+  const fix = w.stuck ? ` — needs you: ${resend}nemia inbox edit ${name} to change after:, or nemia start ${name}` : '';
+  return `waiting on ${w.card} ${where}${fix}`;
+}
+
+/**
+ * Each wait of the entry `l`, as a person reads it (`waitSaid`); none where it waits on none.
+ * @param l The entry: its name and its waits.
+ */
+export const waitsSaid = (l: Pick<InboxListing, 'name' | 'waits'>) => (l.waits ?? []).map((w) => waitSaid(l.name, w));
 
 /**
  * A started card's state as `nemia inbox` says it beside its run: its run's phase, and `waiting on you` for a run that waits on a person.
@@ -843,7 +994,7 @@ const givenMaps = (labels: Labels | undefined, files: CardFiles | undefined) => 
  * (`parseInboxCard`).
  *
  * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — a block that reads as YAML
- * (`frontmatterOrNull`) as keys each of `INBOX_KEYS`, or an `after:`, which is refused by name — gives its keys
+ * (`frontmatterOrNull`) as keys each of `INBOX_KEYS` — gives its keys
  * and its body; any other text, a frontmatter that never closes included, is the body whole, as `nemia start` takes a brief that is
  * not a card. `workflow` and `factory`, when given, are written over the text's own, the keys in `INBOX_KEYS`' order. Refused
  * too: text with nothing in it, a `workflow` or `factory` given on more than one line, a `workflow:` given or in the text that is no
@@ -852,14 +1003,15 @@ const givenMaps = (labels: Labels | undefined, files: CardFiles | undefined) => 
  * a `---` rule of its own is given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
  * @param from Where the idea came from, as a refusal names it: the file given, or the note.
  * @param text The idea as given: a note, or a file's text.
- * @param givenKeys The `workflow`, `factory` and labels given beside the idea, written over the text's own.
+ * @param givenKeys The `workflow`, `factory`, labels, files and the cards it waits on (`after`) given beside the idea, written over the
+ *   text's own.
  */
 export function ideaCard(
   from: string,
   text: string,
-  givenKeys: { workflow?: string; factory?: string; labels?: Labels; files?: CardFiles },
+  givenKeys: { workflow?: string; factory?: string; labels?: Labels; files?: CardFiles; after?: readonly string[] },
 ) {
-  const { labels: givenLabels, files: givenFiles, ...given } = givenKeys;
+  const { labels: givenLabels, files: givenFiles, after: givenAfter, ...given } = givenKeys;
   if (!text.trim()) {
     refuse(
       `nemia inbox add takes the idea, and ${from} has nothing in it. Give it as text — nemia inbox add "<idea>" — or as a file: nemia inbox add ./idea.md. Nothing was filed.`,
@@ -879,9 +1031,9 @@ export function ideaCard(
   const split = splitOrProse(from, text);
   const block = split?.block ?? null;
   const entries = (block === null ? null : frontmatterOrNull(block))?.entries ?? [];
-  const isCardKey = (key: string) => ([...INBOX_KEYS, 'after'] as string[]).includes(key);
+  const isCardKey = (key: string) => (INBOX_KEYS as readonly string[]).includes(key);
   if (split && block !== null && entries.length && entries.every(({ key }) => isCardKey(key))) {
-    const read = inboxKeys(from, block, true);
+    const read = inboxKeys(from, block);
     if (read.queued !== undefined) {
       refuse(
         `${from}: \`queued\` is not a key a filed idea keeps: a card is queued once it is in the inbox, at the time it is queued. Delete the line and file the idea, then queue the card nemia inbox add names: nemia inbox queue <name>.`,
@@ -894,6 +1046,7 @@ export function ideaCard(
   const written = {
     ...keys,
     ...definedOf(given),
+    ...(givenAfter?.length ? { after: afterLine(givenAfter) } : {}),
     ...givenMaps(givenLabels, givenFiles),
   };
   const refusedWorkflow =
@@ -990,6 +1143,7 @@ export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string |
     model: card.model && modelsText(card.model),
     factory: card.factory,
     from: fromLine(card.from),
+    after: afterLine(card.after),
     ...(card.labels !== undefined ? { labels: card.labels } : {}),
     ...(card.files !== undefined ? { files: card.files } : {}),
     ...over,

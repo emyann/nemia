@@ -1,11 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectInside, expectUncut, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { DIAMOND, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedRecord, storeRecord } from '../world.ts';
 
 /** The runner's viewport, put back before the page ends. */
 const WIDE = { width: 1280, height: 800 };
@@ -53,12 +52,10 @@ export default {
   name: 'after-long-title',
   route: `/workflows/repo/${WORKFLOWS.good.name}?factory=${FACTORIES.hiring.name}`,
   expect: async (page) => {
-    const runs = path.join(store!, 'runs');
     const record = storedRecord(DIAMOND.top.id) as { brief: string };
-    const file = path.join(runs, `${LONG.id}.json`);
     const starts = hiringStarts(store!);
     try {
-      fs.writeFileSync(file, JSON.stringify({ ...record, id: LONG.id, brief: `${LONG.title}\n\nA run the e2e waits on, by its title.` }));
+      storeRecord(LONG.id, JSON.stringify({ ...record, id: LONG.id, brief: `${LONG.title}\n\nA run the e2e waits on, by its title.` }));
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       await expectWhole(page, 'wide');
@@ -66,7 +63,7 @@ export default {
       await expectWhole(page, 'phone');
     } finally {
       await page.setViewportSize(WIDE);
-      fs.rmSync(file, { force: true });
+      dropStoredRun(LONG.id);
       starts();
     }
     await page.reload({ waitUntil: 'load' });

@@ -75,15 +75,24 @@ const inApi = (script: string, input = '') =>
   execFileSync(process.execPath, ['--input-type=module', '--eval', script], { cwd: API, env: apiEnv, input, encoding: 'utf8' });
 
 /**
- * The record of the run `id` in the seeded store, as the tick wrote it: what a page reads to change it. Throws where there is none.
+ * The text of the record of the run `id` in the seeded store, as the tick wrote it: what a page keeps to put back. Throws where there is
+ * none.
  * @param id The run's id.
  */
-export function storedRecord(id: string) {
+export function storedRecordText(id: string) {
   const text = inApi(
     `import { recordText, runKey } from 'agent-orchestrator/testing'; process.stdout.write(recordText(process.env.WF_ROOT, runKey(${JSON.stringify(id)})) ?? '');`,
   );
   if (!text) throw new Error(`the seeded store holds no record of run ${id}: seed it first`);
-  return JSON.parse(text) as Record<string, unknown>;
+  return text;
+}
+
+/**
+ * The record of the run `id` in the seeded store, as the tick wrote it: what a page reads to change it. Throws where there is none.
+ * @param id The run's id.
+ */
+export function storedRecord(id: string) {
+  return JSON.parse(storedRecordText(id)) as Record<string, unknown>;
 }
 
 /**
@@ -144,6 +153,17 @@ export function storedRuns() {
       "import { keysUnder, runKey } from 'agent-orchestrator/testing'; process.stdout.write(JSON.stringify(keysUnder(process.env.WF_ROOT, runKey('')).map((key) => key.slice(runKey('').length))));",
     ),
   ) as string[];
+}
+
+/** The record of every run in the seeded store, read in one go: what a page reads to place a run of its own among them. */
+export function storedRecords() {
+  return (
+    JSON.parse(
+      inApi(
+        "import { keysUnder, recordText, runKey } from 'agent-orchestrator/testing'; const root = process.env.WF_ROOT; process.stdout.write(JSON.stringify(keysUnder(root, runKey('')).map((key) => recordText(root, key) ?? '')));",
+      ),
+    ) as string[]
+  ).map((text) => JSON.parse(text) as Record<string, unknown>);
 }
 
 /**

@@ -151,7 +151,7 @@ const workflowViewOf = (workflow: Workflow) =>
     ...workflowRowOf(workflow),
     readme: workflow.status.readmeBody,
     steps: workflow.status.steps.map(stepOf),
-  }) satisfies WorkflowListing as WorkflowListing;
+  }) satisfies WorkflowListing;
 
 /** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
 const LISTS_OF_NONE: readonly string[] = ['tools', 'routes', 'when', 'ends'];

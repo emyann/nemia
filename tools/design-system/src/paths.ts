@@ -47,9 +47,9 @@ export const layout = (out: string) => ({
 /** What a build's folders are. */
 export type Layout = ReturnType<typeof layout>;
 
-/** The commit the checkout stands on, short, and its date: what tokens.json says it was built from. */
+/** The last commit that changed the board, short, and its date: what tokens.json says it was built from, moved by the board alone. */
 export const headOf = () => {
-  const said = execFileSync('git', ['log', '-1', '--format=%h %cs'], { cwd: REPO, encoding: 'utf8' }).trim();
+  const said = execFileSync('git', ['log', '-1', '--format=%h %cs', '--', 'apps/web'], { cwd: REPO, encoding: 'utf8' }).trim();
   const [sha = 'unknown', date = 'unknown'] = said.split(' ');
   return { sha, date };
 };

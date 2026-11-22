@@ -150,6 +150,10 @@ here.
   (`parameters.msw`), with handlers over fixtures typed by `objects`' own types (`.storybook/fixtures/`), so a key the api renames
   fails the typecheck there; no file of `src` gains a seam for a story. MSW's worker, `.storybook/public/mockServiceWorker.js`, is
   written by `npx msw init .storybook/public --no-save` and served to Storybook alone.
+- A story that reads the api, through MSW handlers or with none, is tagged `network` (Storybook's `tags`, at its meta or on itself), and
+  one that opens a layer over the whole window at rest `overlay`: the design system's producer (`tools/design-system/README.md`)
+  draws neither in a card, refuses a story with handlers and no tag, and its CI job names a story that waits on the api untagged.
+  The stories' stage (`.storybook/stage.tsx`: the ground, the router, the query client) is the producer's `NemiaRoot` too.
 - `test/stories.test.ts` holds the stories (`test/stories.ts`, the rules): a title opens with `Look/`, `Frame/`, `Store/`,
   `Factory/`, `Run/` or `Pages/`, by where the part sits, with no exception; and, each against the baseline, whose
   lists only shrink, a component or page body of `src/components` with no story beside it (never `ui/` or `ai-elements/`), a story

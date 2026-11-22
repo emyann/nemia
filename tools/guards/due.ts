@@ -78,15 +78,16 @@ export const CONTRACTS_TOOL = '$TURBO_ROOT$/tools/contracts/**';
 /**
  * The jobs that run no turbo task, by the workspaces they reach, each with the workspaces those depend on. `e2e` (asked by `e2e-bound`
  * too) visits the board, served by the api it spawns (`apps/web/test/e2e/served.ts`), whose orchestrator finds the builtin templates by
- * path; `e2e-look` draws the board's stories; each contracts leg proves the files `tools/contracts/legs.ts` gives it, which lie in
- * these workspaces (`test/due.test.ts` holds it).
+ * path; `e2e-look` draws the board's stories; `design-system` builds the board's Design System artifact with its producer; each
+ * contracts leg proves the files `tools/contracts/legs.ts` gives it, which lie in these workspaces (`test/due.test.ts` holds it).
  */
 export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   e2e: ['web', 'api', 'templates'],
   'e2e-look': ['web'],
+  'design-system': ['design-system', 'web'],
   'contracts observe': ['agent-runtime'],
   'contracts approval-refusal': ['agent-orchestrator'],
-  'contracts rest': ['agent-runtime', 'agent-orchestrator', 'objects', 'api', 'cli', 'web', 'templates'],
+  'contracts rest': ['agent-runtime', 'agent-orchestrator', 'objects', 'api', 'cli', 'web', 'templates', 'design-system'],
 };
 
 type Pattern = { input: string; negated: boolean; matches: (file: string) => boolean };

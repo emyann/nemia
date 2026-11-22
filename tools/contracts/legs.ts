@@ -53,6 +53,7 @@ export const ROOTS = [
   'apps/web/test/baseline.ts',
   'apps/web/test/stories.ts',
   'packages/templates/released.ts',
+  'tools/design-system/src',
 ];
 
 /** A leg of the `contracts` job: one runner, its own verdict cache. */

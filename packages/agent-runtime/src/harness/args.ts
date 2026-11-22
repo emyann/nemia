@@ -162,7 +162,24 @@ export type HarnessArgs = {
    * close its set of skills (`HarnessSpec.enabledSkills`). Refused unless `'default'` or a list of names, none twice.
    */
   enabledSkills?: string[] | 'default';
+  /**
+   * The pictures put before the session in its first message, as a Pod's container is given its args: each a file by its absolute path
+   * and the media type it is in (`Picture`). Claude Code reads each when the session is spawned and sends it as an image block beside
+   * the brief, in the Agent SDK's streaming input, on a fresh start alone: an adopted or resumed session saw them. A file it cannot read
+   * refuses the spawn, `unstartable`. Refused unless a list of at most `PICTURES_MOST` pictures, each an absolute path with no NUL in it,
+   * none twice, in one of `PICTURE_TYPES`; and on a harness that does not declare `pictures`, which would start its session without them.
+   */
+  pictures?: Picture[];
 };
+
+/** The media types a picture is sent in: what the Messages API's image block takes. */
+export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
+
+/** One picture put before a session: its file, by its absolute path, and the media type it is in. */
+export type Picture = { path: string; mediaType: (typeof PICTURE_TYPES)[number] };
+
+/** The most pictures one task puts before its session: the Messages API's smallest count of images in one request. */
+export const PICTURES_MOST = 100;
 
 /**
  * What a Codex session is given of its own. `trustFrom`: a directory whose trust in the operator's Codex config extends to
@@ -196,6 +213,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   callAdmission: true,
   mayAsk: true,
   enabledSkills: true,
+  pictures: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -370,7 +388,29 @@ const ownArgsRefusalOf = (config: HarnessArgs) =>
   mountsRefusalOf(config.mounts) ??
   admissionRefusalOf(config.callAdmission) ??
   mayAskRefusalOf(config) ??
-  enabledSkillsRefusalOf(config);
+  enabledSkillsRefusalOf(config) ??
+  picturesRefusalOf(config);
+
+/**
+ * Why a task's `pictures` are no pictures to put before a session — or `undefined`: not a list, more than `PICTURES_MOST`, a path that is
+ * not absolute or holds a NUL, a media type none of `PICTURE_TYPES`, or a path given twice.
+ */
+const picturesRefusalOf = ({ pictures }: HarnessArgs) => {
+  if (pictures === undefined) return undefined;
+  const given: unknown = pictures;
+  if (!Array.isArray(given) || given.length > PICTURES_MOST)
+    return `\`pictures\` is a list of at most ${PICTURES_MOST} pictures, each { "path": "<absolute file>", "mediaType": "image/png" }. Give the pictures the session is shown in its first message, or leave it out.`;
+  for (const p of given as unknown[]) {
+    const at = typeof p === 'object' && p !== null ? (p as Record<string, unknown>) : {};
+    if (!(isArg(at.path) && path.isAbsolute(at.path)))
+      return `\`pictures\` names ${JSON.stringify(at.path)}, which is not an absolute file. Name each picture by its absolute path.`;
+    if (!(PICTURE_TYPES as readonly unknown[]).includes(at.mediaType))
+      return `\`pictures\` gives ${JSON.stringify(at.path)} the media type ${JSON.stringify(at.mediaType)}: a picture is sent as one of ${PICTURE_TYPES.join(', ')}. Leave any other out.`;
+  }
+  const paths = pictures.map((p) => p.path);
+  const twice = paths.find((p, i) => paths.indexOf(p) !== i);
+  return twice === undefined ? undefined : `\`pictures\` names ${twice} twice. Name each picture once.`;
+};
 
 /** Why a task's `enabledSkills` names no set of skills — or `undefined`: neither `'default'` nor a list of names, or a name twice. */
 const enabledSkillsRefusalOf = ({ enabledSkills }: HarnessArgs) => {

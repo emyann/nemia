@@ -48,6 +48,7 @@ import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
 import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, SESSION_TOKEN, tryModel } from '../filed/filed.ts';
 import { filedOn, resumeOn } from '../pinned/pinned.ts';
+import { heldLine, picturesFiled, type PicturesFiled } from '../filed/pictures/pictures.store.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
@@ -343,7 +344,8 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
   const told: Told = { ...(yield* toldOf(run, step)), ...landing };
   const deps = remote || answers ? undefined : (yield* depsBefore(f, r.step, record.workspace ?? run.workspace))?.deps;
-  const brief = remote
+  const pictured = answers ? undefined : picturesAgain(home, f, step, resumeFrom);
+  const composed = remote
     ? remoteBrief(step, run, reads.steps, closeouts, remoteTry(r, status), undefined, reads.answers)
     : composeBrief(
         told.step,
@@ -363,9 +365,10 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
         undefined,
         reads.answers,
       );
+  const brief = composed + heldSaid(pictured);
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
-  yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told })));
+  yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told, pictured })));
   return undefined;
 });
 
@@ -421,7 +424,14 @@ const trySpec = (
   r: Retry,
   step: StepSpec,
   record: StepRecord,
-  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: Told },
+  t: {
+    taskId: string;
+    brief: string;
+    resumeFrom: string | undefined;
+    budgetUsd: number | undefined;
+    told: Told;
+    pictured: PicturesFiled | undefined;
+  },
 ) => ({
   id: t.taskId,
   brief: t.brief,
@@ -437,6 +447,7 @@ const trySpec = (
       ...stepToken(f.home, f.run, step, t.taskId, r.try),
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
+      ...picturesConfig(t.pictured),
     }),
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
@@ -527,31 +538,33 @@ function roundSpec(
   const files = artifactsDir(home, run, r.target);
   fs.mkdirSync(files, { recursive: true });
   const resumeFrom = resumeOn(record.taskId ? sessionIn(reads.views, record.taskId) : undefined, target, f, record);
+  const pictured = picturesAgain(home, f, target, resumeFrom);
   return {
     id: taskId,
     /** Read off the closeout that asked for the round, before the record moves it behind (`roundFiled`). */
-    brief: composeBrief(
-      told.step,
-      run,
-      reads.steps,
-      reads.signedOff,
-      files,
-      said.deps,
-      undefined,
-      {
-        ...roundBriefed(r, looping, said.landing),
-        resumed: Boolean(resumeFrom),
-        ...(resumeFrom ? { said: saidIn(record.taskId === null ? undefined : reads.views.get(record.taskId)) } : {}),
-      },
-      undefined,
-      inputsDir(home, run),
-      undefined,
-      foldersTold(home, run, reads, told.step),
-      said.costs,
-      { words: said.words, say: said.say, workspace: record.workspace ?? run.workspace },
-      undefined,
-      reads.answers,
-    ),
+    brief:
+      composeBrief(
+        told.step,
+        run,
+        reads.steps,
+        reads.signedOff,
+        files,
+        said.deps,
+        undefined,
+        {
+          ...roundBriefed(r, looping, said.landing),
+          resumed: Boolean(resumeFrom),
+          ...(resumeFrom ? { said: saidIn(record.taskId === null ? undefined : reads.views.get(record.taskId)) } : {}),
+        },
+        undefined,
+        inputsDir(home, run),
+        undefined,
+        foldersTold(home, run, reads, told.step),
+        said.costs,
+        { words: said.words, say: said.say, workspace: record.workspace ?? run.workspace },
+        undefined,
+        reads.answers,
+      ) + heldSaid(pictured),
     cwd: sessionCwd(target, run, f.home, record.workspace ?? run.workspace),
     harness: target.harness,
     priority: MOMENTUM,
@@ -567,6 +580,7 @@ function roundSpec(
         ),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],
+        ...picturesConfig(pictured),
       }),
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
@@ -749,14 +763,49 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       say: landing.say,
       targets: landing.targets,
     };
-    const taskId = yield* asked('file', e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said))).pipe(
+    const pictured = picturesFor(home, f, step);
+    const taskId = yield* asked('file', e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said, pictured))).pipe(
       forStep(run, step),
     );
-    run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch, ...filedOn(f, step) };
+    run.steps[name] = {
+      ...run.steps[name],
+      taskId,
+      workspace: place.workspace,
+      branch: place.branch,
+      ...filedOn(f, step),
+      ...picturesRecorded(pictured),
+    };
     filed.push(name);
   }
   return filed;
 });
+
+/**
+ * The pictures among the run's inputs `step` is shown in its first message, and those held back (`picturesFiled`): none for a step that
+ * resumes a session, which saw them.
+ */
+const picturesFor = (home: string, f: Filing, step: StepSpec) =>
+  picturesFiled(step, step.resume !== undefined && sessionOf(f, step.resume) !== undefined, inputsDir(home, f.run), f.run.inputs);
+
+/** What a step's record keeps of the pictures it was shown and held back, where it was handed any. */
+const picturesRecorded = (pictured: ReturnType<typeof picturesFor>) =>
+  pictured ? { pictures: { shown: pictured.shown, held: pictured.held } } : {};
+
+/**
+ * The pictures a try or a round's new session of `step` is shown in its first message, and those held back (`picturesFiled`), as its
+ * first try was: none for a session that continues or resumes one, which saw them.
+ */
+const picturesAgain = (home: string, f: Filing, step: StepSpec, resumeFrom: string | undefined) =>
+  resumeFrom === undefined ? picturesFiled(step, false, inputsDir(home, f.run), f.run.inputs) : undefined;
+
+/** What a brief says, after all else, of the pictures held back from its session, where there are any. */
+const heldSaid = (pictured: PicturesFiled | undefined) => {
+  const held = pictured ? heldLine(pictured.held) : undefined;
+  return held ? `\n\n${held}\n` : '';
+};
+
+/** The `pictures` a session's config is filed with, where it is shown any. */
+const picturesConfig = (pictured: PicturesFiled | undefined) => (pictured?.pictures.length ? { pictures: pictured.pictures } : {});
 
 /** The session of the step a step resumes, off its current task: undefined for a step with none. */
 const sessionOf = (f: Filing, stepName: string) => {
@@ -781,6 +830,7 @@ function readySpec(
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
   },
+  pictured?: PicturesFiled,
 ) {
   const { parents, closeoutOf } = said;
   const { run, reads } = f;
@@ -813,7 +863,7 @@ function readySpec(
           { words: said.words, say: said.say, targets: said.targets, workspace: place.workspace },
           place.merge,
           reads.answers,
-        ),
+        ) + heldSaid(pictured),
     cwd: sessionCwd(step, run, f.home, place.workspace),
     harness: step.harness,
     priority: stepMomentum(step),
@@ -827,6 +877,7 @@ function readySpec(
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],
+        ...picturesConfig(pictured),
       }),
       resumeFrom: step.resume ? resumeOn(sessionOf(f, step.resume), step, f, run.steps[step.name]) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),

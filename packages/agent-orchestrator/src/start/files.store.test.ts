@@ -96,3 +96,21 @@ test('a file last written a day ago is let go of by the next upload, a younger o
   uploaded(home, 'acme', Buffer.from('new'));
   assert.ok(fileAt(home, 'default', young.id), 'an upload lets go of nothing younger than a day');
 });
+
+test('a File an inbox card names is kept past its day, a card that does not read included, and let go of once no card names it', () => {
+  const home = scratch('nemia-files-');
+  const named = uploaded(home, 'acme', Buffer.from('a'));
+  const strayNamed = uploaded(home, 'acme', Buffer.from('b'));
+  const old = new Date(NOW - 2 * FILE_KEPT_FOR);
+  for (const f of [named, strayNamed])
+    for (const name of [f.id, `${f.id}.json`]) fs.utimesSync(path.join(filesDir(home, 'acme'), name), old, old);
+  fs.mkdirSync(path.join(home, 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'inbox', 'look.md'), `---\nfactory: acme\nfiles: { shot.png: ${named.id} }\n---\nLook.\n`);
+  fs.writeFileSync(path.join(home, 'inbox', 'broken.md'), `---\nnot a key: ${strayNamed.id}\n---\n`);
+  assert.deepEqual(filesPruned(home, NOW), []);
+  assert.ok(fileAt(home, 'acme', named.id));
+  assert.ok(fileAt(home, 'acme', strayNamed.id));
+  fs.rmSync(path.join(home, 'inbox', 'look.md'));
+  assert.deepEqual(filesPruned(home, NOW).sort(), [`acme/${named.id}`, `acme/${named.id}.json`].sort());
+  assert.ok(fileAt(home, 'acme', strayNamed.id), 'the card that does not read still keeps its File');
+});

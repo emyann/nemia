@@ -159,6 +159,7 @@ erDiagram
     object filesRead "optional"
     string closeoutHash "optional"
     list declared "optional"
+    object pictures "optional"
   }
   Try {
     TaskId taskId FK

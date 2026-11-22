@@ -9,16 +9,24 @@
  * `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
 import { readFactoryAtOnce } from 'agent-orchestrator';
-import type { CardFile } from 'objects';
+import type { CardFile, CardFileRef } from 'objects';
 
 /**
  * What a card filed hands the package: the idea, and the keys the card writes. `repo` is retired, and handed on only for the package to
  * refuse it in its own words (`addToInbox`), so the api says no second sentence of its own.
  */
-export type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };
+export type Filing = {
+  text: string;
+  workflow?: string;
+  repo?: string;
+  factory?: string;
+  label?: string[];
+  files?: CardFileRef[];
+};
 
 /**
- * What a card filed (`POST /api/namespaces/:namespace/cards`) files: its body, its workflow by name, its factory and its labels. A card
+ * What a card filed (`POST /api/namespaces/:namespace/cards`) files: its body, its workflow by name, its factory, its labels and its
+ * files, each a File uploaded to the card's namespace first, by its id. A card
  * names its factory and its workflow, and nothing about repositories: the factory places its run (`nemia factory attach <factory>
  * <workflow> --repo <name>`), so no repository is read here and an api with none of its own files a card all the same.
  *
@@ -37,5 +45,6 @@ export function filingOf(body: CardFile, home: string) {
     ...(body.repo !== undefined ? { repo: body.repo } : {}),
     ...(body.factory !== undefined ? { factory: body.factory } : {}),
     ...(body.label !== undefined ? { label: [...body.label] } : {}),
+    ...(body.files !== undefined ? { files: [...body.files] } : {}),
   };
 }

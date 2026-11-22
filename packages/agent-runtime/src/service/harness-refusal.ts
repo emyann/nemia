@@ -75,7 +75,8 @@ const mayAskWords = (spec: Filed, held: boolean) =>
  * 11. a `mayAsk` on a harness that holds no call for a person (`mayAskWords`);
  * 12. a list in `enabledSkills` on a harness that cannot close a session's skills, whose session would hold every skill it finds;
  *     `'default'` goes anywhere;
- * 13. a memory limit (`resources.limits.memory`) on a remote agent, whose process is the other party's and no cgroup of this host's
+ * 13. a `pictures` on a harness that shows a session no picture, whose session would start without them;
+ * 14. a memory limit (`resources.limits.memory`) on a remote agent, whose process is the other party's and no cgroup of this host's
  *     holds: an engine's `defaultLimits` never lands on such a task (`defaultsOf` in `admissionOf`), so a default makes none
  *     unfileable.
  */
@@ -169,6 +170,14 @@ const ASKED: readonly Asked[] = [
     says: (spec) =>
       `\`enabledSkills\` gives the session those skills alone, and the \`${spec.harness}\` harness runs a session that holds every skill it finds.`,
     fix: { leave: () => "give `enabledSkills: 'default'`", none: () => "closes a session's skills" },
+  },
+  {
+    words: ['pictures'],
+    asks: (spec) => askedIf(spec.config?.pictures !== undefined, 'pictures'),
+    only: 'local',
+    says: (spec) =>
+      `\`pictures\` shows the session pictures in its first message, and the \`${spec.harness}\` harness does not show a session a picture: it would start without them.`,
+    fix: { leave: () => 'leave `pictures` off', none: () => 'shows a session a picture' },
   },
   {
     words: ['memoryLimit'],

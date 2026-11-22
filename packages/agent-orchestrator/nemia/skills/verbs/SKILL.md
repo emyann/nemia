@@ -414,8 +414,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --repo is refused: its factory places the run
                                each tool's words: tools.md#start, tools.md#inbox_start
                                on the port: start, inbox_start
-  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...
-                               park an idea as a card in the inbox, named from its first line
+  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]... [--file <path>]...
+                               park an idea as a card in the inbox, named from its first line;
+                               each --file is uploaded and carried by the card, as is each file
+                               beside an idea file that its text names as an image or a link
                                each tool's words: tools.md#inbox_add
                                on the port: inbox_add
   nemia inbox queue <name> [--workflow <w>] [--off]
@@ -439,6 +441,16 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                the card keeps its name, and its labels: nemia label inbox edits those
                                each tool's words: tools.md#inbox_edit
                                on the port: inbox_edit
+  nemia inbox attach <name> <path>...
+                               upload files and attach them to a card no run was started from,
+                               each under its own name: every run started from it takes them
+                               each tool's words: tools.md#inbox_attach
+                               on the port: inbox_attach
+  nemia inbox detach <name> <file>...
+                               take files off a card no run was started from, by their names
+                               in the card, as nemia inbox files lists them
+                               each tool's words: tools.md#inbox_detach
+                               on the port: inbox_detach
   nemia label run <runId> <key=value|key->... [--overwrite]
                                edit a run's labels: key=value sets a key, key- removes it; changing a
                                value takes --overwrite. nemia ls -l selects by them, and the feed's

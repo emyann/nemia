@@ -1215,11 +1215,28 @@ test('a denial is journalled while the attempt is at work, before its result', W
   );
 });
 
+test('a session started afresh with pictures is sent them in its first message, an image block after the brief', WAITED, async (rt) => {
+  const { root, dir, request } = place({ output: {} });
+  const shot = path.join(dir, 'shot.png');
+  fs.writeFileSync(shot, Buffer.from([0x89, 0x50, 0x4e, 0x47, 7]));
+  const h = await holder(root);
+  rt.onTestFinished(h.close);
+  await Effect.runPromise(
+    h.attached.ops.spawn({ ...request, config: { ...request.config, pictures: [{ path: shot, mediaType: 'image/png' }] } }),
+  );
+  const first = await until(rt, () => lines(dir, 'said.jsonl')[0], 'the first message is said', { everyMs: 50 });
+  assert.deepEqual(first, [
+    { type: 'text', text: 'do the work' },
+    { type: 'image', source: { type: 'base64', media_type: 'image/png', data: fs.readFileSync(shot).toString('base64') } },
+  ]);
+});
+
 describe('a spawn whose options are refused leaves no run file behind: no held sighting of a session that never started', () => {
   const rows: { what: string; config: SpawnRequest['config']; mcp?: string }[] = [
     { what: 'a prompt file that cannot be read', config: { claude: { appendSystemPromptFile: 'not-there.md' } } },
     { what: 'a `config.claude` flag given two values', config: { claude: { someFlag: ['one', 'two'] } } },
     { what: 'a checkout `.mcp.json` that is not JSON', config: {}, mcp: '{ not json' },
+    { what: 'a picture that cannot be read', config: { pictures: [{ path: '/nowhere/shot.png', mediaType: 'image/png' }] } },
   ];
   for (const row of rows)
     test(row.what, async (rt) => {

@@ -2,9 +2,10 @@
  * The files a factory keeps for a start to hand its run's steps (`objects`' `FileObject`, uploaded by `POST
  * /api/namespaces/<namespace>/files`): each under the store's `files/<namespace>/`, its bytes as `<id>` and what it was sent as beside
  * them, `<id>.json`. A file is written first as `<id>.part`, as its bytes come (`fileBegun`, its `write`), then kept whole (`fileKept`)
- * or let go of (`fileDropped`); a start finds one by its id in its own namespace (`fileAt`). Every file is let go of `FILE_KEPT_FOR`
- * after it was last written (`filesPruned`, which each upload asks first): a run copies what it is handed into its own `inputs/`, so a
- * file let go of takes nothing from a run.
+ * or let go of (`fileDropped`); a start finds one by its id in its own
+ * namespace (`fileAt`). Every file no inbox card names is let go of `FILE_KEPT_FOR` after it was last written (`filesPruned`, which
+ * each upload and each card's removal asks first, as `fileLetGo` decides): a run copies what it is handed into its own `inputs/`, so a
+ * file let go of takes nothing from a run, and a card keeps its files while its text names their ids.
  */
 import { Option, Schema } from 'effect';
 import crypto from 'node:crypto';
@@ -12,12 +13,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FILE_ID_PREFIX, FILE_KEPT_FOR, FileObject } from 'objects';
 import { FACTORY_NAME } from '../factory/factory.ts';
+import { fileLetGo } from '../inbox/index.ts';
 
 /** A kept file's record, `<id>.json`, decoded: none where it does not read as a file. */
 const fileIn = Schema.decodeUnknownOption(Schema.fromJsonString(FileObject));
 
 /** A file's id: the prefix, then 32 hexadecimal digits of a random number, so no id is guessed from another. */
 const FILE_ID = new RegExp(`^${FILE_ID_PREFIX}[0-9a-f]{32}$`);
+
+/** Every File id written anywhere in a text, as the prune finds a card's: the prefix, then 32 hexadecimal digits. */
+const FILE_IDS = new RegExp(`${FILE_ID_PREFIX}[0-9a-f]{32}`, 'g');
+
+/**
+ * Every File id written in any entry of the store's inbox, a card that does not read included, so a card nobody can parse loses none of
+ * its files; read afresh on each prune, nothing carried between them.
+ * @param home The store's root.
+ */
+function namedByCards(home: string) {
+  const inbox = path.join(home, 'inbox');
+  const named = new Set<string>();
+  for (const entry of fs.existsSync(inbox) ? fs.readdirSync(inbox) : []) {
+    const at = path.join(inbox, entry);
+    if (!fs.statSync(at, { throwIfNoEntry: false })?.isFile()) continue;
+    for (const id of fs.readFileSync(at, 'utf8').match(FILE_IDS) ?? []) named.add(id);
+  }
+  return named;
+}
 
 /** The namespace's name as the store keeps it: `default`, or a factory's. */
 const namespaceKept = (namespace: string) => namespace === 'default' || FACTORY_NAME.test(namespace);
@@ -30,21 +51,24 @@ const namespaceKept = (namespace: string) => namespace === 'default' || FACTORY_
 export const filesDir = (home: string, namespace: string) => path.join(home, 'files', namespace);
 
 /**
- * Every file of every namespace last written longer ago than `FILE_KEPT_FOR` before `now`, let go of, its bytes, its record and a part
- * never finished alike: the names let go of, as `<namespace>/<file>`.
+ * Every file of every namespace no inbox card names and last written longer ago than `FILE_KEPT_FOR` before `now` (`fileLetGo`), let go
+ * of, its bytes, its record and a part never finished alike: the names let go of, as `<namespace>/<file>`.
  * @param home The store's root.
  * @param now The time it is now, in milliseconds.
  */
 export function filesPruned(home: string, now: number) {
   const root = path.join(home, 'files');
   const gone: string[] = [];
+  const named = namedByCards(home);
   for (const namespace of fs.existsSync(root) ? fs.readdirSync(root) : []) {
     const dir = path.join(root, namespace);
     if (!fs.statSync(dir).isDirectory()) continue;
     for (const name of fs.readdirSync(dir)) {
       const at = path.join(dir, name);
       const begun = fs.statSync(at, { throwIfNoEntry: false })?.mtimeMs;
-      if (begun === undefined || now - begun < FILE_KEPT_FOR) continue;
+      if (begun === undefined) continue;
+      const id = name.replace(/\.(json|part)$/, '');
+      if (!fileLetGo({ writtenAt: Math.floor(begun), named: named.has(id) }, Math.floor(now), FILE_KEPT_FOR)) continue;
       fs.rmSync(at, { force: true });
       gone.push(`${namespace}/${name}`);
     }
@@ -131,3 +155,9 @@ export function fileAt(home: string, namespace: string, id: string) {
   if (file === undefined) return undefined;
   return fs.statSync(bytes, { throwIfNoEntry: false })?.isFile() ? { file, path: bytes } : undefined;
 }
+
+/**
+ * The bytes of a kept file, read from disk as they are asked for, never held whole: what the api streams of a file's content.
+ * @param at The path of its bytes, as `fileAt` answers it.
+ */
+export const fileBytes = (at: string) => fs.createReadStream(at) as AsyncIterable<Uint8Array>;

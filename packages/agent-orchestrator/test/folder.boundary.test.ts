@@ -85,10 +85,14 @@ fs.writeFileSync(
   path.join(FAN, 'd.md'),
   '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: c\n---\nread it once more\n',
 );
-/** Two files a person hands the run with `nemia start --input`. */
+/** Three files a person hands the run with `nemia start --input`: a PNG of one pixel, a `.png` that is no picture, and a text. */
 const GIVEN_FILES = path.join(ROOT, 'given-files');
 fs.mkdirSync(GIVEN_FILES, { recursive: true });
-fs.writeFileSync(path.join(GIVEN_FILES, 'mock.png'), 'PNG');
+const MOCK_PNG = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0,
+]);
+fs.writeFileSync(path.join(GIVEN_FILES, 'mock.png'), MOCK_PNG);
+fs.writeFileSync(path.join(GIVEN_FILES, 'flat.png'), 'PNG');
 fs.writeFileSync(path.join(GIVEN_FILES, 'brief notes.md'), '# what the tides do\n');
 
 /** A team that works on a repository, to hold the refusals apart: a card for it keeps the repository it names. */
@@ -493,7 +497,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
       brief: 'two sides of a note',
       repo: NOT_A_REPO,
       workflowDir: FAN,
-      inputs: [path.join(GIVEN_FILES, 'mock.png'), path.join(GIVEN_FILES, 'brief notes.md')],
+      inputs: [path.join(GIVEN_FILES, 'mock.png'), path.join(GIVEN_FILES, 'flat.png'), path.join(GIVEN_FILES, 'brief notes.md')],
     }),
   );
   const { e, tasks, settle } = board();
@@ -504,10 +508,24 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
     const folder = path.join(work, name);
     assert.deepEqual(
       fs.readdirSync(path.join(folder, 'given', 'inputs')).sort(),
-      ['brief notes.md', 'mock.png'],
+      ['brief notes.md', 'flat.png', 'mock.png'],
       `${name} was given the run's inputs`,
     );
-    assert.equal(fs.readFileSync(path.join(folder, 'given', 'inputs', 'mock.png'), 'utf8'), 'PNG');
+    assert.deepEqual(fs.readFileSync(path.join(folder, 'given', 'inputs', 'mock.png')), MOCK_PNG);
+    const { brief, config } = tasks.get(`${run.id}-${name}`)!.spec as {
+      brief: string;
+      config?: { pictures?: { path: string; mediaType: string }[] };
+    };
+    assert.deepEqual(
+      config?.pictures?.map((p) => [path.basename(p.path), p.mediaType]),
+      [['mock.png', 'image/png']],
+      'a step that waits on none is filed the one picture of the inputs, to be shown in its first message',
+    );
+    assert.deepEqual(runRecord(ROOT, run.id).steps[name]?.pictures, {
+      shown: ['mock.png'],
+      held: [{ name: 'flat.png', reason: 'format' }],
+    });
+    assert.match(brief, /`flat\.png` \(its format is none a model takes/, 'the brief names the picture held back, with its reason');
     assert.equal(fs.existsSync(path.join(folder, 'given', 'from')), false, "a root waits on nobody, so it is given nobody's folder");
   }
   fs.writeFileSync(path.join(work, 'a', 'side-a.md'), '# a\n');
@@ -522,9 +540,15 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   assert.equal(fs.readFileSync(path.join(c, 'given', 'from', 'b', 'side-b.md'), 'utf8'), '# b\n');
   assert.deepEqual(
     fs.readdirSync(path.join(c, 'given', 'inputs')).sort(),
-    ['brief notes.md', 'mock.png'],
+    ['brief notes.md', 'flat.png', 'mock.png'],
     "and the run's inputs, as its parents were",
   );
+  assert.equal(
+    (tasks.get(`${run.id}-c`)!.spec as { config?: { pictures?: unknown } }).config?.pictures,
+    undefined,
+    'a step that waits on others is shown no picture: the roots were',
+  );
+  assert.equal(runRecord(ROOT, run.id).steps.c?.pictures, undefined);
   assert.equal(
     fs.existsSync(path.join(c, 'given', 'from', 'b', 'out')),
     false,
@@ -568,10 +592,13 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
   assert.match(
     tasks.get(`${run.id}-a`)!.spec.brief,
-    /`mock\.png`, a picture; `brief notes\.md`, a text file\. They are copied into `given\/inputs` in this folder\./,
+    /`mock\.png`, a picture; `flat\.png`, a picture; `brief notes\.md`, a text file\. They are copied into `given\/inputs` in this folder\./,
   );
   const d = tasks.get(`${run.id}-d`)!.spec.brief;
-  assert.match(d, /`mock\.png`, a picture; `brief notes\.md`, a text file\. They are copied into `given\/inputs` in this folder\./);
+  assert.match(
+    d,
+    /`mock\.png`, a picture; `flat\.png`, a picture; `brief notes\.md`, a text file\. They are copied into `given\/inputs` in this folder\./,
+  );
   assert.doesNotMatch(d, /given\/from/, 'a step standing in the folder it was given is given nothing more');
 
   await runWith(e, forgetRun(run.id));

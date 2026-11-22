@@ -194,10 +194,10 @@ async function visit(page: Page) {
 
     const box = page.locator('form[aria-label="File a card"]');
     const idea = box.getByRole('textbox', { name: 'An idea' });
-    const fileIt = box.getByRole('button', { name: 'File' });
+    const fileIt = box.getByRole('button', { name: 'File', exact: true });
     await expectVisible(idea, 'the box has a field for the idea');
     if (await fileIt.isEnabled()) throw new Refused('File is disabled while there is no idea — it was enabled with none');
-    await expectCount(box.locator('input'), 0, 'the box has no field to type a repository into');
+    await expectCount(box.locator('input:not([type="file"])'), 0, 'the box has no field to type a repository into');
     await pickIn(page, box.locator('[data-factory-field]'), FACTORY);
     await expectTexts(box.locator('[data-factory-repo]'), [checkout], `the repository is the factory's own (${checkout}), said as text`);
     await idea.fill(FILED);

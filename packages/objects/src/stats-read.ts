@@ -57,6 +57,16 @@ export const StatsStepRow = Schema.Struct({
     }),
   ),
   rules: Schema.Array(Schema.Struct({ skill: Schema.String, rule: Schema.String, kept: Schema.Number, broken: Schema.Number })),
+  pictures: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.Struct({
+        handed: Schema.Number.annotate({ description: 'How many pictures its first tries were handed.' }),
+        shown: Schema.Number.annotate({ description: 'How many of them were shown in the first message of their sessions.' }),
+      }),
+    ).annotate({
+      description: 'The pictures handed to its first tries and those shown in their first message, summed; null where none was handed.',
+    }),
+  ),
 });
 export type StatsStepRow = typeof StatsStepRow.Type;
 

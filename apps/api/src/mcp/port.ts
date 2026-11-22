@@ -40,6 +40,7 @@ import {
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, type ReadBound, READS, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, narrowingOf, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
+import { FILES_EXTENSION, inlined } from './files.ts';
 import { PORT_INSTRUCTIONS } from './instructions.ts';
 import { FEED_TEMPLATES, type FeedView, viewOf } from './resources.ts';
 import { type PortTool, portTools } from './tools.ts';
@@ -195,7 +196,8 @@ async function answerOf(tool: PortTool, args: Readonly<Record<string, unknown>>,
  * A call of `tool` with `args`, answered by `app`'s own fetch of its endpoint (`answerOf`), sent with its link's defaults and the port's
  * page (`argsSent`), and held under `ANSWER_BOUND` (`answerFit`): a page past it asked again shorter — a list's `limit` halved, a read
  * from a cursor's `last` or `limit` (`countKeyOf`) — any other answer past it refused with how to narrow it (`pastTheBound`, the read's
- * own keys in `READS`), its body left out. A path name not given is refused before any request, naming it.
+ * own keys in `READS`), its body left out. A path name not given is refused before any request, naming it; a card's file given inline is
+ * uploaded first (`inlined`, files.ts), and its upload refused is the call's error.
  * @param tool The tool called.
  * @param args The call's arguments, by key.
  * @param from The request to the port that carried the call.
@@ -208,7 +210,9 @@ export async function called(tool: PortTool, args: Readonly<Record<string, unkno
     return failed(
       `${tool.name} needs ${missing.join(' and ')}: give each in its arguments (${tool.path})`,
     ) satisfies CallToolResult as CallToolResult;
-  let sent = argsSent(tool, args);
+  const given = tool.fileKeys.length === 0 ? { args } : await inlined(tool.fileKeys, args, { fetch: app.fetch, from, signal });
+  if ('refused' in given) return failed(`${tool.name} was not called: ${given.refused}`) satisfies CallToolResult as CallToolResult;
+  let sent = argsSent(tool, given.args);
   for (;;) {
     const result = await answerOf(tool, sent, from, app, signal);
     const size = sizeOf(result);
@@ -288,6 +292,7 @@ export function portServer(
     capabilities: {
       tools: {},
       ...(feed === undefined ? {} : { resources: feed.era === 'modern' ? { subscribe: true } : {} }),
+      extensions: FILES_EXTENSION,
     },
     instructions: PORT_INSTRUCTIONS,
     cacheHints: {

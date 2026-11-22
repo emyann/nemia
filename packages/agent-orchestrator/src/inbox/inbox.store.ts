@@ -4,12 +4,14 @@
  * and written through the Card door (`CardDoor`, `src/cards/cards.store.ts`): each verb an Effect program that yields it, so a program
  * given `StoreRoot` reads the store's files and a test gives `cardDoorMemory()`. The judgement is `inbox.ts`'s.
  *
- * Beneath the controllers, beside `files.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
+ * Beneath the controllers, beside `files.store.ts`: it imports neither the engine nor a controller, nor the files' store, whose Files a
+ * controller reads and hands it as data (`filesKept`), and `runner.ts` re-exports what the
  * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
  * is `inbox.verb.ts`'s, through `startRun`.
  */
 import { setting } from '../config/config.store.ts';
-import { DEFAULT_NAMESPACE } from 'objects';
+import { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, DEFAULT_NAMESPACE } from 'objects';
+import { type CardFileGiven, cardFilesRefusal, cardFilesWords } from './card-files.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -25,6 +27,7 @@ import {
   queuedText,
   queueRefusal,
   retiredRepoRefusal,
+  type CardFiles,
   type InboxCard,
   type Triggering,
 } from './inbox.ts';
@@ -116,12 +119,15 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   repo?: string;
   factory?: string;
   labels?: readonly string[];
+  /** The files it carries, each a File uploaded to its namespace first, with its name and the size of the File kept (`filesKept`). */
+  files?: readonly CardFileGiven[];
 }) {
   const edits = parseLabelEdits(opts.labels ?? []);
   if ('refused' in edits) return yield* Effect.fail(new Invalid({ message: `--label: ${edits.refused}. Nothing was filed.` }));
   if (opts.repo !== undefined)
     return yield* Effect.fail(new Invalid({ message: `repository ${opts.repo}: ${retiredRepoRefusal('Nothing was filed.')}` }));
-  const given = { workflow: opts.workflow, factory: opts.factory };
+  const files = opts.files?.length ? yield* cardFilesJudged('filed', opts.files, [], false) : undefined;
+  const given = { workflow: opts.workflow, factory: opts.factory, ...(files !== undefined ? { files } : {}) };
   const idea = ideaCard(opts.from ?? 'the idea', opts.text, given);
   const { body } = idea;
   const read = parseInboxCard(opts.from ?? 'the idea', idea.text);
@@ -150,6 +156,34 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
     };
     return out;
   }
+});
+
+/** How many files, and how many bytes in all, a card carries at most. */
+const CARD_MOST = { count: CARD_FILES_MOST, bytes: CARD_FILES_BYTES_MOST };
+
+/**
+ * The files `given` as the card `card` is to carry them, judged against what the card holds now (`held`) by `cardFilesRefusal`:
+ * refused `Conflict` where the card was started and they change, and `Invalid` where a name is no file's own, is given twice, names no
+ * File the namespace keeps (a size of null), or the files pass what a card carries.
+ * @param card The card's name, as a refusal names it.
+ * @param given The files as they are to be, each its name, its File's id and that File's size where it is kept (`filesKept`).
+ * @param held The files the card carries now.
+ * @param started Whether a run was started from the card.
+ */
+export const cardFilesJudged = Effect.fn('cardFilesJudged')(function* (
+  card: string,
+  given: readonly CardFileGiven[],
+  held: CardFiles,
+  started: boolean,
+) {
+  const bytes = given.reduce((sum, f) => sum + (f.size ?? 0), 0);
+  const refusal = cardFilesRefusal(given, held, started, CARD_MOST, bytes);
+  if (refusal !== undefined) {
+    const message = `${cardFilesWords(refusal, card, CARD_MOST)} Nothing was written.`;
+    return yield* Effect.fail(refusal.reason === 'started' ? new Conflict({ message }) : new Invalid({ message }));
+  }
+  const files: CardFiles = given.map(({ name, file }) => ({ name, file }));
+  return files;
 });
 
 /**

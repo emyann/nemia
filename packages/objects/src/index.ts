@@ -179,6 +179,7 @@ export {
   type CardKey,
   type CardState,
 } from './card.ts';
+export { CARD_FILE_REF, CardAttach, CardFileNamed, CardFileRef, CardFileStatus } from './card.ts';
 export {
   Factory,
   FactoryCommands,
@@ -379,6 +380,7 @@ export {
 export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked } from './table.ts';
 export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
 export { Gone, ReadFailed, TooLarge, UnsupportedMediaType } from './api-errors.ts';
+export { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, PICTURE_TYPES, type PictureMediaType } from './file.ts';
 export { FILE_ID_PREFIX, FILE_KEPT_FOR, FILE_LIMIT, FileObject } from './file.ts';
 export {
   LifecycleEdge,
@@ -698,6 +700,9 @@ export {
 } from './commands-runs.ts';
 export {
   INBOX_ADD_WORDS,
+  INBOX_ATTACH_WORDS,
+  INBOX_DETACH_WORDS,
+  INBOX_FILES_WORDS,
   INBOX_EDIT_WORDS,
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
@@ -706,6 +711,7 @@ export {
   INBOX_WORDS,
   LABEL_INBOX_WORDS,
   LABEL_RUN_WORDS,
+  filesNamed,
   labelEdits,
   noEdits,
   runsNamed,

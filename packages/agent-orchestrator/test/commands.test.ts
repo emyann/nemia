@@ -93,6 +93,8 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['inbox from', 'cli'],
       ['inbox edit', 'cli'],
       ['inbox rm', 'cli'],
+      ['inbox attach', 'typed'],
+      ['inbox detach', 'typed'],
       ['label run', 'cli'],
       ['label inbox', 'cli'],
       ['factory', 'cli'],

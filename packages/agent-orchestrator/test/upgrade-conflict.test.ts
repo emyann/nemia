@@ -45,7 +45,10 @@ import { factoryTyped } from './factory-typed.ts';
 import type { StartedAnswer } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { parseWorkflow } from '../src/workflow/index.ts';
+import { readKeys } from '../src/former/former.ts';
+import { MAP_KEYS } from '../src/frontmatter/frontmatter.ts';
+import { splitFrontmatter } from '../src/step/step.ts';
+import { checksOf } from '../src/check/index.ts';
 
 const ROOT = scratch('wf-upgrade-conflict-');
 const FACTORIES = path.join(ROOT, 'factories');
@@ -628,10 +631,11 @@ describe("an upgrade onto a version whose step writes named checks: the tree's o
     assert.equal(approved.status.phase, 'applied', approved.status.message);
     const merged = reconciled(factory(name));
     assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
-    const step = parseWorkflow('implement', textIn(treeDir(ROOT, name), IMPLEMENT_FILE));
-    assert.equal(step.check, undefined);
+    const text = textIn(treeDir(ROOT, name), IMPLEMENT_FILE);
+    const keys = readKeys('implement', splitFrontmatter('implement', text).block ?? '', () => undefined, MAP_KEYS).meta;
+    assert.equal(keys.check, undefined, "the tree's `check:` gone");
     assert.deepEqual(
-      step.checks?.map((c) => [c.name, c.run, c.after]),
+      checksOf('implement', keys.check, keys.checks)?.map((c) => [c.name, c.run, c.after]),
       [
         ['test', 'npm test', []],
         ['lint', 'npm run lint', ['test']],

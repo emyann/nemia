@@ -4,6 +4,7 @@
  * place that refuses the start refuses it in its words, and nothing is written. A SIGINT to `nemia start` is not passed on to the
  * process group of the git `open` runs, which outlives it. Its store is its own at `ROOT`.
  */
+import { plantRecord, recordText, runKey, runsNow as filesStoreAt } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,7 +23,6 @@ import { PlaceService } from '../src/place/place.store.ts';
 import { gitPlaceLayer, builtinGitPlace } from '../src/place/builtin.store.ts';
 import { runFile } from '../src/record/record.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 
 const ROOT = scratch('wf-start-place-');
 const rooted = filesStoreAt(ROOT);
@@ -104,9 +104,9 @@ test("a start opens the place it is given: the record's base, branch and reposit
 
 test('a record written when a run named its place still reads, the name kept as it was written', () => {
   const run = started(PLAIN, aRepo());
-  const file = runFile(ROOT, run.id);
+  const file = runKey(run.id);
   const named = { skill: 'git', version: 'a'.repeat(64) };
-  fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), placeSkill: named }));
+  plantRecord(ROOT, file, JSON.stringify({ ...(JSON.parse(recordText(ROOT, file) ?? '') as object), placeSkill: named }));
   const read = rooted.runs.read(run.id);
   assert.deepEqual([read.id, read.placeSkill], [run.id, named]);
 });

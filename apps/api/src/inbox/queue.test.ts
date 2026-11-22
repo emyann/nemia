@@ -29,7 +29,6 @@ import {
   readInbox,
   runSlots,
   runWith as runEngine,
-  runsAtOnce,
   slotWord,
   standingReader,
   standingSnapshot,
@@ -39,6 +38,7 @@ import {
   type StoreRoot,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
+import { plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const repo = scratch('nemia-api-queue-repo-');
 /**
@@ -433,9 +433,7 @@ const pending = (taskId: string) => {
 /** A run of one step, frozen on the record as `nemia start` freezes it. */
 function writeRun(id: string, minute: number, fields: { after?: string[]; taskId?: string; cancelled?: boolean } = {}) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(id), JSON.stringify({
       id,
       repo,
       workspace: repo,
@@ -448,8 +446,7 @@ function writeRun(id: string, minute: number, fields: { after?: string[]; taskId
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
       steps: { implement: fields.taskId ? { taskId: fields.taskId, workspace: repo, branch: `wf/${id}/implement` } : { taskId: null } },
       ...(fields.after ? { after: fields.after } : {}),
-    }),
-  );
+    }));
   if (fields.cancelled) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), at(minute + 1));
 }
 
@@ -465,7 +462,7 @@ const ceilings = async () => {
 /** The runs the package's own `runSlots` holds, on the same store, the runs waited on read off `standing.json`, as the api answers them. */
 const packageHeld = async () => {
   const git = standingReader(await runWith(engine(ENV), standingSnapshot()));
-  const held = await runWith(engine(ENV), runSlots(engine(ENV), runsAtOnce(root).runs.list(), settingsOf(ENV), { git, read: new Map() }));
+  const held = await runWith(engine(ENV), runSlots(engine(ENV), runsNow(root).runs.list(), settingsOf(ENV), { git, read: new Map() }));
   return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 };
 

@@ -19,6 +19,7 @@ import { Engine } from '../store.ts';
 import { STEP_BEAT_MS } from './steps.ts';
 import { STEP_FOLLOWS, type TranscriptEvent } from './following.ts';
 import { bell, until, WAITED } from '../../test/waits.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** One moment of a live attempt, as the engine's `follow` hands it. */
 type Followed = Stream.Success<NonNullable<Effect.Success<ReturnType<Engine['Service']['follow']>>>>;
@@ -29,9 +30,7 @@ const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried', 'drifte
 /** The run's record, each step of `STEPS` on the task `t-<step>`, but those `moved` names on another. */
 function writeRun(moved: Record<string, string> = {}) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${RUN}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(RUN), JSON.stringify({
       id: RUN,
       repo: '/code/app',
       workspace: '/code/app',
@@ -43,8 +42,7 @@ function writeRun(moved: Record<string, string> = {}) {
       createdAt: '2026-10-07T12:00:00.000Z',
       workflow: STEPS.map((name) => ({ name, after: [], body: `${name} it.` })),
       steps: Object.fromEntries(STEPS.map((name) => [name, { taskId: moved[name] ?? `t-${name}` }])),
-    }),
-  );
+    }));
 }
 writeRun();
 

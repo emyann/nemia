@@ -7,6 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,7 +15,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { INBOX_ADD, INBOX_ATTACH, inboxDir, runWith, startFromInbox } from '../src/runner.ts';
 import { fileBegun, fileKept } from '../src/start/files.store.ts';
-import { inputsDir, runRecord } from '../src/record/record.store.ts';
+import { inputsDir } from '../src/record/record.store.ts';
 import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { staged } from './story.ts';

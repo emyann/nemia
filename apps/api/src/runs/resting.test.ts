@@ -28,7 +28,6 @@ import {
   passStanding,
   Informer,
   informerRead,
-  runsAtOnce,
   standingReader,
   standingSnapshot,
   verifiesRest,
@@ -37,6 +36,7 @@ import type { RunList } from 'objects';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedRuns } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
+import { runsNow } from 'agent-orchestrator/testing';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
@@ -46,7 +46,7 @@ const snapshotGit = async () => standingReader(await runWith(e, standingSnapshot
  * A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what the list reads, and a tip it
  * read is one the memo watches.
  */
-const aPass = () => runWith(e, passStanding(runsAtOnce(root).runs.list()));
+const aPass = () => runWith(e, passStanding(runsNow(root).runs.list()));
 /** The app's informer of each run's judgement (`Informer`, given by `liveOf`), which the list reads and keeps runs in. */
 const resting = await runtime.runPromise(
   Effect.gen(function* () {
@@ -407,7 +407,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
   blocked('r-raced-implement');
   fed('r-raced-implement');
   await runWith(e, informerRead(e, resting, false, await snapshotGit()));
-  first.keep(findRun(root, 'r-raced')!, judged, [], () => new Map(), true);
+  first.keep((await findRun(root, 'r-raced'))!, judged, [], () => new Map(), true);
   await runWith(e, first.commit());
   assert.ok(
     !resting.runs.has('r-raced'),
@@ -416,7 +416,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'waiting');
 
   const alone = await runWith(e, informerRead(e, resting, false, await snapshotGit()));
-  alone.keep(findRun(root, 'r-raced')!, judged, [], () => new Map(), true);
+  alone.keep((await findRun(root, 'r-raced'))!, judged, [], () => new Map(), true);
   await runWith(e, alone.commit());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
@@ -713,7 +713,7 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
           'each row with its clock read, in flight as much as waiting',
         );
         assert.deepEqual(
-          runsAtOnce(root).runs.read('r-asks').after,
+          runsNow(root).runs.read('r-asks').after,
           ['r-paged'],
           'it was started after the finished run, whose journal is not read',
         );

@@ -1,5 +1,5 @@
 /**
- * The run store's two reads of a store that holds hundreds: `runs.find`, one run by id, found among the ids the store lists and never
+ * The run store's two reads of a store that holds hundreds: `runs.find`, one run by id, found among the keys the store holds and never
  * read by a path made of the id; and `keptRuns`, every run projected off a memo keyed by the run's stamp, which every read that wants
  * a little of every run goes through. And a run's labels, a person's file beside the record (`runs/<id>.labels`): composed onto every
  * read, never written into the record, written whole and removed by an empty map or with the run, and in the run's stamp.
@@ -9,13 +9,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { filesStoreAt, keptRuns, labelsFile, writeLabels } from './files.store.ts';
-import { runsDir, runFile, restStamps } from './record.store.ts';
+import { Effect } from 'effect';
+import { labelsFile, writeLabels } from './files.store.ts';
+import { runsDir, restStamps } from './record.store.ts';
 import { recordMemo } from '../rest/index.ts';
 import { metered } from '../meter/tally.store.ts';
+import { keptRuns } from '../runs/runs.store.ts';
+import { RUNS_PREFIX } from '../runs/run-keys.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { dropRecord, keysUnder, plantRecord, recordText, runKey, runsNow } from '../../testing.ts';
+import type { Run } from './record.ts';
 
 const ROOT = scratch('wf-files-store-');
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 /** A folder run's record as the tick writes one. */
 const aRecord = (id: string) => ({
@@ -29,12 +35,17 @@ const aRecord = (id: string) => ({
 });
 
 const put = (id: string, record: unknown = aRecord(id)) =>
-  fs.writeFileSync(runFile(ROOT, id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
+  plantRecord(ROOT, runKey(id), typeof record === 'string' ? record : JSON.stringify(record));
 
 beforeEach(() => {
+  for (const key of keysUnder(ROOT, RUNS_PREFIX)) dropRecord(ROOT, key);
   fs.rmSync(runsDir(ROOT), { recursive: true, force: true });
   fs.mkdirSync(runsDir(ROOT), { recursive: true });
 });
+
+/** `keptRuns` run at once at this file's store. */
+const keptNow = <P>(memo: Parameters<typeof keptRuns<P>>[0], project: (run: Run) => P) =>
+  Effect.runSync(Effect.provideService(keptRuns(memo, project, false), StoreRoot, ROOT));
 
 describe('`runs.find`: one run by id, among the ids the store lists, never by a path made of the id', () => {
   test('a listed run is found as `runs.read` reads it, and at the cost of its one record whatever the store holds', async () => {
@@ -46,7 +57,7 @@ describe('`runs.find`: one run by id, among the ids the store lists, never by a 
     assert.equal(alone, 1, 'one record read');
     assert.equal(among, alone, 'and one still, with two hundred other records in the store');
   });
-  test('REFUSED: an id the store does not list, one climbing out with `..`, and an absolute one — each undefined, no file read outside runs/', () => {
+  test('REFUSED: an id the store does not hold, one climbing out with `..`, and an absolute one — each undefined, no file read', () => {
     put('r-one');
     const outside = path.join(ROOT, 'outside.json');
     fs.writeFileSync(outside, JSON.stringify(aRecord('outside')));
@@ -54,7 +65,7 @@ describe('`runs.find`: one run by id, among the ids the store lists, never by a 
     assert.equal(files.runs.find('../outside'), undefined, 'an id climbing out of the store');
     assert.equal(files.runs.find(path.join(ROOT, 'outside')), undefined, 'an absolute id');
     assert.equal(files.runs.find(''), undefined, 'no id at all');
-    assert.ok(fs.existsSync(outside), 'and the file outside runs/ is untouched');
+    assert.ok(fs.existsSync(outside), 'and the file outside the keyspace is untouched');
   });
   test('a record that does not read as a run is undefined, said with its fix, and said once a process on stderr, as `runs.list` says it', () => {
     put('r-bad', '{"id": "r-bad"');
@@ -77,7 +88,7 @@ describe('`runs.find`: one run by id, among the ids the store lists, never by a 
 
 /** Every run as `keptRuns` projects it here: its id and its brief, which a record alone says. */
 const briefs = (memo?: ReturnType<typeof recordMemo<{ id: string; brief: string }>>) =>
-  keptRuns(ROOT, memo, (run) => ({ id: run.id, brief: run.brief }), false);
+  keptNow(memo, (run) => ({ id: run.id, brief: run.brief }));
 
 test('a warm read through a memo reads no record whose run has not moved, however many the store holds, and answers a cold read’s own', async () => {
   put('r-moving');
@@ -98,7 +109,7 @@ test('a run whose record is rewritten is read again, and one removed leaves the 
   const memo = recordMemo<{ id: string; brief: string }>();
   briefs(memo);
   put('r-edit', { ...aRecord('r-edit'), brief: 'edited' });
-  fs.rmSync(runFile(ROOT, 'r-go'));
+  dropRecord(ROOT, runKey('r-go'));
   const after = (await metered(async () => briefs(memo))).tallies?.records;
   assert.equal(after, 1, 'the record that was rewritten, and no other');
   assert.deepEqual(briefs(memo), [{ id: 'r-edit', brief: 'edited' }]);
@@ -131,7 +142,7 @@ describe("a run's labels are a person's file beside the record: composed on ever
     assert.deepEqual(files.runs.find('r-labelled')?.labels, labels);
     assert.deepEqual(files.runs.list(() => {}).find((r) => r.id === 'r-labelled')?.labels, labels);
     assert.deepEqual(
-      keptRuns(ROOT, undefined, (r) => [r.id, r.labels], false),
+      keptNow(undefined, (r) => [r.id, r.labels]),
       [
         ['r-labelled', labels],
         ['r-unlabelled', undefined],
@@ -156,7 +167,7 @@ describe("a run's labels are a person's file beside the record: composed on ever
     put('r-labelled');
     writeLabels(ROOT, 'r-labelled', { team: 'core' });
     assert.ok(files.runs.rewrite({ ...files.runs.read('r-labelled'), brief: 'changed' }));
-    const written = JSON.parse(fs.readFileSync(runFile(ROOT, 'r-labelled'), 'utf8')) as Record<string, unknown>;
+    const written = JSON.parse(recordText(ROOT, runKey('r-labelled')) ?? '{}') as Record<string, unknown>;
     assert.equal(written.brief, 'changed');
     assert.equal('labels' in written, false);
     assert.deepEqual(files.runs.read('r-labelled').labels, { team: 'core' });
@@ -174,7 +185,7 @@ describe("a run's labels are a person's file beside the record: composed on ever
     assert.equal('labels' in files.runs.read('r-labelled'), false);
     files.labels.put('r-labelled', {});
     assert.equal(fs.existsSync(labelsFile(ROOT, 'r-labelled')), false, 'removing none is no refusal');
-    assert.deepEqual(fs.readdirSync(runsDir(ROOT)), ['r-labelled.json']);
+    assert.deepEqual(fs.readdirSync(runsDir(ROOT)), []);
   });
   test('a labels file that is no JSON object of strings reads as no labels, and is said, naming the file and the verb that mends it', () => {
     for (const [id, text] of [
@@ -193,11 +204,12 @@ describe("a run's labels are a person's file beside the record: composed on ever
   });
   test("the run's rest stamp moves when its labels are written, and again when they are removed", () => {
     put('r-labels-stamp');
-    const before = restStamps(ROOT).get('r-labels-stamp');
+    const before = files.runs.stamps().get('r-labels-stamp');
     files.labels.put('r-labels-stamp', { team: 'core' });
-    const written = restStamps(ROOT).get('r-labels-stamp');
+    const written = files.runs.stamps().get('r-labels-stamp');
+    assert.ok(restStamps(ROOT).has('r-labels-stamp'), 'the labels file is a marker the stamp reads');
     files.labels.put('r-labels-stamp', {});
-    const removed = restStamps(ROOT).get('r-labels-stamp');
+    const removed = files.runs.stamps().get('r-labels-stamp');
     assert.ok(before);
     assert.notEqual(written, before);
     assert.notEqual(removed, written);

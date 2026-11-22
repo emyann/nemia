@@ -15,6 +15,7 @@
  * `ROOT`, given as `ENV`, whose `WF_DEFAULT_FACTORY_STARTS` starts runs in repositories no factory holds.
 
  */
+import { dropRecord, listRuns, plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -31,7 +32,7 @@ import { names } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import { advanceRun, cancelRun, forgetRun, prune, retryRun, runsForgetting, startRun, runWith } from '../src/runner.ts';
 import { stepsNow } from './steps-now.ts';
-import { listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import { runTasks } from '../src/record/record.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { tickRun } from '../src/tick/tick.verb.ts';
@@ -41,7 +42,6 @@ import { Invalid } from '../src/refusal/refusal.ts';
 import { idRefusal } from '../src/forget/forget.ts';
 import { EngineService, engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { typed as onHandler } from './typed.ts';
 import { forgetTyped, type Typed } from './forgetting.ts';
@@ -408,7 +408,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
         steps: { implement: { taskId: 'legacy-run-9z9z-implement' } },
         createdAt: '2026-01-01T00:00:00Z',
       };
-      fs.writeFileSync(path.join(ROOT, 'runs', `${legacy.id}.json`), JSON.stringify(legacy, null, 2));
+      plantRecord(ROOT, runKey(legacy.id), JSON.stringify(legacy, null, 2));
       assert.equal(stepsOf(runRecord(ROOT, legacy.id)).length, 1, 'read from the folder, since the record froze nothing');
       fs.rmSync(legacyDir, { recursive: true });
       assert.throws(
@@ -444,9 +444,9 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     names(sibling.printed.join('\n'), `${id}-implement  no such run — nothing to forget`);
     assert.ok(under('checks', `${id}-implement-check.stderr`), "the live run's check log stays");
     const torn = 'torn-record-x2';
-    fs.writeFileSync(path.join(ROOT, 'runs', `${torn}.json`), '{ "id": ');
+    plantRecord(ROOT, runKey(torn), '{ "id": ');
     fs.writeFileSync(path.join(ROOT, 'checks', `${torn}-review-check.stderr`), "a torn run's\n");
-    tt.onTestFinished(() => fs.rmSync(path.join(ROOT, 'runs', `${torn}.json`), { force: true }));
+    tt.onTestFinished(() => dropRecord(ROOT, runKey(torn)));
     const prefix = await typed('rm', 'torn-record');
     assert.equal(prefix.error?.exitCode, 2);
     names(prefix.printed.join('\n'), 'torn-record  no such run — nothing to forget');
@@ -454,7 +454,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     board().settle(`${id}-implement`, 'succeeded', SIGNED);
     await pass(id);
     assert.equal((await stage.runWith(e(), forgetRun(id))).kind, 'forgotten');
-    fs.rmSync(path.join(ROOT, 'runs', `${torn}.json`), { force: true });
+    dropRecord(ROOT, runKey(torn));
   });
 });
 
@@ -874,12 +874,12 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
       );
 
       const unfiled = await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: oneStep() }));
-      const record = path.join(ROOT, 'runs', `${unfiled.id}.json`);
-      const written = fs.readFileSync(record, 'utf8');
+      const record = runKey(unfiled.id);
+      const written = (recordText(ROOT, record) ?? '');
       assert.deepEqual((await pass(unfiled.id)).filed, ['implement']);
       board().settle(`${unfiled.id}-implement`, 'succeeded', SIGNED);
       await pass(unfiled.id);
-      fs.writeFileSync(record, written);
+      plantRecord(ROOT, record, written);
       assert.deepEqual(runTasks(runRecord(ROOT, unfiled.id)), [], 'the record names no task');
       const step = await stage.runWith(e(), runsForgetting([unfiled.id]));
       assert.deepEqual(step.counted.get(unfiled.id)?.forgotten, [`${unfiled.id}-implement`], 'prune counts the step adopted');

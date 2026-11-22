@@ -16,7 +16,7 @@ import { startRun } from 'agent-orchestrator';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace, addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from './placed.ts';
 
 const stand = eachTest(testPlace);
@@ -109,9 +109,7 @@ describe('what a step was told reads, layer by layer, as the run froze it: no la
   s.test('a record that froze no workflow answers no layers, and still what it was told', async () => {
     const id = 'layers-unfrozen';
     fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, 'runs', `${id}.json`),
-      JSON.stringify({
+    plantRecord(root, runKey(id), JSON.stringify({
         id,
         place: { kind: 'folder' },
         workspace: path.join(root, 'runs', id, 'work'),
@@ -119,8 +117,7 @@ describe('what a step was told reads, layer by layer, as the run froze it: no la
         createdAt: '2026-10-03T00:00:00.000Z',
         workflowDir: TEAM,
         steps: { write: { taskId: null } },
-      }),
-    );
+      }));
     const write = await toldWrite(id);
     assert.equal(write.layers, null);
     assert.ok(write.told?.includes('## What was asked for'), write.told ?? 'null');

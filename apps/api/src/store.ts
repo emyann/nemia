@@ -6,7 +6,7 @@
  * `workflowsOf`, `runObject`).
  */
 import { Context, Effect, Layer, Tracer } from 'effect';
-import { asked, engine, engineOf, runsAtOnce, runWith, PlaceService, type EngineService, stepNames, workflowsOf } from 'agent-orchestrator';
+import { asked, engine, engineOf, runFound, runWith, PlaceService, type EngineService, stepNames, workflowsOf } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 
 /**
@@ -35,7 +35,7 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
  * (`storeConfigLayer`, `app.ts`, which gives the store's settings too, `StoreConfig`), with no default, so an app given none does not
  * compile. A test that gives another root moves where the api looks for yours.
  *
- * The package reads off no root of its own as it loads: the runs (`runsAtOnce(home)`, `findRun`), the inbox and the daemon's file are
+ * The package reads off no root of its own as it loads: the runs (`RunDoor`, `findRun`), the inbox and the daemon's file are
  * each read at the root a caller hands it, which the api reads off `StoreRoot` (`Served.home`).
  */
 export { StoreConfig, StoreRoot } from 'agent-orchestrator';
@@ -75,7 +75,7 @@ export async function everyView(e: Reader) {
  * @param home The store's root folder.
  * @param id The run's id, as the request gives it.
  */
-export const findRun = (home: string, id: string) => runsAtOnce(home).runs.find(id);
+export const findRun = (home: string, id: string) => Effect.runPromise(Effect.provideService(runFound(id), StoreRoot, home));
 
 /**
  * The words of a refusal of a run this store has no record of, naming where its runs are listed.
@@ -91,8 +91,8 @@ export const noSuchRun = (id: string) =>
  * @param step The step's name, as the request gives it.
  * @param home The store's root folder.
  */
-export function taskOfStep(id: string, step: string, home: string) {
-  const run = findRun(home, id);
+export async function taskOfStep(id: string, step: string, home: string) {
+  const run = await findRun(home, id);
   if (!run)
     return { error: noSuchRun(id) } satisfies { run: Run; taskId: string | null } | { error: string } as
       | { run: Run; taskId: string | null }

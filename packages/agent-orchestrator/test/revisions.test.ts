@@ -11,6 +11,7 @@
  * The place is the stand-in (`testPlace`): the subject is the ledger and the pin, not git, and the steps work in the checkout itself. Each
  * team is given a folder, an agent and a skill named for itself, so no test's edit of a kind moves another's number.
  */
+import { askKeyOf, askNames, plantRecord, recordText, rewriteRun, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -26,7 +27,7 @@ import { advanceRun, approveRun, driftNow, startRun, retryRun, runWith as runEng
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
-import { asksDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
+
 import { stepTaskId } from '../src/record/record.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { agentFilesDir } from '../src/agents/agents.store.ts';
@@ -821,16 +822,15 @@ test('a try a pass filed and died before writing down is adopted on what filing 
   assert.equal(pinOf(runRecord(ROOT, run.id).pinned, 'agent', t.agent)!.n, 2, 'a pass takes the refresh, with nothing yet to file');
   await runWith(b.e, retryRun(run.id, 'build', { mode: 'continue' }));
   const beforeFiling = runRecord(ROOT, run.id);
-  const asked = fs
-    .readdirSync(asksDir(ROOT, run.id))
-    .map((name) => [name, fs.readFileSync(path.join(asksDir(ROOT, run.id), name))] as const);
+  const asked = askNames(ROOT, run.id)
+    .map((name) => [name, (recordText(ROOT, askKeyOf(run.id, name)) ?? '')] as const);
 
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const filed = runRecord(ROOT, run.id).steps.build;
   const try2 = stepTaskId(run, 'build', 2);
   assert.equal(filed?.taskId, try2);
   rewriteRun(ROOT, beforeFiling);
-  for (const [name, text] of asked) fs.writeFileSync(path.join(asksDir(ROOT, run.id), name), text);
+  for (const [name, text] of asked) plantRecord(ROOT, askKeyOf(run.id, name), text);
   assert.ok(b.tasks.get(try2)?.spec.brief, 'the pass filed try 2 and died: the engine holds it briefed, the record does not name it');
 
   const adopted = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -906,10 +906,10 @@ describe('a step that ended is judged by the fields it was filed with: a run tha
     assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review after it');
   });
   s.test('a record written before the fields were kept reads them where its schema has not moved, and build still signed', async () => {
-    const file = path.join(ROOT, 'runs', `${run.id}.json`);
-    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const file = runKey(run.id);
+    const record = JSON.parse(recordText(ROOT, file) ?? '');
     for (const name of ['build', 'review']) delete record.steps[name].declared;
-    fs.writeFileSync(file, JSON.stringify(record, null, 2));
+    plantRecord(ROOT, file, JSON.stringify(record, null, 2));
     const { steps } = runRecord(ROOT, run.id);
     assert.equal(steps.build?.declared, undefined, 'build, filed on a schema that has moved since, is given none');
     assert.deepEqual(steps.review?.declared, ['goal', 'why'], 'review, whose schema has not moved, is given what it declares');

@@ -12,6 +12,7 @@
  * Every story starts its own runs and counts only its own: they share this file's store at `ROOT`, given as `ENV`.
  * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest.
  */
+import { listRuns, plantRecord, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -42,7 +43,7 @@ import {
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { UnloadedFolder } from '../src/steps/steps.ts';
 import { isRepositoryRun } from '../src/run.ts';
-import { listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -553,7 +554,7 @@ describe('a parent that will not land — cancelled, failed with nothing committ
       assert.equal(readable.landed, true, 'signed off, with its steps readable, it has landed');
       const record = runRecord(ROOT, p.run.id);
       delete record.workflow;
-      fs.writeFileSync(path.join(ROOT, 'runs', `${record.id}.json`), JSON.stringify(record, null, 2));
+      plantRecord(ROOT, runKey(record.id), JSON.stringify(record, null, 2));
       fs.rmSync(dir, { recursive: true });
       let why: string | undefined;
       assert.throws(

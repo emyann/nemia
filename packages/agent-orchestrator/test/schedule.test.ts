@@ -15,6 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
+import { listRuns, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
@@ -29,11 +30,9 @@ import { promised } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { tickRun, runWith as runEngine } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { told } from './typed.ts';
 import { typed } from './typed.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 
 const ROOT = scratch('wf-schedule-');
 /** The file's store and settings; `aStore` sets the cap on it. */

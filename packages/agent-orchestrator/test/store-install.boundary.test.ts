@@ -7,6 +7,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,6 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, cancelRun, forgetRun, retryRun, startRun, startPlan, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { UNPROVISIONED } from '../src/check/index.ts';
 import type { Env } from '../src/config/config.store.ts';

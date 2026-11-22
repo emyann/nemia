@@ -5,6 +5,7 @@
  * skill named with its folder at a start, of any folder, is told in the story of `step-skills.test.ts`; the reader's rule beside its code
  * (`src/skills/read.store.test.ts`). Its store is its own at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +17,6 @@ import { eachTest, runGiven } from './placed.ts';
 import { startRun } from '../src/runner.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentFilesDir } from '../src/agents/agents.store.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-skill-folders-');

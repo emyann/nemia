@@ -26,6 +26,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { Layer, Logger } from 'effect';
 import { appOf, liveOf } from '../src/app.ts';
 import { bell, until, WAITED } from './waits.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const HOLDER = path.join(import.meta.dirname, 'fixtures', 'holder-api.ts');
 const RUN = 'r-holder';
@@ -47,9 +48,7 @@ const filesUnder = (dir: string, at = ''): string[] =>
 /** The run's record, its one step on the task the holder filed. */
 function writeRun(taskId: string) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${RUN}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(RUN), JSON.stringify({
       id: RUN,
       repo: '/code/app',
       workspace: '/code/app',
@@ -61,8 +60,7 @@ function writeRun(taskId: string) {
       createdAt: '2026-10-20T12:00:00.000Z',
       workflow: [{ name: STEP, after: [], body: 'do it.' }],
       steps: { [STEP]: { taskId } },
-    }),
-  );
+    }));
 }
 
 /** A child spawned with all three of its streams piped, so each is there to read and to write. */

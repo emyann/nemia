@@ -9,6 +9,7 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
+import { listRuns, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -45,9 +46,7 @@ import {
   startRun,
   runWith as runEngine,
 } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } from '../src/forget/prune/prune.verb.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
@@ -294,7 +293,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
         [wt],
       );
       assert.ok(
-        !('pruned' in JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8'))),
+        !('pruned' in JSON.parse(recordText(ROOT, runKey(run.id)) ?? '')),
         'the record itself never holds it',
       );
 

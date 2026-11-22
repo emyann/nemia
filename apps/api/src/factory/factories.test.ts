@@ -22,8 +22,8 @@ import { story } from 'test-kit/checkpoints';
 import { linesOf, listedOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { listedIn, workflowsListed } from '../../test/definitions.ts';
-import { addToInbox, loadWorkflows, readInbox, runsAtOnce, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
-import { addFactory, attachWorkflow, clearSchedule, hireAgent, removeFactory, setSchedule } from 'agent-orchestrator/testing';
+import { addToInbox, loadWorkflows, readInbox, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, clearSchedule, hireAgent, removeFactory, runsNow, setSchedule } from 'agent-orchestrator/testing';
 import { Effect } from 'effect';
 import { TABLE_ACCEPT, tableLines } from 'objects';
 
@@ -289,7 +289,7 @@ describe('a person works in a factory with hires: the listing names what is unfi
       const res = await post('/api/namespaces/hired/runs', { workflow: 'alpha', brief: 'Add a cache' });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      const run = runsAtOnce(root).runs.read(id);
+      const run = runsNow(root).runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.workflowDir], ['hired', repoR, path.join(repoR, 'workflows', 'alpha')]);
 
       const listed = await listedOf(app, id);
@@ -337,7 +337,7 @@ describe('a person works in a factory with hires: the listing names what is unfi
       const res = await post(`/api/namespaces/twin/runs?repo=${encodeURIComponent(repoS)}`, { workflow: 'alpha', brief: 'Add a cache' });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      const run = runsAtOnce(root).runs.read(id);
+      const run = runsNow(root).runs.read(id);
       assert.deepEqual([run.factory, run.repo], ['twin', repoR], '`?repo=` found the factory; its wiring placed the run');
     },
   );
@@ -348,7 +348,7 @@ describe('a person works in a factory with hires: the listing names what is unfi
       const res = await post(`/api/namespaces/default/cards/${card.name}/start?factory=hired`, { workflow: 'alpha' });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      const run = runsAtOnce(root).runs.read(id);
+      const run = runsNow(root).runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.from?.inbox], ['hired', repoR, card.name]);
       assert.deepEqual(
         onStore(readInbox()).find((c) => c.name === card.name)?.startedAs,
@@ -412,7 +412,7 @@ describe('POST /api/namespaces/default/runs as shipped: the factory a start that
     const repoT = asShipped(t);
     const res = await post(`/api/namespaces/default/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', brief: 'Add a cache' });
     assert.equal(res.status, 201, await res.clone().text());
-    const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
+    const run = runsNow(root).runs.read(((await res.json()) as { id: string }).id);
     assert.deepEqual([run.factory, run.repo], ['trio', repoT]);
   });
   test('REFUSED: on a repository three factories hold, or one none holds, a 422 naming the namespace to start in, and nothing is written', async (t) => {
@@ -441,7 +441,7 @@ describe('POST /api/namespaces/default/runs as shipped: the factory a start that
       brief: 'Add a cache',
     });
     assert.equal(res.status, 201, await res.clone().text());
-    const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
+    const run = runsNow(root).runs.read(((await res.json()) as { id: string }).id);
     assert.deepEqual([run.factory, run.repo], ['trio', repoT], 'started in the one factory that holds its repository');
   });
   test('REFUSED: a card that names no factory is a 422 naming ?factory=, never placed in the factory a repository is in; with ?repo= a 422 naming the attach; it stays', async (t) => {
@@ -647,7 +647,7 @@ describe('a person reads the factories: the default first, each by name, a broke
 
       const res = await post('/api/namespaces/treed/runs', { workflow: 'alpha', brief: 'Add a cache' });
       assert.equal(res.status, 201, await res.clone().text());
-      const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
+      const run = runsNow(root).runs.read(((await res.json()) as { id: string }).id);
       assert.deepEqual([run.factory, run.repo, run.workflowDir], ['treed', repoR, path.join(tree, 'workflows', 'alpha')]);
     } finally {
       removeFactory('treed');

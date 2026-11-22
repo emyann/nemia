@@ -19,8 +19,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { listedOf, objectOf, triesOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
-import { approveRun, engine, list, runsAtOnce } from 'agent-orchestrator';
+import { approveRun, engine, list } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
+import { runsNow } from 'agent-orchestrator/testing';
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -101,7 +102,7 @@ test("a held step closed and not yet settled reads as it signed, never the engin
     'the seed: closed, and the engine has not settled it',
   );
   await runWith(engine(process.env), approveRun('h-closed', 'plan'));
-  const listed = await runWith(engine(process.env), list(engine(process.env), runsAtOnce(root).runs.read('h-closed')));
+  const listed = await runWith(engine(process.env), list(engine(process.env), runsNow(root).runs.read('h-closed')));
   for (const run of [await detail('h-closed'), await summary('h-closed')]) {
     assert.deepEqual(
       run.steps.map((s) => s.message),

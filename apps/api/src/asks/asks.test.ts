@@ -18,11 +18,11 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { askFile, list, runsAtOnce } from 'agent-orchestrator';
+import { list } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import type { RunList } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { recordText, retryAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
@@ -67,7 +67,7 @@ const blocked = {
 };
 
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-const recordFile = path.join(root, 'runs', `${R}.json`);
+const recordFile = runKey(R);
 fs.writeFileSync(
   recordFile,
   JSON.stringify({
@@ -122,7 +122,7 @@ beforeEachTest(() => {
   task('t-working', 'claude', 'working');
 });
 
-const record = fs.readFileSync(recordFile, 'utf8');
+const record = (recordText(root, recordFile) ?? '');
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -148,7 +148,7 @@ const asked = (run = R) => {
 /** Nothing was written: no ask, and the run's record as it was. */
 const nothingWritten = (why: string) => {
   assert.deepEqual(asked(), [], `no ask file: ${why}`);
-  assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
+  assert.equal((recordText(root, recordFile) ?? ''), record, `the run's record untouched: ${why}`);
 };
 
 /** The run object of `id` (`GET /api/runs/:id`). */
@@ -287,8 +287,8 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       tasks = tasksOf();
       const res = await ask('implement', { mode: 'continue', message: 'Postgres, the one in docker-compose.yml.' });
       assert.equal(res.status, 202, await res.clone().text());
-      assert.deepEqual(await res.json(), { try: 2, file: askFile(root, R, 'implement', 2), stopFirst: false });
-      const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'implement', 2), 'utf8'));
+      assert.deepEqual(await res.json(), { try: 2, file: retryAskKey(R, 'implement', 2), stopFirst: false });
+      const { at: when, ...written } = JSON.parse(recordText(root, retryAskKey(R, 'implement', 2)) ?? '');
       assert.deepEqual(written, {
         step: 'implement',
         try: 2,
@@ -298,9 +298,9 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       });
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       assert.deepEqual(asked(), ['retry-implement-2']);
-      assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
+      assert.equal((recordText(root, recordFile) ?? ''), record, "the api wrote nothing of the run's record");
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const run = await object();
       const implement = stepOf(run, 'implement');
       assert.equal(implement.note, 'try 2 asked (--continue, with your answer) — the next tick files it');
@@ -326,7 +326,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       assert.equal(recheck.status, 202, await recheck.clone().text());
       assert.deepEqual(
         await recheck.json(),
-        { try: 2, file: askFile(root, R, 'theme', 2), stopFirst: false },
+        { try: 2, file: retryAskKey(R, 'theme', 2), stopFirst: false },
         'a refused check, run again: no message, and no session',
       );
       assert.deepEqual(stepOf(await object(), 'theme').asked, {
@@ -346,11 +346,11 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       const { hint, ...answered } = (await res.json()) as { hint?: string };
       assert.deepEqual(
         answered,
-        { try: 2, file: askFile(root, R, 'held', 2), stopFirst: true },
+        { try: 2, file: retryAskKey(R, 'held', 2), stopFirst: true },
         'the former `nudge` is answered as `continue`',
       );
       assert.ok(hint?.includes('"mode": "continue"'), `the answer's hint names the value to send now: ${hint}`);
-      const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'held', 2), 'utf8'));
+      const { at: when, ...written } = JSON.parse(recordText(root, retryAskKey(R, 'held', 2)) ?? '');
       assert.deepEqual(
         written,
         { step: 'held', try: 2, mode: 'continue', actor: SEATED },
@@ -359,8 +359,8 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       const fresh = await ask('idle', { mode: 'fresh', message: 'Sign in again first.' });
       assert.equal(fresh.status, 202, await fresh.clone().text());
-      assert.deepEqual(await fresh.json(), { try: 2, file: askFile(root, R, 'idle', 2), stopFirst: true });
-      const { at: freshWhen, ...freshly } = JSON.parse(fs.readFileSync(askFile(root, R, 'idle', 2), 'utf8'));
+      assert.deepEqual(await fresh.json(), { try: 2, file: retryAskKey(R, 'idle', 2), stopFirst: true });
+      const { at: freshWhen, ...freshly } = JSON.parse(recordText(root, retryAskKey(R, 'idle', 2)) ?? '');
       assert.deepEqual(
         freshly,
         { step: 'idle', try: 2, mode: 'fresh', message: 'Sign in again first.', actor: SEATED },
@@ -368,7 +368,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       );
       assert.ok(!Number.isNaN(Date.parse(freshWhen)), freshWhen);
 
-      assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
+      assert.equal((recordText(root, recordFile) ?? ''), record, "the api wrote nothing of the run's record");
       assert.deepEqual(tasksOf(), tasks, "nor of the engine's tasks");
       assert.deepEqual([standIn().said, standIn().interrupts], [[], []], 'and said nothing to a session');
       assert.equal(
@@ -377,7 +377,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
         "and stopped no session: the api wrote the asks and nothing else, stopping the session is the tick's",
       );
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
       const run = await object();
       const held = stepOf(run, 'held');
@@ -476,7 +476,7 @@ describe('a person answers a blocked step, rechecks a refused check and continue
       assert.equal(implementTries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
       assert.equal(implement.needs, null, 'the current try signed off done');
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(A)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(A)));
       for (const [where, said] of [
         ['object', run.status],
         ['list', await summary(A)],

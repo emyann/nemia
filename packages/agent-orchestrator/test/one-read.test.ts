@@ -9,6 +9,7 @@
  * `ENV`. Beside the table: the tables' empty read is `readersOf`'s, and the engine's `needs-human` is compared in `src/views/`
  * alone (`blockedWord`, `harnessBlocked`), so no reader judges a blocked session by a word of its own.
  */
+import { listRuns, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
 import type { Run } from '../src/run.ts';
 import { describe, test } from 'vitest';
@@ -23,9 +24,7 @@ import { decisionRead } from '../src/decide/decision.verb.ts';
 import { decision } from '../src/decide/decide.ts';
 import { landedOf } from '../src/branches/branches.store.ts';
 import { Tracer } from 'effect';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding, standingSnapshot, headsOver, standingReader } from '../src/standing/standing.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { readRun as theRead } from '../src/tick/told.verb.ts';
 import { passAssessment } from '../src/tick/advance.verb.ts';
 import { cancelPlan } from '../src/cancel/cancel.ts';

@@ -5,6 +5,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,6 @@ import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, approveRun, list, mergeRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { roundOf } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
 

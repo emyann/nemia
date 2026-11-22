@@ -15,6 +15,7 @@ import { prunedKept, prunedWords } from 'agent-orchestrator';
 import type { Decidable, DecideCommand, RunDecision } from 'objects';
 import { app } from '../app.ts';
 import { objectOf } from '../../test/run-reads.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -95,9 +96,7 @@ const workflow = [
 
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${run.id}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(run.id), JSON.stringify({
       workspace: run.repo,
       branch: 'main',
       isolate: true,
@@ -106,8 +105,7 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow,
       ...run,
-    }),
-  );
+    }));
 }
 
 /** The decision of `id` as the route answers it: its status and its body. */

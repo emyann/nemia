@@ -3,13 +3,13 @@
  * file, its schema's and the field, and no run is written; one it can hold is frozen on the run record with the step, which is what
  * `nemia stats` counts the run by. Its store is its own at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Invalid } from '../src/refusal/refusal.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 

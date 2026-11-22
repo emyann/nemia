@@ -8,6 +8,7 @@
  * is filed under, and the run records a listing reads. Its store is at `ROOT`, given as `ENV` with
  * `WF_VERIFY_REST=0`: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
+import { plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../../testing.ts';
 import { afterAll, beforeAll, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -26,7 +27,6 @@ import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
 import { inboxDir, parseArgv, START, StartInput, startRun, startFromInbox, StoreRoot } from '../runner.ts';
 import type { Started } from '../start/commands.verb.ts';
 import * as verbs from '../runner.ts';
-import { runRecord } from '../record/record.store.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
 import { INBOX as INBOX_LIST, INBOX_ADD, type InboxAddInput } from './commands.verb.ts';
 import { inboxLines, type InboxListing } from './inbox.ts';
@@ -35,7 +35,6 @@ import { runWith as runEngine } from '../runtime-client.ts';
 import { main as cli } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
-import { filesStoreAt } from '../record/files.store.ts';
 import { addFactoryAt, attachWorkflowAt } from '../factory/factory.store.ts';
 
 const ROOT = scratch('wf-inbox-');
@@ -150,9 +149,7 @@ const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => 
 
 /** A run record, as `start()` writes one — only what the listing reads of it matters here. */
 const writeRecord = (id: string, from?: Run['from']) =>
-  fs.writeFileSync(
-    path.join(ROOT, 'runs', `${id}.json`),
-    JSON.stringify({
+  plantRecord(ROOT, runKey(id), JSON.stringify({
       id,
       repo: '/repo',
       workspace: '/repo',
@@ -164,8 +161,7 @@ const writeRecord = (id: string, from?: Run['from']) =>
       steps: {},
       createdAt: '2026-09-16T00:00:00Z',
       ...(from ? { from } : {}),
-    }),
-  );
+    }));
 
 describe('a person parks ideas in the inbox, lists them, starts them and drops them', () => {
   const s = story(test);
@@ -338,7 +334,7 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
       );
       const typed = await runPlaced(startRun({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
       assert.equal(
-        Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
+        Object.hasOwn(JSON.parse(recordText(ROOT, runKey(typed.id)) ?? ''), 'from'),
         false,
         'a run typed at nemia start carries no from',
       );

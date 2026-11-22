@@ -84,8 +84,8 @@ const closeoutsNarrowed = ({ fields, bodyFrom, bodyLimit }: CloseoutQuery) => {
 };
 
 /** The step `step` of the run `id` and its current task (null for one not filed yet), or `Missing` for a run or a step it lacks. */
-const stepOf = (s: Served, id: string, step: string) => {
-  const found = taskOfStep(id, step, s.home);
+const stepOf = async (s: Served, id: string, step: string) => {
+  const found = await taskOfStep(id, step, s.home);
   if ('error' in found) throw new Missing({ error: found.error });
   return found;
 };
@@ -416,7 +416,7 @@ async function readAgain(stream: Writer, r: Reading, from: { task: string; after
 const logOf = (runId: string, step: string, tail: string | undefined) =>
   answered(async (s) => {
     const lines = countOf('tail', tail, 1, LOG_TAIL);
-    const { taskId } = stepOf(s, runId, step);
+    const { taskId } = await stepOf(s, runId, step);
     try {
       const { output } = await s.inRequest(LOGS.handler({ runId, step }));
       return output === undefined ? { lines: [], truncated: false } : tailOf(output, lines);
@@ -456,7 +456,7 @@ const checkOutputOf = (
  */
 const artifactOf = (runId: string, step: string, name: string) =>
   answered(async (s) => {
-    const { run } = stepOf(s, runId, step);
+    const { run } = await stepOf(s, runId, step);
     const refused = refusedPath(name);
     if (refused) throw new BadRequest({ error: refused });
     const { file } = await s.inRequest(STEP_ARTIFACT.handler({ runId, step, name }));
@@ -481,7 +481,7 @@ const artifactOf = (runId: string, step: string, name: string) =>
  */
 const fileOf = (runId: string, step: string, name: string) =>
   answered(async (s) => {
-    stepOf(s, runId, step);
+    await stepOf(s, runId, step);
     const refused = refusedPath(name);
     if (refused) throw new BadRequest({ error: refused });
     const { folder, file } = await s.inRequest(STEP_FILE.handler({ runId, step, name }));
@@ -501,7 +501,7 @@ const fileOf = (runId: string, step: string, name: string) =>
 /** The path of the task of the step's try `tried` (`STEP_PATH`), the current one's for none, cut to that try's turn (`pathToTurn`). */
 const pathOf = (runId: string, step: string, tried: string | undefined) =>
   answered(async (s) => {
-    const { run } = stepOf(s, runId, step);
+    const { run } = await stepOf(s, runId, step);
     const asked = tryOfStep(run, step, tried);
     if ('error' in asked) throw asked.status === 400 ? new BadRequest({ error: asked.error }) : new Missing({ error: asked.error });
     if (!asked.taskId) return { taskId: null, try: asked.try, path: [], lifecycle: lifecycleGraph() };
@@ -532,7 +532,7 @@ export const transcriptAt = (runId: string, step: string, after: string | undefi
     if (at instanceof Error) throw at;
     const checked = transcriptAskedRead(asked, bounds);
     if (checked instanceof Error) throw checked;
-    const { taskId } = stepOf(s, runId, step);
+    const { taskId } = await stepOf(s, runId, step);
     if (!taskId) return { events: [], cursor: null, live: false, open: false };
     return readTranscript(s, runId, step, taskId, after, { ...asked, bounds }).catch((err: unknown) => Promise.reject(unreadAs(err)));
   });
@@ -545,7 +545,7 @@ export const transcriptAt = (runId: string, step: string, after: string | undefi
 const followedFrom = (runId: string, step: string, after: string | undefined) =>
   answered(async (s) => {
     const { beats, followings } = s;
-    const { taskId } = stepOf(s, runId, step);
+    const { taskId } = await stepOf(s, runId, step);
     if (!taskId) {
       throw new Missing({
         error: `Step '${step}' of run '${runId}' is not filed yet, so it has no session to follow. GET /api/runs/${runId} gives its task once a tick files it.`,

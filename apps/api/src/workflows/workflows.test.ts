@@ -22,9 +22,9 @@ import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
-import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runsAtOnce, settingsOf } from 'agent-orchestrator';
+import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, settingsOf } from 'agent-orchestrator';
 import { AGENTS_FOLDER, parseWorkflow, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
-import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, hireAgent, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 /**
  * The scratch repository, a git repository, as `nemia start` reads its HEAD: read in the default factory by `?repo=`, which the factory
  * `bench`, filed on it, lets the api read (`placeFor`); a start there runs in `bench`, the one factory that holds it, which offers `good`
@@ -559,7 +559,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
       assert.equal(res.headers.get('location'), `/api/runs/${id}`);
 
       assert.deepEqual(runFiles(), [id, `${id}.json`], "the record, and the run's own folder beside it");
-      const run = runsAtOnce(root).runs.read(id);
+      const run = runsNow(root).runs.read(id);
       assert.deepEqual(
         fs.readdirSync(path.join(root, 'runs', id)),
         ['agents', 'workflow'],
@@ -632,7 +632,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it lands.', after: ['p-running'] });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      assert.deepEqual(runsAtOnce(root).runs.read(id).after, ['p-running']);
+      assert.deepEqual(runsNow(root).runs.read(id).after, ['p-running']);
       assert.deepEqual(filedTasks(), [], 'nothing filed');
 
       const unread = await objectOf(app, id);
@@ -640,14 +640,14 @@ describe('a person starts runs from the board: the record as `nemia start` write
         unread.status.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
         `no pass has read where p-running stands since it was written: ${unread.status.waiting?.word}`,
       );
-      await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
+      await runWith(engine(process.env), passStanding(runsNow(root).runs.list()));
       const detail = await objectOf(app, id);
       assert.deepEqual([detail.spec.after, detail.status.waiting?.word], [['p-running'], 'waiting on p-running']);
 
       const none = await post({ workflow: 'good', from: 'repo', brief: 'Right away.', after: [] });
       assert.equal(none.status, 201);
       assert.equal(
-        Object.hasOwn(runsAtOnce(root).runs.read(((await none.json()) as { id: string }).id), 'after'),
+        Object.hasOwn(runsNow(root).runs.read(((await none.json()) as { id: string }).id), 'after'),
         false,
         'none to wait on is a run that waits on none: a record with no `after`, as `nemia start` writes without one',
       );
@@ -660,7 +660,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['p-running'] });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      assert.deepEqual([runsAtOnce(root).runs.read(id).context, runsAtOnce(root).runs.read(id).after], [['p-running'], undefined]);
+      assert.deepEqual([runsNow(root).runs.read(id).context, runsNow(root).runs.read(id).after], [['p-running'], undefined]);
       const detail = await objectOf(app, id);
       assert.deepEqual([detail.spec.context, detail.spec.after, detail.status.waiting], [['p-running'], [], null]);
     },
@@ -673,7 +673,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['rows-qeyh'] });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      assert.deepEqual(runsAtOnce(root).runs.read(id).cards, ['rows-qeyh']);
+      assert.deepEqual(runsNow(root).runs.read(id).cards, ['rows-qeyh']);
       assert.equal(
         fs.readFileSync(path.join(root, 'runs', id, 'inputs', 'cards', 'rows-qeyh.md'), 'utf8'),
         'Say which rows a run reads.\n',
@@ -901,7 +901,7 @@ describe('POST /api/namespaces/default/runs: what a start refuses, writing nothi
 
     const chosen = await post({ workflow: 'good', from: 'user', brief: 'Do it my way.' });
     assert.equal(chosen.status, 201);
-    const run = runsAtOnce(root).runs.read(((await chosen.json()) as { id: string }).id);
+    const run = runsNow(root).runs.read(((await chosen.json()) as { id: string }).id);
     assert.equal(run.workflowDir, yours);
     assert.deepEqual(Object.keys(run.steps), ['implement']);
   });
@@ -909,7 +909,7 @@ describe('POST /api/namespaces/default/runs: what a start refuses, writing nothi
 
 /** A run of the repository's `good` as `nemia start` records one, never filed — and called off, when `cancelledAt` says when. */
 function parentRun(id: string, cancelledAt?: string) {
-  if (fs.existsSync(path.join(root, 'runs', `${id}.json`))) return;
+  if ((recordText(root, runKey(id)) !== undefined)) return;
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
   write(
     path.join(root, 'runs', `${id}.json`),

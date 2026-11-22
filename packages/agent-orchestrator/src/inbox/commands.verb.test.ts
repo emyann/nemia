@@ -15,6 +15,7 @@ import { INBOX } from './commands.verb.ts';
 import { runWith as runEngine } from '../runtime-client.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
+import { dropRecord, plantRecord, runKey } from '../../testing.ts';
 
 const ROOT = scratch('wf-inbox-card-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -31,9 +32,7 @@ fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.md'), CARD);
 
 /** A run's record of one step, `implement`, its task `t-<id>`, started from the card `card`. */
 const runFrom = (id: string, card: string) =>
-  fs.writeFileSync(
-    path.join(ROOT, 'runs', `${id}.json`),
-    JSON.stringify({
+  plantRecord(ROOT, runKey(id), JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -46,8 +45,7 @@ const runFrom = (id: string, card: string) =>
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
       steps: { implement: { taskId: `t-${id}` } },
       from: { inbox: card },
-    }),
-  );
+    }));
 
 test("`INBOX`: the cards in play by default — a card whose run ended left out and counted — every card with --all, each in its run's phase; -l composes with both; a stray file that is no card is listed beside the card of its name, never hidden", async () => {
   fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -90,6 +88,6 @@ test("`INBOX`: the cards in play by default — a card whose run ended left out 
     });
   } finally {
     for (const name of ['at-work-a1b2', 'ended-c3d4']) fs.rmSync(path.join(ROOT, 'inbox', `${name}.md`));
-    for (const id of ['r-at-work', 'r-ended']) fs.rmSync(path.join(ROOT, 'runs', `${id}.json`));
+    for (const id of ['r-at-work', 'r-ended']) dropRecord(ROOT, runKey(id));
   }
 });

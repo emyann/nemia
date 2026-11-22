@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { recordText, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { objectOf, stepOf } from '../../test/run-reads.ts';
 
@@ -168,7 +168,7 @@ describe("a run's object says what its sessions read: each step's classes, peak 
       );
 
       const R2 = 'r-read-all';
-      const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'));
+      const record = JSON.parse(recordText(root, runKey(R)) ?? '');
       write(
         path.join(root, 'runs', `${R2}.json`),
         JSON.stringify({

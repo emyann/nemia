@@ -4,6 +4,7 @@
  * store never wrote. The test's store is its own, at `ROOT`, given as `ENV`.
 
  */
+import { recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,7 +14,6 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, forgetRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -79,7 +79,7 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
     ['forgotten', [], 1, ['implement']],
   );
   assert.ok(
-    !fs.existsSync(wt) && !fs.existsSync(path.join(ROOT, 'worktrees', run.id)) && !fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)),
+    !fs.existsSync(wt) && !fs.existsSync(path.join(ROOT, 'worktrees', run.id)) && recordText(ROOT, runKey(run.id)) === undefined,
   );
   assert.equal(git(repo, 'show', '--name-only', '--format=', `wf/${run.id}/${LINE_NAME}`), 'left.txt');
 });

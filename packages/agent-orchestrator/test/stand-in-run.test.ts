@@ -7,6 +7,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
+import { listRuns, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -21,7 +22,6 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { advanceRun, approveRun, decideRun, startRun, runWith as runEngine } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 

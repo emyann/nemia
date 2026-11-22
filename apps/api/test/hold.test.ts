@@ -28,7 +28,6 @@ import {
   holdWord,
   list,
   passStanding,
-  runsAtOnce,
   type RunHolding,
   unhold,
   builtin,
@@ -41,6 +40,7 @@ import {
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { listedRuns, objectOf } from './run-reads.ts';
+import { plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 
 /** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
 const ENV: NodeJS.ProcessEnv = { ...process.env, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
@@ -169,10 +169,7 @@ writeRun(
     implement: { taskId: null },
   },
 );
-fs.writeFileSync(
-  path.join(root, 'runs', `${GATE}.json`),
-  JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${GATE}.json`), 'utf8')), gates: ['plan'] }),
-);
+plantRecord(root, runKey(GATE), JSON.stringify({ ...JSON.parse(recordText(root, runKey(GATE)) ?? ''), gates: ['plan'] }));
 signedOff(`${GATE}-plan`, DONE);
 holdOn(GATE, ['p-live']);
 
@@ -239,7 +236,7 @@ holdOn(CANCELLED, ['p-live']);
 const AFTER = 'h-after';
 writeRun(AFTER, [implement], { implement: { taskId: null } }, { after: ['p-live'] });
 holdOn(AFTER, ['p-landed', 'p-live']);
-await runWith(engine(ENV), passStanding(runsAtOnce(root).runs.list()));
+await runWith(engine(ENV), passStanding(runsNow(root).runs.list()));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -299,7 +296,7 @@ describe('a person holds a run until another lands: the list, the page and the d
       const e = engine(ENV);
       for (const id of HELD) {
         const api = runs.get(id)!;
-        const run = runsAtOnce(root).runs.read(id);
+        const run = runsNow(root).runs.read(id);
         const cli = await runWith(e, list(e, run));
         assert.deepEqual(api.holdUntil, run.hold!.until, id);
         assert.ok(api.holding, id);
@@ -509,7 +506,7 @@ describe('a person holds a run until another lands: the list, the page and the d
     const status = await detail(CANCELLED);
     assert.deepEqual([status.holdUntil, status.holding], [[], null]);
     assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
-    assert.equal((await runWith(engine(ENV), list(engine(ENV), runsAtOnce(root).runs.read(CANCELLED)))).holding, undefined);
+    assert.equal((await runWith(engine(ENV), list(engine(ENV), runsNow(root).runs.read(CANCELLED)))).holding, undefined);
   });
   s.test(
     'a run waiting on runs and held as well is both, as `nemia decide` says both: its decision carries the wait and the hold',
@@ -559,10 +556,7 @@ writeRun(
     implement: { taskId: null },
   },
 );
-fs.writeFileSync(
-  path.join(root, 'runs', `${LIFT}.json`),
-  JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${LIFT}.json`), 'utf8')), gates: ['plan'] }),
-);
+plantRecord(root, runKey(LIFT), JSON.stringify({ ...JSON.parse(recordText(root, runKey(LIFT)) ?? ''), gates: ['plan'] }));
 signedOff(`${LIFT}-plan`, DONE);
 
 /**
@@ -651,10 +645,7 @@ writeRun(
   ],
   { plan: { taskId: `${SAID}-plan`, branch: `wf/${SAID}/plan` }, implement: { taskId: null } },
 );
-fs.writeFileSync(
-  path.join(root, 'runs', `${SAID}.json`),
-  JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${SAID}.json`), 'utf8')), gates: ['plan'] }),
-);
+plantRecord(root, runKey(SAID), JSON.stringify({ ...JSON.parse(recordText(root, runKey(SAID)) ?? ''), gates: ['plan'] }));
 signedOff(`${SAID}-plan`, DONE);
 
 /**
@@ -683,7 +674,7 @@ describe("a hold put on the board is put as `nemia hold --until --why --by` puts
     async () => {
       holdOn(SAID, ['p-live'], { why: 'merge conflicts in five files', by: 'operator' });
       const words = 'held until p-live lands (why: merge conflicts in five files; by operator)';
-      const run = runsAtOnce(root).runs.read(SAID);
+      const run = runsNow(root).runs.read(SAID);
       const cli = await runWith(engine(ENV), list(engine(ENV), run));
       const api = (await listed()).get(SAID)!;
       assert.equal(api.holding?.word, words);
@@ -720,7 +711,7 @@ describe("a hold put on the board is put as `nemia hold --until --why --by` puts
       );
       assert.deepEqual(JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')), answer.hold, 'the file is the hold the answer says');
       const words = `held until p-live lands (why: merge conflicts; by ${by})`;
-      const run = runsAtOnce(root).runs.read(PUT);
+      const run = runsNow(root).runs.read(PUT);
       assert.equal(holdWord((await runWith(engine(ENV), list(engine(ENV), run))).holding!, run.hold), words, "nemia ls's line");
       assert.equal((await listed()).get(PUT)!.holding?.word, words);
       assert.equal((await detail(PUT)).holding?.word, words);
@@ -731,7 +722,7 @@ describe("a hold put on the board is put as `nemia hold --until --why --by` puts
         { since: answer.hold.at, actor: SEATED },
         'who lifted it kept beside the run, paired by the moment of the hold it lifted',
       );
-      assert.deepEqual(runsAtOnce(root).runs.read(PUT).unheld, { since: answer.hold.at, actor: SEATED }, 'read with the run');
+      assert.deepEqual(runsNow(root).runs.read(PUT).unheld, { since: answer.hold.at, actor: SEATED }, 'read with the run');
     },
   );
   s.test('a hold put with no run to wait on, `{until: []}` or `{}`, holds the run until DELETE lifts it, and asks nothing', async () => {

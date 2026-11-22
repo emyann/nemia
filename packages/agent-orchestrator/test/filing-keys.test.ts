@@ -8,6 +8,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
+import { listRuns, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -17,7 +18,6 @@ import type { RepositoryRun, Run } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { advanceRun, retryRun, startRun, runWith } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { isRepositoryRun } from '../src/run.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';

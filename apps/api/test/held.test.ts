@@ -18,9 +18,9 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { listedOf, objectOf, triesOf } from './run-reads.ts';
-import { list, runsAtOnce } from 'agent-orchestrator';
+import { list } from 'agent-orchestrator';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 
 const stand = eachTest(testPlace);
@@ -110,7 +110,7 @@ describe('a step whose task is held open reads as waiting on a person, never as 
         'input-required',
         "the seed is the engine's held task, waiting",
       );
-      const listed = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read('h-blocked')));
+      const listed = await runWith(engine(), list(engine(), runsNow(root).runs.read('h-blocked')));
       for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
         assert.deepEqual(
           run.steps.map(({ name, message, needs }) => ({ name, message, needs })),

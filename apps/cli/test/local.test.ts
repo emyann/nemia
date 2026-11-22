@@ -16,6 +16,7 @@ import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { captured } from '../src/local.ts';
 import { servedStore } from './served.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const SCRATCH = scratch('nemia-local-');
@@ -81,7 +82,7 @@ function seedGated(root: string) {
     steps: { plan: { taskId: task, workspace: lane, branch: `wf/${GATED.id}/plan` }, implement: { taskId: null } },
   };
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'runs', `${GATED.id}.json`), JSON.stringify(run, null, 2));
+  plantRecord(root, runKey(GATED.id), JSON.stringify(run, null, 2));
   const journal = [
     { kind: 'filed', at, brief: 'Plan it.', cwd: lane, maxAttempts: 1, harness: 'claude' },
     { kind: 'starting', at, attempt: 1 },

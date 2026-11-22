@@ -20,6 +20,7 @@
  * The store is the test's own, at `ROOT`, given as `ENV`; `WF_MAX_CONCURRENT` is read by `engine(ENV)`.
  * Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`WF_VERIFY_REST`).
  */
+import { rewriteRun, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,7 +32,6 @@ import { testPlace } from '../place/memory/index.ts';
 import { runGiven, runOver } from './placed.ts';
 import { gatedJob } from './gated-job.ts';
 import { engine, startRun, tickRun, runWith as runEngine } from '../src/runner.ts';
-import { runRecord, rewriteRun } from '../src/record/record.store.ts';
 
 const ROOT = scratch('wf-restart-');
 /** The test's store and settings; the second case raises the ceiling on it, for the engine and the pass alike. */

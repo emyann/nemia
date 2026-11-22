@@ -15,8 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
-import { Informer, informerMemo, passStanding, runsAtOnce, type InformerMemo } from 'agent-orchestrator';
+import { dropRecord, plantRecord, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import { Informer, informerMemo, passStanding, type InformerMemo } from 'agent-orchestrator';
 import type { Labelled, RunDecision, RunList } from 'objects';
 import type { Run as RunAnswer } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -55,8 +55,8 @@ const record = (id: string, gates: string[] = []) => ({
   steps: { implement: { taskId: `t-${id}` } },
 });
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(path.join(root, 'runs', `${GATED}.json`), JSON.stringify(record(GATED, ['implement'])));
-fs.writeFileSync(path.join(root, 'runs', `${AT_WORK}.json`), JSON.stringify(record(AT_WORK)));
+plantRecord(root, runKey(GATED), JSON.stringify(record(GATED, ['implement'])));
+plantRecord(root, runKey(AT_WORK), JSON.stringify(record(AT_WORK)));
 beforeEachTest(() => {
   fs.rmSync(path.join(root, 'runs', `${GATED}.asks`), { recursive: true, force: true });
   Effect.runSync(engine().file({ id: `t-${GATED}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
@@ -180,13 +180,13 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
     workflow: [...record(id).workflow, ending],
     steps: { implement: { taskId: `t-${id}`, branch } },
   };
-  fs.writeFileSync(path.join(root, 'runs', `${id}.json`), JSON.stringify(run));
+  plantRecord(root, runKey(id), JSON.stringify(run));
   Effect.runSync(engine().file({ id: `t-${id}`, brief: 'Do it.', cwd: repo, harness: 'claude' }));
   standIn().settle(`t-${id}`, 'succeeded', {
     exitCode: 0,
     closeout: { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] },
   });
-  const aPass = () => runOver(() => stand().layer)(engine(), passStanding(runsAtOnce(root).runs.list()));
+  const aPass = () => runOver(() => stand().layer)(engine(), passStanding(runsNow(root).runs.list()));
   const decision = async () => {
     const res = await app().request(`/api/runs/${id}/decision`);
     assert.equal(res.status, 200, await res.clone().text());
@@ -213,6 +213,6 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
     assert.ok('nothing' in landed && landed.nothing.startsWith('landed'), JSON.stringify(landed));
     assert.equal((await object(id)).status.toDecide, null, 'once a pass reads the hand merge, the object has nothing to decide either');
   } finally {
-    fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true });
+    dropRecord(root, runKey(id));
   }
 });

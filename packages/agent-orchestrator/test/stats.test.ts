@@ -26,6 +26,7 @@ import { typed } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { dropRecord, plantRecord, runKey } from '../testing.ts';
 
 const ROOT = scratch('wf-stats-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -101,15 +102,13 @@ const planted: string[] = [];
 /** Takes out, once the story `t` ends, every run it planted: the next story reads a store with none of them. */
 const plantedFor = (t: Finishes) =>
   t.onTestFinished(() => {
-    for (const file of planted.splice(0)) fs.rmSync(file, { recursive: true, force: true });
+    for (const file of planted.splice(0)) dropRecord(ROOT, file);
   });
 
 function writeRun(id: string, workflow: object[], steps: Record<string, object>, more: object = {}) {
-  const file = path.join(ROOT, 'runs', `${id}.json`);
+  const file = runKey(id);
   planted.push(file, path.join(ROOT, 'runs', id));
-  fs.writeFileSync(
-    file,
-    JSON.stringify({
+  plantRecord(ROOT, file, JSON.stringify({
       id,
       repo: '/repos/one',
       baseRef: 'abc',
@@ -122,8 +121,7 @@ function writeRun(id: string, workflow: object[], steps: Record<string, object>,
       workflow,
       steps,
       ...more,
-    }),
-  );
+    }));
 }
 
 /** The skill `name` as `nemia start` rendered it for `agentName` on the step `step` of the run `id`, with `rules.json` and `applies:`. */

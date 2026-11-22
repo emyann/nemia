@@ -12,7 +12,7 @@ import path from 'node:path';
 import type { Run, RunList } from 'objects';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -34,9 +34,7 @@ beforeEachTest(() => {
   });
   fs.mkdirSync(path.join(root, 'runs', R, 'artifacts', 'write'), { recursive: true });
   fs.writeFileSync(path.join(root, 'runs', R, 'artifacts', 'write', 'shot.png'), 'png');
-  fs.writeFileSync(
-    path.join(root, 'runs', `${R}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(R), JSON.stringify({
       id: R,
       place: { kind: 'folder' },
       workspace: path.join(root, 'runs', R, 'work'),
@@ -45,8 +43,7 @@ beforeEachTest(() => {
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'codex', workspace: 'folder' }],
       steps: { write: { taskId: `${R}-write` } },
-    }),
-  );
+    }));
 });
 
 const read = async <T>(address: string) => {

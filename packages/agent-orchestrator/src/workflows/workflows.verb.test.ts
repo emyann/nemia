@@ -5,6 +5,7 @@
  * and one step of a folder, or none, with the names of those it has. On a store of its own at `ROOT`,
  * given as `ENV`.
  */
+import { runsNow as filesStoreAt } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,6 @@ import { runWith as runEngine } from '../runner.ts';
 import { engineOf } from '../runtime-client.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { removeWorkflowAt } from '../folder/write.store.ts';
-import { filesStoreAt } from '../record/files.store.ts';
 import * as verbs from '../inbox/inbox.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';

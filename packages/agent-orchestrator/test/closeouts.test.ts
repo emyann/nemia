@@ -10,6 +10,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds. No story leaves a run the tick of another would read: each passes only the runs it started.
  */
+import { askKeyOf, askNames, recordText, rewriteRun, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -39,7 +40,7 @@ import {
   startRun,
   runWith,
 } from '../src/runner.ts';
-import { artifactsDir, asksDir, inputsDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
+import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
 import { SIGNOFF } from '../src/run.ts';
 import { lackedOf } from '../src/record/record.ts';
 import { RUN_LABELS, SESSION_TOKEN, STEP_FILES } from '../src/filed/filed.ts';
@@ -750,7 +751,7 @@ describe('a run given inputs', () => {
   });
   s.test('a run given none has no key on its record, no inputs directory, and a brief without the line', async () => {
     const plain = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: twoSteps(), isolate: false }));
-    const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${plain.id}.json`), 'utf8'));
+    const record = JSON.parse(recordText(ROOT, runKey(plain.id)) ?? '');
     assert.equal(Object.hasOwn(record, 'inputs'), false);
     assert.equal(fs.existsSync(path.join(ROOT, 'runs', plain.id, 'inputs')), false, 'no inputs directory');
     await pass(plain.id);
@@ -939,8 +940,8 @@ describe('a blocked step asks questions in two fields, and is answered by their 
   });
   s.test("`--answer 2=a,b` and `3=a` answer them, in the board's words", async (sub) => {
     await printedBy(sub, ['retry', id, 'plan', '--answer', '1=a', '--answer', '2=a,b', '--answer', '3=a']);
-    const asks = fs.readdirSync(asksDir(ROOT, id)).filter((f) => f !== 'done');
-    const ask = JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), asks[0]), 'utf8'));
+    const asks = askNames(ROOT, id).filter((n) => !n.startsWith('done/')).filter((f) => f !== 'done');
+    const ask = JSON.parse(recordText(ROOT, askKeyOf(id, asks[0])) ?? '');
     const expected = answerText(
       [cut, where, when],
       [

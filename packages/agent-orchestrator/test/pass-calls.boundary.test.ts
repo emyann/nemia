@@ -8,6 +8,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest.
  */
+import { runRecord } from '../testing.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
@@ -20,7 +21,6 @@ import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { meteredEngine } from '../src/meter/meter.verb.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';

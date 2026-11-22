@@ -12,6 +12,7 @@
  * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
  * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.
  */
+import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { outlived, teardowns, type Finishes } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -25,7 +26,6 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { nodeChild } from './child.ts';
 import { approveRun, startRun, tickRun, runWith, readFeed } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { readPause, readPauseFile } from '../src/pause/pause.store.ts';
 import { liveHost } from '../src/service/service.verb.ts';
 import { takeOver } from '../src/service/takeover.verb.ts';

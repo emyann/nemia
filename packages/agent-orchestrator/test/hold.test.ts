@@ -11,6 +11,7 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
+import { listRuns, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns, outlived } from 'test-kit/checkpoints';
@@ -54,7 +55,6 @@ import {
   WHY_CAP,
   runWith,
 } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { howOf } from '../src/summary/how.verb.ts';
 import { runsSummarized } from '../src/summary/summary.verb.ts';
 import { EngineService as RunsEngine } from '../src/runtime-client.ts';

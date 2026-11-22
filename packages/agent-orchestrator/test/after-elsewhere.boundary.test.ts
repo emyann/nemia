@@ -6,6 +6,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
+import { recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,7 @@ import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { factsOf, typed as onHandler } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
@@ -317,7 +318,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   );
   const bare = await typed();
   assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${bare.id}.json`), 'utf8')), 'after'),
+    Object.hasOwn(JSON.parse(recordText(ROOT, runKey(bare.id)) ?? ''), 'after'),
     false,
     'without --after the record is what it was',
   );

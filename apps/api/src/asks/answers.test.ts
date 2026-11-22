@@ -17,11 +17,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { recordText, retryAskKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
-import { askFile } from 'agent-orchestrator';
+
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { actorWords } from 'objects';
@@ -215,14 +215,14 @@ describe('a person reads the questions a closeout asks on the run’s detail and
       ];
       const res = await ask('design', { mode: 'continue', message: 'Thanks.', answers });
       assert.equal(res.status, 202, await res.clone().text());
-      const written = JSON.parse(fs.readFileSync(askFile(root, R, 'design', 2), 'utf8')) as { mode: string; message: string };
+      const written = JSON.parse(recordText(root, retryAskKey(R, 'design', 2)) ?? '') as { mode: string; message: string };
       assert.equal(written.mode, 'continue');
       assert.equal(written.message, answerText([cut, where], answers, 'Thanks.', actorWords(SEATED)));
       assert.ok(written.message.endsWith('Answered by: the person, on harness'), written.message);
 
       const plain = await ask('plain', { mode: 'continue', message: 'Postgres.' });
       assert.equal(plain.status, 202, await plain.clone().text());
-      assert.equal((JSON.parse(fs.readFileSync(askFile(root, R, 'plain', 2), 'utf8')) as { message: string }).message, 'Postgres.');
+      assert.equal((JSON.parse(recordText(root, retryAskKey(R, 'plain', 2)) ?? '') as { message: string }).message, 'Postgres.');
       const twice = await ask('twice', { mode: 'continue', message: 'Shape first, into the retry.' });
       assert.equal(twice.status, 409, 'questions that do not read are refused back to the session first: the run asks it to mend them');
     },

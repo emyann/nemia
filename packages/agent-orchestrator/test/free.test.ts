@@ -14,6 +14,7 @@
  *
  * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
+import { plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { configGiven } from './config-given.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -27,7 +28,6 @@ import { steeredClock } from './steered.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
 import { approveRun, cancelRun, decideRun, startRun, runWith as runEngine } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { tickRun, freshRestMemo } from '../src/tick/tick.verb.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { free, freeOnce, freshFreeMemory, FREE_A_SWEEP } from '../src/forget/prune/free.verb.ts';
@@ -37,7 +37,6 @@ import { up } from '../src/daemon/up.verb.ts';
 import { recentPasses } from '../src/daemon/daemon.store.ts';
 import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
 import { hold, unhold } from '../src/wait/wait.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { listedRow, stepRow, told } from './typed.ts';
 import { shownNote, shownStatus, type RunsListed } from '../src/list/list.ts';
 import { forgetTyped } from './forgetting.ts';
@@ -238,7 +237,7 @@ describe(
         const branch = runRecord(ROOT, id).steps.work.branch!;
         const tip = world().tip(repo, branch);
         assert.ok(tip, 'the run has its branch');
-        const record = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
+        const record = (recordText(ROOT, runKey(id)) ?? '');
         assert.ok(fs.existsSync(wt), 'landed, its worktree is still there: no pass removes it');
 
         const pass = await tick();
@@ -270,7 +269,7 @@ describe(
           'one inventory, one standing and one remove, every one off the loop',
         );
 
-        assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), record, 'the sweep wrote nothing on the run record');
+        assert.equal((recordText(ROOT, runKey(id)) ?? ''), record, 'the sweep wrote nothing on the run record');
         assert.equal(world().tip(repo, branch), tip, 'its branch is kept');
         assert.ok(fs.existsSync(path.join(ROOT, 'runs', id)), 'and its files under runs/<id>/');
         assert.equal((await stage.runWith(engine(), decideRun(id))).decision.kind, 'landed');
@@ -388,7 +387,7 @@ describe(
         mergedIn(repo, runRecord(ROOT, id).steps.work.branch!, 'by hand');
         const record = runRecord(ROOT, id);
         delete record.workflow;
-        fs.writeFileSync(path.join(ROOT, 'runs', `${id}.json`), JSON.stringify(record, null, 2));
+        plantRecord(ROOT, runKey(id), JSON.stringify(record, null, 2));
         const logged: string[] = [];
         for (let k = 0; k < 3; k++) {
           const pass = await tick();

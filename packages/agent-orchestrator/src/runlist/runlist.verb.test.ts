@@ -9,6 +9,7 @@
  * On a store of its own at `ROOT`, given as `ENV`; each test empties the store's runs first, and a test that compares two answers, or
  * orders runs by time, seeds `Date`.
  */
+import { listRuns, runRecord } from '../../testing.ts';
 import { beforeEach, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,7 +24,6 @@ import { kindOf } from '../run-state/run-state.ts';
 import { judgedNow } from '../summary/summary.verb.ts';
 import { advanceRun, approveRun, startRun, runWith as runEngine } from '../runner.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { listRuns, runRecord } from '../record/record.store.ts';
 import { passStanding } from '../standing/standing.verb.ts';
 import { engineOf } from '../runtime-client.ts';
 import { metered } from '../meter/tally.store.ts';

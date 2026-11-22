@@ -20,6 +20,7 @@ import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
+import { dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
 const waitFor = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
@@ -199,12 +200,10 @@ const doneTask = (taskId: string) => {
 
 /** A run of `default` waiting at its `design` gate, its task done, its record laid by hand and taken away after `t`. */
 const gatedRun = (t: TestContext, id: string, createdAt = '2026-11-05T06:00:00.000Z') => {
-  t.onTestFinished(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
+  t.onTestFinished(() => dropRecord(root, runKey(id)));
   doneTask(`t-${id}`);
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(id), JSON.stringify({
       id,
       repo: '/code/app',
       workspace: '/code/app',
@@ -220,8 +219,7 @@ const gatedRun = (t: TestContext, id: string, createdAt = '2026-11-05T06:00:00.0
       ],
       gates: ['design'],
       steps: { design: { taskId: `t-${id}` }, implement: { taskId: null } },
-    }),
-  );
+    }));
 };
 
 test('a watch of the runs over a store holding one, plain and namespaced, sends it ADDED as a Run carrying a resourceVersion, then a BOOKMARK of Run', async (t) => {

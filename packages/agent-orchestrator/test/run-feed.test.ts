@@ -14,6 +14,7 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
+import { rewriteRun, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { beforeAll, beforeEach, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -46,8 +47,6 @@ import {
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { recordFeed } from '../src/feed/feed.store.ts';
 import { isRunLine } from '../src/feed/feed.ts';
-import { runRecord, rewriteRun } from '../src/record/record.store.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { tryOf } from '../src/record/record.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';

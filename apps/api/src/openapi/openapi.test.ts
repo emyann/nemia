@@ -11,8 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
-import { runObject, runsAtOnce } from 'agent-orchestrator';
+import { plantRecord, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
+import { runObject } from 'agent-orchestrator';
 import { OpenApi } from 'effect/http-api';
 import { Api, KINDS } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -26,9 +26,7 @@ const runWith = runOver(() => stand().layer);
 
 const R = 'r-openapi';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${R}.json`),
-  JSON.stringify({
+plantRecord(root, runKey(R), JSON.stringify({
     id: R,
     repo: '/code/app',
     workspace: '/code/app',
@@ -43,8 +41,7 @@ fs.writeFileSync(
       { name: 'implement', after: ['design'], input: ['design'], body: 'Implement it.', harness: 'claude' },
     ],
     steps: { design: { taskId: 't-design' } },
-  }),
-);
+  }));
 beforeEachTest(() => {
   Effect.runSync(engine().file({ id: 't-design', brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle('t-design', 'succeeded', {
@@ -73,7 +70,7 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
   const back = SchemaRepresentation.fromJsonSchemaDocument(
     JsonSchema.fromSchemaOpenApi3_1({ $ref: '#/components/schemas/Run', $defs: doc.components.schemas }),
   ) as Schema.Decoder<unknown>;
-  const object = await runWith(engine(), runObject(runsAtOnce(root).runs.read(R), { memo: { said: new Map() } }));
+  const object = await runWith(engine(), runObject(runsNow(root).runs.read(R), { memo: { said: new Map() } }));
   assert.ok(!('unjudged' in object), 'the run is judged');
   assert.deepEqual(Schema.decodeUnknownSync(back)(object), object, "the imported Schema decodes the package's object of the run");
   assert.ok(

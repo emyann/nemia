@@ -22,7 +22,8 @@ import type { Pruning } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedRuns, objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, prune, prunedKept, prunedWords, runsAtOnce } from 'agent-orchestrator';
+import { engine, passStanding, prune, prunedKept, prunedWords } from 'agent-orchestrator';
+import { runsNow } from 'agent-orchestrator/testing';
 
 const git = (...args: string[]) =>
   execFileSync(
@@ -205,7 +206,7 @@ describe('a finished run pruned on the board as `nemia prune` prunes it: what it
   s.test(
     "the decision's `awaiting`, once a pass has read where the branches stand, is what `nemia prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand",
     async () => {
-      await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
+      await runWith(engine(process.env), passStanding(runsNow(root).runs.list()));
       const awaiting = new Map<string, unknown>();
       for (const id of ['p-merged', 'p-unmerged', 'p-running', 'p-failed-merged', 'p-direct']) {
         const res = await app.request(`/api/runs/${id}/decision`);
@@ -252,7 +253,7 @@ describe('a finished run pruned on the board as `nemia prune` prunes it: what it
       assert.ok(hasBranch(branchOf('p-merged')), 'its branch is kept');
       assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.json')), 'its record is kept');
 
-      const pruned = runsAtOnce(root).runs.read('p-merged').pruned!;
+      const pruned = runsNow(root).runs.read('p-merged').pruned!;
       assert.ok(pruned.artifacts, 'the marker says the files went');
       const run = (await listed()).get('p-merged')!;
       assert.equal(run.pruned?.said, `${prunedWords(pruned)}; ${prunedKept(pruned)}`);
@@ -315,7 +316,7 @@ describe('a finished run pruned on the board as `nemia prune` prunes it: what it
       assert.equal(fs.existsSync(worktreeOf('p-unmerged')), false, 'its worktree is gone');
       assert.ok(hasBranch(branchOf('p-unmerged')), 'its branch is kept');
       assert.ok(fs.existsSync(filesDir('p-unmerged')), 'its files are kept without `artifacts`');
-      const pruned = runsAtOnce(root).runs.read('p-unmerged').pruned!;
+      const pruned = runsNow(root).runs.read('p-unmerged').pruned!;
       assert.equal(pruned.artifacts, undefined);
       assert.equal((await listed()).get('p-unmerged')!.pruned?.said, `${prunedWords(pruned)}; ${prunedKept(pruned)}`);
       assert.match((await listed()).get('p-unmerged')!.pruned?.said ?? '', /; its branches, record and files are kept$/);

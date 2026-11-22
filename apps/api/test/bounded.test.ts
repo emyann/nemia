@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { addFactory } from 'agent-orchestrator/testing';
 import { Api, type ApiGetName, READS } from 'objects';
 import { AnswerBound } from '../src/layer.ts';
@@ -26,9 +26,7 @@ const app = eachTest(() => appOver(standIn(), stand(), Layer.succeed(AnswerBound
 
 const RUN = 'r-bound';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${RUN}.json`),
-  JSON.stringify({
+plantRecord(root, runKey(RUN), JSON.stringify({
     id: RUN,
     repo: '/code/app',
     workspace: '/code/app',
@@ -40,8 +38,7 @@ fs.writeFileSync(
     createdAt: '2026-11-02T06:00:00.000Z',
     workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
     steps: { implement: { taskId: `t-${RUN}` } },
-  }),
-);
+  }));
 beforeEachTest(() => {
   Effect.runSync(engineFor(standIn()).file({ id: `t-${RUN}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(`t-${RUN}`, 'succeeded', {

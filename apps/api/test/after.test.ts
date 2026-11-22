@@ -26,7 +26,6 @@ import {
   engine,
   list,
   passStanding,
-  runsAtOnce,
   waitAdvice,
   waitWord,
   builtin,
@@ -40,6 +39,7 @@ import {
 import { Effect } from 'effect';
 import { listedRuns as runList, objectOf } from './run-reads.ts';
 import type { Run } from 'objects';
+import { plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 /** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
 const ENV: NodeJS.ProcessEnv = { ...process.env, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
@@ -113,9 +113,7 @@ const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness
 function writeRun(id: string, fields: { after?: string[]; steps?: object; cancelledAt?: string } = {}) {
   const { cancelledAt, ...rest } = fields;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(id), JSON.stringify({
       id,
       repo,
       workspace: repo,
@@ -128,8 +126,7 @@ function writeRun(id: string, fields: { after?: string[]; steps?: object; cancel
       workflow,
       steps: { implement: { taskId: null } },
       ...rest,
-    }),
-  );
+    }));
   if (cancelledAt) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
 }
 
@@ -152,7 +149,7 @@ writeRun('g-parents-landed', { after: ['a-landed'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
 working('t-i', filedI);
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
-await runWith(engine(ENV), passStanding(runsAtOnce(root).runs.list()));
+await runWith(engine(ENV), passStanding(runsNow(root).runs.list()));
 
 /** A run as the RunList (`GET /api/runs`) has it: its `status`, with the runs it froze to wait on and when it was made. */
 type Listed = Run['status'] & { after: readonly string[]; createdAt: string };
@@ -237,7 +234,7 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
       'c-cancelled',
     ]) {
       const api = runs.get(id)!;
-      const cli = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
+      const cli = await runWith(e, list(e, runsNow(root).runs.read(id)));
       assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
       assert.deepEqual(
         api.steps.map((s) => s.message),
@@ -246,10 +243,10 @@ describe('a run waiting on runs, read on the list, its page and its decision as 
       );
       if (cli.waiting.length) {
         assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
-        assert.equal(api.waiting?.advice, waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting), id);
+        assert.equal(api.waiting?.advice, waitAdvice(runsNow(root).runs.read(id), cli.waiting), id);
         assert.equal(
           api.waiting?.waitingOnYou,
-          !waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
+          !waitAdvice(runsNow(root).runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
           `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still land`,
         );
       }

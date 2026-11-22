@@ -14,6 +14,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -37,7 +38,7 @@ import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../src/factory/factory.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { artifactsDir, inputsDir, runRecord } from '../src/record/record.store.ts';
+import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { factsOf, typed as onHandler } from './typed.ts';
@@ -183,7 +184,7 @@ describe('mounts on every filing: a factory run whose implement writes one folde
       inputs = inputsDir(ROOT, run);
       assert.deepEqual(run.mounts, readOnly(web, docs), 'read back');
       assert.deepEqual(
-        JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8')).mounts,
+        JSON.parse(recordText(ROOT, runKey(id)) ?? '').mounts,
         readOnly(web, docs),
         'as written',
       );
@@ -519,8 +520,8 @@ describe("REFUSED at nemia start: a factory's folder a step cannot be filed, eac
   test('REFUSED: a record whose mounts are not mounts is unreadable, naming the field', async () => {
     const { repos, plain } = fresh();
     const run = await stage.runPlaced(startRun(at(plain, repos[0], 'trio')));
-    const file = path.join(ROOT, 'runs', `${run.id}.json`);
-    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), mounts: [{ path: 1 }] }));
+    const file = runKey(run.id);
+    plantRecord(ROOT, file, JSON.stringify({ ...JSON.parse(recordText(ROOT, file) ?? ''), mounts: [{ path: 1 }] }));
     assert.throws(
       () => runRecord(ROOT, run.id),
       (err: Refusal) => err._tag === 'Invalid' && err.message.includes('`mounts.0.path` is 1'),

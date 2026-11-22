@@ -7,6 +7,7 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
+import { plantRecord, runKey, runRecord } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -32,7 +33,6 @@ import {
 } from '../src/runner.ts';
 import { decidedOf } from './screens.ts';
 import { lacksTold } from '../src/tick/told.verb.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-artifacts-git-');
@@ -386,7 +386,7 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
   const record = runRecord(ROOT, run.id);
   record.steps.implement = { ...record.steps.implement, check: { taskId: `${run.id}-implement-check` } };
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
   b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md', '.e2e/shot.png']));
   fs.rmSync(files, { recursive: true, force: true });
 

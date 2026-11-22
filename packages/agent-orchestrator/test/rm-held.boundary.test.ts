@@ -5,6 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -26,7 +27,7 @@ const refusedWith = (f: Forgot) => {
   const refusal = forgetRefusal(f);
   return [refusal?._tag, refusal?.message] satisfies [string | undefined, string | undefined];
 };
-import { markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
 

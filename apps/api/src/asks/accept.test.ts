@@ -18,10 +18,10 @@ import path from 'node:path';
 import type { Acceptance } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { acceptKey, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from 'objects';
-import { acceptFile, acceptRun, list, roundRun, runsAtOnce } from 'agent-orchestrator';
+import { acceptRun, list, roundRun } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 import { objectOf, stepOf } from '../../test/run-reads.ts';
 
@@ -93,7 +93,7 @@ const loopingRun = (id: string, on: number, again: boolean) => {
   const replies = [{ finding: 'src/flag.ts — the flag is not stored', answer: 'fixed', why: 'It is stored now.' }];
   signedOff(`${id}-implement-${on}`, on > 1 ? { ...DONE, replies } : DONE);
   signedOff(`${id}-review-${on}`, { ...DONE, again });
-  return fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8');
+  return (recordText(root, runKey(id)) ?? '');
 };
 
 /** Out of rounds: round 2 of 2, and review asked for a third. */
@@ -148,7 +148,7 @@ const asked = (run = R) => {
 /** Nothing was written: no acceptance nor ask, and the run's record as it was. */
 const nothingWritten = (why: string, run = R) => {
   assert.deepEqual(asked(run), [], `no file beside the run: ${why}`);
-  if (run === R) assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, `the run's record untouched: ${why}`);
+  if (run === R) assert.equal((recordText(root, runKey(R)) ?? ''), record, `the run's record untouched: ${why}`);
 };
 
 const WHY = 'The findings are follow-up work.';
@@ -241,7 +241,7 @@ describe('a person accepts a loop out of rounds on the board: the acceptance wri
           try: 2,
           at: undefined,
           message: WHY,
-          file: acceptFile(root, R, 'review', 2),
+          file: acceptKey(R, 'review', 2),
           actor: SEATED,
           loop: true,
           next: 'nothing',
@@ -257,7 +257,7 @@ describe('a person accepts a loop out of rounds on the board: the acceptance wri
         actor: SEATED,
       });
       assert.deepEqual(asked(), ['accept-review-2']);
-      assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
+      assert.equal((recordText(root, runKey(R)) ?? ''), record, "the api wrote nothing of the run's record");
       assert.deepEqual(standIn().stopped, [], 'and stopped nothing');
     },
   );
@@ -272,7 +272,7 @@ describe('a person accepts a loop out of rounds on the board: the acceptance wri
         { awaiting: false, approval: { try: 2, at: took.at, message: WHY, actor: SEATED } },
         'the acceptance on the loop, with who accepted',
       );
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const listed = words.steps.find((s) => s.name === 'review')!;
       assert.equal(review.message, listed.message, 'as `nemia ls` has it until the tick files what waits');
       assert.notEqual(review.message, 'exhausted', "the loop over on the person's word");

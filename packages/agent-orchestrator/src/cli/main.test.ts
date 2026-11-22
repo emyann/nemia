@@ -8,6 +8,7 @@
  * record, both through the Factory door at the root the handler is given as it is typed (`StoreRoot`, `storeConfigLayer` of the
  * process's environment), which is what that test pins. `default` has a record and no file, so the test plants only the record.
  */
+import { runRecord, writeRun } from '../../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,6 @@ import { promised } from '../../test/promised.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { advanceRun, CLI, CLI_VERBS, TABLE, startRun, runWith as runEngine } from '../runner.ts';
-import { runRecord, writeRun } from '../record/record.store.ts';
 import { aliased, main } from './main.ts';
 import { HELP, WF_HINT } from './flags.ts';
 import { SHOW } from '../object/commands.verb.ts';

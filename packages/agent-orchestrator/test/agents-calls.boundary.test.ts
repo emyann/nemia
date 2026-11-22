@@ -11,6 +11,7 @@
  * `CLAUDE_CONFIG_DIR`
 , where Claude Code keeps its sessions and transcripts, is a folder of the test's.
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,6 @@ import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
 import { engine, startRun, tickRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { gatedJob } from './gated-job.ts';

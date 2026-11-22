@@ -13,9 +13,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, parseArgv, RM, triesDir } from 'agent-orchestrator';
+import { COMMANDS, engine, parseArgv, RM, triesDir } from 'agent-orchestrator';
 import { forgottenOf } from '../objects/forgotten.ts';
 import { runWith } from '../../test/builtin-place.ts';
+import { approvalKey, recordText, runKey } from 'agent-orchestrator/testing';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -192,8 +193,8 @@ describe('an action on its endpoint answers what its `nemia` entry answers: the 
     assert.deepEqual(Object.keys(answered).sort(), ['actor', 'at', 'caps', 'file', 'loop', 'message', 'next', 'step', 'try']);
     assert.equal(answered.try, typed.try);
     assert.deepEqual([answered.loop, answered.next], [typed.loop, typed.next], 'what `nemia approve` prints of what is filed next');
-    assert.equal(answered.file, approvalFile(root, 'r-api-gate', 'plan', 1));
-    assert.equal(typed.file, approvalFile(root, 'r-cli-gate', 'plan', 1));
+    assert.equal(answered.file, approvalKey('r-api-gate', 'plan', 1));
+    assert.equal(typed.file, approvalKey('r-cli-gate', 'plan', 1));
     assert.deepEqual(written(answered.file), written(String(typed.file)));
     assert.deepEqual([actorIn(answered.file), actorIn(String(typed.file))], [SEATED, undefined], 'the api records its caller');
     assert.deepEqual(asked('r-api-gate'), asked('r-cli-gate'));
@@ -240,7 +241,7 @@ describe('an action on its endpoint answers what its `nemia` entry answers: the 
     for (const id of ['r-cli-base', 'r-api-base']) {
       loopingRun(id);
       signedOff(`${id}-review-1`, { ...DONE, again: false });
-      const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as object;
+      const record = JSON.parse(recordText(root, runKey(id)) ?? '') as object;
       write(path.join(root, 'runs', `${id}.json`), JSON.stringify({ ...record, repo, workspace: repo, baseRef: base }));
     }
     const typed = await asTyped('refresh', ['r-cli-base', '--base']);
@@ -360,7 +361,7 @@ describe('what an action ignores of its body, and the removals the board will no
     assert.ok(said.startsWith(`${id}  not forgotten: ${worktree} is held (a person holds it)`), said);
     for (const fact of [`git -C ${repo} worktree unlock ${worktree}`, `nemia rm ${id} again`])
       assert.ok(said.includes(fact), `${fact} in ${said}`);
-    assert.ok(fs.existsSync(path.join(root, 'runs', `${id}.json`)), 'the record is kept');
+    assert.ok((recordText(root, runKey(id)) !== undefined), 'the record is kept');
     assert.ok(fs.existsSync(worktree), 'and the worktree');
   });
 });

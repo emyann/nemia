@@ -19,12 +19,12 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
-import { list, PERSON, runsAtOnce, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { list, PERSON, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 
 const stand = eachTest(testPlace);
@@ -212,7 +212,7 @@ describe("a person's words to a working session: the package's `sayRun` hands th
       for (const other of steps.filter((s) => s.name !== 'implement'))
         assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
       assert.equal(
-        (await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
+        (await runWith(engine(), list(engine(), runsNow(root).runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
         'said to 1×',
         "`nemia ls`'s words",
       );
@@ -301,12 +301,12 @@ test("words to a step not filed yet are kept for its first try, not delivered: t
   assert.deepEqual([answer.kept, answer.text, answer.attempt, answer.after], [true, 'Look at the parser first.', 1, null]);
   assert.deepEqual([...standIn().said], before.said, 'no session was told anything');
   assert.equal(
-    fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'),
+    (recordText(root, runKey(R)) ?? ''),
     before.files[`${R}.json`],
     "the run's record untouched: the words are kept beside it",
   );
   assert.deepEqual(
-    runsAtOnce(root)
+    runsNow(root)
       .runs.read(R)
       .saidBefore?.review?.map((w) => w.text),
     ['Look at the parser first.'],

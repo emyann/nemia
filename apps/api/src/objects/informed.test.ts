@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
@@ -39,8 +39,8 @@ const record = (id: string, gates: string[] = []) => ({
   steps: { implement: { taskId: `t-${id}` } },
 });
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(path.join(root, 'runs', `${GATED}.json`), JSON.stringify(record(GATED, ['implement'])));
-fs.writeFileSync(path.join(root, 'runs', `${AT_WORK}.json`), JSON.stringify(record(AT_WORK)));
+plantRecord(root, runKey(GATED), JSON.stringify(record(GATED, ['implement'])));
+plantRecord(root, runKey(AT_WORK), JSON.stringify(record(AT_WORK)));
 beforeEachTest(() => {
   fs.rmSync(path.join(root, 'runs', `${GATED}.asks`), { recursive: true, force: true });
   Effect.runSync(engine().file({ id: `t-${GATED}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));

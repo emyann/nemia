@@ -12,6 +12,7 @@
  * pure `storeRootRefusal` (`src/start/store-root.test.ts`); an ending after a step starting under a root every rule carries is the
  * start of `mounts.test.ts`'s story.
  */
+import { recordText, runKey, runsNow as filesStoreAt } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -33,7 +34,6 @@ import { anAgent } from './agent-walks.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { configRefusal, engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = path.join(scratch('wf-start-judged-'), 'First (Last)');
@@ -394,7 +394,7 @@ describe("nemia start copies the workflow folder whole into the run's own, read-
     fs.mkdirSync(path.join(dir, 'sub'));
     fs.writeFileSync(path.join(dir, 'sub', 'x.json'), '{"x":1}\n');
     const id = started(dir);
-    const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8')) as { workflowFiles?: string };
+    const record = JSON.parse(recordText(ROOT, runKey(id)) ?? '') as { workflowFiles?: string };
     assert.equal(typeof record.workflowFiles, 'string', 'the record names the copy');
     const copy = path.join(ROOT, 'runs', id, 'workflow', String(record.workflowFiles));
     for (const file of ['implement.md', 'helper.ts', path.join('sub', 'x.json')]) {

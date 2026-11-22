@@ -25,6 +25,7 @@
  * - `<folder>/given` is the run's to empty and write each time the step is filed: a link there is never followed, or the filing would
  *   remove and write wherever it points.
  */
+import { plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -53,7 +54,6 @@ import {
   gitPlaceLayer,
 } from '../src/runner.ts';
 import * as verbs from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { sentBack, stepTaskId } from '../src/run.ts';
 import { builtinGitPlace, engine, START, type StartInput } from '../src/runner.ts';
 import { factsOf, handled } from './typed.ts';
@@ -331,7 +331,7 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(forgot.kind, 'forgotten');
   assert.equal(forgot.folder, true);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', run.id)), false, 'its folders went with it');
-  assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), false);
+  assert.equal((recordText(ROOT, runKey(run.id)) !== undefined), false);
   assert.deepEqual(
     [forgot.removed, forgot.gone, forgot.handedOff, forgot.branches],
     [[], [], [], []],
@@ -639,7 +639,7 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
 
   const record = runRecord(ROOT, run.id);
   record.steps.c = sentBack(record.steps.c);
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
   fs.rmSync(path.join(work, 'a', 'gone.md'));
   fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
 
@@ -690,7 +690,7 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
 
   const record = runRecord(ROOT, run.id);
   record.steps.c = sentBack(record.steps.c);
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
   let said = '';
   let filed: string[] = [];
   try {

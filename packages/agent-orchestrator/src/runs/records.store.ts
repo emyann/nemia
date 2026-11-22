@@ -692,32 +692,47 @@ export const runsImported = Effect.fnUntraced(function* (home: string, keyspace:
   return made;
 });
 
-/** The stores whose run files this process has imported, by root. */
-const IMPORTED = new Set<string>();
+/**
+ * Where the store `home` keeps its run files stands, as the folders that hold them say it: the change time of `runs/` and of `started/`,
+ * which a file made, renamed or removed in either moves. Read before each open, so a file planted since the last import is imported too.
+ */
+const plantedMark = (home: string) =>
+  [runsDir(home), startedDir(home)].map((dir) => String(fs.statSync(dir, { bigint: true, throwIfNoEntry: false })?.mtimeNs ?? 0)).join(':');
+
+/** The mark of each store's run folders as this process last imported them, by root. */
+const IMPORTED = new Map<string, string>();
 
 /** One import at a time, so two fibers opening one store import it once. */
 const IMPORTING = Semaphore.makeUnsafe(1);
 
 /**
- * The keyspace of the store `home`, its run files imported the first time this process opens it (`runsImported`); a failed import is not
- * kept, so the next open imports again.
+ * The keyspace of the store `home`, its run files imported whenever the folders that hold them moved since this process last imported
+ * them (`runsImported`): level-triggered, so a file an older process writes beside the keyspace is imported on the next open, and a file
+ * already imported is gone from its folder, moved aside. The mark is read before the import, so a file planted while it runs is imported
+ * by the next open, and the import's own moves cost one more pass that finds nothing. A failed import is not kept, so the next open
+ * imports again.
  * @param home The store's root folder.
  */
 export const runKeyspace = (home: string) =>
-  Effect.flatMap(keyspaceAt(keyspaceFile(home)), (keyspace) =>
-    IMPORTED.has(home)
-      ? Effect.succeed(keyspace)
-      : IMPORTING.withPermits(1)(
-          Effect.suspend(() =>
-            IMPORTED.has(home)
-              ? Effect.succeed(keyspace)
-              : Effect.map(runsImported(home, keyspace), () => {
-                  IMPORTED.add(home);
-                  return keyspace;
-                }),
+  Effect.flatMap(keyspaceAt(keyspaceFile(home)), (keyspace) => {
+    const due = () => IMPORTED.get(home) !== plantedMark(home);
+    return Effect.flatMap(fromThrow(due), (stale) =>
+      !stale
+        ? Effect.succeed(keyspace)
+        : IMPORTING.withPermits(1)(
+            Effect.flatMap(fromThrow(due), (still) =>
+              !still
+                ? Effect.succeed(keyspace)
+                : Effect.flatMap(fromThrow(() => plantedMark(home)), (mark) =>
+                    Effect.map(runsImported(home, keyspace), () => {
+                      IMPORTED.set(home, mark);
+                      return keyspace;
+                    }),
+                  ),
+            ),
           ),
-        ),
-  );
+    );
+  });
 
 /** Whether the store `home` keeps a run file to import: a record, an asks folder or a claim. */
 const runFilesPlanted = (home: string) => {

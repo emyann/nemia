@@ -13,8 +13,8 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
-import { addToInbox, fromNote, inboxDir, startFromInbox, runsAtOnce, engine, StoreRoot } from 'agent-orchestrator';
-import { addFactory, attachWorkflow, hireAgent, removeFactory } from 'agent-orchestrator/testing';
+import { addToInbox, fromNote, inboxDir, startFromInbox, engine, StoreRoot } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, hireAgent, removeFactory, runsNow } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { TEAM } from '../../test/team.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
@@ -209,7 +209,7 @@ describe('a person starts a card: the run carries where it came from, and the ca
       assert.ok(answered.run?.steps.length, JSON.stringify(answered.run));
       assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
-      const run = runsAtOnce(root).runs.read(answered.id);
+      const run = runsNow(root).runs.read(answered.id);
       assert.deepEqual(
         { from: run.from, brief: run.brief, workflowDir: run.workflowDir, repo: run.repo, after: run.after },
         {
@@ -233,7 +233,7 @@ describe('a person starts a card: the run carries where it came from, and the ca
       const { card: plain } = onStore(addToInbox({ text: 'Keep the brief\n\nAs the card says it.' }));
       const bodied = await startCard({ workflow: 'dev', card: plain.name });
       assert.equal(bodied.status, 201, await bodied.clone().text());
-      const bodiedRun = runsAtOnce(root).runs.read(((await bodied.json()) as CardStarted).id);
+      const bodiedRun = runsNow(root).runs.read(((await bodied.json()) as CardStarted).id);
       assert.deepEqual(
         [bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from],
         ['Keep the brief\n\nAs the card says it.', dev, { inbox: plain.name }],
@@ -254,7 +254,7 @@ describe('a person starts a card: the run carries where it came from, and the ca
       const lines = await linesOf(app, id);
       assert.equal(
         lines.fromNote,
-        fromNote(runsAtOnce(root).runs.read(id)),
+        fromNote(runsNow(root).runs.read(id)),
         "`nemia decide`'s sentence is the lines read's alone: the object leaves it out",
       );
       assert.equal(lines.fromNote, `from inbox card ${card.name}`);
@@ -558,7 +558,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       assert.equal(started.status, 201, await started.clone().text());
       const answered = (await started.json()) as CardStarted;
       assert.equal(answered.ignoredRepo, `${elsewhere}/`, "the card's `repo:`, said as not read");
-      const run = runsAtOnce(root).runs.read(answered.id);
+      const run = runsNow(root).runs.read(answered.id);
       assert.deepEqual([run.repo, run.workflowDir], [repo, dev], "started on desk's repository, its workflow found there by name");
     },
   );
@@ -686,7 +686,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       );
       const started = await startCard({ card: there.name }, JSON_TYPE, 'pair');
       assert.equal(started.status, 201, await started.clone().text());
-      const run = runsAtOnce(root).runs.read(((await started.json()) as CardStarted).id);
+      const run = runsNow(root).runs.read(((await started.json()) as CardStarted).id);
       assert.deepEqual(
         [run.factory, run.repo, run.workflowDir],
         ['pair', second, path.join(second, 'workflows', 'dev')],
@@ -986,7 +986,7 @@ test("a card started through its factory's namespace runs in that factory, on th
 
   const own = await start('by-its-own', {});
   assert.equal(own.status, 201, await own.clone().text());
-  const ownRun = runsAtOnce(root).runs.read(((await own.json()) as CardStarted).id);
+  const ownRun = runsNow(root).runs.read(((await own.json()) as CardStarted).id);
   assert.deepEqual(
     [ownRun.workflowDir, ownRun.factory, ownRun.repo],
     [acmeDev, 'acme', acmeRepo],
@@ -995,7 +995,7 @@ test("a card started through its factory's namespace runs in that factory, on th
 
   const named = await start('by-the-start', { workflow: 'dev' });
   assert.equal(named.status, 201, await named.clone().text());
-  const namedRun = runsAtOnce(root).runs.read(((await named.json()) as CardStarted).id);
+  const namedRun = runsNow(root).runs.read(((await named.json()) as CardStarted).id);
   assert.deepEqual(
     [namedRun.workflowDir, namedRun.factory, namedRun.repo],
     [acmeDev, 'acme', acmeRepo],

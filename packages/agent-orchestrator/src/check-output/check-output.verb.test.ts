@@ -7,6 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`; each test empties the store's runs first.
  */
+import { runRecord } from '../../testing.ts';
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,6 @@ import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { engineOf } from '../runtime-client.ts';
 import { CHECK_OUTPUT, type CheckOutputInput } from '../object/commands.verb.ts';
 import { advanceRun, startRun, runWith as runEngine } from '../runner.ts';
-import { runRecord } from '../record/record.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Env } from '../config/config.store.ts';
 

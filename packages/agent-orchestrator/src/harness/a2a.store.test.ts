@@ -10,6 +10,7 @@
  * file a holder's engine mints it in. That path is the runtime's own, and that the two processes agree on
  * it is what `apps/api/test/holder-stream.boundary.test.ts` proves with a real holder; this file proves the branch that reads it.
  */
+import { runRecord } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -28,7 +29,6 @@ import type { EnginePhase } from '../views/views-words.ts';
 import { advanceRun, procStartOf, remoteAgents, startRun, runWith as runEngine } from '../runner.ts';
 import { BEARER } from 'agent-runtime';
 import { engineOf } from '../runtime-client.ts';
-import { runRecord } from '../record/record.store.ts';
 import { credentialsAt, missingCredential, readRemote } from '../runtime-client.ts';
 import { remoteBrief } from '../run.ts';
 import type { Env } from '../config/config.store.ts';

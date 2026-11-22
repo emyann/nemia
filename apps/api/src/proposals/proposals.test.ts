@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { LISTED_WITHOUT, TABLE_ACCEPT, filesHeld, type Delegation, type Proposal, type Table } from 'objects';
 import { AnswerBound } from '../layer.ts';
@@ -78,9 +78,7 @@ const TREE = (() => {
 })();
 
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${RUN}.json`),
-  JSON.stringify({
+plantRecord(root, runKey(RUN), JSON.stringify({
     id: RUN,
     repo: path.join(root, 'pr-repo'),
     workspace: path.join(root, 'pr-repo'),
@@ -93,8 +91,7 @@ fs.writeFileSync(
     workflow: [{ name: 'design', after: [], body: 'Design it.' }],
     steps: { design: { taskId: TASK } },
     factory: FACTORY,
-  }),
-);
+  }));
 
 /** A session's token for the step `design` of the run, its try the live one while `TASK` is filed and unsettled. */
 const token = Effect.runSync(

@@ -19,20 +19,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from 'objects';
 import {
-  askFile,
   decideRun,
   list,
   prunedKept,
   prunedWords,
   retryRun,
-  roundAskFile,
   roundRun,
-  runsAtOnce,
   usedLines,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { recordText, retryAskKey, roundAskKey, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf } from './run-reads.ts';
@@ -102,7 +99,7 @@ const USAGE = {
  */
 const R = 'r-cost';
 const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
-const recordFile = path.join(root, 'runs', `${R}.json`);
+const recordFile = runKey(R);
 write(
   recordFile,
   JSON.stringify({
@@ -221,7 +218,7 @@ beforeEachTest(() => {
   refusedCheck('t-lint-check', 70);
 });
 
-const record = fs.readFileSync(recordFile, 'utf8');
+const record = (recordText(root, recordFile) ?? '');
 
 /** The run object `GET /api/runs/:id` answers. */
 const detail = async (id = R) => objectOf(app(), id);
@@ -249,7 +246,7 @@ const asksDir = path.join(root, 'runs', `${R}.asks`);
 /** Nothing was written: no ask, and the run's record as it was. */
 const nothingWritten = (why: string) => {
   assert.equal(fs.existsSync(asksDir) ? fs.readdirSync(asksDir, { recursive: true }).length : 0, 0, `no ask file: ${why}`);
-  assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
+  assert.equal((recordText(root, recordFile) ?? ''), record, `the run's record untouched: ${why}`);
 };
 
 /** What the package's `retryRun` refuses `how` for, word for word, given the harness's word as `nemia retry` gives it. */
@@ -419,7 +416,7 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
       );
       assert.equal(stepOf(run, 'implement').spent?.said, '$2.10');
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       assert.ok(run.status.cost);
       const { usd, ...total } = run.status.cost;
       assert.deepEqual(
@@ -452,7 +449,7 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
         'its cap is there, and what it cost of it is not known: no of',
       );
       assert.equal(
-        (await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(FREE)))).cost,
+        (await runWith(engine(), list(engine(), runsNow(root).runs.read(FREE)))).cost,
         undefined,
         '`nemia ls` prints no cost for it either',
       );
@@ -461,7 +458,7 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
   s.test(
     "a step over its budget, on the list and on the detail, in `nemia ls`'s words — waiting on you, and moving nothing — with its cap, what it has cost of it, and the raise the package takes",
     async () => {
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const listed = await summary();
       const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
       assert.deepEqual(
@@ -582,20 +579,20 @@ describe('a run whose steps went over their budgets: what each try cost, the ste
     async () => {
       const res = await askTry('tokens', { mode: 'continue', budget: 5 });
       assert.equal(res.status, 202, await res.clone().text());
-      assert.deepEqual(await res.json(), { try: 3, file: askFile(root, R, 'tokens', 3), stopFirst: false });
-      const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'tokens', 3), 'utf8'));
+      assert.deepEqual(await res.json(), { try: 3, file: retryAskKey(R, 'tokens', 3), stopFirst: false });
+      const { at: when, ...written } = JSON.parse(recordText(root, retryAskKey(R, 'tokens', 3)) ?? '');
       assert.deepEqual(written, { step: 'tokens', try: 3, mode: 'continue', budget: 5, actor: SEATED }, 'the ask, and who asked it');
       assert.ok(!Number.isNaN(Date.parse(when)), when);
 
       const rounded = await askRound({ step: 'review', budget: 3 });
       assert.equal(rounded.status, 202, await rounded.clone().text());
-      assert.deepEqual(await rounded.json(), { step: 'review', round: 3, budget: 3, file: roundAskFile(root, R, 'review', 3) });
-      const { at: roundWhen, ...roundWritten } = JSON.parse(fs.readFileSync(roundAskFile(root, R, 'review', 3), 'utf8'));
+      assert.deepEqual(await rounded.json(), { step: 'review', round: 3, budget: 3, file: roundAskKey(R, 'review', 3) });
+      const { at: roundWhen, ...roundWritten } = JSON.parse(recordText(root, roundAskKey(R, 'review', 3)) ?? '');
       assert.deepEqual(roundWritten, { step: 'review', round: 3, budget: 3, actor: SEATED });
       assert.ok(!Number.isNaN(Date.parse(roundWhen)), roundWhen);
-      assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
+      assert.equal((recordText(root, recordFile) ?? ''), record, "the api wrote nothing of the run's record");
 
-      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R)));
       const run = await detail();
       assert.deepEqual(
         run.status.steps.map(({ name, note }) => ({ name, note })),
@@ -674,8 +671,8 @@ describe('steps past their budget on their own work: one that signed off blocked
   s.test('the answer and the raise, as the board sends them, are one ask, 202; the refused check is rechecked with no budget', async () => {
     const answered = await askTry('palette', { mode: 'continue', budget: 2, message: answer }, BOARD, R2);
     assert.equal(answered.status, 202, await answered.clone().text());
-    assert.deepEqual(await answered.json(), { try: 2, file: askFile(root, R2, 'palette', 2), stopFirst: false });
-    const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R2, 'palette', 2), 'utf8'));
+    assert.deepEqual(await answered.json(), { try: 2, file: retryAskKey(R2, 'palette', 2), stopFirst: false });
+    const { at: when, ...written } = JSON.parse(recordText(root, retryAskKey(R2, 'palette', 2)) ?? '');
     assert.deepEqual(
       written,
       { step: 'palette', try: 2, mode: 'continue', message: answer, budget: 2, actor: SEATED },
@@ -685,8 +682,8 @@ describe('steps past their budget on their own work: one that signed off blocked
 
     const rechecked = await askTry('lint', { mode: 'recheck' }, BOARD, R2);
     assert.equal(rechecked.status, 202, await rechecked.clone().text());
-    assert.deepEqual(await rechecked.json(), { try: 2, file: askFile(root, R2, 'lint', 2), stopFirst: false });
-    const { at: _, ...recheck } = JSON.parse(fs.readFileSync(askFile(root, R2, 'lint', 2), 'utf8'));
+    assert.deepEqual(await rechecked.json(), { try: 2, file: retryAskKey(R2, 'lint', 2), stopFirst: false });
+    const { at: _, ...recheck } = JSON.parse(recordText(root, retryAskKey(R2, 'lint', 2)) ?? '');
     assert.deepEqual(
       recheck,
       { step: 'lint', try: 2, mode: 'recheck', actor: SEATED },
@@ -694,7 +691,7 @@ describe('steps past their budget on their own work: one that signed off blocked
     );
   });
   s.test('both read their asks in notes, as `nemia ls` has them until the tick files them, and neither is waited on', async () => {
-    const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R2)));
+    const words = await runWith(engine(), list(engine(), runsNow(root).runs.read(R2)));
     const after = await detail(R2);
     assert.deepEqual(
       after.status.steps.map(({ name, note }) => ({ name, note })),

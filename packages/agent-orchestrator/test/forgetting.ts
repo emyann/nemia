@@ -9,7 +9,8 @@
  * had its say, the error it ends with names those left, exit 2, or 1 where one failed otherwise than by a refusal.
  */
 import type { Effect } from 'effect';
-import { type Args, Invalid, parseArgv, PRUNE, RM, runsAtOnce, sizeOf } from '../src/runner.ts';
+import { type Args, Invalid, parseArgv, PRUNE, RM, sizeOf } from '../src/runner.ts';
+import { listRuns } from '../testing.ts';
 import type { Forgot } from '../src/run.ts';
 
 /**
@@ -98,9 +99,7 @@ async function pruneTyped(run: Run, home: string, rest: readonly string[]) {
   const how = { unmerged: args.unmerged === true, artifacts: args.artifacts === true, refuses: true };
   const ids = named.length
     ? named
-    : runsAtOnce(home)
-        .runs.list()
-        .map((r) => r.id);
+    : listRuns(home).map((r) => r.id);
   const printed: string[] = [];
   const left: string[] = [];
   const ready: { runId: string; bytes: number }[] = [];

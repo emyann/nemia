@@ -17,6 +17,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges every run a pass answers from
  * its memo in full.
  */
+import { rewriteRun, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -27,7 +28,6 @@ import type { Stats } from '../src/stats/stats.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { approveRun, cancelRun, retryRun, startRun, tickRun, runWith } from '../src/runner.ts';
-import { runRecord, rewriteRun } from '../src/record/record.store.ts';
 import { stepsNow } from './steps-now.ts';
 import { DENIED_SPAN, TIMELINE_SPAN, WAIT_SPANS } from '../src/meter/meter.verb.ts';
 import { stepAttributes } from '../src/meter/step.ts';

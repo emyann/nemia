@@ -15,9 +15,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest } from '../../test/placed.ts';
-import { runsAtOnce } from 'agent-orchestrator';
+
 import { TEAM } from '../../test/team.ts';
 
 const write = (file: string, text: string) => {
@@ -69,7 +69,7 @@ test("POST /api/namespaces/acme/runs with models, gates and inputs starts a run 
   const res = await post('runs', { workflow: 'dev', brief: 'Add a cache.', ...EXTRAS });
   assert.equal(res.status, 201, await res.clone().text());
   const started = (await res.json()) as { id: string; run?: { models?: Record<string, string>; gated?: string[] } };
-  const run = runsAtOnce(root).runs.read(started.id);
+  const run = runsNow(root).runs.read(started.id);
   assert.deepEqual(run.models, { implement: 'sonnet' });
   assert.deepEqual(run.inputs, ['notes.md', 'shot.png']);
   const inputs = path.join(root, 'runs', started.id, 'inputs');
@@ -88,7 +88,7 @@ test('POST /api/namespaces/acme/cards/:name/start with models starts a run whose
   assert.equal(res.status, 201, await res.clone().text());
   const started = (await res.json()) as { id: string; card: string; run?: { from?: string } };
   assert.equal(started.card, 'cache-card');
-  assert.deepEqual(runsAtOnce(root).runs.read(started.id).models, { implement: 'sonnet' });
+  assert.deepEqual(runsNow(root).runs.read(started.id).models, { implement: 'sonnet' });
   assert.equal(started.run?.from, 'cache-card', 'what nemia start prints of it: the card it came from');
 });
 
@@ -131,7 +131,7 @@ test('DELETE a run of a workflow: refused as a try alone, removed whole with ?wh
   assert.equal(gone.status, 200, await gone.clone().text());
   const removed = (await gone.json()) as { id: string; removed: boolean };
   assert.deepEqual([removed.id, removed.removed], [id, true]);
-  assert.equal(runsAtOnce(root).runs.exists(id), false);
+  assert.equal(runsNow(root).runs.exists(id), false);
 });
 
 /** What a removal answers of the run's branches. */

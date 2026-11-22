@@ -5,6 +5,7 @@
  *
  * On a store of its own at `ROOT`, given as `ENV`; each test empties the store's runs first.
  */
+import { rewriteRun, runRecord } from '../../testing.ts';
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +20,6 @@ import { informerMemo, passStarted } from '../rest/informer.verb.ts';
 import type { Env } from '../config/config.store.ts';
 import { Effect as RunsEffect } from 'effect';
 import { advanceRun, startRun, runWith as runEngine } from '../runner.ts';
-import { rewriteRun, runRecord } from '../record/record.store.ts';
 import { runObject } from '../object/run.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { EngineService as RunsEngine, engineOf } from '../runtime-client.ts';

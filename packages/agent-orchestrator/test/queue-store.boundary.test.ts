@@ -8,6 +8,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
+import { listRuns, runRecord } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,7 +25,6 @@ import { runGiven, runOver } from './placed.ts';
 import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
 import { startRun, tickRun, runWith as runEngine, gitPlaceLayer, StoreRoot, readInbox as readInboxVerb } from '../src/runner.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-queue-');

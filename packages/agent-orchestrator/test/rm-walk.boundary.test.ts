@@ -5,6 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
+import { plantRecord, runKey, runRecord } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +18,6 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -49,7 +49,7 @@ const aRun = (id: string, steps: Run['steps']) =>
   }) satisfies Run;
 
 /** What the daemon does to the run's json, and the only thing it does to it. */
-const writeRun = (run: Run) => fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(run, null, 2));
+const writeRun = (run: Run) => plantRecord(ROOT, runKey(run.id), JSON.stringify(run, null, 2));
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = () => {

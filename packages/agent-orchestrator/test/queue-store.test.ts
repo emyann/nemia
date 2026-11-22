@@ -12,6 +12,7 @@
  * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts). The stage's engine keeps no pass of its own: `ticking` hands it
  * one that reports nothing, so a pass reads each task off the stand-in as a person settled it.
  */
+import { dropRecord, listRuns, runKey, runRecord } from '../testing.ts';
 import { settingsOf } from '../src/config/config.store.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -49,7 +50,6 @@ import {
   readInbox as readInboxVerb,
 } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { listedRow, stepRow, told } from './typed.ts';
 import { shownStatus, type RunsListed } from '../src/list/list.ts';
 import { cardFiles } from '../src/cards/cards.store.ts';
@@ -1240,7 +1240,7 @@ test.skipIf(process.getuid?.() === 0 && 'root removes a file from a folder it ma
       [undefined, undefined, 1],
     );
     const [byHand] = fromCard(removed.card.name);
-    fs.rmSync(path.join(ROOT, 'runs', `${byHand.id}.json`));
+    dropRecord(ROOT, runKey(byHand.id));
     assert.deepEqual(
       [
         readInbox().find((l) => l.name === removed.card.name)?.startedAs,

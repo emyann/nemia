@@ -15,6 +15,7 @@
  * Its store is its own at `ROOT`, given as `ENV`.
  */
 
+import { listRuns, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -44,7 +45,6 @@ import {
   runWith as runEngine,
   gitPlaceLayer,
 } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { checkOutputFile } from '../src/check/check.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { roundOf } from '../src/run.ts';
@@ -54,7 +54,6 @@ import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { filedDenies } from '../src/ending/ending.ts';
 import { landingContract } from '../src/check/check.ts';
 import { passStanding, standingLive } from '../src/standing/standing.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-ship-git-');

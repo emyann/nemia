@@ -5,6 +5,7 @@
  * A file of its own, since `tick` reads every run of its store: its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full
  * every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
+import { listRuns, runRecord } from '../../testing.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,6 @@ import type { Env } from '../config/config.store.ts';
 import { lastPassCost, startRun, tickRun, runWith as runEngine, withProposalsPass } from '../runner.ts';
 import { EngineService } from '../runtime-client.ts';
 import { recentFile, recentPasses } from '../daemon/daemon.store.ts';
-import { listRuns, runRecord } from '../record/record.store.ts';
 import { metered, meteredPass, metering, within } from './tally.store.ts';
 import { Effect, Fiber, Metric } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';

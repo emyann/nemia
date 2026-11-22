@@ -3,13 +3,13 @@
  * from the run's frozen workflow files with a request and an answer file in its environment, and read off its attempt — its exit and the
  * answer the runtime kept (`terminationMessage`) — as a route, or as the word its step reads instead.
  */
+import { rewriteRun, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { advanceRun, startRun, runWith as runEngine } from '../src/runner.ts';
-import { runRecord, rewriteRun } from '../src/record/record.store.ts';
 import { main as cli } from '../src/cli/main.ts';
 import { engineOf, over } from '../src/runtime-client.ts';
 import { closeoutReader, taskPhasesRead } from '../src/views/views.verb.ts';

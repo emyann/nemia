@@ -19,6 +19,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { listRuns, recordText, rewriteRun, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -29,7 +30,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { decidedOn } from './screens.ts';
 import { runWith, tickRun } from '../src/runner.ts';
-import { listRuns, runRecord, rewriteRun, runFile } from '../src/record/record.store.ts';
+import { runFile } from '../src/record/record.store.ts';
 import { ownDenies } from '../src/workflow/index.ts';
 import { stepPlace } from '../src/workflow.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
@@ -61,7 +62,7 @@ const copied = (base: string) => {
 
 /** A record as it stands on disk. */
 const written = (id: string) =>
-  JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown> & { workflow: Array<Record<string, unknown>> };
+  JSON.parse(recordText(ROOT, runKey(id)) ?? '') as Record<string, unknown> & { workflow: Array<Record<string, unknown>> };
 
 /** Whether `object` holds any of `keys` as its own. */
 const holdsAny = (object: unknown, ...keys: string[]) => keys.some((key) => Object.hasOwn(object as object, key));
@@ -302,7 +303,7 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
   s.test('`nemia rm` forgets a run of the old store, and the others stay', async () => {
     const forgot = await stage.runWith(b.e, RM.handler({ runId: 'notes' }));
     assert.deepEqual([forgot.id, forgot.removed], ['notes', true]);
-    assert.equal(fs.existsSync(runFile(ROOT, 'notes')), false, 'its record is gone');
+    assert.equal((recordText(ROOT, runKey('notes')) !== undefined), false, 'its record is gone');
     assert.deepEqual(
       listRuns(ROOT, () => {})
         .map((r) => r.id)

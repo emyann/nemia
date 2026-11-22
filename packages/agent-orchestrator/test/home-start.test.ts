@@ -10,6 +10,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -22,7 +23,6 @@ import { advanceRun, forgetRun, retryRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { treeDir, writeTreeWiring } from '../src/factory/applied/applied.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { homeFilesDir } from '../src/frozen/frozen.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';

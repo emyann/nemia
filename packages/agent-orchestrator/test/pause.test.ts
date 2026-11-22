@@ -20,6 +20,7 @@
  * instant written as a literal. The store is the file's own, at `ROOT`, given as `ENV`, and the run cap high, so the
  * schedule's fire is held by the pause alone.
  */
+import { askKeyOf, askNames, asksPrefix, dropRecord, keysUnder, listRuns, plantRecord, recordText, retryAskKey, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -34,7 +35,7 @@ import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
 import { approveRun, startRun, tickRun, runWith } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
-import { askFile, asksDir, listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import { pauseFile, readPause } from '../src/pause/pause.store.ts';
 import { nowRead } from '../src/pause/pause.verb.ts';
 import { pausedRead } from '../src/list/list.verb.ts';
@@ -105,8 +106,8 @@ const folder = (steps: readonly string[], more: (name: string) => string = () =>
   return dir;
 };
 /** The asks of `run` no pass has set aside. */
-const asksOf = (id: string) => (fs.existsSync(asksDir(ROOT, id)) ? fs.readdirSync(asksDir(ROOT, id)).filter((f) => f !== 'done') : []);
-const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSync(askFile(ROOT, id, step, n), 'utf8'));
+const asksOf = (id: string) => askNames(ROOT, id).filter((n) => !n.startsWith('done/'));
+const askOf = (id: string, step: string, n: number) => JSON.parse(recordText(ROOT, retryAskKey(id, step, n)) ?? '');
 /** The runs a schedule started: the fire each was started for. */
 const scheduledDues = () => listRuns(ROOT).flatMap((r) => (r.scheduled ? [r.scheduled.due] : [])) satisfies string[];
 
@@ -139,7 +140,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
             taskId,
             askOnDisk:
               run !== undefined &&
-              asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(ROOT, run.id), f), 'utf8').includes(taskId)),
+              asksOf(run.id).some((f) => (recordText(ROOT, askKeyOf(run.id, f)) ?? '').includes(taskId)),
           });
           if (taskId !== task('ended')) return b.e.stop(taskId);
           return Effect.promise(async () => {
@@ -209,11 +210,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
     await stage.runWith(b.e, approveRun(runs.landing.id, 'ship'));
     await pass();
     b.settle(task('landing', 'ship'), 'working');
-    fs.mkdirSync(asksDir(ROOT, runs.asked.id), { recursive: true });
-    fs.writeFileSync(
-      askFile(ROOT, runs.asked.id, 'work', 2),
-      JSON.stringify({ step: 'work', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }),
-    );
+    plantRecord(ROOT, retryAskKey(runs.asked.id, 'work', 2), JSON.stringify({ step: 'work', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }));
     markCancelled(ROOT, runs.called.id);
     assert.equal(readPause(ROOT), null);
   });
@@ -309,7 +306,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
         [],
         'a landing is asked no try',
       );
-      assert.equal(fs.existsSync(asksDir(ROOT, runs.called.id)), false, 'a run called off is left alone');
+      assert.equal((keysUnder(ROOT, asksPrefix(runs.called.id)).length > 0), false, 'a run called off is left alone');
       for (const name of ['session', 'ended', 'called'] as const) parked.add(task(name));
     },
   );
@@ -420,9 +417,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
 test("a warm read of what a pause at once would stop reads the live runs' records alone, and answers a cold read's own", async (t) => {
   const b = stage.board();
   const write = (id: string, taskId: string) =>
-    fs.writeFileSync(
-      path.join(ROOT, 'runs', `${id}.json`),
-      JSON.stringify({
+    plantRecord(ROOT, runKey(id), JSON.stringify({
         id,
         workspace: ROOT,
         brief: `The brief of ${id}`,
@@ -431,11 +426,10 @@ test("a warm read of what a pause at once would stop reads the live runs' record
         place: { kind: 'folder' },
         workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
         steps: { implement: { taskId } },
-      }),
-    );
+      }));
   const ids = ['r-live', ...Array.from({ length: 200 }, (_, n) => `fin-${String(n).padStart(3, '0')}`)];
   t.onTestFinished(() => {
-    for (const id of ids) fs.rmSync(path.join(ROOT, 'runs', `${id}.json`), { force: true });
+    for (const id of ids) dropRecord(ROOT, runKey(id));
   });
   write('r-live', 'live-1');
   for (let n = 0; n < 200; n++) write(ids[n + 1], `fin-${n}`);

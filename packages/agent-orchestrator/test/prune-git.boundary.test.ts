@@ -4,6 +4,7 @@
  * no branch and a locked one, each refused with the command that clears it; and a worktree detached since a prompt's listing, judged
  * again and kept. On `gitPlaceLayer` and the engine's stand-in, over a store of its own at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +18,6 @@ import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { advanceRun, prune, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { freeingMany, judgingMany } from '../src/forget/prune/prune.verb.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';

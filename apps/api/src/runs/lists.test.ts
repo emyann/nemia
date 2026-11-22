@@ -12,7 +12,7 @@ import path from 'node:path';
 import type { RunList } from 'objects';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -43,9 +43,7 @@ function journalled(taskId: string, from: string, end?: { to: string; closeout: 
 /** A folder run of one step, created at `created`, of `factory` where one is named. */
 function aRun(id: string, created: string, factory?: string) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(id), JSON.stringify({
       id,
       place: { kind: 'folder' },
       workspace: path.join(root, 'runs', id, 'work'),
@@ -55,8 +53,7 @@ function aRun(id: string, created: string, factory?: string) {
       workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'codex', workspace: 'folder' }],
       steps: { write: { taskId: `${id}-write` } },
       ...(factory ? { factory } : {}),
-    }),
-  );
+    }));
 }
 
 /** A run whose step signed off done at minute `to`: finished. */

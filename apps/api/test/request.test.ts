@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer, Logger, Option, References, Tracer } from 'effect';
-import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { appOf, liveOf } from '../src/app.ts';
 import { tookOf } from '../src/request/request.ts';
 import { until, WAITED } from 'agent-runtime/testing';
@@ -182,9 +182,7 @@ function aFinishedRun(id: string) {
   ];
   fs.writeFileSync(journal, events.map((e) => `${JSON.stringify(e)}\n`).join(''));
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(id), JSON.stringify({
       id,
       repo,
       baseRef: 'main',
@@ -196,8 +194,7 @@ function aFinishedRun(id: string) {
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
       steps: { implement: { taskId, branch: `wf/${id}/implement` } },
-    }),
-  );
+    }));
   fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
   fs.writeFileSync(path.join(root, 'inbox', `card-${id}.md`), `Do ${id}.\n`);
 }

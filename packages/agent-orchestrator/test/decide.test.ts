@@ -9,6 +9,7 @@
  *
  * The test's store is its own, at `ROOT`, given as `ENV`.
  */
+import { listRuns, recordText, runKey, runRecord } from '../testing.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import { beforeAll, describe, test } from 'vitest';
@@ -44,7 +45,6 @@ import {
   runWith,
   tryNote,
 } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
@@ -784,7 +784,7 @@ describe('a step retried, answered, over its budget and nudged: what `nemia deci
       'and what the try made of them',
     );
     assert.ok(
-      !fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8').includes('The flag is public'),
+      !(recordText(ROOT, runKey(id)) ?? '').includes('The flag is public'),
       'composed on read: the record keeps no message',
     );
   });

@@ -13,6 +13,7 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
+import { runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -28,7 +29,6 @@ import { FACTORY_INSTRUCT, FACTORY_RULES, factoryInstruction, factoryRules, runW
 import { addFactoryAt, attachWorkflowAt, readFactoryAt, setInstructionAt } from '../src/factory/factory.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { factoryTyped } from './factory-typed.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { agentFilesDir } from '../src/agents/agents.store.ts';
 import { WORKFLOWS_STEP } from '../src/workflows/workflows.verb.ts';
 import { clearRules, readRules, rulesAt, writeRules } from '../src/factory/rules/rules.store.ts';

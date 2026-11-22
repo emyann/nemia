@@ -2,13 +2,13 @@
  * The collisions an ending's decision reads live (`collisionsAt`): no other run's steps are read unless ours has a branch ahead of its
  * base, so a run beside ours whose folder no longer loads does not fail a decision that asks nothing.
  */
+import { writeRun } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { collisionsAt } from './collisions.verb.ts';
-import { writeRun } from '../record/record.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { UnloadedFolder } from '../steps/steps.ts';
 import type { RepositoryRun } from '../record/record.ts';

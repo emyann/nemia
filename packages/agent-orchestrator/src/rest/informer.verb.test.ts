@@ -8,6 +8,7 @@
  * On a store of its own at `ROOT`, given as `ENV`, with `WF_VERIFY_REST=1`, as every test that ticks a store, and a read that counts
  * what it judged turns it off for itself (`unverified`), since a verified read judges each answer afresh.
  */
+import { runRecord } from '../../testing.ts';
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,6 @@ import { advanceRun, approveRun, startRun, tickRun, runWith as runEngine } from 
 import { runObject } from '../object/run.verb.ts';
 import { runsSummarized } from '../summary/summary.verb.ts';
 import { Informer, informerMemo, passStarted, type InformerMemo } from './informer.verb.ts';
-import { runRecord } from '../record/record.store.ts';
 import { engineOf } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-informer-');

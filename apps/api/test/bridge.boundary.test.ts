@@ -18,6 +18,7 @@ import { objectOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import { Effect } from 'effect';
 import { engine } from 'agent-orchestrator';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const at = '2026-10-06T08:00:00.000Z';
 const BRIDGED = { claude: { remoteControl: true } };
@@ -75,7 +76,7 @@ const writeRun = (id: string, steps: Array<{ name: string } & Record<string, unk
     workflow: steps.map((s) => ({ after: [], body: 'Work.', harness: 'claude', ...s })),
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: `${id}-${s.name}` }])),
   };
-  fs.writeFileSync(path.join(root, 'runs', `${id}.json`), JSON.stringify(record));
+  plantRecord(root, runKey(id), JSON.stringify(record));
 };
 
 test("a step that says remote: true answers its session's web link on its detail while its job runs, and one that does not answers null", async () => {

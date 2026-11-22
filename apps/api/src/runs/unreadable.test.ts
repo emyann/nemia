@@ -17,9 +17,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Ceilings } from '../gauges/ceilings.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
+import { engine, passStanding } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { runListOf } from '../../test/run-reads.ts';
+import { runsNow } from 'agent-orchestrator/testing';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -108,7 +109,7 @@ writeRun('r-bad', { implement: { taskId: 'r-bad-implement', branch: 'wf/r-bad/im
 
 writeRun('r-child', {}, { after: ['r-bad'] });
 writeRun('r-sibling', {}, { after: ['r-good'] });
-await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
+await runWith(engine(process.env), passStanding(runsNow(root).runs.list()));
 
 describe('a run whose task journal holds an entry no runtime wrote is answered off its record on the list, refused on its page in those words, and counted in flight', () => {
   const s = story(test);

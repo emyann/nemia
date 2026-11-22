@@ -8,6 +8,7 @@
  * Its store is its own at `ROOT`, given as `ENV` with `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
  * in scratch repositories no factory holds.
  */
+import { runRecord } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,6 @@ import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import { advanceRun, startRun, runWith as runEngine } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';

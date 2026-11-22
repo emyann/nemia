@@ -5,6 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
+import { plantRecord, runKey, runsNow as filesStoreAt } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -22,7 +23,6 @@ import { passStanding } from '../standing/standing.verb.ts';
 import { Missing, isRefusal } from '../refusal/refusal.ts';
 import { runDecision, diffFiles, DIFF_LINES } from './decision.verb.ts';
 import type { Env } from '../config/config.store.ts';
-import { filesStoreAt } from '../record/files.store.ts';
 
 const root = scratch('wf-decision-');
 const ENV: Env = { ...process.env, WF_ROOT: root };
@@ -122,9 +122,7 @@ const workflow = [
 
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${run.id}.json`),
-    JSON.stringify({
+  plantRecord(root, runKey(run.id), JSON.stringify({
       workspace: run.repo,
       branch: 'main',
       isolate: true,
@@ -133,8 +131,7 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow,
       ...run,
-    }),
-  );
+    }));
 }
 
 /**

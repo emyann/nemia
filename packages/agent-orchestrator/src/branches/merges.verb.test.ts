@@ -10,7 +10,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Missing } from '../refusal/refusal.ts';
 import { mergesOf } from './merges.verb.ts';
-import { atStore } from '../../testing.ts';
+import { atStore, plantRecord, runKey } from '../../testing.ts';
 import { builtinGitPlace } from '../place/builtin.store.ts';
 
 const ROOT = scratch('wf-merge-root-');
@@ -40,11 +40,9 @@ function repoOf() {
 
 /** A repository run `id` on `repo`, branched from `main`, its record written as `nemia start` would. */
 function runOn(id: string, repo: string) {
-  const file = path.join(ROOT, 'runs', `${id}.json`);
+  const file = runKey(id);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(
-    file,
-    JSON.stringify({
+  plantRecord(ROOT, file, JSON.stringify({
       id,
       repo,
       workspace: repo,
@@ -56,8 +54,7 @@ function runOn(id: string, repo: string) {
       workflowDir: path.join(repo, 'no-such-workflow'),
       workflow: [{ name: 'implement', after: [], body: 'Do it.', harness: 'codex' }],
       steps: {},
-    }),
-  );
+    }));
 }
 
 test('a branch merges cleanly, then conflicts once main writes its file otherwise, and the checkout is untouched', async () => {

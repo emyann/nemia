@@ -17,9 +17,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
-import { approvalFile, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { app } from '../app.ts';
 import { floorEntryOf } from './floor.ts';
+import { approvalKey, recordText } from 'agent-orchestrator/testing';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -107,7 +108,7 @@ test('REFUSED 403 waits-on-person: an approval at a gate in a store at auto that
   gatedRun('r-floor-waits');
   const res = await post('/api/namespaces/default/runs/r-floor-waits/steps/plan/approve', { message: 'Go.' }, STORE_WIDE);
   assert.deepEqual(await refusalOf(res), [403, 'waits-on-person']);
-  assert.equal(fs.existsSync(approvalFile(root, 'r-floor-waits', 'plan', 1)), false, 'no approval was written: the step still waits');
+  assert.equal((recordText(root, approvalKey('r-floor-waits', 'plan', 1)) !== undefined), false, 'no approval was written: the step still waits');
 });
 
 test('a rule the person confirmed for the agent lets the same approval through, and it is written', async () => {
@@ -116,7 +117,7 @@ test('a rule the person confirmed for the agent lets the same approval through, 
   gatedRun('r-floor-ruled');
   const res = await post('/api/namespaces/default/runs/r-floor-ruled/steps/plan/approve', { message: 'Go.' }, STORE_WIDE);
   assert.equal(res.status, 202);
-  assert.equal(fs.existsSync(approvalFile(root, 'r-floor-ruled', 'plan', 1)), true);
+  assert.equal((recordText(root, approvalKey('r-floor-ruled', 'plan', 1)) !== undefined), true);
 });
 
 test('REFUSED 403 out-of-reach: a command out of an agent’s reach (a token’s mint), before the route’s own refusal', async () => {

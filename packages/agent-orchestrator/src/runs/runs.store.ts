@@ -113,3 +113,10 @@ export const keptRuns = <P>(memo: RecordMemo<P> | undefined, project: (run: Run)
     const byId = new Map(runs.map((run) => [run.id, run]));
     return keptRecords(memo, { stamps, find: (id) => byId.get(id), verify }, project);
   });
+
+/**
+ * The run `id` as the Run door finds it among the ids the store lists (`runs.find`), never read by a path made of it: undefined where
+ * the store has no such run. What a reader outside the package, which holds the id as a request gave it, finds a run by.
+ * @param id The run's id, as a caller gives it.
+ */
+export const runFound = (id: string) => Effect.flatMap(RunDoor, (door) => door.runs.find(RunId.read(id)));

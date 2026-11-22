@@ -15,6 +15,7 @@ import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
 import { type Said, servedStore, write } from './served.ts';
+import { recordText, runKey } from 'agent-orchestrator/testing';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const TEAM = path.join(import.meta.dirname, '..', '..', '..', 'packages', 'agent-orchestrator', 'test', 'fixtures', 'team');
@@ -60,7 +61,7 @@ const idIn = (said: Said) => /^(\S+)\s/.exec(said.out)?.[1] ?? assert.fail(`no r
 
 /** The run's record as the store keeps it. */
 const recordOf = (root: string, id: string) =>
-  JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as {
+  JSON.parse(recordText(root, runKey(id)) ?? '') as {
     factory?: string;
     repo?: string;
     brief: string;
@@ -247,7 +248,7 @@ test('nemia cancel stops the run; nemia rm forgets it, its branches deleted, and
   assert.equal(gone.code, 0, `${gone.out}${gone.err}`);
   assert.match(gone.out, new RegExp(`^${id} {2}forgotten: no worktrees; removed runs/${id}\\.json`, 'm'));
   assert.match(gone.out, /^nobody-1 {2}no such run — nothing to forget but what was left under its id: removed runs\/nobody-1\.asks\/$/m);
-  assert.equal(fs.existsSync(path.join(store.root, 'runs', `${id}.json`)), false);
+  assert.equal((recordText(store.root, runKey(id)) !== undefined), false);
   assert.equal(fs.existsSync(asks), false, 'the leftovers of a run with no record are gone');
 });
 

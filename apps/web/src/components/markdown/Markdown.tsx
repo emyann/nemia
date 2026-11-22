@@ -135,7 +135,7 @@ const DRAWN: Components = { ...COMPONENTS, ...HEADINGS };
  * A file a text carries, as the board reads it: the address it is served at, and whether it is a picture the api serves as its own type
  * (`PICTURE_TYPES`), shown where the text draws it as an image; any other is a link to it.
  */
-export type TextFile = { readonly at: string; readonly picture: boolean };
+type TextFile = { readonly at: string; readonly picture: boolean };
 
 /** The name a target written `name` or `./name` stands for, with its escapes read. */
 const targetName = (src: string) => {

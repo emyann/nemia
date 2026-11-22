@@ -519,13 +519,13 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
     assert.deepEqual(
       config?.pictures?.map((p) => [path.basename(p.path), p.mediaType]),
       [['mock.png', 'image/png']],
-      `${name}, a step that waits on none, is filed the run's one picture to be shown in its first message`,
+      'a step that waits on none is filed the one picture of the inputs, to be shown in its first message',
     );
     assert.deepEqual(runRecord(ROOT, run.id).steps[name]?.pictures, {
       shown: ['mock.png'],
       held: [{ name: 'flat.png', reason: 'format' }],
     });
-    assert.match(brief, /`flat\.png` \(its format is none a model takes/, `${name}'s brief names the picture held back, and why`);
+    assert.match(brief, /`flat\.png` \(its format is none a model takes/, 'the brief names the picture held back, with its reason');
     assert.equal(fs.existsSync(path.join(folder, 'given', 'from')), false, "a root waits on nobody, so it is given nobody's folder");
   }
   fs.writeFileSync(path.join(work, 'a', 'side-a.md'), '# a\n');

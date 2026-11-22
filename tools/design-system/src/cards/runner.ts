@@ -57,7 +57,7 @@ const stillNetwork = () => {
   const media = window.matchMedia.bind(window);
   window.matchMedia = (query: string) =>
     /prefers-color-scheme/.test(query)
-      ? ({
+      ? {
           matches: /dark/.test(query) === (document.documentElement.dataset.theme !== 'light'),
           media: query,
           onchange: null,
@@ -66,7 +66,7 @@ const stillNetwork = () => {
           addListener() {},
           removeListener() {},
           dispatchEvent: () => false,
-        } as unknown as MediaQueryList)
+        }
       : media(query);
 };
 
@@ -79,6 +79,10 @@ const words = (name: string) => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
+/** What a story threw, as words. */
+const thrownText = (failed: unknown) =>
+  failed instanceof Error ? `${failed.name}: ${failed.message}` : (JSON.stringify(failed) ?? 'undefined');
+
 /** Says what a story threw in its place (`data-failed`). */
 class Held extends Component<{ name: string; children: ReactNode }, { failed: unknown }> {
   override state = { failed: null as unknown };
@@ -89,7 +93,7 @@ class Held extends Component<{ name: string; children: ReactNode }, { failed: un
 
   override render() {
     return this.state.failed
-      ? h('pre', { 'data-failed': this.props.name, style: { margin: 0, whiteSpace: 'pre-wrap' } }, String(this.state.failed))
+      ? h('pre', { 'data-failed': this.props.name, style: { margin: 0, whiteSpace: 'pre-wrap' } }, thrownText(this.state.failed))
       : this.props.children;
   }
 }

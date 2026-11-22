@@ -83,7 +83,7 @@ export const kitCards = (kit: string) => {
     }
   }
   guided(cards);
-  const withGuides = cards.map((card) => ({ ...card, guide: KIT_MAP.GUIDES[card.name] as Guide }));
+  const withGuides = cards.map((card) => ({ ...card, guide: KIT_MAP.GUIDES[card.name] }));
   const typeCards = Object.entries(KIT_MAP.TYPE).map(([name, guide]) => ({ name, group: KIT_MAP.TYPE_GROUP, guide, files: [] }));
   return [...withGuides, ...typeCards] satisfies KitCard[];
 };

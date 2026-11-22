@@ -271,6 +271,11 @@
     {
       "term": "Light canary",
       "meaning": "a story approved in the light theme too, `apps/web/test/approved/light/<story id>.png`, one of the few that draw what the board writes for one scheme outside the theme's roles (`LIGHT_CANARIES`, `apps/web/.storybook/approved.ts`): light is held by the theme otherwise, its contrast pairs in both schemes (`apps/web/test/theme-contrast.test.ts`) and the palette guard, not by a picture of every story."
+    },
+    {
+      "term": "Way out",
+      "meaning": "one of the two answers the board supplies on every question a step asks, after its options, as the Agent SDK's `AskUserQuestion` supplies \"Other\": \"Something else\" (`else`), which needs the person's words, and \"None of these\" (`none`), which stands without words, chooses no option and is sent as `none: true`. Held in the draft the series of questions writes (`apps/web/contracts/question-draft.contract.ts`, `apps/web/src/lib/question-draft/questionDraft.ts`), drawn by `QuestionSeries` (`apps/web/src/components/gate/Questions.tsx`).",
+      "type": "WayOut"
     }
   ]
 }

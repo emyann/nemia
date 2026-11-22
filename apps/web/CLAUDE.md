@@ -87,7 +87,7 @@ for what a page or a part draws while its first read is out, the kit's `Skeleton
 `Skeleton`s in the shape of what is coming, held back a moment so a fast read draws nothing (`reading.css`), and `ReadingLines` for its
 lines of text; `Pending` for a wait still out drawn small, the kit's circular `ProgressIndicator` in the ink of what holds it: a kit
 `Button`'s `icon` while its press is out (`CutPress` takes `pending`), or a tag's glyph while a fix or an upgrade is at work;
-`ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `RadioTileGroup` and `RadioTile` for one choice among a few, each a tile with its title and its line (the kit's `radio-tile-block`, copied in); `Trace` for
+`ScanLines` for the ground of a page; `Pager`, `TextLink` and `CopyId`; `RadioTileGroup` and `RadioTile` for one choice among a few, each a tile with its title and its line (the kit's `radio-tile-block`, copied in); `CheckTileGroup` and `CheckTile` for several choices among a few, their twin on the kit's checkbox; `Trace` for
 what an agent did, a line a step (`TraceLine`, with `TraceIcon`, `TraceTitle` and `TraceDescription`; `TraceCollapsible`, its
 `TraceCollapsibleTrigger` and `TraceCollapsibleContent`, for a step that opens), and `Marker` for a quiet line across a conversation. Each is shown in its stories beside it
 (`<Part>.stories.tsx`): `npm run storybook`, from `apps/web`, serves them to a person on port 6007, and a step looks at them
@@ -361,8 +361,9 @@ here.
 - A kind of `objects` (the Run, the Card, the Factory, the McpServer, the Schedule, the Hire, the Volume, the Workflow, the Agent, the
   Skill) is read through `lib/api/objects.ts`, never a schema of the board's: its client is made from `objects`' `Api`, and each call
   rejects with `ReadRefusal`, `WriteRefusal` or `UnreadAnswer` (`lib/api/read.ts`). The inbox's entry is made of a `Card` in one place (`entryOf`,
-- `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory`, its `FactoryCommands` and its schedules in one place
-  (`factoryViewOf`, `lib/api/factories.ts`), which `factoriesQuery` reads together. A hire is written to its `Hire`, named
+- `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory` and its `FactoryCommands` in one place (`factoryViewOf`,
+  `lib/api/factories.ts`), which `factoriesQuery` reads together; a factory's schedules are read on its Settings alone
+  (`factorySchedulesQuery`), and a floor asks its factory's cards in play of the api (`factoryInboxQuery`), never every card. A hire is written to its `Hire`, named
   `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value.
   A definition is seen as the board's view of its kind in one place each — `workflowViewOf` (`lib/api/workflows.ts`), `agentViewOf`
   (`agents.ts`), `skillRowOf` and `skillDetailOf` (`skills.ts`) — read in `default` where the board has no factory, else in the factory's
@@ -483,7 +484,8 @@ e2e page*.
   over the floor (`fitClear`), and `expectClearOfPanels` refuses a card under one; read a size on a card in its own pixels
   (`offsetHeight`).
 - Something that mounts beside the floor after its first render narrows a floor already fitted: load what it draws in the route's loader
-  (`prefetchQuery`), and fit again when it comes or goes.
+  (`prefetchQuery`), and fit again when it comes or goes. A read the floor must not wait on (its queue's cards, `factoryInboxQuery`) the
+  loader starts without awaiting it, and the floor fits again as it comes (`laned`, `FactoryCanvas.tsx`).
 - A full-page screenshot can lay the page out a pixel wide for a moment, and the floor's frame then measures 0 tall: aim no view at a
   frame without room (`revealView` in `apps/web/src/lib/frame.ts`) and watch its size on both axes (`useFrameSize`); `factory-frame`
   forces it.

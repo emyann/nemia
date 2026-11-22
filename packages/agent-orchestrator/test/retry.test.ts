@@ -281,12 +281,12 @@ describe('a planner blocked on two questions is answered at the terminal', () =>
         '         a  one card — All at once.',
         '         b  two cards — The shape first.  (recommended)',
         '         c  three — Thin.',
-        '         choose one, or answer in your own words',
+        '         choose one, answer in your own words, or none (1=none)',
         '      2. Where do the answers go?',
         '         Either or both.',
         '         a  retry — Into the next try.',
         '         b  gate — With the approval.',
-        '         choose one or more, or answer in your own words',
+        '         choose one or more, answer in your own words, or none (2=none)',
       ]);
       assert.ok(!screen.some((l) => l.includes('title: How is the card cut?')), 'the field is not dumped as well');
       assert.ok(

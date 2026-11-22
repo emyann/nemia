@@ -1,8 +1,8 @@
 /**
- * The inbox: its cards, read through the objects' client as `Card`s (`GET /api/cards`) and made the board's entries in one place
- * (`entriesOf`), and a card filed, dropped, started, queued and taken off the queue through the Card's verbs (`objects.ts`). A card's page
- * reads the Card by its name (`GET /api/cards/:name`), its file as written and its keys made of it here (`cardKeysOf`); its `from:` is
- * the Card written whole (`PUT /api/namespaces/:namespace/cards/:name`).
+ * The inbox: its cards, read through the objects' client as `Card`s (`GET /api/cards`, a factory's by its namespace) and made the board's
+ * entries in one place (`entriesOf`), and a card filed, dropped, started, queued and taken off the queue through the Card's verbs
+ * (`objects.ts`). A card's page reads the Card by its name (`GET /api/cards/:name`), its file as written and its keys made of it here
+ * (`cardKeysOf`); its `from:` is the Card written whole (`PUT /api/namespaces/:namespace/cards/:name`).
  */
 import { queryOptions } from '@tanstack/react-query';
 import {
@@ -125,34 +125,49 @@ export const entryOf = (card: CardList['items'][number]) => {
  */
 export const entriesOf = (list: CardList) => list.items.map(entryOf);
 
+/** The field selector that keeps the cards still in play, as the api says of each (`status.inPlay`). */
+const IN_PLAY = 'status.inPlay=true';
+
+/** `selector` as the api is sent it: trimmed, and none for a blank one. */
+const pickedOf = (selector: string | undefined) => (selector === undefined || selector.trim() === '' ? undefined : selector.trim());
+
 /** Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none. */
 const cardsListed = async (selector: string | undefined) => {
-  const picked = selector === undefined || selector.trim() === '' ? undefined : selector.trim();
-  return cards.listAll(picked);
+  const picked = pickedOf(selector);
+  return cards.listAll(picked === undefined ? {} : { labelSelector: picked });
 };
 
 /** Every card that `selector` takes, as entries. */
 const cardsSelected = async (selector: string | undefined) => entriesOf(await cardsListed(selector));
 
-/** The cards of `selector` still in play, as the api says of each (`status.inPlay`). */
-const inPlaySelected = async (selector: string | undefined) =>
-  (await cardsListed(selector)).items.filter((card) => card.status.inPlay).map(entryOf);
+/** The cards of `selector` still in play, as the api keeps them (`?fieldSelector=status.inPlay=true`). */
+const inPlaySelected = async (selector: string | undefined) => {
+  const picked = pickedOf(selector);
+  return entriesOf(await cards.listAll({ fieldSelector: IN_PLAY, ...(picked === undefined ? {} : { labelSelector: picked }) }));
+};
 
-/** How long a read of the inbox in play stands fresh (`inboxQuery`): what a page's loader read is not asked again as the page mounts. */
+/**
+ * How long a read of a factory's cards in play stands fresh (`factoryInboxQuery`): what a page's loader read is not asked again as the page
+ * mounts.
+ */
 const INBOX_FRESH_MS = 10_000;
 
 /**
- * The inbox's cards still in play: each not yet started, and each whose run is pending, running or waiting — a card whose run ended is
- * left out (`inboxAllQuery` lists it). It changes when a person files, drops or starts a card, here or at the command line. Read again
- * on each visit once `INBOX_FRESH_MS` has passed since the last read, and on a run's event on the workflow feed, which a queued card
- * started is, and a run ending too; the feed says nothing of cards. One key for every reader of a page (the factory pane's line, the
- * floor's queue), so the page asks the list once: the route's loader reads it, and the readers that mount after it find it fresh.
+ * A factory's cards still in play, as the api keeps them (`GET /api/namespaces/:namespace/cards?fieldSelector=status.inPlay=true`): each
+ * not yet started, and each whose run is pending, running or waiting — a card whose run ended is left out (`inboxAllQuery` lists it) —
+ * each with its place in the queue of the whole inbox. Never every card of every factory: the floor draws only its own. It changes when a
+ * person files, drops or starts a card, here or at the command line. Read again on each visit once `INBOX_FRESH_MS` has passed since the
+ * last read, and on a run's event on the workflow feed, which a queued card started is, and a run ending too. One key for every reader
+ * of a factory's page (the factory pane's line, the floor's queue), so the page asks it once: the route's loader starts it, never
+ * waiting on it, and the readers that mount find it. Keyed by an object under `['inbox']`, which no card's name can be (`cardQuery`).
+ * @param factory The factory whose cards are read, by its name; the default factory's are its namespace's (`namespaceOf`).
  */
-export const inboxQuery = queryOptions({
-  queryKey: ['inbox'],
-  queryFn: () => inPlaySelected(undefined),
-  staleTime: INBOX_FRESH_MS,
-});
+export const factoryInboxQuery = (factory: string) =>
+  queryOptions({
+    queryKey: ['inbox', { factory }],
+    queryFn: async () => entriesOf(await cards.list(namespaceOf(factory), { fieldSelector: IN_PLAY })),
+    staleTime: INBOX_FRESH_MS,
+  });
 
 /**
  * The inbox's cards in play that `selector` takes by their labels, or every one for none; under `['inbox']`, read again with it.
@@ -181,7 +196,7 @@ export const inboxAllQuery = (selector: string | undefined) =>
  * clause). The label filter's check before it writes the address.
  * @param selector The label selector to check, as a person typed it.
  */
-export const checkSelector = (selector: string) => cards.listAll(selector.trim());
+export const checkSelector = (selector: string) => cards.listAll({ labelSelector: selector.trim() });
 
 /**
  * A card's page: the card as the inbox lists it (`entryOf`), its file as written, frontmatter included (`status.source`, sent on a read of

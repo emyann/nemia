@@ -918,7 +918,7 @@ describe('a blocked step asks questions in two fields, and is answered by their 
       '      3. When?',
       '         Soon or later.',
       '         a  now — Today.  (recommended)',
-      '         choose one, or answer in your own words',
+      '         choose one, answer in your own words, or none (3=none)',
     ]);
     assert.deepEqual(
       screen.filter((l) => l.includes('(recommended)')).slice(1, 3),

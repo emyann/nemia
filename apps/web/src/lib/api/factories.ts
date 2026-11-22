@@ -1,9 +1,10 @@
 /**
- * The factories, as the board's pages draw them: each read as a nemia/v1 `Factory` through the objects' client (`objects.ts`), beside
- * the lines a person types for it (`/api/factories/<name>/commands`) and its schedules (`/api/namespaces/<name>/schedules`), and made the
- * board's view of it in one place (`factoryViewOf`). A factory's rules, what every agent hired into it is told, and its instruction,
- * Nemia's, which no step is told, are its sub-resources; its hires are `Hire` objects named `<workflow>.<step>`; its MCP servers are
- * `McpServer` objects, their headers served masked, beside Nemia's builtin ones.
+ * The factories, as the board's pages draw them: each read as a nemia/v1 `Factory` through the objects' client (`objects.ts`), beside the
+ * lines a person types for it (`/api/factories/<name>/commands`), and made the board's view of it in one place (`factoryViewOf`); its
+ * schedules (`/api/namespaces/<name>/schedules`) are read for the one factory whose Settings draws them (`factorySchedulesQuery`). A
+ * factory's rules, what every agent hired into it is told, and its instruction, Nemia's, which no step is told, are its sub-resources; its
+ * hires are `Hire` objects named `<workflow>.<step>`; its MCP servers are `McpServer` objects, their headers served masked, beside Nemia's
+ * builtin ones.
  */
 import { queryOptions } from '@tanstack/react-query';
 import {
@@ -76,7 +77,7 @@ export type FactoryVolume = {
  * The board's view of a factory (`factoryViewOf`): its name, whether it is the default factory, `worksOn` the repositories it works on
  * (its writable volumes' paths, none for a factory given none yet), the
  * workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>` to an agent's
- * name, and its schedules. `error` says why its file does not read, null for every other. `template` is the template it is made from,
+ * name. `error` says why its file does not read, null for every other. `template` is the template it is made from,
  * null for one that is not; `untrusted` each of its places a harness does not trust now; `volumes` each folder its runs reach;
  * `costLines` the line it sets per workflow, none where it sets none; `workflowRepos` the repository each workflow it attaches works on,
  * by the workflow's name to the repository's folder name, `{}` where it names none (`startRepo`).
@@ -88,7 +89,6 @@ export type Factory = {
   workflows: string[] | null;
   hires: Record<string, string>;
   error: string | null;
-  schedules: FactorySchedule[];
   /**
    * The lines a person types for it: a workflow attached, its file removed, filed again, a workflow scheduled, its places trusted, a
    * volume mounted, a card trigger written, and its home opened in a person's own session (`home`, null where it has no home).
@@ -130,13 +130,12 @@ const scheduleViewOf = (schedule: Schedule, unschedule: string) => ({
 });
 
 /**
- * The view of `factory` the pages draw, from the object, the lines a person types for it (`commands`) and its schedules: a key the
- * object leaves out is the view's null, a volume's line that takes it back is the one `commands` keeps under its name.
+ * The view of `factory` the pages draw, from the object and the lines a person types for it (`commands`): a key the object leaves out is
+ * the view's null, a volume's line that takes it back is the one `commands` keeps under its name.
  * @param factory The Factory object as the api serves it.
- * @param commands The lines a person types for it, a schedule's and a volume's line that takes it back by name among them.
- * @param scheduled Its schedules; none for the default factory, which keeps none.
+ * @param commands The lines a person types for it, a volume's line that takes it back by name among them.
  */
-export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands, scheduled: readonly Schedule[] = []) => {
+export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands) => {
   const { spec, status } = factory;
   return {
     name: factory.metadata.name,
@@ -145,7 +144,6 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
     workflows: spec.workflows ? [...spec.workflows] : null,
     hires: { ...spec.hires },
     error: status.error ?? null,
-    schedules: scheduled.map((s) => scheduleViewOf(s, commands.unschedule[s.metadata.name] ?? '')),
     commands: {
       attach: commands.attach,
       rm: commands.rm,
@@ -173,24 +171,43 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
   };
 };
 
-/** The view of one factory: its object, its lines and, for a factory a person made, its schedules, read together. */
-const viewRead = async (factory: FactoryObject) => {
-  const name = factory.metadata.name;
-  const [commands, scheduled] = await Promise.all([
-    factories.commands(name),
-    name === DEFAULT_NAMESPACE ? Promise.resolve([]) : schedules.list(name).then((list) => list.items),
-  ]);
-  return factoryViewOf(factory, commands, scheduled);
-};
+/** The view of one factory: its object and its lines. */
+const viewRead = async (factory: FactoryObject) => factoryViewOf(factory, await factories.commands(factory.metadata.name));
 
 /**
- * The factories: the default factory first, then each in the store, each with its lines and schedules. Not polled: a factory changes when
+ * The factories: the default factory first, then each in the store, each with its lines. Not polled: a factory changes when
  * a person runs the CLI's `factory`. Read again on each visit.
  */
 export const factoriesQuery = queryOptions({
   queryKey: ['factories'],
   queryFn: async () => Promise.all((await factories.listAll()).items.map(viewRead)),
 });
+
+/**
+ * The factories as a floor places them, by their name and whether each is the default factory, in the order the api lists them: one read
+ * of the list, no factory's lines asked, so a factory's floor waits on nothing more. Under `['factories']`, so a write that reads the
+ * factories again reads it too.
+ */
+export const factoryPlacesQuery = queryOptions({
+  queryKey: ['factories', 'places'],
+  queryFn: async () =>
+    (await factories.listAll()).items.map((f) => ({ name: f.metadata.name, default: f.metadata.name === DEFAULT_NAMESPACE })),
+});
+
+/**
+ * The schedules of the factory `name`, each with the line that takes it back (`scheduleViewOf`): read for its Settings alone, the one page
+ * that draws them. Under `['factories']`, so a write that reads the factories again reads it too.
+ * @param name The factory's name.
+ */
+export const factorySchedulesQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['factories', 'schedules', name],
+    queryFn: async () => {
+      const [scheduled, commands] = await Promise.all([schedules.list(name), factories.commands(name)]);
+      const viewed: FactorySchedule[] = scheduled.items.map((s) => scheduleViewOf(s, commands.unschedule[s.metadata.name] ?? ''));
+      return viewed;
+    },
+  });
 
 /**
  * The volume `volume` given to the factory `name`, a writable one left untrusted for the page to ask its trust: what the api answered.
@@ -207,7 +224,7 @@ export const addVolumeUntrusted = (name: string, volume: string) => factories.ad
 export const trustFactory = (name: string) => factories.trust(name);
 
 /**
- * The view of the factory `name` alone, with its lines and no schedules: what the volume step reads of the factory it gives a volume, its
+ * The view of the factory `name` alone, with its lines: what the volume step reads of the factory it gives a volume, its
  * volumes and the places a harness does not trust now. Under `['factories']`, so a write that reads the factories again reads it too.
  * @param name The factory's name.
  */

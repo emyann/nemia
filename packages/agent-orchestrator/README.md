@@ -4321,9 +4321,9 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   between the two loses that run's, a run started before the mark existed is never handed over, a run retried after it was is not
   handed over again, and a run called off with nothing filed has no timeline and is left unmarked.
 - **Their names in Prometheus**, through an OTLP collector, measured on the side Grafana: `pass_duration_bucket` (`_count`, `_sum`),
-  `pass_phase_duration_bucket`, `pass_journal_reads_bucket`; the gauges with `_ratio`, the unit `1` the exporter gives one with none
-  (`store_runs_ratio`, `sessions_queued_ratio`, `sessions_admitted_ratio`, `admission_wait_ratio`, `machine_load_ratio`, and the
-  disk's, in bytes whatever the suffix: `disk_bytes_ratio`, `disk_free_ratio`, `disk_size_ratio`, and `disk_unread_ratio`); the counters
+  `pass_phase_duration_bucket`, `pass_journal_reads_bucket`; the gauges by their bare name, since effect 4.1.3 exports one with no
+  unit with an empty unit rather than `1`, which took `_ratio` (`store_runs`, `sessions_queued`, `sessions_admitted`, `admission_wait`,
+  `machine_load`, and the disk's, in bytes: `disk_bytes`, `disk_free`, `disk_size`, and `disk_unread`); the counters
   with `_total` (`step_cost_total`, `step_tokens_input_total`, `step_tokens_output_total`, `step_tries_total`, `step_checks_total`,
   `step_rounds_total`); and `step_duration_bucket`.
 - **The system's series are kept as rollups**, so what the recent passes say outlives the ring (`src/series/`). Each pass also keeps among

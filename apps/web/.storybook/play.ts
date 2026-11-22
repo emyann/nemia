@@ -132,3 +132,35 @@ export const skippedHeadings = (root: Element) => {
   const levels = [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((heading) => Number(heading.tagName.slice(1)));
   return levels.flatMap((level, i) => (i > 0 && level > levels[i - 1] + 1 ? [`h${levels[i - 1]} to h${level}`] : []));
 };
+
+/** What of the user a play function is handed `rowOpens` drives: its Tab key, its keys and its pointer's rest. */
+type Pointer = User & Keys & { hover: (element: Element) => Promise<void>; unhover: (element: Element) => Promise<void> };
+
+/** Where the story's router stands, as its ground says it (`data-at`). */
+export const standing = (root: Element) => root.closest('[data-story-ground]')?.getAttribute('data-at') ?? null;
+
+/**
+ * A row of the kit's table that opens something, driven as a person drives it: the pointer rested on it, which React Aria answers with
+ * `data-hovered` where the row is interactive (the kit's hover state is CSS's `:hover`, which a script's pointer does not reach), then
+ * the focus put on it from the keyboard's mode and Enter pressed. Waits until the story's router stands on `at`, then puts the pointer
+ * and the focus down, so the picture is the row at rest. Throws where the row is not the kit's interactive row, does not answer the
+ * pointer, or opens elsewhere.
+ * @param user The user the play function is handed.
+ * @param row The row of the table, a `tr`.
+ * @param at The address the row opens, as the story's router writes it.
+ */
+export async function rowOpens(user: Pointer, row: HTMLElement, at: string) {
+  if (!row.hasAttribute('data-interactive')) throw new Error(`the row is not the kit's interactive row: ${row.outerHTML.slice(0, 80)}`);
+  await user.hover(row);
+  await waitFor(() => {
+    if (!row.hasAttribute('data-hovered')) throw new Error('the row does not answer the pointer');
+  });
+  await user.tab();
+  row.focus();
+  await user.keyboard('{Enter}');
+  await waitFor(() => {
+    if (standing(row) !== at) throw new Error(`the row opened ${standing(row)}, not ${at}`);
+  });
+  await user.unhover(row);
+  atRest();
+}

@@ -1,5 +1,6 @@
 import { Cell, Column, Focusable, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
 import { runLinesQuery } from '@/lib/api/run';
 import { titleOf } from '@/lib/factory';
@@ -44,13 +45,21 @@ const Ago = ({ at, asOf }: { at: string; asOf: Date }) => {
 /**
  * One finished run's row: its title as a link over its meta line (`RunMeta`, its workflow linked to its page, which is its lines'
  * `runLinesQuery` the route's loader read), when it finished, its time at work, its cost and how it ended, a plain word, red only where
- * it failed. Times are said against `asOf`.
+ * it failed. Times are said against `asOf`. The row opens the run's page, as its title does, on a press or Enter, through the board's
+ * router (the kit's interactive row); a control inside it does its own thing.
  */
 function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: Date }) {
   const ended = ENDED[run.outcome];
   const workflowPage = useQuery(runLinesQuery(run.id)).data?.workflowPage ?? null;
+  const navigate = useNavigate();
   return (
-    <Row id={run.id} data-run={run.id} data-outcome={run.outcome} className={FRAMED_ROW}>
+    <Row
+      id={run.id}
+      data-run={run.id}
+      data-outcome={run.outcome}
+      className={FRAMED_ROW}
+      onAction={() => void navigate({ to: '/runs/$runId', params: { runId: run.id } })}
+    >
       <Cell className="py-2.5">
         <span className="flex min-w-0 flex-col gap-1">
           <TooltipTrigger delay={300}>

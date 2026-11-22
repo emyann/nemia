@@ -573,6 +573,12 @@ export const READS: Record<'1sw7' | '72wy' | 'vqvd', { steps: StepRead[] }> = {
 /** The floor's runs: 1sw7 at work, a run waiting on lgll, one for a run slot, one held, and vqvd waiting on you, its land failed. */
 export const onTheFloor: RunList = listOf([VQVD, AT_WORK, ON_A_RUN, FOR_A_SLOT, HELD], { waiting: 1, inFlight: 4, finished: 0 });
 
+/** The runs in flight when nothing waits on you, as the list answers them: lgll being checked and two waiting on the checkout it holds. */
+export const inFlightList: RunList = listOf([LGLL, ...ON_THE_CHECKOUT], { waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
+
+/** The first page of the finished runs, five of 123, as the list answers it, its next page's token given. */
+export const finishedList: RunList = finishedOf({ waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
+
 /** Nothing waits on you: three runs in flight, lgll being checked and two waiting on the checkout it holds; five finished of 123. */
 export const nothingWaits = answering([LGLL, ...ON_THE_CHECKOUT], { waiting: 0, inFlight: 3, finished: FINISHED_COUNT });
 

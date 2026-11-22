@@ -13,7 +13,7 @@ const OPEN = openOf(inFlightList);
 const UNJUDGED: UnjudgedRun = {
   id: 'board-a-run-whose-journal-is-torn-u9tn',
   factory: 'nemia',
-  unjudged: 'its journal could not be read: run nemia doctor',
+  unjudged: 'its journal could not be read',
 };
 
 /** The judged runs every row's words can name. */

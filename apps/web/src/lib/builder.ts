@@ -68,6 +68,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   remote: null,
   deadlineSeconds: null,
   memory: null,
+  memoryRequest: null,
   budget: null,
   check: null,
   checks: null,

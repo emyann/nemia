@@ -401,6 +401,7 @@ const wiringOf = (step: StepSpec) => ({
 const boundsOf = (step: StepSpec) => ({
   deadlineSeconds: step.deadlineSeconds ?? null,
   memory: step.memory ?? null,
+  memoryRequest: step.memoryRequest ?? null,
   budget: step.budget ?? null,
 });
 

@@ -163,6 +163,23 @@ test('a card filed with --after names each card it waits on, written as its afte
   assert.match(cardOn(store.root, name) ?? '', /^after: first-a1b2, zero-c3d4$/m);
 });
 
+test('a card edited keeps the after: its text names, said with the wait it had, and a text with none takes the wait off, said', async () => {
+  const added = await store.nemia(['inbox', 'add', 'Land the third slice', '--after', 'first-a1b2']);
+  ok(added, 'inbox add --after');
+  const name = nameIn(added.out);
+  const text = path.join(IDEAS, `${name}-after.md`);
+  write(text, '---\nafter: other-c3d4\n---\nLand the third slice\n');
+  const moved = await store.nemia(['inbox', 'edit', name, text]);
+  ok(moved, 'inbox edit, after: changed');
+  assert.match(moved.out, /^ {2}after: other-c3d4 — queued and started once each has landed \(was first-a1b2\)$/m);
+  assert.match(cardOn(store.root, name) ?? '', /^after: other-c3d4$/m);
+  const off = await store.nemia(['inbox', 'edit', name, 'Land the third slice\n']);
+  ok(off, 'inbox edit, no after:');
+  assert.match(off.out, /^ {2}after: taken off — it waited on other-c3d4/m);
+  assert.doesNotMatch(off.out, /next pass/, 'a card not queued may not start');
+  assert.doesNotMatch(cardOn(store.root, name) ?? '', /^after:/m);
+});
+
 test('a card carries the picture its idea file names beside it and a --file, and names the one in a folder it does not; attach, files, --get and detach', async () => {
   const dir = scratch('nemia-inbox-files-');
   const shot = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);

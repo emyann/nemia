@@ -1,0 +1,7 @@
+{
+  // The board's own options, with `noUncheckedIndexedAccess`: tsverify reads the draft through the nearest tsconfig, and without it
+  // refuses the contract's read of a draft by a question's title (`contracts/question-draft.contract.ts`).
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": { "noUncheckedIndexedAccess": true },
+  "include": ["*.ts", "../../../contracts/question-draft.contract.ts"]
+}

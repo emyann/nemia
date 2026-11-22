@@ -753,6 +753,35 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
     assert.equal(all.queryKey[0], factoryInboxQuery('pair').queryKey[0], "under ['inbox'], so every write and the feed read it again");
     assert.notDeepEqual(all.queryKey, cardQuery('all').queryKey, 'a card named all keeps its page');
   });
+  test("a factory's Inbox reads its own namespace's cards, ended included, never every card of every factory", async (t) => {
+    const sent = sending(t, () => answered(200, cardList()));
+    const read = async (query: { queryFn?: unknown }) => (query.queryFn as () => Promise<InboxEntry[]>)();
+    await read(inboxAllQuery(undefined, 'pair'));
+    await read(inboxAllQuery('team=core', 'pair'));
+    await read(inboxAllQuery(undefined, 'default'));
+    const urls = sent.map((r) => new URL(r.url, 'http://board'));
+    assert.deepEqual(
+      urls.map((u) => u.pathname),
+      ['/api/namespaces/pair/cards', '/api/namespaces/pair/cards', '/api/namespaces/default/cards'],
+    );
+    assert.deepEqual(
+      urls.map((u) => u.searchParams.get('fieldSelector')),
+      [null, null, null],
+      'the ended cards are read too: the page splits them itself',
+    );
+    assert.deepEqual(
+      urls.map((u) => u.searchParams.get('labelSelector')),
+      [null, 'team=core', null],
+    );
+    const key = inboxAllQuery(undefined, 'pair').queryKey;
+    assert.equal(key[0], 'inbox', "under ['inbox'], so every write and the feed read it again");
+    assert.notDeepEqual(key, inboxAllQuery(undefined).queryKey, "the store's Inbox keeps its own key");
+    assert.notDeepEqual(key, factoryInboxQuery('pair').queryKey, "the floor's in-play read keeps its own key");
+    assert.notDeepEqual(key, inboxAllQuery(undefined, 'default').queryKey, 'each factory its own key');
+    assert.notDeepEqual(key, inboxAllQuery('team=core', 'pair').queryKey, 'each selector its own key');
+    assert.notDeepEqual(key, cardQuery('pair').queryKey, 'a card named as the factory keeps its page');
+    assert.deepEqual(inboxAllQuery(undefined).queryKey, ['inbox', { all: true }]);
+  });
   test("the floor's cards are its factory's in play, asked of the api, never every card of every factory", async (t) => {
     const sent = sending(t, () => answered(200, cardList()));
     await (factoryInboxQuery('pair').queryFn as unknown as () => Promise<InboxEntry[]>)();

@@ -8,9 +8,10 @@
  */
 import path from 'node:path';
 import { ByteSize, Cause, Effect, Exit, Stream } from 'effect';
-import { Multipart } from 'effect/http';
-import { type FileBegun, fileBegun, fileDropped, fileKept } from 'agent-orchestrator';
-import { Api, BadRequest, FILE_LIMIT, type FileObject, Invalid, TooLarge } from 'objects';
+import { HttpServerResponse, Multipart } from 'effect/http';
+import { type FileBegun, fileAt, fileBegun, fileBytes, fileDropped, fileKept } from 'agent-orchestrator';
+import { Api, BadRequest, FILE_LIMIT, type FileObject, Invalid, Missing, PICTURE_TYPES, type PictureMediaType, TooLarge } from 'objects';
+import { ServedNow } from '../objects/refused.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 import { answeredWriteIn } from '../objects/refused.ts';
 
@@ -96,7 +97,52 @@ const uploaded = (namespace: string, parts: Stream.Stream<Multipart.Part, Multip
     return fileKept(begun.home, namespace, file);
   });
 
-/** The files group's handlers: a file uploaded. */
+/**
+ * The kept file `id` of `namespace`, and the path of its bytes: `Missing` where it was never kept there, or let go of.
+ * @param namespace The namespace it was kept in.
+ * @param id Its id.
+ */
+const keptAt = (namespace: string, id: string) =>
+  Effect.gen(function* () {
+    const { home } = yield* ServedNow;
+    const at = fileAt(home, namespace, id);
+    if (at === undefined)
+      return yield* Effect.fail(
+        new Missing({
+          error: `No file ${id} is kept in the namespace ${namespace}: it was never uploaded there, or was let go of a day after its last write with no inbox card naming it. Upload it again: POST /api/namespaces/${namespace}/files.`,
+        }),
+      );
+    return at;
+  });
+
+/** Whether `mediaType` is a picture the board draws inline. */
+const isPicture = (mediaType: string): mediaType is PictureMediaType => (PICTURE_TYPES as readonly string[]).includes(mediaType);
+
+/**
+ * The bytes of the kept file `id` of `namespace`, streamed from disk: a picture as its own type, inline, any other as
+ * `application/octet-stream`, an attachment; never sniffed, never run.
+ * @param namespace The namespace it was kept in.
+ * @param id Its id.
+ */
+const contentOf = (namespace: string, id: string) =>
+  Effect.map(keptAt(namespace, id), ({ file, path: at }) => {
+    const picture = isPicture(file.mediaType);
+    const body = Stream.fromAsyncIterable(fileBytes(at), (cause) => cause);
+    return HttpServerResponse.stream(body, {
+      contentType: picture ? file.mediaType : 'application/octet-stream',
+      headers: {
+        'content-length': String(file.size),
+        'cache-control': 'private, max-age=86400',
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': 'sandbox',
+        'content-disposition': `${picture ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+      },
+    });
+  });
+
+/** The files group's handlers: a file uploaded, and a kept one's bytes streamed. */
 export const filesHandlers = readsBounded(Api, 'files', (handlers) =>
-  handlers.handle('upload', ({ params: { namespace }, payload }) => uploaded(namespace, payload)),
+  handlers
+    .handle('upload', ({ params: { namespace }, payload }) => uploaded(namespace, payload))
+    .handle('content', ({ params: { namespace, id } }) => contentOf(namespace, id)),
 );

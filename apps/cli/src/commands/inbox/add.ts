@@ -2,11 +2,15 @@
  * `nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...`: an idea filed as a card through the
  * Card's `create`, in the namespace of `--factory` (`default` for none). A file is read here and its text sent (Q8); a folder is refused,
  * naming the command. `--workflow` is sent by its name, a path refused; `--label` each edit as typed. A card names no repository: its
- * words refuse `--repo`, the factory's wiring placing its run.
+ * words refuse `--repo`, the factory's wiring placing its run. Each `--file`, and each file beside an idea file that its text names as a
+ * markdown image's or link's target (`besideIdea`), is uploaded first to the namespace's files and carried by the card by its id.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { DEFAULT_NAMESPACE, INBOX_ADD_WORDS, type Args, type Card } from 'objects';
 import { asked } from '../../objects.ts';
 import { listArg, said, textArg } from '../requests.ts';
+import { inputsOf, uploaded } from '../runs/start.ts';
 import { factoryLine, fileOf, labelsText, textOrFile, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_ADD_WORDS;
@@ -33,21 +37,66 @@ export const filedLines = (card: Card) => {
   ];
 };
 
+/** A markdown image's or link's target, up to its closing parenthesis or a title after a space: `](<target>`. */
+const TARGET = /\]\(\s*<?([^)\s>]+)>?/g;
+
+/**
+ * The files of the idea file `idea` that its text names as a markdown image's or link's target, each a file there, in the order the text
+ * names them, once: `taken`, each beside it (`name` or `./name`), which the card carries; `notTaken`, each in a folder below or beside it
+ * (`img/shot.png`), which it does not, as the text names it and as `--file` takes it.
+ * @param idea The idea as typed: a file's path, or words, which name none.
+ * @param body The idea's text.
+ */
+export function besideIdea(idea: string, body: string) {
+  const taken = new Set<string>();
+  const notTaken = new Map<string, string>();
+  if (!fs.statSync(idea, { throwIfNoEntry: false })?.isFile()) return { taken: [...taken], notTaken: [...notTaken] };
+  const dir = path.dirname(idea);
+  for (const match of body.matchAll(TARGET)) {
+    const target = (match[1] ?? '').replace(/^\.\//, '');
+    if (target === '' || target.includes(':') || path.isAbsolute(target)) continue;
+    const at = path.join(dir, target);
+    if (!fs.statSync(at, { throwIfNoEntry: false })?.isFile()) continue;
+    if (target.includes('/')) notTaken.set(target, at);
+    else taken.add(at);
+  }
+  return { taken: [...taken], notTaken: [...notTaken] };
+}
+
+/**
+ * A line for each file the idea's text names in a folder, which the card does not carry: the `--file` that would.
+ * @param notTaken Each such file, as the text names it and as `--file` takes it.
+ */
+const notTakenLines = (notTaken: readonly (readonly [string, string])[]) =>
+  notTaken.map(
+    ([named, at]) =>
+      `not carried: ${named} is in a folder, and a card carries only the files beside its idea file — add it with --file ${at}, or nemia inbox attach <card> ${at}`,
+  );
+
 /**
  * `nemia inbox add`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function inboxAdd(args: Args) {
-  const body = textOrFile(textArg(args, 'idea') ?? '', COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
+  const idea = textArg(args, 'idea') ?? '';
+  const body = textOrFile(idea, COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');
   const factory = textArg(args, 'factory');
   const label = listArg(args, 'label');
   const namespace = factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
+  const typed = listArg(args, 'file');
+  const named = besideIdea(idea, body);
+  const typedHere = (f: string) => typed.some((t) => path.resolve(t) === path.resolve(f));
+  const beside = named.taken.filter((f) => !typedHere(f));
+  const given = inputsOf([...typed, ...beside], 'nemia inbox add', '--file');
+  const files = given.length ? await uploaded(namespace, given, COMMAND) : [];
   const payload = {
     body,
     ...(workflow === undefined ? {} : { workflow }),
     ...(label.length ? { label } : {}),
+    ...(files.length ? { files } : {}),
   };
   said(filedLines(await asked(COMMAND, (c) => c.cards.create({ params: { namespace }, payload }))));
+  said(notTakenLines(named.notTaken.filter(([, at]) => !typedHere(at))));
   return 0;
 }

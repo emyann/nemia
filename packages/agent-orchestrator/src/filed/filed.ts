@@ -38,7 +38,8 @@ export type { HandedRunFolders } from '../../contracts/handed-folders.contract.t
  * MCP servers its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files
  * directory and the run's copies of its workflow folder and its carried files, the run's labels and the try's session token in its
  * session's environment (`stepFilesEnv`), and the harness's own arguments (`own`) last, a step's settings given its factory's harness
- * settings beneath its own (`ownWith`). Where the run froze a home and the step's harness adds a writable folder (`startOf`), its session
+ * settings beneath its own (`ownWith`), and the pictures it is shown in its first message (`t.pictures`). Where the run froze a home and
+ * the step's harness adds a writable folder (`startOf`), its session
  * starts in the home: its workspace is added first, writable by the step's own rules or read-only where its fence writes nothing, the
  * home denied, every rule read against the workspace (`inWorkspace`), the workspace named as `WORKSPACE`, the servers read from the
  * home's `.mcp.json` where it has one and else the workspace's (`projectMcpFrom`), the skills of the home and of each added folder
@@ -85,6 +86,11 @@ export const filedConfig = <Own extends object>(
      * nothing is filed — a check of the config a try or a start would file — and the variable left out.
      */
     sessionToken?: string;
+    /**
+     * The pictures the step is shown in its first message (`picturesFiled`), each a file and its media type: given only to a first step
+     * filed a session of its own on a harness that shows pictures, and the key left out otherwise.
+     */
+    pictures?: readonly { readonly path: string; readonly mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' }[];
   },
 ) => {
   const others = [...(stepMounts(step, run.mounts) ?? []), ...volumeMounts(step, run.volumes), ...folders(filedFolders(step, steps, t))];
@@ -106,6 +112,7 @@ export const filedConfig = <Own extends object>(
       ...placed.env,
       ...owned.env,
     }),
+    ...(t.pictures?.length ? { pictures: t.pictures.map((p) => ({ ...p })) } : {}),
     ...owned.own,
   };
 };

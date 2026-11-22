@@ -91,20 +91,22 @@ const sizeSaid = (bytes: number) => `${ByteSize.format(ByteSize.bytes(bytes))} (
  * past what a file may be (`FILE_LIMIT`), naming each such file's size, the total of them all, and the cap, so the person sees what to
  * shrink or leave out before a byte is sent.
  * @param files The paths of the files to hand, as `--input` typed them.
+ * @param who The command as a refusal names it, `nemia start` unless another command hands files.
+ * @param flag How the command takes a file, as a refusal names it: `--input` unless another word.
  */
-export function inputsOf(files: readonly string[]) {
+export function inputsOf(files: readonly string[], who = 'nemia start', flag = '--input') {
   const inputs = files.map((file) => {
     const at = fs.statSync(file, { throwIfNoEntry: false });
     if (!at?.isFile())
       throw new Refused(
-        `nemia start cannot read --input ${path.resolve(file)}: it is ${at ? 'no file' : 'not there'}. Name a file that is there.`,
+        `${who} cannot read ${flag} ${path.resolve(file)}: it is ${at ? 'no file' : 'not there'}. Name a file that is there.`,
       );
     return { file, name: path.basename(file), size: at.size };
   });
   const past = inputs.filter((input) => input.size > Number(FILE_LIMIT));
   if (past.length)
     throw new Refused(
-      `nemia start hands a run files of ${sizeSaid(Number(FILE_LIMIT))} at most each, and ${past.map((p) => `--input ${p.file} is ${sizeSaid(p.size)}`).join(', ')}; the ${inputs.length} file${inputs.length === 1 ? '' : 's'} given are ${sizeSaid(inputs.reduce((sum, i) => sum + i.size, 0))} in all. Hand ${past.length === 1 ? 'it' : 'each'} smaller, or leave ${past.length === 1 ? 'it' : 'them'} out. Nothing was sent.`,
+      `${who} hands a run files of ${sizeSaid(Number(FILE_LIMIT))} at most each, and ${past.map((p) => `${flag} ${p.file} is ${sizeSaid(p.size)}`).join(', ')}; the ${inputs.length} file${inputs.length === 1 ? '' : 's'} given are ${sizeSaid(inputs.reduce((sum, i) => sum + i.size, 0))} in all. Hand ${past.length === 1 ? 'it' : 'each'} smaller, or leave ${past.length === 1 ? 'it' : 'them'} out. Nothing was sent.`,
     );
   return inputs;
 }
@@ -114,15 +116,16 @@ export function inputsOf(files: readonly string[]) {
  * sent, never held whole: the inputs a start names, each by its name and the id it was answered.
  * @param namespace The namespace the start is sent to, whose files it names.
  * @param inputs The files `inputsOf` read.
+ * @param command The command that uploads them, as a refusal of the api names it.
  */
-async function uploaded(namespace: string, inputs: readonly InputFile[]) {
+export async function uploaded(namespace: string, inputs: readonly InputFile[], command: string = COMMAND) {
   const sent: { name: string; file: string }[] = [];
   for (const input of inputs) {
     const form = new FormData();
     const type = MEDIA_TYPES[path.extname(input.name).toLowerCase()] ?? '';
     form.append('file', await fs.openAsBlob(input.file, { type }), input.name);
     const file = await asked(
-      COMMAND,
+      command,
       (c) => c.files.upload({ params: { namespace }, payload: form }),
       process.env,
       uploadBoundMs(input.size),

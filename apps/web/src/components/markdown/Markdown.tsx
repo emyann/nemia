@@ -1,4 +1,4 @@
-import { memo, useId, type ComponentProps } from 'react';
+import { memo, useId, useMemo, type ComponentProps } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fencedCode, labelFootnotes, languageOf, placeHeadings } from '../../lib/markdown';
@@ -39,6 +39,35 @@ const HEADINGS: Components = Object.fromEntries(TAGS.map((tag) => [tag, heading(
 
 const LINK = 'font-medium text-foreground underline underline-offset-2 break-words hover:text-muted-foreground';
 
+/** A link, as `COMPONENTS` draws it. */
+const drawnLink = ({ node: _node, href, children, className, ...props }: ComponentProps<'a'> & ExtraProps) => {
+  if (!href) return <span className={className}>{children}</span>;
+  if (href.startsWith('#')) {
+    return (
+      <a href={href} className={cn(LINK, className)} {...props}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <a href={href} target="_blank" rel="noreferrer noopener" className={cn(LINK, className)} {...props}>
+      {children}
+    </a>
+  );
+};
+
+/** An image, as `COMPONENTS` draws it: a link to it. */
+const drawnImage = ({ src, alt }: ComponentProps<'img'> & ExtraProps) => {
+  const label = alt ? `image: ${alt}` : 'image';
+  return typeof src === 'string' && src ? (
+    <a href={src} target="_blank" rel="noreferrer noopener" data-image className={LINK}>
+      {label}
+    </a>
+  ) : (
+    <span data-image>{label}</span>
+  );
+};
+
 /**
  * How each element of a text is drawn: the board's type in both themes, and three rules.
  *
@@ -47,34 +76,12 @@ const LINK = 'font-medium text-foreground underline underline-offset-2 break-wor
  *   footnote, stays in the tab.
  * - A fenced block is the board's code block, highlighted where its fence names a language it has (`languageOf`), its lines as written:
  *   a long one scrolls inside the block, never wraps.
- * - An image is a link to it, never fetched: a text an agent wrote names any address it likes.
+ * - An image is a link to it, never fetched: a text an agent wrote names any address it likes; but one that names a file the text carries
+ *   (`files`, a card's), which the board's own api serves, is shown.
  */
 const COMPONENTS: Components = {
-  a: ({ node: _node, href, children, className, ...props }) => {
-    if (!href) return <span className={className}>{children}</span>;
-    if (href.startsWith('#')) {
-      return (
-        <a href={href} className={cn(LINK, className)} {...props}>
-          {children}
-        </a>
-      );
-    }
-    return (
-      <a href={href} target="_blank" rel="noreferrer noopener" className={cn(LINK, className)} {...props}>
-        {children}
-      </a>
-    );
-  },
-  img: ({ src, alt }) => {
-    const label = alt ? `image: ${alt}` : 'image';
-    return typeof src === 'string' && src ? (
-      <a href={src} target="_blank" rel="noreferrer noopener" data-image className={LINK}>
-        {label}
-      </a>
-    ) : (
-      <span data-image>{label}</span>
-    );
-  },
+  a: drawnLink,
+  img: drawnImage,
   pre: ({ node }) => {
     const { code, className } = fencedCode(node);
     return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-body-small [&_pre]:whitespace-pre" />;
@@ -124,6 +131,48 @@ const COMPONENTS: Components = {
 /** The components a text is drawn with. */
 const DRAWN: Components = { ...COMPONENTS, ...HEADINGS };
 
+/**
+ * A file a text carries, as the board reads it: the address it is served at, and whether it is a picture the api serves as its own type
+ * (`PICTURE_TYPES`), shown where the text draws it as an image; any other is a link to it.
+ */
+type TextFile = { readonly at: string; readonly picture: boolean };
+
+/** The name a target written `name` or `./name` stands for, with its escapes read. */
+const targetName = (src: string) => {
+  const bare = src.startsWith('./') ? src.slice(2) : src;
+  try {
+    return decodeURIComponent(bare);
+  } catch {
+    return bare;
+  }
+};
+
+/**
+ * The components a text that carries `files` is drawn with: an image whose target is one of them shown, from the address the board
+ * reads it at, and a link to one led there; every other image and link as `DRAWN` draws it.
+ */
+const drawnWith = (files: Readonly<Record<string, TextFile>>) => {
+  const fileOf = (src: unknown) => (typeof src === 'string' ? files[targetName(src)] : undefined);
+  const drawn: Components = {
+    ...DRAWN,
+    img: (props) => {
+      const file = fileOf(props.src);
+      if (file === undefined) return drawnImage(props);
+      if (!file.picture) return drawnImage({ ...props, src: file.at });
+      const at = file.at;
+      return (
+        <img src={at} alt={props.alt ?? ''} data-card-file className="my-2 max-h-96 max-w-full rounded border border-outline-variant" />
+      );
+    },
+    a: (props) => drawnLink({ ...props, href: fileOf(props.href)?.at ?? props.href }),
+  };
+  return drawn;
+};
+
+/** Whether two maps of a text's files say the same. */
+const sameFiles = (a: Readonly<Record<string, TextFile>> | undefined, b: Readonly<Record<string, TextFile>> | undefined) =>
+  JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
+
 type MarkdownProps = {
   /** The text, as an agent, a folder or a card wrote it. */
   children: string;
@@ -137,6 +186,12 @@ type MarkdownProps = {
   top?: boolean;
   /** Marks a text by what it is on its page (`data-body`, a closeout's body), on the element that holds it. */
   'data-body'?: boolean;
+  /**
+   * The files the text carries, by the name its markdown targets them with, each the address the board reads it at and whether it is a
+   * picture (`TextFile`): a card's, served by the api as itself. An image naming a picture is shown; an image naming any other file is a
+   * link to it, and any other image stays a link, never fetched.
+   */
+  files?: Readonly<Record<string, TextFile>>;
 };
 
 /**
@@ -149,8 +204,9 @@ type MarkdownProps = {
  * line break joins its lines into one paragraph: nothing here keeps a source's breaks. A text's footnote ids have a prefix of its own, so
  * two closeouts with a `[^1]` on one page each link to their own.
  */
-function MarkdownText({ children, className, level = 3, top = false, 'data-body': body }: MarkdownProps) {
+function MarkdownText({ children, className, level = 3, top = false, 'data-body': body, files }: MarkdownProps) {
   const prefix = `md${useId().replace(/[^\w-]/g, '')}-`;
+  const components = useMemo(() => (files === undefined ? DRAWN : drawnWith(files)), [files]);
   return (
     <div
       data-markdown
@@ -161,7 +217,7 @@ function MarkdownText({ children, className, level = 3, top = false, 'data-body'
         remarkPlugins={PLUGINS}
         remarkRehypeOptions={{ clobberPrefix: prefix }}
         rehypePlugins={[() => placeHeadings(level, top, sizeOf), () => labelFootnotes(prefix)]}
-        components={DRAWN}
+        components={components}
       >
         {children}
       </ReactMarkdown>
@@ -177,6 +233,7 @@ export const Markdown = memo(
     before.className === after.className &&
     before.level === after.level &&
     before.top === after.top &&
-    before['data-body'] === after['data-body'],
+    before['data-body'] === after['data-body'] &&
+    sameFiles(before.files, after.files),
 );
 Markdown.displayName = 'Markdown';

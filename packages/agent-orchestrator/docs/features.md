@@ -1236,7 +1236,10 @@ What it leaves:
   `inputsDir(run)`.
 - **The files are copied once, whole, and kept.** A file changed after `wf start` is not seen, nothing limits a file's size,
   and nothing removes `runs/<id>/`, as nothing removes a run's artifacts.
-- **A card has no inputs** (`wf plan`), as §6 left it.
+- **A card has no inputs** (`wf plan`), as §6 left it. Shipped since: an inbox card carries files (`files:`), uploaded first and
+  named by their ids, copied into the `inputs/` of every run started from it, its pictures shown to its first step
+  (*front-door: a card carries its files and pictures, and they reach the run that takes it*; the package's README, *A card carries
+  files*).
 
 ### Artifacts collected from the workspace
 

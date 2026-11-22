@@ -31,7 +31,7 @@ async function fileFrom(page: Page, idea: string) {
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
   const [filed] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === 'POST' && cardsPath().test(new URL(r.url()).pathname), { timeout: WAIT_MS }),
-    box.getByRole('button', { name: 'File' }).click(),
+    box.getByRole('button', { name: 'File', exact: true }).click(),
   ]);
   if (filed.status() !== 201) throw new Refused(`the api files the card — it answered ${filed.status()}: ${await filed.text()}`);
   const {

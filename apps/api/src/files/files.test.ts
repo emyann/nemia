@@ -5,6 +5,9 @@
  * write with no bearer token sends (but the board's, by its cookie with the header a script sets), an id no file of the namespace is
  * kept under — with nothing kept or started.
  *
+ * Through the MCP port, a card's file given inline to its tool is uploaded and named by its id, and one past the inline bound is the
+ * call's error with nothing kept.
+ *
  * In a factory of the store (`acme`, the orchestrator's test team's `dev`), on a scratch repository: each run is written and nothing is
  * filed.
  */
@@ -17,11 +20,14 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { FILE_LIMIT, type FileObject, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
+import { Api, FILE_LIMIT, type FileObject, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
-import { runsAtOnce } from 'agent-orchestrator';
+import { CLI_VERBS, runsAtOnce, TABLE } from 'agent-orchestrator';
 import { TEAM } from '../../test/team.ts';
 import { OBJECT_BODY_LIMIT } from '../objects/serve.ts';
+import { called } from '../mcp/port.ts';
+import { portTools } from '../mcp/tools.ts';
+import { MAX_INLINE_BYTES } from '../mcp/files.ts';
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -217,4 +223,130 @@ test('REFUSED: an input with no name and no file is a 422, nothing started', asy
   const res = await post('runs', { workflow: 'dev', brief: 'Read it.', inputs: [{ text: 'x' }] });
   assert.equal(res.status, 422, await res.clone().text());
   assert.equal(runCount(), before);
+});
+
+test('an uploaded picture is streamed inline as its own type, and an SVG only as an attachment', async () => {
+  const bytes = crypto.randomBytes(2000);
+  const put = await upload(formOf('shot.png', bytes));
+  assert.equal(put.status, 201, await put.clone().text());
+  const file = (await put.json()) as FileObject;
+  const content = await app().request(`/api/namespaces/acme/files/${file.id}/content`);
+  assert.equal(content.status, 200);
+  assert.equal(content.headers.get('content-type'), 'image/png');
+  assert.equal(content.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(Buffer.from(await content.arrayBuffer()), bytes);
+  const svg = await upload(formOf('logo.svg', Buffer.from('<svg/>'), 'image/svg+xml'));
+  const svgFile = (await svg.json()) as FileObject;
+  const served = await app().request(`/api/namespaces/acme/files/${svgFile.id}/content`);
+  assert.equal(served.headers.get('content-type'), 'application/octet-stream');
+  assert.match(served.headers.get('content-disposition') ?? '', /^attachment/);
+});
+
+test('REFUSED: the content of an id never kept is Missing', async () => {
+  assert.equal((await app().request(`/api/namespaces/acme/files/file_${'0'.repeat(32)}/content`)).status, 404);
+});
+
+test('a card filed with a kept file says it in its status, attaches another and takes it off; an unknown id is refused', async () => {
+  const shot = (await (await upload(formOf('shot.png', crypto.randomBytes(300)))).json()) as FileObject;
+  const log = (await (await upload(formOf('run.log', Buffer.from('a log\n'), 'text/plain'))).json()) as FileObject;
+  const filed = await post('cards', { body: 'Look at ![it](shot.png).', workflow: 'dev', files: [{ file: shot.id }] });
+  assert.equal(filed.status, 201, await filed.clone().text());
+  const card = (await filed.json()) as {
+    metadata: { name: string };
+    status: { files?: { name: string; inText: boolean; kept: boolean }[] };
+  };
+  assert.deepEqual(
+    card.status.files?.map((f) => [f.name, f.inText, f.kept]),
+    [['shot.png', true, true]],
+  );
+  const name = card.metadata.name;
+  const attached = await post(`cards/${name}/files`, { files: [{ file: log.id }] });
+  assert.equal(attached.status, 200, await attached.clone().text());
+  const after = (await attached.json()) as typeof card;
+  assert.deepEqual(
+    after.status.files?.map((f) => [f.name, f.inText]),
+    [
+      ['shot.png', true],
+      ['run.log', false],
+    ],
+  );
+  const detached = await app().request(`/api/namespaces/acme/cards/${name}/files/run.log`, {
+    method: 'DELETE',
+    headers: { ...BEARER, 'content-type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(detached.status, 200, await detached.clone().text());
+  assert.deepEqual(
+    ((await detached.json()) as typeof card).status.files?.map((f) => f.name),
+    ['shot.png'],
+  );
+  const unknown = await post('cards', { body: 'Another.', workflow: 'dev', files: [{ file: `file_${'0'.repeat(32)}` }] });
+  assert.equal(unknown.status, 422);
+});
+
+test("the port lists a card's files as an id or the files extension's FileInput, uploads its inline data, and refuses one past the inline bound or with no data", async () => {
+  const tools = portTools(TABLE, CLI_VERBS, Api);
+  const attach = tools.find((t) => t.name === 'inbox_attach');
+  assert.ok(attach, 'the port has a tool for attaching files to a card');
+  assert.deepEqual(attach.fileKeys, ['files']);
+  assert.equal(
+    tools
+      .filter((t) => t.fileKeys.length > 0)
+      .every(
+        (t) =>
+          JSON.stringify(t.inputSchema).includes('"contentEncoding":"base64"') && JSON.stringify(t.inputSchema).includes('"x-mcp-file"'),
+      ),
+    true,
+    'each tool that takes files marks its FileInput x-mcp-file, its data in base64',
+  );
+  write(path.join(root, 'inbox', 'port-card.md'), '---\nworkflow: dev\nfactory: acme\n---\nLook at ![it](shot.png).\n');
+  const from = new Request('http://127.0.0.1:8787/mcp', { method: 'POST', headers: BEARER });
+  const shot = crypto.randomBytes(500);
+  const result = await called(
+    attach,
+    {
+      namespace: 'acme',
+      name: 'port-card',
+      files: [{ id: 'f1', name: 'shot.png', mimeType: 'image/png', size: shot.length, data: shot.toString('base64') }],
+    },
+    from,
+    { fetch: (r) => app().fetch(r) },
+  );
+  assert.notEqual(result.isError, true, JSON.stringify(result.content));
+  const card = result.structuredContent as { status: { files?: { name: string; file: string; kept: boolean }[] } };
+  assert.deepEqual(
+    card.status.files?.map((f) => [f.name, f.kept]),
+    [['shot.png', true]],
+  );
+  const id = card.status.files?.[0]?.file ?? '';
+  assert.deepEqual(fs.readFileSync(path.join(root, 'files', 'acme', id)), shot);
+  const before = kept();
+  const past = await called(
+    attach,
+    {
+      namespace: 'acme',
+      name: 'port-card',
+      files: [
+        {
+          id: 'f2',
+          name: 'big.bin',
+          mimeType: 'application/octet-stream',
+          size: MAX_INLINE_BYTES + 1,
+          data: Buffer.alloc(MAX_INLINE_BYTES + 1).toString('base64'),
+        },
+      ],
+    },
+    from,
+    { fetch: (r) => app().fetch(r) },
+  );
+  assert.equal(past.isError, true);
+  assert.deepEqual(kept(), before);
+  const unsent = await called(
+    attach,
+    { namespace: 'acme', name: 'port-card', files: [{ id: 'f3', name: 'later.png', mimeType: 'image/png', size: 10 }] },
+    from,
+    { fetch: (r) => app().fetch(r) },
+  );
+  assert.equal(unsent.isError, true, 'a FileInput with no data is refused: this port takes no upload out of band');
+  assert.deepEqual(kept(), before);
 });

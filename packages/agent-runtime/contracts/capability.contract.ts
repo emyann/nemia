@@ -16,7 +16,8 @@ import { type Implementation, spec } from '@emyann/tsverify';
  *
  * - `contextTokens`, `claudeFlags` (a task's `config.claude`, carried whole), `codexArgs` (`config.codex`), `commandArgs` (`command`,
  *   `niceness`, `terminationMessagePath`), `env`, `readOnlyMount`, `writableMount`, `callAdmission`, `projectMcp`, `enabledSkills`,
- *   `memoryLimit`, `bridge` (a session bridged to a remote control): a task's config it takes;
+ *   `pictures` (shown in a session's first message), `memoryLimit`, `bridge` (a session bridged to a remote control): a task's config
+ *   it takes;
  * - `keepsOpen`: a session kept open until stopped (`restartPolicy: 'Always'`); `holdsCalls`: a call held open for a person (`mayAsk`);
  * - `interrupt`, `answerAsk`, `quota`, `mcp` (`mcpState`, `mcpSignIn`, `mcpSignInState`, `mcpSignOut`), `hold`, `drain` (its sessions'
  *   calls held, and their deadlines paused, while the store's drain stands): an Engine verb it answers.
@@ -32,6 +33,7 @@ export type Capability =
   | 'callAdmission'
   | 'projectMcp'
   | 'enabledSkills'
+  | 'pictures'
   | 'memoryLimit'
   | 'bridge'
   | 'keepsOpen'

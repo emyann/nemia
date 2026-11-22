@@ -27,8 +27,8 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-describe('argsRefusalOf: where a key is and whether it is one — the twenty-two arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', () => {
-  test("HARNESS_ARGS is the twenty-two arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
+describe('argsRefusalOf: where a key is and whether it is one — the twenty-three arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', () => {
+  test("HARNESS_ARGS is the twenty-three arguments a harness takes — the spend cap, the pictures, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
     assert.deepEqual([...HARNESS_ARGS].sort(), [
       'allowedTools',
       'budgetUsd',
@@ -47,12 +47,29 @@ describe('argsRefusalOf: where a key is and whether it is one — the twenty-two
       'mounts',
       'niceness',
       'permissionMode',
+      'pictures',
       'projectMcp',
       'projectMcpFrom',
       'terminationMessagePath',
       'tools',
       'worktree',
     ]);
+  });
+  test('pictures: a relative path, a media type none of the four, a path twice, or more than a hundred are refused; a list of absolute pictures is taken', () => {
+    const at = (n: number) => ({ path: `/shots/${n}.png`, mediaType: 'image/png' });
+    for (const pictures of [
+      [{ path: 'shot.png', mediaType: 'image/png' }],
+      [{ path: '/shot.svg', mediaType: 'image/svg+xml' }],
+      [at(1), at(1)],
+      Array.from({ length: 101 }, (_, n) => at(n)),
+      'shot.png',
+    ]) {
+      assert.match(argsRefusalOf({ ...task, config: { pictures } } as never) ?? '', /^`pictures`/, JSON.stringify(pictures).slice(0, 80));
+    }
+    assert.equal(
+      argsRefusalOf({ ...task, config: { pictures: [at(1), { path: '/b.webp', mediaType: 'image/webp' }] } } as never),
+      undefined,
+    );
   });
   test("remoteControl, one of Claude Code's own flags, is refused under config and beside it at any value, naming config.claude — and taken there", () => {
     const says =
@@ -109,6 +126,7 @@ describe('argsRefusalOf: where a key is and whether it is one — the twenty-two
       callAdmission: { command: ['my-admit'], tools: ['Bash'] },
       mayAsk: true,
       enabledSkills: ['my-plugin:review'],
+      pictures: [{ path: '/repo/shot.png', mediaType: 'image/png' }],
     };
     for (const key of HARNESS_ARGS) {
       const says = argsRefusalOf({ ...task, [key]: value[key] } as never);

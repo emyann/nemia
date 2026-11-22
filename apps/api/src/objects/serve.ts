@@ -69,6 +69,9 @@ const DOCUMENT = 'GET /openapi/v3/nemia/v1';
  */
 export const OBJECT_BODY_LIMIT = ByteSize.mebibytes(1);
 
+/** A card's create, whole write or edit: a body past the limit there is a card's text, which a file carries instead. */
+const CARD_PATH = /^\/api\/namespaces\/[^/]+\/cards(?:\/[^/]+(?:\/source)?)?$/;
+
 /** The limit as a refusal says it: its unit and its bytes. */
 const OBJECT_BODY_LIMIT_SAID = `${ByteSize.format(OBJECT_BODY_LIMIT)} (${Number(OBJECT_BODY_LIMIT)} bytes)`;
 
@@ -158,7 +161,7 @@ async function inApiWords(c: RequestContext<ApiEnv>, response: Response) {
   const route = `${c.req.method} ${new URL(c.req.url).pathname}`;
   const error =
     response.status === 413
-      ? `${route} was sent an object too large: a body may be ${OBJECT_BODY_LIMIT_SAID} at most. Send a smaller one.`
+      ? `${route} was sent an object too large: a body may be ${OBJECT_BODY_LIMIT_SAID} at most. ${CARD_PATH.test(new URL(c.req.url).pathname) ? "Keep the card's text short, and attach what is long as a file: upload it (POST /api/namespaces/<namespace>/files), then name it under files, as nemia inbox add <idea> --file <path> does." : 'Send a smaller one.'}`
       : response.status === 415
         ? `${route} does not take a body of the content-type sent (${c.req.header('content-type') ?? 'none'}): ${DOCUMENT} says what it takes.`
         : `${route} does not read as its route takes it. Send it in that shape: ${DOCUMENT} says each key and value.`;

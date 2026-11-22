@@ -115,6 +115,7 @@ erDiagram
     object callAdmission "optional"
     boolean mayAsk "optional"
     unknown enabledSkills "optional"
+    list pictures "optional"
     boolean remoteControl "optional"
     list checkoutMcp "optional"
   }

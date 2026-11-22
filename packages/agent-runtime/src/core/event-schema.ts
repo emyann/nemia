@@ -76,6 +76,13 @@ const harnessArgs = {
   callAdmission: Schema.optional(Schema.Struct({ command: Strings, tools: Strings })),
   mayAsk: Schema.optional(Schema.Boolean),
   enabledSkills: Schema.optional(Schema.Union([Strings, Schema.Literal('default')])),
+  pictures: Schema.optional(
+    Schema.mutable(
+      Schema.Array(
+        Schema.Struct({ path: Schema.String, mediaType: Schema.Literals(['image/png', 'image/jpeg', 'image/gif', 'image/webp']) }),
+      ),
+    ),
+  ),
 };
 
 /**

@@ -14,11 +14,24 @@ import { ByteSize, Schema } from 'effect';
 export const FILE_LIMIT = ByteSize.mebibytes(64);
 
 /**
- * How long a file is kept from its upload: a day, in milliseconds. Long enough to upload and start, and to start again after a start
+ * How long a file no card names is kept from its last write: a day, in milliseconds. A File an inbox card names (its id anywhere in the
+ * card's text) is kept as long as the card stays in the inbox. Long enough to upload and start, and to start again after a start
  * refused for something else, with the same ids; short enough that a store does not grow with the files of starts never made. A run copies
  * each file it is handed into its own `inputs/` as it starts, so letting a file go takes nothing from a run.
  */
 export const FILE_KEPT_FOR = 24 * 60 * 60 * 1000;
+
+/** How many files one card may carry: a card past it is refused at filing, attach or edit (`count`). */
+export const CARD_FILES_MOST = 32;
+
+/** How many bytes all of a card's files together may be: 256 MiB, four files at the cap (`bytes`). */
+export const CARD_FILES_BYTES_MOST = 256 * 1024 * 1024;
+
+/** The media types a picture is drawn and shown in: what the Messages API's image block takes, and what the board draws inline. */
+export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
+
+/** A media type a picture is drawn and shown in. */
+export type PictureMediaType = (typeof PICTURE_TYPES)[number];
 
 /** The prefix of every file's id, as the model APIs' ids say what they name (`file_…`). */
 export const FILE_ID_PREFIX = 'file_';

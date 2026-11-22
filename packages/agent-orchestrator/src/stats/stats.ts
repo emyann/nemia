@@ -90,6 +90,11 @@ export type TryFact = RunKeys & {
   landingDeadlineMs: number | null;
   /** Each of its checks, by name: how long it ran, null while not ended, and its verdict; absent on a fact read before checks had names. */
   checks?: CheckFact[];
+  /**
+   * The pictures handed to the run its first try was filed with, and how many of them it was shown in its first message (the step's
+   * `pictures` on the record): on a step's first try alone, null for any other try or a step handed none; absent on a fact read before.
+   */
+  pictures?: { handed: number; shown: number } | null;
 };
 
 /** One check of a try (`TryFact.checks`): its name (`check` for a step's `check: <line>`), the ms it ran, and its verdict. */
@@ -248,11 +253,16 @@ function tryFactsOf(r: RunRead) {
           })),
           landingDeadlineMs: landingDeadlineOf(r, step, t),
           checks: checkFactsOf(r, t),
+          pictures: t.try === 1 ? picturesHanded(r.run.steps[step.name]?.pictures) : null,
         },
       ];
     }),
   );
 }
+
+/** The pictures a step's record says its first filing was handed and shown, counted; null where it was handed none. */
+const picturesHanded = (p: { readonly shown: readonly string[]; readonly held: readonly unknown[] } | undefined) =>
+  p === undefined ? null : { handed: p.shown.length + p.held.length, shown: p.shown.length };
 
 /** For each `loop:` step whose loop ended accepted — its closeout said `again: false`, or a person accepted it — the rounds it ran. */
 const roundsOf = (r: RunRead) =>
@@ -386,6 +396,8 @@ export type StepRow = {
   skillTries: number;
   skills: SkillRow[];
   rules: RuleRow[];
+  /** The pictures its first tries were handed and shown in their first message, summed: null where none was handed. */
+  pictures: { handed: number; shown: number } | null;
 };
 
 /**
@@ -505,7 +517,17 @@ function stepRowsOf(tries: readonly TryFact[]) {
     skillTries: of.filter((t) => t.skills !== null).length,
     skills: skillRowsOf(of),
     rules: ruleRowsOf(of),
+    pictures: picturesOf(of),
   }));
+}
+
+/** The pictures `of`'s tries were handed and shown, summed; null where none of them was handed one. */
+function picturesOf(of: readonly TryFact[]) {
+  const handed = of.flatMap((t) => (t.pictures ? [t.pictures] : []));
+  const sum: StepRow['pictures'] = handed.length
+    ? { handed: handed.reduce((n, p) => n + p.handed, 0), shown: handed.reduce((n, p) => n + p.shown, 0) }
+    : null;
+  return sum;
 }
 
 const DAY_MS = 86_400_000;

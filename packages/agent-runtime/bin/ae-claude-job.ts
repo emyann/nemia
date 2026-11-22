@@ -61,6 +61,7 @@ import { jobHoldOf, type HoldIO } from '../src/harness/claude/job-hooks.ts';
 import { replaceFile } from '../src/core/replace.ts';
 import { claudeExecutableOf } from '../src/harness/mcp-sign-in.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
+import { type Block, openingOf, pictureBlocks } from '../src/harness/claude/pictures.ts';
 
 /** Why the session cannot go on, thrown so that whatever is printed is flushed before the process leaves. */
 class Refused extends Error {}
@@ -70,7 +71,8 @@ class Refused extends Error {}
  * message of the shape `claudeJobSpec.input.line` writes is passed over rather than taken for one: the worker writes nothing else
  * on it, and a line torn mid-write is no message.
  */
-const inputOf = () => {
+const inputOf = (pictures: readonly Block[]) => {
+  let first: readonly Block[] | undefined = pictures.length ? pictures : undefined;
   const items: string[] = [];
   let wake: (() => void) | undefined;
   let closed = false;
@@ -105,10 +107,12 @@ const inputOf = () => {
     async *[Symbol.asyncIterator]() {
       for (;;) {
         for (let content = items.shift(); content !== undefined; content = items.shift()) {
+          const said = first === undefined ? content : openingOf(content, first);
+          first = undefined;
           yield {
             type: 'user' as const,
             uuid: randomUUID(),
-            message: { role: 'user' as const, content },
+            message: { role: 'user' as const, content: said },
             parent_tool_use_id: null,
             session_id: '',
           };
@@ -202,7 +206,13 @@ const ran = async ({ request, io }: Requested) => {
   } catch (e) {
     throw new Refused((e as Error).message);
   }
-  const input = inputOf();
+  let pictures: Block[];
+  try {
+    pictures = pictureBlocks(request);
+  } catch (e) {
+    throw new Refused((e as Error).message);
+  }
+  const input = inputOf(pictures);
   let ends: () => void = () => {};
   const hold = io.hold === undefined ? undefined : jobHoldOf(io.hold, () => ends());
   const session = query({

@@ -180,6 +180,7 @@ test('inbox_add says its body keys, and agents_custom_put its path, query and bo
   assert.deepEqual([...keysSaidBy(inbox.description, inputKeys(inbox.inputSchema))].sort(), [
     'body',
     'factory',
+    'files',
     'from',
     'label',
     'namespace',

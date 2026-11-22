@@ -49,6 +49,7 @@ import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { defaultStartRefusal, unattachedRefusal, wiredRepo, type Factory } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { fileAt, filesDir } from '../start/files.store.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
 export type InboxStart = {
@@ -179,6 +180,17 @@ const cardFactory = Effect.fn('cardFactory')(function* (
 });
 
 /**
+ * The files `card` carries, each by its name in the card and the path of the File it names in its factory's files: a File no longer kept
+ * at the path it would have, which the start refuses as missing.
+ * @param home The store's root.
+ * @param card The card, its factory and its files.
+ */
+const cardFilesAt = (home: string, card: InboxCard) => {
+  const at = card.factory ?? DEFAULT_NAMESPACE;
+  return (card.files ?? []).map((f) => ({ name: f.name, path: fileAt(home, at, f.file)?.path ?? path.join(filesDir(home, at), f.file) }));
+};
+
+/**
  * `nemia start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name>
  * }` on its record. The card is kept, and lists as `started` while that record stands; a queued one has its `queued:` line taken off, so
  * that the tick never starts it again, even once the run is forgotten.
@@ -199,7 +211,9 @@ const cardFactory = Effect.fn('cardFactory')(function* (
  * its name, one the factory does not offer or wires no repository for, one that does not load — a `gate:` naming no step of it, in the
  * card's words, a `from:` naming a run the store does not have or one also waited
  * on (`contextRefusal`), and a `brief` with nothing in it. The run is handed as context the card's `from:` and `context`, in that order.
- * And refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, or a factory not there.
+ * And refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, or a factory not there. The card's files
+ * (`files:`) are copied into the run's `inputs/` under their names in the card, beside `inputs`: a File its factory no longer keeps,
+ * or one whose name an `--input` takes too, is refused before anything is written (`inputRefusal`), naming `nemia inbox attach`.
  */
 export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: InboxStart) {
   const refused = inboxNameRefusal(opts.name);
@@ -232,6 +246,8 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const ids = new Set(yield* runs.runs.ids());
   const context = cardContext(card, opts, (id) => ids.has(id));
 
+  const cardFiles = cardFilesAt(yield* StoreRoot, card);
+
   const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,
     repo,
@@ -241,6 +257,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     after: opts.after,
     ...(context.length ? { context } : {}),
     inputs: opts.inputs,
+    ...(cardFiles.length ? { cardFiles } : {}),
     cards: opts.cards,
     from: { inbox: card.name, ...(opts.trigger === undefined ? {} : { trigger: opts.trigger }) },
     ...(gates.length ? { gates } : {}),

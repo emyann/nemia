@@ -135,6 +135,8 @@ export const UNLINKED_READS: { readonly [K in ApiGetName]?: string } = {
   'templates.skills': TEMPLATE_PREVIEW,
   'templates.skill': TEMPLATE_PREVIEW,
   'factories.export': 'read by `nemia factory move`, a write that carries a factory to another store',
+  'files.content':
+    "a kept file's bytes, which no tool answers: `nemia inbox files <card> --get <name>` writes a card's out, the board shows its pictures, and a card's own read lists each file",
   'factories.home': "rendered by `nemia factory home` on the client's machine, to start the person's own session",
 };
 

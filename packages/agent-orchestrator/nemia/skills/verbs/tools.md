@@ -212,8 +212,10 @@ Its arguments:
 ## inbox_add
 
 ```text
-  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...
-    park an idea as a card in the inbox, named from its first line
+  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]... [--file <path>]...
+    park an idea as a card in the inbox, named from its first line;
+    each --file is uploaded and carried by the card, as is each file
+    beside an idea file that its text names as an image or a link
 ```
 
 Files a new card in the inbox, in the namespace's factory (none, in default), from the CardFile body. Answers the Card filed with a 201, naming any label it left out.
@@ -229,6 +231,7 @@ Its arguments:
 - repo: Retired and refused: the factory places the card's run.
 - factory (--factory at a shell): The factory the card is filed in.
 - label (--label at a shell): The labels the card is filed with, each as `key=value`.
+- files: The files the card carries, each a File uploaded to the card's namespace first, by its id.
 
 ## inbox_queue
 
@@ -337,6 +340,42 @@ Its arguments:
 
 - namespace: The namespace the object is in: the name of its factory, default for one that names none.
 - name (<name> at a shell): The object's name, unique in its namespace for its kind.
+
+## inbox_attach
+
+```text
+  nemia inbox attach <name> <path>...
+    upload files and attach them to a card no run was started from,
+    each under its own name: every run started from it takes them
+```
+
+Attaches files to a card no run was started from, each a File uploaded to the card's namespace first, by its id, under the name the body gives or the File's own. Answers the Card as it is now; a started card is a Conflict.
+
+Calls `POST /api/namespaces/:namespace/cards/:name/files`.
+
+Its arguments:
+
+- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- name (<name> at a shell): The object's name, unique in its namespace for its kind.
+- files (<files> at a shell): The files to attach, each a File uploaded to the card's namespace first, by its id, and the name it takes in the card.
+
+## inbox_detach
+
+```text
+  nemia inbox detach <name> <file>...
+    take files off a card no run was started from, by their names
+    in the card, as nemia inbox files lists them
+```
+
+Takes a file off a card no run was started from, by its name in the card. Answers the Card as it is now; a started card is a Conflict.
+
+Calls `DELETE /api/namespaces/:namespace/cards/:name/files/:file`.
+
+Its arguments:
+
+- namespace: The namespace the object is in: the name of its factory, default for one that names none.
+- name (<name> at a shell): The object's name, unique in its namespace for its kind.
+- file: The file's name in the card.
 
 ## label_run
 

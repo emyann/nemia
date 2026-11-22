@@ -568,6 +568,12 @@ describe("inputsLine, inputsNote and composeBrief of a run's inputs", () => {
       'under a heading of their own, after what was asked for',
     );
     assert.equal(inputsLine(DIR, inputs), line);
+    assert.equal(inputsLine(DIR, inputs, false, undefined, [], []), line, 'a request that names none of them marks none');
+    assert.match(
+      brief(step('implement'), { ...r, brief: 'add a flag, as ![the mock](./mock.png) shows', inputs }, STEPS),
+      /`mock\.png`, a picture, named in what was asked; `brief notes\.md`, a text file, named nowhere in it\./,
+      'a request that names a file by an image or a link marks which of them it names',
+    );
     assert.match(line, /part of what was asked/);
     assert.match(
       inputsLine(DIR, ['shot.JPG', 'trace.bin', 'Makefile'])!,

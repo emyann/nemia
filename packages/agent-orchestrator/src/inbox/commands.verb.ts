@@ -1,20 +1,25 @@
 /**
  * `nemia inbox`, each of its forms an entry of the command table: the cards listed, an idea filed as one, a card queued to start on its own
- * or taken off the queue, a started card sent on, its `from:` set, and a card dropped. None is routed by the table: the Card's verbs are
- * declared in `objects`' Api, and the api's handlers (apps/api/src/objects/cards.ts) call the handlers of `inbox add`, `inbox queue`,
- * `inbox resend` and `inbox rm` by their `input`. The writes' words are the client's (`objects`' `INBOX_WORDS`): it parses, words and
- * prints them, and the entries here spread those words beside their handlers. A card's `from:` (`nemia inbox from`) the api writes as part
- * of the Card's whole write (`update`, `replaceCard`), and reads one card with its file as written (`get`); a card's text (`nemia inbox
- * edit`) it writes through the Card's `edit`, which calls the handler of `inbox edit` (`editCard`).
+ * or taken off the queue, a started card sent on, its `from:` set, a card dropped, and files attached to a card or taken off it. None is
+ * routed by the table: the Card's verbs are declared in `objects`' Api, and the api's handlers (apps/api/src/objects/cards.ts) call the
+ * handlers of `inbox add`, `inbox queue`, `inbox resend`, `inbox rm`, `inbox attach` and `inbox detach` by their `input`. The writes'
+ * words are the client's (`objects`' `INBOX_WORDS`): it parses, words and prints them, and the entries here spread those words beside
+ * their handlers. A card's `from:` (`nemia inbox from`) the api writes as part of the Card's whole write (`update`, `replaceCard`), and
+ * reads one card with its file as written (`get`); a card's text (`nemia inbox edit`) it writes through the Card's `edit`, which calls
+ * the handler of `inbox edit` (`editCard`).
  */
 import {
   INBOX_READ_WORDS,
   INBOX_ADD_WORDS,
+  INBOX_ATTACH_WORDS,
+  INBOX_DETACH_WORDS,
   INBOX_EDIT_WORDS,
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
   INBOX_RESEND_WORDS,
   INBOX_RM_WORDS,
+  CardFileRef,
+  DEFAULT_NAMESPACE,
   Actor,
   runsNamed,
 } from 'objects';
@@ -31,7 +36,9 @@ import { EngineService } from '../runtime-client.ts';
 import { howOf } from '../summary/how.verb.ts';
 import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 import { editCard } from '../card-write/card-edit.verb.ts';
-import type { CardReplaced } from '../card-write/card-write.verb.ts';
+import { attachToCard, type CardReplaced, detachFromCard, filesKept } from '../card-write/card-write.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { filesPruned } from '../start/files.store.ts';
 import { resendCard, type Resent } from './resend.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -80,6 +87,7 @@ export const InboxAddInput = Schema.Struct({
   repo: Schema.optionalKey(Schema.String),
   factory: Schema.optionalKey(Schema.String),
   label: Schema.optionalKey(Schema.Array(Schema.String)),
+  files: Schema.optionalKey(Schema.Array(CardFileRef)),
 });
 export type InboxAddInput = typeof InboxAddInput.Type;
 
@@ -90,7 +98,11 @@ export type InboxAddInput = typeof InboxAddInput.Type;
 export const INBOX_ADD: Served<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }, InboxAddInput> = {
   ...INBOX_ADD_WORDS,
   input: InboxAddInput,
-  handler: ({ idea, label, ...keys }) => Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])] })),
+  handler: ({ idea, label, files, ...keys }) =>
+    Effect.gen(function* () {
+      const kept = files === undefined ? undefined : yield* filesKept(keys.factory ?? DEFAULT_NAMESPACE, files);
+      return yield* addToInbox({ text: idea, ...keys, labels: [...(label ?? [])], ...(kept !== undefined ? { files: kept } : {}) });
+    }),
 };
 
 /** What `nemia inbox queue` did, and the card as it now reads. */
@@ -206,7 +218,46 @@ export type InboxRmInput = typeof InboxRmInput.Type;
 export const INBOX_RM: Served<InboxDropped, InboxRmInput> = {
   ...INBOX_RM_WORDS,
   input: InboxRmInput,
-  handler: ({ name }) => dropFromInbox(name),
+  handler: ({ name }) =>
+    dropFromInbox(name).pipe(
+      Effect.tap((dropped) => (dropped.removed ? Effect.map(StoreRoot, (home) => filesPruned(home, Date.now())) : Effect.void)),
+    ),
+};
+
+/** What `nemia inbox attach`'s handler takes: the card, its namespace, and the Files it is to carry, each uploaded there first. */
+export const InboxAttachInput = Schema.Struct({
+  name: Schema.String,
+  namespace: Schema.String,
+  files: Schema.Array(CardFileRef),
+});
+export type InboxAttachInput = typeof InboxAttachInput.Type;
+
+/**
+ * `nemia inbox attach`: Files uploaded to a card's namespace attached to it, each under its name, while no run was started from it
+ * (`attachToCard`), its words the client's (`objects`' `INBOX_ATTACH_WORDS`). The api's Card `attach` calls it.
+ */
+export const INBOX_ATTACH: Served<CardReplaced, InboxAttachInput> = {
+  ...INBOX_ATTACH_WORDS,
+  input: InboxAttachInput,
+  handler: ({ name, namespace, files }) => attachToCard(name, namespace, files),
+};
+
+/** What `nemia inbox detach`'s handler takes: the card, its namespace, and the names of the files to take off it. */
+export const InboxDetachInput = Schema.Struct({
+  name: Schema.String,
+  namespace: Schema.String,
+  files: Schema.Array(Schema.String),
+});
+export type InboxDetachInput = typeof InboxDetachInput.Type;
+
+/**
+ * `nemia inbox detach`: files a card carries taken off it by their names, while no run was started from it (`detachFromCard`), its
+ * words the client's (`objects`' `INBOX_DETACH_WORDS`). The api's Card `detach` calls it.
+ */
+export const INBOX_DETACH: Served<CardReplaced, InboxDetachInput> = {
+  ...INBOX_DETACH_WORDS,
+  input: InboxDetachInput,
+  handler: ({ name, namespace, files }) => detachFromCard(name, namespace, files),
 };
 
 /** `nemia inbox`'s entries, in the order `nemia`'s help lists them. */
@@ -218,4 +269,6 @@ export const INBOXES: readonly (Command | Served)[] = [
   INBOX_FROM,
   tableEntry(INBOX_EDIT),
   tableEntry(INBOX_RM),
+  tableEntry(INBOX_ATTACH),
+  tableEntry(INBOX_DETACH),
 ];

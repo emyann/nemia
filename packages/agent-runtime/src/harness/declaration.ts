@@ -28,6 +28,7 @@ export const CAPABILITIES: readonly Capability[] = [
   'callAdmission',
   'projectMcp',
   'enabledSkills',
+  'pictures',
   'memoryLimit',
   'bridge',
   'keepsOpen',

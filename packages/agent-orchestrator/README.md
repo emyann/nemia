@@ -3394,6 +3394,18 @@ run 'wf tick' (or 'wf up') to start it
   refused, naming the attach. A file whose frontmatter is an inbox card's gives its keys and its body. Any other text is the
   body whole, as `wf start` takes a brief that is not a card. `--repo`, and a file's `repo:`, are refused: the factory names
   the repository.
+- **A card carries files** (`files:`, a map of the name its text and its run find each by to the File it names, `file_…`). Each
+  is uploaded first to the card's namespace (`POST /api/namespaces/<namespace>/files`) and named to the card by its id:
+  `nemia inbox add "<idea>" --file <path>`, every file beside an idea file that its text names as a markdown image or link, and
+  `nemia inbox attach <name> <path>...`; `nemia inbox detach <name> <file>...` takes one off and `nemia inbox files <name>
+  [--get <file>]` lists them or writes one out. A card carries 32 files and 256 MiB at most, each name a file's own, never
+  `cards`, and its files change only until a run is started from it (`cardFilesRefusal`, `src/inbox/card-files.ts`, proved by
+  `contracts/card-files.contract.ts`). A File is kept while any inbox entry's text names its id, and let go of a day after its
+  last write once none does (`filesPruned`). Every run started from the card has its files copied into its `inputs/`, beside
+  each `--input`, a name the two share refused; and a step that waits on none, filed a session of its own on a harness that shows
+  pictures, is shown the pictures among them in its first message (`picturesShown`, `src/filed/pictures/pictures.ts`, proved by
+  `contracts/pictures-shown.contract.ts`; the harness argument `pictures`), each held back named in its brief with why, and both
+  written on the step's record (`pictures`), which the stats count.
 - **`nemia inbox edit <name> <file>`, or `nemia inbox edit <name> -- "<card>"`, changes a card where it lives.** It takes a
   card's text, frontmatter and body, as `status.source` serves it, and reads it as the card's own file is read: a key no card has,
   or one whose value does not read, is refused by name, and nothing is written. The body and the keys `workflow:`, `gate:`,

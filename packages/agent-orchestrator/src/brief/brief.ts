@@ -31,7 +31,7 @@ import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
 import { FENCE_KEYS, headedLayers, ownDenies, type ComposedLayer } from '../workflow/index.ts';
-import { INPUTS_HEADING, inputsLine, mountsLine } from '../start/index.ts';
+import { INPUTS_HEADING, inputsLine, mountsLine, namedInText } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
@@ -134,6 +134,9 @@ const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly 
 
 /** What a continued session is told of its tree, which the run provisioned again under it: under its own heading, or nothing. */
 const resumedLook = (tree: readonly string[]) => (tree.length ? ['', '', '## Where to look', '', ...tree, ''].join('\n') : '');
+
+/** The files of `run.inputs` its brief names by a markdown image or link (`namedInText`): none for a run given none. */
+const inputsNamed = (run: Run) => namedInText(run.brief, run.inputs ?? []);
 
 /**
  * What a step is told. THE decision about what one step knows of another.
@@ -253,7 +256,7 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards);
+  const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards, inputsNamed(run));
   const request = [run.brief, ...mountsLine(step, run, folders, place.workspace), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
   const parts = [...opening, headingOf('What was asked for'), '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];

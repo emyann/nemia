@@ -1,7 +1,7 @@
 /**
  * The box that files a card, on the Inbox page: the idea, and the factory it is filed in, picked from a list. With a factory, the workflows
  * are those it offers, by name, and the repository is the one its wiring gives the workflow picked, said and never picked; with none, the
- * idea is filed alone.
+ * idea is filed alone. Files dropped, chosen or pasted are carried by the card, each uploaded first.
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +13,10 @@ import { keptBy, startRepo } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
 import { Button, Select, SelectItem, TextField } from '@/components/ui/ds';
 import { Pending, Reading, ReadingLines } from '@/components/look';
+import { CARD_FILES_MOST } from 'objects';
 import { sayWritten } from '@/lib/written';
+import { inputsAdded } from '@/lib/startInputs';
+import { StartInputs } from '../run/StartInputs';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -35,14 +38,16 @@ export function FileCard({ shown }: { shown: string | undefined }) {
   const [chosen, setChosen] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState('');
   const [filed, setFiled] = useState<{ name: string; factory: string | null } | null>(null);
+  const [given, setGiven] = useState<File[]>([]);
   const factory = offered.find((f) => f.name === (chosen ?? factoryPreset(shown, offered))) ?? null;
   const picked = factory?.workflows?.includes(workflow) ? workflow : null;
   const file = useMutation({
-    mutationFn: () => fileCard(cardFiling({ idea, factory, workflow: picked })),
+    mutationFn: () => fileCard({ ...cardFiling({ idea, factory, workflow: picked }), given }),
     onMutate: () => setFiled(null),
     onSuccess: ({ name }) => {
       setIdea('');
       setWorkflow('');
+      setGiven([]);
       setFiled({ name, factory: factory?.name ?? null });
       sayWritten('filed', name, () => void navigate({ to: '/inbox/$name', params: { name } }));
       void queryClient.invalidateQueries({ queryKey: ['inbox'] });
@@ -53,6 +58,10 @@ export function FileCard({ shown }: { shown: string | undefined }) {
     <form
       aria-label="File a card"
       className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
+      onPaste={(event) => {
+        const pasted = [...event.clipboardData.files];
+        if (pasted.length > 0) setGiven(inputsAdded(given, pasted));
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         file.mutate();
@@ -70,6 +79,13 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         }}
       />
       {factory && <InFactory factory={factory} picked={picked} onWorkflow={setWorkflow} />}
+      <StartInputs
+        label="Files the card carries"
+        note={`A picture its text names, ![shot](shot.png), is shown on its page. ${CARD_FILES_MOST} files at most.`}
+        files={given}
+        onChange={setGiven}
+        isDisabled={file.isPending}
+      />
       <div className="flex flex-wrap items-center gap-3">
         <Button icon={file.isPending ? Pending : undefined} type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}

@@ -19,7 +19,38 @@ import { HANDED_CLOSEOUT, type HandedFiles } from '../artifacts/artifacts.ts';
  * A file `nemia start --input` was given, as start.verb.ts found it: the path as typed, where it resolves, and what is there. What
  * `inputRefusal` judges; start.verb.ts looks, and this file does not.
  */
-export type InputFile = { given: string; resolved: string; kind: 'file' | 'directory' | 'missing' | 'other' };
+export type InputFile = {
+  given: string;
+  resolved: string;
+  kind: 'file' | 'directory' | 'missing' | 'other';
+  /** The name it takes in the run's `inputs/`, where it is not its path's own: a card's file, kept by the api under its id. */
+  name?: string;
+};
+
+/**
+ * The name `f` takes in the run's `inputs/`: its own name where it is given one, a card's file's, else its path's.
+ * @param f The file as found.
+ */
+export const inputName = (f: Pick<InputFile, 'resolved' | 'name'>) => f.name ?? path.basename(f.resolved);
+
+/**
+ * What a refusal calls `f`: the `--input` it was given as, or a card's file by its own words.
+ * @param f The file as found.
+ */
+const inputSaid = (f: Pick<InputFile, 'given' | 'name'>) => (f.name !== undefined ? f.given : `--input ${f.given}`);
+
+/** Why the one input `f` cannot be read, naming the fix, or null where it is a regular file. */
+const unreadInput = (f: InputFile) => {
+  if (f.name !== undefined && f.kind === 'missing')
+    return `${f.given} is no longer kept: its File was let go of. Attach it to the card again — nemia inbox attach <card> <path> — and start it again.`;
+  if (f.kind === 'missing')
+    return `--input ${f.given}: there is no file at ${f.resolved}. Give the path to a file to hand the run's steps, from where nemia start is typed or absolute.`;
+  if (f.kind === 'directory')
+    return `--input ${f.given}: ${f.resolved} is a directory, and --input copies one file. Give each file its own --input.`;
+  if (f.kind === 'other')
+    return `--input ${f.given}: ${f.resolved} is not a regular file, so there is nothing to copy. Give the path to a file.`;
+  return null;
+};
 
 /**
  * Why `nemia start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything
@@ -29,20 +60,17 @@ export type InputFile = { given: string; resolved: string; kind: 'file' | 'direc
  */
 export function inputRefusal(inputs: readonly InputFile[]) {
   for (const f of inputs) {
-    if (f.kind === 'missing')
-      return `--input ${f.given}: there is no file at ${f.resolved}. Give the path to a file to hand the run's steps, from where nemia start is typed or absolute.`;
-    if (f.kind === 'directory')
-      return `--input ${f.given}: ${f.resolved} is a directory, and --input copies one file. Give each file its own --input.`;
-    if (f.kind === 'other')
-      return `--input ${f.given}: ${f.resolved} is not a regular file, so there is nothing to copy. Give the path to a file.`;
+    const unread = unreadInput(f);
+    if (unread !== null) return unread;
   }
   const named = new Map<string, InputFile>();
   for (const f of inputs) {
-    const name = path.basename(f.resolved);
+    const name = inputName(f);
     const other = named.get(name);
-    if (other?.resolved === f.resolved) return `--input ${f.given} is given twice. Each file is copied once: give it one --input.`;
+    if (other?.resolved === f.resolved && other.name === undefined && f.name === undefined)
+      return `--input ${f.given} is given twice. Each file is copied once: give it one --input.`;
     if (other) {
-      return `--input ${other.given} and --input ${f.given} are both named ${name}, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.`;
+      return `${inputSaid(other)} and ${inputSaid(f)} are both named ${name}, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.`;
     }
     named.set(name, f);
   }
@@ -81,7 +109,8 @@ export const cardsRefusal: CardsRefusal = (cards, unnamed, found, inputs) => {
  */
 export const namedTwice: NamedTwice = (names) => names.find((name, at) => names.slice(0, at).includes(name));
 
-const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
+/** The extensions a handed file is a picture by: what a brief calls it, and what a first step is shown of (`handedPictures`). */
+export const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
 const TEXTS = new Set(['.md', '.txt', '.json', '.yaml', '.yml', '.csv', '.log', '.html', '.xml', '.toml']);
 
 /** What a given file is, read off its name alone: a picture, a text file, or a file. */
@@ -90,6 +119,29 @@ const inputKind = (name: string) => {
   if (PICTURES.has(ext)) return 'a picture';
   return TEXTS.has(ext) ? 'a text file' : 'a file';
 };
+
+/** A markdown image's or link's target, up to its closing parenthesis or a title after a space: `](<target>`. */
+const TARGET = /\]\(\s*<?([^)\s>]+)>?/g;
+
+/**
+ * The names of `names` that `body` uses as a markdown image's or link's target, `name` or `./name`, each once, in the order of `names`.
+ * @param body The text, its markdown: a card's, or what a run was asked.
+ * @param names The names of its files: a card's, or a run's inputs.
+ */
+export function namedInText(body: string, names: readonly string[]) {
+  const targets = new Set<string>();
+  for (const match of body.matchAll(TARGET)) {
+    const raw = match[1] ?? '';
+    let target = raw;
+    try {
+      target = decodeURIComponent(raw);
+    } catch {
+      target = raw;
+    }
+    targets.add(target.startsWith('./') ? target.slice(2) : target);
+  }
+  return names.filter((n) => targets.has(n));
+}
 
 /**
  * What a step's brief says, under a heading of its own (`INPUTS_HEADING`), when `nemia start --input` gave the run files or
@@ -109,6 +161,8 @@ const inputKind = (name: string) => {
  * @param inFolder Whether the step is of a folder run, which gets a copy of the inputs in its folder.
  * @param folders The folders the step is filed with, whose inputs mount is named where there is one; undefined where it is filed none.
  * @param cards The inbox cards handed, by name; none where not given.
+ * @param named The files of `names` that what was asked names by a markdown image or link (`namedInText`): each file is then said to be
+ *   named there or not, so a step reads first the ones the request points at. None said where it names none, or is not read for them.
  */
 export const inputsLine = (
   dir: string | undefined,
@@ -116,10 +170,12 @@ export const inputsLine = (
   inFolder = false,
   folders?: Pick<FiledFolders, 'inputs'>,
   cards: readonly string[] = [],
+  named?: readonly string[],
 ) => {
   if (!dir || (!names?.length && !cards.length)) return undefined;
+  const where = (n: string) => (!named?.length ? '' : named.includes(n) ? ', named in what was asked' : ', named nowhere in it');
   const files = names?.length
-    ? `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: ${names.map((n) => `\`${n}\`, ${inputKind(n)}`).join('; ')}.`
+    ? `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: ${names.map((n) => `\`${n}\`, ${inputKind(n)}${where(n)}`).join('; ')}.`
     : undefined;
   const handed = cards.length
     ? `The person handed these inbox cards with it (\`nemia start --card\`), each copied as it read when the run started, under \`${CARDS_FOLDER}/\` as \`<name>.md\`: ${cards.map((c) => `\`${c}\``).join(', ')}.`

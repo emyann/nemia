@@ -408,7 +408,7 @@
     },
     {
       "term": "File",
-      "meaning": "a file a factory keeps for a start to hand its run's steps, as the model APIs' Files API keeps one: uploaded once, its own request, as a form of one part (`POST /api/namespaces/<namespace>/files`), 64 MiB at most (`FILE_LIMIT`) and kept a day (`FILE_KEPT_FOR`), and answered as its file object, whose id (`file_…`) a start in the same namespace names as an input's `file` (`FileObject`, `packages/objects/src/file.ts`).",
+      "meaning": "a file a factory keeps for a start to hand its run's steps, as the model APIs' Files API keeps one: uploaded once, its own request, as a form of one part (`POST /api/namespaces/<namespace>/files`), 64 MiB at most (`FILE_LIMIT`) and kept a day from its last write (`FILE_KEPT_FOR`), or while an inbox card names it, and answered as its file object, whose id (`file_…`) a start in the same namespace names as an input's `file` (`FileObject`, `packages/objects/src/file.ts`); its bytes streamed again at `GET /api/namespaces/<namespace>/files/<id>/content`.",
       "type": "FileObject"
     },
     {
@@ -430,6 +430,11 @@
       "term": "Trigger quota",
       "meaning": "whether a trigger can spend quota: `spends` where something its target can reach runs an agent (a session or a judge), `free` where nothing it reaches does, however many cards it queues, `unknown` where a workflow it reaches cannot be read; read off the steps of the target and of the workflows its card nodes file for, never off whether it fires or matches now (`TriggerQuota`, `packages/objects/src/trigger.ts`).",
       "type": "TriggerQuota"
+    },
+    {
+      "term": "Card file",
+      "meaning": "a file a card carries: a File uploaded first to the card's namespace, named to the card by its id and the name it takes there (`CardFileRef`), at most `CARD_FILES_MOST` of them and `CARD_FILES_BYTES_MOST` together; read back as the card's status says it, whether its text names it and whether it is still kept (`CardFileStatus`) (`packages/objects/src/card.ts`).",
+      "type": "CardFileRef"
     }
   ]
 }

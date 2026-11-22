@@ -559,6 +559,18 @@ export const cards = {
       (c) => c.cards.labels({ params: { namespace, name }, payload: edit }),
       write(Labelled, 'The labels may be set: read the card again before sending it again.'),
     ),
+  /** Files uploaded first, each named to a card by its id and the name it takes there: answers the card as it now reads. */
+  attach: (namespace: string, name: string, attached: readonly { name: string; file: string }[]) =>
+    call(
+      (c) => c.cards.attach({ params: { namespace, name }, payload: { files: attached } }),
+      write(Card, 'The files may be attached: read the card again before attaching them again.'),
+    ),
+  /** A file a card carries taken off it, by its name in the card: answers the card as it now reads. */
+  detach: (namespace: string, name: string, file: string) =>
+    call(
+      (c) => c.cards.detach({ params: { namespace, name, file } }),
+      write(Card, 'The file may be taken off: read the card again before taking it off again.'),
+    ),
 };
 
 /** What a write of a factory's rules, instruction or cost line may have done, and what to look at before writing again. */

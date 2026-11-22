@@ -313,8 +313,8 @@ export function ServerReleaseView({
       )}
       {shown.unread !== undefined && (
         <p role="status" data-upgrades-unread className="text-body-small break-words text-on-surface-variant">
-          Whether an upgrade is at work could not be read, so none is offered here: {shown.unread} Upgrade at the machine that serves this
-          board, or reload the page once the api answers.
+          Whether an upgrade is at work could not be read, so none is offered here: {shown.unread}
+          {/[.!?]$/.test(shown.unread) ? '' : '.'} Upgrade at the machine that serves this board, or reload the page once the api answers.
         </p>
       )}
       {run}

@@ -485,7 +485,7 @@ export const files = {
 const Started = Schema.Struct({ id: Schema.String, card: Schema.String });
 
 /** What a list of cards is asked by: its labels, and whether each is still in play (`status.inPlay=true`). */
-export type CardListQuery = { labelSelector?: string; fieldSelector?: string };
+type CardListQuery = { labelSelector?: string; fieldSelector?: string };
 
 /** The query a list of cards is sent with: each key given. */
 const cardListQueryOf = (query: CardListQuery) => ({

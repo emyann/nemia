@@ -1040,7 +1040,7 @@ describe("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's
     ],
     'a key spelt as another': ['---\nrepos: /home/me/code/app\n---\nx\n', [F, '`repos`']],
     'a misspelt `factory`': ['---\nfactry: shop\n---\nx\n', [F, '`factry`', 'workflow, repo, queued, gate, model, factory,']],
-    '`after:` with a blank card': ['---\nafter: a-1x2y, \n---\nx\n', [F, '`after: a-1x2y, `', 'comma-separated', 'Correct the line.']],
+    '`after:` with a blank card': ['---\nafter: a-1x2y,\n---\nx\n', [F, '`after: a-1x2y,`', 'comma-separated', 'Correct the line.']],
     "`after:` a name that is no card's": ['---\nafter: ../up\n---\nx\n', [F, '`after: ../up`', "is not a card's name"]],
     '`after:` naming a card twice': ['---\nafter: a-1x2y, a-1x2y\n---\nx\n', [F, 'names a-1x2y twice']],
     '`after:` naming the card itself': ['---\nafter: cache-the-views-k2q9\n---\nx\n', [F, 'names the card itself', 'cache-the-views-k2q9']],

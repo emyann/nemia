@@ -1058,6 +1058,25 @@ describe('`statsOf`: the facts bucketed by UTC day and by a key, filtered, total
       },
     },
     {
+      name: "a step's pictures are what its record says its first try was handed and shown, 3 and 2, counted once; a step handed none is null",
+      check: () => {
+        const steps = [step('design', [], { by: 'planner' }), step('implement', ['design'], { by: 'implementer' })];
+        const r = readOf('pictured', steps, {
+          design: [{ end: at(1, JOBS_DAY) }, { end: at(2, JOBS_DAY) }],
+          implement: [{ end: at(3, JOBS_DAY) }],
+        });
+        r.run.steps.design = {
+          ...r.run.steps.design,
+          pictures: { shown: ['a.png', 'b.png'], held: [{ name: 'c.png', reason: 'size' }] },
+        } as Run['steps'][string];
+        const rows = statsOf(factsOfAll(r), {}, JOBS_NOW).all.steps;
+        assert.deepEqual(
+          ['design', 'implement'].map((name) => rows.find((row) => row.step === name)?.pictures),
+          [{ handed: 3, shown: 2 }, null],
+        );
+      },
+    },
+    {
       name: "a day's skills loaded are a mean over its measured tries",
       check: () => {
         const s = statsOf(

@@ -29,7 +29,7 @@ import {
 } from './stats.ts';
 import type { SkillRule } from '../skills/skills.ts';
 import { deniedCallsOf } from './discipline.ts';
-import type { TryMemory } from '../out-of-memory/peak.ts';
+import type { TryMemory } from '../out-of-memory/index.ts';
 
 const MIN = 60_000;
 const minus = (at: string, ms: number) => new Date(Date.parse(at) - ms).toISOString();

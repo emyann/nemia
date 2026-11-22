@@ -15,7 +15,7 @@ const GI = 1024 * MI;
 
 /** A local step whose workflow sets none of what the engine files. */
 const SPEC: StepSpecView = {
-  harness: 'claude',
+  harness: null,
   model: null,
   effort: null,
   context: null,

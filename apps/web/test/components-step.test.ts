@@ -1648,7 +1648,7 @@ test("a step's memory row says what its session asks, its limit and its peak, th
   const row = (memory: StepFiled['memory']) => {
     const html = renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed(memory)) }));
     const m = /<div data-fact="memory"[^>]*>\s*<dt[^>]*>memory<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/.exec(html);
-    return m ? { said: textsOf(m[1]!).join(''), mark: /data-step-memory="(\w+)"/.exec(m[1]!)?.[1] } : null;
+    return m ? { said: textsOf(m[1]).join(''), mark: /data-step-memory="(\w+)"/.exec(m[1])?.[1] } : null;
   };
   const within = { request: '1Gi', limit: '6Gi', askedBytes: GI, peakBytes: 812 * MI, peakLimitBytes: 6 * GI };
   assert.deepEqual(row(within), { said: 'asks 1Gi · limit 6Gi · peaked 812Mi', mark: 'within' });

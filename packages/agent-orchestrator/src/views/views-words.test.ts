@@ -6,7 +6,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { killedMemoryOf, type AttemptMemory, type WordAttempt, type WordView } from './views-words.ts';
-import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
+import { outOfMemory, outOfMemoryWords } from '../out-of-memory/index.ts';
 import { memoryBytesWord } from 'objects';
 
 const GI = 1024 ** 3;

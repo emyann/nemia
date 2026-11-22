@@ -12,7 +12,7 @@ import { type Bridge, bridgeOf } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { remoteAgents } from '../runtime-client.ts';
 import { runsInOf } from './runs-in.ts';
-import { askedBytesOf, tryMemoryOf, type AttemptResources } from '../out-of-memory/peak.ts';
+import { askedBytesOf, tryMemoryOf, type AttemptResources } from '../out-of-memory/index.ts';
 import type { AttemptMemory } from '../views/views-words.ts';
 import type { HandedHow, RunsInBy, TaskSource } from 'objects';
 

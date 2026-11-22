@@ -231,28 +231,19 @@ test("the light steps' sessions ask the memory the factory sets, 1Gi where it se
     ['quick', 'land'],
   ];
   for (const [workflow, step] of light) {
-    const asked = (name: string) => loaded(name, workflow).find((one) => one.name === step)?.memoryRequest;
-    assert.equal(asked('plain'), '1Gi', `plain: ${workflow}/${step}`);
-    assert.equal(asked('set'), '768Mi', `set: ${workflow}/${step}`);
-    assert.equal(asked('own'), undefined, `own: ${workflow}/${step}`);
-    assert.equal(
-      Object.hasOwn(stepIn(treeOf('own'), workflow, step).front, 'memoryRequest'),
-      false,
-      `own: ${workflow}/${step} writes no line`,
-    );
+    const front = (name: string) => stepIn(treeOf(name), workflow, step).front;
+    assert.equal(front('plain').memoryRequest, '1Gi', `plain: ${workflow}/${step}`);
+    assert.equal(front('set').memoryRequest, '768Mi', `set: ${workflow}/${step}`);
+    assert.equal(Object.hasOwn(front('own'), 'memoryRequest'), false, `own: ${workflow}/${step} writes no line`);
   }
-  for (const [workflow, step] of [
-    ['build', 'design'],
-    ['build', 'implement'],
-    ['build', 'review'],
-    ['quick', 'implement'],
-    ['quick', 'review'],
-  ])
-    assert.equal(
-      loaded('plain', workflow).find((one) => one.name === step)?.memoryRequest,
-      undefined,
-      `${workflow}/${step} asks the default`,
-    );
+  for (const workflow of ['build', 'quick']) {
+    const asked = (name: string, step: string) => loaded(name, workflow).find((one) => one.name === step)?.memoryRequest;
+    assert.equal(asked('plain', 'land'), '1Gi', `plain: ${workflow}/land loads asking it`);
+    assert.equal(asked('set', 'land'), '768Mi', `set: ${workflow}/land loads asking it`);
+    assert.equal(asked('own', 'land'), undefined, `own: ${workflow}/land loads asking the default`);
+    for (const step of workflow === 'build' ? ['design', 'implement', 'review'] : ['implement', 'review'])
+      assert.equal(asked('plain', step), undefined, `${workflow}/${step} asks the default`);
+  }
 });
 
 /** The steps of `workflow` in the factory `name`'s tree, loaded as a start of it in the factory loads them: with the factory's hires. */

@@ -21,7 +21,7 @@ import { RunId } from '../record/record.model.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { tryMemoryOf } from '../out-of-memory/peak.ts';
+import { tryMemoryOf } from '../out-of-memory/index.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import type { SeriesMemo } from '../series/series.ts';

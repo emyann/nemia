@@ -4,6 +4,7 @@ import { storeQuery } from '../lib/api/store.ts';
 import { pagePlaceOf } from '../lib/factories';
 import { filterOf } from '../lib/listFilter';
 import { loadWorkflowsIn } from '../lib/placed';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** The workflows of the factory its path names, read on the repository its search names (`?repo=`). */
 export const Route = createFileRoute('/factories/$factory_/workflows')({
@@ -15,12 +16,7 @@ export const Route = createFileRoute('/factories/$factory_/workflows')({
       context.queryClient.ensureQueryData(storeQuery),
     ]),
   component: Page,
-  errorComponent: ({ error }) => (
-    <p className="text-body-medium text-failure">
-      Could not load the workflows: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?{' '}
-      {everyFactory}.
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the workflows" error={error} then={<>{everyFactory}.</>} />,
 });
 
 /** The workflows page, read off its address; its filter is written to it as a person types (`?q=`). */

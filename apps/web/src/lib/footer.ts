@@ -13,6 +13,7 @@ import { openRows } from './factory.ts';
 import type { FeedStatus } from './feed.ts';
 import { lastWords, quotaTitle, type WindowWords, windowWords } from './quota.ts';
 import { stepState } from './status.ts';
+import { troubleOf } from './api/read.ts';
 
 /** What is at work across every factory: the runs in flight, and the sessions working or checking. */
 type AtWork = { runs: number; sessions: number };
@@ -120,7 +121,7 @@ export function daemonDot(daemon: Daemon | undefined, error: Error | null, now: 
       kind: 'error',
       tone: 'down',
       word: 'unread',
-      title: `Whether a daemon ticks this store could not be read: ${error.message}`,
+      title: `Whether a daemon ticks this store could not be read: ${troubleOf(error).words}`,
     } satisfies DaemonDot;
   }
   if (!daemon)
@@ -169,7 +170,7 @@ const windowsText = (windows: readonly WindowWords[]) => windows.map((w) => `${w
  * @param now The instant the windows and the last reading are read against.
  */
 export function quotaShort(quota: Quota | undefined, error: Error | null, now: Date) {
-  if (error) return { text: 'unread', marked: false, stale: false, title: `The quota could not be read: ${error.message}` };
+  if (error) return { text: 'unread', marked: false, stale: false, title: `The quota could not be read: ${troubleOf(error).words}` };
   if (!quota) return { text: 'reading', marked: false, stale: false, title: 'Reading the quota.' };
   const title = quotaTitle(quota, now);
   if (quota.state === 'fresh') {

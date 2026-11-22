@@ -1,10 +1,12 @@
 /**
  * What the board's reads and writes of the api are refused with — in the api's words (`ReadRefusal`, `WriteRefusal`), or as an answer this
  * board does not read (`UnreadAnswer`) — and the decode that words the last (`decoded`). Every read and write is made by the objects'
- * client (`objects.ts`), which reads a refusal's words once.
+ * client (`objects.ts`), which reads a refusal's words once. And what a page says where a read fails, by its kind, the same on every
+ * page (`troubleOf`, `troubleLine`, proved by `contracts/read-trouble.contract.ts`).
  */
 import { Result, Schema, SchemaIssue } from 'effect';
 import { refusedIn, type RefusedPlace, type TokenRefusal } from 'objects';
+import type { ReadFailure, Trouble, TroubleKind, TroubleWords } from '../../../contracts/read-trouble.contract.ts';
 
 /** A read the api answered with an error: its words, and its status, which is how a run gone from the store is told apart (`readGone`). */
 export class ReadRefusal extends Error {
@@ -17,7 +19,7 @@ export class ReadRefusal extends Error {
 
 /**
  * A read the api answered, with what this board does not read: `route` the read (`GET /api/runs`), and a message naming the first key that
- * is wrong, what was there, and the fix — the board and the api were built apart, so restart the api and rebuild the board, then reload.
+ * is wrong, what was there, and the fix, `BUILT_APART`: the board and the api are of different builds.
  */
 export class UnreadAnswer extends Error {
   readonly route: string;
@@ -38,6 +40,9 @@ export class WriteRefusal extends Error {
     this.status = status;
   }
 }
+
+/** The fix where the api answered what this board does not read: the two are of different builds, said for an install. */
+export const BUILT_APART = "The board and Nemia's api are of different builds: restart Nemia's service, then reload the page.";
 
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
 const shown = (value: unknown) => {
@@ -66,8 +71,43 @@ function unreadWords(route: string, issue: SchemaIssue.Issue, may?: string) {
       : deepest._tag === 'MissingKey'
         ? 'is missing'
         : `is ${shown(deepest.input)}, where the board reads ${deepest.message ?? deepest.expected}`;
-  return `${route} answered what this board does not read: at ${pathWords(path)}, the value ${what}.${may ? ` ${may}` : ''} The board and the api were built apart: restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.`;
+  return `${route} answered what this board does not read: at ${pathWords(path)}, the value ${what}.${may ? ` ${may}` : ''} ${BUILT_APART}`;
 }
+
+/**
+ * How `error` failed a read, and its message: the api's refusal (`ReadRefusal`, `WriteRefusal`), an answer this board does not read
+ * (`UnreadAnswer`), or anything else, which is nothing having answered — the objects' client throws no other error where the api answered.
+ * @param error What the read was rejected with.
+ */
+export function failureOf(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const kind: TroubleKind =
+    error instanceof ReadRefusal || error instanceof WriteRefusal ? 'refused' : error instanceof UnreadAnswer ? 'unread' : 'unanswered';
+  return { kind, message } satisfies ReadFailure;
+}
+
+/**
+ * What the board says of a failed read, by its kind: the api's words where it refused, the answer's own message where it answered what
+ * the board does not read, and where nothing answered, that Nemia's api did not, why, and to reload once it does.
+ * @param failure The read's failure: its kind and its message.
+ */
+export const troubleWords: TroubleWords = (failure) => {
+  if (failure.kind !== 'unanswered') return { kind: failure.kind, words: failure.message };
+  return { kind: failure.kind, words: "Nemia's api did not answer (" + failure.message + '). Reload the page once it is running again.' };
+};
+
+/**
+ * What the board says where `error` failed a read: its kind, which a page marks it by, and its words.
+ * @param error What the read was rejected with.
+ */
+export const troubleOf = (error: unknown) => troubleWords(failureOf(error)) satisfies Trouble;
+
+/**
+ * The one line a page says where it could not read `what`: `Could not read <what>: ` and the trouble's words.
+ * @param what What the page reads, as a person names it: `the agents`, `the run r-1`.
+ * @param error What the read was rejected with.
+ */
+export const troubleLine = (what: string, error: unknown) => `Could not read ${what}: ${troubleOf(error).words}`;
 
 /**
  * `value` decoded with `schema`; throws an `UnreadAnswer` for `route` where it does not decode, with `may`'s words before the fix. Shared

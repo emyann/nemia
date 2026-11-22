@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { WorkflowTrail, loadWorkflow, WorkflowPage, workflowSearch } from '../components/workflow/WorkflowPage';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of a workflow, at /factories/$factory/workflows/$from/$workflow: `workflows_` draws it on its own, not inside the Workflows
@@ -28,9 +29,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <WorkflowTrail from={from} workflow={workflow} place={{ factory, ...(repo && { repo }) }} />
-      <p className="text-body-medium text-failure">
-        Could not load this workflow: {error instanceof Error ? error.message : String(error)}
-      </p>
+      <ReadTrouble what="this workflow" error={error} />
     </div>
   );
 }

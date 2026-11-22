@@ -11,6 +11,7 @@ import { FactoryTag } from '../factory/FactoryTag';
 import { BarPanel } from '../frame/BarPanel';
 import { Reading } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { troubleOf } from '@/lib/api/read';
 
 /** One run waiting on you: its title, its factory and what it waits for, a link to its run's page at its gate, or at its top for none. */
 function WaitingRow({ row }: { row: BellRow }) {
@@ -64,7 +65,7 @@ export function WaitingBar() {
           </p>
         )
       ) : runs.error ? (
-        <p className="text-body-medium">The runs could not be read: {runs.error.message}</p>
+        <p className="text-body-medium">The runs could not be read: {troubleOf(runs.error).words}</p>
       ) : (
         <Reading label="Reading the runs…" className="flex flex-col gap-2">
           {[0, 1, 2].map((at) => (

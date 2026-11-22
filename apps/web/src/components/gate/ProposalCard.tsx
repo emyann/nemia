@@ -22,6 +22,7 @@ import { sayWritten } from '@/lib/written';
 import { ProposalTags } from './ProposalTags';
 import { Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** What a change does to its object, in the person's words. */
 const VERB_WORDS: Record<ChangeVerb, string> = { create: 'makes', update: 'changes', delete: 'removes' };
@@ -57,9 +58,9 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
       );
     if (error)
       return (
-        <p data-proposal-reading={name} className="text-body-medium text-muted-foreground">
-          Could not read the proposal: {error.message}
-        </p>
+        <div data-proposal-reading={name}>
+          <ReadTrouble what="the proposal" error={error} className="text-muted-foreground" />
+        </div>
       );
     return (
       <div data-proposal-reading={name}>

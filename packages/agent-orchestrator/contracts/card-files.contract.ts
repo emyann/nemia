@@ -143,6 +143,49 @@ const cardFilesRefusalSpec = spec<
 /** Why a card's files as given cannot be written, or undefined where they can. */
 export type CardFilesRefusalOf = Implementation<typeof cardFilesRefusalSpec>;
 
+/** Whether two files are the one file: the same name, the same File, the same size kept. */
+const sameGiven = (a: CardFileGiven, b: CardFileGiven) => a.name === b.name && a.file === b.file && a.size === b.size;
+
+/**
+ * Whether the held file `held` is a reference that is gone, which a file attached under its name takes the place of: its File is no
+ * longer kept in the card's namespace, and one of `attached` is given its name.
+ */
+const replacedBy = (held: CardFileGiven, attached: readonly CardFileGiven[]) =>
+  held.size === null && attached.some((a) => a.name === held.name);
+
+const cardFilesAttachedSpec = spec<(held: readonly CardFileGiven[], attached: readonly CardFileGiven[]) => readonly CardFileGiven[]>({
+  ensures: {
+    aGoneReferenceIsReplaced: {
+      description:
+        "A file the card holds whose File is no longer kept is taken off where a file is attached under its name: attaching it again is how the refusal at start is answered",
+      condition: ({ input: [held, attached], output }) =>
+        output.length === held.filter((h) => !replacedBy(h, attached)).length + attached.length,
+    },
+    whatIsKeptStays: {
+      description:
+        'Every other file the card holds stays, a kept File under a name attached again among them, so two files of one name are still refused',
+      condition: ({ input: [held, attached], output }) =>
+        held.every((h) => replacedBy(h, attached) || output.some((o) => sameGiven(o, h))),
+    },
+    everyAttachedFileIsCarried: {
+      description: 'Every file attached is carried',
+      condition: ({ input: [held, attached], output }) => attached.every((a) => output.some((o) => sameGiven(o, a))),
+    },
+    nothingElseIsCarried: {
+      description: 'The card carries no file it neither held nor was attached',
+      condition: ({ input: [held, attached], output }) =>
+        output.every((o) => held.some((h) => sameGiven(o, h)) || attached.some((a) => sameGiven(o, a))),
+    },
+  },
+});
+
+/**
+ * The files a card is to carry once `attached` are attached beside the ones it holds (`held`), each with the size of its File kept in the
+ * card's namespace: the held, but each whose File is gone and whose name an attached file takes, then the attached. What `cardFilesRefusal`
+ * then judges.
+ */
+export type CardFilesAttached = Implementation<typeof cardFilesAttachedSpec>;
+
 /**
  * A kept File as the prune reads it: when it was last written, in milliseconds, and whether a card names it — its id written anywhere in
  * an inbox card's text, a card that does not read included, so a card nobody can parse loses none of its files.

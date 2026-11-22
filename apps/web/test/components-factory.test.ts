@@ -467,3 +467,40 @@ test("switcherLine: the switcher says its factory's repository, its template and
   assert.equal(switcherLine(filed('kit', { worksOn: [] }), undefined), 'no volume to work on', 'nothing said of what is not read');
   assert.equal(switcherLine(undefined, 'not ticking'), 'no volume to work on · not ticking');
 });
+
+test("a factory's Proposals page lists its rows, what waits first; a read that fails says what to do by its kind, never a dev command", async () => {
+  const { FactoryProposals } = await import('../src/components/factory/FactoryProposals.tsx');
+  const { proposalsQuery } = await import('../src/lib/api/proposals.ts');
+  const { ReadRefusal, UnreadAnswer } = await import('../src/lib/api/read.ts');
+  const drawn = (seed: (client: InstanceType<typeof QueryClient>) => void) => {
+    const client = new QueryClient();
+    seed(client);
+    return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(FactoryProposals, { factory: 'acme' })));
+  };
+  const rows = drawn((client) =>
+    client.setQueryData(proposalsQuery('acme').queryKey, [
+      { name: 'p-applied', phase: 'applied', widens: false, why: '', creationTimestamp: '2026-11-02T00:00:00Z' },
+      { name: 'p-waiting', phase: 'waiting', widens: true, why: 'Hire a reviewer.', creationTimestamp: '2026-11-01T00:00:00Z' },
+    ]),
+  );
+  assert.ok(rows.indexOf('data-factory-proposal="p-waiting"') < rows.indexOf('data-factory-proposal="p-applied"'));
+  assert.match(rows, /Hire a reviewer\./);
+  const failed = (error: Error) =>
+    drawn((client) =>
+      client
+        .getQueryCache()
+        .build(client, proposalsQuery('acme'))
+        .setState({ status: 'error', error, fetchStatus: 'idle', errorUpdatedAt: 1, errorUpdateCount: 1, fetchFailureCount: 1 }),
+    );
+  for (const error of [
+    new ReadRefusal('too long', 422),
+    new UnreadAnswer('GET /api/namespaces/acme/proposals', 'unread'),
+    new TypeError('fetch failed'),
+  ]) {
+    const line = failed(error);
+    assert.match(line, /data-proposals-trouble/, error.name);
+    assert.ok(!line.includes('npm run dev'), error.name);
+  }
+  assert.match(failed(new TypeError('fetch failed')), /nemia doctor/);
+  assert.match(failed(new UnreadAnswer('GET /x', 'unread')), /nemia service restart/);
+});

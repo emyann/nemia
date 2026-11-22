@@ -205,15 +205,14 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
       );
 
       const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
-      fs.writeFileSync(given, `---\nworkflow: ui\nfactory: nemia\n---\nShow the flag on the settings page.\n`);
+      fs.writeFileSync(given, `---\nworkflow: ui\nfactory: shop\n---\nShow the flag on the settings page.\n`);
       await added({ idea: fs.readFileSync(given, 'utf8'), factory: 'shop' });
       const third = inInbox().find((f) => f.startsWith('show-the-flag'))!;
       assert.equal(
         fs.readFileSync(path.join(INBOX, third), 'utf8'),
         `---\nworkflow: ui\nfactory: shop\n---\nShow the flag on the settings page.\n`,
-        "a file's card keys are read, and --factory written over its own",
+        "a file's card keys are read, its factory the namespace it is filed in",
       );
-      assert.equal(fs.readFileSync(given, 'utf8').includes('factory: nemia'), true, 'the file given is left as it was');
       const byName = addToInbox({ text: 'Store the flag', workflow: 'dev' });
 
       writeRecord('show-the-flag-on-the-settin-zz99', { inbox: third.slice(0, -3) });
@@ -258,19 +257,23 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
       fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
     },
   );
-  s.test("`nemia inbox add --factory` files a card that names its factory, over the text's own, and says it", async () => {
-    emptyInbox();
-    const { card, file } = addToInbox({ text: 'Build the page', factory: 'shop' });
-    assert.equal(card.factory, 'shop');
-    assert.equal(fs.readFileSync(file, 'utf8'), '---\nfactory: shop\n---\nBuild the page\n');
-    const idea = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
-    fs.writeFileSync(idea, '---\nfactory: nemia\nworkflow: build\n---\nShip it\n');
-    const filedThere = await added({ idea: fs.readFileSync(idea, 'utf8'), factory: 'shop' });
-    const { name } = filedThere.card;
-    assert.deepEqual([filedThere.card.body, filedThere.card.workflow, filedThere.card.factory], ['Ship it', 'build', 'shop']);
-    assert.equal(fs.readFileSync(path.join(INBOX, `${name}.md`), 'utf8'), '---\nworkflow: build\nfactory: shop\n---\nShip it\n');
-    assert.equal(readInbox().find((l) => l.name === name)?.factory, 'shop');
-  });
+  s.test(
+    '`nemia inbox add --factory` files a card that names its factory; an idea whose own factory: names another is refused, nothing filed',
+    async () => {
+      emptyInbox();
+      const { card, file } = addToInbox({ text: 'Build the page', factory: 'shop' });
+      assert.equal(card.factory, 'shop');
+      assert.equal(fs.readFileSync(file, 'utf8'), '---\nfactory: shop\n---\nBuild the page\n');
+      const idea = '---\nfactory: nemia\nworkflow: build\n---\nShip it\n';
+      await assert.rejects(added({ idea, factory: 'shop' }), (err: Error & { _tag?: string }) => {
+        assert.equal(err._tag, 'Invalid');
+        assert.ok(err.message.includes('/api/namespaces/nemia/cards'), err.message);
+        return true;
+      });
+      await assert.rejects(added({ idea }), (err: Error & { _tag?: string }) => err._tag === 'Invalid', 'nor in default');
+      assert.deepEqual(inInbox(), [path.basename(file)], 'nothing filed');
+    },
+  );
   s.test(
     '`nemia inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are',
     async () => {

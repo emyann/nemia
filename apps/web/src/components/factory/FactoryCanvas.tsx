@@ -21,7 +21,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { routeLink } from '@/components/nav/routeLink';
 import { Button, Card, CardContent, Switch, Title } from '@/components/ui/ds';
 import { ceilingsQuery } from '@/lib/api/ceilings';
-import { inboxQuery } from '@/lib/api/inbox';
+import { factoryInboxQuery } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
 import { judged, runViewOf, type RunRow } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/api/namespace';
@@ -537,7 +537,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
     setShowFinished(on);
     setFits((n) => n + 1);
   };
-  const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
+  const queue = useQuery({ ...factoryInboxQuery(factory.name), refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queuedIn(queue.data, factory)) : [];
   const laned = queued.length > 0 && !machine;
   const wasLaned = useRef(laned);

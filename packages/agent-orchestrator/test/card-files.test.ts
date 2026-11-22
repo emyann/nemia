@@ -1,7 +1,9 @@
 /**
  * A card carries its files to every run started from it: a card naming a kept File, started, leaves the File's bytes in the run's
  * `inputs/` under the name the card gives it, its name frozen on the record; a card whose File was let go of, and one whose file takes the
- * name of an `--input`, are refused before anything is written, by their kind.
+ * name of an `--input`, are refused before anything is written, by their kind. A card whose File is gone is answered as its refusal says:
+ * the file attached again under its name replaces the reference, and the card starts. An idea whose `factory:` is not the namespace it is
+ * filed in is refused, nothing filed, since its Files were uploaded to the namespace it was sent to.
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
@@ -10,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { inboxDir, runWith, startFromInbox } from '../src/runner.ts';
+import { INBOX_ADD, INBOX_ATTACH, inboxDir, runWith, startFromInbox } from '../src/runner.ts';
 import { fileBegun, fileKept } from '../src/start/files.store.ts';
 import { inputsDir, runRecord } from '../src/record/record.store.ts';
 import { main as cli } from '../src/cli/main.ts';
@@ -31,6 +33,8 @@ const ENV: Env = {
 };
 const stage = staged({ runWith, main: cli, engineOf, env: ENV });
 const { runPlaced } = stage;
+/** A handler's program over this test's engine and place. */
+const served = <A, E>(program: Parameters<typeof stage.runWith<A, E>>[1]) => stage.runWith(stage.board().e, program);
 
 /** A repository of the stage's place, with the one-step workflow `look` under its `workflows/`. */
 const aRepo = () => {
@@ -96,5 +100,42 @@ describe("a card's files reach the run started from it", () => {
       (err: Error & { _tag?: string }) => err._tag === 'Invalid',
     );
     assert.deepEqual(runsNow(), before, 'no run is written');
+  });
+  test('a card whose File is gone starts once the file is attached again under its name, and a kept one is still not given twice', async () => {
+    const repo = aRepo();
+    const name = card('look-a7b8', { 'shot.png': `file_${'0'.repeat(32)}` });
+    await assert.rejects(
+      runPlaced(startFromInbox({ name, callerRepo: repo, isolate: false })),
+      (err: Error & { _tag?: string }) => err._tag === 'Invalid',
+    );
+    const bytes = Buffer.from('again');
+    const again = kept(bytes);
+    await served(INBOX_ATTACH.handler({ name, namespace: 'default', files: [{ file: again.id, name: 'shot.png' }] }));
+    const text = fs.readFileSync(path.join(inboxDir(ROOT), `${name}.md`), 'utf8');
+    assert.ok(text.includes(again.id) && !text.includes(`file_${'0'.repeat(32)}`), text);
+    const twice = kept(Buffer.from('twice'));
+    await assert.rejects(
+      served(INBOX_ATTACH.handler({ name, namespace: 'default', files: [{ file: twice.id, name: 'shot.png' }] })),
+      (err: Error & { _tag?: string }) => err._tag === 'Invalid',
+    );
+    const { run } = await runPlaced(startFromInbox({ name, callerRepo: repo, isolate: false }));
+    assert.deepEqual(fs.readFileSync(path.join(inputsDir(ROOT, runRecord(ROOT, run.id)), 'shot.png')), bytes);
+  });
+  test('REFUSED: an idea whose factory: is not the namespace it is filed in, nothing filed, naming where to file it; one naming default by name is filed there', async () => {
+    const file = kept(Buffer.from('pic'));
+    fs.mkdirSync(inboxDir(ROOT), { recursive: true });
+    const before = fs.readdirSync(inboxDir(ROOT)).sort();
+    await assert.rejects(
+      served(
+        INBOX_ADD.handler({
+          idea: '---\nfactory: elsewhere\nworkflow: look\n---\nLook at ![it](shot.png).\n',
+          files: [{ file: file.id, name: 'shot.png' }],
+        }),
+      ),
+      (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message.includes('/api/namespaces/elsewhere/cards'),
+    );
+    assert.deepEqual(fs.readdirSync(inboxDir(ROOT)).sort(), before, 'no card is filed');
+    const named = await served(INBOX_ADD.handler({ idea: '---\nfactory: default\n---\nFiled where it says\n' }));
+    assert.equal(named.card.factory ?? 'default', 'default', 'an idea naming the default factory by name is filed in default');
   });
 });

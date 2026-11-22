@@ -14,15 +14,21 @@ import { LibraryAdds } from '@/components/library/LibraryAdds';
 import { TextLink } from '@/components/look';
 import { factoryLevel, Trail } from '@/components/nav/Trail';
 import { delegationsQuery } from '@/lib/api/proposals';
-import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api/factories';
+import {
+  factoriesQuery,
+  factoryInstructionQuery,
+  factorySchedulesQuery,
+  factoryRulesQuery,
+  factoryServersQuery,
+} from '@/lib/api/factories';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * A factory's settings, at /factories/$factory/settings: `$factory_` draws it on its own, not inside the floor, which has no outlet for it.
- * It waits for the factories, then prefetches the rules, the instruction, the delegations and the MCP servers of a factory a person made,
- * each of which says why it does not read in its own section; the default factory and a name no factory has ask for none. The servers are
- * prefetched because something that mounts beside the floor after its first render narrows a floor already fitted — and because that read
- * spawns a harness session, which the loader makes once per visit rather than on each render. The query never goes stale
+ * It waits for the factories, then prefetches the rules, the instruction, the delegations, the schedules and the MCP servers of a factory a
+ * person made, each of which says why it does not read in its own section; the default factory and a name no factory has ask for none. The
+ * servers are prefetched because something that mounts beside the floor after its first render narrows a floor already fitted — and because
+ * that read spawns a harness session, which the loader makes once per visit rather than on each render. The query never goes stale
  * (`factoryServersQuery`), so the loader reads it as stale on entering the page (`OPENED`) and the section's mount reads nothing again; a
  * preload, on a link's hover, reads none, since the page it would read for is not open.
  */
@@ -34,6 +40,7 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
         context.queryClient.prefetchQuery(factoryRulesQuery(params.factory)),
         context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory)),
         context.queryClient.prefetchQuery(delegationsQuery(params.factory)),
+        context.queryClient.prefetchQuery(factorySchedulesQuery(params.factory)),
         cause === 'preload'
           ? undefined
           : context.queryClient.prefetchQuery({ ...factoryServersQuery(params.factory), staleTime: OPENED[cause] }),
@@ -55,8 +62,8 @@ const OPENED = { enter: 0, stay: Infinity } as const;
  * (`FactoryTrust`); the folders its runs reach beside its repositories, each with its two switches and the line that takes it back
  * (`FactoryVolumes`); the cost line it sets per workflow it offers, which a gate whose caps pass it says (`FactoryCostLines`); its rules,
  * what every agent hired into it is told (`FactoryRules`); the agents it lets approve its proposals (`FactoryDelegations`); its
- * instruction, what Nemia is to know about it (`FactoryInstruction`); then its triggers, its schedules among them as the factories' read
- * answers them (`FactoryTriggers`). The default factory, and a name no factory has, have no settings to keep, and say so: neither the rules
+ * instruction, what Nemia is to know about it (`FactoryInstruction`); then its triggers, its schedules among them, read for this factory
+ * alone (`FactoryTriggers`). The default factory, and a name no factory has, have no settings to keep, and say so: neither the rules
  * nor the instruction is read for them. Its head says where it is: the factory, leading to its floor, then Settings.
  */
 function SettingsPage() {
@@ -97,12 +104,7 @@ function SettingsPage() {
           <FactoryInstruction name={name} />
           <FactoryServers name={name} />
           <LibraryAdds name={name} />
-          <FactoryTriggers
-            name={name}
-            line={factory.commands.trigger}
-            schedules={factory.schedules}
-            scheduleLine={factory.commands.schedule}
-          />
+          <FactoryTriggers name={name} line={factory.commands.trigger} scheduleLine={factory.commands.schedule} />
         </>
       )}
     </article>

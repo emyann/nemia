@@ -123,14 +123,21 @@ const inputKind = (name: string) => {
 /** A markdown image's or link's target, up to its closing parenthesis or a title after a space: `](<target>`. */
 const TARGET = /\]\(\s*<?([^)\s>]+)>?/g;
 
+/** A fenced code block, from its fence of three backticks or tildes to the line that closes it, or to the end where none does. */
+const FENCED = /^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm;
+
+/** An inline code span: a run of backticks, what it quotes, and a run of as many. */
+const SPAN = /(?<!`)(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g;
+
 /**
- * The names of `names` that `body` uses as a markdown image's or link's target, `name` or `./name`, each once, in the order of `names`.
+ * The names of `names` that `body` uses as a markdown image's or link's target, `name` or `./name`, each once, in the order of `names`:
+ * a link quoted in a code span or a fenced code block, an example of one, is none.
  * @param body The text, its markdown: a card's, or what a run was asked.
  * @param names The names of its files: a card's, or a run's inputs.
  */
 export function namedInText(body: string, names: readonly string[]) {
   const targets = new Set<string>();
-  for (const match of body.matchAll(TARGET)) {
+  for (const match of body.replace(FENCED, ' ').replace(SPAN, ' ').matchAll(TARGET)) {
     const raw = match[1] ?? '';
     let target = raw;
     try {

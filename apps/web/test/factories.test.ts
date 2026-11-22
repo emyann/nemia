@@ -44,7 +44,6 @@ const factory = (name: string, extra: Partial<Factory> = {}) =>
     workflows: ['build'],
     hires: { 'build/implement': 'implementer' },
     error: null,
-    schedules: [],
     commands: {
       attach: `nemia factory attach ${name} <workflow>`,
       rm: `nemia factory rm ${name}`,

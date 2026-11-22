@@ -15,7 +15,9 @@ import {
   clearCostLine,
   clearRules,
   factoriesQuery,
+  factoryPlacesQuery,
   factoryRulesQuery,
+  factorySchedulesQuery,
   factoryServersQuery,
   factoryViewOf,
   fireAgent,
@@ -25,6 +27,7 @@ import {
   writeRules,
   type Factory,
   type FactoryRules,
+  type FactorySchedule,
   type FactoryServers,
 } from '../src/lib/api/factories.ts';
 import {
@@ -166,18 +169,6 @@ const millView: Factory = {
   workflows: ['build'],
   hires: { 'build/implement': 'implementer' },
   error: null,
-  schedules: [
-    {
-      workflow: 'build',
-      cron: '0 9 * * 1',
-      tz: null,
-      brief: 'The weekly build',
-      next: '2026-10-05T09:00:00.000Z',
-      last: { run: 'r-1', at: '2026-09-28T09:00:00.000Z' },
-      refused: null,
-      commands: { unschedule: 'nemia unschedule mill build' },
-    },
-  ],
   commands: {
     attach: 'nemia factory attach mill <workflow>',
     rm: 'nemia factory rm mill',
@@ -214,15 +205,23 @@ const millView: Factory = {
   workflowRepos: {},
 };
 
-describe("the factories are read as objects and made the pages' view: the Factory, its lines and its schedules", () => {
-  test('factoryViewOf: a key the object leaves out is null, a volume its line by name, a schedule its own', () => {
-    assert.deepEqual(factoryViewOf(factoryObject(), factoryCommands(), [scheduleObject()]), millView);
-    const old = scheduleObject();
-    assert.deepEqual(
-      factoryViewOf(factoryObject(), factoryCommands(), [{ ...old, spec: { ...old.spec, repo: '/work/elsewhere' } }]).schedules,
-      millView.schedules,
-      "a schedule's retired repository is not carried: the factory's wiring places its runs",
-    );
+/** The schedules of `mill` the fixtures make, as its Settings draws them. */
+const millSchedules: FactorySchedule[] = [
+  {
+    workflow: 'build',
+    cron: '0 9 * * 1',
+    tz: null,
+    brief: 'The weekly build',
+    next: '2026-10-05T09:00:00.000Z',
+    last: { run: 'r-1', at: '2026-09-28T09:00:00.000Z' },
+    refused: null,
+    commands: { unschedule: 'nemia unschedule mill build' },
+  },
+];
+
+describe("the factories are read as objects and made the pages' view: the Factory and its lines; its schedules on its own", () => {
+  test('factoryViewOf: a key the object leaves out is null, a volume its line by name', () => {
+    assert.deepEqual(factoryViewOf(factoryObject(), factoryCommands()), millView);
     assert.deepEqual(
       factoryViewOf(factoryObject({ spec: { costLines: { build: 80 } } }), factoryCommands()).costLines,
       { build: 80 },
@@ -260,16 +259,14 @@ describe("the factories are read as objects and made the pages' view: the Factor
     });
     assert.deepEqual(view.untrusted, [{ place: '/work/mill', harness: 'Claude Code', withheld: 'its hooks', never: null }]);
     assert.equal(view.error, 'mill.json does not read');
-    assert.deepEqual(view.schedules, [], 'no schedules read, none drawn');
     assert.equal(factoryViewOf(factoryObject({ metadata: { name: 'default' } }), factoryCommands('default')).default, true);
   });
-  test("the query reads the list, then each factory's lines and, but for the default factory, its schedules", async (t) => {
+  test("the query reads the list, then each factory's lines, and no factory's schedules", async (t) => {
     const sent = serving(t, (url) => {
       if (url.startsWith('/api/factories?') || url === '/api/factories')
         return factoryList(factoryObject({ metadata: { name: 'default' }, spec: { workflows: undefined } }), factoryObject());
       if (url === '/api/factories/default/commands') return factoryCommands('default');
       if (url === '/api/factories/mill/commands') return factoryCommands();
-      if (url.startsWith('/api/namespaces/mill/schedules')) return scheduleList(scheduleObject());
       throw new Error(`no answer for ${url}`);
     });
     const [first, mill] = await readFactories();
@@ -278,14 +275,45 @@ describe("the factories are read as objects and made the pages' view: the Factor
     assert.deepEqual(mill, millView);
     assert.deepEqual(
       sent.map((one) => `${one.method} ${one.url.split('?')[0]}`).sort(),
-      [
-        'GET /api/factories',
-        'GET /api/factories/default/commands',
-        'GET /api/factories/mill/commands',
-        'GET /api/namespaces/mill/schedules',
-      ],
-      'no schedules asked of the default factory',
+      ['GET /api/factories', 'GET /api/factories/default/commands', 'GET /api/factories/mill/commands'],
+      "no schedules asked: only a factory's Settings draws them",
     );
+  });
+  test("the places of the floor are one read of the list, no factory's lines asked", async (t) => {
+    const sent = serving(t, (url) => {
+      if (url.startsWith('/api/factories?') || url === '/api/factories')
+        return factoryList(factoryObject({ metadata: { name: 'default' }, spec: { workflows: undefined } }), factoryObject());
+      throw new Error(`no answer for ${url}`);
+    });
+    const places = await (factoryPlacesQuery.queryFn as unknown as () => Promise<unknown>)();
+    assert.deepEqual(places, [
+      { name: 'default', default: true },
+      { name: 'mill', default: false },
+    ]);
+    assert.deepEqual(
+      sent.map((one) => `${one.method} ${one.url.split('?')[0]}`),
+      ['GET /api/factories'],
+    );
+    assert.equal(
+      factoryPlacesQuery.queryKey[0],
+      'factories',
+      "under ['factories'], so a write that reads the factories again reads it too",
+    );
+  });
+  test("a factory's schedules are read for it alone, each with the line that takes it back, a retired repository not carried", async (t) => {
+    const old = scheduleObject();
+    const sent = serving(t, (url) => {
+      if (url.startsWith('/api/namespaces/mill/schedules')) return scheduleList({ ...old, spec: { ...old.spec, repo: '/work/elsewhere' } });
+      if (url === '/api/factories/mill/commands') return factoryCommands();
+      throw new Error(`no answer for ${url}`);
+    });
+    const read = await (factorySchedulesQuery('mill').queryFn as unknown as () => Promise<FactorySchedule[]>)();
+    assert.deepEqual(read, millSchedules, "a schedule's retired repository is not carried: the factory's wiring places its runs");
+    assert.deepEqual(sent.map((one) => `${one.method} ${one.url.split('?')[0]}`).sort(), [
+      'GET /api/factories/mill/commands',
+      'GET /api/namespaces/mill/schedules',
+    ]);
+    assert.equal(factorySchedulesQuery('mill').queryKey[0], 'factories');
   });
   test('an answer that is no FactoryList is unread, naming where', async (t) => {
     serving(t, () => ({ apiVersion: 'nemia/v1', kind: 'FactoryList', metadata: {}, items: [{ ...factoryObject(), kind: 'Card' }] }));

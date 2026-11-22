@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { http, HttpResponse } from 'msw';
 import type { Trigger } from 'objects';
-import { factoryTriggersQuery, type FactorySchedule } from '@/lib/api/factories';
+import { factorySchedulesQuery, factoryTriggersQuery, type FactorySchedule } from '@/lib/api/factories';
 import { FactoryTriggers } from './FactoryTriggers';
 import { FACTORY, seeded } from '../../../.storybook/fixtures/proposals';
 import { scheduleLine, triggerLine, unscheduleLine } from '../../../.storybook/fixtures/factories';
@@ -51,9 +51,16 @@ const NIGHTLY_SCHEDULE = {
   commands: { unschedule: unscheduleLine('janitor') },
 } satisfies FactorySchedule;
 
-/** `children` over a query client that holds `items` as the factory's triggers, asking the network nothing. */
-function Served({ items, children }: { items: readonly Trigger[]; children: ReactNode }) {
-  const [client] = useState(() => seeded([[factoryTriggersQuery(FACTORY).queryKey, items]]));
+/**
+ * `children` over a query client that holds `items` as the factory's triggers and `schedules` as its schedules, asking the network nothing.
+ */
+function Served({ items, schedules, children }: { items: readonly Trigger[]; schedules: readonly FactorySchedule[]; children: ReactNode }) {
+  const [client] = useState(() =>
+    seeded([
+      [factoryTriggersQuery(FACTORY).queryKey, items],
+      [factorySchedulesQuery(FACTORY).queryKey, schedules],
+    ]),
+  );
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
@@ -65,17 +72,17 @@ function Served({ items, children }: { items: readonly Trigger[]; children: Reac
 const meta: Meta<typeof FactoryTriggers> = {
   title: 'Factory/FactoryTriggers',
   component: FactoryTriggers,
-  args: { name: FACTORY, line: triggerLine, schedules: [], scheduleLine: scheduleLine },
+  args: { name: FACTORY, line: triggerLine, scheduleLine: scheduleLine },
 };
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** `items` served as the factory's triggers, in the settings page's width. */
-const served = (items: readonly Trigger[]) =>
+/** `items` served as the factory's triggers and `schedules` as its schedules, none by default, in the settings page's width. */
+const served = (items: readonly Trigger[], schedules: readonly FactorySchedule[] = []) =>
   function ServedTriggers(args: Parameters<typeof FactoryTriggers>[0]) {
     return (
-      <Served items={items}>
+      <Served items={items} schedules={schedules}>
         <div style={{ width: 640 }}>
           <FactoryTriggers {...args} />
         </div>
@@ -109,8 +116,10 @@ export const None: Story = {
  * its next fire and the line that takes it back.
  */
 export const Spends: Story = {
-  args: { schedules: [NIGHTLY_SCHEDULE] },
-  render: served([onCards('ready', 'ready=yes', 'build', { quota: 'spends', quotaBy: 'build', queued: ['fix-login'] }), NIGHTLY]),
+  render: served(
+    [onCards('ready', 'ready=yes', 'build', { quota: 'spends', quotaBy: 'build', queued: ['fix-login'] }), NIGHTLY],
+    [NIGHTLY_SCHEDULE],
+  ),
   play: async ({ canvasElement }) => {
     const ready = canvasElement.querySelector('[data-factory-trigger="ready"]');
     await expect(ready?.querySelector('[data-trigger-quota]')).toHaveTextContent('Spends quota: build runs an agent');

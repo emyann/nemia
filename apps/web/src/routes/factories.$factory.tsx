@@ -3,23 +3,25 @@ import { createFileRoute } from '@tanstack/react-router';
 import { FactoryCanvas } from '@/components/factory/FactoryCanvas';
 import { routeLink } from '@/components/nav/routeLink';
 import { Button, Card, CardContent, Title } from '@/components/ui/ds';
-import { factoriesQuery } from '@/lib/api/factories';
-import { inboxQuery } from '@/lib/api/inbox';
+import { factoryPlacesQuery } from '@/lib/api/factories';
+import { factoryInboxQuery } from '@/lib/api/inbox';
 import { openRunsQuery } from '@/lib/api/runs';
 import { storeQuery } from '@/lib/api/store';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 export const Route = createFileRoute('/factories/$factory')({
   /**
-   * Waits for the factories and the factory's runs that are not finished (`openRunsQuery`, its namespace its name, `default` the runs of
-   * no factory), and prefetches the inbox for the queue's ghosts beside the floor, so the floor is fitted beside
-   * them with the first cards. A prefetch never throws: what cannot be read says so over the floor, and the runs are drawn all the same.
+   * Waits for the factories as places (`factoryPlacesQuery`, the list alone, no factory's lines) and the factory's runs that are not
+   * finished (`openRunsQuery`, its namespace its name, `default` the runs of no factory), and nothing more: the floor draws as soon as
+   * those are read. It starts the factory's cards in play (`factoryInboxQuery`) for the queue's ghosts beside the floor without waiting on
+   * them, so the page never waits on the inbox; the lane comes after, and the floor fits again as it comes (`FactoryCanvas`). A prefetch
+   * never throws: what cannot be read says so over the floor, and the runs are drawn all the same.
    */
   loader: async ({ context, params }) => {
+    void context.queryClient.prefetchQuery(factoryInboxQuery(params.factory));
     await Promise.all([
-      context.queryClient.ensureQueryData(factoriesQuery),
+      context.queryClient.ensureQueryData(factoryPlacesQuery),
       context.queryClient.ensureQueryData(openRunsQuery(params.factory)),
-      context.queryClient.prefetchQuery(inboxQuery),
     ]);
   },
   staticData: { fullBleed: true },
@@ -35,7 +37,7 @@ export const Route = createFileRoute('/factories/$factory')({
  */
 function FactoryPage() {
   const { factory: name } = Route.useParams();
-  const { data: factories } = useSuspenseQuery(factoriesQuery);
+  const { data: factories } = useSuspenseQuery(factoryPlacesQuery);
   const { data: open } = useSuspenseQuery(openRunsQuery(name));
   const factory = factories.find((f) => f.name === name);
   if (!factory) return <NoSuchFactory name={name} />;

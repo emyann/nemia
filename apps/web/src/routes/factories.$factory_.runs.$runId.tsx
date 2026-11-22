@@ -3,6 +3,7 @@ import { RunTrail, RunPage } from '../components/run/RunPage';
 import { loadRun } from '../lib/runView';
 import { barValue } from '../lib/bar';
 import { objectHome } from '../lib/factoryAddress';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * A run under its factory's path, the factory's pane beside it: the run's page as at `/runs/<id>`. A run of another factory, or of the
@@ -37,7 +38,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <RunTrail runId={runId} />
-      <p className="text-body-medium text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this run" error={error} />
     </div>
   );
 }

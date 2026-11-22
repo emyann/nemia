@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { clearRules, factoryRulesQuery, writeRules, type FactoryRules as Rules } from '../../lib/api/factories.ts';
 import { Pending, Reading } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** What a person asks of a factory's rules: their words saved, or the rules removed. */
 type Change = { kind: 'save'; words: string } | { kind: 'clear' };
@@ -58,7 +59,7 @@ export function FactoryRules({ name }: { name: string }) {
           <RulesForm key={`${data.words ?? ''}\n${data.error ?? ''}`} data={data} pending={change.isPending} onChange={ask} />
         </>
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read the rules: {error.message}</p>
+        <ReadTrouble what="the rules" error={error} className="text-muted-foreground" />
       ) : (
         <Reading label="Reading the rules…" className="flex flex-col gap-2">
           <Skeleton shape="rectangle" className="h-32 rounded-none" />

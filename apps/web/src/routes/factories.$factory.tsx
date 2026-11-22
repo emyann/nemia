@@ -7,6 +7,7 @@ import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery } from '@/lib/api/inbox';
 import { openRunsQuery } from '@/lib/api/runs';
 import { storeQuery } from '@/lib/api/store';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 export const Route = createFileRoute('/factories/$factory')({
   /**
@@ -23,12 +24,7 @@ export const Route = createFileRoute('/factories/$factory')({
   },
   staticData: { fullBleed: true },
   component: FactoryPage,
-  errorComponent: ({ error }) => (
-    <p className="p-4 text-body-medium text-failure">
-      Could not load the factories and their runs: {error instanceof Error ? error.message : String(error)}. Is the api running (
-      <code>npm run dev</code>)?
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the factories and their runs" error={error} className="p-4" />,
 });
 
 /**

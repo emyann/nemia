@@ -11,7 +11,10 @@
  *
  * The board names no store path and builds no command of its own: a command or a store folder it shows is text the api answered, and no
  * file of `src` spells one, JSDoc included (`STORE_PATHS`, `COMMAND_TEXT`, both empty). `ratchetBreaks` refuses a file the baseline does
- * not hold, a count above the measure or below it, an entry for a file that is gone or clean, and an entry that names no card.
+ * not hold, a count above the measure or below it, an entry for a file that is gone or clean, and an entry that names no card. Nor does
+ * it spell a checkout's command, which a person on an install has none of (`CHECKOUT_COMMAND`, `CHECKOUT_TEXT`, empty), nor word a
+ * failed read by hand: `ReadTrouble` and `troubleLine` say it, by its kind, from `src/lib/api/read.ts` alone (`HAND_TROUBLE`,
+ * `HAND_TROUBLES`, empty). A story and the kit's files are let through both: their words are a stand-in's and another repository's.
  *
  * A person's words for a step's state are written once, in `src/lib/words.ts`'s `PERSON`: no other file spells a word of it
  * (`personWordBreaks`), no file says a retired phrasing or `cancelled` to a person (`retiredBreaks`), and no hover says a runtime word
@@ -62,6 +65,15 @@ const STORE_PATH = /\.agent-workflows|\.agent-engine|\bWF_ROOT\b|\bAE_ROOT\b/g;
 /** A command of the orchestrator's CLI, under its name today or the one it takes: `wf retry`, `nemia start`. */
 const COMMAND = /\b(?:wf|nemia) [a-z]+/g;
 
+/** A checkout's command, which a person on an install has none of: `npm run dev`, `npm run theme:generate`, never `npm test`. */
+const CHECKOUT_COMMAND = /\bnpm run [a-z:]+/g;
+
+/** A failed read worded by hand, where `ReadTrouble` and `troubleLine` (`src/lib/api/read.ts`) say it one way on every page. */
+const HAND_TROUBLE = /Could not (?:read|load|list)\b/g;
+
+/** The one file that words a failed read: `troubleLine` and the trouble's words by kind. */
+const TROUBLE = 'src/lib/api/read.ts';
+
 /** The route that mounts the frame on every page: what it reaches is drawn whatever the page. */
 const ROOT = 'src/routes/__root.tsx';
 
@@ -90,6 +102,19 @@ const STORE_PATHS: Baseline = {};
 
 /** Each file that spells a command, JSDoc included, with its count of them and the card that moves them to the api: none. */
 const COMMAND_TEXT: Baseline = {};
+
+/** Each file that spells a checkout's command, with its count and the card that takes it out: none. */
+const CHECKOUT_TEXT: Baseline = {};
+
+/** Each file but `TROUBLE` that words a failed read by hand, with its count and the card that moves it to `ReadTrouble`: none. */
+const HAND_TROUBLES: Baseline = {};
+
+/** The board's own words: `texts` but a story, whose words are a stand-in's, and the kit's files, another repository's. */
+const boardWords = (texts: ReadonlyMap<string, string>) =>
+  new Map([...texts].filter(([file]) => !file.endsWith('.stories.tsx') && !file.startsWith('src/components/ui/ds/')));
+
+/** The board's own words but the one file that words a failed read. */
+const troubleTexts = (texts: ReadonlyMap<string, string>) => new Map([...boardWords(texts)].filter(([file]) => file !== TROUBLE));
 
 /** Every `.ts` and `.tsx` under `src`, by its path from `apps/web`, with its text. */
 const sourceTexts = () =>
@@ -520,6 +545,54 @@ test('the board spells no store path and no command: the api answers each', () =
   const texts = sourceTexts();
   assert.deepEqual(ratchetBreaks('store paths', measured(texts, STORE_PATH), STORE_PATHS, onDisk), []);
   assert.deepEqual(ratchetBreaks('commands', measured(texts, COMMAND), COMMAND_TEXT, onDisk), []);
+});
+
+test("the board spells no checkout's command, and words a failed read in one place", () => {
+  const texts = sourceTexts();
+  assert.deepEqual(ratchetBreaks("checkout's commands", measured(boardWords(texts), CHECKOUT_COMMAND), CHECKOUT_TEXT, onDisk), []);
+  assert.deepEqual(ratchetBreaks('failed reads worded by hand', measured(troubleTexts(texts), HAND_TROUBLE), HAND_TROUBLES, onDisk), []);
+});
+
+test("the checkout's command and the hand-worded failed read are found, and not their neighbours", () => {
+  const texts = new Map([
+    ['a.ts', "const say = 'restart the api (npm run dev), then npm run theme:generate';\nconst no = 'npm test, npx tsrs, npm runs';"],
+    [
+      'b.ts',
+      "const say = [`Could not read ${x}`, 'Could not load it', 'Could not list them'];\nconst no = 'Could not reader, could not read';",
+    ],
+  ]);
+  assert.deepEqual(measured(texts, CHECKOUT_COMMAND), { 'a.ts': 2 });
+  assert.deepEqual(measured(texts, HAND_TROUBLE), { 'b.ts': 3 });
+});
+
+test("REFUSED: a checkout's command or a failed read worded by hand in the board; a story, the kit and the one place let through", () => {
+  const named = (breaks: string[]) => breaks.map((b) => b.split(' ')[0]) satisfies string[];
+  const plant = (file: string, text: string) => new Map([...sourceTexts(), [file, text]]);
+  const commands = (file: string) =>
+    named(
+      ratchetBreaks(
+        "checkout's commands",
+        measured(boardWords(plant(file, 'const say = `Is the api running (npm run dev)?`;\n')), CHECKOUT_COMMAND),
+        CHECKOUT_TEXT,
+        onDisk,
+      ),
+    );
+  const troubles = (file: string) =>
+    named(
+      ratchetBreaks(
+        'failed reads worded by hand',
+        measured(troubleTexts(plant(file, 'const say = `Could not read the agents: ${e.message}`;\n')), HAND_TROUBLE),
+        HAND_TROUBLES,
+        onDisk,
+      ),
+    );
+  assert.deepEqual(commands('src/x.tsx'), ['src/x.tsx']);
+  assert.deepEqual(troubles('src/x.tsx'), ['src/x.tsx']);
+  for (const file of ['src/x.stories.tsx', 'src/components/ui/ds/x.tsx']) {
+    assert.deepEqual(commands(file), [], `${file} is let through`);
+    assert.deepEqual(troubles(file), [], `${file} is let through`);
+  }
+  assert.deepEqual(troubles(TROUBLE), [], `${TROUBLE} is let through`);
 });
 
 test('the patterns find what they name, and not their neighbours', () => {

@@ -15,6 +15,7 @@ import { TextLink } from '@/components/look';
 import { factoryLevel, Trail } from '@/components/nav/Trail';
 import { delegationsQuery } from '@/lib/api/proposals';
 import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api/factories';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * A factory's settings, at /factories/$factory/settings: `$factory_` draws it on its own, not inside the floor, which has no outlet for it.
@@ -39,11 +40,7 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
       ]);
   },
   component: SettingsPage,
-  errorComponent: ({ error }) => (
-    <p className="p-4 text-body-medium text-failure">
-      Could not load the factories: {error instanceof Error ? error.message : String(error)}
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the factories" error={error} className="p-4" />,
 });
 
 /**

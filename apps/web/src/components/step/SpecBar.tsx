@@ -12,6 +12,7 @@ import { BarPanel } from '../frame/BarPanel';
 import { runsOn, specLines } from './StepNode';
 import { Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The bar for the step `step` of the workflow `workflow` read from `from`, titled by the step's name, saying whose workflow it is under the
@@ -67,7 +68,7 @@ function Nowhere({ where }: { where: ListPlace }) {
  * that it reads.
  */
 function Unread({ workflow, error, read }: { workflow: string; error: Error | null; read: boolean }) {
-  if (error) return <p className="text-body-medium text-failure">Could not read the workflows: {error.message}</p>;
+  if (error) return <ReadTrouble what="the workflows" error={error} />;
   if (read) return <p className="text-body-medium text-yours">No workflow is named {workflow}.</p>;
   return (
     <Reading label="Reading the workflows…" className="flex flex-col gap-4">

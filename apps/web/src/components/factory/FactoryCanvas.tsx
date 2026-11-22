@@ -25,6 +25,7 @@ import { inboxQuery } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
 import { judged, runViewOf, type RunRow } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/api/namespace';
+import { troubleLine } from '@/lib/api/read';
 import { FINISHED_SIZE, finishedRunsQuery, type OpenRuns, undecidedRunsQuery } from '@/lib/api/runs';
 import {
   forgetFactoryLayout,
@@ -240,7 +241,7 @@ const NOT_READ: Read = { detail: null, trouble: null };
 const readsOf = (results: UseQueryResult<RunObject.Run>[]) =>
   results.map(({ data, error }) => ({
     detail: data?.status ?? null,
-    trouble: error ? `Could not read its steps: ${error.message}` : null,
+    trouble: error ? troubleLine('its steps', error) : null,
   }));
 
 /**

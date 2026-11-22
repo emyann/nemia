@@ -11,7 +11,7 @@ import { frontmatterValues, MAP_KEYS, readFrontmatter } from '../frontmatter/fro
 import { STEP_KEY_FORM, type WorkflowStep } from 'objects';
 import type { StepDraft } from '../workflow/index.ts';
 import { tokensOf } from '../keys/index.ts';
-import { isHarnessBlock } from '../former/former.ts';
+import { isHarnessBlock, keptAsJson } from '../former/former.ts';
 import { isMap } from '../template/index.ts';
 
 /** A text file directly in a workflow's folder: its name and its text. */
@@ -52,16 +52,17 @@ export const fileParts = (name: string, text: string) => {
 };
 
 /**
- * The keys of a step's `block` the loader reads as text though they hold a map (`MAP_KEYS`), each as the JSON text `readKeys` keeps of
- * it: the block read as the loader reads it (`readFrontmatter`, every scalar the string written), whether the file writes the map in flow
- * or as a block. A key written as a line is left out, carried as it reads.
+ * The keys of a step's `block` the loader reads as text though they hold a map (`MAP_KEYS`), or a list of maps (`checks:`), each as the
+ * JSON text `readKeys` keeps of it, by the loader's own rule (`keptAsJson`): the block read as the loader reads it (`readFrontmatter`,
+ * every scalar the string written), whether the file writes it in flow or as a block. A key written as a line is left out, carried as it
+ * reads.
  */
 const mapTexts = (name: string, block: string | null) =>
   block === null
     ? {}
     : Object.fromEntries(
         readFrontmatter(name, block).entries.flatMap(({ key, value }) =>
-          MAP_KEYS.includes(key) && typeof value === 'object' && !Array.isArray(value) ? [[key, JSON.stringify(value)]] : [],
+          keptAsJson(key, value, MAP_KEYS) ? [[key, JSON.stringify(value)]] : [],
         ),
       );
 

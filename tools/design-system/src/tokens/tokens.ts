@@ -5,7 +5,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { WEB, headOf } from '../paths.ts';
+import { headOf } from '../../head.ts';
+import { WEB } from '../paths.ts';
 import type { Face } from '../stylesheet/fonts.ts';
 import { ALIASES, FAMILIES, MEANING, SCALE, SHADOW_USAGE, USAGE } from './usage.ts';
 

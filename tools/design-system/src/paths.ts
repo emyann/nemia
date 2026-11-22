@@ -3,7 +3,6 @@
  * the kit's stories and the generated entry are kept in (`node_modules/.cache/design-system`), and the build's folder, whose `project/`
  * holds the artifact's files, `shots/` the verification's pictures, and `manifest.json` and `CHANGES.json` beside them.
  */
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -46,13 +45,6 @@ export const layout = (out: string) => ({
 
 /** What a build's folders are. */
 export type Layout = ReturnType<typeof layout>;
-
-/** The last commit that changed the board, short, and its date: what tokens.json says it was built from, moved by the board alone. */
-export const headOf = () => {
-  const said = execFileSync('git', ['log', '-1', '--format=%h %cs', '--', 'apps/web'], { cwd: REPO, encoding: 'utf8' }).trim();
-  const [sha = 'unknown', date = 'unknown'] = said.split(' ');
-  return { sha, date };
-};
 
 /** Every file under `dir`, by its path from `dir` with `/` between folders, sorted. */
 export const filesUnder = (dir: string) =>

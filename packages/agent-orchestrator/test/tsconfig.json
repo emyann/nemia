@@ -9,6 +9,7 @@
     "../../../tools"
   ],
   "exclude": [
-    "../../../tools/**/node_modules"
+    "../../../tools/**/node_modules",
+    "../../../tools/design-system"
   ]
 }

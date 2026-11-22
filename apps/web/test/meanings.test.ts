@@ -98,7 +98,10 @@ export function tableOf(design: string) {
 export function writtenOf(css: string) {
   const at = css.indexOf(DARK);
   const read = (part: string) => new Map([...part.matchAll(/--meaning-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1]!, m[2]!.trim()]));
-  return { light: read(at < 0 ? css : css.slice(0, at)), dark: read(at < 0 ? '' : css.slice(at)) } satisfies Record<Scheme, Map<string, string>>;
+  return { light: read(at < 0 ? css : css.slice(0, at)), dark: read(at < 0 ? '' : css.slice(at)) } satisfies Record<
+    Scheme,
+    Map<string, string>
+  >;
 }
 
 /**
@@ -189,10 +192,14 @@ test("the rulebook's table names the four meanings, each with its roles, in both
 
 test("the stylesheet writes each meaning at the rulebook's value, in light and in dark", () => {
   assert.ok(styles.includes(DARK), `src/styles.css writes the dark meanings under ${DARK}`);
-  assert.deepEqual(apartFrom(TABLE, WRITTEN, THEME), [], "write DESIGN.md's value in src/styles.css's --meaning-*, light at :root, dark below");
+  assert.deepEqual(
+    apartFrom(TABLE, WRITTEN, THEME),
+    [],
+    "write DESIGN.md's value in src/styles.css's --meaning-*, light at :root, dark below",
+  );
 });
 
-test('the meanings are the four, rest\'s tint and money, retiring, each written once a scheme', () => {
+test("the meanings are the four, rest's tint and money, retiring, each written once a scheme", () => {
   const four = MEANINGS.flatMap((meaning) => (meaning === 'rest' ? ROLES.slice(0, 2) : ROLES).map((role) => nameOf(meaning, role)));
   assert.deepEqual([...WRITTEN.light.keys()].sort(), [...four, ...BESIDE].sort(), 'the light scheme, at the root');
   assert.deepEqual(
@@ -201,10 +208,7 @@ test('the meanings are the four, rest\'s tint and money, retiring, each written 
     'the dark scheme writes no other meaning',
   );
   for (const name of [...four, ...BESIDE])
-    assert.ok(
-      styles.split(`--meaning-${name}:`).length - 1 <= 2,
-      `--meaning-${name} is written once in light and at most once in dark`,
-    );
+    assert.ok(styles.split(`--meaning-${name}:`).length - 1 <= 2, `--meaning-${name} is written once in light and at most once in dark`);
 });
 
 for (const scheme of ['light', 'dark'] as const)
@@ -215,7 +219,9 @@ for (const scheme of ['light', 'dark'] as const)
       if (meaning !== 'rest') pairs.push([nameOf(meaning, 'on--container'), nameOf(meaning, '-container')]);
       const onFills = pairs.map(([ink, fill]) => [ink, fill, ratio(colour(ink)!, colour(fill)!)] as const);
       const onRungs = RUNGS.map((rung) => [meaning, rung, ratio(colour(meaning)!, THEME[scheme].get(rung)!)] as const);
-      return [...onFills, ...onRungs].filter(([, , read]) => read < THRESHOLD).map(([ink, fill, read]) => `${ink} on ${fill}: ${read.toFixed(2)}:1`);
+      return [...onFills, ...onRungs]
+        .filter(([, , read]) => read < THRESHOLD)
+        .map(([ink, fill, read]) => `${ink} on ${fill}: ${read.toFixed(2)}:1`);
     });
     assert.deepEqual(under, [], `under ${THRESHOLD}:1 in the ${scheme} scheme: say it to the person who owns DESIGN.md's values`);
   });

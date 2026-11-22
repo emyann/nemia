@@ -178,7 +178,9 @@ function RunsOnOrGave({ step, gave, line }: { step: StepNodeData['step']; gave: 
 const nodeFrame = (state: StepState, gate: boolean) => {
   if (state === 'skipped') return 'border border-dashed border-outline bg-background';
   if (gate) return 'bg-surface-container-low shadow-sm border-2 border-yours';
-  return state === 'working' ? 'bg-surface-container-low shadow-sm border border-alive ring-4 ring-alive/25' : 'bg-surface-container-low shadow-sm border border-outline';
+  return state === 'working'
+    ? 'bg-surface-container-low shadow-sm border border-alive ring-4 ring-alive/25'
+    : 'bg-surface-container-low shadow-sm border border-outline';
 };
 
 /** A node's head: its place in the order, after its kind where it is a condition or a workflow node (`condition · step 02`). */

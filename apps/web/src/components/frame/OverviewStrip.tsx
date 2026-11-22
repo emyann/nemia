@@ -15,7 +15,10 @@ import { dayStartOf, quotaLineOf, readoutOf, type Strip, stripOf } from '@/lib/s
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
 
-/** The daemon's tag colour by its tone: alive while it ticks (a meaning's tag), neutral while read or warned of, failure when nothing ticks. */
+/**
+ * The daemon's tag colour by its tone: alive while it ticks (a meaning's tag), neutral while read or warned of, failure when nothing
+ * ticks.
+ */
 const DAEMON_TAG: Record<DaemonTone, 'alive' | 'neutral' | 'error'> = {
   ok: 'alive',
   warn: 'neutral',

@@ -87,7 +87,10 @@ const COMPONENTS: Components = {
     return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-body-small [&_pre]:whitespace-pre" />;
   },
   code: ({ node: _node, className, ...props }) => (
-    <code className={cn('box-decoration-clone rounded bg-surface-container-highest px-1 py-px font-mono text-[0.9em]', className)} {...props} />
+    <code
+      className={cn('box-decoration-clone rounded bg-surface-container-highest px-1 py-px font-mono text-[0.9em]', className)}
+      {...props}
+    />
   ),
   p: ({ node: _node, className, ...props }) => <p className={cn('my-2 leading-relaxed', className)} {...props} />,
   ul: ({ node: _node, className, ...props }) => <ul className={cn('my-2 list-disc space-y-1 pl-5', className)} {...props} />,

@@ -59,7 +59,8 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
   const tail = turns.slice(-ACTIVITY_TURNS);
 
   if (!step.taskId) return <p className="text-on-surface-variant">Not filed yet, so there is no conversation.</p>;
-  if (!sessionToRead(step)) return <p className="text-on-surface-variant">No session of it has started, so there is no conversation yet.</p>;
+  if (!sessionToRead(step))
+    return <p className="text-on-surface-variant">No session of it has started, so there is no conversation yet.</p>;
 
   return (
     <>
@@ -85,7 +86,9 @@ export function ActivityTail({ run, step, following }: { run: RunDetail; step: S
         </Suspense>
       ) : (
         !following.error && (
-          <p className="text-on-surface-variant">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
+          <p className="text-on-surface-variant">
+            {following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}
+          </p>
         )
       )}
     </>

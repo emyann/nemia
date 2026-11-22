@@ -13,7 +13,9 @@ const RouterLinkButton = routeLink(LinkButton);
 export function CommandText({ text }: { text: string }) {
   return (
     <div className="flex w-full min-w-0 items-center gap-2">
-      <code className="min-w-0 flex-1 rounded bg-surface-container-highest px-2 py-1 text-left font-mono text-body-small [overflow-wrap:anywhere]">{text}</code>
+      <code className="min-w-0 flex-1 rounded bg-surface-container-highest px-2 py-1 text-left font-mono text-body-small [overflow-wrap:anywhere]">
+        {text}
+      </code>
       <CopyButton text={text} />
     </div>
   );

@@ -547,7 +547,10 @@ test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the gr
   const bare = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true }));
   assert.doesNotMatch(bare, backdrop);
   assert.match(bare, /class="[^"]*rounded-full bg-surface-container-highest/);
-  assert.match(renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })), /^<svg [^>]*class="[^"]*rounded-full bg-surface-container-highest/);
+  assert.match(
+    renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })),
+    /^<svg [^>]*class="[^"]*rounded-full bg-surface-container-highest/,
+  );
 });
 
 /** An agent as the Agents page lists it, one that sets every kind of key: what a character card is drawn from. */

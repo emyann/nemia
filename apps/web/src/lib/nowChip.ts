@@ -58,10 +58,7 @@ export function nowStandsOf(state: StepState, on: WaitOn | null, held: boolean) 
  * How each colour of the chip is drawn: the kit's tag in the variant and colour of its role, or, for a session at work, which the
  * theme has no role for, the look's tag in the meaning (`color: 'alive'`, `MeaningTag`).
  */
-export const CHIP_TAG: Record<
-  ChipTone,
-  { variant: 'tonal' | 'filled' | 'outlined'; color: 'neutral' | 'primary' | 'alive' | 'error' }
-> = {
+export const CHIP_TAG: Record<ChipTone, { variant: 'tonal' | 'filled' | 'outlined'; color: 'neutral' | 'primary' | 'alive' | 'error' }> = {
   alive: { variant: 'tonal', color: 'alive' },
   yours: { variant: 'filled', color: 'primary' },
   failure: { variant: 'tonal', color: 'error' },

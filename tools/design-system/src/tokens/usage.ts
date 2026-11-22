@@ -50,7 +50,7 @@ export const USAGE: Readonly<Record<string, string>> = {
   'outline-variant': "A hairline: a card's edge, a divider. Never the only boundary of a control.",
   shadow: 'The colour of a shadow. The look draws none.',
   scrim: 'The veil behind a modal surface.',
-  'inverse-surface': "A light grey in the dark scheme, a dark one in the light: the ground of a snackbar.",
+  'inverse-surface': 'A light grey in the dark scheme, a dark one in the light: the ground of a snackbar.',
   'inverse-on-surface': `${on('inverse-surface')} Black ink.`,
   'inverse-primary': 'Action text on `md-sys-color-inverse-surface`.',
   ...fixed('primary', 'A yellow'),
@@ -88,7 +88,13 @@ export const SCALE: readonly (readonly [string, string, string, string, string])
     "A card's title and a dialog's title; the medium and small sizes, and so a tab's word, are drawn in Barlow, mixed case.",
     'Open the run',
   ],
-  ['Body', 'body', 'barlow', 'What is read: a sentence, a value, a cell. Untracked, 13 pixels at the least.', 'A run waits at its gate until a person approves it.'],
+  [
+    'Body',
+    'body',
+    'barlow',
+    'What is read: a sentence, a value, a cell. Untracked, 13 pixels at the least.',
+    'A run waits at its gate until a person approves it.',
+  ],
   [
     'Label',
     'label',

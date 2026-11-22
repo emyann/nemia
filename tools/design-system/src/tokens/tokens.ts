@@ -43,9 +43,13 @@ const colourTokens = (light: Record<string, string>, dark: Record<string, string
 const DARK = '@media (prefers-color-scheme: dark)';
 
 /** The `--meaning-*` values one part of the board's stylesheet writes, by their name after `--meaning-`. */
-const meaningsIn = (css: string) => Object.fromEntries([...css.matchAll(/--meaning-([a-z-]+):\s*([^;]+);/g)].map(([, n, v]) => [n ?? '', (v ?? '').trim()]));
+const meaningsIn = (css: string) =>
+  Object.fromEntries([...css.matchAll(/--meaning-([a-z-]+):\s*([^;]+);/g)].map(([, n, v]) => [n ?? '', (v ?? '').trim()]));
 
-/** A meaning's value as a token's: a colour as written, or a role of the theme read through `var(--md-sys-color-…)` as the theme writes it. */
+/**
+ * A meaning's value as a token's: a colour as written, or a role of the theme read through `var(--md-sys-color-…)`, as the theme
+ * writes it.
+ */
 const valueOf = (value: string, roles: Record<string, string>) => {
   const role = /^var\(\s*--(md-sys-color-[a-z-]+)\s*\)$/.exec(value)?.[1];
   return role ? (roles[role] ?? value) : value;
@@ -61,7 +65,8 @@ const meaningTokens = (light: Record<string, string>, dark: Record<string, strin
   const written = { light: meaningsIn(at < 0 ? css : css.slice(0, at)), dark: meaningsIn(at < 0 ? '' : css.slice(at)) };
   return [
     ...MEANING.flatMap(([word, usage]) => {
-      if (!written.light[word]) throw new Error(`src/styles.css writes no --meaning-${word}: say its value there, or take it out of usage.ts`);
+      if (!written.light[word])
+        throw new Error(`src/styles.css writes no --meaning-${word}: say its value there, or take it out of usage.ts`);
       return [
         [word, usage],
         [`on-${word}`, `Ink on \`meaning-${word}\`.`],

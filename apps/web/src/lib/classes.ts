@@ -8,7 +8,8 @@ export const BUTTON =
   'rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-on-primary hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
 
 /** A button beside the primary one, ringed on the card's surface. */
-export const BUTTON_SECONDARY = 'bg-surface-container-low text-on-surface ring-1 ring-outline ring-inset hover:bg-surface-container-high disabled:hover:bg-surface-container-low';
+export const BUTTON_SECONDARY =
+  'bg-surface-container-low text-on-surface ring-1 ring-outline ring-inset hover:bg-surface-container-high disabled:hover:bg-surface-container-low';
 
 /** A choice drawn as its box: the kit's radio and its words, framed, the frame lit while it is chosen (an agent's prompt, a prune). */
 export const CHOICE = 'items-start rounded border border-outline-variant px-3 py-2 data-selected:border-primary';

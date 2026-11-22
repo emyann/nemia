@@ -31,12 +31,10 @@ const UTILITIES =
   '(?:bg|text|border(?:-[xytrblse])?|outline|ring(?:-offset)?|inset-ring|divide|fill|stroke|from|via|to|decoration|caret|placeholder|(?:inset-|drop-)?shadow|accent)';
 
 /** A colour role written as a utility, as Tailwind's variable or as the theme's own, in group 1 the role. */
-const roleWritten = (roles: string) =>
-  new RegExp(`(?<![\\w-])(?:${UTILITIES}-|--color-|--md-sys-color-)(${roles})(?![\\w-])`, 'g');
+const roleWritten = (roles: string) => new RegExp(`(?<![\\w-])(?:${UTILITIES}-|--color-|--md-sys-color-)(${roles})(?![\\w-])`, 'g');
 
 /** The kit's accent roles: each accent's own, its `on-`, its container and its fixed roles, and the inverse primary. */
-const ACCENT =
-  '(?:on-)?(?:primary|secondary|tertiary)(?:-container|-fixed(?:-dim|-variant)?)?|inverse-primary';
+const ACCENT = '(?:on-)?(?:primary|secondary|tertiary)(?:-container|-fixed(?:-dim|-variant)?)?|inverse-primary';
 
 /** What each rule finds in a file's text: the words that break it, by the group a match keys. */
 const FINDERS: Record<Rule, { pattern: RegExp; spared?: (word: string) => boolean }> = {
@@ -79,8 +77,8 @@ export function entriesOf(root: string, rule: Rule) {
 const INSTEAD: Record<Rule, string> = {
   accentRole: "write a meaning, a neutral role or the kit's part that draws the accent itself (its filled button, its selection)",
   money: 'draw a cost in ink on the Control rung; over its budget it is failure, a spend that needs a word is yours',
-  rawType: 'set the text through the kit\'s primitive: <Body size=…>, <Label size=…>, <Title size=…>',
-  kitSurface: 'take the ladder\'s rung: background, or a surface-container role',
+  rawType: "set the text through the kit's primitive: <Body size=…>, <Label size=…>, <Title size=…>",
+  kitSurface: "take the ladder's rung: background, or a surface-container role",
 };
 
 test('REFUSED: each rule finds its word where it is written, under any variant or alpha, once a file; what the rulebook allows is spared', () => {

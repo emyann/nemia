@@ -18,7 +18,8 @@ const buttonVariants = cva(
           'border-outline-variant bg-background hover:bg-surface-container-highest hover:text-on-surface aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface dark:border-outline dark:bg-outline/30 dark:hover:bg-outline/50',
         secondary:
           'bg-surface-container-highest text-on-surface hover:bg-[color-mix(in_oklch,var(--md-sys-color-surface-container-highest),var(--md-sys-color-on-surface)_5%)] aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface',
-        ghost: 'hover:bg-surface-container-highest hover:text-on-surface aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface dark:hover:bg-surface-container-highest/50',
+        ghost:
+          'hover:bg-surface-container-highest hover:text-on-surface aria-expanded:bg-surface-container-highest aria-expanded:text-on-surface dark:hover:bg-surface-container-highest/50',
         destructive:
           'bg-failure-container text-on-failure-container hover:bg-failure-container/90 focus-visible:border-failure/40 focus-visible:ring-failure/20 dark:focus-visible:ring-failure/40',
         link: 'text-primary underline-offset-4 hover:underline',

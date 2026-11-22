@@ -60,10 +60,14 @@ export const runRecipe = tv({
     tone: {
       alive: { ground: 'bg-[color-mix(in_srgb,var(--meaning-alive-container)_22%,var(--md-sys-color-surface-container-low))]' },
       yours: {
-        ground: 'bg-surface-container-low dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_3%,var(--md-sys-color-surface-container-low))]',
+        ground:
+          'bg-surface-container-low dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_3%,var(--md-sys-color-surface-container-low))]',
         clock: 'text-yours',
       },
-      failure: { ground: 'bg-surface-container-low dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_4%,var(--md-sys-color-surface-container-low))]' },
+      failure: {
+        ground:
+          'bg-surface-container-low dark:bg-[color-mix(in_srgb,var(--md-sys-color-error)_4%,var(--md-sys-color-surface-container-low))]',
+      },
       waits: { ground: 'bg-surface-container-low' },
       rest: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-inverse-surface)_4%,var(--md-sys-color-surface-container-low))]' },
     },

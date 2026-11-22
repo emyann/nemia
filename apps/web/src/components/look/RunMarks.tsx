@@ -71,7 +71,12 @@ export function Chip({ now, small = false }: { now: Pick<Now, 'step' | 'tone'>; 
   return (
     <CutTag edge={tag.variant === 'outlined'}>
       {tag.color === 'alive' ? (
-        <MeaningTag data-now-word data-tone={now.tone} hue="alive" className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}>
+        <MeaningTag
+          data-now-word
+          data-tone={now.tone}
+          hue="alive"
+          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
+        >
           {now.step}
         </MeaningTag>
       ) : (

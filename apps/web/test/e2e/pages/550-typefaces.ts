@@ -39,13 +39,11 @@ async function expectTypefaces(page: Page) {
       elsewhere: files.filter((name) => new URL(name).origin !== location.origin),
     };
   }, FACES);
-  if (!/^"?Barlow"?,/.test(seen.body))
-    throw new Refused(`the page is set in the read face, Barlow — it is set in ${seen.body}`);
+  if (!/^"?Barlow"?,/.test(seen.body)) throw new Refused(`the page is set in the read face, Barlow — it is set in ${seen.body}`);
   if (!/^\s*['"]Archivo Variable['"],/.test(seen.label))
     throw new Refused(`the label face is Archivo Variable (--font-label) — it is ${seen.label || 'not set'}`);
   for (const [what, family] of Object.entries(seen.mono))
-    if (!/^"?JetBrains Mono"?,/.test(family))
-      throw new Refused(`${what} is set in the mono face, JetBrains Mono — it is set in ${family}`);
+    if (!/^"?JetBrains Mono"?,/.test(family)) throw new Refused(`${what} is set in the mono face, JetBrains Mono — it is set in ${family}`);
   for (const { family } of FACES)
     if (!seen.loaded[family]) throw new Refused(`${family} loads — the page has no face of that family to load`);
   if (seen.files.length < FACES.length)

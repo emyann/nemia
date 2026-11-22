@@ -40,7 +40,10 @@ const NAMES = [
 const UTILITIES =
   '(?:bg|text|border(?:-[xytrblse])?|outline|ring(?:-offset)?|inset-ring|divide|fill|stroke|from|via|to|decoration|caret|placeholder|(?:inset-|drop-)?shadow|accent)';
 
-/** A shadcn name drawn as a colour utility, or read or declared as a variable, its own or Tailwind's, shadcn's `--ring` and `--secondary` too. */
+/**
+ * A shadcn name drawn as a colour utility, or read or declared as a variable, its own or Tailwind's, shadcn's `--ring` and
+ * `--secondary` too.
+ */
 const SHADCN = new RegExp(
   `(?<![\\w-])${UTILITIES}-(?:${NAMES})(?![\\w-])|var\\(\\s*--(?:color-)?(?:${NAMES}|ring|secondary)(?![\\w-])|(?<![\\w-])--(?:${NAMES}|ring|secondary)\\s*:`,
   'g',

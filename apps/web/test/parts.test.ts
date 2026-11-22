@@ -456,7 +456,7 @@ describe("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and
     assert.match(tagWith(html, 'data-sticker'), /data-sticker="money"[^>]*bg-money text-on-money/);
     assert.match(html, />Cost<\/span><span[^>]*>\$4\.25</);
   });
-  test('the scan lines: a glow and lines in the ink of what is read, thinned, no meaning\'s hue, and the glow alone without lines', async () => {
+  test("the scan lines: a glow and lines in the ink of what is read, thinned, no meaning's hue, and the glow alone without lines", async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(ScanLines, { children: 'page' }));
     const ground = tagWith(html, 'data-scan-lines');

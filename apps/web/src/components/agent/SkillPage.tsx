@@ -11,6 +11,9 @@ import type { PagePlace } from '@/lib/api/workflows';
 
 const code = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
 
+/** The line naming the skill's own file, in the mono face, over a hairline. */
+const SKILL_FILE = 'border-b border-outline-variant pb-2 font-mono text-body-small break-all text-on-surface-variant';
+
 /**
  * One skill: the agents that give it, each linked; what it costs a turn and the switch that loads it every turn; and its form — to edit,
  * when it is yours; to read, when it is the repository's or a builtin one, which the board does not write. Save and the switch each write
@@ -79,7 +82,7 @@ export function SkillPage({ from, name, place }: { from: string; name: string; p
         </div>
       )}
 
-      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-on-surface-variant">{skill.dir}/SKILL.md</p>
+      <p className={SKILL_FILE}>{skill.dir}/SKILL.md</p>
       <SkillForm
         key={shown.version}
         detail={shown}

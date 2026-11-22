@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { filled, paint } from '@/lib/meaning';
+import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 
 /** Bars of the plate's own ink, `widths` in pixels, an inked bar and a gap in turn, repeated along the barcode. */

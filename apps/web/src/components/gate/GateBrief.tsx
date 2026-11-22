@@ -105,7 +105,11 @@ function Waits({
   children?: ReactNode;
 }) {
   return (
-    <section aria-label="What the run asks of you" data-asked={kind} className="space-y-2 rounded border border-yours bg-surface-container-low p-3">
+    <section
+      aria-label="What the run asks of you"
+      data-asked={kind}
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3"
+    >
       <h3 className="text-label-medium text-yours uppercase">Waiting on you</h3>
       {children ?? <p className="break-words whitespace-pre-wrap">{said}</p>}
       <RouteLink

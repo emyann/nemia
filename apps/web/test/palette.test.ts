@@ -138,7 +138,8 @@ export interface Kept {
 }
 
 /** Why a meaning's colour is written by hand in the stylesheet. */
-const MEANING = "A meaning's value, written beside the theme since the kit's generator gives no colour of the board's own: DESIGN.md's table of the four meanings, held to it and to contrast by meanings.test.ts.";
+const MEANING =
+  "A meaning's value, written beside the theme since the kit's generator gives no colour of the board's own: DESIGN.md's table of the four meanings, held to it and to contrast by meanings.test.ts.";
 
 /** Why money's amber is. */
 const MONEY = "Money's amber, kept by hand until the board-look's second card takes money off its last part (test/baseline/money/).";

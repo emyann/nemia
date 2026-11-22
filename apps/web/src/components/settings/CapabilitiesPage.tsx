@@ -282,7 +282,9 @@ function ServerRow({ server }: { server: McpServer }) {
         >
           {enabled ? 'enabled' : 'not enabled'}
         </span>
-        {tools && <span className="text-body-small text-on-surface-variant">{tools.length === 1 ? '1 tool' : `${tools.length} tools`}</span>}
+        {tools && (
+          <span className="text-body-small text-on-surface-variant">{tools.length === 1 ? '1 tool' : `${tools.length} tools`}</span>
+        )}
         <span className="ml-auto">
           <Path path={server.source} />
         </span>

@@ -130,7 +130,17 @@ const COUNT_TAG = {
 } as const;
 
 /** The count chip's tag: the look's tag in the meaning for a session at work, which the theme has no role for, else the kit's. */
-function CountTag({ count, drawn, tag, children }: { count: number; drawn: string; tag: (typeof COUNT_TAG)[keyof typeof COUNT_TAG]; children: ReactNode }) {
+function CountTag({
+  count,
+  drawn,
+  tag,
+  children,
+}: {
+  count: number;
+  drawn: string;
+  tag: (typeof COUNT_TAG)[keyof typeof COUNT_TAG];
+  children: ReactNode;
+}) {
   return tag.color === 'alive' ? (
     <MeaningTag data-count-chip={count} data-count-tone={drawn} hue="alive" className="h-8 px-3">
       {children}

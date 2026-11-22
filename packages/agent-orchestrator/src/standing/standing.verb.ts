@@ -6,6 +6,8 @@
  * of them (`standingReader`): a question none asked is unread, never asked of git as it goes. A reading the place refused or did not
  * answer is unread too: nothing on it has landed, and the reader says why.
  */
+import { idRefusal } from '../forget/forget.ts';
+import { RunId } from '../record/record.model.ts';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
@@ -16,7 +18,7 @@ import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.
 import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import { landedOver } from '../branches/index.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -250,15 +252,17 @@ export const standingSnapshot = Effect.fn('standingSnapshot')(function* () {
   return snapshotStanding(yield* tried(() => readStanding(home)));
 });
 
-/** The records of `ids` the store has, none of `runs`: a run named that is not there is left out. */
-const recordsOf = (home: string, ids: Iterable<string>, runs: readonly Run[]) =>
-  [...new Set(ids)].flatMap((id) => {
-    if (runs.some((r) => r.id === id) || !runsAtOnce(home).runs.exists(id)) return [];
-    try {
-      return [runsAtOnce(home).runs.read(id)];
-    } catch {
-      return [];
+/** The records of `ids` the store has, none of `runs`: a run named that is not there, or that does not read, is left out. */
+const recordsOf = (ids: Iterable<string>, runs: readonly Run[]) =>
+  Effect.gen(function* () {
+    const door = (yield* RunDoor).runs;
+    const out: Run[] = [];
+    for (const id of new Set(ids)) {
+      if (runs.some((r) => r.id === id) || idRefusal(id, 'read')) continue;
+      const read = yield* Effect.result(door.read(RunId.read(id)));
+      if (read._tag === 'Success') out.push(read.success);
     }
+    return out;
   });
 
 /**
@@ -268,7 +272,7 @@ const recordsOf = (home: string, ids: Iterable<string>, runs: readonly Run[]) =>
  */
 export const standingLive = Effect.fn('standingLive')(function* (runs: readonly Run[]) {
   const home = yield* StoreRoot;
-  const related = yield* tried(() => recordsOf(home, [...runs.flatMap(waitedOn), ...runs.flatMap((r) => r.context ?? [])], runs));
+  const related = yield* recordsOf([...runs.flatMap(waitedOn), ...runs.flatMap((r) => r.context ?? [])], runs);
   return standingReader(yield* standingNow([...runs, ...related], asksOwnOr(runs.map((r) => r.id))));
 });
 
@@ -284,7 +288,7 @@ export const asksOwnOr = (ids: readonly string[]) => {
 /** A reader over where the runs of `ids` the store has stand now, each asked of (`standingLive`): none asked where the store has none. */
 export const standingLiveOf = Effect.fn('standingLiveOf')(function* (ids: readonly string[]) {
   const home = yield* StoreRoot;
-  return yield* standingLive(yield* tried(() => recordsOf(home, ids, [])));
+  return yield* standingLive(yield* recordsOf(ids, []));
 });
 
 /**

@@ -44,7 +44,7 @@ import { WorkflowError } from '../step/step.ts';
 import { FactoryDoor, factoryOrNone } from '../factory/door/factories.store.ts';
 import { unattachedRefusal, type Factory } from '../factory/factory.ts';
 import { runId } from '../record/record.store.ts';
-import { keptRuns } from '../record/files.store.ts';
+import { keptRuns } from '../runs/runs.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { everyCardTrigger } from '../factory/applied/applied.store.ts';
 
@@ -73,7 +73,7 @@ export const readInbox = Effect.fn('readInbox')(function* () {
   const factories = yield* readableFactories();
   return cardsListed(
     entries,
-    keptRuns(home, undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
+    yield* keptRuns(undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
     tries,
     factories,
     yield* triggeringOf(entries, factories.values()),

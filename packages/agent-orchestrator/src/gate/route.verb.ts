@@ -4,20 +4,14 @@
  * the api's Run `route` (`POST /api/namespaces/:namespace/runs/:name/steps/:step/route`) calls it with its typed input (`RouteInput`).
  */
 import { ROUTE_WORDS } from 'objects';
-import fs from 'node:fs';
-import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import type { Served } from '../command/entry.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { WorkflowError, type StepSpec } from '../step/step.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { RunId } from '../record/record.model.ts';
-import { asksDir } from '../record/record.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { routeAsk } from '../route/index.ts';
-import { writeWhole } from '../whole-file/whole-file.store.ts';
-import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * The follower of a condition already filed or sent its card, which settles its route; undefined while none is.
@@ -68,7 +62,6 @@ export const ROUTE: Served<{ step: string; try: number; route: string; at: strin
   ...ROUTE_WORDS,
   input: RouteInput,
   handler: Effect.fnUntraced(function* ({ runId: id, step, route }: RouteInput) {
-    const home = yield* StoreRoot;
     const door = (yield* RunDoor).runs;
     if (!(yield* door.exists(RunId.read(id))))
       return yield* Effect.fail(new Missing({ message: `no such run: ${id}. nemia route takes a run by its id, as nemia ls lists it.` }));
@@ -77,9 +70,7 @@ export const ROUTE: Served<{ step: string; try: number; route: string; at: strin
     if (refused) return yield* Effect.fail(refused);
     const n = tryOf(run, step);
     const at = new Date().toISOString();
-    const file = path.join(asksDir(home, id), routeAsk(step, n));
-    fs.mkdirSync(asksDir(home, id), { recursive: true });
-    writeWhole(file, `${JSON.stringify({ route, at })}\n`);
+    const file = yield* (yield* RunDoor).asks.route(RunId.read(id), step, n, { route, at });
     return { step, try: n, route, at, file };
   }),
 };

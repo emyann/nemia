@@ -13,7 +13,7 @@ import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { UNREADABLE, unjudgedWord, type UnjudgedWord } from '../views/views.verb.ts';
 import { isRepositoryRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
 import { runLabelMap, selectedRuns } from '../labels/labels.ts';
@@ -433,7 +433,7 @@ const listedThrough = Effect.fnUntraced(function* (e: Engine, memo: InformerMemo
   const home = yield* StoreRoot;
   const git = standingReader(yield* standingSnapshot());
   const read = yield* informerRead(e, memo, verify, git, sameJudgement);
-  const all = runsAtOnce(home).runs.list(undefined, read.given);
+  const all = yield* (yield* RunDoor).runs.list(undefined, read.given);
   read.only(all.map((run) => run.id));
   return { git, read, all };
 });

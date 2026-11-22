@@ -26,6 +26,11 @@ import {
   setScheduleAt,
 } from './src/factory/factory.store.ts';
 import { wfRoot } from './src/config/config.store.ts';
+import { Effect } from 'effect';
+import { StoreRoot } from './src/config/root.store.ts';
+import { keyspaceAt, keyspaceFile } from './src/keyspace/keyspace.store.ts';
+import { runsImported } from './src/runs/records.store.ts';
+import { RunDoor, type RunDoorShape, type RunsLayer } from './src/runs/runs.store.ts';
 
 /**
  * A function of the factories' store taking the store's root first, as a test plants a factory by hand: at the root its process's
@@ -61,3 +66,53 @@ export const setInstruction = atRoot(setInstructionAt);
 export const setSchedule = atRoot(setScheduleAt);
 /** `clearScheduleAt` at the test's root. */
 export const clearSchedule = atRoot(clearScheduleAt);
+
+/**
+ * Import the run files a test planted under the store `root` into its keyspace (`runsImported`): what a test runs after it wrote a run's
+ * record, ask or claim as a file once its process had opened the store, which imports only the first time. Answers how many records it
+ * made.
+ * @param root The store's root folder.
+ */
+export const runFilesImported = (root: string) =>
+  Effect.runPromise(Effect.flatMap(keyspaceAt(keyspaceFile(root)), (keyspace) => runsImported(root, keyspace)));
+
+/**
+ * `program` run at the store `root` (`StoreRoot`), the run files planted there imported first: a test's way to run a program that yields
+ * the Run door.
+ * @param root The store's root folder.
+ * @param program The program run.
+ */
+export const atStore = <A, E>(root: string, program: Effect.Effect<A, E, StoreRoot>) =>
+  runFilesImported(root).then(() => Effect.runPromise(Effect.provideService(program, StoreRoot, root)));
+
+/**
+ * The Run door over the keyspace of the store `root`, handed to `use`, the run files planted there imported first.
+ * @param root The store's root folder.
+ * @param use What the test reads and writes through the door.
+ */
+export const runDoorAt = <A, E>(root: string, use: (door: RunDoorShape) => Effect.Effect<A, E>) =>
+  atStore(root, Effect.flatMap(RunDoor, use));
+
+/**
+ * The Run door over the keyspace of the store `root`, each method run at once: a test's synchronous reading and writing of what a program
+ * reads through the door, the run files planted there imported before each call. A test's alone: no program of the package reads a run
+ * but through the Effect it yields.
+ * @param root The store's root folder.
+ */
+export const runsNow = (root: string) => {
+  const door = Effect.runSync(Effect.provideService(RunDoor, StoreRoot, root));
+  const imported = Effect.flatMap(keyspaceAt(keyspaceFile(root)), (keyspace) => runsImported(root, keyspace));
+  return Object.fromEntries(
+    Object.entries(door as Record<string, Record<string, (...args: never[]) => Effect.Effect<unknown, unknown, StoreRoot>>>).map(
+      ([group, methods]) => [
+        group,
+        Object.fromEntries(
+          Object.entries(methods).map(([name, method]) => [
+            name,
+            (...args: never[]) => Effect.runSync(Effect.provideService(Effect.andThen(imported, method(...args)), StoreRoot, root)),
+          ]),
+        ),
+      ],
+    ),
+  ) as RunsLayer;
+};

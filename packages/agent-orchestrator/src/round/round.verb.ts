@@ -11,7 +11,6 @@ import { type Acceptance, type Run } from '../record/record.ts';
 import { type RoundAsk } from '../status/status.ts';
 import { acceptAsk, acceptWordsRefusal, roundAsk } from './round.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -132,9 +131,10 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
   const file = written.where;
   if (!written.written) {
     const { stray } = written;
-    const why = yield* tried(() =>
-      acceptedAlready(file, stray, acceptance, answer(runsAtOnce(home).runs.read(id), runsAtOnce(home).asks.read(id).rounds), id),
-    );
+    const door = yield* RunDoor;
+    const now = yield* door.runs.read(RunId.read(id));
+    const rounds = (yield* door.asks.read(RunId.read(id))).rounds;
+    const why = yield* tried(() => acceptedAlready(file, stray, acceptance, answer(now, rounds), id));
     return yield* Effect.fail(new Conflict({ message: why }));
   }
   return { run, acceptance, file } satisfies Accepted;

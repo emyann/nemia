@@ -34,7 +34,7 @@ import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld, SaidBefore } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
-import { countRecord, readText, within } from '../meter/tally.store.ts';
+import { countRead, countRecord, readText, within } from '../meter/tally.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 import { isFilePath } from '../artifacts/artifacts.ts';
@@ -172,9 +172,9 @@ function recordRefusal(raw: unknown) {
  * fix, and left out of `listRuns`, so one record nobody can read stops no other run.
  */
 export class UnreadableRecord extends Invalid {
-  constructor(home: string, id: string, why: string) {
+  constructor(where: string, id: string, why: string) {
     super({
-      message: `run ${id}: its record, ${runFile(home, id)}, ${why}. Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it; if a newer nemia wrote it, read this store with that nemia.`,
+      message: `run ${id}: its record, ${where}, ${why}. Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it; if a newer nemia wrote it, read this store with that nemia.`,
     });
   }
 }
@@ -391,24 +391,6 @@ export const removeHold = (home: string, id: string, at: string, actor?: Actor) 
   }
 };
 
-/**
- * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its hold
- * (`holdFile`), what was said to its steps before each was filed (`saidDir`), each approval at a gate (`readApprovals`), and each loop a
- * person ended as it stands (`readAcceptances`), off one listing of its asks directory. None of them is ever written into the record
- * (`rewriteRun`), and whatever the record carries under their keys is dropped, the store's pause's, the run's labels and what was said
- * before a step was filed (`pause`, `labels`, `saidBefore`, which the Run door composes) with them. Counted as one record read
- * (`countRecord`) under `records` while a pass is metered.
- *
- * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
- * among the record's keys, so a record read and written back moves no line; a try's former `then` is read as its `cause`
- * (`upgradeTries`), and a step's record written before `declared` was kept is given it where its schema has not moved (`keptDeclared`).
- * Refused: an id with no record, as `no such run` naming
- * `nemia ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export const runRecord = (home: string, id: string) => within('records', () => readRecord(home, id)) satisfies Run;
-
 /** The run's hold (`holdFile`) and who last lifted one by hand (`unheldFile`), each where its file is there, as the run carries them. */
 const heldOf = (home: string, id: string) => {
   const [hold, unheld] = [readHold(home, id), readUnheld(home, id)];
@@ -418,30 +400,57 @@ const heldOf = (home: string, id: string) => {
   >;
 };
 
-const readRecord = (home: string, id: string) => {
-  if (!fs.existsSync(runFile(home, id))) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
-  countRecord();
-  let raw: unknown;
-  try {
-    raw = upgradeTries(JSON.parse(readText(runFile(home, id))));
-  } catch (err) {
-    if (!(err instanceof SyntaxError)) throw err;
-    throw new UnreadableRecord(home, id, `is not JSON (${err.message})`);
-  }
-  if (!isRunRecord(raw)) throw new UnreadableRecord(home, id, recordRefusal(raw));
-  const read = { ...raw };
-  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
-  const { workflow, ...unfrozen } = read;
-  const run = workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen;
-  const [cancelled, pruned, saidBefore] = [readCancelled(home, id), readPruned(home, id), readSaidBefore(home, id)];
-  const { approvals, acceptances, routes } = within('asks', () => {
-    const names = fileNames(asksDir(home, id));
-    return {
-      ...readApprovalsNow(home, id, names),
-      ...readAcceptancesNow(home, id, names),
-      routes: personRoutes(asksDir(home, id), names, heldIn),
-    };
+/** An ask as the Run door hands it to a reader: its name (`retry-<step>-<n>`, …), what it holds, and where a person finds it, its key. */
+export type AskEntry = { readonly name: string; readonly text: string; readonly where: string };
+
+/**
+ * A run's record as its text reads, bare: nothing a person owns beside it, and whatever it carries under their keys dropped, the store's
+ * pause's, the run's labels and what was said before a step was filed (`pause`, `labels`, `saidBefore`, which the Run door composes)
+ * with them. The frozen steps are read under the names their keys have now (`asNamed`), and written back under them, in their place among
+ * the record's keys; a try's former `then` is read as its `cause` (`upgradeTries`), and a step's record written before `declared` was kept
+ * is given it where its schema has not moved (`keptDeclared`). Counted as one record read (`countRecord`). Refused: a record that does not
+ * read as a run (`UnreadableRecord`).
+ * @param id The run's id.
+ * @param text The record's text.
+ * @param where Where a person finds the record: its key.
+ */
+export const recordIn = (id: string, text: string, where: string) =>
+  within('records', () => {
+    countRecord();
+    let raw: unknown;
+    try {
+      raw = upgradeTries(JSON.parse(text));
+    } catch (err) {
+      if (!(err instanceof SyntaxError)) throw err;
+      throw new UnreadableRecord(where, id, `is not JSON (${err.message})`);
+    }
+    if (!isRunRecord(raw)) throw new UnreadableRecord(where, id, recordRefusal(raw));
+    const read = { ...raw };
+    for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
+    const { workflow, ...unfrozen } = read;
+    return (workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen) satisfies Run as Run;
   });
+
+/**
+ * A run: its bare record (`recordIn`), with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning
+ * (`pruneFile`), its hold (`holdFile`), what was said to its steps before each was filed (`saidDir`), each approval at a gate and each
+ * loop a person ended as it stands, and each person's route, off its asks. None of them is ever written into the record.
+ * @param home The store's root folder.
+ * @param run The run's bare record.
+ * @param asks The run's waiting asks.
+ */
+export const composedRun = (home: string, run: Run, asks: readonly AskEntry[]) => {
+  const id = run.id;
+  const [cancelled, pruned, saidBefore] = [readCancelled(home, id), readPruned(home, id), readSaidBefore(home, id)];
+  const { approvals, acceptances, routes } = within('asks', () => ({
+    ...approvalsIn(asks),
+    ...acceptancesIn(asks),
+    routes: personRoutes(
+      '',
+      asks.map((a) => a.name),
+      (name) => heldText(asks.find((a) => `/${a.name}` === name)?.text ?? ''),
+    ),
+  }));
   const standing = approvals.filter((a) => workStands(run, a));
   return {
     ...withRoutes(run, routes),
@@ -578,96 +587,28 @@ export function readCancelled(home: string, id: string) {
 }
 
 /**
- * A person's `nemia retry`, in files of its own: `runs/<id>.asks/retry-<step>-<n>`, one per try asked for.
- *
- * For the reason a cancellation has its own file: the run's json has one writer, the tick, and a verb typed
- * while `nemia up` runs must not be a second. The verb creates the ask, whole and exclusively, and never touches
- * it again. Every pass reads the directory, and once the run's record holds the try an ask names, the tick
- * moves the file into `done/` — consumed, never edited. Naming the try is what makes an ask honoured once: a
- * pass that dies after filing the try and before consuming the ask files nothing more, because the next pass
- * finds the try on the board (`adoptTries`) or on the record (`spentAsks`).
- *
- * `nemia retry --round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`);
- * and `nemia refresh --base`, in `merge-<step>-<n>`, read and consumed beside the rest (`readMergeAsks`, `consumeMergeAsks`).
- *
- * `nemia approve` too, in `approve-<step>-<n>`: the gated step, and the try it approves. It is never consumed while it opens the gate — the
- * record holds no approval, and every pass reads the file (`runRecord`) — only once a later try of the step spent it (`spentApprovals`).
- *
- * And `nemia approve`, in `accept-<step>-<n>`: the looping step whose loop a person ended as it stands, and the try they accepted. Read and
- * spent exactly as an approval is (`readAcceptances`, `spentAcceptances`) — every pass reads the file, so the loop stays ended after a
- * restart, and a later try of the step takes it back.
- * @param home The store's root folder.
- * @param id The run's id.
+ * A person's asks of a run, each a record of the keyspace under the run's asks (`askKey`, `src/runs/run-keys.ts`), named as its file was:
+ * `retry-<step>-<n>` (`nemia retry`), `round-<step>-<round>` (`nemia retry --round`), `merge-<step>-<n>` (`nemia refresh --base`),
+ * `approve-<step>-<n>` (`nemia approve` at a gate), `accept-<step>-<n>` (a loop a person ended as it stands) and `route-<step>-<n>`
+ * (`nemia route`). The verb creates the ask, whole, and never touches it again; once the run's record answers it, the pass that writes the
+ * record moves it under `done/` in the same transaction (`runs.settle`) — consumed, never edited. An approval and an acceptance stay while
+ * they hold, read on every pass, until a later try of the step spends them (`spentApprovals`, `spentAcceptances`). Read here from what
+ * each holds (`AskEntry`), and the readers take no path.
  */
-export const asksDir = (home: string, id: string) => path.join(runsDir(home), `${id}.asks`);
-/**
- * The file of a person's `nemia retry` of a step's try: `retry-<step>-<n>` in the run's asks directory (`asksDir`).
- * @param home The store's root folder.
- * @param id The run's id.
- * @param step The step's name.
- * @param n The try asked for, from 1.
- */
-export const askFile = (home: string, id: string, step: string, n: number) => path.join(asksDir(home, id), `retry-${step}-${n}`);
-/**
- * The file of a person's `nemia retry --round` of a looping step: `round-<step>-<round>` in the run's asks directory (`asksDir`).
- * @param home The store's root folder.
- * @param id The run's id.
- * @param step The looping step's name.
- * @param round The round asked for.
- */
-export const roundAskFile = (home: string, id: string, step: string, round: number) =>
-  path.join(asksDir(home, id), `round-${step}-${round}`);
-/**
- * The file of a person's `nemia approve` at a gate: `approve-<step>-<n>` in the run's asks directory (`asksDir`).
- * @param home The store's root folder.
- * @param id The run's id.
- * @param step The gated step's name.
- * @param n The try approved, from 1.
- */
-export const approvalFile = (home: string, id: string, step: string, n: number) => path.join(asksDir(home, id), `approve-${step}-${n}`);
-/**
- * The file of a loop a person ended as it stands: `accept-<step>-<n>` in the run's asks directory (`asksDir`).
- * @param home The store's root folder.
- * @param id The run's id.
- * @param step The looping step's name.
- * @param n The try accepted, from 1.
- */
-export const acceptFile = (home: string, id: string, step: string, n: number) => path.join(asksDir(home, id), `accept-${step}-${n}`);
 
 /**
- * The names of the files in `dir`, sorted; undefined where it cannot be listed, as when it was never made.
- * @param dir The folder listed.
+ * The approvals at a run's gates among its asks — each opens the gate of the try it names — and a line for each ask named as one that
+ * cannot be read as one.
+ * @param asks The run's waiting asks.
  */
-export const fileNames = (dir: string) => {
-  try {
-    return fs
-      .readdirSync(dir, { withFileTypes: true })
-      .filter((d) => d.isFile())
-      .map((d) => d.name)
-      .sort();
-  } catch {
-    return undefined;
-  }
-};
-
-/**
- * The approvals at a run's gates, waiting in its asks directory — each opens the gate of the try it names — and a line for each file named
- * as one that cannot be read as one.
- * @param home The store's root folder.
- * @param id The run's id.
- */
-export const readApprovals = (home: string, id: string) => within('asks', () => readApprovalsNow(home, id));
-
-function readApprovalsNow(home: string, id: string, names = fileNames(asksDir(home, id))) {
+export function approvalsIn(asks: readonly AskEntry[]) {
   const approvals: Approval[] = [];
   const notes: string[] = [];
-  if (!names) return { approvals, notes };
-  for (const name of names) {
+  for (const { name, text, where } of asks) {
     const [, step, n] = /^approve-(.+)-(\d+)$/.exec(name) ?? [];
     if (step === undefined || n === undefined) continue;
-    const file = path.join(asksDir(home, id), name);
-    const read = approvalIn(file, step, Number(n));
-    if (typeof read === 'string') notes.push(`${file}: ${read}, so it opens no gate — remove it, and approve with nemia approve`);
+    const read = approvalIn(text, step, Number(n));
+    if (typeof read === 'string') notes.push(`${where}: ${read}, so it opens no gate — remove it, and approve with nemia approve`);
     else approvals.push(read);
   }
   return { approvals, notes };
@@ -706,12 +647,13 @@ const RetryAskFileSchema = Kept({
 });
 
 /**
- * An ask file's JSON, or why it cannot be read.
- * @param file The ask file's path.
+ * An ask's JSON, or why it cannot be read.
+ * @param text What the ask holds.
  */
-export function heldIn(file: string) {
+export function heldText(text: string) {
   try {
-    return { read: JSON.parse(readText(file)) } satisfies { read: unknown } | { unreadable: string } as
+    countRead(Buffer.byteLength(text, 'utf8'));
+    return { read: JSON.parse(text) } satisfies { read: unknown } | { unreadable: string } as
       | { read: unknown }
       | { unreadable: string };
   } catch (err) {
@@ -749,12 +691,12 @@ const NO_APPROVAL = 'it is not an approval nemia approve wrote';
 
 /**
  * One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read.
- * @param file The approval file's path.
+ * @param text What the approval holds.
  * @param step The gated step, from the file's name.
  * @param n The try approved, from the file's name.
  */
-export function approvalIn(file: string, step: string, n: number) {
-  const held = heldIn(file);
+export function approvalIn(text: string, step: string, n: number) {
+  const held = heldText(text);
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(ApprovalFileSchema, held.read);
   if ('refused' in read) return read.refused === 'message' ? messageWords(held.read) : (APPROVAL_WORDS[read.refused] ?? NO_APPROVAL);
@@ -771,25 +713,18 @@ export function approvalIn(file: string, step: string, n: number) {
 }
 
 /**
- * The acceptances of a run's loops, waiting in its asks directory — each ends the loop of the try it names — and a line for each file named
- * as one that cannot be read as one.
- * @param home The store's root folder.
- * @param id The run's id.
+ * The acceptances of a run's loops among its asks — each ends the loop of the try it names — and a line for each ask named as one that
+ * cannot be read as one.
+ * @param asks The run's waiting asks.
  */
-export function readAcceptances(home: string, id: string) {
-  return within('asks', () => readAcceptancesNow(home, id));
-}
-
-function readAcceptancesNow(home: string, id: string, names = fileNames(asksDir(home, id))) {
+export function acceptancesIn(asks: readonly AskEntry[]) {
   const acceptances: Acceptance[] = [];
   const notes: string[] = [];
-  if (!names) return { acceptances, notes };
-  for (const name of names) {
+  for (const { name, text, where } of asks) {
     const [, step, n] = /^accept-(.+)-(\d+)$/.exec(name) ?? [];
     if (step === undefined || n === undefined) continue;
-    const file = path.join(asksDir(home, id), name);
-    const read = acceptanceIn(file, step, Number(n));
-    if (typeof read === 'string') notes.push(`${file}: ${read}, so it ends no loop — remove it, and accept with nemia approve`);
+    const read = acceptanceIn(text, step, Number(n));
+    if (typeof read === 'string') notes.push(`${where}: ${read}, so it ends no loop — remove it, and accept with nemia approve`);
     else acceptances.push(read);
   }
   return { acceptances, notes };
@@ -799,12 +734,12 @@ function readAcceptancesNow(home: string, id: string, names = fileNames(asksDir(
  * One acceptance file, read: the looping step and the try from its name, when and what was said from what it holds — or why it cannot be
  * read. What `nemia approve` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with
  * no words ends a loop with findings open and tells the steps after it nothing, which is the whole of what it is for.
- * @param file The acceptance file's path.
+ * @param text What the acceptance holds.
  * @param step The looping step, from the file's name.
  * @param n The try accepted, from the file's name.
  */
-export function acceptanceIn(file: string, step: string, n: number) {
-  const held = heldIn(file);
+export function acceptanceIn(text: string, step: string, n: number) {
+  const held = heldText(text);
   if ('unreadable' in held) return held.unreadable satisfies Acceptance | string as Acceptance | string;
   const read = readAs(AcceptanceFileSchema, held.read);
   if ('refused' in read) {
@@ -820,31 +755,23 @@ export function acceptanceIn(file: string, step: string, n: number) {
 }
 
 /**
- * The asks waiting in a run's directory — tries and rounds — and a line for each file there that names one and cannot be read as one, and
- * for each approval and acceptance that cannot be read (`readApprovals`, `readAcceptances`), said on the pass as an ask's is. A file named
- * otherwise is no ask, the dot-named one a verb writes before linking it into place (`writeAsk`) among them. The directory is listed once,
- * and each file in it read once.
- * @param home The store's root folder.
- * @param id The run's id.
+ * The asks waiting among a run's — tries and rounds — and a line for each ask that names one and cannot be read as one, and for each
+ * approval and acceptance that cannot be read (`approvalsIn`, `acceptancesIn`), said on the pass as an ask's is. Each read once.
+ * @param asks The run's waiting asks.
  */
-export const readAsks = (home: string, id: string) => within('asks', () => readAsksNow(home, id));
-
-function readAsksNow(home: string, id: string) {
+export function asksIn(asks: readonly AskEntry[]) {
   const read: AsksRead = { asks: [], rounds: [], notes: [] };
-  const names = fileNames(asksDir(home, id));
-  if (!names) return read;
-  read.notes.push(...readApprovalsNow(home, id, names).notes, ...readAcceptancesNow(home, id, names).notes);
-  for (const name of names) {
+  read.notes.push(...approvalsIn(asks).notes, ...acceptancesIn(asks).notes);
+  for (const { name, text, where } of asks) {
     const [, tried, triedN] = /^retry-(.+)-(\d+)$/.exec(name) ?? [];
     const [, again, againN] = /^round-(.+)-(\d+)$/.exec(name) ?? [];
-    const file = path.join(asksDir(home, id), name);
     if (tried !== undefined && triedN !== undefined) {
-      const ask = askIn(file, tried, Number(triedN));
-      if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
+      const ask = askIn(text, tried, Number(triedN));
+      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
       else read.asks.push(ask);
     } else if (again !== undefined && againN !== undefined) {
-      const ask = roundAskIn(file, again, Number(againN));
-      if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry --round`);
+      const ask = roundAskIn(text, again, Number(againN));
+      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — remove it, and ask with nemia retry --round`);
       else read.rounds.push(ask);
     }
   }
@@ -853,12 +780,12 @@ function readAsksNow(home: string, id: string) {
 
 /**
  * One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read.
- * @param file The round ask file's path.
+ * @param text What the round ask holds.
  * @param step The looping step, from the file's name.
  * @param round The round asked for, from the file's name.
  */
-export function roundAskIn(file: string, step: string, round: number) {
-  const held = heldIn(file);
+export function roundAskIn(text: string, step: string, round: number) {
+  const held = heldText(text);
   if ('unreadable' in held) return held.unreadable satisfies RoundAsk | string as RoundAsk | string;
   const read = readAs(RoundAskFileSchema, held.read);
   if ('refused' in read)
@@ -889,12 +816,12 @@ function askRefusal(refused: string, held: unknown) {
  * A file with no message reads as an ask without one. What `nemia retry` refuses to write is refused here too, so a file written by hand is
  * held to the verb's word: a message that is not text or is empty, and a message on a recheck. A file that holds no object, or whose mode
  * is not one of the three, asks for no mode `nemia retry` knows.
- * @param file The ask file's path.
+ * @param text What the ask holds.
  * @param step The step, from the file's name.
  * @param n The try asked for, from the file's name.
  */
-export function askIn(file: string, step: string, n: number) {
-  const held = heldIn(file);
+export function askIn(text: string, step: string, n: number) {
+  const held = heldText(text);
   if ('unreadable' in held) return held.unreadable satisfies RetryAsk | string as RetryAsk | string;
   const read = readAs(RetryAskFileSchema, upgradeAsk(held.read));
   if ('refused' in read) return askRefusal(read.refused, held.read) satisfies RetryAsk | string as RetryAsk | string;
@@ -924,185 +851,30 @@ export function askIn(file: string, step: string, n: number) {
 }
 
 /**
- * Every ask that carried a message — still waiting, or consumed into `done/` — for what `nemia ls` and `nemia decide` say of a try that was
- * answered (`answerOf`). Composed on read, as the ask itself is: the run's record keeps no message. A file that cannot be read as an ask
- * is left out; the tick's own read (`readAsks`) says why.
- * @param home The store's root folder.
- * @param id The run's id.
+ * Every ask that carried a message — still waiting, or consumed under `done/` — for what `nemia ls` and `nemia decide` say of a try that
+ * was answered (`answerOf`). Composed on read, as the ask itself is: the run's record keeps no message. An ask that cannot be read is left
+ * out; the tick's own read (`asksIn`) says why.
+ * @param asks The run's asks, waiting and spent, each by its name, a spent one's under `done/`.
  */
-export function readAnswers(home: string, id: string) {
-  return within('asks', () => readAnswersNow(home, id));
-}
-
-function readAnswersNow(home: string, id: string) {
+export function answersIn(asks: readonly AskEntry[]) {
   const answers: RetryAsk[] = [];
-  for (const dir of [asksDir(home, id), path.join(asksDir(home, id), 'done')]) {
-    const names = fileNames(dir) ?? [];
-    for (const name of names) {
-      const [, step, n] = /^retry-(.+)-(\d+)$/.exec(name) ?? [];
-      const ask = step !== undefined && n !== undefined ? askIn(path.join(dir, name), step, Number(n)) : undefined;
-      if (ask && typeof ask !== 'string' && ask.message !== undefined) answers.push(ask);
-    }
+  for (const { name, text } of asks) {
+    const [, step, n] = /^(?:done\/)?retry-(.+)-(\d+)(?:\.\d+)?$/.exec(name) ?? [];
+    const ask = step !== undefined && n !== undefined ? askIn(text, step, Number(n)) : undefined;
+    if (ask && typeof ask !== 'string' && ask.message !== undefined) answers.push(ask);
   }
   return answers;
 }
 
 /**
- * Write a person's ask, whole and exclusively: into a file of its own, then linked to its name. `link` refuses a
- * name that exists, as `wx` does, and unlike `wx` leaves no moment in which the tick can read an ask that has
- * been created and not yet written. False when an ask for that try was already there.
- * @param file The ask's file, in the run's asks directory.
- * @param ask What the ask holds.
- */
-export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acceptance | MergeAskHeld) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const whole = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}`);
-  fs.writeFileSync(whole, `${JSON.stringify(ask, null, 2)}\n`, { flag: 'wx' });
-  try {
-    fs.linkSync(whole, file);
-    return true;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return false;
-    throw err;
-  } finally {
-    fs.rmSync(whole, { force: true });
-  }
-}
-
-/**
- * Move each ask the run's record already answers into `done/`, and each one of `voided` — an ask `nemia pause --now` wrote that the pass
- * found void (`pauseAskVoid`) — and each approval a later try of its step spent (`spentApprovals`), and
- * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit. `done/` is made inside the
- * run's asks directory, never the directory itself, which `nemia rm` may remove mid-pass; an ask already moved by a pass beside this one,
- * or removed with its run, is passed over.
- * @param home The store's root folder.
- * @param run The run as its record reads now.
- * @param asks The tries asked for, read off the asks directory.
- * @param rounds The rounds asked for, read off the asks directory.
- * @param voided The asks the pass found void; none where absent.
- */
-export function consumeAsks(
-  home: string,
-  run: Run,
-  asks: readonly RetryAsk[],
-  rounds: readonly RoundAsk[],
-  voided: readonly RetryAsk[] = [],
-) {
-  within('act', () =>
-    doneWith(home, run.id, [
-      ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askFile(home, run.id, a.step, a.try)),
-      ...spentRoundAsks(run, rounds).map((a) => roundAskFile(home, run.id, a.step, a.round)),
-      ...spentApprovals({ ...run, approvals: readApprovalsNow(home, run.id).approvals }).map((a) =>
-        approvalFile(home, run.id, a.step, a.try),
-      ),
-      ...spentAcceptances(run).map((a) => acceptFile(home, run.id, a.step, a.try)),
-    ]),
-  );
-}
-
-/**
- * Move each of a run's ask files `spent` into `done/` in its asks directory, passing over one already moved or removed with its run. One
- * spent before at the same name — an ending's approval of a try whose work was sent back, given again and spent again — is kept: the later
- * goes in beside it, at the name with `.2`, `.3`, … after it (`keptName`), and no file in `done/` is ever written over.
- * @param home The store's root folder.
- * @param id The run's id.
- * @param spent The paths of the ask files spent.
- */
-export function doneWith(home: string, id: string, spent: readonly string[]) {
-  for (const file of spent) {
-    const done = path.join(asksDir(home, id), 'done', path.basename(file));
-    try {
-      fs.mkdirSync(path.dirname(done));
-    } catch {}
-    try {
-      fs.linkSync(file, keptName(done));
-      fs.unlinkSync(file);
-    } catch {}
-  }
-}
-
-/**
- * Set aside the approval of try `n` of `step` of run `id`, taken back by a person (`nemia approve <run> <step> --off`): what its file
- * said, with `takenBack` beside it, written exclusively into `done/` at the first name there no file holds (`keptName`), then its file
- * removed — never deleted unkept, never written over. Answers where it was set aside; null where no approval is at its name, or where it
- * went between the read and the removal (a pass set it aside as spent), whose copy is then removed again.
- * @param home The store's root folder.
- * @param id The run's id.
- * @param step The gated step's name.
- * @param n The try the approval opened the gate of, from 1.
- * @param takenBack When, and by whom, the approval was taken back.
- */
-export function takeBackApproval(home: string, id: string, step: string, n: number, takenBack: TakenBack) {
-  return within('act', () => {
-    const file = approvalFile(home, id, step, n);
-    const held = heldIn(file);
-    if ('unreadable' in held || typeof approvalIn(file, step, n) === 'string') return null;
-    const said = held.read !== null && typeof held.read === 'object' ? held.read : {};
-    const done = keptName(path.join(asksDir(home, id), 'done', path.basename(file)));
-    fs.mkdirSync(path.dirname(done), { recursive: true });
-    fs.writeFileSync(done, `${JSON.stringify({ ...said, takenBack }, null, 2)}\n`, { flag: 'wx' });
-    try {
-      fs.unlinkSync(file);
-    } catch (err) {
-      fs.rmSync(done, { force: true });
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-      throw err;
-    }
-    return done;
-  });
-}
-
-/**
- * The first of `done`, `done.2`, `done.3`, … no file holds; `done` itself past a thousand, where the link then refuses and moves nothing.
- */
-const keptName = (done: string) => {
-  for (let n = 1; n <= 1000; n++) {
-    const name = n === 1 ? done : `${done}.${n}`;
-    if (!lstatOf(name)) return name;
-  }
-  return done;
-};
-
-/**
- * Every run in the store. A record `nemia rm` removed after the directory was read is no run, and no reason to fail every other run's pass;
- * nor is a record that does not read as a run (`UnreadableRecord`), which is left out and said, once a process, on `said` — stderr unless
- * given — with its fix. `nemia <verb> <that id>` refuses in the same words. A run `kept` answers for an id is listed as given, its record
- * neither read nor counted; an id it answers nothing for is read.
- * @param home The store's root folder.
- * @param said Where a record that does not read is said; once a process on stderr where absent.
- * @param kept The run kept for an id, or undefined where its record is to be read; every record is read where absent.
- */
-export const listRuns = (home: string, said: (line: string) => void = sayOnce, kept?: (id: string) => Run | undefined) =>
-  within('records', () =>
-    fs.existsSync(runsDir(home))
-      ? fs
-          .readdirSync(runsDir(home))
-          .filter((f) => f.endsWith('.json'))
-          .flatMap((f) => {
-            const id = path.basename(f, '.json');
-            try {
-              return [kept?.(id) ?? runRecord(home, id)];
-            } catch (err) {
-              if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
-              else if (fs.existsSync(runFile(home, id))) throw err;
-              return [];
-            }
-          })
-          .sort((a, b) => a.id.localeCompare(b.id))
-      : [],
-  ) satisfies Run[];
-
-/**
- * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they
- * were is not read again off the engine or git. One `readdir` of the store, and a `stat` of every file named `<id>.<anything>` — the
- * record, `.cancelled`, `.pruned`, `.hold`, `.labels`, and any other marker, as every name of that form is stamped — and of every
- * entry of a directory so named and of the directories in it: the asks, with the approvals and acceptances among them, and `done/`, where
- * each goes once it is spent. Its inode, size and modification time to the nanosecond, so a file written in place, moved, or removed and
- * made again moves its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out. The
- * files so named that a run's judgement reads are the stamped inputs of `RUN_INPUTS` (`STAMPED_FILES`, rest/rest.ts).
- *
- * A stamp is taken before the pass reads the records: a file changed between the two is read as changed by the next pass, never missed.
- * While a run's stamp holds, a pass does not read its record again: the memo hands its run to `listRuns`.
+ * Each run's markers in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares beside the revisions of its record
+ * and asks, so that a run whose inputs are as they were is not read again off the engine or git. One `readdir` of the store, and a `stat`
+ * of every file named `<id>.<anything>` — `.cancelled`, `.pruned`, `.hold`, `.labels`, and any other marker, as every name of that form
+ * is stamped — and of every entry of a directory so named and of the directories in it. Its inode, size and modification time to the
+ * nanosecond, so a file written in place, moved, or removed and made again moves its run's stamp. The run's own directory (`<id>/`: its
+ * files and inputs) is no input of a pass, and is left out; so are the files a store kept before its records were in the keyspace
+ * (`<id>.json`, `<id>.asks`), which the Run door imports. The files so named that a run's judgement reads are `STAMPED_FILES`
+ * (rest/rest.ts).
  * @param home The store's root folder.
  */
 export const restStamps = (home: string) =>
@@ -1130,7 +902,7 @@ export const restStamps = (home: string) =>
     };
     for (const name of names.sort()) {
       const dot = name.indexOf('.');
-      if (dot <= 0) continue;
+      if (dot <= 0 || name.endsWith('.json') || name.endsWith('.asks')) continue;
       const id = name.slice(0, dot);
       const parts = stamps.get(id) ?? [];
       stamps.set(id, [...parts, `${name}=${stat(path.join(runsDir(home), name), 0)}`]);
@@ -1138,57 +910,21 @@ export const restStamps = (home: string) =>
     return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
   }) satisfies Map<string, string> as Map<string, string>;
 
-/** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
-const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause' | 'saidBefore'>) =>
-  JSON.stringify(run, null, 2);
-
 /**
- * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, the run's labels and what was said before a
- * step was filed, each a person's file
- * (`runs.labels.put` writes the labels, `writeLabels` in files.store.ts). Exclusive (`wx`): a record already at the id is left as it is,
- * and the write throws `EEXIST`, which the Run door answers as `Conflict`.
- * @param home The store's root folder.
+ * A record as the keyspace holds it: compact JSON, without what a person owns beside it (the approvals, acceptances, pruning, hold and a
+ * person's routes a read composed onto it, `unrouted`), nor the pause, labels and words said before a step was filed the Run door did.
+ * @param run The run as a pass or `nemia start` writes it.
  */
-export const writeRun = (home: string, { pause: _, labels: __, saidBefore: ___, ...run }: Run) => {
-  fs.mkdirSync(runsDir(home), { recursive: true });
-  fs.writeFileSync(runFile(home, run.id), recordText(run), { flag: 'wx' });
-};
-
-/**
- * Write back the record a pass read — only while it is still there, and false when it is not.
- *
- * A pass reads a run, spends seconds on the engine and git, and writes the run back. `nemia rm` may remove the record in those seconds, and
- * a pass that wrote a whole new file would put it back: a run nobody can forget, pointing at worktrees that are gone. So the record is
- * opened `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record
- * removed after it is opened takes the write with it.
- *
- * Without the approvals, acceptances, pruning, hold and a person's routes `runRecord` composed onto it (`unrouted`), nor the pause, labels
- * and words said before a step was filed the run store did: they are a person's files, and a copy in the record would outlive the file it
- * was read from.
- * @param home The store's root folder.
- * @param run The run the pass read, as it writes it back.
- */
-export const rewriteRun = (home: string, run: Run) => within('act', () => rewriteNow(home, run));
-
-const rewriteNow = (
-  home: string,
-  { approvals: _, acceptances: __, pruned: ___, hold: ____, labels: ______, pause: _____, saidBefore: _______, ...run }: Run,
-) => {
-  let fd: number;
-  try {
-    fd = fs.openSync(runFile(home, run.id), 'r+');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw err;
-  }
-  try {
-    fs.ftruncateSync(fd);
-    fs.writeFileSync(fd, recordText(unrouted(run)));
-  } finally {
-    fs.closeSync(fd);
-  }
-  return true;
-};
+export const recordValue = ({
+  approvals: _,
+  acceptances: __,
+  pruned: ___,
+  hold: ____,
+  labels: ______,
+  pause: _____,
+  saidBefore: _______,
+  ...run
+}: Run) => JSON.stringify(unrouted(run));
 
 /**
  * The directory the run makes for a step's files: screenshots, logs, reports — for the steps after it

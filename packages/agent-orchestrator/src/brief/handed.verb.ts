@@ -9,13 +9,13 @@ import type { StepSpec } from '../workflow.ts';
 import type { Run } from '../record/record.ts';
 import { resultSteps } from '../branches/index.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { ParentCloseout, ParentStep } from './handed.ts';
 import { firstPiece } from '../piece/piece.ts';
-import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * What the step `step` of the run `record` said, on the engine's record of its current try (`closeoutOf`) — or why it cannot be given: it
@@ -57,16 +57,15 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
   how: ParentCloseout['how'],
   git: BranchReader,
 ) {
-  const home = yield* StoreRoot;
+  const door = yield* RunDoor;
   const out: ParentCloseout[] = [];
   for (const id of new Set(ids)) {
-    let record: Run;
-    try {
-      record = runsAtOnce(home).runs.read(id);
-    } catch (err) {
-      out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}`, how, landed: false });
+    const got = yield* Effect.result(door.runs.read(RunId.read(id)));
+    if (Result.isFailure(got)) {
+      out.push({ run: id, unreadable: `its record cannot be read: ${got.failure.message}`, how, landed: false });
       continue;
     }
+    const record: Run = got.success;
     const read = yield* Effect.result(stepsOf(record));
     if (Result.isFailure(read)) {
       out.push({ run: id, unreadable: `its record cannot be read: ${read.failure.message}`, how, landed: false });

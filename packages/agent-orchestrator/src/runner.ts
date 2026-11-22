@@ -273,10 +273,10 @@ export {
   takeoverLine,
 } from './daemon/daemon.ts';
 export type { DaemonFile, DaemonStanding, Identity, Liveness } from './daemon/daemon.ts';
-export { acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFile, runId } from './record/record.store.ts';
+export { artifactsDir, inputsDir, runId } from './record/record.store.ts';
 export { stepsOf } from './steps/steps.verb.ts';
-export { inboxDir, keptRuns } from './record/files.store.ts';
-export { runsAtOnce } from './runs/runs.store.ts';
+export { inboxDir } from './record/files.store.ts';
+export { keptRuns, RunDoor } from './runs/runs.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
 export { alive } from './process/alive.store.ts';
 export {

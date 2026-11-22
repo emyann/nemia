@@ -129,7 +129,6 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const memo = statusMemo(headsOver(git), yield* PlaceService);
   const standing = how.checkout ? Effect.succeed(how.checkout) : standingSnapshot();
   const checkout = yield* checkoutHold(
-    home,
     e,
     run,
     steps,

@@ -5,6 +5,7 @@
  * shares with it — a path as git names a worktree (`resolved`), and whose merge is in the checkout (`merging`). A controller, reaching
  * the runtime through the client (`runtime-client.ts`); it never stops anything.
  */
+import { RunId } from '../../record/record.model.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -17,7 +18,8 @@ import { approvedFirst, landsOnCheck } from '../../status/status.ts';
 import { decision } from '../../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, inventoryUnread, leftWhy, runWorktrees, type AskName } from '../forget.ts';
 import { stepsOrWhy } from '../../steps/steps.verb.ts';
-import { runsAtOnce } from '../../runs/runs.store.ts';
+import { RunDoor } from '../../runs/runs.store.ts';
+import { askKey } from '../../runs/run-keys.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';
 import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../../place/place.ts';
@@ -148,7 +150,8 @@ export const judging = Effect.fn('prune.judging')(function* (
   const e = yield* EngineService;
   const refusedId = idRefusal(id, 'prune');
   if (refusedId) throw new Invalid({ message: refusedId });
-  const run = runsAtOnce(home).runs.read(id);
+  const door = (yield* RunDoor).runs;
+  const run = yield* door.read(RunId.read(id));
   const refused = (refusal: string, facts?: PruneFacts) =>
     ({
       pruning: { id, kind: 'refused', refusal, worktrees: [], left: [] },
@@ -162,7 +165,7 @@ export const judging = Effect.fn('prune.judging')(function* (
   const place = yield* askRunPlace(run, yield* PlaceService, within);
   if (!('inventory' in place)) return refused(inventoryUnread('prune', id, run.repo, place));
   const listed = placeWorktrees(run, steps, within, place).filter((w) => w.removable !== 'gone');
-  const filesAt = artifacts ? runsAtOnce(home).runs.filesAt(id) : undefined;
+  const filesAt = artifacts ? yield* door.filesAt(RunId.read(id)) : undefined;
   if (!listed.length && !filesAt) {
     return { pruning: nothingLeft(run, artifacts), ...(run.pruned ? { left: { run, place, within } } : {}) } satisfies Judged;
   }
@@ -265,14 +268,13 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   steps: StepSpec[] | undefined,
   flags: { unmerged: boolean; artifacts: boolean },
 ) {
-  const home = yield* StoreRoot;
   const judged: Pick<PruneFacts, 'decided' | 'held' | 'owed'> = { decided: undefined, held: null, owed: [] };
   if (!steps) return judged;
   const git = yield* standingLive([run]);
   const placed = yield* PlaceService;
   const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
   const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, spendOf } = read;
-  const askAt = (a: AskName) => runsAtOnce(home).asks.where(run.id, a);
+  const askAt = (a: AskName) => askKey(run.id, a);
   const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const checkout = statusMemo(headsOver(git), placed);
   if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, steps, checkout);
@@ -324,8 +326,10 @@ type Marked = Sized & { readonly now: string; readonly base: Pruned | undefined;
  * judgement, every worktree that mark lists kept, and its files counted as gone when they are to go. The read and the write are one
  * stretch nothing else of this process runs in.
  */
-function marked(home: string, ready: Sized, now: string) {
-  const base = runsAtOnce(home).runs.pruned(ready.run.id);
+const marked = Effect.fnUntraced(function* (ready: Sized, now: string) {
+  const door = (yield* RunDoor).runs;
+  const id = RunId.read(ready.run.id);
+  const base = yield* door.pruned(id);
   const filesBefore = base?.artifacts;
   const mine: Pruned = {
     at: ready.worktrees.length || !base ? now : base.at,
@@ -336,9 +340,9 @@ function marked(home: string, ready: Sized, now: string) {
         ? { artifacts: filesBefore }
         : {}),
   };
-  runsAtOnce(home).runs.prune(ready.run.id, mine);
-  return { ...ready, now, base, mine };
-}
+  yield* door.prune(id, mine);
+  return { ...ready, now, base, mine } satisfies Marked as Marked;
+});
 
 /**
  * Write the mark of `r` once its removal is over, on the file as it reads then, in one stretch: the mark without this prune is what
@@ -348,16 +352,18 @@ function marked(home: string, ready: Sized, now: string) {
  * are added to those gone before. A prune that removed nothing, with a worktree it listed still standing or none listed, leaves the
  * mark as it reads without it (`takenBack`): gone on a run never pruned, as it was on one that was.
  */
-function settle(home: string, r: Marked, removed: Pruning['worktrees'], freed: number | undefined) {
-  const current = runsAtOnce(home).runs.pruned(r.run.id);
+const settle = Effect.fnUntraced(function* (r: Marked, removed: Pruning['worktrees'], freed: number | undefined) {
+  const door = (yield* RunDoor).runs;
+  const id = RunId.read(r.run.id);
+  const current = yield* door.pruned(id);
   const untouched = isDeepStrictEqual(current, r.mine);
   const theirs = untouched ? r.base : current;
   const gone = r.worktrees.length > 0 && r.worktrees.every((w) => !fs.existsSync(w.path));
   const went = gone ? r.worktrees : removed;
   const at = removed.length ? r.now : (theirs?.at ?? r.now);
-  if (went.length || freed !== undefined) runsAtOnce(home).runs.prune(r.run.id, markWith(theirs, went, freed, at, r.now));
-  else if (untouched) runsAtOnce(home).runs.prune(r.run.id, takenBack(r));
-}
+  if (went.length || freed !== undefined) yield* door.prune(id, markWith(theirs, went, freed, at, r.now));
+  else if (untouched) yield* door.prune(id, takenBack(r));
+});
 
 /**
  * The mark a prune that removed nothing puts back over its own: the one the file held before it, unless that one lists no worktree
@@ -390,11 +396,10 @@ function markWith(theirs: Pruned | undefined, went: Pruning['worktrees'], freed:
  * @returns What was done with each, in the order given.
  */
 export const freeing = Effect.fn('prune.freeing')(function* (ready: readonly Sized[]) {
-  const home = yield* StoreRoot;
   const [first] = ready;
   if (first === undefined) return [];
   const now = new Date().toISOString();
-  const all = ready.map((r) => marked(home, r, now));
+  const all = yield* Effect.forEach(ready, (r) => marked(r, now));
   const { run, place } = first;
   const outcome = yield* place.place.ask('remove', {
     repo: run.repo,
@@ -409,13 +414,12 @@ export const freeing = Effect.fn('prune.freeing')(function* (ready: readonly Siz
  * its mark written again with what went, or taken back when nothing did (`settle`).
  */
 const finished = Effect.fnUntraced(function* (r: Marked, outcome: PlaceOutcome<'remove'>) {
-  const home = yield* StoreRoot;
   const { removed, left } = removedOf(r, outcome);
   dropEmpty(r.within);
   const files = r.files ? yield* removeFiles(r.run.id, r.files) : undefined;
   if (files?.left) left.push(files.left);
   const filesWent = files !== undefined && (files.freed > 0 || !files.left);
-  settle(home, r, removed, filesWent ? files.freed : undefined);
+  yield* settle(r, removed, filesWent ? files.freed : undefined);
   const done: Pruning = {
     id: r.run.id,
     kind: 'pruned',
@@ -451,8 +455,7 @@ function removedOf({ place, worktrees }: Sized, outcome: PlaceOutcome<'remove'>)
 
 /** Remove the run's files directory, and answer what it freed, and what would not go when not all of it did. */
 const removeFiles = Effect.fnUntraced(function* (id: string, kept: { path: string; bytes: number }) {
-  const home = yield* StoreRoot;
-  const why = runsAtOnce(home).runs.dropFiles(id);
+  const why = yield* (yield* RunDoor).runs.dropFiles(RunId.read(id));
   if (why === null) return { freed: kept.bytes };
   const [still = 0] = yield* freedBytes([kept.path]);
   return { freed: Math.max(0, kept.bytes - still), left: { path: kept.path, files: why } satisfies Pruning['left'][number] };

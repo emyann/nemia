@@ -4,6 +4,7 @@
  * through it. A controller whose program requires nothing: the runtime it reads, through the client (`runtime-client.ts`), is its
  * harnesses, which say which steps a session can be bridged for, and never the engine.
  */
+import type { Refusal } from '../refusal/refusal.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { configRefusal, readRemote, tried } from '../runtime-client.ts';
@@ -37,7 +38,6 @@ import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { inboxNameRefusal } from '../inbox/index.ts';
 import { inboxDir } from '../record/files.store.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
 import { trustRunHome } from '../trust/home.verb.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { artifactsDir, cardsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
@@ -644,7 +644,6 @@ function copyInputs(home: string, run: Run, inputs: readonly InputFile[], cards:
     if (cards.size) fs.mkdirSync(cardsDir(home, run));
     for (const [name, text] of cards) fs.writeFileSync(path.join(cardsDir(home, run), `${name}.md`), text, { flag: 'wx' });
   } catch (err) {
-    runsAtOnce(home).runs.forget(run.id);
     throw Object.assign(
       new Error(
         `--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
@@ -679,7 +678,6 @@ function renderAgents(home: string, run: Run, steps: readonly StepSpec[], found:
       ...(homeFiles === undefined ? {} : { homeFiles }),
     };
   } catch (err) {
-    runsAtOnce(home).runs.forget(run.id);
     throw Object.assign(
       new Error(`${what} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`),
       { exitCode: 1 },
@@ -866,8 +864,10 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const cards = yield* cardsOf(opts.cards ?? [], inputs);
   yield* tried(() => frozenRead(opts.workflowDir, factory));
   let id = runId(opts.brief);
-  while (runsAtOnce(home).runs.taken(id)) id = runId(opts.brief);
-  const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], (runId) => runsAtOnce(home).runs.exists(runId), id);
+  const door = yield* RunDoor;
+  while (yield* door.runs.taken(RunId.read(id))) id = runId(opts.brief);
+  const known = new Set(yield* door.runs.ids());
+  const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], (runId) => known.has(runId), id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
   const inherited = yield* inheritedOf(opts, edits);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
@@ -880,8 +880,10 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const told = toldOf(opts, steps, inputs, factory, mounts, volumes, harnessSettings);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
-  yield* tried(() => copyInputs(home, run, inputs, cards));
-  Object.assign(run, yield* tried(() => renderAgents(home, run, steps, found, factory)));
+  const forgotten = <A>(effect: Effect.Effect<A, Refusal>) =>
+    Effect.onError(effect, () => Effect.ignore(door.runs.forget(RunId.read(run.id))));
+  yield* forgotten(tried(() => copyInputs(home, run, inputs, cards)));
+  Object.assign(run, yield* forgotten(tried(() => renderAgents(home, run, steps, found, factory))));
   Object.assign(run, workedSwitches(factory, run));
   const pinned = yield* pinsOf(run, steps, run.createdAt);
   if (pinned.length) run.pinned = pinned;

@@ -2,7 +2,8 @@
  * The Run door's memory stand-in: a fresh layer of `RunDoor` per call, its runs and a person's files beside them held in maps, built by
  * `runDoorOver` as the files layer is, so the writes are checked the one way on both. A test gives it its program — `Effect.provide(
  * program, runDoorMemory())` — where it needs a run to exist and nothing of the disk; the walks of `test/run-walks.ts` hold it to what
- * the files answer. A run's paths (`where`, `forget`) are under `MEMORY_ROOT`, named as the files name them under `WF_ROOT`.
+ * the keyspace answers. A run's keys (`where`, `forget`) are named as the keyspace names them (`run-keys.ts`), its markers' paths under
+ * `runs/`, as the files name them under `WF_ROOT`; a `nemia rm` marker's under `MEMORY_ROOT`.
  *
  * A test's alone: no file of `src` imports it (`test/boundary.test.ts`, `STAND_INS`). What it holds no
  * file for, it answers as a store with none: no files directory, and no pause.
@@ -14,7 +15,10 @@ import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
-import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, TakenBack, Unheld } from '../record/record.ts';
+import type { AskKey, AskOf, AskWritten, Hold, PersonRequest, Pruned, Run, SaidBefore, TakenBack, Unheld } from '../record/record.ts';
+import { routeAsk, unrouted, withRoutes } from '../route/index.ts';
+import type { PersonRoute } from '../route/person-route.ts';
+import { askDoneKey, askKeyOf, askName, claimKey, runKey } from './run-keys.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
@@ -29,14 +33,13 @@ const keyOf = (person: PersonRequest) =>
     ? { of: 'base', step: person.ask.merge.target, n: person.ask.merge.try }
     : { of: person.of, step: person.ask.step, n: 'round' in person.ask ? person.ask.round : person.ask.try }) satisfies AskKey;
 
-/** An ask's name in the stand-in, by which of its verb it is: no file is written, so none has to keep its former name. */
-const nameOf = ({ of, step, n }: AskKey) => `${of}-${step}-${n}`;
-const runsAt = (...parts: string[]) => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
+/** An ask's name in the stand-in, by which of its verb it is, as the keyspace names it (`askName`). */
+const nameOf = (key: AskKey) => askName(key);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
 const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause'] as const;
 const recordOf = (run: Run) => {
-  const kept: Record<string, unknown> = { ...run };
+  const kept: Record<string, unknown> = { ...unrouted(run) };
   for (const key of COMPOSED) delete kept[key];
   return structuredClone(kept) as Run;
 };
@@ -57,6 +60,7 @@ type State = {
   refresh: Map<string, { at: string }>;
   asks: Map<string, Map<string, Held>>;
   forgetting: Map<string, string[]>;
+  routes: Map<string, Map<string, PersonRoute>>;
   versions: Map<string, number>;
 };
 
@@ -73,6 +77,7 @@ const stateOf = () =>
     refresh: new Map(),
     asks: new Map(),
     forgetting: new Map(),
+    routes: new Map(),
     versions: new Map(),
   }) satisfies State;
 
@@ -98,7 +103,7 @@ function readOf(st: State, id: string) {
   const acceptances = waiting(st, id, 'loop');
   const [pruned, hold, unheld, labels] = [st.pruned.get(id), st.holds.get(id), st.unheld.get(id), st.labels.get(id)];
   return {
-    ...structuredClone(record),
+    ...withRoutes(structuredClone(record), [...(st.routes.get(id)?.values() ?? [])]),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
     ...(st.cancellers.has(id) ? { cancelledBy: structuredClone(st.cancellers.get(id)) } : {}),
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
@@ -112,26 +117,32 @@ function readOf(st: State, id: string) {
 }
 
 /**
- * Remove what the stand-in holds of `id`, answering each name removed as the files name it under `WF_ROOT`: a run from a card, its claim
- * of the card too, which the stand-in holds as the record itself, a run created only while no other from its card stands.
+ * Remove what the stand-in holds of `id`, answering each key and name removed as the keyspace and the files name them: the record, its
+ * claim of a card (which the stand-in holds as the record itself, a run created only while no other from its card stands) and its asks,
+ * then a person's files under `runs/`.
  */
 function forgetOf(st: State, id: string) {
   const card = st.records.get(id)?.from?.inbox;
   const removed: string[] = [];
+  if (st.records.delete(id)) {
+    removed.push(runKey(id));
+    if (card !== undefined) removed.push(claimKey(card));
+  }
+  for (const [name, held] of asksOf(st, id)) removed.push(held.done ? askDoneKey(id, name) : askKeyOf(id, name));
+  for (const name of st.routes.get(id)?.keys() ?? []) removed.push(askKeyOf(id, name));
+  st.asks.delete(id);
+  st.routes.delete(id);
   const named: Array<[Map<string, unknown>, string]> = [
-    [st.records, `${id}.json`],
     [st.cancelled, `${id}.cancelled`],
     [st.pruned, `${id}.pruned`],
     [st.holds, `${id}.hold`],
     [st.unheld, `${id}.unheld`],
     [st.refresh, `${id}.refresh`],
     [st.labels, `${id}.labels`],
-    [st.asks, `${id}.asks/`],
     [st.said, `${id}.said/`],
   ];
   for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
   st.cancellers.delete(id);
-  if (card !== undefined) removed.push(`started/${card}.json`);
   st.versions.delete(id);
   return removed;
 }
@@ -157,9 +168,19 @@ function runsOf(st: State) {
       touch(st, run.id);
       return true;
     },
+    settle: (run, spent) => {
+      if (!st.records.has(run.id)) return false;
+      if (spent.write) {
+        st.records.set(run.id, recordOf(run));
+        touch(st, run.id);
+      }
+      consumeOf(st, run, spent.asks, spent.rounds, spent.voided ?? []);
+      return true;
+    },
     stamps: () => new Map([...st.versions].filter(([id]) => st.records.has(id)).map(([id, v]) => [id, String(v)])),
     exists: (id) => st.records.has(id),
-    taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said].some((m) => m.has(id)),
+    taken: (id) =>
+      [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said, st.routes].some((m) => m.has(id)),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
     cancel: (id, actor) => {
       const at = st.cancelled.get(id);
@@ -208,6 +229,43 @@ function spend(st: State, id: string, of: AskOf, spent: ReadonlyArray<{ step: st
   }
 }
 
+/** Set aside each ask, approval and acceptance the run's record answers, and each ask of `voided`, as the keyspace's settle does. */
+function consumeOf(st: State, run: Run, retries: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[]) {
+  const tries = [...new Set([...spentAsks(run, retries), ...voided])];
+  spend(
+    st,
+    run.id,
+    'try',
+    tries.map((a) => ({ step: a.step, n: a.try })),
+  );
+  const plain = rounds.filter((a) => !a.merge);
+  spend(
+    st,
+    run.id,
+    'round',
+    spentRoundAsks(run, plain).map((a) => ({ step: a.step, n: a.round })),
+  );
+  spend(
+    st,
+    run.id,
+    'gate',
+    spentApprovals({ ...run, approvals: approvalsHeld(st, run.id) }).map((a) => ({ step: a.step, n: a.try })),
+  );
+  spend(
+    st,
+    run.id,
+    'loop',
+    spentAcceptances(run).map((a) => ({ step: a.step, n: a.try })),
+  );
+  const merges = rounds.filter((a) => a.merge && mergeSpent(run, a));
+  spend(
+    st,
+    run.id,
+    'base',
+    merges.flatMap((a) => (a.merge ? [{ step: a.merge.target, n: a.merge.try }] : [])),
+  );
+}
+
 function asksGroup(st: State) {
   return {
     read: (id) => ({
@@ -219,54 +277,19 @@ function asksGroup(st: State) {
       [...asksOf(st, id).values()]
         .filter((h) => h.person.of === 'try' && h.person.ask.message !== undefined)
         .map((h) => structuredClone(h.person.ask as RetryAsk)),
-    consume: (run, retries, rounds, voided = []) => {
-      const tries = [...new Set([...spentAsks(run, retries), ...voided])];
-      spend(
-        st,
-        run.id,
-        'try',
-        tries.map((a) => ({ step: a.step, n: a.try })),
-      );
-      const plain = rounds.filter((a) => !a.merge);
-      spend(
-        st,
-        run.id,
-        'round',
-        spentRoundAsks(run, plain).map((a) => ({ step: a.step, n: a.round })),
-      );
-      spend(
-        st,
-        run.id,
-        'gate',
-        spentApprovals({ ...run, approvals: approvalsHeld(st, run.id) }).map((a) => ({ step: a.step, n: a.try })),
-      );
-      spend(
-        st,
-        run.id,
-        'loop',
-        spentAcceptances(run).map((a) => ({ step: a.step, n: a.try })),
-      );
-      const merges = rounds.filter((a) => a.merge && mergeSpent(run, a));
-      spend(
-        st,
-        run.id,
-        'base',
-        merges.flatMap((a) => (a.merge ? [{ step: a.merge.target, n: a.merge.try }] : [])),
-      );
-    },
     write: (id, person) => {
       const name = nameOf(keyOf(person));
-      const where = runsAt(`${id}.asks`, name);
+      const where = askKeyOf(id, name);
       const held = st.asks.get(id) ?? new Map<string, Held>();
       const before = held.get(name);
-      if (before && !before.done) return { written: false, where, stray: null };
+      if (before && !before.done) return { written: false, where, stray: null } satisfies AskWritten as AskWritten;
       if (before) held.set(keptAside(held, name), before);
       held.set(name, { person: structuredClone(person), done: false });
       st.asks.set(id, held);
       touch(st, id);
-      return { written: true, where };
+      return { written: true, where } satisfies AskWritten as AskWritten;
     },
-    where: (id, key) => runsAt(`${id}.asks`, nameOf(key)),
+    where: (id, key) => askKeyOf(id, nameOf(key)),
     takeBack: (id, step, n, takenBack) => {
       const name = nameOf({ of: 'gate', step, n });
       const before = asksOf(st, id).get(name);
@@ -274,7 +297,15 @@ function asksGroup(st: State) {
       before.done = true;
       before.takenBack = structuredClone(takenBack);
       touch(st, id);
-      return runsAt(`${id}.asks`, 'done', name);
+      return askDoneKey(id, name);
+    },
+    route: (id, step, n, { route, at }) => {
+      const name = routeAsk(step, n);
+      const held = st.routes.get(id) ?? new Map<string, PersonRoute>();
+      held.set(name, { step, try: n, route: route.trim(), at });
+      st.routes.set(id, held);
+      touch(st, id);
+      return askKeyOf(id, name);
     },
   } satisfies RunsLayer['asks'];
 }

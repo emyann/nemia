@@ -3,6 +3,7 @@
  * questions the step asks (`--answer`, `typedAnswers`), or a loop out of rounds ended as it stands, with the person's words (what `nemia
  * accept` was, decision 7: `approveForm`), and what the next tick files because of it.
  */
+import { RunId } from '../record/record.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import { Actor, APPROVE_WORDS, approveRefusal, RunApprove } from 'objects';
@@ -12,7 +13,7 @@ import { acceptRun } from '../round/round.verb.ts';
 import { approveForm } from './form.verb.ts';
 import { checked, type Served } from '../command/entry.verb.ts';
 import { givenAnswers, typedAnswers } from '../question/asked.verb.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { approveRun, takeBackRun } from './gate.verb.ts';
 import { dollarsOf } from '../keys/index.ts';
@@ -84,10 +85,11 @@ function budgetsLoopRefusal(input: ApproveInput) {
  */
 const loopAccepted = Effect.fnUntraced(function* (input: ApproveInput, home: string) {
   const { runId, step, message: words, actor } = input;
-  const refused = runsAtOnce(home).runs.exists(runId) ? (budgetsLoopRefusal(input) ?? loopRefusal(input)) : null;
+  const door = (yield* RunDoor).runs;
+  const refused = (yield* door.exists(RunId.read(runId))) ? (budgetsLoopRefusal(input) ?? loopRefusal(input)) : null;
   if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
   const { acceptance, file } = yield* acceptRun(runId, step, words, actor);
-  const waited = (yield* stepsOf(runsAtOnce(home).runs.read(runId))).some((s) => s.after.includes(acceptance.step));
+  const waited = (yield* stepsOf(yield* door.read(RunId.read(runId)))).some((s) => s.after.includes(acceptance.step));
   const { step: looping, try: tryNo, at, message } = acceptance;
   const by = acceptance.actor ? { actor: acceptance.actor } : {};
   const next: Next = waited ? 'waiting' : 'nothing';
@@ -169,7 +171,7 @@ export const APPROVE: Served<
           ? yield* typedAnswers(runId, gated, typed, { note: words, approval: true, actor })
           : words;
     const { approval, file, caps, above } = yield* approveRun(runId, gated, message, given, actor);
-    const after = runsAtOnce(home).runs.read(runId);
+    const after = yield* (yield* RunDoor).runs.read(RunId.read(runId));
     const ceilings = yield* stepsOf(after);
     const next: Next = !after.steps[gated]?.taskId
       ? 'step'

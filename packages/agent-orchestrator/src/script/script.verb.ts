@@ -5,6 +5,7 @@
  * answered is read off that attempt on every pass (`scriptCloseouts`), and its route copied onto its record once per try (`fileScripts`).
  * A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import type { Refusal } from '../refusal/refusal.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -37,7 +38,7 @@ export type ScriptFiling = {
     verdictOf: (step: string) => Verdict | undefined;
     spendOf: SpendOf;
   };
-  mayFile: () => boolean;
+  mayFile: Effect.Effect<boolean, Refusal>;
   notes: string[];
 };
 
@@ -87,7 +88,7 @@ export const fileScripts = Effect.fn('fileScripts')(function* (f: ScriptFiling, 
   for (const name of ready) {
     const step = reads.steps.find((s) => s.name === name);
     if (!isScript(step)) continue;
-    if (!f.mayFile()) break;
+    if (!(yield* f.mayFile)) break;
     if (yield* fileScript(f, step)) filed.push(name);
   }
   return filed;

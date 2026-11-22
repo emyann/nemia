@@ -5,6 +5,8 @@
  * `readAndAdopt` (adopt/run-adopt.verb.ts), as `nemia cancel`, `nemia rm` and `nemia prune` do. Beside it, the steps owed a hand-off
  * (`handOffOwed`), which `prune` reads. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import { RunId } from '../record/record.model.ts';
+import type { Refusal } from '../refusal/refusal.ts';
 import { StoreConfig } from '../config/config.store.ts';
 import fs from 'node:fs';
 import { endsOnBase } from '../step/step.ts';
@@ -28,7 +30,6 @@ import { assess, type Assessment } from './assess.ts';
 import type { FeedWords } from '../feed/index.ts';
 import { pauseAsksVoid } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
 import {
   headsFor,
@@ -197,11 +198,11 @@ export const advancePass = Effect.fn('advancePass')(
     const lacking = readFiles(home, run, reads);
     const heads = headsOf(run, handed.marked ? undefined : pass?.standing, place);
     const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, place)), place);
-    const landing = landEnding(home, run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
+    const landing = yield* landEnding(home, run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
     const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
     const from = pass
       ? { read: pass, slot }
-      : { standing: standingNow(runsAtOnce(home).runs.list()).pipe(Effect.provideService(PlaceService, place)) };
+      : { standing: standingNow(yield* (yield* RunDoor).runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const lift = yield* liftHold(e, run, parents);
     const { checkout, assessed } = yield* passAssessment(e, run, reads, from, memo, yield* standingOf(pass), heads);
     const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);
@@ -227,7 +228,7 @@ export const advancePass = Effect.fn('advancePass')(
       run: ran,
       reads,
       closer,
-      mayFile: mayFileOf(home, ran),
+      mayFile: mayFileOf(ran),
       notes,
       heads,
       home,
@@ -236,14 +237,13 @@ export const advancePass = Effect.fn('advancePass')(
     const looped = yield* fileRounds(f, due.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
     const filed = yield* fileReady(f, { ready: due.ready, send: assessed.send }, admission.starting, parents.git);
-    const heldFirst = holdFirst(f, admission.held, assessed.ready);
+    const heldFirst = yield* holdFirst(f, admission.held, assessed.ready);
     const { tipped, tips } = keepTips(ran, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
       Boolean(tips || heldFirst || handed.marked || lacking.read || landing.landed || marked.length || timed) ||
       Boolean(settled.marks.settlesCounted);
-    yield* pinsWritten(ran, pinned, wrote);
-    yield* (yield* RunDoor).asks.consume(ran, asks, roundAsks, pauseAsksVoid(steps, ran, asks, phaseOf, spendOf));
+    yield* pinsWritten(ran, pinned, wrote, { asks, rounds: roundAsks, voided: pauseAsksVoid(steps, ran, asks, phaseOf, spendOf) });
 
     const facts = [...settled.facts, ...roundsGranted(ran, steps, looped), ...marked, ...(timed ?? [])];
     const done = { filed, checked, tried, looped, notes, feed, facts };
@@ -314,13 +314,12 @@ export const passAssessment = Effect.fnUntraced(function* (
   e: Engine,
   run: Run,
   reads: RunRead,
-  from: Parameters<typeof checkoutHold>[4],
+  from: Parameters<typeof checkoutHold>[3],
   memo: StatusMemo,
   standing: PassStanding,
   heads?: Heads,
 ) {
-  const home = yield* StoreRoot;
-  const checkout = yield* checkoutHold(home, e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
+  const checkout = yield* checkoutHold(e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
   const tipOf = heads ? { tipOf: (branch: string) => heads()?.[branch] } : {};
   const read = withStandings({ ...reads, checkout, ...tipOf }, standing);
   return { checkout, read, assessed: assess(read) };
@@ -350,12 +349,17 @@ const marksOf = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, st
  * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
  * or held, or the store paused, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
  * reads after.
- * @param home The store's root folder.
  * @param run The run the pass files for.
  */
-export const mayFileOf = (home: string, run: Run) => {
+export const mayFileOf = (run: Run) => {
   let calledOff = false;
-  return () => !(calledOff ||= !runsAtOnce(home).runs.exists(run.id) || runsAtOnce(home).runs.calledOff(run.id));
+  return Effect.gen(function* () {
+    if (calledOff) return false;
+    const door = (yield* RunDoor).runs;
+    const id = RunId.read(run.id);
+    calledOff = !(yield* door.exists(id)) || (yield* door.calledOff(id));
+    return !calledOff;
+  }) satisfies Effect.Effect<boolean, Refusal>;
 };
 
 /**
@@ -377,10 +381,11 @@ const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRe
  */
 const handOffAll = Effect.fnUntraced(function* (run: Run, r: RunRead, place: Place) {
   const home = yield* StoreRoot;
+  const door = yield* RunDoor;
   let marked = false;
   const collected: string[] = [];
   for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
-    if (!runsAtOnce(home).runs.exists(run.id)) continue;
+    if (!(yield* door.runs.exists(RunId.read(run.id)))) continue;
     const record = run.steps[name];
     if (!record?.taskId || !record.workspace) continue;
     const unhanded = isRepositoryRun(run)
@@ -440,7 +445,7 @@ const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Pare
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
   let landed = true;
   for (const id of run.hold.until) if (!(landed = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).landed)) break;
-  if (!landed || !runsAtOnce(home).holds.lift(run.id, run.hold.at)) return nothing;
+  if (!landed || !(yield* (yield* RunDoor).holds.lift(RunId.read(run.id), run.hold.at))) return nothing;
   const { until, at } = run.hold;
   delete run.hold;
   return {
@@ -516,12 +521,12 @@ const admit = Effect.fnUntraced(function* (
 });
 
 /** Write when the cap first held the run (`slotHeldAt`), and say so once, while the pass may file still: answers whether it did. */
-function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[]) {
-  if (!held || f.run.slotHeldAt || !f.mayFile()) return false;
+const holdFirst = Effect.fnUntraced(function* (f: Filing, held: RunSlot | undefined, ready: readonly string[]) {
+  if (!held || f.run.slotHeldAt || !(yield* f.mayFile)) return false;
   f.run.slotHeldAt = new Date().toISOString();
   f.notes.push(`${ready.join(', ')}: ${slotWord(held)} — filed once a run in flight settles`);
   return true;
-}
+});
 
 /** Whether `run` reads other runs: one it waits on (`waitedOn`), or one it is handed as context before it starts. */
 const readsOthers = (run: Run) => waitedOn(run).length > 0 || (!hasStarted(run) && Boolean(run.context?.length));

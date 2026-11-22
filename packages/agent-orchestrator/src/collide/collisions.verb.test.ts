@@ -48,7 +48,7 @@ const git = new Proxy({}, { get: () => assert.fail('git was read') }) as BranchR
 const place = new Proxy({}, { get: () => assert.fail('the place was asked') }) as Place;
 
 const at = (standings: readonly BranchStanding[]) =>
-  Effect.runSyncExit(Effect.provideService(collisionsAt(STORE, ours, 'implement', standings, git, place), StoreRoot, STORE));
+  Effect.runSyncExit(Effect.provideService(collisionsAt(ours, 'implement', standings, git, place), StoreRoot, STORE));
 
 test("a run with no branch ahead reads no other run's steps, and asks nothing", () => {
   const exit = at([{ branch: 'wf/ours/implement', where: 'on' }]);
@@ -57,7 +57,7 @@ test("a run with no branch ahead reads no other run's steps, and asks nothing", 
 });
 
 test("a run with a branch ahead reads the others' steps: one whose folder does not load still fails", () => {
-  const ahead = collisionsAt(STORE, ours, 'implement', [{ branch: 'wf/ours/implement', where: 'ahead', commits: 1 }], git, place);
+  const ahead = collisionsAt(ours, 'implement', [{ branch: 'wf/ours/implement', where: 'ahead', commits: 1 }], git, place);
   const refused = Effect.runSync(Effect.flip(Effect.provideService(ahead, StoreRoot, STORE)));
   assert.ok(refused instanceof UnloadedFolder, 'the read is moved, not dropped');
 });

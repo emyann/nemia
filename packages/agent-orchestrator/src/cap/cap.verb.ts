@@ -10,7 +10,7 @@ import { admissionOrder, heldRuns, slotNeed, type RunSlot } from './cap.ts';
 import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
@@ -90,7 +90,7 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
   settled: ReadonlySet<string> = new Set(),
 ) {
   const home = yield* StoreRoot;
-  const runs = given ?? storeRunsGiven(home);
+  const runs = given ?? (yield* storeRunsGiven());
   const cap = lastCeilings(home)?.runs ?? config.maxRuns;
   if (cap <= 0) return { cap: 0, inFlight: null, held: new Map() } satisfies Slots;
   const read = yield* asked('list', e.list(runs.flatMap(runTasks)));
@@ -119,11 +119,10 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
 
 /**
  * Every run in the store, a run `given` names answered by the record it holds rather than read again: `slotsRead`'s listing.
- * @param home The store's root folder.
  * @param given The record a run's id is answered by, undefined for a run read from the store; left out,
  * every run is read.
  */
-export const storeRunsGiven = (home: string, given?: (id: string) => Run | undefined) => runsAtOnce(home).runs.list(undefined, given);
+export const storeRunsGiven = (given?: (id: string) => Run | undefined) => Effect.flatMap(RunDoor, (door) => door.runs.list(undefined, given));
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no cap

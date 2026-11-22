@@ -1,194 +1,37 @@
 /**
- * The run store on files under the store's root a caller hands it: `filesStoreAt(home)`, the only implementation of `RunStore`, made of
- * the functions of `record.store.ts` and of a person's writes beside them here, and the path of the inbox (`inboxDir`), whose cards are
- * the Card door's (`src/cards/cards.store.ts`); and the claims of the cards started (`claimCard`). The Run door (`src/runs/runs.store.ts`)
- * is the one file of src that reads and writes a run through `filesStoreAt`: every other reads the door (`test/run-store.test.ts`).
+ * A person's markers beside a run, files under the store's root a caller hands it: the cancellation, the pruning, the hold, the labels,
+ * what was said before a step was filed, a refresh ask, and the markers of what `nemia rm` forgets; and the path of the inbox
+ * (`inboxDir`), whose cards are the Card door's (`src/cards/cards.store.ts`). The run's record, its claim and its asks are records of the
+ * keyspace (`src/runs/records.store.ts`), which reads and writes these files beside them: the Run door (`src/runs/runs.store.ts`) is the
+ * one way src reads and writes a run (`test/run-store.test.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Option, Schema } from 'effect';
-import { pauseStands, readPause } from '../pause/pause.store.ts';
+import { readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
-import type { AskKey, AskOf, AskWritten, PersonRequest, Pruned, Run, RunStore } from './record.ts';
+import type { Pruned, Run } from './record.ts';
 import type { Labels } from '../labels/labels.ts';
-import type { RetryAsk } from '../retry/index.ts';
-import type { RoundAsk } from '../status/status.ts';
-import {
-  UnreadableRecord,
-  acceptFile,
-  acceptanceIn,
-  approvalFile,
-  takeBackApproval,
-  approvalIn,
-  askFile,
-  askIn,
-  asksDir,
-  cancelFile,
-  consumeAsks,
-  doneWith,
-  fileNames,
-  heldIn,
-  holdFile,
-  marksAt,
-  unheldFile,
-  listRuns,
-  lstatOf,
-  markCancelled,
-  pruneFile,
-  readAnswers,
-  readPruned,
-  readAs,
-  readAsks,
-  runRecord,
-  removeHold,
-  restStamps,
-  rewriteRun,
-  roundAskFile,
-  sayOnce,
-  roundAskIn,
-  runFile,
-  runsDir,
-  saidDir,
-  keepSaid,
-  writeAsk,
-  writeHold,
-  writeRun,
-  When,
-} from './record.store.ts';
-import { mergeSpent } from '../merge/merge.ts';
-import { keptRecords, type RecordMemo } from '../rest/index.ts';
+import { cancelFile, holdFile, lstatOf, marksAt, pruneFile, runsDir, saidDir, sayOnce, unheldFile } from './record.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { runMarkMove } from '../run-marks/run-marks.ts';
 
-/** Each ask, by which it is: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
-const ASKS: Record<
-  AskOf,
-  { file: (home: string, id: string, step: string, n: number) => string; read: (file: string, step: string, n: number) => unknown }
-> = {
-  try: { file: askFile, read: askIn },
-  round: { file: roundAskFile, read: roundAskIn },
-  gate: { file: approvalFile, read: approvalIn },
-  loop: { file: acceptFile, read: acceptanceIn },
-  base: { file: mergeAskFile, read: mergeAskIn },
-};
-
-/** The file of the ask `key` of the run `id`, under the store's root `home`. */
-const askWhere = (home: string, id: string, { of, step, n }: AskKey) => ASKS[of].file(home, id, step, n);
-
 /**
- * Write a person's ask at its name (`writeAsk`), the ask alone; and, when a file already stands there, why it is no ask of its kind: its
- * reader's words, or null when it reads as one or is gone since.
+ * Remove a person's files beside the run — its labels among them — and its own directory, answering each path removed from `WF_ROOT`, a
+ * directory's with a trailing `/`.
+ * @param home The store's root folder.
+ * @param id The run's id.
  */
-function writePersonAsk(home: string, id: string, person: PersonRequest) {
-  const { of, ask } = person;
-  const [step, n] =
-    person.of === 'base' ? [person.ask.merge.target, person.ask.merge.try] : [ask.step, 'round' in ask ? ask.round : ask.try];
-  const where = askWhere(home, id, { of, step, n });
-  if (writeAsk(where, askHeld(person))) return { written: true, where } satisfies AskWritten;
-  const read = ASKS[of].read(where, step, n);
-  return { written: false, where, stray: typeof read === 'string' && lstatOf(where) ? read : null } satisfies AskWritten;
-}
-
-/** What a person's ask file holds: the ask as its verb gave it, but a merge's, which holds its loop, round, base, commit and time. */
-function askHeld(person: PersonRequest) {
-  if (person.of !== 'base') return person.ask;
-  const { step, round, at, merge } = person.ask;
-  return { loop: step, round, onto: merge.onto, sha: merge.sha, at, ...(merge.landing ? { landing: merge.landing } : {}) };
-}
-
-const MergeAskFileSchema = Schema.StructWithRest(
-  Schema.Struct({
-    loop: Schema.NonEmptyString,
-    round: Schema.Int,
-    onto: Schema.NonEmptyString,
-    sha: Schema.NonEmptyString,
-    at: When,
-    landing: Schema.optional(Schema.Struct({ step: Schema.NonEmptyString, check: Schema.NonEmptyString })),
-  }),
-  [Schema.Record(Schema.String, Schema.Unknown)],
-);
-
-/** A merge ask's file in the run's asks directory: `merge-<step>-<n>`, the loop's target and its try that merges the base. */
-function mergeAskFile(home: string, id: string, step: string, n: number) {
-  return path.join(asksDir(home, id), `merge-${step}-${n}`);
-}
-
-/**
- * One merge ask file, read: the loop's target and its try from its name; the looping step, the round it is on, the base branch, its commit
- * and when from what it holds — as a round ask of that looping step and round, with what it merges (`RoundAsk.merge`) — or why it cannot be
- * read.
- */
-function mergeAskIn(file: string, step: string, n: number) {
-  const held = heldIn(file);
-  if ('unreadable' in held) return held.unreadable satisfies RoundAsk | string;
-  const read = readAs(MergeAskFileSchema, held.read);
-  if ('refused' in read)
-    return (read.refused === 'at' ? 'it says no time it was given' : 'it is not an ask nemia refresh --base wrote') satisfies
-      | RoundAsk
-      | string;
-  const { loop, round, onto, sha, at, landing } = read.read;
-  return { step: loop, round, at, merge: { target: step, try: n, onto, sha, ...(landing ? { landing: { ...landing } } : {}) } } satisfies
-    | RoundAsk
-    | string;
-}
-
-/** The merge asks waiting in a run's directory, and a line for each file named as one that cannot be read as one. */
-function readMergeAsks(home: string, id: string) {
-  const rounds: RoundAsk[] = [];
-  const notes: string[] = [];
-  for (const name of fileNames(asksDir(home, id)) ?? []) {
-    const [, target, n] = /^merge-(.+)-(\d+)$/.exec(name) ?? [];
-    const file = path.join(asksDir(home, id), name);
-    const ask = target !== undefined && n !== undefined ? mergeAskIn(file, target, Number(n)) : undefined;
-    if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia refresh --base`);
-    else if (ask) rounds.push(ask);
-  }
-  return { rounds, notes };
-}
-
-/** Move each merge ask among `rounds` the run's record already answers (`mergeSpent`) into `done/`: the tick's one touch on it. */
-function consumeMergeAsks(home: string, run: Run, rounds: readonly RoundAsk[]) {
-  const spent = rounds.flatMap((a) => (a.merge && mergeSpent(run, a) ? [mergeAskFile(home, run.id, a.merge.target, a.merge.try)] : []));
-  doneWith(home, run.id, spent);
-}
-
-/** The asks waiting in a run's directory (`readAsks`), a person's merges among its rounds (`readMergeAsks`). */
-function readAllAsks(home: string, id: string) {
-  const { asks, rounds, notes } = readAsks(home, id);
-  const merges = readMergeAsks(home, id);
-  return { asks, rounds: [...rounds, ...merges.rounds], notes: [...notes, ...merges.notes] };
-}
-
-/** Consume the asks the run's record answers (`consumeAsks`), its merges apart (`consumeMergeAsks`). */
-function consumeAllAsks(home: string, run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[] = []) {
-  consumeAsks(
-    home,
-    run,
-    asks,
-    rounds.filter((a) => !a.merge),
-    voided,
-  );
-  consumeMergeAsks(home, run, rounds);
-}
-
-/**
- * Remove the run's record and a person's files beside it — its labels among them — and its own directory, and the claim of the card it was
- * started from while the claim names it (`claimCard`), answering each path removed from `WF_ROOT`. A claim naming another run is that
- * run's, and stays.
- */
-function removeRunFiles(home: string, id: string) {
-  const card = cardOf(home, id);
+export function removeMarkerFiles(home: string, id: string) {
   const removed: string[] = [];
   const files = [
-    runFile(home, id),
     cancelFile(home, id),
     pruneFile(home, id),
     holdFile(home, id),
     unheldFile(home, id),
     refreshFile(home, id),
     labelsFile(home, id),
-    asksDir(home, id),
     saidDir(home, id),
     path.join(runsDir(home), id),
   ];
@@ -198,47 +41,28 @@ function removeRunFiles(home: string, id: string) {
     fs.rmSync(at, { recursive: true, force: true });
     removed.push(`${path.relative(home, at)}${st.isDirectory() ? '/' : ''}`);
   }
-  const claim = card === undefined ? undefined : path.join(startedDir(home), `${card}.json`);
-  if (claim !== undefined && claimedAt(claim) === id) {
-    fs.rmSync(claim, { force: true });
-    removed.push(path.join('started', `${card}.json`));
-  }
   return removed;
 }
 
-/** The card the record of the run `id` says it was started from, or undefined: none, no record, or one that does not read. */
-function cardOf(home: string, id: string) {
+/**
+ * The ids a person's file or a run's own directory names under `runs/`: what a new run may not take beside its record and asks.
+ * @param home The store's root folder.
+ */
+export function markerRunIds(home: string) {
   try {
-    return Option.getOrUndefined(fromCardIn(fs.readFileSync(runFile(home, id), 'utf8')))?.from.inbox;
-  } catch {
-    return undefined;
-  }
-}
-const fromCardIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ from: Schema.Struct({ inbox: Schema.String }) })));
-
-/** Whether an id names something of a run in the store: its record, a person's file beside it, its asks or its own directory. */
-function runIdTaken(home: string, id: string) {
-  let names: string[];
-  try {
-    names = fs.readdirSync(runsDir(home));
-  } catch {
-    return false;
-  }
-  return names.some((name) => name === id || name.startsWith(`${id}.`));
-}
-
-/** The id of every `<id>.json` under `runs/`, read or not, sorted; none when there is no `runs/`. */
-function runIds(home: string) {
-  try {
-    return fs
-      .readdirSync(runsDir(home))
-      .filter((f) => f.endsWith('.json'))
-      .map((f) => path.basename(f, '.json'))
-      .sort();
+    return fs.readdirSync(runsDir(home)).map((name) => (name.includes('.') ? name.slice(0, name.indexOf('.')) : name));
   } catch {
     return [];
   }
 }
+
+/**
+ * Whether a person called the run off by a marker: cancelled it, pruned it, or holds it.
+ * @param home The store's root folder.
+ * @param id The run's id.
+ */
+export const calledOffByMarker = (home: string, id: string) =>
+  [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(home, id)));
 
 /**
  * A person's labels on the run (`nemia label run`, and `nemia start`'s copy at creation): a JSON object of strings, a person's fact in a
@@ -287,20 +111,15 @@ export function writeLabels(home: string, id: string, labels: Labels) {
   writeWhole(labelsFile(home, id), JSON.stringify(labels, null, 2));
 }
 
-/** The run as its record reads (`runRecord`), with its labels composed onto it, and whatever the record carried under `labels` dropped. */
-function labelled(home: string, run: Run) {
+/**
+ * The run with its labels composed onto it, and whatever the record carried under `labels` dropped.
+ * @param home The store's root folder.
+ * @param run The run as its record reads.
+ */
+export function labelled(home: string, run: Run) {
   const labels = readLabels(home, run.id);
   const { labels: _, ...bare } = run;
   return labels ? { ...bare, labels } : bare;
-}
-
-/**
- * The run a memo kept, noted in `given` by identity: listed as given, labels and all, since its stamp — the `.labels` file among what it
- * stamps — still holds, so its labels are not read again, and the very run is handed back (`keptOf`).
- */
-function givenOf(given: Set<Run>, run: Run | undefined) {
-  if (run) given.add(run);
-  return run;
 }
 
 /**
@@ -308,13 +127,13 @@ function givenOf(given: Set<Run>, run: Run | undefined) {
  * `cancelFile` is. Written by `refresh` alone, exclusively; removed by the pass that takes the revisions it asked for (`removeRefresh`).
  * Never composed onto the record: the pass reads the file itself (`stands`), as a level-triggered reader must.
  */
-const refreshFile = (home: string, id: string) => path.join(runsDir(home), `${id}.refresh`);
+export const refreshFile = (home: string, id: string) => path.join(runsDir(home), `${id}.refresh`);
 
 /**
  * Write down that a person asked this run to take the new revisions, and answer with the ask written — or null, when one already stands.
  * `wx`, so two people asking at once make one ask, and an ask is never edited: the pass that takes the revisions lifts it.
  */
-const writeRefresh = (home: string, id: string) => {
+export const writeRefresh = (home: string, id: string) => {
   fs.mkdirSync(runsDir(home), { recursive: true });
   const ask = { at: new Date().toISOString() };
   try {
@@ -327,7 +146,7 @@ const writeRefresh = (home: string, id: string) => {
 };
 
 /** Lift the refresh ask: whether a file was there. Taken by the pass that wrote the pins it asked for, after the record is written. */
-const removeRefresh = (home: string, id: string) => {
+export const removeRefresh = (home: string, id: string) => {
   try {
     fs.rmSync(refreshFile(home, id));
     return true;
@@ -341,10 +160,10 @@ const removeRefresh = (home: string, id: string) => {
 const filesDir = (home: string, id: string) => path.join(runsDir(home), id, 'artifacts');
 
 /** The run's files directory while it is a directory and no link; else undefined. */
-const filesAt = (home: string, id: string) => (lstatOf(filesDir(home, id))?.isDirectory() ? filesDir(home, id) : undefined);
+export const filesAt = (home: string, id: string) => (lstatOf(filesDir(home, id))?.isDirectory() ? filesDir(home, id) : undefined);
 
 /** Remove the run's files directory: null once it is gone; else the first line of what the filesystem said. */
-function dropFiles(home: string, id: string) {
+export function dropFiles(home: string, id: string) {
   try {
     fs.rmSync(filesDir(home, id), { recursive: true, force: true });
     return null;
@@ -358,7 +177,7 @@ function dropFiles(home: string, id: string) {
  * stand (`runMarkMove`): a prune of a run already pruned writes what it recorded since, and a prune taken back of a run not pruned
  * has nothing to remove.
  */
-const writePruned = (home: string, id: string, marker: Pruned | undefined) => {
+export const writePruned = (home: string, id: string, marker: Pruned | undefined) => {
   const move = runMarkMove(marksAt(home, id), marker ? 'prune' : 'unprune');
   if (move.kind === 'refused') return;
   if (marker) fs.writeFileSync(pruneFile(home, id), JSON.stringify(marker, null, 2));
@@ -384,13 +203,13 @@ const forgettingIn = Schema.decodeUnknownOption(
 );
 
 /** The marker of the run `id` written whole, through a hidden file renamed over it, the folder made first. */
-function writeForgetting(home: string, id: string, taskIds: readonly string[]) {
+export function writeForgetting(home: string, id: string, taskIds: readonly string[]) {
   fs.mkdirSync(forgettingDir(home), { recursive: true });
   writeWhole(forgettingFile(home, id), JSON.stringify({ run: id, taskIds: [...taskIds] }, null, 2));
 }
 
 /** The task ids the marker of the run `id` lists, or undefined: none there, or one that does not read as a marker. */
-function readForgetting(home: string, id: string) {
+export function readForgetting(home: string, id: string) {
   let text: string;
   try {
     text = fs.readFileSync(forgettingFile(home, id), 'utf8');
@@ -403,7 +222,7 @@ function readForgetting(home: string, id: string) {
 }
 
 /** The runs a marker stands for: each `<id>.json` of the folder, none when there is no folder. */
-function forgettingRuns(home: string) {
+export function forgettingRuns(home: string) {
   try {
     return fs
       .readdirSync(forgettingDir(home))
@@ -422,174 +241,29 @@ function forgettingRuns(home: string) {
  * the pause as it stands, or with none while none does, is the very run given, which the memo knows by identity (`keptOf`). Never
  * written into the record.
  */
-function paused(home: string, run: Run, pause: Pause | null = readPause(home)) {
+export function paused(home: string, run: Run, pause: Pause | null = readPause(home)) {
   if (isDeepStrictEqual(run.pause ?? null, pause)) return run;
   const { pause: _, ...bare } = run;
   return pause ? { ...bare, pause } : bare;
 }
 
 /**
- * The run `id` names, read with `pause` composed onto it as `runs.read` composes the store's own — for an id the caller has already
- * matched against the store's listing. Undefined for a record removed between the listing and the read, and for one that does not read
- * as a run (`UnreadableRecord`), which is said on `said`, as `listRuns` says it: the run page answers that there is no such run where
- * it used to throw.
- */
-function runListed(home: string, id: string, said: (line: string) => void, pause: Pause | null) {
-  try {
-    return paused(home, labelled(home, runRecord(home, id)), pause);
-  } catch (err) {
-    if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
-    else if (fs.existsSync(runFile(home, id))) throw err;
-    return undefined;
-  }
-}
-
-/**
- * The run `id` names, found among the ids the store lists (`runIds`), never read by a path made of the id, so no id — one climbing out
- * with `..`, an absolute one — can name a file outside `runs/`; with the store's pause composed onto it as `runs.read` composes it, and
- * undefined for an id the store does not list, or that does not read (`runListed`).
- */
-function findRun(home: string, id: string, said: (line: string) => void = sayOnce) {
-  return runIds(home).includes(id) ? runListed(home, id, said, readPause(home)) : undefined;
-}
-
-/** Where the claims of the cards started are, `<card>.json` each: beside `runs/`, so that no listing of runs reads one. */
-const startedDir = (home: string) => path.join(path.dirname(runsDir(home)), 'started');
-
-/** The run the claim at `file` names, or undefined: none there, or one that does not read as a claim. */
-function claimedAt(file: string) {
-  try {
-    return Option.getOrUndefined(claimIn(fs.readFileSync(file, 'utf8')))?.run;
-  } catch {
-    return undefined;
-  }
-}
-const claimIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ run: Schema.String })));
-
-/**
- * Claim the card `card` for the run `id`: `started/<card>.json`, created exclusively (`wx`), so that of two processes starting one card
- * one run holds it. The run's record is written before its claim, so a claim whose run has no record, or a record from another card, is
- * stale — a run forgotten, a crash between the writes — and is taken over: renamed aside, which only one taker can do; put back if what
- * was renamed is not what was judged stale, since another taker came between; else made again, once. Answers whom the card is the run
- * of when it is not `id`.
+ * Whether the run's refresh ask is there, read as one or not.
  * @param home The store's root folder.
- * @param card The card's name.
- * @param id The id of the run that claims it.
+ * @param id The run's id.
  */
-export function claimCard(home: string, card: string, id: string) {
-  const file = path.join(startedDir(home), `${card}.json`);
-  const create = () => {
-    try {
-      fs.writeFileSync(file, JSON.stringify({ run: id }, null, 2), { flag: 'wx' });
-      return true;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'EEXIST') return false;
-      throw err;
-    }
-  };
-  fs.mkdirSync(startedDir(home), { recursive: true });
-  if (create()) return { taken: true } satisfies { taken: true } | { by: string } as { taken: true } | { by: string };
-  const by = claimedAt(file);
-  if (by !== undefined && by !== id && findRun(home, by)?.from?.inbox === card)
-    return { by } satisfies { taken: true } | { by: string } as { taken: true } | { by: string };
-  const tomb = path.join(startedDir(home), `.${card}.${process.pid}.${Math.random().toString(36).slice(2)}`);
-  try {
-    fs.renameSync(file, tomb);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-  }
-  const renamed = fs.existsSync(tomb) ? claimedAt(tomb) : by;
-  if (renamed !== by) {
-    try {
-      fs.linkSync(tomb, file);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    }
-    fs.rmSync(tomb, { force: true });
-    return { by: renamed ?? 'another run' } satisfies { taken: true } | { by: string } as { taken: true } | { by: string };
-  }
-  fs.rmSync(tomb, { force: true });
-  return (create() ? { taken: true } : { by: claimedAt(file) ?? 'another run' }) satisfies { taken: true } | { by: string } as
-    | { taken: true }
-    | { by: string };
-}
+export const refreshStands = (home: string, id: string) => fs.existsSync(refreshFile(home, id));
 
 /**
- * The run store at the store's root `home`: a run's record and a person's files beside it, each a file of its own under `runs/`, with the
- * run's labels and the store's pause composed onto each run read (`labelled`, `paused`); the markers of the runs `nemia rm` forgets, under
- * `forgetting/`.
+ * Where a person finds the run's `nemia rm` marker.
  * @param home The store's root folder.
+ * @param id The run's id.
  */
-export const filesStoreAt = (home: string) =>
-  ({
-    runs: {
-      read: (id) => paused(home, labelled(home, runRecord(home, id))),
-      find: (id, said) => findRun(home, id, said),
-      list: (said, kept) => {
-        const pause = readPause(home);
-        const given = new Set<Run>();
-        const keeps = kept && ((id: string) => givenOf(given, kept(id)));
-        return listRuns(home, said, keeps).map((run) => paused(home, given.has(run) ? run : labelled(home, run), pause));
-      },
-      create: (run) => writeRun(home, run),
-      rewrite: (run) => rewriteRun(home, run),
-      stamps: () => restStamps(home),
-      exists: (id) => fs.existsSync(runFile(home, id)),
-      taken: (id) => runIdTaken(home, id),
-      calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(home, id))) || pauseStands(home),
-      cancel: (id, actor) => markCancelled(home, id, actor),
-      forget: (id) => removeRunFiles(home, id),
-      ids: () => runIds(home),
-      filesAt: (id) => filesAt(home, id),
-      dropFiles: (id) => dropFiles(home, id),
-      prune: (id, marker) => writePruned(home, id, marker),
-      pruned: (id) => readPruned(home, id),
-    },
-    asks: {
-      read: (id) => readAllAsks(home, id),
-      answers: (id) => readAnswers(home, id),
-      consume: (run, asks, rounds, voided) => consumeAllAsks(home, run, asks, rounds, voided),
-      write: (id, person) => writePersonAsk(home, id, person),
-      where: (id, key) => askWhere(home, id, key),
-      takeBack: (id, step, n, takenBack) => takeBackApproval(home, id, step, n, takenBack),
-    },
-    holds: {
-      lift: (id, at, actor) => removeHold(home, id, at, actor),
-      put: (id, until, said) => writeHold(home, id, until, said),
-      stands: (id) => fs.existsSync(holdFile(home, id)),
-    },
-    said: { put: (id, step, text) => keepSaid(home, id, step, text) },
-    labels: { put: (id, labels) => writeLabels(home, id, labels) },
-    refresh: {
-      lift: (id) => removeRefresh(home, id),
-      put: (id) => writeRefresh(home, id),
-      stands: (id) => fs.existsSync(refreshFile(home, id)),
-    },
-    forgetting: {
-      write: (id, taskIds) => writeForgetting(home, id, taskIds),
-      read: (id) => readForgetting(home, id),
-      list: () => forgettingRuns(home),
-      lift: (id) => fs.rmSync(forgettingFile(home, id), { force: true }),
-      where: (id) => forgettingFile(home, id),
-    },
-  }) satisfies RunStore as RunStore;
+export const forgettingWhere = (home: string, id: string) => forgettingFile(home, id);
 
 /**
- * Every run of the store as `project` reads it, off `memo` where one is handed in (`keptRecords`): the store stamped before any record
- * is read, each run whose stamp stands answered from memory, and each other read by id. With no memo — the command line's reads, and a
- * test's cold read — every record is read, and nothing is kept. `verify` says whether each kept projection is judged afresh too
- * (`WF_VERIFY_REST`, the program's `StoreConfig`).
- *
- * The store is listed once and its pause read once for the whole read, as `runs.list` lists and reads them once: `runs.find` does both
- * for its one run, and a read that went through it per run would list the store once per run.
+ * Take the run's `nemia rm` marker away, there or not.
  * @param home The store's root folder.
- * @param memo The projections kept from the reads before; undefined where nothing is kept.
- * @param project What each run is read as.
- * @param verify Whether each kept projection is judged afresh too.
+ * @param id The run's id.
  */
-export const keptRuns = <P>(home: string, memo: RecordMemo<P> | undefined, project: (run: Run) => P, verify: boolean) => {
-  const listed = new Set(runIds(home));
-  const pause = readPause(home);
-  const find = (id: string) => (listed.has(id) ? runListed(home, id, sayOnce, pause) : undefined);
-  return keptRecords(memo, { stamps: restStamps(home), find, verify }, project);
-};
+export const liftForgetting = (home: string, id: string) => fs.rmSync(forgettingFile(home, id), { force: true });

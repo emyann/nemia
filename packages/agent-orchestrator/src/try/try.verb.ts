@@ -7,7 +7,7 @@
 import path from 'node:path';
 import { Effect } from 'effect';
 import { EngineService, tried } from '../runtime-client.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { tryOf } from '../summary/reads.verb.ts';
 import { judgedNow } from '../summary/summary.verb.ts';
 import { startRun } from '../start/start.verb.ts';
@@ -78,9 +78,7 @@ export const tryAgent = Effect.fnUntraced(function* (asked: TryAsked) {
   const home = yield* StoreRoot;
   const reading = yield* Effect.provideService(triedAgent(asked), StoreRoot, asked.home);
   const e = yield* EngineService;
-  const tries = runsAtOnce(home)
-    .runs.list()
-    .filter((run) => tryOf(run, asked.home)?.agent === asked.name);
+  const tries = (yield* (yield* RunDoor).runs.list()).filter((run) => tryOf(run, asked.home)?.agent === asked.name);
   const moving = (yield* judgedNow(e, asked.home, tries)).find((run) => run.moving);
   if (moving) {
     return yield* Effect.fail(

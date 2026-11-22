@@ -12,8 +12,8 @@ import { Effect } from 'effect';
 import type { Actor } from 'objects';
 import { EngineService, asked, sessionsDrained, tried } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
-import { keptRuns } from '../record/files.store.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { keptRuns, RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { stopAsked } from '../tick/held.verb.ts';
 import { cutPause, putPause, readPause } from './pause.store.ts';
@@ -53,15 +53,14 @@ const runTasks = (run: Run) => ({
  * answer is the same.
  */
 const interruptsRead = Effect.fnUntraced(function* (memo?: PauseRuns) {
-  const home = yield* StoreRoot;
   const e = yield* EngineService;
-  const seen = keptRuns(home, memo, runTasks, yield* setting('verifyRest'));
+  const door = yield* RunDoor;
+  const seen = yield* keptRuns(memo, runTasks, yield* setting('verifyRest'));
   const ids = [...new Set(seen.filter((run) => !run.cancelledAt).flatMap((run) => run.tasks))];
   const views = new Map((ids.length ? (yield* asked('list', e.list(ids))).views : []).map((v) => [v.id, v]));
-  const runs = liveAmong(seen, (id) => views.get(id)).flatMap((id) => {
-    const run = runsAtOnce(home).runs.find(id);
-    return run ? [run] : [];
-  });
+  const runs = (yield* Effect.forEach(liveAmong(seen, (id) => views.get(id)), (id) => door.runs.find(RunId.read(id)))).filter(
+    (run) => run !== undefined,
+  );
   const steps = new Map(yield* Effect.forEach(runs, (run) => Effect.map(stepsOf(run), (s) => [run.id, s] as const)));
   return {
     runs: new Map<string, Run>(runs.map((r) => [r.id, r])),
@@ -126,7 +125,7 @@ export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; b
       continue;
     }
     const ask = { step: i.step, try: tryOf(run, i.step) + 1, mode: 'recheck' as const, interrupted: i.taskId, at: now.toISOString() };
-    if (!runsAtOnce(home).asks.write(i.run, { kind: 'retry', of: 'try', ask }).written) {
+    if (!(yield* (yield* RunDoor).asks.write(RunId.read(i.run), { kind: 'retry', of: 'try', ask })).written) {
       skipped.push(i);
       continue;
     }

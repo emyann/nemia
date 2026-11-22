@@ -2,8 +2,7 @@
  * A card's files: the files it names by the api's File id under its `files:` key, each by the name its text and its run find it by. Why
  * the files as given cannot be written (`cardFilesRefusal`), asked wherever a card's `files:` is written, before anything is written; and
  * whether a kept File is let go of (`fileLetGo`), asked by the files' prune (`filesPruned`) of every file it reads. Both pure, proved by
- * `contracts/card-files.contract.ts`. Beside them, the names a card's text uses (`namedInText`), and the refusal's words, each naming
- * the fix.
+ * `contracts/card-files.contract.ts`. Beside them, the refusal's words, each naming the fix.
  */
 import type { CardFileGiven, CardFileHeld, CardFilesRefusal, CardFilesRefusalOf, FileLetGo } from '../../contracts/card-files.contract.ts';
 import { CLI } from 'objects';
@@ -51,29 +50,6 @@ export const cardFilesRefusal: CardFilesRefusalOf = (given, held, started, most,
  * @param keptFor How long a File no card names is kept, in milliseconds.
  */
 export const fileLetGo: FileLetGo = (file, now, keptFor) => !file.named && now - file.writtenAt >= keptFor;
-
-/** A markdown image's or link's target, up to its closing parenthesis or a title after a space: `](<target>`. */
-const TARGET = /\]\(\s*<?([^)\s>]+)>?/g;
-
-/**
- * The names of `names` that `body` uses as a markdown image's or link's target, `name` or `./name`, each once, in the order of `names`.
- * @param body The card's text, its markdown.
- * @param names The names of the card's files.
- */
-export function namedInText(body: string, names: readonly string[]) {
-  const targets = new Set<string>();
-  for (const match of body.matchAll(TARGET)) {
-    const raw = match[1] ?? '';
-    let target = raw;
-    try {
-      target = decodeURIComponent(raw);
-    } catch {
-      target = raw;
-    }
-    targets.add(target.startsWith('./') ? target.slice(2) : target);
-  }
-  return names.filter((n) => targets.has(n));
-}
 
 /**
  * What a refusal of a card's files says, naming the fix.

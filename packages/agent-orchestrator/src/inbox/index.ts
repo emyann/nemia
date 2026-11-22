@@ -23,7 +23,7 @@ export {
   startedRefusal,
 } from './inbox.ts';
 export type { CardListing, CardRun, CardState, InboxCard, InboxListing, LabelsShown, QueueStarted, MissedStart } from './inbox.ts';
-export { fileLetGo, namedInText } from './card-files.ts';
+export { fileLetGo } from './card-files.ts';
 export { queueFactoryRefusal } from './queue-factory.ts';
 export { INBOX_COLUMNS, inboxCells } from './table.ts';
 export { cardPlaySelector, type CardPlaySelector } from './card-field.ts';

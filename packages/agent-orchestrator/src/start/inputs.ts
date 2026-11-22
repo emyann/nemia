@@ -120,6 +120,29 @@ const inputKind = (name: string) => {
   return TEXTS.has(ext) ? 'a text file' : 'a file';
 };
 
+/** A markdown image's or link's target, up to its closing parenthesis or a title after a space: `](<target>`. */
+const TARGET = /\]\(\s*<?([^)\s>]+)>?/g;
+
+/**
+ * The names of `names` that `body` uses as a markdown image's or link's target, `name` or `./name`, each once, in the order of `names`.
+ * @param body The text, its markdown: a card's, or what a run was asked.
+ * @param names The names of its files: a card's, or a run's inputs.
+ */
+export function namedInText(body: string, names: readonly string[]) {
+  const targets = new Set<string>();
+  for (const match of body.matchAll(TARGET)) {
+    const raw = match[1] ?? '';
+    let target = raw;
+    try {
+      target = decodeURIComponent(raw);
+    } catch {
+      target = raw;
+    }
+    targets.add(target.startsWith('./') ? target.slice(2) : target);
+  }
+  return names.filter((n) => targets.has(n));
+}
+
 /**
  * What a step's brief says, under a heading of its own (`INPUTS_HEADING`), when `nemia start --input` gave the run files or
  * `nemia start --card` handed it inbox cards: what they are, part of what was asked; each file by name with what it is (`inputKind`) and

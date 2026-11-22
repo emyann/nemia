@@ -21,12 +21,12 @@ import {
   inboxCells,
   type InboxListing,
   parseInboxCard,
-  namedInText,
 } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardVersion } from '../card-write/card-write.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { fileAt } from '../start/files.store.ts';
+import { namedInText } from '../start/index.ts';
 
 /** The Card's whole write, served beside its reads (`update`): the api reads it off the package's entry with them. */
 export { cardWriteRefusal } from '../card-write/index.ts';

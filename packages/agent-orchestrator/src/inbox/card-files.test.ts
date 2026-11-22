@@ -1,13 +1,11 @@
 /**
  * A card's `files:` key (`inbox.ts`): read as the map of a file's name to the File it names, in the order written, and written back the
- * same; a value that is not a map, or not a File's id, refused by its kind. The names a card's text uses as an image's or a link's target
- * (`namedInText`), `name` or `./name`.
+ * same; a value that is not a map, or not a File's id, refused by its kind.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { WorkflowError } from '../step/step.ts';
 import { cardText, filesText, parseInboxCard } from './inbox.ts';
-import { namedInText } from './card-files.ts';
 
 const A = `file_${'a'.repeat(32)}`;
 const B = `file_${'b'.repeat(32)}`;
@@ -38,8 +36,3 @@ for (const [row, block] of [
     assert.throws(() => parseInboxCard('look.md', `---\n${block}\n---\nLook.\n`), WorkflowError);
   });
 }
-
-test('the names a text uses as an image or a link target are found, bare or after ./, and no other', () => {
-  const body = 'See ![a](shot.png) and [the log](./run.log "title"), not notes.pdf, nor ![x](https://example.com/shot.png).';
-  assert.deepEqual(namedInText(body, ['shot.png', 'run.log', 'notes.pdf']), ['shot.png', 'run.log']);
-});

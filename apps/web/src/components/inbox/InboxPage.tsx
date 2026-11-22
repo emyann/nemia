@@ -11,7 +11,6 @@ import { Segment, SegmentedButton } from '../ui/ds/components/SegmentedButton';
 import { dropCard, inboxAllQuery, queueCard, type InboxEntry } from '@/lib/api/inbox';
 import { factoriesQuery } from '@/lib/api/factories';
 import { type Started } from '@/lib/api/workflows';
-import { keptBy, shownIn } from '@/lib/factories';
 import {
   cardLines,
   cardsEnded,
@@ -42,26 +41,25 @@ const code = (text: string) => <code className="font-mono text-body-small">{text
  * refusal stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray
  * file beside it answer to one name, and a refusal is of one of them.
  *
- * Every factory's cards are listed, each tagged with its own, and a card that names none says so; under a factory's path, the factory
- * keeps only its own, and is the one the box files into until a person picks another: the counts are of
- * the cards it keeps, and a factory that keeps none says so and how to show every factory's.
+ * Every factory's cards are listed, each tagged with its own, and a card that names none says so; under a factory's path, the page
+ * reads that factory's cards alone, and the factory is the one the box files into until a person picks another: the counts are of its
+ * cards, and a factory that holds none says so and how to show every factory's, whatever the others hold.
  *
- * It reads every card, its run ended or not (`inboxAllQuery`), and lists the cards still in play — not started, or whose run is pending,
- * running or waiting (`CARD_KIND`) — or, under Ended, kept in the address as `?cards=ended`, those whose run ended: each counted after the
- * factory and the label filter, and an In play that lists none offers the ended cards.
+ * It reads the cards, their run ended or not (`inboxAllQuery`: every factory's, or its factory's alone), and lists the cards still in
+ * play — not started, or whose run is pending, running or waiting (`CARD_KIND`) — or, under Ended, kept in the address as
+ * `?cards=ended`, those whose run ended: each counted after the label filter, and an In play that lists none offers the ended cards.
  */
 export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Partial<InboxAt>) => void }) {
   const { factory, l, cards: kind } = at;
   const ended = kind === 'ended';
-  const { data: entries } = useSuspenseQuery(inboxAllQuery(l));
+  const { data: entries } = useSuspenseQuery(inboxAllQuery(l, factory));
   const [refusals, setRefusals] = useState<CardRefusal[]>([]);
   const all = newestCardsFirst(entries);
-  const kept = shownIn(all, factory);
-  const playing = cardsInPlay(kept);
-  const over = cardsEnded(kept);
+  const playing = cardsInPlay(all);
+  const over = cardsEnded(all);
   const cards = ended ? over : playing;
   const queue = queueOf(cards).length;
-  const lines = cardLines(entries, refusals).filter(({ entry }) => keptBy(factory)(entry) && inPlay(entry) !== ended);
+  const lines = cardLines(entries, refusals).filter(({ entry }) => inPlay(entry) !== ended);
   const show = (next: 'ended' | undefined) => onSearch({ cards: next });
   const refusalFor = (entry: InboxEntry) => (refusal: Omit<CardRefusal, 'entry'> | null) =>
     setRefusals((kept) => [...kept.filter((r) => r.entry.file !== entry.file), ...(refusal ? [{ ...refusal, entry }] : [])]);
@@ -78,7 +76,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
       <FileCard shown={factory} />
       <SelectorField key={l ?? ''} selector={l} onSelect={(next) => onSearch({ l: next })} />
       <section aria-label="Cards" className="space-y-3">
-        {kept.length > 0 && <CardsSwitch ended={ended} inPlay={playing.length} over={over.length} onShow={show} />}
+        {all.length > 0 && <CardsSwitch ended={ended} inPlay={playing.length} over={over.length} onShow={show} />}
         <h2 className="flex items-baseline gap-2 text-title-small">
           Cards{' '}
           <span data-count className="text-body-small font-normal text-muted-foreground">
@@ -101,8 +99,8 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
             )}
           </ul>
         )}
-        {cards.length === 0 && kept.length > 0 && <NoneShown ended={ended} over={over.length} />}
-        {kept.length === 0 && all.length > 0 && (
+        {cards.length === 0 && all.length > 0 && <NoneShown ended={ended} over={over.length} />}
+        {all.length === 0 && factory !== undefined && (
           <p data-filtered-out className="text-body-medium text-muted-foreground">
             No card of the factory <span className="font-mono">{factory}</span>.{' '}
             <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
@@ -111,7 +109,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
             .
           </p>
         )}
-        {all.length === 0 && (
+        {all.length === 0 && factory === undefined && (
           <p data-empty className="text-body-medium text-muted-foreground">
             The inbox is empty. File an idea in the box above, or from the command line.
           </p>

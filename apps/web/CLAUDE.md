@@ -363,7 +363,9 @@ here.
   rejects with `ReadRefusal`, `WriteRefusal` or `UnreadAnswer` (`lib/api/read.ts`). The inbox's entry is made of a `Card` in one place (`entryOf`,
 - `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory` and its `FactoryCommands` in one place (`factoryViewOf`,
   `lib/api/factories.ts`), which `factoriesQuery` reads together; a factory's schedules are read on its Settings alone
-  (`factorySchedulesQuery`), and a floor asks its factory's cards in play of the api (`factoryInboxQuery`), never every card. A hire is written to its `Hire`, named
+  (`factorySchedulesQuery`), and a floor asks its factory's cards in play of the api (`factoryInboxQuery`), never every card; a factory's
+  Inbox asks its own namespace's cards, ended included (`inboxAllQuery` with its factory), and only the store's Inbox reads every card.
+  A hire is written to its `Hire`, named
   `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value.
   A definition is seen as the board's view of its kind in one place each — `workflowViewOf` (`lib/api/workflows.ts`), `agentViewOf`
   (`agents.ts`), `skillRowOf` and `skillDetailOf` (`skills.ts`) — read in `default` where the board has no factory, else in the factory's

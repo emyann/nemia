@@ -6,23 +6,27 @@ import { inboxAllQuery, type InboxEntry } from '@/lib/api/inbox';
 import { FACTORY, factoryView, queuedCard, seeded, unstartedCard } from '../../../.storybook/fixtures/proposals';
 import { InboxPage } from './InboxPage';
 
-/** The inbox page over the cards `cards`, its factories `nemia`'s alone, every read answered from the seed. */
-const drawn = (cards: readonly InboxEntry[]) => (
+/**
+ * The inbox page over the cards `cards`, its factories `nemia`'s alone, every read answered from the seed: the store's Inbox, or, where
+ * `factory` is given, that factory's, seeded under its own read's key.
+ */
+const drawn = (cards: readonly InboxEntry[], factory?: string) => (
   <QueryClientProvider
     client={seeded([
       [factoriesQuery.queryKey, [factoryView(FACTORY)]],
-      [inboxAllQuery(undefined).queryKey, cards],
+      [inboxAllQuery(undefined, factory).queryKey, cards],
     ])}
   >
     <div style={{ width: 880 }}>
-      <InboxPage at={{}} onSearch={() => undefined} />
+      <InboxPage at={factory === undefined ? {} : { factory }} onSearch={() => undefined} />
     </div>
   </QueryClientProvider>
 );
 
 /**
  * The inbox page, one story a state: two cards in play, one filed and one queued; a started card waiting on its person beside one not
- * started; cards a trigger queues and one two triggers clash on; cards that wait on others, one stalled; and an empty inbox. Axe's
+ * started; cards a trigger queues and one two triggers clash on; cards that wait on others, one stalled; an empty inbox; and a factory's
+ * Inbox whose factory holds no card. Axe's
  * `label-content-name-mismatch` alone is off, for the box's Factory list: the ds kit's `Select` draws its value before its floating
  * label and is named by the label first, which axe reads as visible text left out of its name, an ask of the kit.
  */
@@ -114,5 +118,14 @@ export const Empty: Story = {
   render: () => drawn([]),
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector('[data-empty]')).not.toBeNull();
+  },
+};
+
+/** A factory's Inbox whose factory holds no card: the line that says so and links every factory's, never that the inbox is empty. */
+export const EmptyInFactory: Story = {
+  render: () => drawn([], FACTORY),
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector('[data-filtered-out]')).toHaveTextContent(`No card of the factory ${FACTORY}`);
+    await expect(canvasElement.querySelector('[data-empty]')).toBeNull();
   },
 };

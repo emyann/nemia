@@ -1133,15 +1133,22 @@ const reruns = (calls: readonly Called[]) => asked(calls, 'run', 'rerun');
 
 /**
  * The wait in a place whose rollup reads `outs` (one per poll, the last repeating) and whose run 1234 answers `attempt` (a rule, or a
- * number); `rerun` answers `gh run rerun`; `more` sets the bounds.
+ * number); `rerun` answers `gh run rerun`; `more` sets the bounds; `logs` answer a job's log before the bare one every other job gets.
  */
-function redThen(outs: string[], attempt: Rule | number = 1, rerun: Rule = { when: 'run rerun' }, more: Record<string, string> = {}) {
+function redThen(
+  outs: string[],
+  attempt: Rule | number = 1,
+  rerun: Rule = { when: 'run rerun' },
+  more: Record<string, string> = {},
+  logs: Rule[] = [],
+) {
   const at = placed();
   at.gh.answers([
     ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
     { when: 'pr view', outs },
     typeof attempt === 'number' ? { when: 'actions/runs/1234', out: JSON.stringify({ id: 1234, run_attempt: attempt }) } : attempt,
     rerun,
+    ...logs,
     { when: 'actions/jobs', out: stamped(['Process completed with exit code 1.']) },
   ]);
   return pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0', ...more });
@@ -1158,6 +1165,7 @@ test("wait re-runs a red ci's failed jobs once, and a green second time passes t
   const attemptAt = r.calls.findIndex((call) => call.argv.join(' ').includes('actions/runs/1234'));
   assert.ok(attemptAt !== -1 && attemptAt < r.calls.findIndex((call) => call.argv[1] === 'rerun'), 'its attempt is read first');
   assert.match(r.out, /re-ran .* run 1234/);
+  assert.match(r.out, /second run is due/, 'saying why it was re-run: no red job named a failing line');
   assert.match(r.out, /test x: success/);
   assert.match(r.out, /ci: success/);
   assert.match(r.out, /nemia ci: `ci` passed on/);
@@ -1176,7 +1184,65 @@ test("red twice is refused as today, the work's, with the re-run said and the se
   assert.ok(r.err.includes(RETRY), r.err);
   const logs = asked(r.calls, 'api').map((call) => call.argv[1]);
   assert.ok(logs.includes('repos/{owner}/{repo}/actions/jobs/6677/logs'), "the second attempt's log is read");
-  assert.ok(!logs.includes('repos/{owner}/{repo}/actions/jobs/5677/logs'), 'not the first one');
+  assert.ok(r.err.includes('test x (job 6677)'), `the refusal gives the second attempt's lines, not the first's:\n${r.err}`);
+  assert.ok(!r.err.includes('test x (job 5677)'), r.err);
+});
+
+/** A log whose job a test failed: the summary line Vitest prints of it and its assertion, as a failing story's job gives one. */
+const FAILING_LOG = stamped([
+  ' FAIL  |storybook (chromium)| src/a.stories.tsx > A > Default',
+  'AssertionError: expected the picture to match',
+  'Process completed with exit code 1.',
+]);
+
+/** The rule that answers the job `id`'s log with `log`. */
+const logOf = (id: number, log: string) => ({ when: `actions/jobs/${id}/logs`, out: log }) satisfies Rule;
+
+test("a red whose job's log names a failing test is reported at once, never re-run, saying so, its log read once", () => {
+  const r = redThen([checks(...FIRST)], 1, { when: 'run rerun' }, {}, [logOf(5677, FAILING_LOG)]);
+  assert.equal(r.code, 1, r.out);
+  assert.notEqual(r.code, PERSONS, "a failing test is the change's");
+  assert.equal(reruns(r.calls).length, 0, 'no re-run');
+  assert.ok(!r.calls.some((call) => call.argv.join(' ').includes('actions/runs/1234')), 'its attempt is not read');
+  assert.match(r.err, /not re-run/);
+  assert.match(r.err, /test x failure \(its log names a line/);
+  assert.ok(r.err.includes('src/a.stories.tsx > A > Default'), `the failing line is given as before:\n${r.err}`);
+  const read = asked(r.calls, 'api').filter((call) => call.argv[1] === 'repos/{owner}/{repo}/actions/jobs/5677/logs');
+  assert.equal(read.length, 1, 'the log read to decide is the one the refusal gives');
+});
+
+test("one job the change's and one timed out is reported at once: the change's keeps the context red whatever a second run does", () => {
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: checks(job('test x', 5677, T1, FAILED), cancelledCi(5678)) },
+    { when: 'check-runs/5678/annotations', out: TIMED_OUT_NOTES },
+    { when: 'actions/runs/1234', out: JSON.stringify({ id: 1234, run_attempt: 1 }) },
+    { when: 'run rerun' },
+    logOf(5677, FAILING_LOG),
+    { when: 'actions/jobs', out: stamped(['The operation was canceled.']) },
+  ]);
+  const r = pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(r.code, 1, r.out);
+  assert.equal(reruns(r.calls).length, 0, 'no re-run');
+  assert.match(r.err, /ci timed_out \(the machine's\)/);
+});
+
+test('a red whose failing job gave no log is re-run once, as before, saying it could not be told', () => {
+  const r = redThen([checks(...FIRST), checks(...FIRST, ...second(PASSED_RUN))], 1, { when: 'run rerun' }, {}, [
+    { when: 'actions/jobs/5677/logs', status: 1, err: 'HTTP 410: gone' },
+  ]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(reruns(r.calls).length, 1, 'the re-run it had');
+  assert.match(r.out, /test x failure \(no log could be read, untold\)/);
+});
+
+test('a re-run that comes back red again with a failing line is red twice, as today, its new log read and nothing re-run again', () => {
+  const r = redThen([checks(...FIRST), checks(...FIRST, ...second(FAILED))], 1, { when: 'run rerun' }, {}, [logOf(6677, FAILING_LOG)]);
+  assert.equal(r.code, 1, r.out);
+  assert.equal(reruns(r.calls).length, 1, 'once, the first red having named no failing line');
+  assert.match(r.err, /re-ran .* run 1234/);
+  assert.ok(r.err.includes('test x (job 6677), the lines that failed it'), r.err);
 });
 
 test('never twice per head: a run GitHub says is past its first attempt is not re-run again', () => {
@@ -1620,12 +1686,13 @@ test("REFUSED, a person's: a dispatch GitHub refuses names the stuck run and the
   assert.ok(r.err.indexOf('gh workflow run') < r.err.indexOf(RETRY), 'the dispatch comes before the retry');
 });
 
-test("a dispatched run's red, whose rollup entry links the run and not a job, is re-run once and refused with its failing jobs' lines", () => {
+/** The wait on a dispatched run 4400 whose rollup reads `outs`, its job 9901 failed, 9902 passed, and 9901's log `log`. */
+function dispatchedRed(outs: string[], log: string) {
   const jobUrl = (id: number) => `${DISPATCHED_URL}/job/${id}`;
   const at = placed();
   at.gh.answers([
     ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
-    { when: 'pr view', outs: [checks(dispatched(FAILED, T1)), checks(dispatched(FAILED, T2))] },
+    { when: 'pr view', outs },
     {
       when: 'actions/runs/4400/jobs',
       out: JSON.stringify({
@@ -1636,17 +1703,14 @@ test("a dispatched run's red, whose rollup entry links the run and not a job, is
       }),
     },
     { when: 'actions/runs/4400', out: JSON.stringify({ id: 4400, run_attempt: 1 }) },
-    {
-      when: 'actions/jobs/9901/logs',
-      out: stamped([
-        'templates:test: ✖ failing tests:',
-        'templates:test: test at test/words.test.ts:3:1',
-        'templates:test: ✖ no word of the repository (2ms)',
-        'templates:test:   AssertionError [ERR_ASSERTION]: a word',
-      ]),
-    },
+    { when: 'actions/jobs/9901/logs', out: log },
   ]);
-  const r = pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' });
+  return pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' });
+}
+
+test("a dispatched run's red, whose rollup entry links the run and not a job, is told by its jobs read from the run: re-run once where none names a failing line, else refused at once with the lines", () => {
+  const twice = [checks(dispatched(FAILED, T1)), checks(dispatched(FAILED, T2))];
+  const r = dispatchedRed(twice, stamped(['templates:test: npm ERR! network ECONNRESET', 'Process completed with exit code 1.']));
   assert.equal(r.code, 1, r.out);
   assert.deepEqual(
     reruns(r.calls).map((call) => call.argv),
@@ -1658,6 +1722,18 @@ test("a dispatched run's red, whose rollup entry links the run and not a job, is
   assert.match(r.err, /test words: FAILURE/, 'the failing job is listed, read from its run');
   assert.ok(!r.err.includes('  lint: '), 'a job that passed is not');
   assert.ok(r.err.includes('test words (job 9901)'), r.err);
-  assert.ok(r.err.includes('✖ no word of the repository'), `the failing test's lines:\n${r.err}`);
+  assert.ok(r.err.includes('ECONNRESET'), `its log's tail:\n${r.err}`);
   assert.ok(r.err.includes(RETRY), r.err);
+
+  const failing = stamped([
+    'templates:test: ✖ failing tests:',
+    'templates:test: test at test/words.test.ts:3:1',
+    'templates:test: ✖ no word of the repository (2ms)',
+    'templates:test:   AssertionError [ERR_ASSERTION]: a word',
+  ]);
+  const once = dispatchedRed([checks(dispatched(FAILED, T1))], failing);
+  assert.equal(once.code, 1, once.out);
+  assert.equal(reruns(once.calls).length, 0, 'a failing test is reported at once');
+  assert.match(once.err, /test words failure \(its log names a line/);
+  assert.ok(once.err.includes('✖ no word of the repository'), `the failing test's lines:\n${once.err}`);
 });

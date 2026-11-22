@@ -57,6 +57,7 @@ export const ROOTS = [
   'apps/web/test/baseline.ts',
   'apps/web/test/stories.ts',
   'packages/templates/released.ts',
+  'packages/templates/sdlc/carried/ci-log.ts',
   'tools/design-system/src',
 ];
 

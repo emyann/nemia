@@ -10,7 +10,8 @@ Two component families draw from one palette. shadcn's (`src/components/ui/*.tsx
 no file gains an import of it, nor a control drawn by hand (`test/stories.test.ts`), and `test/destinations.ts` says where each
 of its parts moves. The design system kit (`src/components/ui/ds`, Material Design 3 on React Aria)
 is the board's one system, which it moves to a component at a time. The look is `DESIGN.md`,
-and `theme/` is what the kit's generator makes of it; `src/styles.css` imports the theme and reads shadcn's names from its roles.
+and `theme/` is what the kit's generator makes of it; `src/styles.css` imports the theme and writes the four meanings beside it, and
+no file of the board names a colour of shadcn's (`test/shadcn-names.test.ts`).
 
 The traps of the board's tools — what Chromium, Playwright, React Flow, React Aria, the React Compiler, the e2e runner and the kit's
 class merge do, which no test refuses — are *The board's traps*, at the end of this file, read by whoever changes the board before
@@ -54,9 +55,9 @@ root.
 - `theme/` is generated, never edited: change `DESIGN.md`, then `npm run theme:generate` from `apps/web` (the kit's generator, `npx tsx
   src/components/ui/ds/tokens/generate-theme.mjs DESIGN.md --out theme`), and read the warnings in `theme/DESIGN.resolved.md`. CI's build
   job runs it and `npm run build`, and refuses a `theme/` or a `src/routeTree.gen.ts` whose committed bytes are not what they write. A face the `DESIGN.md` names is loaded by
-  `src/styles.css` from its npm package, under the exact family the package registers (`Michroma`, `Chakra Petch`, `Share Tech Mono`),
+  `src/styles.css` from its npm package, under the exact family the package registers (`Michroma`, `Barlow`, `Chakra Petch`, `JetBrains Mono`),
   and given to the theme's hook (`--font-michroma`); the label face (`Archivo Variable`, `--font-label`) is the board's own.
-  The symbols none of the four has are drawn from two faces served with them, declared under each family by
+  The symbols none of the five has are drawn from two faces served with them, declared under each family by
   `src/components/look/symbols.css`: Noto Sans Math for `← → ↗ ≥ ✓ ⧉`, and the symbols subset of Noto Sans Symbols 2 for `✗`, which
   Noto Sans Math lacks. Each rule's `unicode-range` is its face's characters alone, one rule per face `styles.css` loads, its
   descriptors exact: a character the board adds that its faces lack joins every rule of the symbol face that has it, so no reader's
@@ -77,7 +78,7 @@ shape, where the kit's ground would fill the cut corner square, `CutTag` for a t
 with a cut corner, which takes off the border, ring and outline of what it holds and draws its own edge with `edge` (an outlined tag,
 a hairline) and its own focus ring in its cut, `CutBubble` for the agent's words in a cut bubble, `CutIconPress` for the kit's tonal
 icon button in a cut (a composer's send), `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
-`CutCue` for a cue in a small cut frame beside a face or in a header, `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, which keeps what it holds inside its diagonals and sets a control given as `end` in from its cut; `Plate` for a section's heading and `PageName` for
+`CutCue` for a cue in a small cut frame beside a face or in a header, `MeaningTag` for a tag in a meaning's colour at the kit Tag's metrics (a session at work, which the theme's ink `secondary` no longer says), `CutField` for a box that holds a field, whose edge lights round its cut when the focus is in it, which keeps what it holds inside its diagonals and sets a control given as `end` in from its cut; `Plate` for a section's heading and `PageName` for
 a page's name; `Sticker` for a tile that carries a number and `StatTile` for one over its breakdown; `BreakdownRows` for a breakdown's rows and
 `BreakdownPreview` for one hung off a focusable trigger of your own; `StepGraph` for a run's steps as its workflow's graph;
 `Run` for a run at any of its five sizes, from its mark in a sentence to the floor's opened panel (`RunMeta`, `RunClock` and
@@ -163,8 +164,10 @@ here.
   given no args, each name a file takes from shadcn's `components/ui/*` or React Aria outside the kit and the look
   (`<file>#<module>:<name>`), each control a file draws by hand (a raw `<button>`, `<input>`, `<select>` or `<textarea>`, or an
   import of `lib/classes.ts`'s control strings, `handDrawn`; an input whose literal `type` is `checkbox` or `radio` is keyed by it, the kit
-  drawing each with its own part), and the `todo` stories. The baseline is a folder,
-  `test/baseline/<list>/<path under src>.txt`, a file per list and source file holding that file's entries one a line (`shardOf`,
+  drawing each with its own part), and the `todo` stories. `test/rulebook.test.ts` holds the rules of `DESIGN.md` the pages do not
+  yet obey to four more lists of the same baseline: a kit accent role the board's parts write (`accentRole`), the retiring `money`
+  (`money`), a raw type class where the kit's primitive belongs (`rawType`) and a surface role of the kit's (`kitSurface`). The
+  baseline is a folder, `test/baseline/<list>/<path under src>.txt`, a file per list and source file holding that file's entries one a line (`shardOf`,
   `test/baseline.ts`, proved by `contracts/baseline-shard.contract.ts`), so that a cut deletes a file and two runs' cuts never meet in one
   file, which git merges clean. A file you mend is cut from its list in the same change: its line, or the file where it is the last
   (never left empty); the test refuses a list that keeps it, an entry in another file's place, an empty file and any other file there. `test/destinations.ts` maps each name and control to where it moves (a part of the
@@ -295,9 +298,11 @@ here.
 - No export of `src` is dead: `test/dead-exports.test.ts` refuses a name no other file of `src`, `test`, `.storybook` or `contracts`
   imports. Unexport a name used only in its own file, delete one used nowhere; the vendored folders, stories, `main.tsx`,
   `routeTree.gen.ts`, a route's `Route` and the look's door are exempt.
-- A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
-  `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
-  whole literal.
+- A colour says one thing, one of four meanings: `yours` (waits on a person), `alive`, `rest` (grey, and sage for done) and `failure`.
+  `src/styles.css` writes each beside the theme, light at its root and dark under the media query (`--meaning-*`, `bg-yours`), at the
+  values of `DESIGN.md`'s table, which `test/meanings.test.ts` holds, with contrast; `failure` is Material's error. `money` keeps its
+  amber there until the board-look's second card takes it off its last part (`test/baseline/money/`). `lib/meaning.ts` holds the
+  drawn forms, each class a whole literal, and a tag in one is the look's `MeaningTag`.
 - A cut corner is a shape of its own under unclipped content: `look/cut.ts`, `look/CutFrame.tsx`, `look/CutButton.tsx`. Its
   geometry (`cutShape`, `cutRing`, `cutPoints`, `cutEdge` and `cutHold`) is taken from `./cut` by a part of the look alone, and no
   file outside the look writes a cut, a clip path or a polygon (`test/look.test.ts`): it takes the part that draws one. A part that
@@ -444,8 +449,10 @@ e2e page*.
 - A weight the board wants on a role's text sits on the element that carries the role, never on a parent, which the role overrides. The
   guard that refuses a weight written beside a role reads one quoted class string at a time (`dressed`, `apps/web/test/type.test.ts`),
   so a `font-bold` on a parent of a `text-label-large` is refused by nothing and loses its weight all the same.
-- A colour means one of five things on the board (`yours`, `alive`, `money`, `rest`, `failure`): a use that means none of them is rest; a
-  caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note.
+- A colour means one of four things on the board (`yours`, `alive`, `rest`, `failure`): a use that means none of them is rest or
+  plain ink; a caution is failure for a write refused, yours drawn light for what a person weighs, rest for a note. Selection, state
+  and focus are ink: the theme's `secondary` and `tertiary` are, and the focus ring is the kit's `ring`, which the theme declares from
+  `secondary`.
 - Classes merge through `cn`, built from the kit's `twMergeConfig`: a `leading-*` written before a role in one merge is dropped, so write
   it after.
 - A ground on a child of a cut frame (the kit's `Card`, a table `Row`) paints the cut over, so it is given none (`bg-transparent`), and

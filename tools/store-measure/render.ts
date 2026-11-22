@@ -66,6 +66,8 @@ export type StoreMeasure = {
   from: string;
   engine: string;
   copy: { files: number; bytes: number; ms: number; leftOut: string[] };
+  /** The copy's run files imported into its keyspace before any read: how long, the records made, and its largest run record. */
+  keyspace?: { ms: number; records: number; largest: { id: string; bytes: number; ceiling: number } | null };
   counts: {
     runs: number;
     finishedRuns: number;
@@ -114,6 +116,11 @@ export function rendered(report: StoreMeasure) {
   return [
     `store measure of ${report.from} (${report.engine}), copied: ${report.copy.files} files, ${mb(report.copy.bytes)} MB in ${(report.copy.ms / 1000).toFixed(0)} s, without ${report.copy.leftOut.join(', ') || 'nothing'}`,
     `${counts.runs} runs (${counts.finishedRuns} finished, ${counts.openRuns} open), ${counts.tasks} tasks, ${mb(counts.journalBytes)} MB of journals, ${counts.feedLines} feed lines, ${counts.cards.listed} cards (${counts.cards.started} started); unreadable: ${counts.unreadable.runs} runs, ${counts.unreadable.passLines} pass lines; invariant refusals: ${counts.invariantRefusals}`,
+    ...(report.keyspace
+      ? [
+          `keyspace import: ${report.keyspace.records} records in ${(report.keyspace.ms / 1000).toFixed(1)} s; largest run record: ${report.keyspace.largest ? `${report.keyspace.largest.id}, ${report.keyspace.largest.bytes} bytes of the ${report.keyspace.largest.ceiling} a record holds` : 'none'}`,
+        ]
+      : []),
     `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}, load ${report.machine.load}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
     `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines; her chat: task ${report.asked.chat?.task ?? '—'}, ${report.asked.chat?.events ?? 0} events listed, cursor ${report.asked.chat?.cursor ?? '—'}`,
     '',

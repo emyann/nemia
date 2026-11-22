@@ -52,8 +52,7 @@ const rerunDueSpec = spec<(told: readonly Told[]) => Second>({
   ensures: {
     reportedExactlyWhenAJobIsTheChanges: {
       description:
-        "A red context is reported at once exactly where one of its red jobs is the change's, which a second run would leave red; " +
-        "else its failed jobs are re-run once, as before",
+        "A red context is reported at once exactly where one of its red jobs is the change's, which a second run would leave red; else its failed jobs are re-run once, as before",
       condition: ({ input: [told], output }) => (output === 'report') === told.some((t) => t === 'change'),
     },
   },

@@ -4,9 +4,14 @@
  * jobs that did not pass as a refusal lists them — for that script's wait and `landing.ts`'s, and what `landing.ts`'s receipt says of
  * its wait at the merge: pure,
  * reading no process and calling nothing. It sits beside the scripts rather than in them so each stays within its size, and it travels
- * with them: a run freezes the carried folder whole (`$WF_CARRIED_FILES`), so a script reads it there, as it is read here. It
- * imports nothing.
+ * with them: a run freezes the carried folder whole (`$WF_CARRIED_FILES`), so a script reads it there, as it is read here. It also
+ * decides whose a red job is and whether a red context is worth a second run before the step hears of it (`toldOf`, `rerunDue`, which
+ * `contracts/second-run.contract.ts`, beside the template, proves). It imports only that contract's types, by a whole `import type`,
+ * which the run's type stripping erases, so the frozen copy, where no `contracts/` sits, loads nothing of it.
  */
+import type { Reading, RedJob, RerunDue, Second, Told, ToldOf } from '../../contracts/second-run.contract.ts';
+
+export type { Reading, RedJob, Second, Told };
 
 /** The most lines the refusal prints of one failing job's log: enough to read, never a log in a closeout. */
 const JOB_LINES = 40;
@@ -350,3 +355,13 @@ const WORKFLOW_FILE = /^\.github\/workflows\/[^/]+\.ya?ml$/;
  * @param paths The tree's files, each by its path from the repository's root.
  */
 export const declaresCi = (paths: readonly string[]) => paths.some((p) => WORKFLOW_FILE.test(p));
+
+/** Whose the red job `job` is: the change's, the machine's, or untold where its failure's log could not be read. */
+export const toldOf: ToldOf = (job) => {
+  if (job.verdict !== 'FAILURE') return 'machine';
+  if (job.reading === 'failing') return 'change';
+  return job.reading === 'unread' ? 'untold' : 'machine';
+};
+
+/** Whether a red context whose red jobs are `told` is re-run once, or reported now. */
+export const rerunDue: RerunDue = (told) => (told.includes('change') ? 'report' : 'rerun');

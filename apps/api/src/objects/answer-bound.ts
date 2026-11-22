@@ -154,8 +154,8 @@ const asSent = (schemas: readonly Schema.Top[], answer: unknown) => {
  * `handler`, the handler of the GET endpoint `endpoint`, its success measured against the app's bound (`Served.answerMost`) before HttpApi
  * encodes it: past it, a defect of `AnswerPastBound`, answered 422. A list's page (`READS`' `page`) is measured as its endpoint's success
  * Schema writes it, which leaves its items' files' content out, so a page is not refused for what it never sends. A read of bytes or a
- * stream (`READS`' `bytes`, `stream`), and a response the handler built itself, are answered as they are. Every GET handler of the `Api` is given through it by its group
- * (`readsBounded`), which `test/bounded.test.ts` holds.
+ * stream (`READS`' `bytes`, `stream`), and a response the handler built itself, are answered as they are. Every GET handler of the
+ * `Api` is given through it by its group (`readsBounded`), which `test/bounded.test.ts` holds.
  * @param endpoint The GET endpoint, by its group and name.
  * @param handler The endpoint's handler.
  */

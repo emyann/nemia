@@ -3,17 +3,14 @@ import { LibraryPage } from '@/components/library/LibraryPage';
 import { LibraryReading } from '@/components/library/LibraryReading';
 import { libraryQuery } from '../lib/api/storeLibrary.ts';
 import { filterOf } from '../lib/listFilter';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 export const Route = createFileRoute('/library')({
   validateSearch: filterOf,
   loader: ({ context }) => context.queryClient.ensureQueryData(libraryQuery()),
   component: Page,
   pendingComponent: LibraryReading,
-  errorComponent: ({ error }) => (
-    <p className="text-body-medium text-failure">
-      Could not read the library: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the library" error={error} />,
 });
 
 /** The Library, read off its address; its filter is written to it as a person types (`?q=`). */

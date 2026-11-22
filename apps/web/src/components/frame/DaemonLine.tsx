@@ -2,6 +2,7 @@ import { TriangleAlert } from 'lucide-react';
 import type { Daemon } from '@/lib/api/daemon';
 import { daemonWords } from '@/lib/daemon';
 import { useNow } from '@/lib/useNow';
+import { troubleOf } from '@/lib/api/read';
 
 /**
  * Over the Factory's floor when nothing ticks the store: why — no daemon, the api or the CLI's daemon stopped, gone, or silent past its
@@ -13,8 +14,8 @@ export function DaemonLine({ daemon, error }: { daemon: Daemon | undefined; erro
   const now = new Date(useNow(30_000));
   if (error) {
     return (
-      <p data-daemon="error" className="max-w-3xl basis-full text-body-small text-failure" title={error.message}>
-        Whether a daemon ticks this store could not be read: {error.message}
+      <p data-daemon="error" className="max-w-3xl basis-full text-body-small text-failure" title={troubleOf(error).words}>
+        Whether a daemon ticks this store could not be read: {troubleOf(error).words}
       </p>
     );
   }

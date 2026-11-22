@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pending } from '@/components/look';
 import { Button, ComboBox, ComboBoxItem } from '@/components/ui/ds';
 import { folderNamesQuery } from '@/lib/api/folders';
+import { troubleOf } from '@/lib/api/read';
 
 /** How long the field waits after a key before it asks the api what is under the path. */
 const SETTLE_MS = 200;
@@ -61,7 +62,7 @@ export function FolderPick({
         placeholder="/home/you/code/my-app"
         supportingText={
           listed.error !== null && listed.error !== undefined
-            ? `No help here: ${listed.error.message}`
+            ? `No help here: ${troubleOf(listed.error).words}`
             : read?.more
               ? 'More folders than shown: type more of the name.'
               : 'Its whole path, from /.'

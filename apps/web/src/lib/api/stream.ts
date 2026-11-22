@@ -4,7 +4,7 @@
  * shares.
  */
 import { Option, Schema } from 'effect';
-import { decoded, UnreadAnswer } from './read.ts';
+import { BUILT_APART, decoded, UnreadAnswer } from './read.ts';
 
 /** What a stream's `unreadable` event says: why the api could not read it, and whether it reads it again on its own beat. */
 export type StreamUnreadable = { error: string; retrying: boolean };
@@ -24,10 +24,7 @@ export function streamDataOf<D, K extends keyof D & string>(
 ) {
   const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(data);
   if (Option.isNone(json)) {
-    return new UnreadAnswer(
-      event,
-      `${event} sent what this board does not read: its data is no JSON. The board and the api were built apart: restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.`,
-    );
+    return new UnreadAnswer(event, `${event} sent what this board does not read: its data is no JSON. ${BUILT_APART}`);
   }
   const parsed = json.value;
   try {

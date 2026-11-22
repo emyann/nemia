@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { MachineCanvas } from './MachineCanvas';
 import { Reading, ReadingLines } from '@/components/look';
 import { Button, Disclosure, DisclosurePanel, DisclosureTrigger, Pressable, SideSheet, Skeleton, Slider, Title } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 type Step = StepView;
 
@@ -90,7 +91,7 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
         {step.tries.length > 1 && <span data-path-try={shown}>try {shown}</span>}
       </div>
       {read.error ? (
-        <p className="text-body-medium text-failure">Could not read the path: {read.error.message}</p>
+        <ReadTrouble what="the path" error={read.error} />
       ) : !read.data ? (
         <Reading label="Reading the path…" className="flex flex-col gap-3">
           <Skeleton shape="rectangle" className="h-24 rounded-none" />

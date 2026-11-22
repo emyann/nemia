@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { DefinitionTrail } from '../components/agent/AgentParts';
 import { AgentPage, loadAgent } from '../components/agent/AgentPage';
 import { definitionSearch } from '../lib/factoryAddress';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of an agent read in a factory, at /factories/$factory/agents/$agent: the factory's own, or a repository's where the search says
@@ -30,7 +31,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <DefinitionTrail kind="agent" name={agent} place={{ factory, ...(repo && { repo }) }} />
-      <p className="text-body-medium text-failure">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this agent" error={error} />
     </div>
   );
 }

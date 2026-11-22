@@ -1,0 +1,1 @@
+apps/web/src/routes/labels.$key.$value.tsx#text-body-medium

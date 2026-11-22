@@ -1,0 +1,1 @@
+apps/web/src/components/look/RunFigures.stories.tsx#text-body-small

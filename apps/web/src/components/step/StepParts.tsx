@@ -21,7 +21,7 @@ import { Markdown } from '../markdown/Markdown';
 import { Told, type LayerHomes } from './Told';
 import { focusRing } from '../ui/ds/utils';
 
-const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-foreground', focusRing());
+const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-on-surface', focusRing());
 
 /**
  * The step's agent: the one the factory picked hires into it, marked as hired (`data-hired`); else the one its file names, or that it names
@@ -31,8 +31,8 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
   const { from, workflow, step, factory, hired, hiredIn } = page;
   if (factory && hired) {
     return (
-      <p data-step-agent className="text-body-small leading-6 text-muted-foreground">
-        Its agent: <AgentLink from={from} name={hired} place={place} className="text-foreground" />{' '}
+      <p data-step-agent className="text-body-small leading-6 text-on-surface-variant">
+        Its agent: <AgentLink from={from} name={hired} place={place} className="text-on-surface" />{' '}
         <Tag variant="outlined" data-hired={factory}>
           hired by {factory}
         </Tag>
@@ -43,10 +43,10 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
   const named = page.keys.find((row) => row.key === 'agent')?.value ?? null;
   return (
     <div className="space-y-1">
-      <p data-step-agent className="text-body-small text-muted-foreground">
+      <p data-step-agent className="text-body-small text-on-surface-variant">
         {named ? (
           <>
-            Its agent: <AgentLink from={from} name={named} place={place} className="text-foreground" />, named by its file, whose
+            Its agent: <AgentLink from={from} name={named} place={place} className="text-on-surface" />, named by its file, whose
             instructions it is told first.
           </>
         ) : (
@@ -54,17 +54,17 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
         )}
       </p>
       {!factory && hiredIn.length > 0 && (
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-small text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-small text-on-surface-variant">
           Hired into this step by:
           {hiredIn.map((hire) => (
             <RouteLink
               key={hire.factory}
               {...workflowLink({ factory: hire.factory }, from, workflow, step)}
               data-hired-in={hire.factory}
-              className={cn('text-foreground', LINK)}
+              className={cn('text-on-surface', LINK)}
             >
               {hire.factory}
-              <span className="text-muted-foreground"> ({hire.agent})</span>
+              <span className="text-on-surface-variant"> ({hire.agent})</span>
             </RouteLink>
           ))}
         </p>
@@ -131,7 +131,7 @@ function homesOf(page: WorkflowStepPage, place: PagePlace) {
       if (!found?.foundIn) return name;
       return (
         <span data-skill-found-in={found.foundIn} title={found.foundIn}>
-          {name} <span className="text-muted-foreground">· {SOURCE_BADGES.repo}</span>
+          {name} <span className="text-on-surface-variant">· {SOURCE_BADGES.repo}</span>
         </span>
       );
     },
@@ -185,9 +185,9 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
   const now = new Date(useNow(60_000));
   return (
     <section aria-label="Recent runs" data-recent-runs className="space-y-2">
-      <h2 className="text-label-medium text-muted-foreground uppercase">Recent runs</h2>
+      <h2 className="text-label-medium text-on-surface-variant uppercase">Recent runs</h2>
       {page.recentRuns.length === 0 ? (
-        <p className="text-body-medium text-muted-foreground">No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.</p>
+        <p className="text-body-medium text-on-surface-variant">No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.</p>
       ) : (
         <ul className="space-y-1.5">
           {page.recentRuns.map((run) => (
@@ -195,9 +195,9 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
               <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(page.step)} className={cn('min-w-0 truncate', LINK)}>
                 {titleOf(run)}
               </RouteLink>
-              <span className="text-body-small text-muted-foreground">{clockWord(new Date(run.createdAt), now)}</span>
+              <span className="text-body-small text-on-surface-variant">{clockWord(new Date(run.createdAt), now)}</span>
               {run.factory && <FactoryTag name={run.factory} />}
-              <span className="text-body-small text-muted-foreground">{run.filed ? 'What it was told' : 'not reached yet'}</span>
+              <span className="text-body-small text-on-surface-variant">{run.filed ? 'What it was told' : 'not reached yet'}</span>
             </li>
           ))}
         </ul>
@@ -216,7 +216,7 @@ export function StepPageLink({ page, step }: { page: WorkflowPageAddress | null;
     <RouteLink
       {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
       data-step-page-link={step}
-      className="text-body-small text-muted-foreground hover:text-foreground"
+      className="text-body-small text-on-surface-variant hover:text-on-surface"
     >
       What it will be told now →
     </RouteLink>

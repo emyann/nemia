@@ -85,7 +85,7 @@ function Lines({ lines, atEnd }: { lines: Printed['lines']; atEnd: boolean }) {
       aria-label="Its lines"
       // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
       tabIndex={0}
-      className={cn('max-h-96 overflow-auto rounded bg-muted p-2 font-mono text-body-small leading-snug', focusRing())}
+      className={cn('max-h-96 overflow-auto rounded bg-surface-container-highest p-2 font-mono text-body-small leading-snug', focusRing())}
     >
       {lines.map((line) => (
         <span key={line.n} data-line={line.n} className="flex gap-3">

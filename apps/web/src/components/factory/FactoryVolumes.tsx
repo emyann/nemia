@@ -91,7 +91,7 @@ function VolumeRow({
           Remove
         </Button>
       </div>
-      <p data-volume-role={v.readOnly ? 'read' : 'worked-on'} className="text-body-medium text-muted-foreground">
+      <p data-volume-role={v.readOnly ? 'read' : 'worked-on'} className="text-body-medium text-on-surface-variant">
         {v.readOnly ? 'Read by every local step of a run here.' : 'Worked on: a repository this factory runs its work in.'}
         {v.origin !== null && <span className="[overflow-wrap:anywhere]"> Cloned from {v.origin}.</span>}
       </p>
@@ -200,7 +200,7 @@ export function FactoryVolumes({ factory }: { factory: Pick<Factory, 'name' | 'v
         ))
       )}
       {factory.volumes.length > 0 && (
-        <p data-volume-switches-reach className="text-body-medium text-muted-foreground">
+        <p data-volume-switches-reach className="text-body-medium text-on-surface-variant">
           A change reaches the runs started after it; a run under way keeps what it began with.
         </p>
       )}

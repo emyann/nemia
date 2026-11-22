@@ -70,7 +70,7 @@ function Run({ run }: { run: RunDetail }) {
       <FirstHint run={run} beat="card" />
 
       {run.warning && (
-        <p data-run-warning className="rounded border border-outline px-3 py-2 text-body-medium text-muted-foreground">
+        <p data-run-warning className="rounded border border-outline px-3 py-2 text-body-medium text-on-surface-variant">
           {run.warning}
         </p>
       )}

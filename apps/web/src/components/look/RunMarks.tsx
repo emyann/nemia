@@ -10,6 +10,7 @@ import { nowOf, type Now, type NowPart } from '@/lib/runWords';
 import { nowMark } from '@/lib/stepMark';
 import { NOW_WORDS } from '@/lib/words';
 import { CutTag } from './CutTag';
+import { MeaningTag } from './MeaningTag';
 import { MarkDiamond } from './StepGraph';
 import { TextLink } from './TextLink';
 
@@ -69,15 +70,26 @@ export function Chip({ now, small = false }: { now: Pick<Now, 'step' | 'tone'>; 
   const tag = CHIP_TAG[now.tone];
   return (
     <CutTag edge={tag.variant === 'outlined'}>
-      <Tag
-        data-now-word
-        data-tone={now.tone}
-        variant={tag.variant}
-        color={tag.color}
-        className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
-      >
-        {now.step}
-      </Tag>
+      {tag.color === 'alive' ? (
+        <MeaningTag
+          data-now-word
+          data-tone={now.tone}
+          hue="alive"
+          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
+        >
+          {now.step}
+        </MeaningTag>
+      ) : (
+        <Tag
+          data-now-word
+          data-tone={now.tone}
+          variant={tag.variant}
+          color={tag.color}
+          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
+        >
+          {now.step}
+        </Tag>
+      )}
     </CutTag>
   );
 }

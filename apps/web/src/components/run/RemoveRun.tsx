@@ -29,7 +29,7 @@ export function RemoveRun({ id, onClose, leave = false }: { id: string; onClose:
     },
   });
   return (
-    <span data-remove-run className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+    <span data-remove-run className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
       Remove this try, its record and its folders?
       <Button
         icon={remove.isPending ? Pending : undefined}

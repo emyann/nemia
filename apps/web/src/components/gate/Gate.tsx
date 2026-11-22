@@ -111,7 +111,7 @@ export function Gate({
     <section
       aria-label={`The gate of ${step}`}
       data-gate="awaiting"
-      className={cn('space-y-4 text-body-medium', framed && 'rounded border border-yours bg-card p-3')}
+      className={cn('space-y-4 text-body-medium', framed && 'rounded border border-yours bg-surface-container-low p-3')}
     >
       {framed && <GateSentence step={step} back={back} acts={acts} />}
 
@@ -349,7 +349,7 @@ const GATE_MODES: readonly RetryMode[] = ['continue', 'fresh'];
 const modeLabel = (m: RetryMode) =>
   (
     <>
-      {MODES[m]} <code className="text-muted-foreground">--{m}</code>
+      {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
     </>
   ) satisfies ReactNode as ReactNode;
 
@@ -470,7 +470,7 @@ function GateTaken({ step, taken }: { step: string; taken: { named: string; said
       className="rounded border border-outline-variant px-3 py-2 text-body-medium"
     >
       <strong>{taken.named}</strong>{' '}
-      <span data-note className="font-mono text-body-small text-muted-foreground">
+      <span data-note className="font-mono text-body-small text-on-surface-variant">
         {taken.said}
       </span>
     </section>
@@ -536,12 +536,12 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
       className="min-w-0 space-y-3 rounded border border-outline-variant p-3 text-body-medium"
     >
       <div className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">The result it would act on</h3>
+        <h3 className="text-label-medium text-on-surface-variant">The result it would act on</h3>
         {standings.map((s) => (
           <p key={s.branch} data-standing={s.where} className="break-words">
             <span className="font-mono text-body-small">{s.said}</span>
             {s.stat && (
-              <span data-stat className="block font-mono text-body-small text-muted-foreground">
+              <span data-stat className="block font-mono text-body-small text-on-surface-variant">
                 {s.stat}
               </span>
             )}
@@ -549,7 +549,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
         ))}
         {!standings.length &&
           (error || isDecidable(data) ? (
-            <p className="text-body-small text-muted-foreground">
+            <p className="text-body-small text-on-surface-variant">
               {error
                 ? `The branch could not be read: ${troubleOf(error).words}`
                 : 'No result branch of its own: the work is on the base branch.'}
@@ -568,7 +568,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
               <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(one.name)} className={LINK}>
                 What {one.name} gave
               </RouteLink>
-              {one.closeout && <span className="text-body-small text-muted-foreground"> — {one.closeout.summary}</span>}
+              {one.closeout && <span className="text-body-small text-on-surface-variant"> — {one.closeout.summary}</span>}
             </li>
           ))}
         </ul>
@@ -623,8 +623,8 @@ export function Approved({
       className="space-y-1 rounded border border-sage bg-surface-variant px-3 py-2 text-body-medium text-on-surface-variant"
     >
       <p>
-        <span className="font-medium text-foreground">Approved</span>{' '}
-        <span className="text-muted-foreground">
+        <span className="font-medium text-on-surface">Approved</span>{' '}
+        <span className="text-on-surface-variant">
           try {approval.try}, {when(approval.at)} —{' '}
           {ends
             ? `your approval filed it, and the step is handed ${approval.message === null ? 'it' : 'these words'} as the terms it acts on`
@@ -633,7 +633,7 @@ export function Approved({
       </p>
       <Actor actor={approval.actor} />
       {approval.message === null ? (
-        <p data-words="none" className="text-muted-foreground">
+        <p data-words="none" className="text-on-surface-variant">
           with no words
         </p>
       ) : (

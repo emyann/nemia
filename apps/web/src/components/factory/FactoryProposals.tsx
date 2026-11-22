@@ -21,14 +21,14 @@ export function FactoryProposals({ factory }: { factory: string }) {
   if (!data) return null;
   if (data.length === 0)
     return (
-      <p data-no-proposals={factory} className="text-body-medium text-muted-foreground">
+      <p data-no-proposals={factory} className="text-body-medium text-on-surface-variant">
         {factory} has no proposals: an agent's proposal to change its definitions is listed here.
       </p>
     );
   const waiting = data.filter((p) => p.phase === 'waiting').length;
   return (
     <section aria-label="Proposals" data-factory-proposals={factory} className="flex flex-col gap-2">
-      {waiting > 0 ? <p className="text-body-medium text-muted-foreground">{waiting} wait on you</p> : null}
+      {waiting > 0 ? <p className="text-body-medium text-on-surface-variant">{waiting} wait on you</p> : null}
       <ul className="flex flex-col gap-1">
         {proposalsInOrder(data).map((proposal) => {
           const { name } = proposal;
@@ -47,7 +47,7 @@ export function FactoryProposals({ factory }: { factory: string }) {
                 {name}
               </RouteLink>
               <ProposalTags phase={proposal.phase} widens={proposal.widens} size="small" />
-              {proposal.why && <span className="truncate text-body-small text-muted-foreground">{proposal.why}</span>}
+              {proposal.why && <span className="truncate text-body-small text-on-surface-variant">{proposal.why}</span>}
             </li>
           );
         })}

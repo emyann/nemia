@@ -7,7 +7,7 @@ const meta: Meta = { title: 'Run/ConversationBand' };
 export default meta;
 
 /** Where a band stands in its story: a panel's width, on the card's ground. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
+const PANEL = { width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)' };
 
 /** A quiet note at rest, over an accent at its left. */
 export const QuietNote: StoryObj = {

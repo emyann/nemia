@@ -6,18 +6,23 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 /*
- * The look's faces, each under the family its package registers, bundled by the build and served from the board's own origin: the brand
- * face (Michroma), the plain face (Chakra Petch), the mono face (Share Tech Mono, one weight) and the label face (Archivo Variable, its
- * width axis from 62% to 125%), and the symbols none of them has (`look/symbols.css`).
+ * The look's faces, each under the family its package registers, bundled by the build and served from the board's own origin: the
+ * lettering (Michroma), the read face (Barlow, 400 to 600), the short face of a label (Chakra Petch), the mono face (JetBrains Mono, 400
+ * and 500) and the label's numerals (Archivo Variable, its width axis from 62% to 125%), and the symbols none of them has
+ * (`look/symbols.css`).
  */
 @import '@fontsource/michroma/400.css';
+@import '@fontsource/barlow/400.css';
+@import '@fontsource/barlow/500.css';
+@import '@fontsource/barlow/600.css';
 @import '@fontsource/chakra-petch/400.css';
 @import '@fontsource/chakra-petch/500.css';
 @import '@fontsource/chakra-petch/600.css';
 @import '@fontsource/chakra-petch/700.css';
-@import '@fontsource/share-tech-mono/400.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
 @import '@fontsource-variable/archivo/wdth.css';
-/* The symbols none of the four faces has, from one face served with them, under each of their families. */
+/* The symbols none of the five faces has, from one face served with them, under each of their families. */
 @import './components/look/symbols.css';
 /* Blobatar's motion, then its gaze, which reads the properties motion registers: what a following agent face moves with. */
 @import 'blobatar/motion.css';
@@ -39,11 +44,11 @@
 
 @layer base {
   html {
-    @apply scroll-pt-12;
+    scroll-padding-top: var(--frame-top);
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-on-surface antialiased;
   }
 
   /*
@@ -95,7 +100,7 @@
     color: var(--md-sys-color-on-surface-variant);
   }
   * {
-    @apply border-border outline-ring/50;
+    @apply border-outline-variant outline-on-surface/50;
   }
   html {
     @apply font-sans;
@@ -198,30 +203,6 @@
   --color-on-rest: var(--meaning-on-rest);
   --color-sage: var(--meaning-sage);
   --color-on-sage: var(--meaning-on-sage);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -232,10 +213,13 @@
 }
 
 /*
- * The look's five meanings, each read from a role of the theme once: a colour says one thing on every page. Yours is what waits on a
- * person, alive a session at work, money an amount, failure what failed and nothing else; rest is the label's grey, and sage, filled, a
- * step that is done. The three faces the theme names by a hook are given their loaded families here. The page says it is drawn in both
- * schemes, so that what the browser draws itself (a list of choices, a scroll bar it styles alone) follows the system as the theme does.
+ * The look's four meanings, a colour of the board's own beside the theme (DESIGN.md, *The four meanings*, the table that
+ * `test/meanings.test.ts` holds them to): a colour says one thing on every page. Yours is what waits on a person, alive a session at
+ * work, failure what failed and nothing else, Material's error; rest is the label's grey, and sage, filled, a step that is done. Each is
+ * written in light here and in dark below. Money, an amount, is no meaning any more: it keeps its amber here until the board-look's
+ * second card takes it off its last part (`test/baseline/money/`). The four faces the theme names by a hook are given their loaded
+ * families here. The page says it is drawn in both schemes, so that what the browser draws itself (a list of choices, a scroll bar it
+ * styles alone) follows the system as the theme does.
  * The theme's own scroll bar colour gives way to the look's bar, drawn in the base layer: in Chromium a `scrollbar-color` set on the
  * root would hide every `::-webkit-scrollbar` rule, and elsewhere it would show the window's thumb at rest.
  */
@@ -243,54 +227,49 @@
   color-scheme: light dark;
   scrollbar-color: revert-layer;
   --font-michroma: 'Michroma', ui-sans-serif, system-ui, sans-serif;
+  --font-barlow: 'Barlow', ui-sans-serif, system-ui, sans-serif;
   --font-chakra-petch: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
-  --font-share-tech-mono: 'Share Tech Mono', ui-monospace, monospace;
-  --meaning-yours: var(--md-sys-color-primary);
-  --meaning-on-yours: var(--md-sys-color-on-primary);
-  --meaning-yours-container: var(--md-sys-color-primary-container);
-  --meaning-on-yours-container: var(--md-sys-color-on-primary-container);
-  --meaning-alive: var(--md-sys-color-secondary);
-  --meaning-on-alive: var(--md-sys-color-on-secondary);
-  --meaning-alive-container: var(--md-sys-color-secondary-container);
-  --meaning-on-alive-container: var(--md-sys-color-on-secondary-container);
-  --meaning-money: var(--md-sys-color-tertiary);
-  --meaning-on-money: var(--md-sys-color-on-tertiary);
-  --meaning-money-container: var(--md-sys-color-tertiary-container);
-  --meaning-on-money-container: var(--md-sys-color-on-tertiary-container);
+  --font-jetbrains-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --meaning-yours: #676000;
+  --meaning-on-yours: #ffffff;
+  --meaning-yours-container: #f5e61b;
+  --meaning-on-yours-container: #4d4800;
+  --meaning-alive: #7732d9;
+  --meaning-on-alive: #ffffff;
+  --meaning-alive-container: #ecdcff;
+  --meaning-on-alive-container: #5e00c1;
+  --meaning-money: #855317;
+  --meaning-on-money: #ffffff;
+  --meaning-money-container: #ffdcbd;
+  --meaning-on-money-container: #683c00;
   --meaning-failure: var(--md-sys-color-error);
   --meaning-on-failure: var(--md-sys-color-on-error);
   --meaning-failure-container: var(--md-sys-color-error-container);
   --meaning-on-failure-container: var(--md-sys-color-on-error-container);
-  --meaning-rest: var(--md-sys-color-inverse-surface);
-  --meaning-on-rest: var(--md-sys-color-inverse-on-surface);
+  --meaning-rest: #2f3031;
+  --meaning-on-rest: #f2f0f1;
   --meaning-sage: var(--md-sys-color-outline);
   --meaning-on-sage: var(--md-sys-color-surface-container-lowest);
-  --background: var(--md-sys-color-background);
-  --foreground: var(--md-sys-color-on-background);
-  --card: var(--md-sys-color-surface-container-low);
-  --card-foreground: var(--md-sys-color-on-surface);
-  --popover: var(--md-sys-color-surface-container);
-  --popover-foreground: var(--md-sys-color-on-surface);
-  --primary: var(--md-sys-color-primary);
-  --primary-foreground: var(--md-sys-color-on-primary);
-  --muted: var(--md-sys-color-surface-container-highest);
-  --muted-foreground: var(--md-sys-color-on-surface-variant);
-  --accent: var(--md-sys-color-surface-container-high);
-  --accent-foreground: var(--md-sys-color-on-surface);
-  --destructive: var(--md-sys-color-error);
-  --border: var(--md-sys-color-outline-variant);
-  --input: var(--md-sys-color-outline);
-  --ring: var(--md-sys-color-secondary);
   --radius: 0.625rem;
-  --sidebar: var(--md-sys-color-surface-container-low);
-  --sidebar-foreground: var(--md-sys-color-on-surface);
-  --sidebar-primary: var(--md-sys-color-primary);
-  --sidebar-primary-foreground: var(--md-sys-color-on-primary);
-  --sidebar-accent: var(--md-sys-color-surface-container-high);
-  --sidebar-accent-foreground: var(--md-sys-color-on-surface);
-  --sidebar-border: var(--md-sys-color-outline-variant);
-  --sidebar-ring: var(--md-sys-color-secondary);
-  --destructive-foreground: var(--md-sys-color-on-error);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --meaning-yours: #f5e61a;
+    --meaning-on-yours: #141300;
+    --meaning-yours-container: #4d4800;
+    --meaning-on-yours-container: #f5e61b;
+    --meaning-alive: #c4a8ff;
+    --meaning-on-alive: #0c1416;
+    --meaning-alive-container: #45218a;
+    --meaning-on-alive-container: #e9ddff;
+    --meaning-money: #e0a15e;
+    --meaning-on-money: #1c1105;
+    --meaning-money-container: #683c00;
+    --meaning-on-money-container: #ffdcbd;
+    --meaning-rest: #a9aaa8;
+    --meaning-on-rest: #0d0d0d;
+  }
 }
 
 /*
@@ -309,7 +288,8 @@
  * `--frame-top`; under it the frame's lines (a newer release, the setup banner, a refused link), as tall as `--frame-lines`, which the
  * frame measures and sets on the column the page stands in (`__root.tsx`); and at the window's foot the machine bar (`MachineBar.tsx`), as
  * tall as `--frame-foot`. A page that fills the window is `100svh` less the three. What stands in the page's column and is brought into
- * view, by a focus or by `scrollIntoView`, stops above the machine bar, which stays over the window's foot (`scroll-margin-bottom`); a
+ * view, by a focus or by `scrollIntoView`, stops under the page's head, which stays over the window's top (the window's
+ * `scroll-padding-top`, the head's own height), and above the machine bar, which stays over the window's foot (`scroll-margin-bottom`); a
  * popover, portaled over the frame and the bar alike, keeps the window's whole height.
  */
 :root {

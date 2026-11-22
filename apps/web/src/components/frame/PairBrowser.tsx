@@ -26,7 +26,7 @@ const statusOf = (error: unknown) => {
 function PairCode({ code, approved, notKept, unasked }: { code: string; approved: boolean; notKept?: string; unasked?: string }) {
   return (
     <div data-pair-browser={approved ? 'claimed' : 'waiting'} className="flex flex-col gap-2">
-      <p className="text-body-medium text-muted-foreground">
+      <p className="text-body-medium text-on-surface-variant">
         Approve this browser with its code, at the server's shell or from a board already signed in:
       </p>
       <p
@@ -35,7 +35,7 @@ function PairCode({ code, approved, notKept, unasked }: { code: string; approved
       >
         {code}
       </p>
-      <p data-pair-said className="text-body-small text-muted-foreground" aria-live="polite">
+      <p data-pair-said className="text-body-small text-on-surface-variant" aria-live="polite">
         {approved ? 'Approved: signing this browser in…' : 'Waiting for the approval…'}
       </p>
       {notKept !== undefined && (

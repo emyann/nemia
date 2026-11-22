@@ -1,0 +1,3 @@
+apps/web/src/components/look/RunMarks.tsx#text-body-medium
+apps/web/src/components/look/RunMarks.tsx#text-body-small
+apps/web/src/components/look/RunMarks.tsx#text-label-small

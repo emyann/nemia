@@ -81,10 +81,10 @@ export function GateBudgetRows({
       data-gate-budgets={budgets.from}
       className="space-y-2 rounded border border-outline-variant p-3"
     >
-      <h3 className="text-label-medium text-muted-foreground">
+      <h3 className="text-label-medium text-on-surface-variant">
         {proposed ? (
           <>
-            The budgets <span className="text-foreground">{step}</span> proposes for the steps after it: change one to set it with your
+            The budgets <span className="text-on-surface">{step}</span> proposes for the steps after it: change one to set it with your
             approval
           </>
         ) : (
@@ -140,7 +140,7 @@ function BudgetRow({
             {row.said}
           </span>
         )}{' '}
-        <span data-own className="text-body-small text-muted-foreground">
+        <span data-own className="text-body-small text-on-surface-variant">
           {row.workflow === null ? 'no budget of its own' : `its own budget ${budgetWord(row.workflow)}`}
         </span>{' '}
         {above && row.workflow !== null && (
@@ -150,7 +150,7 @@ function BudgetRow({
         )}
       </div>
       {row.why !== null && (
-        <p data-why className="break-words text-body-small text-muted-foreground">
+        <p data-why className="break-words text-body-small text-on-surface-variant">
           {row.why}
         </p>
       )}

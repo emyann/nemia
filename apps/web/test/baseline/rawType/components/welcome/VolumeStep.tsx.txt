@@ -1,0 +1,3 @@
+apps/web/src/components/welcome/VolumeStep.tsx#text-body-large
+apps/web/src/components/welcome/VolumeStep.tsx#text-body-medium
+apps/web/src/components/welcome/VolumeStep.tsx#text-body-small

@@ -1,0 +1,4 @@
+apps/web/src/components/step/session/SessionOwn.tsx#text-body-medium
+apps/web/src/components/step/session/SessionOwn.tsx#text-body-small
+apps/web/src/components/step/session/SessionOwn.tsx#text-label-small
+apps/web/src/components/step/session/SessionOwn.tsx#text-title-small

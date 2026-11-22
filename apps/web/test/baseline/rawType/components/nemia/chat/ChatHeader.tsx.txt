@@ -1,0 +1,2 @@
+apps/web/src/components/nemia/chat/ChatHeader.tsx#text-body-small
+apps/web/src/components/nemia/chat/ChatHeader.tsx#text-title-small

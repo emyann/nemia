@@ -1,0 +1,4 @@
+apps/web/src/components/factory/FactoryTriggers.tsx#text-body-medium
+apps/web/src/components/factory/FactoryTriggers.tsx#text-label-large
+apps/web/src/components/factory/FactoryTriggers.tsx#text-title-medium
+apps/web/src/components/factory/FactoryTriggers.tsx#text-title-small

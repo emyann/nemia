@@ -62,7 +62,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
       data-kind={offer.kind}
       data-step={offer.step}
       data-by={offer.by}
-      className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
     >
       <RaiseHead offer={offer} asks={asks} />
       <form
@@ -125,7 +125,7 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { case: 'raise' }>;
             {OFFERS.answer.said}
           </p>
         ))}
-      <p className="text-body-small break-words text-muted-foreground">
+      <p className="text-body-small break-words text-on-surface-variant">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
         {offer.by === 'round' ? ", with its loop's next round" : ''}: the button below raises it.
         {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}
@@ -183,7 +183,7 @@ function RaiseModes({
     >
       {modes.map((m) => (
         <Radio key={m} value={m}>
-          {MODES[m]} <code className="text-muted-foreground">--{m}</code>
+          {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
         </Radio>
       ))}
     </RadioGroup>
@@ -195,7 +195,7 @@ function RaiseAsked({ step, said }: { step: string; said: string }) {
   return (
     <li data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-body-small text-muted-foreground">
+      <span data-note className="font-mono text-body-small text-on-surface-variant">
         {said}
       </span>
     </li>

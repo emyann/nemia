@@ -1,0 +1,3 @@
+apps/web/src/components/frame/PairBrowser.tsx#text-body-large
+apps/web/src/components/frame/PairBrowser.tsx#text-body-medium
+apps/web/src/components/frame/PairBrowser.tsx#text-body-small

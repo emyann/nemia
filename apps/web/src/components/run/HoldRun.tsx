@@ -157,7 +157,7 @@ function WaitFor({
                 <span className="block truncate text-body-small" title={titleOf(r)}>
                   {titleOf(r)}
                 </span>
-                <span className="block font-mono text-body-small text-muted-foreground">{r.id}</span>
+                <span className="block font-mono text-body-small text-on-surface-variant">{r.id}</span>
               </span>
             </Checkbox>
           ))}

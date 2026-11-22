@@ -1,0 +1,2 @@
+apps/web/src/components/look/Pager.tsx#text-body-small
+apps/web/src/components/look/Pager.tsx#text-label-large

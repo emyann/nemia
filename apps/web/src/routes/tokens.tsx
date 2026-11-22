@@ -28,7 +28,7 @@ function TokensPage() {
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-title-large">Tokens</h1>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           The tokens that reach this store: yours, for a browser or a program of yours, and those an agent holds. Mint one on the store's
           machine with <code className="font-mono text-on-surface">{MINT}</code> (<code className="font-mono">--agent</code> for an
           agent's); retire one here.
@@ -39,7 +39,7 @@ function TokensPage() {
       ) : !read.data ? (
         <TokensReading />
       ) : read.data.tokens.length === 0 ? (
-        <p data-tokens-none className="text-body-medium text-muted-foreground">
+        <p data-tokens-none className="text-body-medium text-on-surface-variant">
           No token is kept.
         </p>
       ) : (

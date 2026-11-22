@@ -21,13 +21,13 @@ import { CheckOutput, type CheckRead } from './CheckOutput';
 import { Fold } from './part/Fold';
 
 /** A section's quiet heading: small, medium weight, in the muted ink. */
-export const HEADING = 'text-body-small font-medium text-muted-foreground';
+export const HEADING = 'text-body-small font-medium text-on-surface-variant';
 
 /** A link's look in a fact's words. */
-export const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-foreground', focusRing());
+export const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-on-surface', focusRing());
 
 const STATE = {
-  good: 'text-foreground',
+  good: 'text-on-surface',
   bad: 'text-failure',
   none: '',
 } as const;
@@ -48,7 +48,7 @@ export function FactList({
     <dl aria-label={label} className={cn('grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-body-small', className)}>
       {facts.map((fact, i) => (
         <div key={`${fact.label}-${i}`} className="contents">
-          <dt className="text-muted-foreground">{fact.label}</dt>
+          <dt className="text-on-surface-variant">{fact.label}</dt>
           <dd data-fact={fact.label} data-state={fact.state} className={cn('min-w-0 break-words', STATE[fact.state ?? 'none'])}>
             <FactWords runId={runId} fact={fact} />
           </dd>
@@ -75,7 +75,7 @@ function FactWords({ runId, fact }: { runId: string; fact: GateFact }) {
 export function TrialMerges({ runId, collisions }: { runId: string; collisions: Collisions }) {
   return (
     <section aria-label="Trial merges" className="space-y-1">
-      <h3 className="text-label-medium text-muted-foreground">
+      <h3 className="text-label-medium text-on-surface-variant">
         Trial merges, as git says them now: onto {collisions.onto}, and onto each run in flight on it
       </h3>
       <FactList runId={runId} facts={collisionFacts(collisions)} label="What the trial merges say" />
@@ -89,7 +89,7 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-body-medium">
       {rows.map(([label, value]) => (
         <div key={label} data-fact={label} className="contents">
-          <dt className="text-muted-foreground">{label}</dt>
+          <dt className="text-on-surface-variant">{label}</dt>
           <dd className="min-w-0 break-words">{value ?? '—'}</dd>
         </div>
       ))}
@@ -303,7 +303,7 @@ function Marked({ value, mark, word = false, title }: { value: string; mark: str
   return (
     <span data-mark={mark} title={title}>
       <span className={word ? undefined : 'font-mono text-body-small'}>{value}</span>
-      <span className="text-muted-foreground"> · {mark}</span>
+      <span className="text-on-surface-variant"> · {mark}</span>
     </span>
   );
 }
@@ -453,7 +453,7 @@ export function Check({
   const title = named ? `Check ${name}` : 'Check';
   return (
     <section aria-label={title} className="space-y-2">
-      <h3 className="text-label-medium text-muted-foreground">{title}</h3>
+      <h3 className="text-label-medium text-on-surface-variant">{title}</h3>
       <Facts
         rows={[
           ...(named ? namedRows(verdict, started, ended) : []),
@@ -515,13 +515,13 @@ export function Checks({
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
 function Stream({ name, log }: { name: string; log: Frozen<StepLog> }) {
-  if (!log.lines.length) return <p className="text-body-small text-muted-foreground">No {name}.</p>;
+  if (!log.lines.length) return <p className="text-body-small text-on-surface-variant">No {name}.</p>;
   return (
     <div className="space-y-1">
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         {log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}
       </p>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-body-small leading-snug">
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-container-highest p-2 font-mono text-body-small leading-snug">
         {log.lines.join('\n')}
       </pre>
     </div>

@@ -64,7 +64,7 @@ test('REFUSED: a card that names a workflow and no factory says it has no Queue 
   const note = (extra: Record<string, unknown>) => renderToStaticMarkup(createElement(InboxParts.NoQueue, { entry: inboxCard(extra) }));
   for (const factory of [null, 'default']) {
     const said = note({ factory, workflow: 'dev' });
-    assert.ok(classesAt(said, 'data-no-queue="true"').includes('text-muted-foreground'), `a note, drawn at rest\n${said}`);
+    assert.ok(classesAt(said, 'data-no-queue="true"').includes('text-on-surface-variant'), `a note, drawn at rest\n${said}`);
     const words = textsOf(said).join(' ');
     assert.ok(words.startsWith('No Queue:') && words.includes('Start gives it one'), `${String(factory)}: ${words}`);
   }

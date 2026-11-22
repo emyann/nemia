@@ -9,7 +9,7 @@ const meta: Meta = { title: 'Run/Worked' };
 export default meta;
 
 /** Where a turn stands in its story: a panel's width, on the card's ground. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
+const PANEL = { width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)' };
 
 /** One line of a turn, over what every line has. */
 const line = (over: Partial<ConversationLine> & { id: string }) =>

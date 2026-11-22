@@ -136,7 +136,7 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
         Factory
       </legend>
       {!places.length ? (
-        <p className="text-body-small text-muted-foreground">
+        <p className="text-body-small text-on-surface-variant">
           No factory is filed to start a run in: a run in none starts from the Workflows page.
         </p>
       ) : (
@@ -217,7 +217,7 @@ function Unfixed({ factory, repos }: { factory: Factory; repos: number }) {
             ))}
           </Select>
         )}
-        <p className="text-body-small text-muted-foreground">
+        <p className="text-body-small text-on-surface-variant">
           The factory {code(factory.name)} works on {repos} repositories: its wiring says which one each workflow runs on.
         </p>
       </div>
@@ -265,7 +265,7 @@ function Workflows({ place, only }: { place: Place; only?: string }) {
             <ReadingLines widths={['w-40', 'w-48', 'w-36']} className="gap-1.5 text-body-medium" />
           </Reading>
         ) : !workflows.data.length ? (
-          <p className="text-body-small text-muted-foreground">
+          <p className="text-body-small text-on-surface-variant">
             No workflow the factory attaches is on {path(place.repo)}: attach one there{attach ? <> with {code(attach)}</> : null}.
           </p>
         ) : (

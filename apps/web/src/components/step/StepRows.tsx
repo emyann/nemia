@@ -6,7 +6,7 @@ import { Skills } from './Told';
 import type { ListedStep, PagePlace, WorkflowListing } from '../../lib/api/workflows.ts';
 
 const LINK =
-  'rounded-sm font-mono text-body-medium font-semibold underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
+  'rounded-sm font-mono text-body-medium font-semibold underline decoration-outline underline-offset-2 outline-none hover:decoration-on-surface focus-visible:ring-2 focus-visible:ring-ring/50';
 
 /**
  * A workflow's steps, a row each in the order a run runs them: its name, linked to its page; its own words — a step with an agent its
@@ -34,10 +34,10 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
         <RouteLink {...workflowLink(place, workflow.from, workflow.name, step.name)} className={LINK}>
           {step.name}
         </RouteLink>
-        <span className="text-body-small text-muted-foreground">
+        <span className="text-body-small text-on-surface-variant">
           {agent ? (
             <>
-              Its agent: <AgentLink from={workflow.from} name={agent} place={place} className="text-foreground" />
+              Its agent: <AgentLink from={workflow.from} name={agent} place={place} className="text-on-surface" />
             </>
           ) : (
             'No agent: its own words are all it is told'
@@ -49,7 +49,7 @@ function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow
           {words}
         </Markdown>
       ) : (
-        <p className="text-body-small text-muted-foreground italic">
+        <p className="text-body-small text-on-surface-variant italic">
           No words of its own{agent ? `: ${agent}'s instructions are all it is told` : ''}
         </p>
       )}

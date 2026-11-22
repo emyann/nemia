@@ -120,7 +120,7 @@ export function SkillForm({
               Discard changes
             </Button>
           )}
-          <p className="text-body-small text-muted-foreground">
+          <p className="text-body-small text-on-surface-variant">
             A save changes every agent that gives it, from what a run started later freezes. A run already started keeps what it froze.
           </p>
         </div>

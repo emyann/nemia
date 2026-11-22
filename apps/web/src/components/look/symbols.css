@@ -1,5 +1,5 @@
 /*
- * The symbols the board draws that none of its four faces has, drawn from two faces served with the board under each of the board's
+ * The symbols the board draws that none of its five faces has, drawn from two faces served with the board under each of the board's
  * families, so every reader's browser draws the same glyph rather than whatever system font it falls back to: ← → ↗ ≥ ✓ ⧉ (U+2190,
  * U+2192, U+2197, U+2265, U+2713, U+29C9) from Noto Sans Math (@fontsource/noto-sans-math), and ✗ (U+2717), which it lacks, from the
  * symbols subset of Noto Sans Symbols 2 (@fontsource/noto-sans-symbols-2). Each rule's unicode-range is its face's characters alone,
@@ -14,6 +14,30 @@
   font-style: normal;
   font-display: swap;
   font-weight: 400;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
   src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
   unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
 }
@@ -50,10 +74,18 @@
   unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
 }
 @font-face {
-  font-family: 'Share Tech Mono';
+  font-family: 'JetBrains Mono';
   font-style: normal;
   font-display: swap;
   font-weight: 400;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
   src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
   unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
 }
@@ -75,6 +107,30 @@
   unicode-range: U+2717;
 }
 @font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
   font-family: 'Chakra Petch';
   font-style: normal;
   font-display: swap;
@@ -107,10 +163,18 @@
   unicode-range: U+2717;
 }
 @font-face {
-  font-family: 'Share Tech Mono';
+  font-family: 'JetBrains Mono';
   font-style: normal;
   font-display: swap;
   font-weight: 400;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
   src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
   unicode-range: U+2717;
 }

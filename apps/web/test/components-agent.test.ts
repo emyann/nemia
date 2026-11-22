@@ -193,7 +193,7 @@ test("a skill an agent gives named with its folder is a row as written, the repo
   const html = await routedWith(createElement(GivenSkills, { rows, none: 'None.' }));
   const [folder, gone] = html.split('data-given-skill="gone"');
   assert.match(folder, /data-given-skill="apps\/site:lay-out"[^]*<span[^>]*font-mono[^>]*>apps\/site:lay-out<\/span>/);
-  assert.match(folder, /data-skill-from="folder"[^>]*bg-muted text-muted-foreground[^>]*>this repository</);
+  assert.match(folder, /data-skill-from="folder"[^>]*bg-surface-container-highest text-on-surface-variant[^>]*>this repository</);
   assert.match(folder, /data-found-in[^>]*>Read from\s*<code[^>]*>apps\/site\/\.claude\/skills\/lay-out<\/code>/);
   assert.doesNotMatch(folder, /data-skill-link|href="\/agents\/skills\/|not found/);
   assert.match(gone, /data-skill-from="none"[^>]*>not found</);
@@ -538,7 +538,7 @@ test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the gr
   const backdrop = /<svg [^>]*>(?:<title>[^<]*<\/title>)?<path [^>]*><\/path><g class="mo-root/;
   const plated = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true, plate: true }));
   assert.match(plated, backdrop, 'a backdrop drawn under the face, in its own colours');
-  assert.doesNotMatch(plated, /rounded-full|bg-muted/, 'and no grey round behind it');
+  assert.doesNotMatch(plated, /rounded-full|bg-surface-container-highest/, 'and no grey round behind it');
   assert.match(
     plated,
     /^<svg [^>]*class="[^"]*dark:\[&amp;&gt;path\]:opacity-25/,
@@ -546,8 +546,11 @@ test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the gr
   );
   const bare = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true }));
   assert.doesNotMatch(bare, backdrop);
-  assert.match(bare, /class="[^"]*rounded-full bg-muted/);
-  assert.match(renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })), /^<svg [^>]*class="[^"]*rounded-full bg-muted/);
+  assert.match(bare, /class="[^"]*rounded-full bg-surface-container-highest/);
+  assert.match(
+    renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })),
+    /^<svg [^>]*class="[^"]*rounded-full bg-surface-container-highest/,
+  );
 });
 
 /** An agent as the Agents page lists it, one that sets every kind of key: what a character card is drawn from. */

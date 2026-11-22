@@ -1,0 +1,4 @@
+apps/web/src/components/field/widgets/FieldWidgetView.tsx#text-body-large
+apps/web/src/components/field/widgets/FieldWidgetView.tsx#text-body-medium
+apps/web/src/components/field/widgets/FieldWidgetView.tsx#text-body-small
+apps/web/src/components/field/widgets/FieldWidgetView.tsx#text-label-large

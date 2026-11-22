@@ -20,14 +20,13 @@ export const USAGE: Readonly<Record<string, string>> = {
   'on-primary': `${on('primary')} Black in the dark scheme.`,
   'primary-container': 'A quieter yellow field: a selected or highlighted container; the label stock of a waiting tag in the light scheme.',
   'on-primary-container': on('primary-container'),
-  secondary:
-    'A pale violet in the dark scheme, a deeper violet in the light one. Alive: a session at work, a selected filter, and the focus ring.',
+  secondary: "Plain ink: the kit's state on a control, its tonal parts and its focus ring. The board's own parts write none of it.",
   'on-secondary': on('secondary'),
-  'secondary-container': 'A deep violet field: a tag or row that is alive.',
+  'secondary-container': 'A neutral field under plain ink: what a person selects, a selected tab, a chosen tile, a picked filter.',
   'on-secondary-container': on('secondary-container'),
-  tertiary: 'The amber of a printed label. Money: what a run cost.',
-  'on-tertiary': `${on('tertiary')} Black ink.`,
-  'tertiary-container': 'A tonal amber field for a container that carries an amount.',
+  tertiary: "Plain ink, as secondary: the kit's third accent, which says no meaning on the board.",
+  'on-tertiary': on('tertiary'),
+  'tertiary-container': 'A neutral field, as `md-sys-color-secondary-container`.',
   'on-tertiary-container': on('tertiary-container'),
   error: 'Red, kept for what failed. A board where nothing failed shows none.',
   'on-error': on('error'),
@@ -51,37 +50,31 @@ export const USAGE: Readonly<Record<string, string>> = {
   'outline-variant': "A hairline: a card's edge, a divider. Never the only boundary of a control.",
   shadow: 'The colour of a shadow. The look draws none.',
   scrim: 'The veil behind a modal surface.',
-  'inverse-surface': "The label's grey. Rest: a count, a clock, a finished run.",
+  'inverse-surface': 'A light grey in the dark scheme, a dark one in the light: the ground of a snackbar.',
   'inverse-on-surface': `${on('inverse-surface')} Black ink.`,
   'inverse-primary': 'Action text on `md-sys-color-inverse-surface`.',
   ...fixed('primary', 'A yellow'),
-  ...fixed('secondary', 'A violet'),
-  ...fixed('tertiary', 'An amber'),
+  ...fixed('secondary', 'A neutral'),
+  ...fixed('tertiary', 'A neutral'),
 };
 
-/** The look's four meanings, each a word, the role it stands on, and what it says. */
-export const MEANING: readonly (readonly [string, string, string])[] = [
-  ['yours', 'primary', 'What waits on a person: a gate, a waiting tag, the one filled button.'],
-  ['alive', 'secondary', 'A session at work: a running step, a selected filter.'],
-  ['money', 'tertiary', 'An amount: what a run cost.'],
-  ['failure', 'error', 'What failed, and nothing else.'],
+/**
+ * The look's four meanings, each a word and what it says, their values written by the board beside the theme (`src/styles.css`,
+ * `--meaning-*`), and money's amber, which is no meaning any more and goes with the board-look's second card.
+ */
+export const MEANING: readonly (readonly [string, string])[] = [
+  ['yours', 'What waits on a person: a gate, a waiting tag, the one filled button.'],
+  ['alive', 'A session at work: a running step, the live step on a rail.'],
+  ['failure', "What failed, and nothing else: Material's error."],
+  ['rest', "What is at rest: the label's grey of a count, a clock, a finished run."],
+  ['money', 'Retiring: an amount, drawn in ink once the board-look takes it off its last part.'],
 ];
 
 /** The look's further names, each over a role, as Tailwind's classes name them. */
 export const ALIASES: readonly { name: string; value: string; usage: string }[] = [
-  {
-    name: 'meaning-rest',
-    value: '{md-sys-color-inverse-surface}',
-    usage: "What is at rest: the label's grey of a count, a clock, a finished run.",
-  },
-  { name: 'meaning-on-rest', value: '{md-sys-color-inverse-on-surface}', usage: 'Black ink on `meaning-rest`.' },
   { name: 'meaning-sage', value: '{md-sys-color-outline}', usage: 'A step that is done: the filled grey of the steps rail.' },
   { name: 'meaning-on-sage', value: '{md-sys-color-surface-container-lowest}', usage: 'Ink on `meaning-sage`.' },
   { name: 'background', value: '{md-sys-color-background}', usage: "The page ground, as Tailwind's `bg-background`." },
-  { name: 'foreground', value: '{md-sys-color-on-background}', usage: 'The text on the page ground, as `text-foreground`.' },
-  { name: 'card', value: '{md-sys-color-surface-container-low}', usage: "A card's ground, as `bg-card`; the grain lies on it." },
-  { name: 'border', value: '{md-sys-color-outline-variant}', usage: 'The default hairline of an element, as `border-border`.' },
-  { name: 'muted-foreground', value: '{md-sys-color-on-surface-variant}', usage: 'Secondary text, as `text-muted-foreground`.' },
 ];
 
 /** The type scale: each group's name, its stem in the theme, its family, what it is for and a sample. */
@@ -92,10 +85,16 @@ export const SCALE: readonly (readonly [string, string, string, string, string])
     'Title',
     'title',
     'michroma',
-    "A card's title and a dialog's title; the medium and small sizes are drawn in the plain face, mixed case.",
+    "A card's title and a dialog's title; the medium and small sizes, and so a tab's word, are drawn in Barlow, mixed case.",
     'Open the run',
   ],
-  ['Body', 'body', 'chakra-petch', 'Passages and supporting text, untracked.', 'A run waits at its gate until a person approves it.'],
+  [
+    'Body',
+    'body',
+    'barlow',
+    'What is read: a sentence, a value, a cell. Untracked, 13 pixels at the least.',
+    'A run waits at its gate until a person approves it.',
+  ],
   [
     'Label',
     'label',
@@ -108,16 +107,17 @@ export const SCALE: readonly (readonly [string, string, string, string, string])
 /** What each elevation level is for. */
 export const SHADOW_USAGE: Readonly<Record<string, string>> = {
   1: 'A resting raised surface: a hairline in `outline-variant`. Nothing casts a shadow.',
-  2: 'A raised surface: a hairline in yellow at 45%.',
-  3: 'A floating surface (a menu, a dialog): a hairline in yellow at 70%.',
-  4: 'A surface under the pointer: a hairline in violet at 60%.',
-  5: 'The highest lift: a hairline in violet at 85%.',
+  2: 'A raised surface: a hairline in `outline` at 70%.',
+  3: 'A floating surface (a menu, a dialog): a hairline in `outline`.',
+  4: 'A surface under the pointer: a hairline in `on-surface-variant` at 70%.',
+  5: 'The highest lift: a hairline in the text ink at 85%. Height says no meaning, so no hairline takes a hue.',
 };
 
 /** The families the code's stacks ask for. */
 export const FAMILIES: Readonly<Record<string, string>> = {
   michroma: '"Michroma", ui-sans-serif, system-ui, sans-serif',
+  barlow: '"Barlow", ui-sans-serif, system-ui, sans-serif',
   'chakra-petch': '"Chakra Petch", ui-sans-serif, system-ui, sans-serif',
-  'share-tech-mono': '"Share Tech Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  'jetbrains-mono': '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
   archivo: '"Archivo Variable", "Arial Black", sans-serif',
 };

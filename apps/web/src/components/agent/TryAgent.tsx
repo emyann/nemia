@@ -62,7 +62,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
     <section aria-label="Try it" data-try-agent className="space-y-3 border-t border-outline-variant pt-4">
       <div className="space-y-1">
         <h2 className="text-title-small">Try it</h2>
-        <p data-try-fence className="text-body-small text-muted-foreground">
+        <p data-try-fence className="text-body-small text-on-surface-variant">
           {TRY_FENCE}: {TRY_TERMS}.
         </p>
       </div>
@@ -87,7 +87,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
             {start.isPending ? 'Starting…' : 'Try it'}
           </Button>
           {held && (
-            <span data-try-held className="text-body-small text-muted-foreground">
+            <span data-try-held className="text-body-small text-on-surface-variant">
               {held}
             </span>
           )}
@@ -112,14 +112,14 @@ export function TryRun({ id }: { id: string }) {
   );
   if (readGone(error)) {
     return (
-      <p data-try-gone className="text-body-small text-muted-foreground">
+      <p data-try-gone className="text-body-small text-on-surface-variant">
         The try {code(id)} was removed.
       </p>
     );
   }
   if (!run)
     return error instanceof Error ? (
-      <ReadTrouble what={`the try ${id}`} error={error} className="text-body-small text-muted-foreground" />
+      <ReadTrouble what={`the try ${id}`} error={error} className="text-body-small text-on-surface-variant" />
     ) : (
       <Reading label="Reading the try…" className="rounded border border-outline-variant px-3 py-2">
         <ReadingLines widths={['w-1/2', 'w-5/6']} className="text-body-small" />
@@ -129,7 +129,7 @@ export function TryRun({ id }: { id: string }) {
   const spent = step ? costText(step) : null;
   return (
     <div data-try={id} className="space-y-2 rounded border border-outline-variant px-3 py-2">
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
         <span>The latest try, {link}:</span>
         {step && <StatusChip codes={step} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />}
         <span data-try-status>{run.status}</span>
@@ -140,7 +140,7 @@ export function TryRun({ id }: { id: string }) {
         )}
       </p>
       {step && step.taskId !== null ? (
-        <div data-try-files className="text-body-small text-muted-foreground">
+        <div data-try-files className="text-body-small text-on-surface-variant">
           {step.filesError === null ? (
             <>
               Files it wrote:
@@ -151,7 +151,7 @@ export function TryRun({ id }: { id: string }) {
           )}
         </div>
       ) : (
-        <p className="text-body-small text-muted-foreground">Not filed yet: nothing is filed until the daemon&apos;s next pass.</p>
+        <p className="text-body-small text-on-surface-variant">Not filed yet: nothing is filed until the daemon&apos;s next pass.</p>
       )}
     </div>
   );
@@ -170,9 +170,9 @@ function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing
       className="space-y-1 border-t border-outline-variant pt-4"
     >
       <h2 className="text-title-small">Try it</h2>
-      <p className="text-body-small text-muted-foreground">{untried.why}</p>
+      <p className="text-body-small text-on-surface-variant">{untried.why}</p>
       {untried.copy && (
-        <p className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
           {code(untried.copy)}
           <CopyButton text={untried.copy} />
         </p>

@@ -1,0 +1,2 @@
+apps/web/src/components/welcome/FactoryStep.tsx#text-body-large
+apps/web/src/components/welcome/FactoryStep.tsx#text-body-medium

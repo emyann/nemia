@@ -1,0 +1,5 @@
+apps/web/src/components/step/part/PartHead.tsx#text-body-large
+apps/web/src/components/step/part/PartHead.tsx#text-body-medium
+apps/web/src/components/step/part/PartHead.tsx#text-body-small
+apps/web/src/components/step/part/PartHead.tsx#text-label-large
+apps/web/src/components/step/part/PartHead.tsx#text-title-small

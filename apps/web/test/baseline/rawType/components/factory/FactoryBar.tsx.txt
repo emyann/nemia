@@ -1,0 +1,3 @@
+apps/web/src/components/factory/FactoryBar.tsx#text-body-medium
+apps/web/src/components/factory/FactoryBar.tsx#text-label-medium
+apps/web/src/components/factory/FactoryBar.tsx#text-title-medium

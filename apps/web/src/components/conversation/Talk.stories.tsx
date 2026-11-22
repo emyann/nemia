@@ -10,7 +10,7 @@ const meta: Meta = { title: 'Run/Talk' };
 export default meta;
 
 /** Where a talk stands in its story: a panel's width and a panel's height, on the card's ground. */
-const PANEL = { width: 460, height: 420, padding: 16, background: 'var(--card)', display: 'flex' };
+const PANEL = { width: 460, height: 420, padding: 16, background: 'var(--md-sys-color-surface-container-low)', display: 'flex' };
 
 /** What a caller of the talk draws itself, here a question of hers in her own words. */
 type Own = { words: string };

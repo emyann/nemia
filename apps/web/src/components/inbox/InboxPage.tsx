@@ -66,7 +66,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
 
   return (
     <article className="space-y-6">
-      <p className="text-body-medium text-muted-foreground">
+      <p className="text-body-medium text-on-surface-variant">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
         command line parks one. Starting a card writes its run&apos;s record as any start does, and keeps the card, which reads its
         run&apos;s phase from then on: in play while the run waits its turn, works or waits on you, ended once it is over. A card queued
@@ -79,11 +79,11 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
         {all.length > 0 && <CardsSwitch ended={ended} inPlay={playing.length} over={over.length} onShow={show} />}
         <h2 className="flex items-baseline gap-2 text-title-small">
           Cards{' '}
-          <span data-count className="text-body-small font-normal text-muted-foreground">
+          <span data-count className="text-body-small font-normal text-on-surface-variant">
             {cards.length}
           </span>
           {queue > 0 && (
-            <span data-queue-count className="text-body-small font-normal text-muted-foreground">
+            <span data-queue-count className="text-body-small font-normal text-on-surface-variant">
               · {queue} queued
             </span>
           )}
@@ -101,7 +101,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
         )}
         {cards.length === 0 && all.length > 0 && <NoneShown ended={ended} over={over.length} />}
         {all.length === 0 && factory !== undefined && (
-          <p data-filtered-out className="text-body-medium text-muted-foreground">
+          <p data-filtered-out className="text-body-medium text-on-surface-variant">
             No card of the factory <span className="font-mono">{factory}</span>.{' '}
             <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
               Show every factory&apos;s
@@ -110,7 +110,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
           </p>
         )}
         {all.length === 0 && factory === undefined && (
-          <p data-empty className="text-body-medium text-muted-foreground">
+          <p data-empty className="text-body-medium text-on-surface-variant">
             The inbox is empty. File an idea in the box above, or from the command line.
           </p>
         )}
@@ -161,7 +161,7 @@ function CardsSwitch({
 /** What the page says where the segment picked lists none of the cards the filters keep, and a link to the other segment. */
 function NoneShown({ ended, over }: { ended: boolean; over: number }) {
   return ended ? (
-    <p data-none-ended className="text-body-medium text-muted-foreground">
+    <p data-none-ended className="text-body-medium text-on-surface-variant">
       No card&apos;s run has ended: every card here is still in play.{' '}
       <Link to="." search={(prev) => ({ ...prev, cards: undefined })} className="underline underline-offset-2">
         Show the cards in play
@@ -169,7 +169,7 @@ function NoneShown({ ended, over }: { ended: boolean; over: number }) {
       .
     </p>
   ) : (
-    <p data-none-in-play className="text-body-medium text-muted-foreground">
+    <p data-none-in-play className="text-body-medium text-on-surface-variant">
       No card is in play: every card here was started, and its run has ended.{' '}
       <Link to="." search={(prev) => ({ ...prev, cards: 'ended' as const })} className="underline underline-offset-2">
         Show the {over} ended
@@ -253,7 +253,7 @@ function CardItem({
     <li
       aria-label={`Card ${entry.name}`}
       data-card={entry.name}
-      className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
+      className="space-y-3 rounded-lg border border-outline-variant bg-surface-container-low p-4 shadow-sm"
     >
       <div className="flex flex-wrap items-start gap-3 @md/page:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">

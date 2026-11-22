@@ -94,7 +94,7 @@ export function FlightTable({
               <Column id="now" className={cn(HEAD, 'w-[360px]')}>
                 Now
               </Column>
-              <Column id="clock" align="end" className={cn(HEAD, 'w-[144px]')}>
+              <Column id="clock" align="end" className={cn(HEAD, 'w-[160px]')}>
                 Clock
               </Column>
               <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>

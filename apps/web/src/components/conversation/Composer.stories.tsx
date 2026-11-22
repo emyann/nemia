@@ -6,7 +6,7 @@ const meta: Meta = { title: 'Run/Composer' };
 export default meta;
 
 /** Where the composer stands in its story: a panel's width, on the card's ground. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
+const PANEL = { width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)' };
 
 /** What every story of it hands over, its caller's vocabulary. */
 const SAID = { marks: 'chat', label: 'Message to Nemia', sendLabel: 'Send', onSend: () => {} };

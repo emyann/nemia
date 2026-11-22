@@ -1,0 +1,2 @@
+apps/web/src/components/factory/FactoryProposals.tsx#text-body-medium
+apps/web/src/components/factory/FactoryProposals.tsx#text-body-small

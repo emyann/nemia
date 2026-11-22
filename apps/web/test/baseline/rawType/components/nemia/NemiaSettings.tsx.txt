@@ -1,0 +1,4 @@
+apps/web/src/components/nemia/NemiaSettings.tsx#text-body-medium
+apps/web/src/components/nemia/NemiaSettings.tsx#text-body-small
+apps/web/src/components/nemia/NemiaSettings.tsx#text-title-medium
+apps/web/src/components/nemia/NemiaSettings.tsx#text-title-small

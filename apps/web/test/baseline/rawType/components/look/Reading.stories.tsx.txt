@@ -1,0 +1,2 @@
+apps/web/src/components/look/Reading.stories.tsx#text-body-medium
+apps/web/src/components/look/Reading.stories.tsx#text-title-small

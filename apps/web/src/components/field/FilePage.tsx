@@ -13,11 +13,11 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
     <section aria-label="Keys" className="space-y-2">
       <div className="space-y-0.5">
         <h2 className="text-title-small">Keys</h2>
-        {note && <p className="text-body-small text-muted-foreground">{note}</p>}
+        {note && <p className="text-body-small text-on-surface-variant">{note}</p>}
       </div>
       <div className="overflow-x-auto rounded border border-outline-variant">
         <table className="w-full min-w-[36rem] border-collapse text-left text-body-medium">
-          <thead className="bg-surface-container text-body-small text-muted-foreground">
+          <thead className="bg-surface-container text-body-small text-on-surface-variant">
             <tr>
               <th scope="col" className="px-3 py-1.5 font-medium">
                 key
@@ -35,16 +35,16 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
               <tr key={key} data-key={key} data-set={value !== null} className="border-t border-outline-variant align-top">
                 <th
                   scope="row"
-                  className={cn('w-36 px-3 py-1.5 font-mono text-body-small font-medium', value === null && 'text-muted-foreground')}
+                  className={cn('w-36 px-3 py-1.5 font-mono text-body-small font-medium', value === null && 'text-on-surface-variant')}
                 >
                   {key}
                 </th>
                 <td data-value className="w-56 px-3 py-1.5 font-mono text-body-small break-all">
-                  {value ?? <span className="font-sans text-muted-foreground">not set</span>}
+                  {value ?? <span className="font-sans text-on-surface-variant">not set</span>}
                 </td>
                 <td
                   data-meaning
-                  className={cn('px-3 py-1.5 text-body-small', value === null ? 'text-muted-foreground' : 'text-foreground')}
+                  className={cn('px-3 py-1.5 text-body-small', value === null ? 'text-on-surface-variant' : 'text-on-surface')}
                 >
                   <Markdown>{meaning}</Markdown>
                 </td>
@@ -66,7 +66,7 @@ export function AsWritten({ file, source, children }: { file: string; source: st
   return (
     <section aria-label="The file" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-outline-variant pb-2">
-        <p className="min-w-0 font-mono text-body-small break-all text-muted-foreground">{file}</p>
+        <p className="min-w-0 font-mono text-body-small break-all text-on-surface-variant">{file}</p>
         <span
           title={shown ? 'Show it rendered, with its keys' : 'Show the file as written, frontmatter included'}
           className="inline-flex shrink-0"

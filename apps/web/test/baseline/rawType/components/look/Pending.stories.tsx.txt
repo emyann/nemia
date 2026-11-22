@@ -1,0 +1,1 @@
+apps/web/src/components/look/Pending.stories.tsx#text-label-medium

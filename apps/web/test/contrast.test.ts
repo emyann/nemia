@@ -46,7 +46,7 @@ test('only a measured pair fails the bar: an unmeasured one and a disabled contr
 
 test('the table names each failing pair once a scheme, worst first, with its colours, its classes and its pictures', () => {
   const sheets = [
-    sheet('runs-light.png', 'light', [pair([0x77, 0x77, 0x77]), pair([0, 0, 0], { classes: 'text-foreground' })]),
+    sheet('runs-light.png', 'light', [pair([0x77, 0x77, 0x77]), pair([0, 0, 0], { classes: 'text-on-surface' })]),
     sheet('gate-light.png', 'light', [pair([0x77, 0x77, 0x77]), pair([0xaa, 0xaa, 0xaa], { classes: 'text-neutral-400' })]),
     sheet('runs-dark.png', 'dark', [pair([0xee, 0xee, 0xee], { ground: [0, 0, 0] })]),
   ];

@@ -16,7 +16,7 @@ export const COVER = `<!-- @dsCard height=320 -->
 html, body { margin: 0; }
 body { background: var(--md-sys-color-surface); width: 960px; height: 320px; position: relative; overflow: hidden; }
 h1 { position: absolute; left: 32px; bottom: 72px; margin: 0; white-space: nowrap; font: 400 60px/0.95 var(--font-michroma); color: var(--md-sys-color-on-surface); }
-p { position: absolute; left: 32px; bottom: 36px; margin: 0; font: 400 14px/20px var(--font-chakra-petch); color: var(--md-sys-color-on-surface-variant); }
+p { position: absolute; left: 32px; bottom: 36px; margin: 0; font: 400 15px/22px var(--font-barlow); color: var(--md-sys-color-on-surface-variant); }
 svg { position: absolute; left: 0; top: 0; }
 .yours { fill: var(--md-sys-color-primary); } .alive { fill: var(--md-sys-color-secondary); } .money { fill: var(--md-sys-color-tertiary); }
 .rest { fill: var(--md-sys-color-inverse-surface); } .deep { fill: var(--md-sys-color-surface-container-high); }

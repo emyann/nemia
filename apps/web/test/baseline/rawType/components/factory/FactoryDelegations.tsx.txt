@@ -1,0 +1,3 @@
+apps/web/src/components/factory/FactoryDelegations.tsx#text-body-medium
+apps/web/src/components/factory/FactoryDelegations.tsx#text-label-medium
+apps/web/src/components/factory/FactoryDelegations.tsx#text-title-medium

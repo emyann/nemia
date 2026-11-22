@@ -1,0 +1,2 @@
+apps/web/src/components/run/TryTag.tsx#text-body-small
+apps/web/src/components/run/TryTag.tsx#text-label-small

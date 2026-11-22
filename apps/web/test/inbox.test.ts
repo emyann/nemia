@@ -755,7 +755,7 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
   });
   test("a factory's Inbox reads its own namespace's cards, ended included, never every card of every factory", async (t) => {
     const sent = sending(t, () => answered(200, cardList()));
-    const read = async (query: { queryFn?: unknown }) => (query.queryFn as unknown as () => Promise<InboxEntry[]>)();
+    const read = async (query: { queryFn?: unknown }) => (query.queryFn as () => Promise<InboxEntry[]>)();
     await read(inboxAllQuery(undefined, 'pair'));
     await read(inboxAllQuery('team=core', 'pair'));
     await read(inboxAllQuery(undefined, 'default'));

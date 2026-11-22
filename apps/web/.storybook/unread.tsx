@@ -7,9 +7,23 @@ import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, waitFor } from 'storybook/test';
 
+/** A read that never settles: what every query of `Unread`'s client asks in place of the network. */
+const stillOut = () => new Promise<never>(() => undefined);
+
+/**
+ * A query client whose reads are each still out and none reaches the network: a query is off unless it turns itself on, and one that
+ * does (`enabled` of its own) asks `stillOut` in place of its own function, which no option of the query can set back.
+ */
+function unreadClient() {
+  const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
+  const defaulted = client.defaultQueryOptions.bind(client);
+  client.defaultQueryOptions = (options) => ({ ...defaulted(options), queryFn: stillOut });
+  return client;
+}
+
 /** Holds `children` under a query client whose queries never fetch: each read the part makes is still out. */
 export function Unread({ children }: { children: ReactNode }) {
-  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } }));
+  const [client] = useState(unreadClient);
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 

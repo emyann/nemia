@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, userEvent, within } from 'storybook/test';
 import type { PartSize } from '@/lib/stepPart';
 import type { RunDetail } from '@/lib/runView';
 import { StepPart } from './StepPart';
 import { CODES, NOW, PLAN, measured, runOf, spendingSoFar, stepOf, toldInLayers, tryOf } from '../../../../.storybook/fixtures/steps';
 import { skippedHeadings } from '../../../../.storybook/play';
+import { Unread } from '../../../../.storybook/unread';
 
 /**
  * A step's part at each of its three sizes — the graph's node (S), the preview card (M) and whole (L) — in each of the five places a
@@ -14,9 +14,6 @@ import { skippedHeadings } from '../../../../.storybook/play';
  */
 const meta: Meta = { title: 'Run/StepPart' };
 export default meta;
-
-/** A client that asks the api nothing: a story draws what its run holds, and a read it would make waits. */
-const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
 
 /** A check of the step's first try by `name`, its task and its verdict: passed, refused with exit 1, or never filed, with neither. */
 const named = (name: string, verdict: 'passed' | 'failed' | null) =>
@@ -60,7 +57,7 @@ const WHOLE: CSSProperties = { maxWidth: 880 };
 function Sizes({ run }: { run: RunDetail }) {
   const at = (size: PartSize) => <StepPart view={run} step="design" size={size} now={NOW} />;
   return (
-    <QueryClientProvider client={client}>
+    <Unread>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
         <div style={ROW}>
           {at('S')}
@@ -68,7 +65,7 @@ function Sizes({ run }: { run: RunDetail }) {
         </div>
         <div style={WHOLE}>{at('L')}</div>
       </div>
-    </QueryClientProvider>
+    </Unread>
   );
 }
 
@@ -161,11 +158,11 @@ export const TryAgain: StoryObj = { render: () => <Sizes run={RUNS.tryAgain} /> 
 export const Checked: StoryObj<{ step: string }> = {
   args: { step: 'design' },
   render: ({ step }) => (
-    <QueryClientProvider client={client}>
+    <Unread>
       <div style={WHOLE}>
         <StepPart view={RUNS.checked} step={step} size="L" now={NOW} />
       </div>
-    </QueryClientProvider>
+    </Unread>
   ),
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: /Detail/ }));
@@ -184,11 +181,11 @@ export const Checked: StoryObj<{ step: string }> = {
 export const Told: StoryObj<{ step: string }> = {
   args: { step: 'design' },
   render: ({ step }) => (
-    <QueryClientProvider client={client}>
+    <Unread>
       <div style={WHOLE}>
         <StepPart view={RUNS.told} step={step} size="L" now={NOW} />
       </div>
-    </QueryClientProvider>
+    </Unread>
   ),
   play: async ({ canvasElement }) => {
     const user = userEvent.setup();

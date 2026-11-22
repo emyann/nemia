@@ -176,6 +176,7 @@ test("a matrix leg reads its key off LEG: a push is due the leg of the workspace
   assert.equal(leg('objects').output, 'due=false\n', 'a workspace that does not reach it');
   assert.equal(run(root, ['contracts'], { ...push, LEG: 'observe' }).output, 'due=true\n', "the contracts leg of the runtime's file");
   assert.equal(run(root, ['e2e-look'], push).output, 'due=false\n', 'the look, which reaches the board alone');
+  assert.equal(run(root, ['e2e-stories'], push).output, 'due=false\n', 'the stories, which reach the board alone');
 });
 
 test('a push touching the lockfile is due every leg', () => {

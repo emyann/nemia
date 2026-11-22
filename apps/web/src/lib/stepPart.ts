@@ -18,6 +18,7 @@ import { durationWords } from './duration.ts';
 import { whenWords } from './runWords.ts';
 import { stateDrawn, stepState, type StepState } from './status.ts';
 import { stateWordsOf } from './words.ts';
+import { stepQueuedSaid } from './queued.ts';
 
 /** The slots of a step's part, in the one order every size draws them in. */
 export const PART_SLOTS = ['head', 'asks', 'got', 'said', 'gave', 'detail'] as const;
@@ -273,10 +274,11 @@ function gateWords(step: StepView, now: Date) {
 }
 
 /**
- * The head's one note, the first that says something: the agent's last line, the calls its harness denied, its check's refusal, then
- * its gate's words; null when none does.
+ * The head's one note, the first that says something: why its session or its check waits to start (`stepQueuedSaid`), the agent's last
+ * line, the calls its harness denied, its check's refusal, then its gate's words; null when none does.
  */
 function noteOf(step: StepView, now: Date) {
+  if (step.queuedFor) return { text: stepQueuedSaid(step.queuedFor), icon: 'info' } satisfies CardNote | null;
   if (step.lastLine) return { text: step.lastLine, icon: 'info' } satisfies CardNote | null;
   if (step.denied) return { text: step.denied.words, icon: 'shield' } satisfies CardNote | null;
   const refused = refusalOf(step);

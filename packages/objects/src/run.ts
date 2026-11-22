@@ -29,6 +29,7 @@ import {
 export { CheckOutput, SessionReleaseSchema, StepLog, StepUsed } from './run-step.ts';
 import { API_VERSION, listOf } from './meta.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
+import { describedNumber } from './meta.ts';
 import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
@@ -48,6 +49,7 @@ import {
   STEP_REASONS,
   STEP_STATUSES,
   WAIT_ON,
+  QUEUED_TASKS,
 } from './words.ts';
 import { runCodesLegal, stepCodesLegal, tryCodesLegal, type RunCodes, type StepCodes, type TryCodes } from './codes.ts';
 
@@ -254,6 +256,35 @@ export const BaseHold = Schema.Struct({
 export type BaseHold = typeof BaseHold.Type;
 
 /**
+ * Why a task filed to start has not, as the engine last judged it: the machine's memory has no room for it (its need, the room left to
+ * it and the memory kept for a person's turn, each in bytes), its pool is at its ceiling (the pool and the ceiling), or the server is
+ * paused. Served on a step (`RunStepStatus.queuedFor`) and on an upgrade (`Upgrade.queuedFor`).
+ */
+export const QueuedFor = Schema.Union([
+  Schema.Struct({
+    for: Schema.Literal('memory').annotate({ description: "The machine's memory has no room for the task." }),
+    needBytes: describedNumber('What the task needs of the memory, in bytes: its request, else its limit.'),
+    roomBytes: describedNumber('The room the machine has left to it, in bytes, at least nothing.'),
+    keptBytes: Schema.NullOr(Schema.Number).annotate({
+      description: "The memory kept free for a person's turn and withheld from this task, in bytes; null where none is withheld.",
+    }),
+  }),
+  Schema.Struct({
+    for: Schema.Literal('slot').annotate({ description: 'Its pool has as many sessions at work as its ceiling allows.' }),
+    pool: Schema.String.annotate({ description: 'The pool whose ceiling it waits under.' }),
+    ceiling: describedNumber('The sessions the pool may have at work at once (WF_MAX_CONCURRENT).'),
+  }),
+  Schema.Struct({
+    for: Schema.Literal('paused').annotate({ description: 'The server is paused: nothing filed starts until it resumes.' }),
+  }),
+]).annotate({
+  identifier: 'QueuedFor',
+  description:
+    "Why a task filed to start has not, as the engine last judged it: memory (its need, the room left and what is kept for a person's turn), a slot (the pool at its ceiling), or the server paused.",
+});
+export type QueuedFor = typeof QueuedFor.Type;
+
+/**
  * A step now: where it stands as codes and in its word, the raise of its cap the package takes (null where none), its tries on the clock
  * (`TimelineTry`), the short of its current try (null while it has none); then all the board shows of it but its tries whole and what
  * it was told (its sub-resources) — its task and place, its folder's files, its note, what it needs of a person, its gate, what was said
@@ -327,6 +358,15 @@ export const RunStepStatus = Schema.Struct({
   }),
   sessionUnread: NullString.annotate({
     description: "Why the runtime could not read the step's session, in its words; null where it was read.",
+  }),
+  queuedFor: Schema.NullOr(
+    Schema.Struct({
+      task: Schema.Literals(QUEUED_TASKS).annotate({ description: 'Which task of the step waits to start: its session or its check.' }),
+      wait: QueuedFor,
+    }),
+  ).annotate({
+    description:
+      "Why the step's current task, its session or else its check, waits to start, as the engine last judged it; null where none waits.",
   }),
   lastLine: NullString.annotate({ description: "What the step's session said last, on a run read alone; null where nothing was read." }),
   gate: Schema.NullOr(StepGate).annotate({

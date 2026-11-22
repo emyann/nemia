@@ -670,14 +670,19 @@ const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: Read
  */
 export const ROOM_STEP = 256 * 2 ** 20;
 
-/** Whether two waits say the same to a person: the same pool and ceiling, or the same need and room in one grain (`ROOM_STEP`). */
+/**
+ * Whether two waits say the same to a person: both the engine unschedulable, the same pool and ceiling, or the same need, the same
+ * kept memory and the room in one grain (`ROOM_STEP`).
+ */
 const sameWait = (a: AdmissionWait | undefined, b: AdmissionWait) => {
   if (a === undefined || a.for !== b.for) return false;
+  if (a.for === 'unschedulable') return true;
   if (a.for === 'slot' && b.for === 'slot') return a.pool === b.pool && a.ceiling === b.ceiling;
   return (
     a.for === 'memory' &&
     b.for === 'memory' &&
     a.needBytes === b.needBytes &&
+    a.keptBytes === b.keptBytes &&
     Math.floor(a.roomBytes / ROOM_STEP) === Math.floor(b.roomBytes / ROOM_STEP)
   );
 };
@@ -689,8 +694,9 @@ const unwaiting = ({ waits: _, ...view }: TaskView) => view;
  * Admits the queued tasks the engine's ceiling and the machine's memory have room for (`toAdmit`), off the views the pass built,
  * and journals `admitted` for each: the next pass starts them. For each other queued task it judged, it journals why it waits
  * (`waits`) where that differs from the wait on record (`sameWait`), so the record says it to a reader that never saw this pass.
- * A queued task the pass did not judge — the engine unschedulable, or no ceiling — whose record still holds a wait has it taken off
- * (`waits` with none), so no reader is told a reason the pass no longer gave. Returns the views with those marked admitted and the
+ * The engine unschedulable, every queued task is said to wait for that (`unschedulable`), journalled once while it holds. A queued
+ * task the pass did not judge — no ceiling — whose record still holds a wait has it taken off (`waits` with none), so no reader is
+ * told a reason the pass no longer gave. Returns the views with those marked admitted and the
  * rest carrying their wait as on record, as `view` reads them after the pass.
  */
 const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskView[]) {

@@ -8,7 +8,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { listing, phases, run, step, STEPS } from '../../test/assessed.ts';
 import type { AttemptMemory } from '../views/views-words.ts';
-import type { HeldBack } from './list.ts';
+import { queuedForOf, type HeldBack } from './list.ts';
 
 /** The implement row of a run whose implement is at work as `t1`, parked as `parked` says. */
 const implementRow = (parked: { after?: string; cut?: string } | undefined) => {
@@ -129,6 +129,16 @@ describe('a queued step the runtime holds says why in its note: the memory it ne
     const note = implement(listed((id) => (id === 't1' ? { for: 'slot', pool: 'claude', ceiling: 4 } : undefined))).note;
     for (const fact of ['claude', '4', 'WF_MAX_CONCURRENT']) assert.ok(note?.includes(fact), fact);
   });
+  test("a memory wait with memory kept: the note names what is kept for a person's turn and WF_KEPT_TURNS", () => {
+    const note = implement(
+      listed((id) => (id === 't1' ? { for: 'memory', needBytes: 2 * GI, roomBytes: 1.5 * GI, keptBytes: 2.5 * GI } : undefined)),
+    ).note;
+    for (const fact of ['memory', '2Gi', '1.5Gi', '2.5Gi', 'WF_KEPT_TURNS']) assert.ok(note?.includes(fact), fact);
+  });
+  test('the engine unschedulable: the note says the store is paused and names nemia resume', () => {
+    const note = implement(listed((id) => (id === 't1' ? { for: 'unschedulable' } : undefined))).note;
+    for (const fact of ['paused', 'nemia resume']) assert.ok(note?.includes(fact), fact);
+  });
   test('its check held: the note says the check', () => {
     const note = implement(listed((id) => (id === 'c1' ? { for: 'memory', needBytes: 2 * GI, roomBytes: 0 } : undefined))).note;
     for (const fact of ['check', 'memory', '2Gi']) assert.ok(note?.includes(fact), fact);
@@ -171,4 +181,19 @@ describe('a held run waits on no one and lists no try due, though a step signed 
     assert.deepEqual(held.waitingOnYou, []);
     assert.equal(held.steps.find((s) => s.name === 'implement')?.asks, undefined);
   });
+});
+
+describe("queuedForOf: the runtime's wait served as `QueuedFor`, the engine unschedulable as the store paused", () => {
+  const rows: Array<[string, HeldBack | undefined, unknown]> = [
+    ['no wait', undefined, null],
+    ['paused', { for: 'unschedulable' }, { for: 'paused' }],
+    ['a slot', { for: 'slot', pool: 'claude', ceiling: 2 }, { for: 'slot', pool: 'claude', ceiling: 2 }],
+    ['memory, none kept', { for: 'memory', needBytes: 2, roomBytes: 1 }, { for: 'memory', needBytes: 2, roomBytes: 1, keptBytes: null }],
+    [
+      'memory, some kept',
+      { for: 'memory', needBytes: 2, roomBytes: 1, keptBytes: 3 },
+      { for: 'memory', needBytes: 2, roomBytes: 1, keptBytes: 3 },
+    ],
+  ];
+  for (const [name, wait, served] of rows) test(name, () => assert.deepEqual(queuedForOf(wait), served));
 });

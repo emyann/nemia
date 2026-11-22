@@ -7,6 +7,11 @@
   ],
   "terms": [
     {
+      "term": "Queued for",
+      "meaning": "why a task filed to start has not, as the engine last judged it: the machine's memory (its need, the room left to it and the memory kept for a person's turn), a slot (its pool at its ceiling), or the server paused; served on a step, naming its session or its check, and on an upgrade (`QueuedFor`, `packages/objects/src/run.ts`).",
+      "type": "QueuedFor"
+    },
+    {
       "term": "Tool words",
       "meaning": "what a tool of the MCP port says, read once off the command table's links and the `Api` for both of Nemia's seats: its name, input, method and path, whether it answers a `Table`, the defaults its link sends, its endpoint's description and each key's (`toolWordsOf`); the port describes each tool by them (`toolDescriptionOf`) and Nemia's verbs skill says them to her shell seat (`packages/objects/src/tool-words.ts`).",
       "type": "ToolWords"

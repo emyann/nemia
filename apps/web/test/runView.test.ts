@@ -75,6 +75,7 @@ const stepStatus = (name: string, extra: Partial<RunObject.RunStepStatus> = {}) 
     approve: null,
     denied: null,
     sessionUnread: null,
+    queuedFor: null,
     lastLine: null,
     gate: null,
     said: [],

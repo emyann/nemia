@@ -24,6 +24,7 @@ import { writeStoreFloor } from './archive.store.ts';
 import type { Running } from './release.ts';
 import { releaseDir, releasesDir, writeReleaseFile } from './release.store.ts';
 import { writeUpgradeRecord } from './upgrade-job.store.ts';
+import { ASKED_PRIORITY } from '../status/status.ts';
 import { followUpgrade, RunningCode, startUpgrade, upgradeOf, upgradesRead } from './upgrade-job.verb.ts';
 
 const ROOT = scratch('wf-upgrade-job-');
@@ -76,12 +77,26 @@ describe('Settings upgrades the server, one upgrade at a time, never below the f
       'run by the package’s own CLI',
     );
     assert.equal(config.env.WF_ROOT, ROOT);
+    assert.equal(filed.priority, ASKED_PRIORITY, 'an upgrade a person started: the turn they wait on goes first');
+    assert.equal('queuedFor' in started, false, 'filed, no wait said yet');
+  });
+  s.test('held for memory or by a pause, it says why it has not started', async () => {
+    engine().plantWait(id, { for: 'memory', needBytes: 2 * 2 ** 30, roomBytes: 2 ** 30, keptBytes: 2 ** 30 });
+    assert.deepEqual((await run(upgradeOf(id))).queuedFor, {
+      for: 'memory',
+      needBytes: 2 * 2 ** 30,
+      roomBytes: 2 ** 30,
+      keptBytes: 2 ** 30,
+    });
+    engine().plantWait(id, { for: 'unschedulable' });
+    assert.deepEqual((await run(upgradeOf(id))).queuedFor, { for: 'paused' });
   });
   s.test('a second start while that task is unsettled is refused Conflict, and files nothing', async () => {
     engine().settle(id, 'working');
     assert.ok((await refusedBy(startUpgrade({ tag: 'v1.5.0' }))) instanceof Conflict);
     assert.equal(engine().tasks.size, 1);
-    assert.equal((await run(upgradeOf(id))).phase, 'running');
+    const running = await run(upgradeOf(id));
+    assert.deepEqual([running.phase, 'queuedFor' in running], ['running', false], 'started: it waits for nothing');
   });
   s.test('once it settles, upgradeOf and the read say it succeeded, with its output and exit code', async () => {
     engine().settle(id, 'succeeded', { exitCode: 0, printed: { stdout: 'downloaded v1.4.0\nreleases/current now names v1.4.0\n' } });

@@ -375,6 +375,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
       approve: step.approve,
       denied: step.denied,
       sessionUnread: step.sessionUnread,
+      queuedFor: step.queuedFor,
     });
     const { resourceVersion, ...metadata } = run.metadata;
     assert.equal(typeof resourceVersion, 'string', 'the listed run carries a resourceVersion');
@@ -476,6 +477,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
               approve: null,
               denied: null,
               sessionUnread: null,
+              queuedFor: null,
             },
             {
               name: 'review',
@@ -494,6 +496,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
               approve: null,
               denied: null,
               sessionUnread: null,
+              queuedFor: null,
             },
           ],
           /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
@@ -654,6 +657,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
       approve: null,
       denied: null,
       sessionUnread: null,
+      queuedFor: null,
       gate: null,
       lastLine: null,
       said: [],
@@ -735,6 +739,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
       approve: null,
       denied: null,
       sessionUnread: null,
+      queuedFor: null,
       gate: null,
       lastLine: null,
       said: [],
@@ -964,6 +969,7 @@ describe('a run whose workflow folder changes or vanishes after it starts is rea
       approve: null,
       denied: null,
       sessionUnread: null,
+      queuedFor: null,
       gate: null,
       lastLine: null,
       said: [],

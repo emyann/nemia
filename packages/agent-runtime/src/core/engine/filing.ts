@@ -360,10 +360,11 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
  * @param state The task's fold, or undefined where it has no journal.
  * @param text The words the next turn is to begin with, as the caller gave them.
  * @param config What the turn gives its configuration, as the caller gave it, or undefined where it gives none.
+ * @param priority The turn's priority, as the caller gave it, or undefined where the turn goes at its filing's.
  */
-export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, config?: unknown) => {
+export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, config?: unknown, priority?: unknown) => {
   if (typeof text !== 'string' || !text.trim()) return '`text` is empty. Give the words the next turn should begin with.';
-  return turnArgsRefusalOf(config) ?? waitRefusalOf('answer', taskId, state);
+  return turnArgsRefusalOf(config) ?? priorityRefusalOf(priority) ?? waitRefusalOf('answer', taskId, state);
 };
 
 /**
@@ -377,17 +378,23 @@ export const closeRefusalOf = (taskId: string, state: State | undefined) => wait
 /**
  * A person's answer to a task held open that waits for one. Journalled as an `input`, and returned; the next pass
  * starts the task's next turn — an attempt that continues the session that ended, told `text` — with `config` laid
- * over the task's own when given (`TURN_ARGS`: its spend cap). The configuration is the harness's to keep, so the one
- * the turn would start with is asked of it as a filing's is.
+ * over the task's own when given (`TURN_ARGS`: its spend cap), and admitted at `priority` when given, else at the task's filing's.
+ * The configuration is the harness's to keep, so the one the turn would start with is asked of it as a filing's is.
  */
-export const answer = Effect.fn('answer')(function* (taskId: string, text: string, config?: HarnessArgs) {
+export const answer = Effect.fn('answer')(function* (taskId: string, text: string, config?: HarnessArgs, priority?: number) {
   const journal = yield* Journal;
   const events = yield* journal.read(TaskId.read(taskId));
   const state = events.length ? fold(taskId, events) : undefined;
   const runner = yield* Runner;
-  const refused = answerRefusalOf(taskId, state, text, config) ?? (config && state ? runner.refuses?.(filingOf(state, config)) : undefined);
+  const refused =
+    answerRefusalOf(taskId, state, text, config, priority) ?? (config && state ? runner.refuses?.(filingOf(state, config)) : undefined);
   if (refused) return yield* Effect.fail(new InputRefused({ message: refused }));
-  const input: Input = { at: new Date().toISOString(), text, ...(config ? { config } : {}) };
+  const input: Input = {
+    at: new Date().toISOString(),
+    text,
+    ...(config ? { config } : {}),
+    ...(priority !== undefined ? { priority } : {}),
+  };
   yield* journal.append(TaskId.read(taskId), { kind: 'input', ...input });
   return input;
 });

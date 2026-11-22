@@ -149,6 +149,7 @@ export const stepOf = (codes: Codes, tries: StepTry[], gated = false) => ({
   approve: gated ? 'approve r-1 design' : null,
   denied: null,
   sessionUnread: null,
+  queuedFor: null,
   gate: null,
   lastLine: null,
   said: [],

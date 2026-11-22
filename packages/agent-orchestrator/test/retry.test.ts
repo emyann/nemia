@@ -13,6 +13,7 @@
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
+import { MOMENTUM } from '../src/status/status.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -642,6 +643,7 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
         { limits: { memory: '4Gi' }, requests: { memory: '1Gi' } },
         "a try is filed under the step's `memory:` and `memoryRequest:` as its first was",
       );
+      assert.equal(spec.priority, MOMENTUM, "the run's own try goes at its momentum, below a person's turn");
       assert.deepEqual(
         { cwd: spec.cwd, resumeFrom: spec.resumeFrom, harness: spec.harness },
         { cwd: run.repo, resumeFrom: `native-${id()}-implement`, harness: undefined },

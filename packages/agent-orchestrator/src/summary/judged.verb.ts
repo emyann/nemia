@@ -6,9 +6,9 @@
  */
 import type { Settings } from '../config/config.store.ts';
 import { Effect } from 'effect';
-import type { Actor } from 'objects';
+import type { Actor, QueuedFor, QueuedTask } from 'objects';
 import { type Engine, nameFor } from '../runtime-client.ts';
-import { answerIn, onYouWords } from '../list/list.ts';
+import { answerIn, onYouWords, queuedForOf } from '../list/list.ts';
 import { listReading } from '../list/list.verb.ts';
 import { type BranchReader, branchStandings, landedOf } from '../branches/branches.store.ts';
 import { askedOf, branchesAsked, resultSteps } from '../branches/index.ts';
@@ -177,6 +177,9 @@ export type RunHolding = {
  * `sessionUnread` is why the runtime could not read the step's session alone, in its words (`unreadOf`, off its view): the step is
  * neither working nor gone, and its status says nothing of it. Null for a step whose session was read — on the first request whose look
  * reads it, as nothing carries it.
+ *
+ * `queuedFor` is why the step's current task waits to start, its session's, else its check's, as the engine last judged it
+ * (`queuedForOf`, off its view's `waits`): memory, a slot, or the store paused. Null where neither waits.
  */
 export type StepNeeds = {
   needs: string | null;
@@ -184,6 +187,7 @@ export type StepNeeds = {
   approve: string | null;
   denied: { words: string; calls: string[] } | null;
   sessionUnread: string | null;
+  queuedFor: { task: QueuedTask; wait: QueuedFor } | null;
 };
 
 /**
@@ -611,5 +615,22 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
     approve: atGate ? (onYouWords({ steps: [{ name, reason }], waitingOnYou: [name] })[0] ?? null) : null,
     denied: denied && view && taskId ? { words: denied, calls: deniedOf(views)(taskId) } : null,
     sessionUnread: unreadOf(view),
+    queuedFor: queuedOf(run, name, views),
   };
 }
+
+/**
+ * Why a step's current task waits to start, as the engine last judged it: its session's wait, else its check's (`queuedForOf`), with
+ * which; null where neither waits.
+ * @param run The run the step is of.
+ * @param name The step's name.
+ * @param views The engine's views of the tasks the request read.
+ */
+const queuedOf = (run: Run, name: string, views: Views) => {
+  const rec = run.steps[name];
+  const of = (taskId: string | null | undefined) => queuedForOf(taskId ? views.get(taskId)?.waits : undefined);
+  const session = of(rec?.taskId);
+  if (session) return { task: 'session', wait: session } satisfies StepNeeds['queuedFor'];
+  const check = of(rec?.check?.taskId);
+  return check ? ({ task: 'check', wait: check } satisfies StepNeeds['queuedFor']) : null;
+};

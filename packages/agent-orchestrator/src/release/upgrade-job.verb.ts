@@ -15,7 +15,8 @@ import { asked, EngineService, tried, type Engine, type TaskView } from '../runt
 import { StoreRoot } from '../config/root.store.ts';
 import { alive } from '../process/alive.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { MOMENTUM } from '../status/status.ts';
+import { ASKED_PRIORITY } from '../status/status.ts';
+import { queuedForOf } from '../list/list.ts';
 import { commandPhaseOf } from '../needs/fix.verb.ts';
 import { tagRefusal, type Running } from './release.ts';
 import { buildUnderWay, installedReleases } from './release.store.ts';
@@ -102,7 +103,7 @@ export const startUpgrade = Effect.fn('startUpgrade')(function* (start: UpgradeS
     e.file({
       id,
       harness: 'command',
-      priority: MOMENTUM,
+      priority: ASKED_PRIORITY,
       brief: `upgrade the server to ${tag}`,
       cwd: home,
       deadlineSeconds: UPGRADE_DEADLINE_SECONDS,
@@ -126,17 +127,23 @@ const floorWords = (tag: string, floor: Version) => {
   return `${tag} cannot read this store, which a newer release has run; the oldest release that can is ${oldest} (store.json): upgrade to ${oldest} or newer.`;
 };
 
-/** The `Upgrade` of `record` over its task's view and the end of its output. */
+/**
+ * The `Upgrade` of `record` over its task's view and the end of its output, and why it has not started while it is pending and the engine
+ * holds it (`queuedForOf`).
+ */
 const upgradeRead = (record: UpgradeRecord, view: TaskView | undefined, output: string) => {
   const exitCode = view?.state.settled ? view.state.attempts.at(-1)?.exitCode : undefined;
+  const phase = commandPhaseOf(view);
+  const queuedFor = phase === 'pending' ? queuedForOf(view?.waits) : null;
   return {
     id: record.id,
     tag: record.tag,
     ...(record.from === undefined ? {} : { from: record.from }),
-    phase: commandPhaseOf(view),
+    phase,
     output,
     ...(typeof exitCode === 'number' ? { exitCode } : {}),
     startedAt: record.startedAt,
+    ...(queuedFor === null ? {} : { queuedFor }),
   } satisfies Upgrade;
 };
 

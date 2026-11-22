@@ -104,7 +104,10 @@ with what, who may drive it, for how long, in how much memory and for how much. 
   WF_MAX_CONCURRENT  sessions at work per pool at once, a whole number from 1 (default 2): claude, codex
                      and checks each a pool; a blocked session holds no slot; one run's review competes
                      with another run's implement
-  WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
+  WF_KEPT_TURNS      turns a person waits on kept room for, a whole number from 0 (default 1): places
+                     per pool beyond WF_MAX_CONCURRENT and a session's ask of memory each, which only
+                     an answer, a retry or an upgrade a person asked for takes; 0 keeps none
+  WF_MAX_RUNS       runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
                      slot, oldest first; a run waiting on --after counts once it is filed; a run of a
                      one-step workflow that says slot: none is not counted and never waits for one
 

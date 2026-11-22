@@ -140,7 +140,8 @@ const Bytes = Schema.Natural;
 /** Why a pass left a queued task waiting (`AdmissionWait`, `contracts/admission.contract.ts`): its pool's slot, or the machine's memory. */
 export const AdmissionWaitSchema = Schema.Union([
   Schema.Struct({ for: Schema.Literal('slot'), pool: Schema.String, ceiling: Schema.Int }),
-  Schema.Struct({ for: Schema.Literal('memory'), needBytes: Bytes, roomBytes: Bytes }),
+  Schema.Struct({ for: Schema.Literal('memory'), needBytes: Bytes, roomBytes: Bytes, keptBytes: Schema.optional(Bytes) }),
+  Schema.Struct({ for: Schema.Literal('unschedulable') }),
 ]);
 
 /** What a task's cgroup said of its memory as an attempt ended (`MemoryUse`, `domain.ts`). */
@@ -233,13 +234,14 @@ const Ended = event('ended', {
 });
 
 /**
- * A person's answer: one an older runtime wrote may carry `budgetUsd` beside `config`, which `upgrade` moves under it. A store that
- * keeps bodies may hold its text as a body (`textBody`).
+ * A person's answer: one an older runtime wrote may carry `budgetUsd` beside `config`, which `upgrade` moves under it, and carries no
+ * `priority`, its turn then going at its filing's. A store that keeps bodies may hold its text as a body (`textBody`).
  */
 const Input = event('input', {
   text: Schema.optional(Schema.String),
   textBody: Schema.optional(BodyRefSchema),
   config: Schema.optional(HarnessArgsSchema),
+  priority: Schema.optional(Schema.Int),
   budgetUsd: Schema.optional(Schema.Finite),
 });
 

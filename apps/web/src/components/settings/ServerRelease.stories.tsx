@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { LatestRelease, Readiness, Upgrade } from 'objects';
+import type { LatestRelease, QueuedFor, Readiness, Upgrade } from 'objects';
 import { ReadinessList } from '../setup/ReadinessList';
 import { ServerRelease, ServerReleaseView, type ServerReleaseShown, UpgradeOutcome, UpgradeRun } from './ServerRelease';
 import { saysReading, Unread } from '../../../.storybook/unread';
@@ -105,14 +105,50 @@ export const Upgrading: StoryObj = {
   ),
 };
 
-/** Filed, waiting for a slot under the server's ceiling. */
+/** Filed, waiting for a slot under the server's ceiling, every kept place taken. */
 export const WaitingForASlot: StoryObj = {
   render: () => (
     <div style={WIDE}>
       <ServerReleaseView
         shown={{ ...BARE, latest: NEWER }}
         onStart={none}
-        run={<UpgradeRun tag="v0.4.0" phase="pending" output="" reconnecting={false} />}
+        run={
+          <UpgradeRun
+            tag="v0.4.0"
+            phase="pending"
+            output=""
+            reconnecting={false}
+            queuedFor={{ for: 'slot', pool: 'command', ceiling: 2 }}
+          />
+        }
+      />
+    </div>
+  ),
+};
+
+/** Filed, waiting for memory: what it needs and what is free. */
+export const WaitingForMemory: StoryObj<{ queuedFor: QueuedFor }> = {
+  args: { queuedFor: { for: 'memory', needBytes: 2 ** 30, roomBytes: 512 * 2 ** 20, keptBytes: null } },
+  render: ({ queuedFor }) => (
+    <div style={WIDE}>
+      <ServerReleaseView
+        shown={{ ...BARE, latest: NEWER }}
+        onStart={none}
+        run={<UpgradeRun tag="v0.4.0" phase="pending" output="" reconnecting={false} queuedFor={queuedFor} />}
+      />
+    </div>
+  ),
+};
+
+/** Filed while the server is paused: it starts once the server resumes. */
+export const WaitingWhilePaused: StoryObj<{ queuedFor: QueuedFor }> = {
+  args: { queuedFor: { for: 'paused' } },
+  render: ({ queuedFor }) => (
+    <div style={WIDE}>
+      <ServerReleaseView
+        shown={{ ...BARE, latest: NEWER }}
+        onStart={none}
+        run={<UpgradeRun tag="v0.4.0" phase="pending" output="" reconnecting={false} queuedFor={queuedFor} />}
       />
     </div>
   ),

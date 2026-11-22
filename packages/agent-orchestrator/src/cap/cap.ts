@@ -167,12 +167,15 @@ export const slotWord = (slot: RunSlot) => `${SLOT_WAIT} (${slot.inFlight} of ${
  * session runs under when its step names none (`WF_MEMORY_LIMIT`), in the slice it names (`WF_CGROUP_PARENT`), on a line of its own
  * only where one is set; and, where the floor of the machine's memory is given (`reserved`), its admission by memory on a line of its
  * own: what each session asks (`request`, `WF_MEMORY_REQUEST`, else its limit) and the floor kept for the daemon and the machine
- * (`WF_MEMORY_RESERVED`, else its default), which no session is admitted into.
- * @param c The daemon's ceilings: sessions per pool, runs in flight (0 is no cap), and the memory limit, slice, request and floor,
- * each undefined where none is set.
+ * (`WF_MEMORY_RESERVED`, else its default), which no session is admitted into; and, where room is kept for a person's turn (`kept`,
+ * `WF_KEPT_TURNS`), a line of its own: the places kept per pool beyond the ceiling, which only a person's turn takes, and the memory kept
+ * with them where the floor is given.
+ * @param c The daemon's ceilings: sessions per pool, the turns kept for a person (0 or absent is none), runs in flight (0 is no cap),
+ * and the memory limit, slice, request and floor, each undefined where none is set.
  */
 export const ceilingLines = (c: {
   sessions: number;
+  kept?: number;
   runs: number;
   memory?: string;
   cgroupParent?: string;
@@ -190,6 +193,11 @@ export const ceilingLines = (c: {
     ? []
     : [
         `sessions admitted by memory: a session waits until what it asks — ${c.request ?? (c.memory === undefined ? "its step's memory:, where it names one" : `its limit, ${c.memory}`)} — fits the machine above the ${c.reserved} kept for the daemon and the machine (WF_MEMORY_REQUEST, WF_MEMORY_RESERVED)`,
+      ]),
+  ...(c.kept === undefined || c.kept === 0
+    ? []
+    : [
+        `kept for a person's turn: ${c.kept} per pool beyond WF_MAX_CONCURRENT, so at most ${c.sessions + c.kept} at once — an answer, a retry or an upgrade a person asked for goes first and takes it${c.reserved === undefined || (c.request ?? c.memory) === undefined ? '' : `, with ${c.kept} × ${c.request ?? c.memory} of the machine's memory no other work is admitted into`} (WF_KEPT_TURNS)`,
       ]),
 ];
 

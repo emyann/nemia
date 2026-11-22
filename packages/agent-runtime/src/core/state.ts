@@ -537,7 +537,16 @@ export type Said = { at: string; attempt: number; text: string; after?: Transcri
  * A person's answer to a task held open, and what the turn it starts gives its configuration for itself when they gave any
  * (`TURN_ARGS` in `harness/args.ts`: its spend cap), over the task's own. Carried whole, never opened here. See the `input` event.
  */
-export type Input = { at: string; text: string; config?: HarnessArgs };
+export type Input = {
+  at: string;
+  text: string;
+  config?: HarnessArgs;
+  /**
+   * Which waiting turn a free slot of its pool goes to first, higher first, as filed with the answer: the turn's own priority, as a
+   * Pod's, in place of its task's filing. Carried for the pass's admission, never read by `decide`.
+   */
+  priority?: number;
+};
 
 export type Attempt = {
   n: number;

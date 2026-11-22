@@ -1,11 +1,12 @@
 /**
  * A worker's store after its last page is the store it seeded (e2e/print.ts): a file a page changed, added or removed and did not put
  * back is refused, naming it and the worker's pages; a write taken back, byte for byte, passes; and what git and the e2e's own `claude`
- * write is no page's. No browser, so `npm test` runs it.
+ * write is no page's; a keyspace is read by its live records, a record left live refused. No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { test } from 'vitest';
 import { drift, fingerprint, leftOver } from './e2e/print.ts';
 import { scratch } from 'test-kit/scratch';
@@ -69,4 +70,36 @@ test('REFUSED: a link a page pointed elsewhere', () => {
   fs.rmSync(path.join(root, 'runs', 'latest'));
   fs.symlinkSync('r2.json', path.join(root, 'runs', 'latest'));
   assert.deepEqual(drift(before, fingerprint(root)), ['changed runs/latest']);
+});
+
+/** The keyspace of `root`, laid out as the orchestrator lays it, with `rows` appended: each a key, its value, and if a tombstone. */
+function keyspaceWith(root: string, rows: readonly (readonly [string, string, boolean])[]) {
+  fs.mkdirSync(path.join(root, 'db'), { recursive: true });
+  const db = new DatabaseSync(path.join(root, 'db', 'state.db'));
+  try {
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('CREATE TABLE IF NOT EXISTS kine (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, deleted INTEGER, value BLOB)');
+    for (const [name, value, deleted] of rows)
+      db.prepare('INSERT INTO kine (name, deleted, value) VALUES (?, ?, ?)').run(name, deleted ? 1 : 0, value);
+  } finally {
+    db.close();
+  }
+}
+
+test('a keyspace whose records a page wrote and took back passes, its new rows and its log no write of the page', () => {
+  const root = store();
+  const before = fingerprint(root);
+  keyspaceWith(root, [
+    ['/registry/proposals/acme/a', '{}', false],
+    ['/registry/proposals/acme/a', '', true],
+  ]);
+  assert.equal(leftOver(before, fingerprint(root), PAGES), null);
+});
+
+test('REFUSED: a record a page left live in the keyspace', () => {
+  const root = store();
+  keyspaceWith(root, [['/registry/proposals/acme/kept', '{}', false]]);
+  const before = fingerprint(root);
+  keyspaceWith(root, [['/registry/proposals/acme/a', '{}', false]]);
+  assert.deepEqual(drift(before, fingerprint(root)), ['changed db/state.db']);
 });

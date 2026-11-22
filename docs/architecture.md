@@ -615,6 +615,20 @@ afresh when the end's generation changes or its cursor no longer falls on a line
 door alone and the runtime not at all, so it is the one controller that needs no client (`DOORED_ONLY`, `test/boundary.test.ts`); the
 CLI's follow and the tick's message still call the module spellings, counted in `test/feed-door.baseline.ts`.
 
+**The keyspace, and the Proposal door on it.** The orchestrator's store of records is one SQLite file, `<root>/db/state.db`, opened
+through Effect's SQL client (`@effect/sql-sqlite-node`, over `node:sqlite`, no native addon) and laid out as Kine lays it out: one
+table `kine`, every write a new row whose `id` is the store's next revision, superseded rows compacted away every 5 minutes by the
+daemon past the last 1,000 revisions (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`, `compact.verb.ts`). Each write is
+decided by `keyspaceWrite` (`src/keyspace/keyspace.ts`, proved by `contracts/keyspace.contract.ts`) inside the `BEGIN IMMEDIATE`
+transaction that read its key and the head, so the check and the write are one step; the file is in write-ahead-log mode with
+`synchronous=FULL`. Its table changes by Effect's Migrator, a migration appended to `KEYSPACE_MIGRATIONS`, and a file a newer release
+wrote is refused by the Migrator's loader inside the Migrator's transaction, naming `nemia upgrade`. Proposals are its first kind: the
+Proposal door (`src/proposal/proposal.store.ts`) holds each under `/registry/proposals/<factory>/<name>`, its `resourceVersion` the
+record's revision, a write back refused `Conflict` from a revision it is no longer at. Unlike the doors above, it has no synchronous
+layer: its shape's Effects are the keyspace's, its stand-in (`proposalDoorMemory`) the same code over a keyspace in memory, and no
+`doorOf` or `atOnce` reaches it. A store's proposal files of before it are imported the first time a process opens its keyspace, then
+moved aside under `<root>/imported/proposals/`, never deleted.
+
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the
 files and the memory layers. Its methods take and give a branded `TaskId`, nominal on read, so a journal written under any id still
@@ -688,13 +702,14 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, no node:http, node:https,
   node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
   retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
-  check, closeout, daemon, disk, ending, feed, folder, former, gate, harness, inbox, keys, level, merge, meter, plan, prune, record, refusal,
+  check, closeout, daemon, disk, ending, feed, folder, former, gate, harness, inbox, keys, keyspace, level, merge, meter, plan, prune, record, refusal,
   rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
   custom.store, read.store (in agents and in skills), skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store,
-  places.store, config.store, whole-file.store, alive.store, series.store, subscription.store, level.store, disk.store, a2a.store and frozen.store in the folders. They load as a tree. At
-  the bottom are record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
+  places.store, config.store, whole-file.store, alive.store, series.store, subscription.store, level.store, disk.store, a2a.store,
+  keyspace.store and frozen.store in the folders. They load as a tree. At the bottom are keyspace/keyspace.store.ts (the keyspace, one
+  SQLite file), record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
   meter/tally.store.ts (the pass's meter), whole-file/whole-file.store.ts (`writeWhole`, a file's text written to a hidden file beside
   it and renamed over it), process/alive.store.ts (`alive`, whether a pid is there, a refusal for want of permission counting as there)
   and config/config.store.ts, which import no store file; config/root.store.ts, the store's

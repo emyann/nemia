@@ -14,6 +14,7 @@
  * `src/factory/upgrade/upgrade.verb.test.ts`; the three-way merge itself, `src/factory/upgrade/merge.test.ts`. Its store is its own at
  * `ROOT`, given as `ENV`.
  */
+import { proposalHeld, proposalsHeld } from './proposal-walks.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -123,18 +124,11 @@ const SCRIPT_AT = {
 /** Where a proposal is read and applied: this test's store. */
 const PLACE = { home: ROOT, repo: ROOT };
 
-/** The proposal `name` of the factory `factory`, as the store holds it. */
-const proposalIn = (factory: string, name: string) =>
-  JSON.parse(fs.readFileSync(path.join(FACTORIES, factory, 'proposals', `${name}.json`), 'utf8'));
+/** The proposal `name` of the factory `factory`, as the store holds it, through the Proposal door. */
+const proposalIn = async (factory: string, name: string) => JSON.parse(JSON.stringify(await proposalHeld(ROOT, factory, name)));
 
-/** The proposals of the factory `factory` the store holds, by name. */
-const proposalsOf = (factory: string) => {
-  const dir = path.join(FACTORIES, factory, 'proposals');
-  {
-    const made: string[] = fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => f.replace(/\.json$/, '')) : [];
-    return made;
-  }
-};
+/** The proposals of the factory `factory` the store holds, by name, through the Proposal door. */
+const proposalsOf = (factory: string) => proposalsHeld(ROOT, factory);
 
 /** The proposal recorded for the owner `owner` (`<Kind>/<name>`) of `factory`'s upgrade, in `resolutions.json`. */
 const recordedFor = (factory: string, owner: string) =>
@@ -153,7 +147,7 @@ async function scripted(t: TestContext, name: string) {
   exportTemplate({ dir: at, from: repo });
   fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
   await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
-  reconciled(factory(name));
+  await reconciled(factory(name));
   fs.writeFileSync(path.join(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.ours);
   edit(at, 'nemia.yaml', (spec) => {
     spec.version = '0.2.0';
@@ -161,7 +155,7 @@ async function scripted(t: TestContext, name: string) {
   fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.theirs);
   await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
   assert.deepEqual(
-    reconciled(factory(name)).upgrade?.conflicts.map((c) => c.at),
+    (await reconciled(factory(name))).upgrade?.conflicts.map((c) => c.at),
     [SCRIPT_LINE],
   );
 }
@@ -204,7 +198,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
       spec.steps[1].budget = { param: 'budget' };
     });
     await printedBy(t, 'factory', 'apply', 'crew', '--template', dir, '--volume', `${repo}:rw`, '--set', 'budget=7');
-    assert.equal(reconciled(factory('crew')).conditions[0].reason, 'Rendered');
+    assert.equal((await reconciled(factory('crew'))).conditions[0].reason, 'Rendered');
     run = ((await stage.main(['start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'])) as StartedAnswer).id;
     assert.equal(runRecord(ROOT, run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
     rewrite(tree(), REVIEW, 'rounds: 3', 'rounds: 4');
@@ -263,10 +257,10 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     });
     assert.deepEqual(bytesUnder(path.join(FACTORIES, 'crew')), folder, 'the upgrade writes no tree, base nor status');
   });
-  s.test('while the conflicts wait the controller writes only its status: the tree and the base are left as they are', () => {
+  s.test('while the conflicts wait the controller writes only its status: the tree and the base are left as they are', async () => {
     waitingTree = bytesUnder(tree());
     waitingBase = bytesUnder(appliedDir(ROOT, 'crew'));
-    const waiting = reconciled(factory('crew'));
+    const waiting = await reconciled(factory('crew'));
     assert.deepEqual(bytesUnder(tree()), waitingTree, 'the tree is left as it is while a conflict waits');
     assert.deepEqual(bytesUnder(appliedDir(ROOT, 'crew')), waitingBase, 'and the base');
     assert.equal(waiting.version, '0.1.0');
@@ -308,9 +302,9 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     await assert.rejects(resolve(ROUNDS, '--file', path.join(dir, 'gone.md')), refusedWith('Invalid', /no file at/));
     assert.ok(!fs.existsSync(resolutionsFile(ROOT, 'crew')), 'a refused resolve writes nothing');
     assert.deepEqual((await resolvedBy(ROUNDS, '--theirs')).left, [LINE, SCRIPT_LINE], 'two conflicts still wait');
-    assert.deepEqual(proposalsOf('crew'), [], "the workflow's other conflict has no choice yet, so nothing is proposed");
+    assert.deepEqual(await proposalsOf('crew'), [], "the workflow's other conflict has no choice yet, so nothing is proposed");
     assert.deepEqual(
-      reconciled(factory('crew')).upgrade?.conflicts.map((c) => [c.at, c.proposal]),
+      (await reconciled(factory('crew'))).upgrade?.conflicts.map((c) => [c.at, c.proposal]),
       [
         [LINE, undefined],
         [SCRIPT_LINE, undefined],
@@ -321,9 +315,9 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     assert.deepEqual(bytesUnder(tree()), waitingTree, 'nothing merged');
     const proposing = await resolvedBy(SCRIPT_LINE, '--file', scriptChoice());
     proposal = recordedFor('crew', 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf('crew'), [proposal], 'each conflict of the workflow has a choice: it is proposed, once');
+    assert.deepEqual(await proposalsOf('crew'), [proposal], 'each conflict of the workflow has a choice: it is proposed, once');
     assert.deepEqual(proposing.proposed, { kind: 'Workflow', name: 'dev', proposal }, 'the Workflow dev, as the choices compose it');
-    const made = proposalIn('crew', proposal);
+    const made = await proposalIn('crew', proposal);
     assert.equal(made.status.phase, 'waiting');
     assert.deepEqual(made.status.proposedBy, {}, 'the person, from a shell with no session token');
     assert.deepEqual(
@@ -350,7 +344,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     assert.deepEqual(last.left, [], 'every conflict has a choice');
     for (const p of [proposal, rules]) assert.ok(last.waits.includes(p), `the merge waits on ${p}: ${last.waits.join(', ')}`);
     assert.deepEqual(
-      proposalIn('crew', rules).spec.objects.map((o: { kind: string; spec: { rules?: string } }) => [o.kind, o.spec.rules]),
+      (await proposalIn('crew', rules)).spec.objects.map((o: { kind: string; spec: { rules?: string } }) => [o.kind, o.spec.rules]),
       [['Factory', 'Never push on a Friday, nor on a weekend.\n\nWrite the tests first, always.\n']],
       'the rules as the choice composes them with what merged cleanly',
     );
@@ -366,8 +360,8 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
       proposals: { 'Workflow/dev': proposal, 'Factory/crew': rules },
     });
   });
-  s.test('while the proposals wait the controller writes only its status, naming each and the line that approves it', () => {
-    const waiting = reconciled(factory('crew'));
+  s.test('while the proposals wait the controller writes only its status, naming each and the line that approves it', async () => {
+    const waiting = await reconciled(factory('crew'));
     assert.deepEqual(bytesUnder(tree()), waitingTree, 'the tree is left as it is');
     assert.deepEqual(bytesUnder(appliedDir(ROOT, 'crew')), waitingBase, 'and the base');
     assert.deepEqual(
@@ -386,7 +380,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     async () => {
       const applied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'crew', proposal, PLACE));
       assert.equal(applied.status.phase, 'applied');
-      reconciled(factory('crew'));
+      await reconciled(factory('crew'));
       const factoryApplied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'crew', rules, PLACE));
       assert.equal(factoryApplied.status.phase, 'applied', "a pass between them leaves the Factory's proposal fresh");
       assert.equal(textIn(tree(), RULES), 'Never push on a Friday, nor on a weekend.\n\nWrite the tests first, always.\n');
@@ -401,7 +395,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
       const oldBase = entriesIn(appliedDir(ROOT, 'crew'));
       const oldStatus = fs.readFileSync(statusFile(ROOT, 'crew'));
       const at = '2026-11-01T09:00:00.000Z';
-      const merged = reconciledAt(factory('crew'), at);
+      const merged = await reconciledAt(factory('crew'), at);
       assert.equal(merged.version, '0.2.0');
       assert.equal(merged.conditions[0].reason, 'Upgraded');
       assert.equal(merged.upgrade, undefined, 'no conflict is said once merged');
@@ -414,10 +408,10 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
       baseScript = textIn(appliedDir(ROOT, 'crew'), SCRIPT);
       replaceBase(ROOT, 'crew', oldBase);
       fs.writeFileSync(statusFile(ROOT, 'crew'), oldStatus);
-      assert.deepEqual(reconciledAt(factory('crew'), at), merged, 'stopped after the tree was swapped, the next pass ends it');
+      assert.deepEqual(await reconciledAt(factory('crew'), at), merged, 'stopped after the tree was swapped, the next pass ends it');
       assert.deepEqual(bytesUnder(tree()), mergedTree, 'composing the same tree');
       fs.writeFileSync(statusFile(ROOT, 'crew'), oldStatus);
-      const after = reconciled(factory('crew'));
+      const after = await reconciled(factory('crew'));
       assert.deepEqual([after.version, after.conditions[0].status], ['0.2.0', 'True'], 'stopped after the base: the version is the render');
       assert.deepEqual(bytesUnder(tree()), mergedTree);
       await assert.rejects(
@@ -461,11 +455,11 @@ describe("a workflow's resolution declined: the status says to resolve again, an
     await scripted(t, 'refused');
     await printedBy(t, 'factory', 'resolve', 'refused', SCRIPT_LINE, '--file', scriptChoice());
     first = recordedFor('refused', 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf('refused'), [first]);
+    assert.deepEqual(await proposalsOf('refused'), [first]);
   });
   s.test('declined, the conflict carries its phase, and the status says to resolve it again', async () => {
     await stage.runWith(stage.board().e, declineProgram(PERSON, 'refused', first));
-    const status = reconciled(factory('refused'));
+    const status = await reconciled(factory('refused'));
     assert.deepEqual(
       status.upgrade?.conflicts.map((c) => [c.at, c.proposal]),
       [[SCRIPT_LINE, { name: first, phase: 'declined' }]],
@@ -479,20 +473,20 @@ describe("a workflow's resolution declined: the status says to resolve again, an
     await printedBy(t, 'factory', 'resolve', 'refused', SCRIPT_LINE, '--theirs');
     const second = recordedFor('refused', 'Workflow/dev') ?? '';
     assert.notEqual(second, first);
-    assert.deepEqual(proposalsOf('refused').sort(), [first, second].sort());
-    assert.equal(proposalIn('refused', second).status.phase, 'waiting');
+    assert.deepEqual((await proposalsOf('refused')).sort(), [first, second].sort());
+    assert.equal((await proposalIn('refused', second)).status.phase, 'waiting');
     assert.deepEqual(
-      reconciled(factory('refused')).upgrade?.conflicts.map((c) => c.proposal),
+      (await reconciled(factory('refused'))).upgrade?.conflicts.map((c) => c.proposal),
       [{ name: second, phase: 'waiting' }],
     );
   });
-  s.test('a resolutions.json from before other kinds had proposals, keyed by the bare workflow, still names its proposal', () => {
+  s.test('a resolutions.json from before other kinds had proposals, keyed by the bare workflow, still names its proposal', async () => {
     const file = resolutionsFile(ROOT, 'refused');
     const kept = JSON.parse(fs.readFileSync(file, 'utf8'));
     const second = kept.proposals['Workflow/dev'];
     fs.writeFileSync(file, JSON.stringify({ ...kept, proposals: { dev: second } }));
     assert.deepEqual(
-      reconciled(factory('refused')).upgrade?.conflicts.map((c) => c.proposal),
+      (await reconciled(factory('refused'))).upgrade?.conflicts.map((c) => c.proposal),
       [{ name: second, phase: 'waiting' }],
     );
   });
@@ -519,7 +513,7 @@ describe("a workflow's resolution made from a session: its agent's in its own fa
       (err: Error & { _tag?: string; reason?: string; exitCode?: number }) =>
         err._tag === 'Forbidden' && err.reason === 'other-factory' && err.exitCode === 2,
     );
-    assert.deepEqual(proposalsOf('theirs'), []);
+    assert.deepEqual(await proposalsOf('theirs'), []);
     const record = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'theirs'), 'utf8'));
     assert.deepEqual([record.choices, record.proposals], [{ [SCRIPT_LINE]: 'theirs' }, undefined]);
   });
@@ -528,7 +522,7 @@ describe("a workflow's resolution made from a session: its agent's in its own fa
     vi.spyOn(console, 'log');
     await resolveIn(token, 'theirs', SCRIPT_LINE, '--theirs');
     const made = recordedFor('theirs', 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalIn('theirs', made).status.proposedBy, { agent: 'implementer' });
+    assert.deepEqual((await proposalIn('theirs', made)).status.proposedBy, { agent: 'implementer' });
   });
 });
 
@@ -550,7 +544,7 @@ describe('a workflow whose step writes checkFailurePolicy as a block map: a conf
     exportTemplate({ dir: at, from: repo });
     fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
     await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
-    reconciled(factory(name));
+    await reconciled(factory(name));
     applied = textIn(treeDir(ROOT, name), IMPLEMENT);
     assert.match(applied, /^checkFailurePolicy:\n {2}rules:\n/m, 'the applied step writes its policy as a block map');
     fs.writeFileSync(path.join(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.ours);
@@ -560,15 +554,17 @@ describe('a workflow whose step writes checkFailurePolicy as a block map: a conf
     fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.theirs);
     await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
     assert.deepEqual(
-      reconciled(factory(name)).upgrade?.conflicts.map((c) => c.at),
+      (await reconciled(factory(name))).upgrade?.conflicts.map((c) => c.at),
       [SCRIPT_LINE],
     );
   });
   s.test('resolved with a file, the workflow is proposed, its policy carried as the text the loader reads', async (t) => {
     await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf(name), [proposed]);
-    const implement = proposalIn(name, proposed).spec.objects[0].spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.deepEqual(await proposalsOf(name), [proposed]);
+    const implement = (await proposalIn(name, proposed)).spec.objects[0].spec.steps.find(
+      (step: { name: string }) => step.name === 'implement',
+    );
     assert.equal(typeof implement.keys.checkFailurePolicy, 'string', "StepKeys' text, as readKeys keeps it");
     assert.deepEqual(JSON.parse(implement.keys.checkFailurePolicy), {
       rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: ['78'] } }],
@@ -577,7 +573,7 @@ describe('a workflow whose step writes checkFailurePolicy as a block map: a conf
   s.test('approved, the upgrade applies, and the applied implement.md keeps its map as it was written', async () => {
     const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
     assert.equal(approved.status.phase, 'applied');
-    const merged = reconciled(factory(name));
+    const merged = await reconciled(factory(name));
     assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
     assert.equal(textIn(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.composed);
     assert.equal(textIn(treeDir(ROOT, name), IMPLEMENT), applied, 'the block map stays a block map');
@@ -602,7 +598,7 @@ describe("an upgrade onto a version whose step writes named checks: the tree's o
     const at = path.join(scratch(`wf-upgrade-conflict-${name}-`), 'team');
     exportTemplate({ dir: at, from: repo });
     await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
-    reconciled(factory(name));
+    await reconciled(factory(name));
     rewrite(treeDir(ROOT, name), IMPLEMENT_FILE, 'check: npm test && npm run typecheck && npm run lint', 'check: npm test --mine');
     edit(at, 'nemia.yaml', (spec) => {
       spec.version = '0.2.0';
@@ -614,22 +610,24 @@ describe("an upgrade onto a version whose step writes named checks: the tree's o
     });
     await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
     assert.deepEqual(
-      reconciled(factory(name)).upgrade?.conflicts.map((c) => c.at),
+      (await reconciled(factory(name))).upgrade?.conflicts.map((c) => c.at),
       [CHECK],
     );
   });
   s.test("resolved with the template's side, the workflow is proposed, its checks the text a step's key takes", async (t) => {
     await printedBy(t, 'factory', 'resolve', name, CHECK, '--theirs');
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf(name), [proposed]);
-    const implement = proposalIn(name, proposed).spec.objects[0].spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.deepEqual(await proposalsOf(name), [proposed]);
+    const implement = (await proposalIn(name, proposed)).spec.objects[0].spec.steps.find(
+      (step: { name: string }) => step.name === 'implement',
+    );
     assert.equal(typeof implement.keys.checks, 'string', "StepKeys' text, as readKeys keeps it");
     assert.equal('check' in implement.keys, false, "the tree's `check:` gone, as the template's side has it");
   });
   s.test("approved, the upgrade applies, and the applied implement runs the template's checks", async () => {
     const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
     assert.equal(approved.status.phase, 'applied', approved.status.message);
-    const merged = reconciled(factory(name));
+    const merged = await reconciled(factory(name));
     assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
     const text = textIn(treeDir(ROOT, name), IMPLEMENT_FILE);
     const keys = readKeys('implement', splitFrontmatter('implement', text).block ?? '', () => undefined, MAP_KEYS).meta;
@@ -669,7 +667,7 @@ async function editedAfterApply(t: TestContext, name: string, own = OWN_CHECK) {
   exportTemplate({ dir: at, from: repo });
   fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
   await printedBy(t, 'factory', 'apply', name, '--template', at, '--volume', `${repo}:rw`);
-  reconciled(factory(name));
+  await reconciled(factory(name));
   const tree = treeDir(ROOT, name);
   fs.writeFileSync(path.join(tree, PICTURES), OWN);
   rewrite(tree, IMPLEMENT, 'check: npm test && npm run typecheck && npm run lint', own);
@@ -679,7 +677,7 @@ async function editedAfterApply(t: TestContext, name: string, own = OWN_CHECK) {
   });
   fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.theirs);
   await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
-  return (reconciled(factory(name)).upgrade?.conflicts ?? []).map((c) => c.at);
+  return ((await reconciled(factory(name))).upgrade?.conflicts ?? []).map((c) => c.at);
 }
 
 describe("a tree edited after its apply: the resolution is proposed on the tree as it stands, and approving it keeps the factory's own edits", () => {
@@ -692,8 +690,8 @@ describe("a tree edited after its apply: the resolution is proposed on the tree 
   s.test("resolved with a file, the workflow is proposed with the factory's own edits", async (t) => {
     await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf(name), [proposed]);
-    const spec = proposalIn(name, proposed).spec.objects[0].spec;
+    assert.deepEqual(await proposalsOf(name), [proposed]);
+    const spec = (await proposalIn(name, proposed)).spec.objects[0].spec;
     const implement = spec.steps.find((step: { name: string }) => step.name === 'implement');
     assert.deepEqual([implement.keys.check, implement.keys.skills], ['npm test && npm run typecheck', ['look']]);
     assert.deepEqual(
@@ -704,7 +702,7 @@ describe("a tree edited after its apply: the resolution is proposed on the tree 
   s.test('approved, the upgrade applies, and the applied dev keeps the added file and the changed step', async () => {
     const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
     assert.equal(approved.status.phase, 'applied', approved.status.message);
-    const merged = reconciled(factory(name));
+    const merged = await reconciled(factory(name));
     assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
     const tree = treeDir(ROOT, name);
     assert.equal(textIn(tree, SCRIPT), SCRIPT_AT.composed);
@@ -729,7 +727,7 @@ describe('a tree written between the resolve and the approval: the approval is r
     assert.ok(after.status.message?.includes(`nemia factory resolve ${name} '${SCRIPT_LINE}'`), after.status.message);
     assert.equal(textIn(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.ours);
     assert.equal(textIn(treeDir(ROOT, name), PICTURES), 'export const pictures = false;\n');
-    assert.equal(reconciled(factory(name)).version, '0.1.0');
+    assert.equal((await reconciled(factory(name))).version, '0.1.0');
   });
 });
 
@@ -743,14 +741,14 @@ describe("a tree whose step carries a harness's block: the resolution's proposal
   s.test('resolved with a file, the workflow is proposed with the block read as its fence', async (t) => {
     await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    const spec = proposalIn(name, proposed).spec.objects[0].spec;
+    const spec = (await proposalIn(name, proposed)).spec.objects[0].spec;
     const implement = spec.steps.find((step: { name: string }) => step.name === 'implement');
     assert.deepEqual(implement.keys.disallowedTools, ['Bash(*:4318*)', 'Bash(*:4317*)']);
   });
   s.test('approved, the upgrade applies, and the applied implement keeps its block', async () => {
     const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
     assert.equal(approved.status.phase, 'applied', approved.status.message);
-    const merged = reconciled(factory(name));
+    const merged = await reconciled(factory(name));
     assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
     const tree = treeDir(ROOT, name);
     assert.equal(textIn(tree, SCRIPT), SCRIPT_AT.composed);

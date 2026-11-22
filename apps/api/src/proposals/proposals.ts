@@ -1,7 +1,8 @@
 /**
  * The proposals group's handlers (`objects`' `Api`): a factory's Proposals, in its namespace, each a named action over its definitions and
- * wiring. Listed (those in one phase by `?fieldSelector=status.phase=<phase>`) and read by anyone; made by any caller of the factory
- * (`proposeProgram`, 201), the caller read off the request (`caller`, caller/caller.ts) and never off the body; approved by the person,
+ * wiring. Listed (those in one phase by `?fieldSelector=status.phase=<phase>`), at the keyspace's revision they were read at
+ * (`proposalsListed`), and read by anyone; made by any caller of the factory (`proposeProgram`, 201), the caller read off the request
+ * (`caller`, caller/caller.ts) and never off the body; approved by the person,
  * or by an agent at auto within its delegation and under a confirmed rule, then applied at once where it is due (`approveProgram`);
  * declined by the person alone (`declineProgram`). Every judgement is the package's: a handler hands it the caller and the place, and
  * answers what it answers.
@@ -10,7 +11,7 @@
  * `Api`'s 403 with its reason, as every refusal is answered by its kind (`refusedAs`); a write the disk refused is `Failed`, a 500 in its
  * own words.
  */
-import { approveProgram, declineProgram, proposalGet, proposalsList, proposalTable, proposeProgram } from 'agent-orchestrator';
+import { approveProgram, declineProgram, proposalGet, proposalsListed, proposalTable, proposeProgram } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
@@ -31,7 +32,9 @@ export const proposalsHandlers = readsBounded(Api, 'proposals', (handlers) =>
     .handle('list', ({ params: { namespace }, query }) =>
       Effect.flatMap(wantsTable, (table) =>
         answeredWriteIn(namespace, async (s) => {
-          const list = listed('Proposal', await s.inRequest(proposalsList(namespace, query.fieldSelector)), queryOf(query));
+          const read = await s.inRequest(proposalsListed(namespace, query.fieldSelector));
+          const page = listed('Proposal', read.items, queryOf(query));
+          const list = { ...page, metadata: { ...page.metadata, resourceVersion: read.resourceVersion } };
           return table ? proposalTable(list) : list;
         }),
       ),

@@ -1,6 +1,6 @@
 /**
  * What the store's reads cost, measured on a copy of it: `node --expose-gc tools/store-measure/report.ts [--from <wf-root>]
- * [--engine <ae-root>] [--repeat N] [--json <file>] [--compare <baseline.json>]`.
+ * [--engine <ae-root>] [--repeat N] [--json <file>] [--compare <baseline.json>] [--factory <name>]`.
  *
  * It copies the workflows' store (`--from`, `WF_ROOT` or `~/.agent-workflows`, its runtime's journals under `engine/` with it) and the
  * runtime's own (`--engine`, `AE_ROOT` or `~/.agent-engine`) into a fresh temp folder, leaving out what no read opens and what would tie
@@ -49,12 +49,13 @@
  *   time holds the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
  *
  * - `factoryList`, `factoryGet`, `factoryCommands`, `scheduleList`, `hireList`, `volumeList`, `mcpServerList`: `GET /api/factories`,
- *   and of the copy's first factory but the default by name, `GET /api/factories/:name`, `…/commands` and
+ *   and of the factory `--factory` names, else the copy's first but the default, by name, `GET /api/factories/:name`, `…/commands` and
  *   `GET /api/namespaces/:name/schedules`, `hires`, `volumes` and `mcpservers`, over apps as `runList` is; null where the copy has no
  *   factory of its own. `libraryAddList`: `GET /api/namespaces/:name/libraryadds` of that factory, the same way: its adds, recorded or
- *   derived from what its workflows resolve. `proposalList`, `proposalWaiting`: `GET /api/namespaces/:name/proposals?limit=500` of that
- *   factory, every proposal whole (the proposals page's read), and the same asked `?fieldSelector=status.phase=waiting` (the factory
- *   pane's line). `cardList`: `GET /api/namespaces/:name/cards?limit=500`, the factory's cards, as `inbox` reads every card.
+ *   derived from what its workflows resolve. `proposalList`, `proposalWaiting`: `GET /api/namespaces/:name/proposals` of that factory,
+ *   the api's default page of proposals whole, and the same asked `?fieldSelector=status.phase=waiting` (the factory pane's line): a
+ *   baseline before s15.json asked `?limit=500`, which a factory's proposals whole pass the api's bound at (`nemia`'s, 13.8 MB in 69).
+ *   `cardList`: `GET /api/namespaces/:name/cards?limit=500`, the factory's cards, as `inbox` reads every card.
  *   `libraryAgents`, `librarySkills`: `GET /api/agents` and `/api/skills` at the store's level, over apps as `runList` is, each item
  *   with the factories that use it, the library's reverse lookup over every factory.
  *   `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the app's informer, as
@@ -88,17 +89,18 @@ export { comparedWith, MEASURES, rendered, type MeasureKey, type Measured, type 
 export const FEED_BACK = 1000;
 
 /** What the command was asked. */
-export type Asked = { from: string; engine: string; repeat: number; json?: string; compare?: string };
+export type Asked = { from: string; engine: string; repeat: number; json?: string; compare?: string; factory?: string };
 
 const USAGE =
-  'usage: node --expose-gc tools/store-measure/report.ts [--from <wf-root>] [--engine <ae-root>] [--repeat N] [--json <file>] [--compare <baseline.json>]';
+  'usage: node --expose-gc tools/store-measure/report.ts [--from <wf-root>] [--engine <ae-root>] [--repeat N] [--json <file>] [--compare <baseline.json>] [--factory <name>]';
 
 /** The arguments, each store an existing folder, or the words that say how to call it. */
 export function argsOf(args: readonly string[], env: NodeJS.ProcessEnv) {
   const given: Record<string, string> = {};
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
-    if (!['--from', '--engine', '--repeat', '--json', '--compare'].includes(flag)) return `${flag} is not a flag of the measure. ${USAGE}`;
+    if (!['--from', '--engine', '--repeat', '--json', '--compare', '--factory'].includes(flag))
+      return `${flag} is not a flag of the measure. ${USAGE}`;
     const value = args[i + 1];
     if (value === undefined || value.startsWith('--')) return `${flag} takes a value. ${USAGE}`;
     given[flag] = value;
@@ -115,7 +117,15 @@ export function argsOf(args: readonly string[], env: NodeJS.ProcessEnv) {
   const repeat = given['--repeat'] ?? '5';
   if (!/^[1-9]\d*$/.test(repeat)) return `--repeat ${repeat} is not a count from 1: --repeat 5. ${USAGE}`;
   const at = (flag: string) => (given[flag] === undefined ? undefined : path.resolve(given[flag]));
-  return { from, engine, repeat: Number(repeat), json: at('--json'), compare: at('--compare') };
+  const factory = given['--factory'];
+  return {
+    from,
+    engine,
+    repeat: Number(repeat),
+    json: at('--json'),
+    compare: at('--compare'),
+    ...(factory === undefined ? {} : { factory }),
+  };
 }
 
 /** The middle of `values`, the mean of the two middle ones for an even count. */
@@ -512,8 +522,8 @@ type OfFactory = (url: (name: string) => string) => Promise<Measured> | null;
  * @param ofFactory Measures a read of the copy's factory, or answers null where it has none.
  */
 const factoryLists = async (ofFactory: OfFactory) => ({
-  proposalList: await ofFactory((f) => `/api/namespaces/${f}/proposals?limit=500`),
-  proposalWaiting: await ofFactory((f) => `/api/namespaces/${f}/proposals?limit=500&fieldSelector=status.phase%3Dwaiting`),
+  proposalList: await ofFactory((f) => `/api/namespaces/${f}/proposals`),
+  proposalWaiting: await ofFactory((f) => `/api/namespaces/${f}/proposals?fieldSelector=status.phase%3Dwaiting`),
   cardList: await ofFactory((f) => `/api/namespaces/${f}/cards?limit=500`),
 });
 
@@ -535,7 +545,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const cards = ((await get(first.app, INBOX_URL)) as { items: { status: { runs: readonly string[] } }[] }).items;
   const factory = ((await get(first.app, '/api/factories?limit=500')) as { items: { metadata: { name: string } }[] }).items
     .map((f) => f.metadata.name)
-    .find((name) => name !== 'default');
+    .find((name) => (asked.factory === undefined ? name !== 'default' : name === asked.factory));
   await first.runtime.dispose();
   const ofFactory = (url: (name: string) => string) =>
     factory === undefined ? null : overApps(fresh, (app) => get(app, url(encodeURIComponent(factory))), repeat);

@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { scratch } from 'test-kit/scratch';
 import { argsOf, invariantRefusals, MEASURES, rootAsWritten, type StoreMeasure } from '../../store-measure/report.ts';
 import { copyStore, destinationRefusal, gitVerdict, installFence, LEFT_OUT, readOnlyPlace } from '../../store-measure/fence.ts';
@@ -103,6 +104,35 @@ test('the copy leaves the checkouts, the logs, the daemon file and the holder to
   assert.ok(LEFT_OUT.some((l) => l.path === 'worktrees'));
   assert.equal(copied.files, 4);
   assert.deepEqual([...copied.leftOut].sort(), ['api.log', 'daemon.json', 'engine/a2a', 'worktrees']);
+});
+
+test('the keyspace is copied as one snapshot SQLite takes, what its log holds included, and its log and index files left', () => {
+  const from = scratch('store-measure-from-');
+  fs.mkdirSync(path.join(from, 'db'));
+  const live = new DatabaseSync(path.join(from, 'db', 'state.db'));
+  live.exec('PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0; CREATE TABLE kine (id INTEGER PRIMARY KEY, name TEXT)');
+  live.exec("INSERT INTO kine (name) VALUES ('/registry/proposals/acme/a')");
+  try {
+    assert.ok(fs.existsSync(path.join(from, 'db', 'state.db-wal')), 'the live file holds its last write in its log');
+    const to = path.join(scratch('store-measure-copy-'), 'wf');
+    const copied = copyStore(from, to);
+    assert.deepEqual(fs.readdirSync(path.join(to, 'db')), ['state.db']);
+    assert.equal(copied.files, 1);
+    const copy = new DatabaseSync(path.join(to, 'db', 'state.db'), { readOnly: true });
+    try {
+      assert.deepEqual(
+        copy
+          .prepare('SELECT name FROM kine')
+          .all()
+          .map((row) => ({ ...row })),
+        [{ name: '/registry/proposals/acme/a' }],
+      );
+    } finally {
+      copy.close();
+    }
+  } finally {
+    live.close();
+  }
 });
 
 test('the place the measure reads through answers a read and refuses a write, never asking the place under it', () => {

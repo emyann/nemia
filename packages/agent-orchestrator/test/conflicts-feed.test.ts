@@ -109,7 +109,7 @@ describe("a factory's upgrade conflicts said on the feed: one line when they tur
     fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n\nWrite the tests first.\n');
     for (const name of ['acme', 'quiet']) {
       await handedTo('factory', 'apply', name, '--template', dir, '--volume', `${repo}:rw`);
-      reconciled(factory(name));
+      await reconciled(factory(name));
     }
     await pass();
     assert.deepEqual(factorySaid(), []);
@@ -121,7 +121,7 @@ describe("a factory's upgrade conflicts said on the feed: one line when they tur
     fs.writeFileSync(path.join(dir, 'nemia.yaml'), stringify(doc, { lineWidth: 0 }));
     rewrite(dir, 'Never push on a Friday.', 'Never push on a weekend.');
     await handedTo('factory', 'upgrade', 'acme', '--to', '0.2.0');
-    const status = reconciled(factory('acme'));
+    const status = await reconciled(factory('acme'));
     assert.deepEqual(
       status.conditions.filter((c) => c.type === 'ConflictsPending').map((c) => c.status),
       ['True'],
@@ -147,7 +147,7 @@ describe("a factory's upgrade conflicts said on the feed: one line when they tur
       await resolvedBy(sub, 'acme', LINE, '--theirs');
       const proposal = readResolutions(ROOT, 'acme')?.proposals?.['Factory/acme'] ?? '';
       await stage.runWith(stage.board().e, approveProgram(PERSON, 'acme', proposal, { home: ROOT }));
-      const status = reconciled(factory('acme'));
+      const status = await reconciled(factory('acme'));
       assert.deepEqual(
         status.conditions.filter((c) => c.type === 'ConflictsPending').map((c) => [c.status, c.reason]),
         [['False', 'Merged']],

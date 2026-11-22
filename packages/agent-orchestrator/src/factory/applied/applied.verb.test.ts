@@ -172,7 +172,7 @@ describe('what apply and a start of a templated factory refuse, by kind and exit
     exportTemplate({ dir, from });
     const lacking = repoWithTeam();
     await apply('nested', dir, lacking);
-    reconciled(templated('nested'));
+    await reconciled(templated('nested'));
     const step = fs.readFileSync(path.join(treeDir(ROOT, 'nested'), 'workflows', 'dev', 'implement.md'), 'utf8');
     assert.match(step, /^skills: app:y$/m, 'the applied step names the skill as the template does');
     assert.equal(fs.existsSync(path.join(treeDir(ROOT, 'nested'), 'workflows', 'skills', 'y')), false, 'and the tree carries none');
@@ -212,7 +212,7 @@ describe('what the controller says of a template or parameters moved since the r
     vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('drifted', dir, repo, '--set', 'budget=7');
-    const first = reconciled(templated('drifted'));
+    const first = await reconciled(templated('drifted'));
     edit(dir, 'nemia.yaml', (spec) => {
       spec.version = '0.2.0';
     });
@@ -221,7 +221,7 @@ describe('what the controller says of a template or parameters moved since the r
     });
     const listed = () => readFactoriesAt(ROOT).find((f) => f.name === 'drifted') as { status?: unknown };
     assert.deepEqual(listed().status, { applied: '0.1.0', conditions: first.conditions }, 'the listing reads what the controller wrote');
-    const status = reconciled(templated('drifted'));
+    const status = await reconciled(templated('drifted'));
     assert.deepEqual(listed().status, { applied: '0.1.0', conditions: status.conditions });
     const { message: drift, lastTransitionTime: _driftedAt, ...drifted } = status.conditions[0];
     assert.deepEqual(drifted, { type: 'Applied', status: 'False', reason: 'VersionDrift' });
@@ -230,13 +230,13 @@ describe('what the controller says of a template or parameters moved since the r
     assert.equal(status.digest, first.digest);
     assert.doesNotMatch(fs.readFileSync(path.join(treeDir(ROOT, 'drifted'), 'workflows/dev/review.md'), 'utf8'), /^rounds: 5$/m);
     fs.writeFileSync(path.join(dir, 'nemia.yaml'), 'not: [yaml');
-    assert.equal(reconciled(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
+    assert.equal((await reconciled(templated('drifted'))).conditions[0].reason, 'TemplateInvalid');
   });
   test("parameters changed in the factory's file alone are merged at its version; changed with the template's files under it, said by Applied, base and tree kept", async () => {
     vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('moved', dir, repo, '--set', 'budget=7');
-    const first = reconciled(templated('moved'));
+    const first = await reconciled(templated('moved'));
     const file = path.join(FACTORIES, 'moved.json');
     const params = (budget: number) => {
       const content = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -245,7 +245,7 @@ describe('what the controller says of a template or parameters moved since the r
     };
     const review = (folder: string) => fs.readFileSync(path.join(folder, 'workflows/dev/review.md'), 'utf8');
     params(9);
-    const merged = reconciled(templated('moved'));
+    const merged = await reconciled(templated('moved'));
     assert.deepEqual([merged.version, merged.conditions[0].reason, merged.params.budget], ['0.1.0', 'Upgraded', 9]);
     assert.match(review(appliedDir(ROOT, 'moved')), /^budget: 9$/m);
     assert.match(review(treeDir(ROOT, 'moved')), /^budget: 9$/m);
@@ -255,7 +255,7 @@ describe('what the controller says of a template or parameters moved since the r
       spec.steps[1].rounds = 5;
     });
     params(11);
-    const both = reconciled(templated('moved'));
+    const both = await reconciled(templated('moved'));
     const { message: moved, lastTransitionTime: _movedAt, ...together } = both.conditions[0];
     assert.deepEqual(together, { type: 'Applied', status: 'False', reason: 'ParamsChanged' });
     assert.ok(moved.includes('nemia factory diff moved --to <version> --set'), moved);
@@ -264,7 +264,7 @@ describe('what the controller says of a template or parameters moved since the r
     assert.match(review(appliedDir(ROOT, 'moved')), /^budget: 9$/m);
     assert.match(review(treeDir(ROOT, 'moved')), /^budget: 9$/m);
     fs.writeFileSync(workflow, released);
-    const restored = reconciled(templated('moved'));
+    const restored = await reconciled(templated('moved'));
     assert.deepEqual(
       [restored.conditions[0].reason, restored.params.budget],
       ['Upgraded', 11],
@@ -274,7 +274,7 @@ describe('what the controller says of a template or parameters moved since the r
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
     });
-    const edited = reconciled(templated('moved'));
+    const edited = await reconciled(templated('moved'));
     const { message: changedWords, lastTransitionTime: _editedAt, ...contentChanged } = edited.conditions[0];
     assert.deepEqual(contentChanged, { type: 'Applied', status: 'False', reason: 'ContentChanged' });
     assert.ok(changedWords.includes('0.1.0'), changedWords);
@@ -301,45 +301,45 @@ describe("the controller stamps each condition with when its status last moved, 
   const times = (status: { conditions: readonly { type: string; status: string; lastTransitionTime?: string }[] }) =>
     status.conditions.map((c) => [c.type, c.status, c.lastTransitionTime]);
   const at = ['2026-11-01T09:00:00.000Z', '2026-11-01T09:00:05.000Z', '2026-11-01T09:00:10.000Z', '2026-11-01T09:00:15.000Z'];
-  test('a condition the factory did not have is stamped with the time of the pass', () => {
-    assert.deepEqual(times(reconciledAt(templated('stamped'), at[0])), [
+  test('a condition the factory did not have is stamped with the time of the pass', async () => {
+    assert.deepEqual(times(await reconciledAt(templated('stamped'), at[0])), [
       ['Applied', 'True', at[0]],
       ['ConflictsPending', 'False', at[0]],
     ]);
   });
-  test('a pass that observes the same status keeps the time each condition moved, and writes nothing', () => {
+  test('a pass that observes the same status keeps the time each condition moved, and writes nothing', async () => {
     const before = fs.readFileSync(statusFile(ROOT, 'stamped'), 'utf8');
-    assert.deepEqual(times(reconciledAt(templated('stamped'), at[1])), [
+    assert.deepEqual(times(await reconciledAt(templated('stamped'), at[1])), [
       ['Applied', 'True', at[0]],
       ['ConflictsPending', 'False', at[0]],
     ]);
     assert.equal(fs.readFileSync(statusFile(ROOT, 'stamped'), 'utf8'), before);
   });
-  test("a condition whose status flips is stamped with the pass's time, the other keeps its own", () => {
-    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+  test("a condition whose status flips is stamped with the pass's time, the other keeps its own", async () => {
+    edit(dir, 'workflows/dev/workflow.yaml', async (spec) => {
       spec.steps[1].rounds = 5;
     });
-    assert.deepEqual(times(reconciledAt(templated('stamped'), at[2])), [
+    assert.deepEqual(times(await reconciledAt(templated('stamped'), at[2])), [
       ['Applied', 'False', at[2]],
       ['ConflictsPending', 'False', at[0]],
     ]);
   });
-  test('a status written before the field is stamped with the time of the pass that reads it', () => {
+  test('a status written before the field is stamped with the time of the pass that reads it', async () => {
     const status = JSON.parse(fs.readFileSync(statusFile(ROOT, 'stamped'), 'utf8'));
     for (const c of status.conditions) delete c.lastTransitionTime;
     fs.writeFileSync(statusFile(ROOT, 'stamped'), JSON.stringify(status));
-    assert.deepEqual(times(reconciledAt(templated('stamped'), at[3])), [
+    assert.deepEqual(times(await reconciledAt(templated('stamped'), at[3])), [
       ['Applied', 'False', at[3]],
       ['ConflictsPending', 'False', at[3]],
     ]);
   });
-  test("observedGeneration is the factory's generation the pass read: 1 for a file without one, else its own", () => {
+  test("observedGeneration is the factory's generation the pass read: 1 for a file without one, else its own", async () => {
     const content = JSON.parse(fs.readFileSync(file, 'utf8'));
     delete content.generation;
     fs.writeFileSync(file, JSON.stringify(content));
-    assert.equal(reconciledAt(templated('stamped'), at[3]).observedGeneration, 1);
+    assert.equal((await reconciledAt(templated('stamped'), at[3])).observedGeneration, 1);
     fs.writeFileSync(file, JSON.stringify({ ...content, generation: 5 }));
-    assert.equal(reconciledAt(templated('stamped'), at[3]).observedGeneration, 5);
+    assert.equal((await reconciledAt(templated('stamped'), at[3])).observedGeneration, 5);
     assert.equal(readStatus(ROOT, 'stamped')?.observedGeneration, 5, 'and it is written');
   });
 });
@@ -356,18 +356,18 @@ describe('the controller names the template a base holds, even where the base is
     vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('as-rendered', dir, repo, '--set', 'budget=7');
-    assert.equal(reconciled(templated('as-rendered')).template, 'team');
+    assert.equal((await reconciled(templated('as-rendered'))).template, 'team');
   });
   test("the template's files changed under its version (ContentChanged): the base is named after the template the file names", async () => {
     vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('content', dir, repo, '--set', 'budget=7');
-    reconciled(templated('content'));
+    await reconciled(templated('content'));
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
     });
     unnamed('content');
-    const status = reconciled(templated('content'));
+    const status = await reconciled(templated('content'));
     assert.deepEqual([status.conditions[0].reason, status.template], ['ContentChanged', 'team']);
     assert.equal(readStatus(ROOT, 'content')?.template, 'team', 'and written');
   });
@@ -375,19 +375,19 @@ describe('the controller names the template a base holds, even where the base is
     vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('drift', dir, repo, '--set', 'budget=7');
-    reconciled(templated('drift'));
+    await reconciled(templated('drift'));
     edit(dir, 'nemia.yaml', (spec) => {
       spec.version = '0.2.0';
     });
     unnamed('drift');
-    const status = reconciled(templated('drift'));
+    const status = await reconciled(templated('drift'));
     assert.deepEqual([status.conditions[0].reason, status.template], ['VersionDrift', 'team']);
   });
   test("the parameters in the factory's file changed with the template's files under its version (ParamsChanged): named", async () => {
     vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('params', dir, repo, '--set', 'budget=7');
-    reconciled(templated('params'));
+    await reconciled(templated('params'));
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
     });
@@ -396,21 +396,21 @@ describe('the controller names the template a base holds, even where the base is
     content.template.params.budget = 9;
     fs.writeFileSync(file, JSON.stringify(content));
     unnamed('params');
-    const status = reconciled(templated('params'));
+    const status = await reconciled(templated('params'));
     assert.deepEqual([status.conditions[0].reason, status.template], ['ParamsChanged', 'team']);
   });
   test("an upgrade under way: the factory's file names the template wanted, not the base's, so no name is written", async () => {
     vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('under-way', dir, repo, '--set', 'budget=7');
-    reconciled(templated('under-way'));
+    await reconciled(templated('under-way'));
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
     });
     unnamed('under-way', (status) => {
       status.upgrade = { from: '0.1.0', to: '0.2.0', conflicts: [] };
     });
-    assert.equal(reconciled(templated('under-way')).template, undefined);
+    assert.equal((await reconciled(templated('under-way'))).template, undefined);
   });
 });
 
@@ -424,7 +424,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
       refusedNaming('Conflict', 'nemia up'),
     );
     await assert.rejects(async () => followed(ROOT, 'wired', 'follow'), refusedNaming('Conflict', 'nemia up'));
-    reconciled(templated('wired'));
+    await reconciled(templated('wired'));
     const own = fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8');
     const wiring = () => JSON.parse(fs.readFileSync(path.join(treeDir(ROOT, 'wired'), 'factory.json'), 'utf8'));
     assert.deepEqual(readFactoryAt(ROOT, 'wired').workflows, ['dev', 'triage']);
@@ -478,7 +478,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     fs.writeFileSync(words, 'Operate the tree.\n');
     await assert.rejects(instruct('told', words), refusedWith('Conflict', /its tree is not rendered yet/));
     assert.equal(fs.existsSync(treeDir(ROOT, 'told')), false, 'an instruct refused seeds no tree');
-    reconciled(templated('told'));
+    await reconciled(templated('told'));
     await instruct('told', words);
     assert.equal(fs.readFileSync(path.join(treeDir(ROOT, 'told'), 'NEMIA.md'), 'utf8'), 'Operate the tree.\n');
     await assert.rejects(
@@ -521,7 +521,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
       await assert.rejects(handled(write), refusedWith('Invalid', /plain is not made from a template/));
     for (const write of writes(besideDraft, 'written', 'user')) await assert.rejects(handled(write), refusedWith('Invalid', /--factory/));
     assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'a refused write writes nothing of yours');
-    reconciled(templated('written'));
+    await reconciled(templated('written'));
     const { places, fills } = factoryDraftOf(ROOT, 'written', 'lean');
     for (const write of writes(await handled(draftSteps(bare, places, fills)), 'written')) await handled(write);
     const tree = path.join(treeDir(ROOT, 'written'), 'workflows');
@@ -593,7 +593,7 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
       version: '0.1.0',
       params: done.template.params,
     });
-    const status = programsAt(ROOT, s.builtins).reconciled(templated('named'));
+    const status = await programsAt(ROOT, s.builtins).reconciled(templated('named'));
     assert.deepEqual([status.conditions[0].reason, status.version], ['Rendered', '0.1.0']);
     assert.ok(fs.existsSync(path.join(treeDir(ROOT, 'named'), 'workflows/dev/review.md')), 'the tree is seeded');
   });
@@ -602,7 +602,7 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
     fs.cpSync(s.builtins, moved, { recursive: true });
     fs.rmSync(s.builtins, { recursive: true });
     const before = fs.readFileSync(s.file, 'utf8');
-    assert.equal(programsAt(ROOT, moved).reconciled(templated('named')).conditions[0].reason, 'Rendered');
+    assert.equal((await programsAt(ROOT, moved).reconciled(templated('named'))).conditions[0].reason, 'Rendered');
     assert.equal(fs.readFileSync(s.file, 'utf8'), before);
     s.builtins = moved;
   });
@@ -614,7 +614,7 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
     });
-    const drift = programsAt(ROOT, s.builtins).reconciled(templated('named'));
+    const drift = await programsAt(ROOT, s.builtins).reconciled(templated('named'));
     assert.equal(drift.conditions[0].reason, 'VersionDrift');
     const volumes = [{ path: scratch('wf-applied-kept-'), readOnly: false }];
     const harnessSettings = { claude: { attribution: { commit: '', pr: '' } } };
@@ -630,13 +630,13 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
     assert.deepEqual([source, version], ['team', '0.2.0']);
     assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).volumes, volumes, 'an upgrade keeps the volumes');
     assert.deepEqual(JSON.parse(fs.readFileSync(s.file, 'utf8')).harnessSettings, harnessSettings, 'and the harness settings');
-    assert.equal(programsAt(ROOT, s.builtins).reconciled(templated('named')).conditions[0].reason, 'Upgraded');
+    assert.equal((await programsAt(ROOT, s.builtins).reconciled(templated('named'))).conditions[0].reason, 'Upgraded');
   });
   test('REFUSED by the controller: a recorded name no builtin template has any longer is TemplateInvalid, its base and tree kept', async () => {
     const digest = readStatus(ROOT, 'named')?.digest;
     const { template: _named, ...unnamed } = JSON.parse(fs.readFileSync(statusFile(ROOT, 'named'), 'utf8'));
     fs.writeFileSync(statusFile(ROOT, 'named'), JSON.stringify(unnamed));
-    const gone = programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
+    const gone = await programsAt(ROOT, scratch('wf-applied-none-')).reconciled(templated('named'));
     assert.equal(gone.template, 'team', 'a builtin is named by the name it is recorded by, even where none has it any longer');
     const { message, lastTransitionTime: _goneAt, ...applied } = gone.conditions[0];
     assert.deepEqual(applied, { type: 'Applied', status: 'False', reason: 'TemplateInvalid' });

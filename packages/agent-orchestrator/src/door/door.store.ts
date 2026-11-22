@@ -3,7 +3,10 @@
  * through which an aggregate is read and written, each method an Effect whose failure is a refusal (`Refusal`); its layers — the files
  * and a memory stand-in — are each a plain value of synchronous methods turned into the door's shape by `doorOf`, and the write a layer
  * takes is checked first, on every layer, by the aggregate's own schema (`checked`), so a write that breaks an invariant is refused the
- * same way whichever layer holds the records. The walks that hold the layers to one table are the tests' (`test/door-walks.ts`).
+ * same way whichever layer holds the records. A door whose records are in the keyspace answers its shape's Effects itself, with no
+ * synchronous layer under it: the Proposal door (`src/proposal/proposal.store.ts`, over `src/keyspace/keyspace.store.ts`), whose
+ * stand-in is the same code over a keyspace in memory. The walks that hold the layers to one table are the tests' (`test/door-walks.ts`,
+ * `walkedOn` for a door that answers its Effects itself).
  *
  * A door whose files are under the store's root is rooted (`rootedDoor`): its default reads the root the program is given, `StoreRoot`,
  * when a method runs, and is refused where none was given, so a door never reads a root of its own module's.

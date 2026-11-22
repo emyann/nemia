@@ -5,7 +5,8 @@
  * file names no aggregate.
  *
  * A walk's acts are Effects, run at once (`act`): what one succeeds with, or `{ refused: <kind> }` for a refusal, since each layer words
- * its own. An answer is compared after `told`, the side's root read as `<root>`. What one layer alone can be asked — a file planted on
+ * its own; a door whose layer may suspend is walked the same way by `walkedOn`, its acts awaited (`acted`, `settled`). An answer is
+ * compared after `told`, the side's root read as `<root>`. What one layer alone can be asked — a file planted on
  * disk, the store's pause — is a test of that layer's own file, never a walk. `unwalked` names a method with no walk.
  */
 import assert from 'node:assert/strict';
@@ -79,4 +80,51 @@ export function walksOn<D extends object>(walks: Readonly<Record<string, readonl
       ),
     ),
   ] satisfies Array<readonly [name: string, body: () => void]>;
+}
+
+/** An act of a door whose layer may suspend, run to its end: what it succeeded with, or `{ refused }` naming the refusal's kind. */
+export async function acted<A>(effect: Effect.Effect<A, { readonly _tag: string }>) {
+  const exit = await Effect.runPromiseExit(effect);
+  if (Exit.isSuccess(exit)) return exit.value satisfies A | { refused: string };
+  const failed = exit.cause.reasons.find(Cause.isFailReason);
+  if (failed) return { refused: failed.error._tag } satisfies A | { refused: string };
+  throw Cause.squash(exit.cause);
+}
+
+/** An act of a door whose layer may suspend, that must succeed: what it succeeded with; a refusal fails the walk. */
+export async function settled<A>(effect: Effect.Effect<A, { readonly _tag: string }>) {
+  const answer = await acted(effect);
+  if (typeof answer === 'object' && answer !== null && 'refused' in answer) assert.fail(`refused as ${String(answer.refused)}`);
+  return answer satisfies A;
+}
+
+/** One walk of a door whose layer may suspend: what it shows, what it asks of a side, and the one answer every side gives. */
+export type AsyncDoorWalk<D> = {
+  readonly name: string;
+  readonly walk: (side: DoorSide<D>) => Promise<unknown>;
+  readonly says: unknown;
+};
+
+/** `walksOn` for a door whose layer may suspend: each walk awaited, on a side new for each walk. */
+export function walkedOn<D extends object>(walks: Readonly<Record<string, readonly AsyncDoorWalk<D>[]>>, sideOf: () => DoorSide<D>) {
+  const first = sideOf();
+  const covered: readonly [string, () => Promise<void>] = [
+    `every method of the door has a walk, on ${first.layer}`,
+    async () => assert.deepEqual(unwalked(first.door, walks), []),
+  ];
+  return [
+    covered,
+    ...Object.entries(walks).flatMap(([method, list]) =>
+      list.map(
+        (w) =>
+          [
+            `${method}: ${w.name}`,
+            async () => {
+              const side = sideOf();
+              assert.deepEqual(told(await w.walk(side), side.root), w.says);
+            },
+          ] as const,
+      ),
+    ),
+  ] satisfies Array<readonly [name: string, body: () => Promise<void>]>;
 }

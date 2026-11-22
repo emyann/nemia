@@ -13,10 +13,11 @@ export type { Version };
 
 /**
  * The oldest release that reads what this release writes to the store. A release that changes what the store holds so that an older one
- * would misread it raises this to its own version: v1.26.0 has, as each factory's file holds one list of volumes, which a release before
- * it reads as a factory on no repository.
+ * would misread it raises this to its own version: v1.26.0 did, as each factory's file holds one list of volumes, which a release before
+ * it reads as a factory on no repository; and v1.36.0 has, as a factory's proposals are records of the keyspace (`<store>/db/state.db`)
+ * and their files moved aside, which a release before it reads as none.
  */
-export const STORE_READABLE_FROM: Version = { major: 1, minor: 26, patch: 0 };
+export const STORE_READABLE_FROM: Version = { major: 1, minor: 36, patch: 0 };
 
 /**
  * A release's version as its tag or `release.json` says it, `v1.2.3` or `1.2.3`, read as three whole numbers; null for anything else,

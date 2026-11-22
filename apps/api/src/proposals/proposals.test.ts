@@ -248,6 +248,17 @@ describe('a proposal filed by a live session names its agent, run and step; the 
     assert.deepEqual(await phases('status.phase!=applied'), ['declined']);
     assert.deepEqual((await phases('')).sort(), ['applied', 'declined']);
   });
+  test("a list's resourceVersion is the store's revision it was read at: digits, at least each item's, with and without a fieldSelector", async () => {
+    for (const query of ['', `?fieldSelector=${encodeURIComponent('status.phase=applied')}`]) {
+      const res = await app().request(`${ns}/proposals${query}`);
+      assert.equal(res.status, 200, query);
+      const list = (await res.json()) as { metadata: { resourceVersion?: string }; items: Proposal[] };
+      assert.match(list.metadata.resourceVersion ?? '', /^\d+$/, query);
+      assert.ok(list.items.length > 0, query);
+      for (const item of list.items)
+        assert.ok(Number(list.metadata.resourceVersion) >= Number(item.metadata.resourceVersion), `${query} ${item.metadata.name}`);
+    }
+  });
   test('REFUSED: a fieldSelector that names no phase, or another field, is 422', async () => {
     for (const selector of ['status.phase=pending', 'status.state=waiting'])
       assert.equal((await app().request(`${ns}/proposals?fieldSelector=${encodeURIComponent(selector)}`)).status, 422, selector);

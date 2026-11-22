@@ -4,6 +4,7 @@
  * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; a step's own closeout schema; the factory's rules,
  * `RULES.md`, carried as any file of the tree is; choices made for another version; a status lost; and a swap whose rename fails.
  */
+import { proposalsHeld } from '../../../test/proposal-walks.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -83,7 +84,7 @@ async function applied(name: string, rules?: string) {
     spec.steps[1].budget = { param: 'budget' };
   });
   await main(['factory', 'apply', name, '--template', dir, '--volume', `${repo}:rw`, '--set', 'budget=7'], noEngine());
-  reconciled(templated(name));
+  await reconciled(templated(name));
   return { dir, repo };
 }
 
@@ -180,7 +181,7 @@ describe('an upgrade with no conflict, up or down: filed alone, then merged by t
     released(dir, '0.0.9', 5);
     await main(['factory', 'upgrade', 'lowered', '--to', '0.0.9', '--downgrade'], noEngine());
     assert.equal(templated('lowered').template.version, '0.0.9');
-    assert.equal(reconciled(templated('lowered')).version, '0.0.9');
+    assert.equal((await reconciled(templated('lowered'))).version, '0.0.9');
     assert.match(textIn(treeDir(ROOT, 'lowered'), REVIEW), /^rounds: 5$/m);
   });
   test("a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing", async () => {
@@ -199,7 +200,7 @@ describe('an upgrade with no conflict, up or down: filed alone, then merged by t
       'the template wanted is a change of its spec, counted',
     );
     assert.deepEqual(bytesUnder(path.join(FACTORIES, 'clean')), folder, 'the upgrade writes no tree, base nor status');
-    const status = reconciled(templated('clean'));
+    const status = await reconciled(templated('clean'));
     assert.equal(status.version, '0.2.0');
     assert.deepEqual(
       status.conditions.map((c) => [c.type, c.status, c.reason]),
@@ -218,7 +219,7 @@ describe('an upgrade with no conflict, up or down: filed alone, then merged by t
     assert.equal(fs.statSync(path.join(appliedDir(ROOT, 'clean'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
     const written = fs.statSync(statusFile(ROOT, 'clean')).mtimeMs;
     const tree = bytesUnder(treeDir(ROOT, 'clean'));
-    assert.deepEqual(reconciled(templated('clean')), status);
+    assert.deepEqual(await reconciled(templated('clean')), status);
     assert.equal(fs.statSync(statusFile(ROOT, 'clean')).mtimeMs, written, 'a second pass writes no status');
     assert.deepEqual(bytesUnder(treeDir(ROOT, 'clean')), tree, 'nor a tree');
     await assert.rejects(
@@ -308,7 +309,7 @@ test('an upgrade onto a template that declares other parameters: --set given, th
     generation: 2,
   });
   assert.deepEqual(bytesUnder(path.join(FACTORIES, 'onto')), folder, 'the upgrade writes no tree, base nor status');
-  const status = reconciled(templated('onto'));
+  const status = await reconciled(templated('onto'));
   assert.equal(status.version, '0.2.0');
   assert.deepEqual(
     status.conditions.map((c) => [c.type, c.status, c.reason]),
@@ -333,7 +334,7 @@ test("a step's own closeout schema carried by an upgrade: its line merged into a
   });
   fs.writeFileSync(path.join(dir, SCHEMA), STEP_OUTPUT_SCHEMA);
   await main(['factory', 'upgrade', 'schemed', '--to', '0.2.0'], noEngine());
-  const status = reconciled(templated('schemed'));
+  const status = await reconciled(templated('schemed'));
   assert.equal(status.version, '0.2.0');
   assert.equal(status.upgrade, undefined, 'no conflict');
   const step = textIn(treeDir(ROOT, 'schemed'), IMPLEMENT);
@@ -351,7 +352,7 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
     released(dir, '0.2.0', 5);
     fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n');
     await main(['factory', 'upgrade', 'ruled', '--to', '0.2.0'], noEngine());
-    const status = reconciled(templated('ruled'));
+    const status = await reconciled(templated('ruled'));
     assert.equal(status.version, '0.2.0');
     assert.equal(status.upgrade, undefined, 'no conflict');
     assert.equal(textIn(treeDir(ROOT, 'ruled'), RULES), 'Never push on a Friday.\n');
@@ -371,7 +372,7 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
     released(dir, '0.2.0', 5);
     fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
     await main(['factory', 'upgrade', 'both', '--to', '0.2.0'], noEngine());
-    const waiting = reconciled(templated('both'));
+    const waiting = await reconciled(templated('both'));
     assert.equal(waiting.version, '0.1.0');
     assert.deepEqual(waiting.upgrade?.conflicts, [
       { at: RULES, base: null, ours: 'Ours: push whenever.\n', theirs: 'Theirs: never push on a Friday.\n' },
@@ -380,11 +381,11 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
     await main(['factory', 'resolve', 'both', RULES, '--theirs'], noEngine());
     const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'both'), 'utf8')).proposals?.['Factory/both'] ?? '';
     assert.ok(proposal, 'the rules are proposed as the Factory');
-    const recorded = reconciled(templated('both'));
+    const recorded = await reconciled(templated('both'));
     assert.equal(recorded.version, '0.1.0', 'the merge waits on the proposal');
     assert.deepEqual(recorded.upgrade?.conflicts[0]?.proposal, { name: proposal, phase: 'waiting' }, 'the status names it');
     await runWith(noEngine(), approveProgram(PERSON, 'both', proposal, { home: ROOT }));
-    const merged = reconciled(templated('both'));
+    const merged = await reconciled(templated('both'));
     assert.equal(merged.version, '0.2.0');
     assert.equal(merged.upgrade, undefined);
     assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Theirs: never push on a Friday.\n');
@@ -398,7 +399,7 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
     released(dir, '0.2.0', 5);
     rewrite(dir, RULES, 'before a migration', 'before any migration');
     await main(['factory', 'upgrade', 'lined', '--to', '0.2.0'], noEngine());
-    const status = reconciled(templated('lined'));
+    const status = await reconciled(templated('lined'));
     assert.equal(status.version, '0.2.0');
     assert.equal(status.upgrade, undefined, 'no conflict');
     assert.equal(
@@ -422,7 +423,7 @@ test('choices made for another version are not merged, and the next resolve drop
   rewrite(dir, README, '# dev, theirs\n', '# dev, three\n');
   await main(['factory', 'upgrade', 'stale', '--to', '0.3.0'], noEngine());
   const tree = bytesUnder(treeDir(ROOT, 'stale'));
-  const waiting = reconciled(templated('stale'));
+  const waiting = await reconciled(templated('stale'));
   assert.deepEqual(
     waiting.upgrade?.conflicts.map((c) => c.at),
     [`${README}:1-1`, `${REVIEW}#rounds`],
@@ -437,7 +438,7 @@ test('choices made for another version are not merged, and the next resolve drop
     choices: { [`${README}:1-1`]: 'theirs' },
   });
   assert.deepEqual(
-    reconciled(templated('stale')).upgrade?.conflicts.map((c) => [c.at, c.proposal]),
+    (await reconciled(templated('stale'))).upgrade?.conflicts.map((c) => [c.at, c.proposal]),
     [
       [`${README}:1-1`, undefined],
       [`${REVIEW}#rounds`, undefined],
@@ -455,7 +456,7 @@ test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with tex
   const broken = path.join(scratch('wf-upgrade-unread-'), 'rounds.md');
   fs.writeFileSync(broken, 'rounds: [5\n');
   await assert.rejects(main(['factory', 'resolve', 'unread', `${REVIEW}#rounds`, '--file', broken], noEngine()), refusedWith('Invalid'));
-  assert.equal(fs.existsSync(path.join(FACTORIES, 'unread', 'proposals')), false, 'nothing is proposed');
+  assert.deepEqual(await proposalsHeld(ROOT, 'unread'), [], 'nothing is proposed');
   const kept = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'unread'), 'utf8'));
   assert.deepEqual([kept.choices, kept.proposals], [{ [`${REVIEW}#rounds`]: { text: 'rounds: [5\n' } }, undefined]);
 });
@@ -490,7 +491,7 @@ describe('a parameter set again at the version applied: previewed, filed with it
       generation: 2,
     });
     assert.deepEqual(bytesUnder(path.join(FACTORIES, 'reset')), folder, 'the upgrade writes no tree, base nor status');
-    const status = reconciled(templated('reset'));
+    const status = await reconciled(templated('reset'));
     assert.deepEqual([status.version, status.params], ['0.1.0', { budget: 9 }]);
     assert.deepEqual(
       status.conditions.map((c) => [c.type, c.status, c.reason]),
@@ -531,7 +532,7 @@ describe('a parameter set again at the version applied: previewed, filed with it
     };
     rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 7', 'budget: 8');
     await set(9);
-    const waiting = reconciled(templated('clash'));
+    const waiting = await reconciled(templated('clash'));
     assert.deepEqual(
       [waiting.conditions[1].status, waiting.conditions[1].reason, waiting.upgrade?.conflicts.map((c) => c.at)],
       ['True', 'Conflicts', [`${REVIEW}#budget`]],
@@ -547,13 +548,13 @@ describe('a parameter set again at the version applied: previewed, filed with it
       choices: { [`${REVIEW}#budget`]: 'theirs' },
       proposals: { 'Workflow/dev': proposal },
     });
-    assert.equal(reconciled(templated('clash')).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
+    assert.equal((await reconciled(templated('clash'))).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
     await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT }));
-    assert.equal(reconciled(templated('clash')).conditions[0].reason, 'Upgraded');
+    assert.equal((await reconciled(templated('clash'))).conditions[0].reason, 'Upgraded');
     assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 9$/m);
     rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 9', 'budget: 6');
     await set(11);
-    const again = reconciled(templated('clash'));
+    const again = await reconciled(templated('clash'));
     assert.deepEqual(
       again.upgrade?.conflicts.map((c) => c.at),
       [`${REVIEW}#budget`],
@@ -573,7 +574,7 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   fs.rmSync(statusFile(ROOT, 'lost'));
   const tree = bytesUnder(treeDir(ROOT, 'lost'));
   const base = bytesUnder(appliedDir(ROOT, 'lost'));
-  const unknown = reconciled(templated('lost'));
+  const unknown = await reconciled(templated('lost'));
   assert.equal(unknown.version, null, 'the base is not the render, and no status names its version');
   assert.deepEqual([unknown.conditions[0].status, unknown.conditions[0].reason], ['False', 'VersionUnknown']);
   assert.match(unknown.conditions[0].message, /nemia factory upgrade lost --to <it>/);
@@ -585,10 +586,10 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   );
 
   await main(['factory', 'upgrade', 'lost', '--to', '0.1.0', '--template', old], noEngine());
-  const named = reconciled(templated('lost'));
+  const named = await reconciled(templated('lost'));
   assert.deepEqual([named.version, named.conditions[0].reason], ['0.1.0', 'Rendered']);
   await main(['factory', 'upgrade', 'lost', '--to', '0.2.0', '--template', dir], noEngine());
-  const merged = reconciled(templated('lost'));
+  const merged = await reconciled(templated('lost'));
   assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
   assert.match(textIn(treeDir(ROOT, 'lost'), REVIEW), /^rounds: 5$/m);
 });
@@ -658,7 +659,7 @@ describe('--template names a builtin template by its name: an upgrade records th
   test('a factory applied from a folder, upgraded with --template <name>, records the name', async () => {
     await handledWith(builtins, FACTORY_UPGRADE, { factory: 'from-folder', to: '0.2.0', template: 'team' });
     assert.deepEqual(templated('from-folder').template.source, 'team');
-    assert.equal(programsAt(ROOT, builtins).reconciled(templated('from-folder')).conditions[0].reason, 'Upgraded');
+    assert.equal((await programsAt(ROOT, builtins).reconciled(templated('from-folder'))).conditions[0].reason, 'Upgraded');
   });
 });
 
@@ -680,7 +681,7 @@ test("a conflict's resolution is checked against the tree the upgrade composes: 
   const sets = ['--to', '0.2.0', '--set', 'budget=9'];
   const { plan } = planIn(await previewOf('tallied', ...sets));
   await main(['factory', 'upgrade', 'tallied', ...sets, '--plan', plan], noEngine());
-  const waiting = reconciled(templated('tallied'));
+  const waiting = await reconciled(templated('tallied'));
   assert.deepEqual(
     waiting.upgrade?.conflicts.map((c) => c.at),
     [`${REVIEW}#budget`],
@@ -691,7 +692,7 @@ test("a conflict's resolution is checked against the tree the upgrade composes: 
   const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'tallied'), 'utf8')).proposals?.['Workflow/dev'] ?? '';
   const approved = await runWith(noEngine(), approveProgram(PERSON, 'tallied', proposal, { home: ROOT }));
   assert.equal(approved?.status.phase, 'applied', approved?.status.message);
-  assert.equal(reconciled(templated('tallied')).conditions[0].reason, 'Upgraded');
+  assert.equal((await reconciled(templated('tallied'))).conditions[0].reason, 'Upgraded');
   assert.match(textIn(treeDir(ROOT, 'tallied'), REVIEW), /^tally: findings\.missed$/m);
   assert.match(textIn(treeDir(ROOT, 'tallied'), schema), /"missed"/, "the clean merge's schema is the tree's once merged");
 });

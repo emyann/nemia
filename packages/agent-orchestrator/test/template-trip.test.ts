@@ -236,7 +236,7 @@ describe("a template's round trip: the team exported, checked, packed, unpacked,
   });
   s.test('the controller renders the base read-only and seeds the tree once; the tree, once seeded, is the person’s', async () => {
     const at = AT;
-    const status = reconciledAt(factory('trip'), at);
+    const status = await reconciledAt(factory('trip'), at);
     assert.deepEqual(status.conditions, [
       {
         type: 'Applied',
@@ -269,7 +269,7 @@ describe("a template's round trip: the team exported, checked, packed, unpacked,
     assert.deepEqual(readFactoryAt(ROOT, 'trip').workflows, ['dev', 'triage']);
     fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
     const written = fs.statSync(statusFile(ROOT, 'trip')).mtimeMs;
-    assert.deepEqual(reconciled(factory('trip')), status, 'a second pass reads the archive to the same base');
+    assert.deepEqual(await reconciled(factory('trip')), status, 'a second pass reads the archive to the same base');
     assert.match(fs.readFileSync(review, 'utf8'), /^budget: 9$/m, "the tree, once seeded, is the person's");
     assert.equal(fs.statSync(statusFile(ROOT, 'trip')).mtimeMs, written, 'a status that did not change is not written');
   });
@@ -288,7 +288,7 @@ describe("a template's round trip: the team exported, checked, packed, unpacked,
     const [applied, conflicts] = status.conditions;
     fs.writeFileSync(statusFile(ROOT, 'trip'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
     assert.equal(readStatus(ROOT, 'trip'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
-    assert.deepEqual(reconciledAt(factory('trip'), AT), status, 'and the next pass writes it again');
+    assert.deepEqual(await reconciledAt(factory('trip'), AT), status, 'and the next pass writes it again');
     fs.writeFileSync(tree, kept);
   });
   s.test("a bare workflow name started is the tree's, and the run is told the tree's step as the person changed it", async () => {
@@ -316,7 +316,7 @@ describe("a template's round trip: the team exported, checked, packed, unpacked,
     });
     fs.rmSync(archive);
     await printedBy(t, 'template', 'pack', dir, '--out', archive);
-    const status = reconciled(factory('trip'));
+    const status = await reconciled(factory('trip'));
     const { message, lastTransitionTime: _driftedAt, ...drifted } = status.conditions[0];
     assert.deepEqual(drifted, { type: 'Applied', status: 'False', reason: 'VersionDrift' });
     assert.ok(message.includes('nemia factory diff trip --to 0.2.0'), message);

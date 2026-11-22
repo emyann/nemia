@@ -181,8 +181,8 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
   s.test('the run in flight keeps its record as it was: its workflow folder and its frozen steps', () => {
     assert.equal(JSON.stringify(runRecord(ROOT, run)), runBefore);
   });
-  s.test("the controller's next pass finds it applied, with no upgrade under way", () => {
-    const status = reconciled(readFactoryAt(ROOT, 'crew') as Parameters<typeof reconciled>[0]);
+  s.test("the controller's next pass finds it applied, with no upgrade under way", async () => {
+    const status = await reconciled(readFactoryAt(ROOT, 'crew') as Parameters<typeof reconciled>[0]);
     assert.deepEqual(
       status.conditions.map((c) => [c.type, c.status, c.reason]),
       [
@@ -309,7 +309,7 @@ describe('--template names a builtin template by its name: the takeover records 
     assert.ok(preview.line.includes('--template team '), preview.line);
     await handled(FACTORY_ADOPT, { factory: 'named', template: 'team', plan: preview.digest });
     assert.equal((fileOf('named').template as { source: string }).source, 'team');
-    const status = programsAt(ROOT, builtins).reconciled(readFactoryAt(ROOT, 'named') as Parameters<typeof reconciled>[0]);
+    const status = await programsAt(ROOT, builtins).reconciled(readFactoryAt(ROOT, 'named') as Parameters<typeof reconciled>[0]);
     assert.equal(status.conditions[0]?.reason, 'Rendered');
   });
 });

@@ -32,6 +32,7 @@ import { keep } from '../nemia/keep.verb.ts';
 import { reconcile } from '../factory/applied/applied.verb.ts';
 import { free } from '../forget/prune/free.verb.ts';
 import { clones } from '../factory/clones/clones.verb.ts';
+import { compaction } from '../keyspace/compact.verb.ts';
 import { disk } from '../disk/disk.verb.ts';
 import type { DiskReading } from '../disk/disk.ts';
 import { leaseRelease } from '../release/index.ts';
@@ -326,8 +327,10 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * among them, and every pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`). On an eleventh, once the
  * first pass has answered and every `NEEDS_EVERY` after, it reads the store's readiness over that memory (`readied`), and hands each
  * pass the latest read, whose moves the pass writes to the feed: `not ready` while a piece a run waits on is missing, `ready` once none
- * is. All of it with its event loop watched (`eventLoopWatched`): the loop's delay recorded into a histogram exported with the rest
- * (`EVENT_LOOP_DELAY`), and a stall of a second or more logged once, naming the span that was running as the loop came back.
+ * is. On a twelfth it compacts the keyspace every `KEYSPACE_COMPACT_EVERY` (`compaction`), keeping the last `KEYSPACE_RETAIN`
+ * revisions a watch can start from. All of it with its event loop watched (`eventLoopWatched`): the loop's delay recorded into a
+ * histogram exported with the rest (`EVENT_LOOP_DELAY`), and a stall of a second or more logged once, naming the span that was running
+ * as the loop came back.
  * @param e The engine every pass runs on, whose sessions the daemon holds.
  * @param options Its interval, its repository, its kind and the rest of what it runs with (`UpOptions`).
  */
@@ -385,6 +388,7 @@ const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, s
     yield* Effect.forkScoped(over(e)(keep()));
     yield* Effect.forkScoped(reconcile());
     yield* Effect.forkScoped(clones());
+    yield* Effect.forkScoped(compaction());
     yield* Effect.forkScoped(needs(memo));
     let rested: Pass['runs'] = [];
     yield* Effect.forkScoped(over(e)(free(() => rested)));

@@ -195,6 +195,14 @@ of its kind, never from an older file that looks alike:
   `memory.store.ts` beside its store). A synchronous caller still on the synchronous spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
   reads the files at the root it hands them whatever door was given, counted per door in `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`;
   none is left on the subscriptions' (`src/subscription/subscription.store.test.ts` refuses one). The feed's fold memo is `emitFeed`'s, never the layer's.
+- **A proposal is read and written through the Proposal door (`ProposalDoor`, `src/proposal/proposal.store.ts`), over the keyspace**
+  (`src/keyspace/keyspace.store.ts`, `<root>/db/state.db`, one SQLite file laid out as Kine's), rooted as the Factory door is. Its
+  methods answer Effects that may suspend, with no synchronous layer: a test runs a program that reaches it with `runPromise`
+  (`walkedOn`, `acted` and `settled` in `test/door-walks.ts`; `reconciled` in `test/templated.ts`), given a root or
+  `proposalDoorMemory()`, a keyspace in memory. A write back's `resourceVersion` is the revision it read, refused `Conflict` where the
+  proposal moved since; an empty one overwrites. A change of the keyspace's table is a migration appended to `KEYSPACE_MIGRATIONS`, never
+  an edit of one there. A test that opens a second client of one file, or closes one, uses `keyspaceIn` with a scope of its own, and
+  never races two clients of one process on a file: `node:sqlite` waits for a lock on the event loop.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.

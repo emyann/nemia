@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import type { Locator, Page, Request } from 'playwright';
 import { herChat, openChat, photograph, placeLitOf, placeOf, themeOf, trailLevel } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
@@ -56,16 +57,62 @@ function mountReads(asked: readonly Request[]) {
   return timed.filter((r) => r.timing().startTime < answered + QUEUE_POLL_MS) satisfies Request[];
 }
 
+/** A proposal as the keyspace holds it: its JSON, read loosely, as the page changes a field or two of it. */
+type Held = { metadata: { name: string }; status: Record<string, unknown> & { changes: { access: string }[] } };
+
+/**
+ * The record `name` of FACTORY in the store's keyspace (`<store>/db/state.db`, one table laid out as Kine's), written as `next` makes it
+ * from the proposal `from` holds: one transaction that reads the latest row of each and appends the record's next row at the store's next
+ * revision, as the store writes one; `next` answering undefined writes its tombstone. What the page sets that no caller of the api can
+ * (who proposed it, that it widens), and a proposal planted beside another and taken back.
+ * @param from The proposal read.
+ * @param name The proposal written.
+ * @param next The proposal to write, from the one read; undefined deletes it.
+ */
+function keyspaceWritten(from: string, name: string, next: (read: Held) => Held | undefined) {
+  const key = (n: string) => `/registry/proposals/${FACTORY}/${n}`;
+  const db = new DatabaseSync(path.join(store!, 'db', 'state.db'), { timeout: 30_000 });
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    const latest = (n: string) =>
+      db.prepare('SELECT id, create_revision, deleted, value FROM kine WHERE name = ? ORDER BY id DESC LIMIT 1').get(key(n)) as
+        | { id: number; create_revision: number; deleted: number; value: string | Uint8Array }
+        | undefined;
+    const text = (v: string | Uint8Array) => (typeof v === 'string' ? v : Buffer.from(v).toString('utf8'));
+    const read = latest(from);
+    if (read === undefined || read.deleted) throw new Refused(`the keyspace holds no proposal ${from} to write ${name} from`);
+    const was = latest(name);
+    const written = next(JSON.parse(text(read.value)) as Held);
+    const head = (db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'kine'").get() as { seq: number }).seq;
+    const live = was !== undefined && !was.deleted;
+    db.prepare(
+      'INSERT INTO kine (id, name, created, deleted, create_revision, prev_revision, lease, value, old_value) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)',
+    ).run(
+      head + 1,
+      key(name),
+      live ? 0 : 1,
+      written === undefined ? 1 : 0,
+      live ? was.create_revision : head + 1,
+      was?.id ?? 0,
+      written === undefined ? text(was?.value ?? '') : JSON.stringify(written),
+      text(was?.value ?? ''),
+    );
+    db.exec('COMMIT');
+  } catch (err) {
+    if (db.isTransaction) db.exec('ROLLBACK');
+    throw err;
+  } finally {
+    db.close();
+  }
+}
+
 /** The proposal `name` of FACTORY written again as one already applied, under `applied`: a proposal that waits no more beside it. */
 function appliedBeside(name: string, applied: string) {
-  const dir = path.join(store!, 'factories', FACTORY, 'proposals');
-  const proposal = JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8')) as {
-    metadata: { name: string };
-    status: Record<string, unknown>;
-  };
-  proposal.metadata.name = applied;
-  proposal.status = { ...proposal.status, phase: 'applied', approvedBy: { by: 'person', at: '2026-11-15T10:00:00.000Z' } };
-  fs.writeFileSync(path.join(dir, `${applied}.json`), `${JSON.stringify(proposal, null, 2)}\n`);
+  keyspaceWritten(name, applied, (proposal) => ({
+    ...proposal,
+    metadata: { ...proposal.metadata, name: applied },
+    status: { ...proposal.status, phase: 'applied', approvedBy: { by: 'person', at: '2026-11-15T10:00:00.000Z' } },
+  }));
 }
 
 /**
@@ -108,7 +155,7 @@ async function floorReads(page: Page, name: string) {
         `the floor never asks the whole list of proposals — it asked ${whole.map((u) => `${u.pathname}${u.search}`).join(', ')}`,
       );
   } finally {
-    fs.rmSync(path.join(store!, 'factories', FACTORY, 'proposals', `${applied}.json`), { force: true });
+    keyspaceWritten(applied, applied, () => undefined);
   }
 }
 
@@ -137,8 +184,8 @@ const send = (page: Page, method: 'PUT' | 'DELETE', at: string, body: unknown) =
   ) satisfies Promise<number>;
 
 /**
- * The proposal made through the api's door, an update of the hire at the version it reads, then its file made Nemia's and widening, as her
- * session would have made it: the door's own decode reads it back. Its name.
+ * The proposal made through the api's door, an update of the hire at the version it reads, then its record made Nemia's and widening, as
+ * her session would have made it: the door's own decode reads it back. Its name.
  */
 async function proposed(page: Page) {
   const hire = await page.evaluate(
@@ -158,14 +205,15 @@ async function proposed(page: Page) {
   });
   if (made.status !== 201) throw new Refused(`the api makes the proposal — it answered ${made.status}: ${JSON.stringify(made.answer)}`);
   const name = (made.answer as { metadata: { name: string } }).metadata.name;
-  const file = path.join(store!, 'factories', FACTORY, 'proposals', `${name}.json`);
-  const proposal = JSON.parse(fs.readFileSync(file, 'utf8')) as {
-    status: { proposedBy: object; widens: boolean; changes: { access: string }[] };
-  };
-  proposal.status.proposedBy = { agent: 'nemia' };
-  proposal.status.widens = true;
-  proposal.status.changes = proposal.status.changes.map((c) => ({ ...c, access: 'widens' }));
-  fs.writeFileSync(file, `${JSON.stringify(proposal, null, 2)}\n`);
+  keyspaceWritten(name, name, (proposal) => ({
+    ...proposal,
+    status: {
+      ...proposal.status,
+      proposedBy: { agent: 'nemia' },
+      widens: true,
+      changes: proposal.status.changes.map((c) => ({ ...c, access: 'widens' })),
+    },
+  }));
   return name;
 }
 
@@ -362,13 +410,13 @@ async function ruledOverProposals(page: Page) {
 
 export default {
   /**
-   * A factory's proposal on the board. In a factory the page writes, a proposal of Nemia's that widens access, which her message links: her
-   * chat draws it under her words with its mark, and Approve applies it there, after which it offers nothing. The factory's proposals page
-   * lists it, waiting, then applied, the pane's Proposals lit and counting what waits off the proposals that wait alone, and the floor
-   * lists none, asking the cards once; its link opens its page with the same part, whose way back is the proposals page. On the
-   * factory's settings, the form writes a delegation, listed, then removed. On Nemia's settings, her proposed rule over the factory's
-   * proposals is confirmed, read in force, then dropped. The page takes back the factory, its folder of proposals and hires, and her
-   * chat, and her rules.
+   * A factory's proposal on the board. In a factory the page writes, a proposal of Nemia's that widens access (its record changed in the
+   * store's keyspace), which her message links: her chat draws it under her words with its mark, and Approve applies it there, after
+   * which it offers nothing. The factory's proposals page lists it, waiting, then applied, the pane's Proposals lit and counting what
+   * waits off the proposals that wait alone, and the floor lists none, asking the cards once; its link opens its page with the same part,
+   * whose way back is the proposals page. On the factory's settings, the form writes a delegation, listed, then removed. On Nemia's
+   * settings, her proposed rule over the factory's proposals is confirmed, read in force, then dropped. The page takes back the factory,
+   * its proposal, its folder and hires, and her chat, and her rules.
    */
   name: 'proposal',
   route: '/runs',
@@ -379,8 +427,10 @@ export default {
       JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [WORKFLOWS.yours.name] }, null, 2),
     );
     let back: () => void = () => undefined;
+    let made: string | undefined;
     try {
       const name = await proposed(page);
+      made = name;
       back = herChat({ session: 'up', said: [{ text: said(name) }] });
       await page.reload({ waitUntil: 'load' });
       await idle(page);
@@ -392,6 +442,7 @@ export default {
     } finally {
       back();
       await goto(page, '/runs');
+      if (made !== undefined) keyspaceWritten(made, made, () => undefined);
       fs.rmSync(path.join(store!, 'factories', FACTORY), { recursive: true, force: true });
       fs.rmSync(factoryFile, { force: true });
     }

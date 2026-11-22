@@ -21,6 +21,7 @@ import { RunId } from '../record/record.model.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
+import { tryMemoryOf } from '../out-of-memory/peak.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import type { SeriesMemo } from '../series/series.ts';
@@ -77,6 +78,7 @@ const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: StepSp
     appliesOf: (step) => renderedSkillApplies(home, run, step),
     closeoutOfTask: (taskId) => taskCloseout(everyTry, taskId),
     deadlineOf: (taskId) => everyTry.get(taskId)?.state.deadlineSeconds ?? null,
+    memoryOf: (taskId) => tryMemoryOf(everyTry.get(taskId)?.state.attempts ?? []),
   });
   return { ...of, settled };
 });

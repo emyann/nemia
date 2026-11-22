@@ -124,6 +124,31 @@ export const StatsGroup = Schema.Struct({
       description: 'Each check of each step the tries ran, by name: its count, its median and p90 time, and how often it refused.',
     }),
   ),
+  memory: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        workflow: Schema.String.annotate({ description: 'The workflow whose step the sessions ran.' }),
+        step: Schema.String.annotate({ description: 'The step whose sessions ran.' }),
+        tries: Schema.Number.annotate({ description: 'How many tries ran a session of their own.' }),
+        measured: Schema.Number.annotate({
+          description: 'How many of those had a peak measured: a peak is kept only for a session run under a memory limit.',
+        }),
+        medianBytes: Schema.NullOr(Schema.Number).annotate({ description: 'The median peak, in bytes; null where none was measured.' }),
+        p90Bytes: Schema.NullOr(Schema.Number).annotate({
+          description: 'The 90th percentile of the peaks, nearest rank, in bytes; null where none was measured.',
+        }),
+        maxBytes: Schema.NullOr(Schema.Number).annotate({ description: 'The highest peak, in bytes; null where none was measured.' }),
+        askedBytes: Schema.NullOr(Schema.Number).annotate({
+          description:
+            "What admission counted the latest of those sessions at, in bytes: its request, else its limit; null where it does not say.",
+        }),
+        aboveAsked: Schema.Number.annotate({ description: 'How many measured sessions peaked above what admission counted them at.' }),
+      }),
+    ).annotate({
+      description:
+        "Each workflow step's sessions' memory peaks: the median, p90 and highest, what they ask, and how many passed it. A read: nothing is set from it.",
+    }),
+  ),
 });
 export type StatsGroup = typeof StatsGroup.Type;
 

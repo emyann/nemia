@@ -19,6 +19,7 @@ import {
   headlineOf,
   keysOf,
   checkRowsOf,
+  memoryRowsOf,
   slowLandingsOf,
   statsOf,
   statsQueryOf,
@@ -28,6 +29,7 @@ import {
 } from './stats.ts';
 import type { SkillRule } from '../skills/skills.ts';
 import { deniedCallsOf } from './discipline.ts';
+import type { TryMemory } from '../out-of-memory/peak.ts';
 
 const MIN = 60_000;
 const minus = (at: string, ms: number) => new Date(Date.parse(at) - ms).toISOString();
@@ -67,6 +69,7 @@ type Try = {
   closeout?: Record<string, unknown>;
   checkRan?: number;
   deadline?: number;
+  memory?: TryMemory;
 };
 
 /** A session or a check that ran `ranMs`, an hour unless given, and ended at `end`: succeeded, unless `failed`. */
@@ -115,6 +118,7 @@ function readOf(id: string, steps: readonly StepSpec[], tries: Record<string, Tr
   const files = new Map<string, string[]>();
   const closeouts = new Map<string, Record<string, unknown>>();
   const deadlines = new Map<string, number>();
+  const memories = new Map<string, TryMemory>();
   const record: Run['steps'] = {};
   for (const [name, list] of Object.entries(tries)) {
     const ids: EarlierTry[] = [];
@@ -133,6 +137,7 @@ function readOf(id: string, steps: readonly StepSpec[], tries: Record<string, Tr
       if (t.skills) skills.set(taskId, t.skills);
       if (t.files) files.set(taskId, t.files);
       if (t.closeout) closeouts.set(taskId, t.closeout);
+      if (t.memory) memories.set(taskId, t.memory);
       if (t.check) {
         views.set(`${own}-check`, ended(t.end, null, false, t.checkRan === undefined ? 60 * MIN : t.checkRan * 1000));
         if (t.deadline !== undefined) deadlines.set(`${own}-check`, t.deadline);
@@ -162,6 +167,7 @@ function readOf(id: string, steps: readonly StepSpec[], tries: Record<string, Tr
     rulesOf: (_step: StepSpec) => new Map() satisfies ReadonlyMap<string, readonly SkillRule[]>,
     appliesOf: (_step: StepSpec) => new Map() satisfies ReadonlyMap<string, readonly string[]>,
     deadlineOf: (taskId: string) => deadlines.get(taskId) ?? null,
+    memoryOf: (taskId: string) => memories.get(taskId) ?? { peak: null, askedBytes: null },
     closeoutOfTask: (taskId: string) => {
       const output = closeouts.get(taskId);
       return output && { outcome: 'done' as const, summary: '', artifacts: [], output };
@@ -821,6 +827,60 @@ describe('`checkRowsOf`: a row per named check of a step, its median and p90 ove
         ['probe', 3, 500, 500, 0],
         ['own', 3, 2000, 10_000, 1 / 3],
       ],
+    );
+  });
+});
+
+const MI = 1024 ** 2;
+const GI = 1024 * MI;
+
+describe("`memoryRowsOf`: a row per workflow step whose tries ran a session, its peaks' median, p90 and highest, what it asks, and how many passed it", () => {
+  const tryOf = (step: string, n: number, memory: TryMemory | undefined) =>
+    ({ workflow: 'build', step, try: n, ...(memory ? { memory } : {}) }) as TryFact;
+  const peak = (peakBytes: number) => ({ peakBytes, limitBytes: 6 * GI });
+  const rows = memoryRowsOf([
+    tryOf('implement', 1, { peak: peak(700 * MI), askedBytes: 2 * GI }),
+    tryOf('implement', 2, { peak: peak(3 * GI), askedBytes: 2 * GI }),
+    tryOf('implement', 3, { peak: null, askedBytes: 2 * GI }),
+    tryOf('implement', 4, undefined),
+    tryOf('implement', 5, { peak: peak(812 * MI), askedBytes: 2 * GI }),
+    tryOf('land', 1, { peak: null, askedBytes: null }),
+  ]);
+  test('implement: four tries ran a session, three measured, median 812Mi, p90 and highest 3Gi, one above its 2Gi ask', () =>
+    assert.deepEqual(rows[0], {
+      workflow: 'build',
+      step: 'implement',
+      tries: 4,
+      measured: 3,
+      medianBytes: 812 * MI,
+      p90Bytes: 3 * GI,
+      maxBytes: 3 * GI,
+      askedBytes: 2 * GI,
+      aboveAsked: 1,
+    }));
+  test('land: nothing measured is null, never 0', () =>
+    assert.deepEqual(rows[1], {
+      workflow: 'build',
+      step: 'land',
+      tries: 1,
+      measured: 0,
+      medianBytes: null,
+      p90Bytes: null,
+      maxBytes: null,
+      askedBytes: null,
+      aboveAsked: 0,
+    }));
+  test("a try's session's memory is on its fact, and a recheck, which ran no session of its own, carries none", () => {
+    const measured = { peak: peak(900 * MI), askedBytes: GI };
+    const r = readOf('peaks', [step('design', [])], {
+      design: [
+        { end: at(1, JOBS_DAY), check: 'unfinished', memory: measured },
+        { end: at(2, JOBS_DAY), recheck: true, check: 'passed' },
+      ],
+    });
+    assert.deepEqual(
+      factsOf(r).tries.map((t) => t.memory),
+      [measured, undefined],
     );
   });
 });

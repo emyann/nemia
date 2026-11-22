@@ -3,9 +3,20 @@
  * the runtime carries on each attempt of the session's task: pure and importing no file of the package. The stats' fact of a try reads
  * it (src/stats/stats.verb.ts), and so does a step's filing (src/resource/told.verb.ts).
  */
+import { memoryBytesOf } from 'agent-runtime/vocabulary';
+import type { AttemptMemory } from '../../contracts/out-of-memory.contract.ts';
 import type { TryPeak, TryPeakOf } from '../../contracts/try-peak.contract.ts';
 
 export type { TryPeak };
+
+/** What an attempt ran under, a container's `resources`, as the engine records it on the attempt: its limit and its request. */
+export type AttemptResources = { limits?: { memory?: string }; requests?: { memory?: string } };
+
+/**
+ * What a try's session peaked at (`TryPeak`), and what admission counted it at (`askedBytes`): its last attempt's request, else its limit,
+ * as the runtime counts a task that names no request, in bytes; null where that attempt ran under neither, or its record does not say.
+ */
+export type TryMemory = { peak: TryPeak; askedBytes: number | null };
 
 /**
  * The largest peak the attempts of a try's session measured, with the limit of the attempt that measured it, the first such attempt where
@@ -21,3 +32,21 @@ export const tryPeakOf: TryPeakOf = (memories) => {
       peak = { peakBytes: m.peakBytes, limitBytes: m.limitBytes };
   return peak;
 };
+
+/**
+ * What admission counted an attempt at, in bytes: its request, else its limit, as the runtime counts a task that names no request
+ * (`needBytesOf`); null where it ran under neither, or a quantity the runtime does not read.
+ * @param resources What the attempt ran under, as the engine recorded it, undefined where it recorded none.
+ */
+export const askedBytesOf = (resources: AttemptResources | undefined) => {
+  const quantity = resources?.requests?.memory ?? resources?.limits?.memory;
+  return quantity === undefined ? null : (memoryBytesOf(quantity) ?? null);
+};
+
+/**
+ * A try's session's memory (`TryMemory`): the largest peak its attempts measured (`tryPeakOf`), and what admission counted its last attempt
+ * at (`askedBytesOf`).
+ * @param attempts The attempts of the session's task, in the order they ran, each with its memory record and what it ran under.
+ */
+export const tryMemoryOf = (attempts: ReadonlyArray<{ memory?: AttemptMemory; resources?: AttemptResources }>) =>
+  ({ peak: tryPeakOf(attempts.map((a) => a.memory)), askedBytes: askedBytesOf(attempts.at(-1)?.resources) }) satisfies TryMemory;

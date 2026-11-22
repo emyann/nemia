@@ -1,11 +1,11 @@
 /**
  * The stats in words, off `GET /api/stats`' answer, its groups read by `objects`' `StatsGroup` and its health by `StatsHealth`: the
  * tiles, a row per landing check that passed in more than half its deadline, a row per day, a row per change to what the runs froze, a
- * row per step, a row per call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, a row per day
+ * row per step, a row per workflow step's memory peaks against what it asks, a row per call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, a row per day
  * and count a step declares (`tally:`), and the one line the morning recap quotes. A number with nothing measured under it reads `—`,
  * never 0. Pure.
  */
-import type { StatsGroup, StatsHeadline, StatsHealth, StatsStepRow } from 'objects';
+import { memoryBytesWord, type StatsGroup, type StatsHeadline, type StatsHealth, type StatsStepRow } from 'objects';
 
 /** The stats as this file reads them: the answer's keys, its groups and health decoded. */
 export type StatsRead = {
@@ -135,6 +135,37 @@ function stepLines(steps: readonly StatsStepRow[]) {
   ]);
 }
 
+/**
+ * A row per workflow step whose tries ran a session: the tries, how many had a peak measured, the median, p90 and highest peak, what it
+ * asks, and how many peaked above it, each quantity as `memoryRequest:` takes it back; and, where a row measured none, one line saying
+ * when a peak is kept. None where no try ran a session.
+ * @param memory The group's memory rows, absent from an answer an older api gave.
+ */
+function memoryLines(memory: StatsGroup['memory']) {
+  if (!memory?.length) return [];
+  const unmeasured = memory.some((m) => m.measured < m.tries);
+  return [
+    'memory each step peaked at, against what it asks (set a step\'s memoryRequest: from these; Nemia sets none)',
+    ...table([
+      ['workflow', 'step', 'tries', 'measured', 'median', 'p90', 'max', 'asks', 'above it'],
+      ...memory.map((m) => [
+        m.workflow,
+        m.step,
+        String(m.tries),
+        String(m.measured),
+        or(m.medianBytes, memoryBytesWord),
+        or(m.p90Bytes, memoryBytesWord),
+        or(m.maxBytes, memoryBytesWord),
+        or(m.askedBytes, memoryBytesWord),
+        m.measured ? `${m.aboveAsked} of ${m.measured}` : NONE,
+      ]),
+    ]),
+    ...(unmeasured
+      ? ["a peak is kept only for a session run under a memory limit (WF_MEMORY_LIMIT, or the step's memory:), on a kernel from 5.19"]
+      : []),
+  ];
+}
+
 /** A row per call each step and agent was refused, with how many times; none where no step was refused a call. */
 function denialLines(steps: readonly StatsStepRow[]) {
   const rows = steps.flatMap((s) => s.denials.map((d) => [s.step, s.agent ?? NONE, d.call, String(d.count)]));
@@ -220,6 +251,7 @@ export function statsLines(s: StatsRead) {
     ...groups,
     ...block(markLines(s.all.marks)),
     ...block(stepLines(s.all.steps)),
+    ...block(memoryLines(s.all.memory)),
     ...block(denialLines(s.all.steps)),
     ...block(skillLines(s.all.steps)),
     ...block(ruleLines(s.all.steps)),

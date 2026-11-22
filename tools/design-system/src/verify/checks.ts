@@ -75,7 +75,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         h(N.IconButton, { icon: I[names[7]], variant: "outlined", "aria-label": "Star" }),
         h(N.Button, { icon: I[names[8]], variant: "filled" }, "Start")),
       h("div", { id: "all", style: { display: "grid", gridTemplateColumns: "repeat(7, 96px)", gap: 8 } },
-        names.map((n) => h("div", { key: n, style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 4, font: "11px var(--font-share-tech-mono)" } }, h(I[n], { size: 24 }), n))))));
+        names.map((n) => h("div", { key: n, style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 4, font: "11px var(--font-jetbrains-mono)" } }, h(I[n], { size: 24 }), n))))));
 </script></body></html>`;
 
 /**

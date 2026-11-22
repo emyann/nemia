@@ -39,16 +39,48 @@ const colourTokens = (light: Record<string, string>, dark: Record<string, string
     return { name, value: { light: light[name] ?? '', dark: dark[name] ?? '' }, usage } satisfies Themed;
   });
 
-/** The look's meanings over the roles, each with its ink and its quieter field, then its further names. */
-const meaningTokens = () => [
-  ...MEANING.flatMap(([word, role, usage]) => [
-    { name: `meaning-${word}`, value: `{md-sys-color-${role}}`, usage },
-    { name: `meaning-on-${word}`, value: `{md-sys-color-on-${role}}`, usage: `Ink on \`meaning-${word}\`.` },
-    { name: `meaning-${word}-container`, value: `{md-sys-color-${role}-container}`, usage: `The quieter field of \`meaning-${word}\`.` },
-    { name: `meaning-on-${word}-container`, value: `{md-sys-color-on-${role}-container}`, usage: `Ink on \`meaning-${word}-container\`.` },
-  ]),
-  ...ALIASES,
-];
+/** Where the board's stylesheet writes its dark meanings: what is before it is the light scheme's. */
+const DARK = '@media (prefers-color-scheme: dark)';
+
+/** The `--meaning-*` values one part of the board's stylesheet writes, by their name after `--meaning-`. */
+const meaningsIn = (css: string) => Object.fromEntries([...css.matchAll(/--meaning-([a-z-]+):\s*([^;]+);/g)].map(([, n, v]) => [n ?? '', (v ?? '').trim()]));
+
+/** A meaning's value as a token's: a colour as written, or a role of the theme read through `var(--md-sys-color-…)` as the theme writes it. */
+const valueOf = (value: string, roles: Record<string, string>) => {
+  const role = /^var\(\s*--(md-sys-color-[a-z-]+)\s*\)$/.exec(value)?.[1];
+  return role ? (roles[role] ?? value) : value;
+};
+
+/**
+ * The look's meanings as the board writes them beside the theme (`src/styles.css`), each role it writes with its value in both schemes,
+ * then its further names; refused for a meaning the stylesheet does not write.
+ */
+const meaningTokens = (light: Record<string, string>, dark: Record<string, string>) => {
+  const css = fs.readFileSync(path.join(WEB, 'src', 'styles.css'), 'utf8');
+  const at = css.indexOf(DARK);
+  const written = { light: meaningsIn(at < 0 ? css : css.slice(0, at)), dark: meaningsIn(at < 0 ? '' : css.slice(at)) };
+  return [
+    ...MEANING.flatMap(([word, usage]) => {
+      if (!written.light[word]) throw new Error(`src/styles.css writes no --meaning-${word}: say its value there, or take it out of usage.ts`);
+      return [
+        [word, usage],
+        [`on-${word}`, `Ink on \`meaning-${word}\`.`],
+        [`${word}-container`, `The quieter field of \`meaning-${word}\`.`],
+        [`on-${word}-container`, `Ink on \`meaning-${word}-container\`.`],
+      ]
+        .filter(([name = '']) => written.light[name])
+        .map(([name = '', said = '']) => {
+          const lit = written.light[name] ?? '';
+          return {
+            name: `meaning-${name}`,
+            value: { light: valueOf(lit, light), dark: valueOf(written.dark[name] ?? lit, dark) },
+            usage: said,
+          } satisfies Themed;
+        });
+    }),
+    ...ALIASES,
+  ];
+};
 
 /** A number the theme's v4 sheet declares, read by `pattern`'s first group. */
 const numberIn = (v4: string, pattern: RegExp) => Number(pattern.exec(v4)?.[1]);
@@ -61,7 +93,7 @@ const styleOf = (v4: string, stem: string, size: string, group: { usage: string;
   const labelTracking = size === 'small' ? '0.1em' : '0.06em';
   return {
     name: key,
-    ...(stem === 'title' && size !== 'large' ? { family: 'chakra-petch' } : {}),
+    ...(stem === 'title' && size !== 'large' ? { family: 'barlow' } : {}),
     fontSize: `${numberIn(v4, new RegExp(`--md-sys-typescale-${key}-size:\\s*(\\d+)px`))}px`,
     lineHeight: `${numberIn(v4, new RegExp(`--md-sys-typescale-${key}-line-height:\\s*(\\d+)px`))}px`,
     letterSpacing: tracking ?? (stem === 'label' ? labelTracking : '0px'),
@@ -127,7 +159,7 @@ export const tokensOf = (faces: readonly Face[], components: Readonly<Record<str
         { id: 'dark', name: 'Dark' },
         { id: 'light', name: 'Light' },
       ],
-      tokens: [...colourTokens(light, dark, names), ...meaningTokens()],
+      tokens: [...colourTokens(light, dark, names), ...meaningTokens(light, dark)],
     },
     type: {
       fonts: faces.map(({ family, file, weight, style }) => ({ family, file, weight, style })),

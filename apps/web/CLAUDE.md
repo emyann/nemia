@@ -70,7 +70,10 @@ root.
 ## The look's parts
 
 The look's own parts, for a cut, a plate, a tile or a rail, are in `apps/web/src/components/look`, taken through its door (`@/components/look`), never from a part's own file. `CutFrame` for a card
-or a table in a cut frame (with `FRAMED_BOX`, `FRAMED_END`, `FRAMED_TABLE` and `FRAMED_ROW` around a table), `CutTag` for a tag
+or a table in a cut frame (with `FRAMED_BOX`, `FRAMED_TABLE` and `FRAMED_ROW` around a table), `TableAtCut` in place of
+`FRAMED_BOX` for the box of a table that ends its frame (nothing under it, the runs in flight, the tokens), which keeps its scroll bar past the
+cut and paints the hover, pressed and focus states of the interactive row at its foot in the kit's colours on a layer in the cut's
+shape, where the kit's ground would fill the cut corner square, `CutTag` for a tag
 with a cut corner, which takes off the border, ring and outline of what it holds and draws its own edge with `edge` (an outlined tag,
 a hairline) and its own focus ring in its cut, `CutBubble` for the agent's words in a cut bubble, `CutIconPress` for the kit's tonal
 icon button in a cut (a composer's send), `CutButton` for the filled cut button that is a link to a route and `CutPress` for the one that is pressed,
@@ -443,7 +446,9 @@ e2e page*.
 - Classes merge through `cn`, built from the kit's `twMergeConfig`: a `leading-*` written before a role in one merge is dropped, so write
   it after.
 - A ground on a child of a cut frame (the kit's `Card`, a table `Row`) paints the cut over, so it is given none (`bg-transparent`), and
-  no clip goes on what holds content or takes the focus.
+  no clip goes on what holds content or takes the focus. The kit paints an interactive row's hover, pressed and focus states as its
+  ground too: a table that ends its frame takes `TableAtCut`, which paints them for the row at its foot on a layer of its own in the
+  cut's shape.
 - A kit `Cell truncate` shows its children again in a tooltip: a cut cell that holds a link cuts the link itself (`block truncate`, a
   `title`), never the cell.
 - A foot's button needs `ml-auto` only once the foot wraps: two children under `justify-between` stand apart on one line without it, so

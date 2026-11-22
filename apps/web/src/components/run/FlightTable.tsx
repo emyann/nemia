@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { Cell, Column, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import type { ListedRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
@@ -6,7 +7,7 @@ import { ink } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { previewBar } from '../step/StepPreview';
 import { RunActions } from './RunActions';
-import { CopyId, CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Run, TextLink } from '../look';
+import { CopyId, CutFrame, FRAMED_ROW, FRAMED_TABLE, Run, TableAtCut, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
@@ -17,11 +18,18 @@ const TITLE = 'block truncate text-body-large font-medium';
 /**
  * A run in flight the list could not judge, a task it reads having a journal that does not read: its id for its title, a link, with a
  * copy control and its factory; nothing at work and no cost, since nothing of it is judged; and what it does now, the list's sentence
- * of why.
+ * of why. The row opens the run's page, as its title does, on a press or Enter, through the board's router.
  */
 function UnjudgedRow({ run }: { run: UnjudgedRun }) {
+  const navigate = useNavigate();
   return (
-    <Row id={run.id} data-run={run.id} data-unreadable="" className={FRAMED_ROW}>
+    <Row
+      id={run.id}
+      data-run={run.id}
+      data-unreadable=""
+      className={FRAMED_ROW}
+      onAction={() => void navigate({ to: '/runs/$runId', params: { runId: run.id } })}
+    >
       <Cell className="py-3">
         <span className="flex min-w-0 flex-col gap-1">
           <TooltipTrigger delay={300}>
@@ -76,7 +84,7 @@ export function FlightTable({
 }) {
   return (
     <CutFrame size={24}>
-      <div data-table-box className={cn(FRAMED_BOX, FRAMED_END)}>
+      <TableAtCut data-table-box>
         <RunActions runOf={(target) => rowRunOf(runs, target)} className="contents">
           <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
@@ -104,7 +112,7 @@ export function FlightTable({
             </TableBody>
           </Table>
         </RunActions>
-      </div>
+      </TableAtCut>
     </CutFrame>
   );
 }

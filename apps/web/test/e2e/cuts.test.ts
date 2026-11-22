@@ -1,7 +1,8 @@
 /**
  * The look's cuts, read in pixels: each story opened alone in Storybook's static build (`iframe.html?id=<id>`, `stories/built.ts`), in
  * dark. The cut button's shape and its ring, as a link and as a press, a frame's cut corner and its glow, the grain of a card's ground,
- * a sticker and a plate, a focus ring inside the cut-corner frame drawn whole over its cut corner, a disabled press's ground, and ids
+ * a sticker and a plate, a focus ring inside the cut-corner frame drawn whole over its cut corner, the state layer of the row at a
+ * framed table's foot under the pointer in the frame's cut shape (CSS's `:hover`), a disabled press's ground, and ids
  * of different lengths holding their copy controls at one edge; and, at twice the page's pixels in dark and light, a cut tag's edge
  * along its whole shape and its focus ring in its cut, and a cut field's control at its end inside its cut: each read in a picture,
  * pixel by pixel, and refused for a fault put back. Beside them what needs the browser's own input, which a play function's events
@@ -20,6 +21,7 @@ import { photograph } from './board.ts';
 import { entersOnce, focused, tabTo } from './keys.ts';
 import { apart, coloursAt, coloursOf as coloursIn, edgesOf, type Rgb } from './pixels.ts';
 import { openStory, serveBuilt, storybookFor, type Look } from './stories/built.ts';
+import { launch } from './visit.ts';
 
 const pictures = scratch('nemia-cuts-');
 let browser: Browser;
@@ -848,6 +850,89 @@ test(
       } finally {
         await page.context().close();
       }
+    }
+  },
+);
+
+/** The runs in flight, a table that ends its cut frame, and the interactive row at its foot. */
+const FLIGHT = 'run-flighttable--in-flight';
+const FOOT_ROW = '[data-framed-end] tbody > tr[data-interactive]:last-child';
+
+/**
+ * Where the foot of the flight table's frame is read, in the window's pixels, as drawn now: inside its bottom-left cut; a pixel of the
+ * row at its foot three pixels inside the frame's diagonal there, in the row's padding under its text; and a blank spot of that row in
+ * its last column, which a row the list could not judge leaves empty. The frame's ground runs from its diagonal, where the pixels' sum
+ * of how far right of its left and how far up from its foot they stand is a cut of 24 grown by the frame's edge, about 25.4.
+ */
+async function footPoints(page: Page) {
+  const box = await page.locator('[data-cut-frame]').boundingBox();
+  assert.ok(box, 'the frame is drawn');
+  const [left, right, bottom] = [box.x, box.x + box.width, box.y + box.height];
+  return {
+    cut: [Math.floor(left) + 3, Math.ceil(bottom) - 4] as const,
+    diagonal: [Math.floor(left + 18), Math.floor(bottom - 12)] as const,
+    row: [Math.ceil(right) - 41, Math.ceil(bottom) - 15] as const,
+  };
+}
+
+/**
+ * The colours of the foot's points in a picture named `name`, the pointer first rested on the foot's row where `rest` is false and
+ * off the table where it is true, its state layer's colour settled.
+ */
+async function footOf(page: Page, name: string, rest: boolean) {
+  const points = await footPoints(page);
+  await page.mouse.move(...(rest ? ([5, 5] as const) : points.row));
+  await page.waitForFunction(() => document.querySelector('[data-framed-foot]')?.getAnimations().length === 0);
+  return coloursOf(page, name, points);
+}
+
+/** That the foot's row, read at rest and lit, lights up to the frame's diagonal and leaves its cut as it was, `where` said. */
+function litToTheCut(rest: Record<'cut' | 'diagonal' | 'row', Rgb>, lit: Record<'cut' | 'diagonal' | 'row', Rgb>, where: string) {
+  const read = JSON.stringify({ rest, lit });
+  assert.ok(apart(lit.row, rest.row) > 6, `${where}, the row lights under the pointer: ${read}`);
+  assert.ok(apart(lit.diagonal, rest.diagonal) > 6, `${where}, its light reaches the frame's diagonal: ${read}`);
+  assert.ok(apart(lit.cut, rest.cut) <= 3, `${where}, its light leaves the cut corner as it was: ${read}`);
+}
+
+test(
+  "REFUSED: the row at a framed table's foot lights under the pointer to the frame's diagonal and not past it, scrolled sideways over a scroll bar's lane too, nothing out to the frame clipped; a square layer is seen",
+  WAITED,
+  async () => {
+    const page = await open(FLIGHT, 'dark', { still: true });
+    const classic = await launch('classic');
+    const barred = await openStory(classic, served.at, 'dark', FLIGHT, { still: true });
+    try {
+      await edgesOf(page, '[data-cut-frame]');
+      litToTheCut(await footOf(page, 'foot-rest', true), await footOf(page, 'foot-lit', false), 'with no scroll bar');
+      const clipped = await page.locator(FOOT_ROW).evaluate((row) => {
+        const found: string[] = [];
+        for (let at: Element | null = row; at && !at.matches('[data-cut-frame]'); at = at.parentElement)
+          if (getComputedStyle(at).clipPath !== 'none') found.push(at.tagName);
+        return found;
+      });
+      assert.deepEqual(clipped, [], 'nothing from the row out to its frame is clipped, so its focus ring is drawn whole');
+      await barred.locator('[data-cut-frame]').evaluate((frame) => {
+        (frame.parentElement as HTMLElement).style.width = '700px';
+      });
+      await edgesOf(barred, '[data-cut-frame]');
+      await barred.locator('[data-framed-end]').evaluate((box) => {
+        box.scrollLeft = 150;
+      });
+      const lane = await barred.locator('[data-framed-end]').evaluate((box) => ({
+        scrolled: box.scrollLeft,
+        lane: (box as HTMLElement).offsetHeight - box.clientHeight,
+      }));
+      assert.equal(lane.scrolled, 150, 'the table is scrolled sideways');
+      assert.ok(lane.lane > 0, `a scroll bar's lane lies under the foot's row: ${JSON.stringify(lane)}`);
+      const scrolledRest = await footOf(barred, 'foot-scrolled-rest', true);
+      litToTheCut(scrolledRest, await footOf(barred, 'foot-scrolled-lit', false), 'scrolled over a lane');
+      await barred.addStyleTag({ content: '[data-framed-foot] { clip-path: none !important; }' });
+      const square = await footOf(barred, 'foot-square', false);
+      assert.ok(apart(square.cut, scrolledRest.cut) > 3, `a layer left square paints the cut corner: seen ${JSON.stringify(square)}`);
+    } finally {
+      await page.context().close();
+      await barred.context().close();
+      await classic.close();
     }
   },
 );

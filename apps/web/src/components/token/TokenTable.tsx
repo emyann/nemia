@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bot, UserRound } from 'lucide-react';
 import { Button, Cell, Column, Row, Skeleton, Table, TableBody, TableHeader } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
-import { CutFrame, CutPress, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, Reading } from '@/components/look';
+import { CutFrame, CutPress, FRAMED_ROW, FRAMED_TABLE, Reading, TableAtCut } from '@/components/look';
 import { Refusal } from '@/components/gate/Ask';
 import { Instant } from '@/components/time/Instant';
 import { retireToken, tokensQuery, type Token } from '@/lib/api/tokens';
@@ -88,7 +88,7 @@ export function TokenTable({ tokens }: { tokens: readonly Token[] }) {
   return (
     <div className="flex flex-col gap-4">
       <CutFrame size={24}>
-        <div data-table-box className={cn(FRAMED_BOX, FRAMED_END)}>
+        <TableAtCut data-table-box>
           <Table aria-label="Tokens" density="dense" className={cn('min-w-[720px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
               <Column id="name" isRowHeader className={HEAD}>
@@ -124,7 +124,7 @@ export function TokenTable({ tokens }: { tokens: readonly Token[] }) {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableAtCut>
       </CutFrame>
       {confirming !== undefined && (
         <ConfirmRetire

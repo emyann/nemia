@@ -10,7 +10,7 @@ export { CutButton, CutPress } from './CutButton';
 export { CutCue } from './CutCue';
 export { CutField } from './CutField';
 export { CutIconPress } from './CutIconPress';
-export { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, type FrameHue } from './CutFrame';
+export { CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, TableAtCut, type FrameHue } from './CutFrame';
 export { CutTag } from './CutTag';
 export { Marker } from './Marker';
 export { Pager } from './Pager';

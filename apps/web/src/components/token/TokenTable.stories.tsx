@@ -26,11 +26,14 @@ export default meta;
 
 type Story = StoryObj<typeof TokenTable>;
 
-/** Two tokens, each with the kit's outlined Retire. */
+/** Two tokens, each with the kit's outlined Retire; a token opens no page, so its row is not the kit's interactive row and has no hover. */
 export const Listed: Story = {
   play: async ({ canvasElement }) => {
     const retire = canvasElement.querySelector('[data-token-retire="laptop"]');
     await expect(retire?.getAttribute('data-slot')).toBe('button');
+    const rows = canvasElement.querySelectorAll('tbody tr');
+    await expect(rows).toHaveLength(TOKENS.length);
+    await expect(canvasElement.querySelectorAll('tbody tr[data-interactive]'), 'no row opens anything').toHaveLength(0);
   },
 };
 

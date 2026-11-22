@@ -76,7 +76,7 @@ export function FolderPick({
           if (key !== null) setTyped(String(key));
         }}
         isDisabled={pending}
-        className="[--md3-field-notch:var(--background)]"
+        className="[--md3-field-notch:var(--md-sys-color-background)]"
       >
         {(f) => <ComboBoxItem id={f.id} textValue={f.id} label={f.name} />}
       </ComboBox>

@@ -293,7 +293,7 @@ function AgentField({
       onChange={(key) => {
         if (key !== null) onAgent(String(key));
       }}
-      className="[--md3-field-notch:var(--background)]"
+      className="[--md3-field-notch:var(--md-sys-color-background)]"
     >
       {(a) => (
         <ComboBoxItem id={a.name} textValue={a.name} label={personOf(a.name)} supportingText={`${a.role ?? 'No role yet'} · ${a.name}`} />

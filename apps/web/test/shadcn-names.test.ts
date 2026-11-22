@@ -2,10 +2,10 @@
  * The board names no colour of shadcn's: its own code writes Material's roles and the look's meanings (DESIGN.md, *The names the board
  * writes*), so one name says one colour. No file of `src` outside the vendored kit writes a shadcn colour name as a colour utility (any
  * side, variant or alpha: `text-muted-foreground`, `hover:bg-accent`, `border-b-border`, `bg-card/50`), reads or declares one as a
- * variable (`var(--card)`, `--muted:`), and `src/styles.css` declares no Tailwind colour of one (`--color-muted:`) nor of Material's
- * secondary family, which the kit's theme alone declares. `ring` is the kit's own, Material's focus indicator, which the theme
- * (`theme/theme.v4.css`) declares from `secondary` and the kit's `focusRing` reads: the board draws its focus with it, as DESIGN.md's
- * focus line asks, and declares no variable of that name itself. It takes no exception.
+ * variable (`var(--card)`, `--muted:`, the bare `var(--background)` and `--primary`), and `src/styles.css` declares no Tailwind colour
+ * of one (`--color-muted:`) nor of Material's secondary family, which the kit's theme alone declares. `ring` is the kit's own,
+ * Material's focus indicator, which the theme (`theme/theme.v4.css`) declares from `secondary` and the kit's `focusRing` reads: the
+ * board draws its focus with it, as DESIGN.md's focus line asks, and declares no variable of that name itself. It takes no exception.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -41,11 +41,17 @@ const UTILITIES =
   '(?:bg|text|border(?:-[xytrblse])?|outline|ring(?:-offset)?|inset-ring|divide|fill|stroke|from|via|to|decoration|caret|placeholder|(?:inset-|drop-)?shadow|accent)';
 
 /**
+ * shadcn's own variables of a name Material's roles share as Tailwind colours: `bg-background` and `bg-primary` are the kit's, while
+ * the bare `--background` and `--primary` were shadcn's, and nothing declares them.
+ */
+const BARE = 'background|primary';
+
+/**
  * A shadcn name drawn as a colour utility, or read or declared as a variable, its own or Tailwind's, shadcn's `--ring` and
- * `--secondary` too.
+ * `--secondary` too, and its bare `--background` and `--primary`.
  */
 const SHADCN = new RegExp(
-  `(?<![\\w-])${UTILITIES}-(?:${NAMES})(?![\\w-])|var\\(\\s*--(?:color-)?(?:${NAMES}|ring|secondary)(?![\\w-])|(?<![\\w-])--(?:${NAMES}|ring|secondary)\\s*:`,
+  `(?<![\\w-])${UTILITIES}-(?:${NAMES})(?![\\w-])|var\\(\\s*--(?:(?:color-)?(?:${NAMES}|ring|secondary)|${BARE})(?![\\w-])|(?<![\\w-])--(?:${NAMES}|ring|secondary|${BARE})\\s*:`,
   'g',
 );
 
@@ -109,16 +115,18 @@ test("REFUSED: shadcn's colour names in any file of src, each where it is; Mater
     'bg-sidebar-accent',
     'var(--muted-foreground)',
     'bg-secondary text-secondary-foreground',
+    'bg-[var(--background)]',
   ];
   const files: [string, string][] = [
     ['src/components/x.tsx', refused.map((cls) => `const a = "${cls}";`).join('\n') + '\n'],
-    ['src/styles.css', ':root {\n  --card: grey;\n  --x: var(--ring);\n  --secondary: grey;\n}\n'],
+    ['src/styles.css', ':root {\n  --card: grey;\n  --x: var(--ring);\n  --secondary: grey;\n  --primary: grey;\n}\n'],
     ['src/components/ui/ds/y.tsx', 'const c = "bg-card text-muted-foreground var(--secondary) border-border";\n'],
     [
       'src/components/z.tsx',
       [
         'const d = "bg-surface-container-low border ring-1 ring-ring outline-ring/50 bg-background text-on-surface bg-primary";',
         'const e = "data-card text-on-surface-variant border-outline-variant bg-secondary-container var(--md-sys-color-secondary)";',
+        'const g = "bg-[var(--color-background)] var(--md-sys-color-background) var(--color-primary) var(--background-image)";',
         '// a card, an accent, the border of a muted input, `nemia start --input` and `--card` as words',
       ].join('\n') + '\n',
     ],
@@ -139,9 +147,11 @@ test("REFUSED: shadcn's colour names in any file of src, each where it is; Mater
     'src/components/x.tsx:9 (bg-sidebar-accent)',
     'src/components/x.tsx:10 (var(--muted-foreground)',
     'src/components/x.tsx:11 (text-secondary-foreground)',
+    'src/components/x.tsx:12 (var(--background)',
     'src/styles.css:2 (--card:)',
     'src/styles.css:3 (var(--ring)',
     'src/styles.css:4 (--secondary:)',
+    'src/styles.css:5 (--primary:)',
   ]);
 });
 

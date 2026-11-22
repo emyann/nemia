@@ -39,8 +39,11 @@ const colourTokens = (light: Record<string, string>, dark: Record<string, string
     return { name, value: { light: light[name] ?? '', dark: dark[name] ?? '' }, usage } satisfies Themed;
   });
 
-/** Where the board's stylesheet writes its dark meanings: what is before it is the light scheme's. */
-const DARK = '@media (prefers-color-scheme: dark)';
+/**
+ * Where the board's stylesheet writes its dark meanings, the dark media query around a `:root` block, never the `dark` variant that
+ * names the same query above it: what is before it is the light scheme's.
+ */
+const DARK_ROOT = /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{/;
 
 /** The `--meaning-*` values one part of the board's stylesheet writes, by their name after `--meaning-`. */
 const meaningsIn = (css: string) =>
@@ -61,7 +64,7 @@ const valueOf = (value: string, roles: Record<string, string>) => {
  */
 const meaningTokens = (light: Record<string, string>, dark: Record<string, string>) => {
   const css = fs.readFileSync(path.join(WEB, 'src', 'styles.css'), 'utf8');
-  const at = css.indexOf(DARK);
+  const at = css.search(DARK_ROOT);
   const written = { light: meaningsIn(at < 0 ? css : css.slice(0, at)), dark: meaningsIn(at < 0 ? '' : css.slice(at)) };
   return [
     ...MEANING.flatMap(([word, usage]) => {

@@ -8,7 +8,7 @@ const meta: Meta = { title: 'Frame/NemiaFace' };
 export default meta;
 
 /** Where a face stands in its story. */
-const AROUND = { display: 'inline-flex', padding: 24, background: 'var(--background)' };
+const AROUND = { display: 'inline-flex', padding: 24, background: 'var(--md-sys-color-background)' };
 
 /** Each presence of the owner's sheet, by its name. */
 const SHEET: [string, Presence][] = [
@@ -80,7 +80,7 @@ export const InTheHeader: StoryObj = {
 /** The owner's sheet: each presence's face and the cues beside it, as she is docked at the corner of a page. */
 export const Docked: StoryObj = {
   render: () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 24, background: 'var(--background)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 24, background: 'var(--md-sys-color-background)' }}>
       {SHEET.map(([name, presence]) => (
         <div key={name} data-presence={name} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {cuesOf(presence).map((cue) => (

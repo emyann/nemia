@@ -54,7 +54,7 @@ const FINDERS: Record<Rule, { pattern: RegExp; spared?: (word: string) => boolea
  */
 export function brokenIn(rule: Rule, text: string) {
   const { pattern, spared } = FINDERS[rule];
-  const words = [...text.matchAll(pattern)].map((m) => m[1]!).filter((word) => !spared?.(word));
+  const words = [...text.matchAll(pattern)].map((m) => m[1]).filter((word) => !spared?.(word));
   return [...new Set(words)].sort();
 }
 

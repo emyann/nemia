@@ -39,7 +39,7 @@ export const loadAgent = (client: QueryClient, from: string, name: string, place
     from === 'user' ? client.prefetchQuery(customInstructionsQuery(name)) : null,
   ]);
 
-const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small wrap-anywhere">{text}</code>;
 
 /**
  * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, with its Source, when it is the

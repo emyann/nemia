@@ -19,6 +19,12 @@ const WEB = path.resolve(import.meta.dirname, '..');
 /** The schemes, the dark one opening at this line in both the theme and the stylesheet. */
 const DARK = '@media (prefers-color-scheme: dark)';
 
+/**
+ * Where a stylesheet's dark meanings open: the dark media query around a `:root` block, never the `dark` variant that names the same
+ * query above it.
+ */
+const DARK_ROOT = /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{/;
+
 /** WCAG AA for text. */
 const THRESHOLD = 4.5;
 
@@ -53,7 +59,7 @@ const nameOf = (meaning: string, role: (typeof ROLES)[number]) =>
 /** A hex colour's channels. */
 const hexRgb = (hex: string) => {
   const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
-  return [r!, g!, b!] satisfies Rgb;
+  return [r, g, b] satisfies Rgb;
 };
 
 /** An `hsl(h s% l%)` the kit's generator writes, in sRGB's channels. */
@@ -82,9 +88,9 @@ export function tableOf(design: string) {
       ['dark', dark],
       ['light', light],
     ] as const) {
-      const hexes = [...cell!.matchAll(/`(#[0-9a-fA-F]{6})`/g)].map((m) => m[1]!.toLowerCase());
+      const hexes = [...cell.matchAll(/`(#[0-9a-fA-F]{6})`/g)].map((m) => m[1].toLowerCase());
       if (hexes.length === 0) continue;
-      hexes.forEach((hex, i) => table[scheme].set(nameOf(meaning!, ROLES[i]!), hex));
+      hexes.forEach((hex, i) => table[scheme].set(nameOf(meaning, ROLES[i]), hex));
     }
   }
   return table;
@@ -96,8 +102,8 @@ export function tableOf(design: string) {
  * @param css The text of the stylesheet.
  */
 export function writtenOf(css: string) {
-  const at = css.indexOf(DARK);
-  const read = (part: string) => new Map([...part.matchAll(/--meaning-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1]!, m[2]!.trim()]));
+  const at = css.search(DARK_ROOT);
+  const read = (part: string) => new Map([...part.matchAll(/--meaning-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
   return { light: read(at < 0 ? css : css.slice(0, at)), dark: read(at < 0 ? '' : css.slice(at)) } satisfies Record<
     Scheme,
     Map<string, string>
@@ -122,7 +128,7 @@ export function apartFrom(
       const colour = value === undefined || value.startsWith('#') ? undefined : colourOf(value, theme[scheme]);
       const want = hexRgb(hex);
       const same =
-        value?.toLowerCase() === hex || (colour !== undefined && colour.every((channel, i) => Math.abs(channel - want[i]!) <= ROUNDING));
+        value?.toLowerCase() === hex || (colour !== undefined && colour.every((channel, i) => Math.abs(channel - want[i]) <= ROUNDING));
       return same ? [] : [`${scheme} ${name}: ${value ?? 'unwritten'}, ${hex}`];
     }),
   );
@@ -139,7 +145,7 @@ const colourOf = (value: string, roles: Map<string, Rgb>) => {
 const themeOf = (css: string) => {
   const at = css.indexOf(DARK);
   const roles = (part: string) =>
-    new Map([...part.matchAll(/--md-sys-color-([a-z-]+):\s*(hsl\([^)]*\))\s*;/g)].map((m) => [m[1]!, hslRgb(m[2]!)]));
+    new Map([...part.matchAll(/--md-sys-color-([a-z-]+):\s*(hsl\([^)]*\))\s*;/g)].map((m) => [m[1], hslRgb(m[2])]));
   return { light: roles(css.slice(0, at)), dark: roles(css.slice(at)) } satisfies Record<Scheme, Map<string, Rgb>>;
 };
 
@@ -191,7 +197,7 @@ test("the rulebook's table names the four meanings, each with its roles, in both
 });
 
 test("the stylesheet writes each meaning at the rulebook's value, in light and in dark", () => {
-  assert.ok(styles.includes(DARK), `src/styles.css writes the dark meanings under ${DARK}`);
+  assert.ok(DARK_ROOT.test(styles), `src/styles.css writes the dark meanings under ${DARK}, in a :root block`);
   assert.deepEqual(
     apartFrom(TABLE, WRITTEN, THEME),
     [],

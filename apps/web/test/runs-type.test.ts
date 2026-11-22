@@ -43,6 +43,7 @@ const FILES = [
   'components/look/CutIconPress.tsx',
   'components/look/ScanLines.tsx',
   'components/look/Marker.tsx',
+  'components/look/MeaningTag.tsx',
   'components/look/Trace.tsx',
   'components/step/StepPreview.tsx',
   'components/field/SelectorField.tsx',

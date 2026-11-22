@@ -169,6 +169,16 @@ const sizeOf = (result: CallToolResult) =>
   result.content.reduce((n, c) => n + (c.type === 'text' ? c.text.length : 0), 0) +
   (result.structuredContent === undefined ? 0 : JSON.stringify(result.structuredContent).length);
 
+/** A 2xx's `text`, read as `json`, as `tool`'s result: a `Table` as its lines alone, any other JSON as text and as `structuredContent`. */
+const answered = (tool: PortTool, args: Readonly<Record<string, unknown>>, text: string, json: unknown) => {
+  if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] } satisfies CallToolResult;
+  const structured = Array.isArray(json) ? { items: json } : Predicate.isObject(json) ? json : undefined;
+  return {
+    content: [{ type: 'text', text }],
+    ...(structured === undefined ? {} : { structuredContent: structured }),
+  } satisfies CallToolResult;
+};
+
 /**
  * One answer of `app` to `tool` with `args`, as a tool's result: a 2xx's file (a `bytes` read) as a link to it alone (`linkOf`), never its
  * bytes; a 2xx's `Table` as its lines alone (`tableText`), any other JSON as text
@@ -184,14 +194,7 @@ async function answerOf(tool: PortTool, args: Readonly<Record<string, unknown>>,
   }
   const text = await res.text();
   const json = jsonOf(text);
-  if (res.ok) {
-    if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] } satisfies CallToolResult;
-    const structured = Array.isArray(json) ? { items: json } : Predicate.isObject(json) ? json : undefined;
-    return {
-      content: [{ type: 'text', text }],
-      ...(structured === undefined ? {} : { structuredContent: structured }),
-    } satisfies CallToolResult;
-  }
+  if (res.ok) return answered(tool, args, text, json);
   const said = Predicate.isObject(json) && typeof json.error === 'string' ? json.error : undefined;
   return failed(
     said ?? `${tool.method} ${tool.path} answered ${res.status}${text === '' ? '' : `: ${text}`}`,

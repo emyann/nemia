@@ -6,8 +6,8 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { OpenApi } from 'effect/http-api';
-import { API_VERSION, Api, CARD_KEYS, CARD_KEY_MEANINGS, CARD_STATES, Card, CardEdit, CardFile, CardWrite } from 'objects';
-import { answered, taken } from './served.ts';
+import { API_VERSION, Api, CARD_KEYS, CARD_KEY_MEANINGS, CARD_STATES, Card, CardEdit, CardFile, CardWrite, LISTED_WITHOUT } from 'objects';
+import { answered, listedPage, taken } from './served.ts';
 
 const filed = {
   apiVersion: API_VERSION,
@@ -47,7 +47,7 @@ test("the Api's get answers a card and its list a page of cards, every key kept,
     metadata: { continue: 'YnJva2Vu', remainingItemCount: 1 },
     items: [filed, broken],
   };
-  assert.deepEqual(answered('cards', 'list', page), page);
+  assert.deepEqual(answered('cards', 'list', page), listedPage(LISTED_WITHOUT.Card, page));
   assert.equal(answered('cards', 'get', { ...filed, kind: 'Run' }), undefined);
   assert.equal(answered('cards', 'list', { ...page, kind: 'RunList' }), undefined);
 });

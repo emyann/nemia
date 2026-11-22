@@ -7,7 +7,7 @@
  *
  * Beside it, the body a proposal is made with (`ProposalCreate`). Plain Schemas of JSON, as every object of this package is.
  */
-import { Schema } from 'effect';
+import { Schema, Struct } from 'effect';
 import { API_VERSION, ObjectMeta, describedOne, listOf } from './meta.ts';
 import { ACCESS_CHANGES, APPLY_AT, APPROVED_BY, CHANGE_VERBS, PROPOSABLE_KINDS, PROPOSAL_PHASES } from './words.ts';
 
@@ -114,8 +114,39 @@ export const Proposal = Schema.Struct({
 });
 export type Proposal = typeof Proposal.Type;
 
-/** A page of a factory's proposals. */
-export const ProposalList = listOf('Proposal', Proposal);
+/** An object of a proposal as a list serves it: which object it is and what is done to it, without its spec. */
+const ListedObject = ProposedObject.mapFields(Struct.omit(['spec']));
+
+/** A proposal as a list serves it: its object without its objects' specs, which a read of the proposal answers. */
+export const ProposalListed = Schema.Struct({
+  ...Proposal.fields,
+  spec: ProposalSpec.mapFields((fields) => ({
+    ...fields,
+    objects: Schema.Array(ListedObject).annotate({
+      description:
+        'The objects the proposal applies, each by its kind, name and verb, without its spec, which a read of the proposal answers.',
+    }),
+  })).annotate({
+    description:
+      "What the proposal asks, its objects without their specs: the objects it applies, when it applies, and why, in the proposer's words.",
+  }),
+  status: ProposalStatus.mapFields((fields) => ({
+    ...fields,
+    before: Schema.optionalKey(
+      Schema.Array(ListedObject).annotate({
+        description:
+          'The objects as they stood before it applied, without their specs, which a read of the proposal answers; absent until it applies.',
+      }),
+    ),
+  })).annotate({
+    description:
+      "The machinery's account of the proposal, the objects before it applied without their specs: its phase, who proposed and approved it, its changes and whether it widens access, the revisions it made, and why it stands where it does.",
+  }),
+}).annotate({ description: "A proposal as a list serves it, without its files' content (LISTED_WITHOUT)." });
+export type ProposalListed = typeof ProposalListed.Type;
+
+/** A page of a factory's proposals, each without its objects' specs. */
+export const ProposalList = listOf('Proposal', ProposalListed);
 export type ProposalList = typeof ProposalList.Type;
 
 /** A proposal made (`POST …/proposals`): its spec; the machinery names it and reads who proposed it from the caller. */

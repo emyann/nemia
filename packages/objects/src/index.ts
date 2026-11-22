@@ -171,6 +171,7 @@ export {
   CardFile,
   CardLastStart,
   CardList,
+  CardListed,
   CardSpec,
   CardStart,
   CardStatus,
@@ -299,6 +300,7 @@ export {
   DefinitionFiles,
   WorkflowFile,
   WorkflowList,
+  WorkflowListed,
   WorkflowSpec,
   Need,
   NeedAsk,
@@ -313,6 +315,7 @@ export {
   AgentCard,
   AgentFill,
   AgentList,
+  AgentListed,
   AgentSpec,
   AgentStatus,
   AgentTried,
@@ -322,8 +325,19 @@ export {
   AgentDrafted,
   GivenSkill,
 } from './agent.ts';
-export { Skill, SkillFile, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillUser, SkillWrite, SkillDrafted } from './skill.ts';
-export { Template, TemplateList, TemplateParameter, TemplateSpec, TemplateStatus, TemplateText } from './template.ts';
+export {
+  Skill,
+  SkillFile,
+  SkillFiles,
+  SkillList,
+  SkillListed,
+  SkillSpec,
+  SkillStatus,
+  SkillUser,
+  SkillWrite,
+  SkillDrafted,
+} from './skill.ts';
+export { Template, TemplateList, TemplateListed, TemplateParameter, TemplateSpec, TemplateStatus, TemplateText } from './template.ts';
 export { Subscription, SubscriptionList, SubscriptionScope, SubscriptionSpec, SubscriptionStatus } from './subscription.ts';
 export { Event, EventInvolved, EventList } from './event.ts';
 export { WATCH_EVENT_TYPES, type WatchEventType, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
@@ -344,6 +358,7 @@ export {
   ProposalChange,
   ProposalCreate,
   ProposalList,
+  ProposalListed,
   ProposalSpec,
   ProposalStatus,
   ProposedBy,
@@ -380,7 +395,7 @@ export {
   TABLE_COLUMN_TYPES,
   type TableColumnType,
 } from './words.ts';
-export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked } from './table.ts';
+export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked, pagesWithoutTable } from './table.ts';
 export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
 export { Gone, ReadFailed, TooLarge, UnsupportedMediaType } from './api-errors.ts';
 export { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, PICTURE_TYPES, type PictureMediaType } from './file.ts';
@@ -800,3 +815,4 @@ export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGro
 export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
 export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
 export { refusedIn, type RefusedPlace } from './refused.ts';
+export { LISTED_WITHOUT, filesLeftOut } from './listed.ts';

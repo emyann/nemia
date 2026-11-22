@@ -107,6 +107,11 @@
       "term": "Card sent on",
       "meaning": "a started card filed again by a person (`nemia inbox resend`) as a card of its own, `<run>-resent`, its body, factory and labels kept and handed the runs it was started as (`from:`), queued on the workflow named or naming none for its factory's card triggers; the run it came from is cancelled when it waits on a person. A card never started, sent on already, or whose run is still at work is refused (`resendRefusal`, `packages/agent-orchestrator/src/inbox/resend.ts`).",
       "type": "Resent"
+    },
+    {
+      "term": "Card wait",
+      "meaning": "a card not started whose `after:` names a card that has not landed: it is listed with each (`waits`, the Card's `status.waitingOn`), queued by no trigger and started by no tick until the last lands. A named card has landed when a run started from it has, as its own `nemia decide` says, or the card its run passed the work on to has (a workflow node's card, `nemia inbox resend`); a wait on a card the store does not know, on a cycle of `after:`, or at a card whose run ended unlanded or whose start was refused is stuck, waiting on a person (`cardLanded`, `waitStuck`, `packages/agent-orchestrator/src/inbox/waits.ts`). A start by hand starts it all the same.",
+      "type": "ListedWait"
     }
   ]
 }

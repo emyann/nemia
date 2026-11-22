@@ -248,6 +248,15 @@
     {
       "term": "Clash settled",
       "meaning": "a Normal line about a factory, `ClashSettled`, labelled with it and the card: written by the tick once when a card said clashing on the feed clashes no more — a selector or its labels changed, or it was removed. A card never said clashing is never said settled."
+    },
+    {
+      "term": "Card wait stuck",
+      "meaning": "a Warning line about a factory, `CardWaitStuck`, labelled with it and the card (`labels.factory`, `labels.card`): written by the tick once when a card's wait on the cards of its `after:` comes to need a person — a card the store does not know, a cycle, a run ended unlanded, a start refused — its note each such wait and its fix, and not again while it stands (`waitLines`, `packages/agent-orchestrator/src/feed/feed.ts`).",
+      "type": "FeedWaits"
+    },
+    {
+      "term": "Card wait freed",
+      "meaning": "a Normal line about a factory, `CardWaitFreed`, labelled with it and the card: written by the tick once when a card said stuck on the feed is stuck no more — the card it waits on landed or came back in play, its `after:` was edited, it was started, or removed. A card never said stuck is never said freed."
     }
   ]
 }

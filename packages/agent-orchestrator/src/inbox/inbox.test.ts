@@ -36,6 +36,9 @@ import {
   startedRefusal,
   unfactoredCardRefusal,
   type InboxListing,
+  type ListedWait,
+  type Triggering,
+  type Waiting,
 } from './inbox.ts';
 import { fromNote } from '../start/index.ts';
 import { RUN_PHASES } from '../phase/phase.ts';
@@ -256,6 +259,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         labels: {},
         state: 'failed',
         from: [],
+        after: [],
         factoryRepo: null,
         error: 'refused',
       },
@@ -270,6 +274,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         labels: {},
         state: 'filed',
         from: [],
+        after: [],
         factoryRepo: null,
         error: null,
       },
@@ -284,6 +289,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         labels: {},
         state: 'filed',
         from: [],
+        after: [],
         factoryRepo: null,
         error: 'refused',
       },
@@ -298,6 +304,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         labels: {},
         state: 'filed',
         from: [],
+        after: [],
         factoryRepo: null,
         error: 'refused',
       },
@@ -312,6 +319,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         labels: {},
         state: 'waiting',
         from: [],
+        after: [],
         factoryRepo: null,
         error: null,
       },
@@ -855,6 +863,120 @@ test("`from:` names the runs a card's run is handed as context, in the order wri
   assert.equal(fromText(card, []), '---\nworkflow: build\n---\nCache the views.\n', 'taken back: the line goes');
 });
 
+/** What the store and git say of the cards waited on: each card of `cards` known, with its runs, their landing and their hand-offs. */
+const waitingOver = (
+  cards: Readonly<Record<string, { runs?: { id: string; landed: boolean }[]; onward?: string[] }>>,
+  phases: Readonly<Record<string, CardRun['phase']>> = {},
+) =>
+  ({
+    look: (name: string) => {
+      const c = cards[name];
+      return c === undefined ? { known: false, runs: [], onward: [] } : { known: true, runs: c.runs ?? [], onward: c.onward ?? [] };
+    },
+    phaseOf: (id: string) => phases[id],
+  }) satisfies Waiting;
+
+describe('`after:` names the cards a card waits on: read, written back, listed with each card not landed, and passed over by the queue and the triggers', () => {
+  const A = '---\nworkflow: dev\nfactory: f\n---\nFirst.\n';
+  const B = '---\nworkflow: dev\nfactory: f\nqueued: 2026-09-16T09:00:00.000Z\nafter: a-1x2y\n---\nSecond.\n';
+  const files = [
+    { file: 'a-1x2y.md', text: A },
+    { file: 'b-3z4w.md', text: B },
+  ];
+
+  test('read in the order written, and written back by every rewrite of the card', () => {
+    const card = read('---\nworkflow: dev\nafter: a-1x2y,  b-3z4w\n---\nCache the views.\n');
+    assert.deepEqual(card.after, ['a-1x2y', 'b-3z4w']);
+    assert.match(fromText(card, ['r-1']), /^after: a-1x2y, b-3z4w$/m);
+    assert.equal(Object.hasOwn(read('---\nworkflow: dev\n---\nx\n'), 'after'), false, 'none unless it says so');
+    assert.deepEqual(parseInboxCard('d.md', ideaCard('the idea', 'Show it.', { after: ['a-1x2y'] }).text).after, ['a-1x2y'], 'given at a filing');
+  });
+
+  test('a hand-queued card whose named card has not landed is listed waiting on it, at no place in the queue, and the tick starts none of it', () => {
+    const listing = inboxListing(files, [], new Map(), new Map(), undefined, waitingOver({ 'a-1x2y': {} }));
+    const b = listing.find((l) => l.name === 'b-3z4w');
+    assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'filed', stuck: false }]);
+    assert.equal(b?.queued?.place, null, 'no place in the queue while it waits');
+    assert.deepEqual(queueOrder(listing), []);
+    assert.equal(nextQueued(listing, '/repo'), undefined);
+  });
+
+  test('once the named card has landed, it waits on nothing and takes its place', () => {
+    const landed = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', landed: true }] } }, { 'a-run': 'succeeded' });
+    const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'succeeded' }];
+    const b = inboxListing(files, runs, new Map(), new Map(), undefined, landed).find((l) => l.name === 'b-3z4w');
+    assert.equal(b?.waits, undefined);
+    assert.equal(b?.queued?.place, 1);
+  });
+
+  test('handed nothing of the store, no card waits', () => {
+    assert.equal(inboxListing(files, []).find((l) => l.name === 'b-3z4w')?.queued?.place, 1);
+  });
+
+  test('a card a trigger selects is listed with its waits, neither queued nor clashing, until they land', () => {
+    const t: Triggering = {
+      triggers: [
+        { factory: 'f', name: 'one', selector: 'factory=f', target: { kind: 'Workflow', name: 'dev' } },
+        { factory: 'f', name: 'two', selector: 'factory=f', target: { kind: 'Workflow', name: 'other' } },
+      ],
+      filedAt: () => '2026-09-16T08:00:00.000Z',
+    };
+    const C = '---\nfactory: f\nafter: a-1x2y\n---\nThird.\n';
+    const [, c] = inboxListing([files[0], { file: 'c-5v6u.md', text: C }], [], new Map(), new Map(), t, waitingOver({ 'a-1x2y': {} }));
+    assert.equal(c.queued, undefined);
+    assert.equal(c.clash, undefined);
+    assert.equal(c.waits?.length, 1);
+  });
+
+  test('a wait on a card whose run ended unlanded, on a name the store does not know, and on a cycle, is stuck', () => {
+    const ended = waitingOver({ 'a-1x2y': { runs: [{ id: 'a-run', landed: false }] } }, { 'a-run': 'failed' });
+    const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'failed' }];
+    const b = inboxListing(files, runs, new Map(), new Map(), undefined, ended).find((l) => l.name === 'b-3z4w');
+    assert.deepEqual(b?.waits, [{ card: 'a-1x2y', kind: 'waiting', state: 'failed', stuck: true }]);
+
+    const missing = inboxListing([files[1]], [], new Map(), new Map(), undefined, waitingOver({}));
+    assert.deepEqual(missing[0].waits, [{ card: 'a-1x2y', kind: 'missing', stuck: true }]);
+
+    const cycle = [
+      { file: 'a-1x2y.md', text: '---\nafter: b-3z4w\n---\nFirst.\n' },
+      { file: 'b-3z4w.md', text: '---\nafter: a-1x2y\n---\nSecond.\n' },
+    ];
+    const both = inboxListing(cycle, [], new Map(), new Map(), undefined, waitingOver({ 'a-1x2y': {}, 'b-3z4w': {} }));
+    assert.deepEqual(
+      both.map((l) => l.waits),
+      [
+        [{ card: 'b-3z4w', kind: 'cycle', cycle: ['a-1x2y', 'b-3z4w', 'a-1x2y'], stuck: true }],
+        [{ card: 'a-1x2y', kind: 'cycle', cycle: ['b-3z4w', 'a-1x2y', 'b-3z4w'], stuck: true }],
+      ],
+    );
+  });
+
+  test('a door-routed card waits at the card its run passed the work on to, with that card\'s state', () => {
+    const routed = waitingOver(
+      { 'a-1x2y': { runs: [{ id: 'a-run', landed: false }], onward: ['a2-7q8r'] }, 'a2-7q8r': {} },
+      { 'a-run': 'succeeded' },
+    );
+    const runs: CardRun[] = [{ id: 'a-run', from: { inbox: 'a-1x2y' }, phase: 'succeeded' }];
+    const listed = inboxListing([...files, { file: 'a2-7q8r.md', text: A }], runs, new Map(), new Map(), undefined, routed);
+    assert.deepEqual(listed.find((l) => l.name === 'b-3z4w')?.waits, [
+      { card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'filed', stuck: false },
+    ]);
+  });
+
+  test('`nemia inbox` says each wait: the card, where its work stands and its state, and what to type where only a person can release it', () => {
+    const lineOf = (w: ListedWait) => inboxLines([{ ...inboxListing([files[1]], [])[0], waits: [w] }])[0];
+    assert.match(lineOf({ card: 'a-1x2y', kind: 'waiting', at: 'a2-7q8r', state: 'running', stuck: false }), /waiting on a-1x2y at a2-7q8r \(running\)/);
+    assert.doesNotMatch(lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'running', stuck: false }), /needs you/);
+    const stuck = lineOf({ card: 'a-1x2y', kind: 'waiting', state: 'failed', stuck: true });
+    assert.match(stuck, /needs you/);
+    assert.match(stuck, /nemia inbox resend a-1x2y/);
+    assert.match(stuck, /nemia inbox edit b-3z4w/);
+    assert.match(stuck, /nemia start b-3z4w/);
+    assert.match(lineOf({ card: 'a-1x2y', kind: 'missing', stuck: true }), /waiting on a-1x2y \(no such card\)/);
+    assert.match(lineOf({ card: 'a-1x2y', kind: 'cycle', cycle: ['b-3z4w', 'a-1x2y', 'b-3z4w'], stuck: true }), /b-3z4w → a-1x2y → b-3z4w/);
+  });
+});
+
 test("`labels:` is a card's map of a person's labels: read as a map, listed, selectable beside workflow and factory, shown on request, written back with every other key kept", () => {
   const card = read('---\nworkflow: build\nlabels:\n  team: core\n  area: inbox\n---\nCache the views.\n');
   assert.deepEqual(card.labels, { team: 'core', area: 'inbox' });
@@ -905,15 +1027,14 @@ describe("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's
   const rows: Record<string, [text: string, facts: string[]]> = {
     'a key it does not have, naming the keys it has': [
       '---\nworkflow: dev\nharness: codex\n---\nx\n',
-      [F, '`harness`', 'workflow, repo, queued, gate, model, factory, from', 'Correct the spelling or delete the line'],
+      [F, '`harness`', 'workflow, repo, queued, gate, model, factory, from, after', 'Correct the spelling or delete the line'],
     ],
     'a key spelt as another': ['---\nrepos: /home/me/code/app\n---\nx\n', [F, '`repos`']],
     'a misspelt `factory`': ['---\nfactry: shop\n---\nx\n', [F, '`factry`', 'workflow, repo, queued, gate, model, factory,']],
-    '`after:`, with where it is said instead': [
-      '---\nworkflow: dev\nafter: parse-the-flag-1x2y\n---\nx\n',
-      [F, '`after`', `nemia start <inbox>/${F}`, '--after <runId>', 'Delete the line.'],
-    ],
-    '`after:`, still, beside `from:`': ['---\nafter: a-1x2y\n---\nx\n', ['`after` is not a key an inbox card has']],
+    '`after:` with a blank card': ['---\nafter: a-1x2y, \n---\nx\n', [F, '`after: a-1x2y, `', 'comma-separated', 'Correct the line.']],
+    "`after:` a name that is no card's": ['---\nafter: ../up\n---\nx\n', [F, '`after: ../up`', "is not a card's name"]],
+    '`after:` naming a card twice': ['---\nafter: a-1x2y, a-1x2y\n---\nx\n', [F, 'names a-1x2y twice']],
+    '`after:` naming the card itself': ['---\nafter: cache-the-views-k2q9\n---\nx\n', [F, 'names the card itself', 'cache-the-views-k2q9']],
     '`workflow:` with no value': ['---\nworkflow:\n---\nx\n', [F, '`workflow` has no value', 'Delete the line']],
     '`repo:` with nothing but spaces': ['---\nrepo:   \n---\nx\n', [F, '`repo` has no value']],
     '`gate:` with no value': ['---\ngate:\n---\nx\n', [F, '`gate` has no value']],
@@ -984,10 +1105,11 @@ describe("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's
 describe('REFUSED by name at shipped defaults: `ideaCard` refuses what `nemia inbox add` is given — nothing in the idea, a card with a key it does not keep, a key given empty or on two lines, a path to a workflow, a retired repo:', () => {
   const rows: Record<string, [thrown: () => unknown, facts: string[]]> = {
     'an empty body in a file': [() => ideaCard('./empty.md', '---\nworkflow: dev\n---\n', {}), ['./empty.md: the body is empty']],
-    "`after:` in a file: not a card yet, so no card's path is named — file the idea, then give the wait at start": [
-      () => ideaCard('./ideas/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', {}),
-      ['./ideas/d.md: `after`', 'Delete the line and file the idea', 'nemia start <inbox>/<name>.md --after <runId>.'],
+    '`after:` in a file naming a card twice': [
+      () => ideaCard('./ideas/d.md', '---\nworkflow: dev\nafter: b-1x2y, b-1x2y\n---\nShow the flag.\n', {}),
+      ['./ideas/d.md: `after: b-1x2y, b-1x2y`', 'names b-1x2y twice'],
     ],
+    'an `after` given naming a card twice': [() => ideaCard('the idea', 'x', { after: ['b-1x2y', 'b-1x2y'] }), ['names b-1x2y twice']],
     '`queued:` carried in by a file': [
       () => ideaCard('./idea.md', '---\nworkflow: dev\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views.\n', {}),
       ['./idea.md: `queued`', 'Delete the line and file the idea', 'nemia inbox queue <name>.'],

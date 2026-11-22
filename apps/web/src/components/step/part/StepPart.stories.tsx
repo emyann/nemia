@@ -124,9 +124,13 @@ export const AtWorkSpending: StoryObj<{ run: RunDetail }> = {
   },
 };
 
-/** A step filed and waiting to start: its head says why, here memory, with what is kept for a person's turn. */
-export const WaitingToStart: StoryObj = {
-  render: () => <Sizes run={RUNS.queued} />,
+/**
+ * A step filed and waiting to start: its head says why, here memory, with what is kept for a person's turn. Drawn from its args, the
+ * run.
+ */
+export const WaitingToStart: StoryObj<{ run: RunDetail }> = {
+  args: { run: RUNS.queued },
+  render: ({ run }) => <Sizes run={run} />,
   play: async ({ canvasElement }) => {
     const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
     for (const fact of ['waits for memory', '2Gi', '1.5Gi', '2.5Gi']) await expect(card.textContent).toContain(fact);

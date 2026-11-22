@@ -5,13 +5,15 @@
  * brings back the jobs that depend on them). Once is read from GitHub, never carried: a run is re-run only while its `run_attempt`
  * (`gh api repos/{owner}/{repo}/actions/runs/<id>`) is 1, so a retry of the step that waits never re-runs it again. Until GitHub has
  * replaced every job re-run, the red it still shows is no verdict (`seenAfter`); the pass or the refusal then names the jobs re-run and
- * how each ended the second time (`rerunSaid`). An attempt that cannot be read, a re-run `gh` refuses, or a red entry that is no Actions
+ * how each ended the second time (`rerunSaid`). `pull-request.ts`'s wait asks first whether the red is worth it: it reads the logs of the
+ * red jobs a re-run would bring back (`redJobsOf`) and re-runs only where none is the change's (`rerunDue`, `ci-log.ts`), saying in a line
+ * whose each was (`toldSaid`); the receipt re-runs any red it judged. An attempt that cannot be read, a re-run `gh` refuses, or a red entry that is no Actions
  * job means no re-run, said in a line. Each script keeps beside its own code how long it waits and what its refusal says.
  *
  * It imports `ci-log.ts`, for how a check reads, and `exec.ts`, for how `gh` is run: the run freezes the carried folder whole
  * (`$WF_CARRIED_FILES`), so they are beside it wherever it runs.
  */
-import { type Check, PASSED, checkKey, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
+import { type Check, type Second, type Told, PASSED, checkKey, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
 import { run } from './exec.ts';
 
 /** The verdicts that judge nothing: a pass, and what CI or a person runs again rather than the work answers. */
@@ -61,7 +63,40 @@ export function rerunOnce<T extends Check>(ours: readonly T[], entries: readonly
     if (asked?.status !== 0) lines.push(`  not re-run: run ${id}, as ${not}`);
     return asked?.status === 0;
   });
-  return { runs, was: entries.filter((entry) => judgedRed(entry) && runs.includes(runIdOf(entry) ?? '')), lines };
+  return { runs, was: redJobsOf(red.filter((entry) => runs.includes(runIdOf(entry) ?? '')), entries), lines };
+}
+
+/**
+ * The entries of `entries` judged red whose workflow run a red entry of `ours` names: the jobs a re-run of those runs' failed jobs would
+ * bring back, as they were.
+ * @param ours The CI context's entries of the commit.
+ * @param entries The commit's latest checks.
+ */
+export function redJobsOf<T extends Check>(ours: readonly T[], entries: readonly T[]) {
+  const runs = new Set(ours.filter(judgedRed).flatMap((entry) => runIdOf(entry) ?? []));
+  return entries.filter((entry) => judgedRed(entry) && runs.has(runIdOf(entry) ?? ''));
+}
+
+/** How a red job's line names whose it was. */
+const WHOSE: Record<Told, string> = {
+  change: "its log names a line that failed it, the change's",
+  machine: "the machine's",
+  untold: 'no log could be read, untold',
+};
+
+/**
+ * The line that says why a red context was re-run or reported at once, naming each red job read and whose it was.
+ * @param jobs The red jobs whose logs were read, in the order read.
+ * @param told Whose each of `jobs` was, in the same order, with one more `untold` where more jobs were red than were read.
+ * @param due Whether the context is re-run or reported.
+ */
+export function toldSaid(jobs: readonly Check[], told: readonly Told[], due: Second) {
+  const each = jobs.map((job, i) => `${nameOf(job)} ${verdict(job).toLowerCase()} (${WHOSE[told[i] ?? 'untold']})`);
+  const named = each.length ? each.join('; ') : 'no red job of an Actions run could be read';
+  return due === 'report'
+    ? `  not re-run, since a red job's log names a line that failed it, which a second run of the same commit would fail again: ${named}. ` +
+        "A failing line this change did not touch (a flaky test) is said so in the sign-off."
+    : `  a second run is due, since no red job's log names a line that failed it: ${named}`;
 }
 
 /**

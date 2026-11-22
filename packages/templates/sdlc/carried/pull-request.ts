@@ -40,14 +40,19 @@
  *   own (`WF_STEP`). A job of the context GitHub cut off at its own `timeout-minutes` reads `cancelled` like one cancelled by concurrency
  *   or a person, and only its check run's annotations tell them apart (`gh api repos/{owner}/{repo}/check-runs/<id>/annotations`, read
  *   once per cancelled job), so one marked as having exceeded its maximum execution time is read as `TIMED_OUT`, a red (`timedOut`).
- *   A red it judged — a failure or a time-out, never one only cancelled, skipped or neutral — is not refused at once: the failed jobs
+ *   A red it judged — a failure or a time-out, never one only cancelled, skipped or neutral — is first told apart (`secondOf`): the log
+ *   of each red job a re-run would bring back is read (once per job, `jobLog`, the refusal reading it from there), and where a job
+ *   GitHub concluded failed has a log naming a line that failed it (`failures`), the change's, which a second run of the same commit
+ *   would fail again, the red is refused at once, never re-run (`rerunDue`, `ci-log.ts`). Any other red — timed out, started up wrong, a
+ *   failure whose log names no failing line or gave none, more red jobs than `JOBS` — is not refused at once: the failed jobs
  *   of each workflow run the context's red entries name are re-run, once (`gh run rerun <id> --failed`, which brings back the jobs that
  *   depend on them), and waited on again within the same 2400 s. Once is read from GitHub, never carried: a run is re-run only while
  *   its `run_attempt` (`gh api repos/{owner}/{repo}/actions/runs/<id>`) is 1, so a `--recheck` or a later try never re-runs it again.
  *   Until GitHub has replaced every job it re-ran, the red it still shows is no verdict. The pass, or the refusal, then names the jobs
  *   re-run and how each ended the second time; a re-run still running at the bound is the work's refusal, not the person's, since the
  *   next check reads its verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red entry that is no Actions job means no
- *   re-run, said in one line, and the refusal is as it would have been. A context still absent at half the start bound
+ *   re-run, said in one line, and the refusal is as it would have been. Either way a line names each red job read and whose it was
+ *   (`toldSaid`). A context still absent at half the start bound
  *   (`WF_CI_STUCK_SECONDS` for a test) on a head with a workflow run GitHub queued and never started has that run's workflow dispatched
  *   once on the branch (`dispatchStuck`), waited on within the same start bound; a dispatch GitHub refuses is a person's refusal at once,
  *   naming the command to type. A dispatched run's entry links its run, not a job: its failing jobs are read from the run, re-run and read
@@ -77,7 +82,23 @@
  * the base's. A hint, never a verdict: a read that fails, or a base pending, green or unreported, adds nothing, and the refusal stays
  * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
-import { PASSED, type Seen, JOBS, declaresCi, failures, latest, linkOf, listing, nameOf, pending, seenOf, verdict } from './ci-log.ts';
+import {
+  PASSED,
+  type Seen,
+  type Told,
+  JOBS,
+  declaresCi,
+  failures,
+  latest,
+  linkOf,
+  listing,
+  nameOf,
+  pending,
+  rerunDue,
+  seenOf,
+  toldOf,
+  verdict,
+} from './ci-log.ts';
 import {
   PERSONS_EXIT,
   POLL_SECONDS,
@@ -93,7 +114,7 @@ import {
   seconds,
   sleep,
 } from './exec.ts';
-import { type Rerun, jobIdOf, judgedRed, rerunOnce, rerunSaid, runIdOf, seenAfter } from './rerun.ts';
+import { type Rerun, jobIdOf, judgedRed, redJobsOf, rerunOnce, rerunSaid, runIdOf, seenAfter, toldSaid } from './rerun.ts';
 
 /**
  * A refusal only a person can answer — the machine, the repository on GitHub, the factory's rules, or CI that never judged — which no
@@ -424,10 +445,45 @@ function jobsFailing(entry: Entry) {
  * is read with the flag, and again without it where that read gives none, whatever gh said: no version is asked, and no refusal's words
  * are read.
  */
-function jobLog(id: string) {
-  const at = `repos/{owner}/{repo}/actions/jobs/${id}/logs`;
-  const flagged = read('api', at, '--allow-escape-sequences');
-  return flagged.status === 0 && flagged.out.trim() ? flagged : read('api', at);
+const jobLog = (() => {
+  const known = new Map<string, Ran>();
+  return (id: string) => {
+    const was = known.get(id);
+    if (was !== undefined) return was;
+    const at = `repos/{owner}/{repo}/actions/jobs/${id}/logs`;
+    const flagged = read('api', at, '--allow-escape-sequences');
+    const log = flagged.status === 0 && flagged.out.trim() ? flagged : read('api', at);
+    known.set(id, log);
+    return log;
+  };
+})();
+
+/**
+ * What the log of the red job `job` says of why it failed (`failures`): read only where GitHub concluded it failed, since whose a job
+ * timed out or started up wrong is is said by its conclusion alone; `unread` where it names no job or GitHub gives no log.
+ */
+function readingOf(job: Entry) {
+  const id = jobIdOf(job);
+  if (verdict(job) !== 'FAILURE' || !id) return 'unread';
+  const log = jobLog(id);
+  if (log.status !== 0 || !log.out.trim()) return 'unread';
+  return failures(log.out).tests ? 'failing' : 'bare';
+}
+
+/**
+ * Whether the red the context `check` judged, its entries `ours` among the commit's latest `entries`, is re-run once or reported now
+ * (`rerunDue`), with the line that says why (`toldSaid`): each red job a re-run would bring back (`redJobsOf`), the context's own last and
+ * at most `JOBS` of them, told by its conclusion and its log (`toldOf`), one more untold where more were red or none could be named;
+ * `undefined` while the context judged no red.
+ */
+function secondOf(ours: readonly Entry[], entries: readonly Entry[], check: string) {
+  if (seenOf(ours) !== 'failed' || !ours.some(judgedRed)) return undefined;
+  const red = redJobsOf(ours, entries).flatMap(jobsFailing);
+  const jobs = [...red.filter((job) => nameOf(job) !== check), ...red.filter((job) => nameOf(job) === check)].slice(0, JOBS);
+  const told = jobs.map((job) => toldOf({ verdict: verdict(job), reading: readingOf(job) }));
+  const all: Told[] = red.length > jobs.length || !jobs.length ? [...told, 'untold'] : told;
+  const due = rerunDue(all);
+  return { due, line: toldSaid(jobs, all, due) };
 }
 
 /**
@@ -842,9 +898,13 @@ const dispatchDue = (seen: Seen, began: number, stuck: number) => seen === 'abse
 const stalled = (rerun: Rerun | undefined, said: string[], retry: string, say: (tail: string[]) => string) =>
   rerun?.runs.length ? new Refusal(say([...said, RERUNNING, retry])) : new PersonsRefusal(say([...said, retry]));
 
-/** What the wait dispatched, then what it re-ran and how each job ended the second time; nothing where it asked neither. */
-const waitSaid = (dispatch: Dispatch | undefined, rerun: Rerun | undefined, entries: readonly Entry[]) => [
+/**
+ * What the wait dispatched, then `told`, why it re-ran a red or reported it at once, then what it re-ran and how each job ended the second
+ * time; nothing where it asked none of them.
+ */
+const waitSaid = (dispatch: Dispatch | undefined, told: string | undefined, rerun: Rerun | undefined, entries: readonly Entry[]) => [
   ...(dispatch?.lines ?? []),
+  ...(told === undefined ? [] : [told]),
   ...rerunSaid(rerun, entries),
 ];
 
@@ -865,7 +925,8 @@ function stopsAt(began: number, bound: number, dispatch: Dispatch | undefined) {
 }
 
 /**
- * `wait --check <name>`: that context of the pull request's head, waited out and read, a red re-run once first (`rerunOnce`) within the
+ * `wait --check <name>`: that context of the pull request's head, waited out and read, a red no job's log shows is the change's
+ * (`secondOf`) re-run once first (`rerunOnce`) within the
  * same bound, and, where the context is still absent at half the start bound, each workflow of the head GitHub queued and never started
  * dispatched once on the branch (`dispatchStuck`), waited on within the same start bound; its refusal says why CI went red, and what the
  * re-run or the dispatch did.
@@ -881,15 +942,17 @@ function wait(args: string[]) {
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
   const stuck = stuckSeconds(start);
   let rerun: Rerun | undefined;
+  let second: ReturnType<typeof secondOf>;
   let dispatch: Dispatch | undefined;
   for (;;) {
     const entries = timedOut(latest(retried(`the checks of #${pr.number}`, () => rollup(pr.number), began, retry)), check);
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const red = ours.filter(judgedRed);
-    rerun ??= rerunOnce(ours, entries);
+    second ??= secondOf(ours, entries, check);
+    rerun ??= second?.due === 'rerun' ? rerunOnce(ours, entries) : undefined;
     const seen = seenAfter(rerun, entries, ours);
     dispatch ??= dispatchDue(seen, began, stuck) ? dispatchStuck(pr.headRefOid, branch) : undefined;
-    const said = waitSaid(dispatch, rerun, entries);
+    const said = waitSaid(dispatch, second?.line, rerun, entries);
     if (seen === 'passed') return [...said.map((line) => line.trim()), `\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
     if (seen === 'failed') throw new (red.length ? Refusal : PersonsRefusal)(redly(pr, check, ours, entries, retry, onto, said));
     const stopped = stopsAt(began, seen === 'absent' ? start : whole, dispatch);

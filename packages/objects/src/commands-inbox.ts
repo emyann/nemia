@@ -351,10 +351,6 @@ export const INBOX_ATTACH_WORDS = {
       : `${CLI} inbox attach takes the files to attach after the card's name: ${CLI} inbox attach <name> ./shot.png.`,
   writes: true,
   class: 'act',
-  only: {
-    side: 'cli',
-    why: "the client uploads each file first (the files' `upload`), then the api serves the Card's `attach` of `objects`' Api, which calls this entry's handler",
-  },
 } as const satisfies CommandWords;
 
 /** `nemia inbox detach`: files a card carries taken off it, by their names in the card, before a run is started from it. */
@@ -378,10 +374,6 @@ export const INBOX_DETACH_WORDS = {
       : `${CLI} inbox detach takes the names of the files to take off after the card's name, as ${CLI} inbox files lists them.`,
   writes: true,
   class: 'act',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Card's `detach` of `objects`' Api, which calls this entry's handler: no route of its own",
-  },
 } as const satisfies CommandWords;
 
 /** `nemia inbox files`: the files a card carries, as the card's read says them, and one of them written out with `--get`. */

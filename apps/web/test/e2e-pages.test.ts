@@ -312,6 +312,20 @@ test("--look runs the look's browser tests; a whole run runs them too, and a run
   assert.deepEqual(namesOf(both.visit), ['b']);
 });
 
+test("a whole run runs every story after the look's tests; --look, a run of pages and a shard run none, CI running them in e2e-stories", () => {
+  assert.deepEqual(
+    [
+      [],
+      ['--photos'],
+      ['--look'],
+      ['--look', '--pages', 'b'],
+      ['--pages', 'b'],
+      ['--shard', '1', '--of', '2'],
+    ].map((argv) => planOf(argv, ABC).stories),
+    [true, true, false, false, false, false],
+  );
+});
+
 test('REFUSED: --look with a shard, and --look alone with a flag about pages', () => {
   for (const argv of [
     ['--look', '--shard', '1', '--of', '2'],

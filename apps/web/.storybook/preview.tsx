@@ -7,9 +7,10 @@
  *
  * A page body's queries resolve against a query client made once for each story, retrying nothing, so a refused read is said at once;
  * its requests are answered by MSW (`mswLoader`) from the handlers a story names in `parameters.msw`, over fixtures typed by `objects`
- * (`.storybook/fixtures/`). Every story is held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a
- * story that fails it today has its a11y test set to warn only, in its own file, a count `test/stories.test.ts` holds to its
- * baseline. A story the holder caught throwing, or one that draws nothing, fails after it is drawn (`afterEach`, `undrawn`), so a
+ * (`.storybook/fixtures/`). A request none of them answers, to the api or to another origin, never leaves the browser: it is answered
+ * with a network error and the story fails after it is drawn, naming it (`strayHandler`, `straysSaid`, `network.ts`). Every story is
+ * held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a story that fails it today has its a11y
+ * test set to warn only, in its own file, a count `test/stories.test.ts` holds to its baseline. A story the holder caught throwing, or one that draws nothing, fails after it is drawn (`afterEach`, `undrawn`), so a
  * broken story is a failing test and not a quiet `data-broken`. Once Storybook has finished a story, its play function and `afterEach`
  * run, the document's body says which (`data-story-finished`), so a browser test that opens it alone (`test/e2e/stories/built.ts`)
  * presses nothing while the play still moves the focus. The stage a story is drawn on is `stage.tsx`, which the design system's
@@ -21,7 +22,9 @@ import { mswLoader } from 'msw-storybook-addon/csf3';
 import { STORY_FINISHED, type StoryFinishedPayload } from 'storybook/internal/core-events';
 import { addons } from 'storybook/preview-api';
 import '../src/styles.css';
+import { setupWorker } from 'msw/browser';
 import { undrawn } from './drawn';
+import { strayHandler, straysSaid } from './network';
 import { SCHEME_CLASSES } from './scheme';
 import { Routed } from './stage';
 
@@ -29,6 +32,19 @@ import { Routed } from './stage';
 const FINISHED = 'data-story-finished';
 
 let marking = false;
+
+/** The strays the story being drawn sent, as `strayHandler` records them: emptied before each story. */
+const strays: string[] = [];
+
+/**
+ * MSW's worker for every story, started quiet: its one handler of its own is the strays' (`strayHandler`), which the handlers a story
+ * names are put before, and which each story's reset keeps.
+ */
+async function strayWorker() {
+  const worker = setupWorker(strayHandler(location.origin, (request) => strays.push(request)));
+  await worker.start({ quiet: true, onUnhandledRequest: 'bypass' });
+  return worker;
+}
 
 /**
  * Has the body name each story Storybook finishes, once: its channel is listened to from the first story drawn, since it is set only
@@ -42,12 +58,17 @@ function markFinished() {
 
 const preview: Preview = {
   parameters: { layout: 'fullscreen', a11y: { test: 'error' } },
-  loaders: [mswLoader()],
+  loaders: [mswLoader(strayWorker)],
+  beforeEach: () => {
+    strays.length = 0;
+  },
   afterEach: ({ canvasElement, id }) => {
     const broken = canvasElement.querySelector('[data-broken]');
     const drawn = canvasElement.querySelector('[data-story-ground] > *')?.getBoundingClientRect().height ?? 0;
     const faults = undrawn([{ id, broken: broken ? (broken.textContent ?? '') : null, height: drawn }]);
     if (faults.length) throw new Error(`the story did not draw as it should: ${faults.join('; ')}`);
+    const stray = straysSaid(strays);
+    if (stray) throw new Error(stray);
   },
   decorators: [
     withThemeByClassName<ReactRenderer>({ themes: { ...SCHEME_CLASSES }, defaultTheme: 'dark', parentSelector: 'html' }),

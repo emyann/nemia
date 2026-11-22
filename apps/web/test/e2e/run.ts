@@ -5,7 +5,8 @@
  *
  *  0. Reads its plan from its command line (`planOf`, pages.ts), refusing a flag or a page it does not know before anything else.
  *  1. With `--look`, or with no `--pages`, `--shard` or `--look` (the whole e2e), runs the look's browser tests first, two files at a
- *     time (`lookTests`, look.ts), and stops there when it visits no page (`--look` alone). `--pages` and a shard run none of them.
+ *     time (`lookTests`, look.ts), the whole e2e every story after them (`plan.stories`), and stops there when it visits no page
+ *     (`--look` alone). `--pages` and a shard run none of them.
  *  2. Builds the web app, once, unless `dist/` is already the build of the sources as they stand (`current`, built.ts): never in CI.
  *  3. Hands the pages it visits to workers, one at a time as each asks (`queueOf`, workers.ts): half the machine's cores, or as many as
  *     `--workers` asks, capped by as many as its free memory holds and by the pages (`workersFor`); `--workers` can lower the count,
@@ -217,7 +218,7 @@ async function main() {
   const started = performance.now();
   const pages = await loadPages();
   const plan = planOf(process.argv.slice(2), pages);
-  if (plan.look) await lookTests(children);
+  if (plan.look) await lookTests(children, plan.stories);
   if (!plan.visit.length) {
     console.log(`\ne2e: the look's tests passed in ${Math.round((performance.now() - started) / 1000)} s, and no page was asked for`);
     return;

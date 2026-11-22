@@ -7,6 +7,7 @@ import { runViewOf } from '@/lib/api/judged';
 import type { WaitingRun } from '@/lib/api/runs';
 import { nowMark } from '@/lib/stepMark';
 import { READS, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
+import { rowOpens } from '../../../.storybook/play';
 import { Run } from './Run';
 
 /** The instant the stories' answer was read at. */
@@ -94,7 +95,10 @@ export default meta;
 
 type Story = StoryObj<typeof Run>;
 
-/** 1sw7, at work, at every size: the mark in a sentence, the line, the row, the card, the waiting card's size, and the panel. */
+/**
+ * 1sw7, at work, at every size: the mark in a sentence, the line, the row, the card, the waiting card's size, and the panel. The row
+ * answers the pointer and opens the run on Enter.
+ */
 export const Ladder: Story = {
   render: (args) => (
     <div style={BOARD}>
@@ -122,12 +126,13 @@ export const Ladder: Story = {
       </div>
     </div>
   ),
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, userEvent }) => {
     const id = TARGET_RUNS['1sw7'].metadata.name;
     const mark = canvasElement.querySelector(`[data-run-says="state id"] a`);
     await expect(mark, 'the mark is a link to its run').toHaveAttribute('href', `/runs/${id}`);
     const lg = canvasElement.querySelector('[data-size="lg"]') as HTMLElement;
     await expect(within(lg).getByRole('link', { name: 'Open the run' })).toHaveAttribute('href', `/runs/${id}`);
+    await rowOpens(userEvent, canvasElement.querySelector<HTMLElement>(`tr[data-run="${id}"]`)!, `/runs/${id}`);
   },
 };
 

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Cell, Row, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
@@ -226,11 +227,21 @@ function RunLine({ run, asOf, still, className, look }: RunProps & { look: Look 
   );
 }
 
-/** The run as a row of the runs table: its Run cell (title over its meta line), its Now cell (marks over its graph), Clock and Cost. */
+/**
+ * The run as a row of the runs table: its Run cell (title over its meta line), its Now cell (marks over its graph), Clock and Cost. The
+ * row opens the run's page, as its title does, on a press or Enter, through the board's router (the kit's interactive row, with its
+ * hover, pressed and focus states); a control inside it does its own thing.
+ */
 function RunRow({ run, asOf, among = [], wrap, still, look }: RunProps & { look: Look }) {
   const waiters = waitersOf(among, run.id).length;
+  const navigate = useNavigate();
   return (
-    <Row id={run.id} data-run={run.id} className={FRAMED_ROW}>
+    <Row
+      id={run.id}
+      data-run={run.id}
+      className={FRAMED_ROW}
+      onAction={() => void navigate({ to: '/runs/$runId', params: { runId: run.id } })}
+    >
       <Cell className="py-3">
         <span className="flex min-w-0 flex-col gap-1">
           <Title run={run} look={look} still={still} />

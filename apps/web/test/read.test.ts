@@ -6,7 +6,8 @@
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
+import { Schema } from 'effect';
+import { BUILT_APART, decoded, failureOf, ReadRefusal, troubleLine, troubleOf, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
 import { openRunsQuery, rowsOf, runsSelectedQuery, type OpenRuns } from '../src/lib/api/runs.ts';
 import { agentOf, judged, runViewOf, sinceOf, type RunRow } from '../src/lib/api/judged.ts';
 import type { StepView } from '../src/lib/runView.ts';
@@ -206,15 +207,57 @@ test("a read the api refused still rejects in the api's words and status, not as
   assert.equal(err.message, 'no run x');
 });
 
-test("read.ts hands out the decode the objects' client reads every answer with, its three refusals, the api's ask for a token, and nothing else", async () => {
+test("read.ts hands out the decode the objects' client reads every answer with, its three refusals, the api's ask for a token, a failed read's words, and nothing else", async () => {
   assert.deepEqual(Object.keys(await import('../src/lib/api/read.ts')).sort(), [
+    'BUILT_APART',
     'ReadRefusal',
     'UnreadAnswer',
     'WriteRefusal',
     'askToken',
     'decoded',
+    'failureOf',
     'onTokenAsked',
     'tokenAskOf',
     'tokenAsked',
+    'troubleLine',
+    'troubleOf',
+    'troubleWords',
   ]);
+});
+
+test("a failed read is of the kind it failed by: the api's refusal, an answer this board does not read, or nothing having answered", () => {
+  const kinds: Array<[unknown, string]> = [
+    [new ReadRefusal('no run x', 404), 'refused'],
+    [new WriteRefusal('held', 409), 'refused'],
+    [new UnreadAnswer('GET /api/runs', 'unread'), 'unread'],
+    [new TypeError('Failed to fetch'), 'unanswered'],
+    ['a thrown string', 'unanswered'],
+  ];
+  for (const [error, kind] of kinds) {
+    const failure = failureOf(error);
+    assert.equal(failure.kind, kind, String(error));
+    assert.equal(failure.message, error instanceof Error ? error.message : String(error));
+    assert.equal(troubleOf(error).kind, kind, String(error));
+  }
+});
+
+test("a failed read's line names what it read and carries the failure's own words, and adds no checkout's command", () => {
+  for (const error of [
+    new ReadRefusal('no factory acme', 404),
+    new UnreadAnswer('GET /api/agents', 'unread'),
+    new TypeError('Failed to fetch'),
+  ]) {
+    const line = troubleLine('the agents', error);
+    assert.ok(line.includes('the agents'), line);
+    assert.ok(line.includes(error.message), line);
+    assert.ok(!line.includes('npm run'), line);
+  }
+});
+
+test("an answer this board does not read ends on the fix for an install, and names no checkout's command", () => {
+  assert.throws(
+    () => decoded('GET /api/runs', Schema.Struct({ name: Schema.String }), { name: 1 }),
+    (err: unknown) => err instanceof UnreadAnswer && err.message.endsWith(BUILT_APART) && !err.message.includes('npm run'),
+  );
+  assert.ok(!BUILT_APART.includes('npm run'));
 });

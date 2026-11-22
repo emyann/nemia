@@ -16,6 +16,7 @@ import {
   type LifecycleVerb,
 } from 'objects';
 import { call, read } from './objects.ts';
+import { BUILT_APART, UnreadAnswer } from './read.ts';
 
 export type { StepTranscript, TranscriptEvent } from 'objects';
 
@@ -105,7 +106,10 @@ export async function readTranscript(runId: string, step: string) {
     page = await transcriptPage(runId, step, from);
     events.push(...page.events);
     if (page.more === true && page.cursor === from)
-      throw new Error('The api answered a page of the conversation from the cursor it was asked from: restart the api (npm run dev).');
+      throw new UnreadAnswer(
+        `GET /api/runs/${runId}/steps/${step}/transcript`,
+        `The api answered a page of the conversation from the cursor it was asked from. ${BUILT_APART}`,
+      );
   }
   return { ...page, events };
 }

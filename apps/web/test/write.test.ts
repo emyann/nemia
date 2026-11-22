@@ -7,7 +7,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Resumed } from 'objects';
-import { ReadRefusal, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
+import { BUILT_APART, ReadRefusal, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
 import { call, write, type Refuse } from '../src/lib/api/objects.ts';
 import { liftHold, pruneRun, putHold, removeRun } from '../src/lib/api/runs.ts';
 import { approveStep, askRound, askTry, sayToStep } from '../src/lib/api/asks.ts';
@@ -34,8 +34,7 @@ const text = (body: BodyInit | null | undefined) =>
     ? (body ?? undefined)
     : new TextDecoder().decode(body as Uint8Array)) satisfies string | undefined;
 
-const FIX =
-  'The board and the api were built apart: restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.';
+const FIX = BUILT_APART;
 
 /**
  * Whether `err` is an `UnreadAnswer` of `route` and no refusal of the api's: its message names the route, `at`, what was found there, `may`

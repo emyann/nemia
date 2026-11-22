@@ -22,6 +22,12 @@ export type Trouble = { readonly kind: TroubleKind; readonly words: string };
 /** A checkout's command, which the board never adds: a person on an install has none. */
 const CHECKOUT = 'npm run';
 
+/** What the board says before the failure's own words where nothing answered. */
+const UNANSWERED_BEFORE = "Nemia's api did not answer (";
+
+/** What the board says after the failure's own words where nothing answered. */
+const UNANSWERED_AFTER = '). Reload the page once it is running again.';
+
 const troubleWordsSpec = spec<(failure: ReadFailure) => Trouble>({
   ensures: {
     kindKept: {
@@ -33,13 +39,13 @@ const troubleWordsSpec = spec<(failure: ReadFailure) => Trouble>({
       condition: ({ input: [failure], output }) => failure.kind !== 'refused' || output.words === failure.message,
     },
     anUnreadAnswerSaysItsOwn: {
-      description: 'Where the api answered what the board does not read, the board says that answer\'s message, which names the read and the fix',
+      description:
+        "Where the api answered what the board does not read, the board says that answer's message, which names the read and the fix",
       condition: ({ input: [failure], output }) => failure.kind !== 'unread' || output.words === failure.message,
     },
     nothingAnsweredSaysSo: {
       description: "Where nothing answered, the board says first that Nemia's api did not answer",
-      condition: ({ input: [failure], output }) =>
-        failure.kind !== 'unanswered' || output.words.startsWith("Nemia's api did not answer"),
+      condition: ({ input: [failure], output }) => failure.kind !== 'unanswered' || output.words.startsWith("Nemia's api did not answer"),
     },
     nothingAnsweredSaysWhy: {
       description: 'Where nothing answered, the board says why, in the words the failure came with',
@@ -50,8 +56,14 @@ const troubleWordsSpec = spec<(failure: ReadFailure) => Trouble>({
       condition: ({ input: [failure], output }) => failure.kind !== 'unanswered' || output.words.includes('Reload the page'),
     },
     noCheckoutCommand: {
-      description: "The board adds no checkout's command to what it says: one is there only where the failure's own words carry it",
-      condition: ({ input: [failure], output }) => !output.words.includes(CHECKOUT) || failure.message.includes(CHECKOUT),
+      description:
+        "The board adds no checkout's command to what it says: it says the failure's own words, alone or between words of its own that name none",
+      condition: ({ input: [failure], output }) =>
+        failure.kind === 'unanswered'
+          ? output.words === UNANSWERED_BEFORE + failure.message + UNANSWERED_AFTER &&
+            !UNANSWERED_BEFORE.includes(CHECKOUT) &&
+            !UNANSWERED_AFTER.includes(CHECKOUT)
+          : output.words === failure.message,
     },
   },
 });

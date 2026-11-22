@@ -462,7 +462,7 @@ const MAKE: readonly Walk[] = [
     },
   },
   {
-    name: 'REFUSED: a copy `given` over a file the repository holds under `to`, and of a folder with a `.gitignore` at its top',
+    name: 'REFUSED: a copy `given` over a file the repository holds under `to`, of a folder with a `.gitignore` at its top, and to a `to` that climbs out or passes a file',
     walk: (side, area) => {
       const { root } = repoIn(side, area, { 'a.txt': 'one\n', 'given/inputs/kept.md': 'kept\n' });
       const from = path.join(area, 'inputs');
@@ -489,9 +489,29 @@ const MAKE: readonly Walk[] = [
         also: [],
         given: { from, to: 'given/inputs' },
       });
-      return { tracked, ignoring, kept: fs.readFileSync(path.join(area, 'ws', 'one', 'given', 'inputs', 'kept.md'), 'utf8') };
+      fs.rmSync(path.join(from, '.gitignore'));
+      fs.writeFileSync(path.join(area, 'ws', 'x'), 'beside\n');
+      const at = path.join(area, 'ws', 'one');
+      const outside = ['../x', 'a.txt/inputs'].map((to) =>
+        side.place.askNow('make', { repo: root, at, run: 'r', leaf: 'one', from: 'main', also: [], given: { from, to } }),
+      );
+      return {
+        tracked,
+        ignoring,
+        outside,
+        kept: fs.readFileSync(path.join(at, 'given', 'inputs', 'kept.md'), 'utf8'),
+        beside: fs.readFileSync(path.join(area, 'ws', 'x'), 'utf8'),
+        file: fs.readFileSync(path.join(at, 'a.txt'), 'utf8'),
+      };
     },
-    says: { ignoring: { refused: true }, kept: 'kept\n', tracked: { refused: true } },
+    says: {
+      beside: 'beside\n',
+      file: 'one\n',
+      ignoring: { refused: true },
+      kept: 'kept\n',
+      outside: [{ refused: true }, { refused: true }],
+      tracked: { refused: true },
+    },
   },
 ];
 

@@ -323,3 +323,21 @@ test('REFUSED: make with `given` where the repository tracks a file under `to`, 
   });
   assert.ok('refused' in three, JSON.stringify(three));
 });
+
+test('REFUSED: make with a `given.to` that climbs out of the worktree, that is absolute, or whose parent is a file; each leaves what is there untouched', () => {
+  const repo = repository();
+  const at = atOf('a');
+  madeOf(make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [] }));
+  const beside = path.join(path.dirname(at), 'x');
+  fs.writeFileSync(beside, 'beside the worktree\n');
+  const absolute = path.join(scratch('wf-git-make-abs-'), 'kept.txt');
+  fs.writeFileSync(absolute, 'kept\n');
+  const ask = (to: string) => make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [], given: { from: inputsFolder(), to } });
+  for (const to of ['../x', absolute, 'f/inputs']) {
+    const outcome = ask(to);
+    assert.ok('refused' in outcome, `${to}: ${JSON.stringify(outcome)}`);
+  }
+  assert.equal(fs.readFileSync(beside, 'utf8'), 'beside the worktree\n');
+  assert.equal(fs.readFileSync(absolute, 'utf8'), 'kept\n');
+  assert.equal(fs.readFileSync(path.join(at, 'f'), 'utf8'), 'base\n');
+});

@@ -503,7 +503,7 @@ describe('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page
     }
     assert.equal(queueable(solo('refused', { workflow: 'dev', state: 'refused' })), false, 'refused, read off its state alone');
     assert.equal(
-      queueable(solo('broken', { workflow: 'dev', error: 'broken.md: `after` is not a key an inbox card has.' })),
+      queueable(solo('broken', { workflow: 'dev', error: 'broken.md: `colour` is not a key an inbox card has.' })),
       false,
       'does not read',
     );

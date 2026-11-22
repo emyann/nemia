@@ -320,7 +320,7 @@ describe('the queue verbs: what a queue or a take-back refuses, writing nothing'
     const started = onStore(addToInbox({ text: 'Started already', workflow: 'dev' })).card;
     fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
     fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
-    fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');
+    fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: broken\nworkflow: dev\n---\nWait for it.\n');
     const before = inboxAsIs();
 
     for (const [name, status, off] of [

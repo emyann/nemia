@@ -566,14 +566,14 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
     'GET /api/cards lists a card that does not read with its refusal and no body, a card started with its run, an entry that is no markdown file with why, and reads the folder on each request',
     async () => {
       clear();
-      write(path.join(inbox, 'broken.md'), '---\nafter: some-run\n---\nWait for it.\n');
+      write(path.join(inbox, 'broken.md'), '---\nafter: broken\n---\nWait for it.\n');
       write(path.join(inbox, 'notes.txt'), 'not a card\n');
       const { card } = onStore(addToInbox({ text: 'Started at the command line' }));
       write(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', card.name));
 
       const entries = await listed();
       const broken = entries.find((e) => e.name === 'broken')!;
-      assert.match(broken.error!, /^broken\.md: `after` is not a key an inbox card has/);
+      assert.match(broken.error!, /^broken\.md: `after: broken` names the card itself/);
       assert.deepEqual([broken.body, broken.title, typeof broken.filedAt], [null, null, 'string']);
       const stray = entries.find((e) => e.name === 'notes.txt');
       const whyGiven = typeof stray?.error === 'string';
@@ -792,7 +792,7 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
 
     assert.deepEqual(cards(), []);
   });
-  test("what the package refuses to file is a 422 carrying its sentence word for word — an idea with nothing in it, a `repo` of any kind, retired, a factory's repository among them, an `after:` in the idea's frontmatter — and nothing is written", async () => {
+  test("what the package refuses to file is a 422 carrying its sentence word for word — an idea with nothing in it, a `repo` of any kind, retired, a factory's repository among them, an `after:` in the idea's frontmatter that names a card twice — and nothing is written", async () => {
     clear();
     const cases: Array<{ body: string; repo?: string }> = [
       { body: '' },
@@ -801,7 +801,7 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
       { body: 'An idea', repo: path.join(repo, 'not-there') },
       { body: 'An idea', repo: `${repo}\n${repo}` },
       { body: 'An idea', repo },
-      { body: '---\nafter: some-run\n---\nWait for it.' },
+      { body: '---\nafter: some-run, some-run\n---\nWait for it.' },
     ];
     for (const asked of cases) {
       const expected = packageRefusal({ text: asked.body, ...(asked.repo !== undefined ? { repo: asked.repo } : {}) });

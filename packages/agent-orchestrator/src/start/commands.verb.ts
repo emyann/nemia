@@ -13,7 +13,7 @@ import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
-import { startFromInbox } from '../inbox/inbox.verb.ts';
+import { requestLanded, startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { cardsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
@@ -38,9 +38,10 @@ import { RunId } from '../record/record.model.ts';
 import { settingsNamed } from '../harness-settings/harness-settings.ts';
 
 /**
- * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, and a `repo:` the
- * start did not take; for a brief, the `--repo` that only found the factory, where its wiring placed the run on another
- * (`repoFoundFactory`, as typed); the store's pause as it stood once the run was written (`pausedRead`), while one stands; `landed`, the
+ * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, a `repo:` the
+ * start did not take, and the cards of its `after:` that had not landed (`waitedOn`); for a brief, the `--repo` that only found the
+ * factory, where its wiring placed the run on another (`repoFoundFactory`, as typed); the store's pause as it stood once the run was
+ * written (`pausedRead`), while one stands; `landed`, the
  * runs it is handed as context that had landed when it started; and `hints`, a line for each file of its folder that still writes a former
  * spelling, read through the Workflow door (`hints`), where any does.
  */
@@ -52,6 +53,8 @@ export type Started = {
   card?: string;
   queueLeft?: string;
   ignoredRepo?: string;
+  /** The cards of the card's `after:` that had not landed when a person started it all the same. */
+  waitedOn?: readonly string[];
   repoFoundFactory?: string;
   paused?: Paused;
   landed?: readonly string[];
@@ -180,6 +183,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     labels: [...(given.label ?? [])],
     ...(factory !== undefined ? { factory } : {}),
     fix: given.fix ?? '--factory <name>',
+    landed: yield* requestLanded(yield* EngineService),
   });
   return {
     id: started.run.id,
@@ -188,6 +192,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     card: started.card.name,
     ...(started.queueLeft !== undefined ? { queueLeft: started.queueLeft } : {}),
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+    ...(started.waitedOn !== undefined ? { waitedOn: started.waitedOn } : {}),
   } satisfies Started;
 });
 

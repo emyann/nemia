@@ -30,6 +30,7 @@ import {
   type FeedConflicts,
   type FeedMissing,
   type FeedClashes,
+  type FeedWaits,
   type FeedReadiness,
   type FeedPublished,
   type FeedWords,
@@ -144,8 +145,9 @@ const loggedOf = (now: ReadonlyMap<string, FeedWords>) => (line: FeedLine) => {
  * A pass's words written to the feed where they changed (`feedPass`, over this process's fold, `feedMemo`), with the store's pause put or
  * lifted where the pass hands the pause it read (`pause`) and each factory's level changed where it hands the levels (`levels`) and its
  * conflicts turned where it hands them (`conflicts`), its library adds gone missing where it hands them (`missing`), the inbox's cards
- * clashing where it hands them (`clashes`), and the store's readiness where it moved where it hands the daemon's read (`readiness`), each
- * line written logged (`loggedOf`: a `closed out` line as its closeout, every other as its words) and, where the process has a hub
+ * clashing where it hands them (`clashes`), its cards whose wait only a person can release where it hands them (`waits`), and the
+ * store's readiness where it moved where it hands the daemon's read (`readiness`), each line written logged (`loggedOf`: a `closed out`
+ * line as its closeout, every other as its words) and, where the process has a hub
  * (`FeedHub`), published to it with the bytes it was written at (`publishedOf`): none when another writer's bytes landed among them.
  * Answers with the lines written. `memo` is for a test, which starts one afresh to be a restarted daemon. Fails with a refusal of the store
  * — the door's, given no store root among them — and dies of anything else it threw.
@@ -166,6 +168,7 @@ export const emitFeed = Effect.fn('emitFeed')(function* (
     missing?: FeedMissing;
     readiness?: FeedReadiness;
     clashes?: FeedClashes;
+    waits?: FeedWaits;
   } = {},
 ) {
   const appended = yield* withinEffect('act', feedPass(yield* FeedDoor, memo, now, pass));

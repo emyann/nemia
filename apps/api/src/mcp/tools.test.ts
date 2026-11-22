@@ -178,6 +178,7 @@ test('every tool says every key of its input, with its words', () => {
 test('inbox_add says its body keys, and agents_custom_put its path, query and body keys', () => {
   const inbox = tool('inbox_add');
   assert.deepEqual([...keysSaidBy(inbox.description, inputKeys(inbox.inputSchema))].sort(), [
+    'after',
     'body',
     'factory',
     'files',

@@ -208,6 +208,7 @@ erDiagram
     object model "optional"
     FactoryName factory FK "optional"
     list from FK "optional"
+    list after FK "optional"
     object labels "optional"
     string body
   }
@@ -395,6 +396,7 @@ erDiagram
   WorkflowStep ||--o{ Card : gate
   Factory ||--o{ Card : factory
   Run ||--o{ Card : from
+  Card ||--o{ Card : after
   Factory ||--o{ Volume : volumes
   Workflow ||--o{ Factory : workflows
   Agent ||--o{ Factory : hires

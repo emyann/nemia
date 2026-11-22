@@ -376,3 +376,29 @@ test('REFUSED: a field selector that is no status.inPlay selector is Invalid', (
   assert.equal(kindOf(over(five, list({ fieldSelector: 'status.inPlay=maybe' }))), 'Invalid');
   assert.equal(kindOf(over(five, list({ fieldSelector: 'status.state=x' }))), 'Invalid');
 });
+
+test("a card's after: is served on its spec, and the cards of it not landed on its status, each with where it stands and whether it is stalled", () => {
+  const cards = {
+    'a-1x2y': aCard('First'),
+    'b-3z4w': aCard('Second', { after: 'a-1x2y, gone-9z9z' }),
+  };
+  const waiting = {
+    look: (name: string) => ({ known: name === 'a-1x2y', runs: [], onward: [] }),
+    phaseOf: () => undefined,
+  };
+  const card = valueOf(
+    over(
+      cards,
+      Effect.flatMap(CardDoor, (door) =>
+        Effect.flatMap(door.cards.entries(), (entries) =>
+          cardObjectOf(inboxListing(entries, [], new Map(), new Map(), undefined, waiting), 'b-3z4w', 'default'),
+        ),
+      ),
+    ),
+  );
+  assert.deepEqual(card.spec.after, ['a-1x2y', 'gone-9z9z']);
+  assert.deepEqual(card.status.waitingOn, [
+    { card: 'a-1x2y', kind: 'waiting', state: 'filed', stalled: false },
+    { card: 'gone-9z9z', kind: 'missing', stalled: true },
+  ]);
+});

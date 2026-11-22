@@ -10,6 +10,7 @@ import {
   type LibraryItem,
   libraryQuery,
 } from '../../lib/api/storeLibrary.ts';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The agents a harness keeps for its user on the api's machine, each with an Import that copies it into the user library through the
@@ -32,9 +33,9 @@ export function HarnessImport({ items }: { items: readonly LibraryItem[] }) {
         the skills it gives.
       </p>
       {sources.error && (
-        <p data-harness-import-unread className="text-body-medium text-failure">
-          {sources.error.message}
-        </p>
+        <div data-harness-import-unread>
+          <ReadTrouble what="the agents your harness keeps" error={sources.error} />
+        </div>
       )}
       {sources.data && offered.length === 0 && (
         <p className="text-body-medium text-muted-foreground">No agent of your own outside the library.</p>

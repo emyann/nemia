@@ -120,7 +120,7 @@ import {
   SCRIPTED_HEADER,
   uploadBoundMs,
 } from 'objects';
-import { askToken, decoded, ReadRefusal, tokenAskOf, WriteRefusal } from './read.ts';
+import { askToken, BUILT_APART, decoded, ReadRefusal, tokenAskOf, UnreadAnswer, WriteRefusal } from './read.ts';
 
 /**
  * The origin a request is made under where there is no page to resolve its path against — the node tests: effect makes every request's
@@ -258,7 +258,7 @@ const isTable = (answer: unknown): answer is Table =>
 /** A list endpoint's answer, its list: a `Table` where none was asked for is a defect of the api's. */
 const listed = <L>(answer: L | Table) =>
   isTable(answer)
-    ? Effect.die(new Error('The api answered a Table the board did not ask for: restart the api (npm run dev).'))
+    ? Effect.die(new UnreadAnswer('a list the board read', `The api answered a Table the board did not ask for. ${BUILT_APART}`))
     : Effect.succeed(answer);
 
 /** The page of a list asked: the most a page holds, and past the first page the `continue` the page before answered, sent as it is. */
@@ -282,7 +282,7 @@ export async function everyPage<L extends Paged>(page: (asked: PageAsked) => Pro
     const answer = await page({ limit, continue: next });
     pages.push(answer);
     if (answer.metadata.continue === next)
-      throw new Error('The api answered a page the same `continue` it was asked with: restart the api (npm run dev).');
+      throw new UnreadAnswer('a list the board read', `The api answered a page the same \`continue\` it was asked with. ${BUILT_APART}`);
     next = answer.metadata.continue;
   }
   const { metadata } = pages.at(-1) ?? first;

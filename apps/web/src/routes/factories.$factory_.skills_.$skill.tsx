@@ -3,6 +3,7 @@ import { DefinitionTrail } from '../components/agent/AgentParts';
 import { SkillPage } from '../components/agent/SkillPage';
 import { skillQuery } from '../lib/api/skills.ts';
 import { definitionSearch } from '../lib/factoryAddress';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of a skill read in a factory, at /factories/$factory/skills/$skill: the factory's own, or a repository's where the search says
@@ -31,7 +32,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <DefinitionTrail kind="skill" name={skill} place={{ factory, ...(repo && { repo }) }} />
-      <p className="text-body-medium text-failure">Could not load this skill: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this skill" error={error} />
     </div>
   );
 }

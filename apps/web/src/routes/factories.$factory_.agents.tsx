@@ -1,17 +1,14 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { AgentsPage, loadAgents } from '../components/agent/AgentsPage';
 import { filterOf } from '../lib/listFilter';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** A factory's agents: the Agents page, the nearest page there is until a factory's own roster is read. */
 export const Route = createFileRoute('/factories/$factory_/agents')({
   validateSearch: filterOf,
   loader: ({ context }) => loadAgents(context.queryClient),
   component: Page,
-  errorComponent: ({ error }) => (
-    <p className="text-body-medium text-failure">
-      Could not load the agents: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the agents" error={error} />,
 });
 
 /** The page, read off its address; its filter is written to it as a person types (`?q=`). */

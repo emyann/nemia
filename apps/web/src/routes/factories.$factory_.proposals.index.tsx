@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { FactoryProposals } from '@/components/factory/FactoryProposals';
 import { factoriesQuery } from '@/lib/api/factories';
 import { proposalsQuery } from '@/lib/api/proposals';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * A factory's proposals, at /factories/$factory/proposals: a place of its pane, named in the page's head. It waits for the factories, then
@@ -16,11 +17,7 @@ export const Route = createFileRoute('/factories/$factory_/proposals/')({
       await context.queryClient.prefetchQuery(proposalsQuery(params.factory));
   },
   component: ProposalsPage,
-  errorComponent: ({ error }) => (
-    <p className="p-4 text-body-medium text-failure">
-      Could not load the factories: {error instanceof Error ? error.message : String(error)}
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the factories" error={error} className="p-4" />,
 });
 
 /**

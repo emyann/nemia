@@ -32,6 +32,7 @@ import { BridgeWords } from '../step/Facts';
 import { TrustLine } from './NemiaTrust';
 import { Pending, Reading, ReadingLines } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * Nemia, the store's own agent, on the Settings page: the store's level and where it is picked, each factory's level with its default and a
@@ -81,7 +82,7 @@ export function NemiaSettings() {
           <SpendPart nemia={data} />
         </>
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read where she is: {error.message}</p>
+        <ReadTrouble what="where she is" error={error} className="text-muted-foreground" />
       ) : (
         <Reading label="Reading where she is…" className="flex flex-col gap-4">
           {[0, 1, 2].map((at) => (
@@ -473,7 +474,7 @@ function MemoryPart() {
           </p>
         )
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read her memory: {error.message}</p>
+        <ReadTrouble what="her memory" error={error} className="text-muted-foreground" />
       ) : (
         <Reading label="Reading her memory…">
           <ReadingLines widths={['w-40', 'w-32', 'w-48']} className="font-mono text-body-small" />
@@ -509,8 +510,7 @@ function FactText({ name }: { name: string }) {
         {data.fact.text}
       </pre>
     );
-  if (error instanceof Error)
-    return <p className="mt-1 text-body-small text-muted-foreground">Could not read this fact: {error.message}</p>;
+  if (error instanceof Error) return <ReadTrouble what="this fact" error={error} className="mt-1 text-body-small text-muted-foreground" />;
   return (
     <Reading label="Reading the fact…" className="mt-1 rounded-md border px-3 py-2">
       <ReadingLines widths={['w-full', 'w-3/4']} className="font-mono text-body-small" />

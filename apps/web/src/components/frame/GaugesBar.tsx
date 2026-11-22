@@ -15,6 +15,7 @@ import { DaemonLine } from './DaemonLine';
 import { BarPanel } from './BarPanel';
 import { QuotaLine } from './QuotaLine';
 import { Reading, ReadingLines } from '@/components/look';
+import { troubleOf } from '@/lib/api/read';
 
 /** One gauge: its name over what it says. */
 function Gauge({ name, children }: { name: string; children: ReactNode }) {
@@ -56,7 +57,7 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
         <Gauge name="At work">
           {runs.data || runs.error ? (
             <p data-at-work-sentence className="text-body-medium">
-              {runs.data ? atWorkWords(atWork(runs.data)).title : `The runs could not be read: ${runs.error?.message}`}
+              {runs.data ? atWorkWords(atWork(runs.data)).title : `The runs could not be read: ${troubleOf(runs.error).words}`}
             </p>
           ) : (
             <Reading label="Reading the runs…">
@@ -72,7 +73,7 @@ export function GaugesBar({ feed }: { feed: FeedStatus }) {
             <p data-version-sentence className="text-body-medium">
               {version.data
                 ? `${versionWords(version.data).title}, as the api serving this board answers it.`
-                : `The version could not be read: ${version.error?.message}`}
+                : `The version could not be read: ${troubleOf(version.error).words}`}
             </p>
           ) : (
             <Reading label="Reading the version…">

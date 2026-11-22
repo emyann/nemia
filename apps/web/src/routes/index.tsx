@@ -13,6 +13,7 @@ import { welcomeAsked } from '@/lib/welcome';
 import { finishedTodayQuery, openRunsQuery } from '@/lib/api/runs';
 import { holdsRuns, openBlocks } from '@/lib/factories';
 import { dayStartOf } from '@/lib/strip';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** The factories whose light answer the blocks read: each the api lists, and the default one, whose answer says whether it is shown. */
 const answered = (factories: readonly Factory[]) => [...new Set([...factories.map((f) => f.name), DEFAULT_NAMESPACE])];
@@ -47,12 +48,7 @@ export const Route = createFileRoute('/')({
   },
   staticData: { fullBleed: true },
   component: Factories,
-  errorComponent: ({ error }) => (
-    <p className="p-4 text-body-medium text-failure">
-      Could not load the factories and their runs: {error instanceof Error ? error.message : String(error)}. Is the api running (
-      <code>npm run dev</code>)?
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the factories and their runs" error={error} className="p-4" />,
 });
 
 /**

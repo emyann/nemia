@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow } from '../src/lib/api/quota.ts';
 import type { RunView } from '../src/lib/api/judged.ts';
+import { ReadRefusal } from '../src/lib/api/read.ts';
 import { listed, listedStep, summary, waitingRun, type Word } from './run.fixture.ts';
 import {
   atWork,
@@ -104,7 +105,7 @@ describe("daemonDot: the daemon's dot and its title", () => {
     }
   });
   test('the daemon’s dot: REFUSED, a read that failed is down and says so, never a daemon that ticks', () => {
-    const dot = daemonDot(undefined, new Error('the api answered 500'), NOW);
+    const dot = daemonDot(undefined, new ReadRefusal('the api answered 500', 500), NOW);
     assert.deepEqual(dot, {
       kind: 'error',
       tone: 'down',
@@ -174,7 +175,7 @@ describe('quotaShort: the quota, short', () => {
     assert.match(short.title, /^No Claude plan is signed in\./);
   });
   test('the quota, short: a read that failed is a word, not a throw', () => {
-    const short = quotaShort(undefined, new Error('the api answered 500'), NOW);
+    const short = quotaShort(undefined, new ReadRefusal('the api answered 500', 500), NOW);
     assert.equal(short.text, 'unread');
     assert.equal(short.title, 'The quota could not be read: the api answered 500');
   });

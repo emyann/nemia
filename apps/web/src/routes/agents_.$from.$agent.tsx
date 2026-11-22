@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { DefinitionTrail } from '../components/agent/AgentParts';
 import { AgentPage, loadAgent } from '../components/agent/AgentPage';
 import { pagePlaceOf } from '../lib/factories';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. A
@@ -28,7 +29,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <DefinitionTrail kind="agent" name={agent} place={{ ...Route.useSearch() }} />
-      <p className="text-body-medium text-failure">Could not load this agent: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this agent" error={error} />
     </div>
   );
 }

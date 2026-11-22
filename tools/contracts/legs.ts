@@ -31,6 +31,7 @@ export const ROOTS = [
   'apps/api/src/mcp',
   'apps/api/src/server/renewal.ts',
   'apps/cli/src',
+  'apps/web/src/lib/api/read.ts',
   'apps/web/src/lib/api/runs.ts',
   'apps/web/src/lib/brought.ts',
   'apps/web/src/lib/factoryStep.ts',

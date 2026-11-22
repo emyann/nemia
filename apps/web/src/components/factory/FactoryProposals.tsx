@@ -2,45 +2,22 @@
  * The factory's proposals, on their own page of the factory (`/factories/$factory/proposals`): each a row linking to its page, with its
  * phase in the person's words and a *Widens access* mark where it widens, what waits on the person first and the newer of each kind first
  * (`proposalsInOrder`), each read as its list's row (`ProposalRow`), so the page opens however many proposals there are and however large.
- * A factory with none says so in one line; one whose list does not read says why and what to do (`ProposalsTrouble`); the route's loader
+ * A factory with none says so in one line; one whose list does not read says why, as every page does (`ReadTrouble`); the route's loader
  * reads the list before the page is drawn.
  */
 import { useQuery } from '@tanstack/react-query';
 import { RouteLink } from '@/components/agent/AgentParts';
 import { TEXT_LINK } from '@/components/look';
 import { proposalsQuery } from '@/lib/api/proposals';
-import { ReadRefusal, UnreadAnswer } from '@/lib/api/read';
 import { proposalsInOrder } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
 import { ProposalTags } from '@/components/gate/ProposalTags';
-
-/**
- * Why the proposals of `factory` do not read, by what `error` is: the api's refusal in its words; an answer this board does not read, the
- * read named and the restart that brings the board and the api to one build; else nothing answered, and to reload once it does.
- */
-function ProposalsTrouble({ factory, error }: { factory: string; error: Error }) {
-  const said =
-    error instanceof ReadRefusal ? (
-      <>{error.message}</>
-    ) : error instanceof UnreadAnswer ? (
-      <>
-        {error.route} answered what this board does not read: the board and Nemia's api are of different builds. Restart Nemia's service,
-        then reload the page.
-      </>
-    ) : (
-      <>Nemia's api did not answer ({error.message}). Reload the page once it is running again.</>
-    );
-  return (
-    <p data-proposals-trouble className="text-body-medium text-failure">
-      Could not read the proposals of {factory}: {said}
-    </p>
-  );
-}
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** The proposals of the factory `factory`, listed whole; a line that it has none, or why they do not read. */
 export function FactoryProposals({ factory }: { factory: string }) {
   const { data, error } = useQuery(proposalsQuery(factory));
-  if (error) return <ProposalsTrouble factory={factory} error={error} />;
+  if (error) return <ReadTrouble what={`the proposals of ${factory}`} error={error} />;
   if (!data) return null;
   if (data.length === 0)
     return (

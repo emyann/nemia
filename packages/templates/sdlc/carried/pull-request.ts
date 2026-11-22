@@ -898,6 +898,10 @@ const dispatchDue = (seen: Seen, began: number, stuck: number) => seen === 'abse
 const stalled = (rerun: Rerun | undefined, said: string[], retry: string, say: (tail: string[]) => string) =>
   rerun?.runs.length ? new Refusal(say([...said, RERUNNING, retry])) : new PersonsRefusal(say([...said, retry]));
 
+/** The one re-run of the red `ours`, among `entries`, where `second` says one is due (`secondOf`); none where it reports, or none yet. */
+const rerunDueOf = (second: ReturnType<typeof secondOf>, ours: readonly Entry[], entries: readonly Entry[]) =>
+  second?.due === 'rerun' ? rerunOnce(ours, entries) : undefined;
+
 /**
  * What the wait dispatched, then `told`, why it re-ran a red or reported it at once, then what it re-ran and how each job ended the second
  * time; nothing where it asked none of them.
@@ -949,7 +953,7 @@ function wait(args: string[]) {
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const red = ours.filter(judgedRed);
     second ??= secondOf(ours, entries, check);
-    rerun ??= second?.due === 'rerun' ? rerunOnce(ours, entries) : undefined;
+    rerun ??= rerunDueOf(second, ours, entries);
     const seen = seenAfter(rerun, entries, ours);
     dispatch ??= dispatchDue(seen, began, stuck) ? dispatchStuck(pr.headRefOid, branch) : undefined;
     const said = waitSaid(dispatch, second?.line, rerun, entries);

@@ -1196,7 +1196,7 @@ const FAILING_LOG = stamped([
 ]);
 
 /** The rule that answers the job `id`'s log with `log`. */
-const logOf = (id: number, log: string): Rule => ({ when: `actions/jobs/${id}/logs`, out: log });
+const logOf = (id: number, log: string) => ({ when: `actions/jobs/${id}/logs`, out: log }) satisfies Rule;
 
 test("a red whose job's log names a failing test is reported at once, never re-run, saying so, its log read once", () => {
   const r = redThen([checks(...FIRST)], 1, { when: 'run rerun' }, {}, [logOf(5677, FAILING_LOG)]);

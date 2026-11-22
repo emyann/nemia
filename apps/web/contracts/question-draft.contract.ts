@@ -1,6 +1,7 @@
 /**
- * What a person has said so far of a step's questions on the board (src/lib/question-draft/questionDraft.ts), drawn by the one part that answers a
- * series of questions (`QuestionSeries`, src/components/gate/Questions.tsx), and sent as the api's `answers` once nothing is left.
+ * What a person has said so far of a step's questions on the board (src/lib/question-draft/questionDraft.ts), drawn by the one part
+ * that answers a series of questions (`QuestionSeries`, src/components/gate/Questions.tsx), and sent as the api's `answers` once
+ * nothing is left.
  *
  * Each question is answered by choosing among its options, or by one of the two ways out the board supplies on every question, as the
  * Agent SDK's `AskUserQuestion` supplies "Other" itself and no agent writes one: "Something else" (`else`), which needs the person's

@@ -21,6 +21,7 @@ const HANDS: Concluded = {
  * finished, with Show older; each run picked shows what it would hand. Its args are the runs picked and what a pick calls.
  */
 const meta: Meta<typeof ContextPicker> = {
+  tags: ['network'],
   title: 'Store/ContextPicker',
   component: ContextPicker,
   args: { selected: [], onChange: fn(), label: 'Reads' },

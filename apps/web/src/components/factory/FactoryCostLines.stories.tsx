@@ -40,6 +40,7 @@ export const Lines: Story = {
 
 /** A Save still out: Writing…, the kit's small ProgressIndicator in it, the press off until the api answers. */
 export const Writing: Story = {
+  tags: ['network'],
   parameters: { msw: [http.put('/api/factories/:name/costlines/:workflow', async () => delay('infinite'))] },
   play: async ({ canvasElement }) => {
     const quick = within(canvasElement.querySelector<HTMLElement>('[data-cost-line="quick"]')!);

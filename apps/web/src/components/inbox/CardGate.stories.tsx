@@ -88,6 +88,7 @@ export const ConfirmingAnEnding: Story = {
 
 /** Approve pressed at a gate mid-run: the approval is sent at once, with no words, and the card is told it was taken. */
 export const Approved: Story = {
+  tags: ['network'],
   args: { gate: MID, title: 'plan waits on your approval', stamp: 'plan|1', onTaken: fn() },
   parameters: {
     msw: [
@@ -109,6 +110,7 @@ export const Approved: Story = {
 
 /** Approve pressed at a gate mid-run and refused: the approval's form opens over the card to say the refusal in the api's words. */
 export const ApprovalRefused: Story = {
+  tags: ['network'],
   args: { gate: MID, title: 'plan waits on your approval', stamp: 'plan|1' },
   parameters: {
     msw: [http.post(APPROVE, () => HttpResponse.json({ error: 'plan is not waiting at its gate' }, { status: 409 }))],

@@ -8,6 +8,7 @@ type Args = { onMade: (name: string) => void };
 
 /** The scratch way's form: a name and nothing else, an empty factory filed. Its filing is answered by MSW, which keeps what it was sent. */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Pages/Scratch form',
   args: { onMade: fn() },
   parameters: { msw: templatesServed },

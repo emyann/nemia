@@ -173,6 +173,7 @@ const deleted: string[] = [];
 
 /** Remove on a card trigger of the factory's own sends the api its delete, by the trigger's name. */
 export const Removed: Story = {
+  tags: ['network'],
   render: served([onCards('ready', 'ready=yes', 'build', { quota: 'spends', quotaBy: 'build', queued: [] })]),
   parameters: {
     msw: [

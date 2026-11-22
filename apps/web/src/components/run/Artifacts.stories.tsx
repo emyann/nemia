@@ -40,6 +40,7 @@ type Story = StoryObj<typeof Artifacts>;
  * captioned by its path, opened by its url, as one at the top is.
  */
 export const NestedPicture: Story = {
+  tags: ['network'],
   args: {
     artifacts: [
       served('e2e/bar-sheet-narrow-dark.png', 'image', 2140),

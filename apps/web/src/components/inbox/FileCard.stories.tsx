@@ -75,6 +75,7 @@ async function filedIn(canvasElement: HTMLElement) {
 
 /** Filed with no factory: the snackbar the frame hosts names the card, and offers Open, which stays until it is pressed or closed. */
 export const Filed: StoryObj<typeof meta> = {
+  tags: ['network'],
   args: { shown: undefined },
   parameters: { msw: [http.post('/api/namespaces/:namespace/cards', () => HttpResponse.json(FILED, { status: 201 }))] },
   render: (args) => (

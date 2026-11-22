@@ -89,6 +89,7 @@ export const Reading: Story = {
 
 /** Waiting, then Decline pressed: the card reads declined, and the snackbar the frame hosts names the proposal declined. */
 export const DeclinePressed: Story = {
+  tags: ['network'],
   args: { name: 'nemia-p2d4x' },
   parameters: {
     msw: [

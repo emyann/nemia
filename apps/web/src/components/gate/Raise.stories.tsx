@@ -33,6 +33,7 @@ const asked: unknown[] = [];
  * round. The api holds each ask unanswered, so a play reads what was sent.
  */
 const meta: Meta<{ offer: Offer }> = {
+  tags: ['network'],
   title: 'Run/Raise',
   args: { offer: OVER },
   parameters: {

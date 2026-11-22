@@ -42,6 +42,7 @@ const drawn = ({ path, waiting }: Args) => (
  * That is the kit's to mend, upstream; every other rule holds the rail.
  */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Frame/FrameRail',
   args: { path: '/runs', waiting: 0 },
   parameters: {

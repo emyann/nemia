@@ -175,6 +175,7 @@ const standing = (canvasElement: HTMLElement) => canvasElement.querySelector('[d
  * is rather than going to Runs, as the run's own page does.
  */
 export const EveryAction: StoryObj<typeof meta> = {
+  tags: ['network'],
   args: { runs: [OVER] },
   parameters: {
     msw: [

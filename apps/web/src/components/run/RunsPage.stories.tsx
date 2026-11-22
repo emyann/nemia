@@ -118,6 +118,7 @@ const headsOf = (page: HTMLElement, label: string) =>
  * the rows' marks each say their words in the kit's tooltip.
  */
 export const NothingWaits: Story = {
+  tags: ['network'],
   args: { at: {} },
   parameters: { msw: nothingWaits },
   play: async ({ canvasElement, userEvent }) => {
@@ -139,6 +140,7 @@ export const NothingWaits: Story = {
 
 /** One run waits on you, its land failed its check: its card, with one button, which opens the run; the rest as when nothing waits. */
 export const OneWaitsOnYou: Story = {
+  tags: ['network'],
   args: { at: {} },
   parameters: { msw: oneWaits },
   play: async ({ canvasElement }) => {
@@ -162,6 +164,7 @@ export const OneWaitsOnYou: Story = {
  * one that asks questions, one whose check failed.
  */
 export const EveryState: Story = {
+  tags: ['network'],
   args: { at: {} },
   parameters: { msw: everyState },
   play: async ({ canvasElement }) => {
@@ -190,6 +193,7 @@ export const EveryState: Story = {
 
 /** No run at all: each section says it holds nothing. */
 export const NoRuns: Story = {
+  tags: ['network'],
   args: { at: {} },
   parameters: { msw: noRuns },
   play: async ({ canvasElement }) => {
@@ -202,6 +206,7 @@ export const NoRuns: Story = {
 
 /** The api refuses the page's reads: the page says it could not load them, with the api's words as they came. */
 export const ReadRefused: Story = {
+  tags: ['network'],
   args: { at: {} },
   parameters: { msw: refused },
   play: async ({ canvasElement }) => {

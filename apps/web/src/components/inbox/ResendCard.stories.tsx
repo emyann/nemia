@@ -47,6 +47,7 @@ const takes = http.post(RESEND, async ({ request }) => {
  * said, none picked and sent with no workflow, a cancel that failed said in the api's words, and a refusal told in the api's words.
  */
 const meta: Meta<typeof ResendCard> = {
+  tags: ['network'],
   title: 'Store/ResendCard',
   component: ResendCard,
   args: { entry: { name: 'ship-it', factory: FACTORY }, workflows: ['intake', 'build', 'quick'], onRefused: () => undefined },

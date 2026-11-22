@@ -8,6 +8,7 @@ type Args = { width: number };
 
 /** Settings' section for this browser's token, its press the kit's outlined button: offered, and pressed while the api clears it. */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Frame/ForgetToken',
   args: { width: 560 },
   parameters: { msw: [http.delete('/api/session', async () => delay('infinite'))] },

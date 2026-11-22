@@ -8,6 +8,7 @@ type Args = { onUse: (path: string, repository: boolean | undefined) => void; pe
 
 /** The folder way's field: a path typed, the folders under it offered by the api's listing (MSW), and Use this folder. */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Pages/Folder pick',
   args: { onUse: fn(), pending: false },
   parameters: { msw: volumeStore() },

@@ -58,6 +58,7 @@ export const Choices: StoryObj<typeof meta> = {
 
 /** Pruned with nothing left behind: the form closes, and the snackbar the frame hosts names the run pruned. */
 export const Pruned: StoryObj<typeof meta> = {
+  tags: ['network'],
   args: { run: CALLED_OFF },
   parameters: {
     msw: [

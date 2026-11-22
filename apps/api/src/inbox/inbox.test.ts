@@ -613,11 +613,12 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       const items = ((await (await app.request('/api/cards')).json()) as CardList).items;
       const listedAs = items.find((c) => c.metadata.name === 'cache-the-views-k2q9');
       assert.deepEqual(
-        { ...page, status: { ...page.status, source: undefined } },
-        { ...listedAs, status: { ...listedAs?.status, source: undefined } },
-        'the card as GET /api/cards lists it',
+        { ...page, spec: { ...page.spec, body: undefined }, status: { ...page.status, source: undefined } },
+        { ...listedAs, spec: { ...listedAs?.spec, body: undefined }, status: { ...listedAs?.status, source: undefined } },
+        'the card as GET /api/cards lists it, but its file and its body',
       );
-      assert.equal(listedAs?.status.source, undefined, 'a list carries no file');
+      assert.equal('source' in (listedAs?.status ?? {}), false, 'a list carries no file');
+      assert.equal('body' in (listedAs?.spec ?? {}), false, 'a list carries no body');
       assert.equal(page.spec.body, '# Cache the views\n\n- between passes\n- per task');
       assert.deepEqual([page.spec.workflow, page.spec.repo], ['dev', repo]);
       assert.equal(page.status.source, text, 'the file byte for byte, frontmatter included');

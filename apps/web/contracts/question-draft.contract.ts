@@ -123,8 +123,8 @@ export type AnswersFrom = Implementation<typeof answersFromSpec>;
 const aKeyOfItsOwn = (title: string) => title !== '__proto__';
 
 /**
- * What a press on an option's tile writes. One law is not here while tsverify cannot prove it: `severalKeepTheirChoices`, "Choosing an
- * option of a question that takes several keeps every option chosen before, and adds it". tsverify 0.9.1 answers `inconsistent` on it,
+ * What a press on an option's tile writes. One law is not here while tsverify cannot prove it: severalKeepTheirChoices, "Choosing an
+ * option of a question that takes several keeps every option chosen before, and adds it". tsverify 0.9.1 answers "inconsistent" on it,
  * its own bug by its docs (docs/verdicts.md): the proof side proves it, and the search side breaks it on a draft whose choices are as
  * long as its bound, an input the code keeps it on. Filed in the tsverify factory as card `prover-a-law-that-holds-is-n-8890`; until a
  * release fixes it, `test/question-draft.test.ts` holds the law's own condition, and the law comes back here when one does.

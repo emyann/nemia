@@ -17,7 +17,7 @@ import type {
   WayOut,
 } from '../../../contracts/question-draft.contract.ts';
 
-export type { Draft, DraftEntry, SentAnswer, WayOut } from '../../../contracts/question-draft.contract.ts';
+export type { Draft, WayOut } from '../../../contracts/question-draft.contract.ts';
 
 /** Nothing said of a question: no choice, no words, no way out. */
 const NOTHING: DraftEntry = { chose: [], own: '', way: null };
@@ -37,10 +37,20 @@ const hasWords = (entry: DraftEntry) => entry.own.trim() !== '';
 const answers = (entry: DraftEntry) =>
   (entry.chose.length > 0 || entry.way === 'none' || hasWords(entry)) && !(entry.way === 'else' && !hasWords(entry));
 
-/** The titles of the questions `draft` leaves unanswered, in the order asked. */
+/**
+ * The titles of the questions `draft` leaves unanswered, in the order asked.
+ *
+ * @param questions the questions a step asks
+ * @param draft what the person said so far
+ */
 export const unanswered: Unanswered = (questions, draft) => questions.filter((q) => !answers(entryOf(draft, q.title))).map((q) => q.title);
 
-/** `draft` as the api takes it: one answer for each question, in the order asked, `none` and words only where there are. */
+/**
+ * `draft` as the api takes it: one answer for each question, in the order asked, `none` and words only where there are.
+ *
+ * @param questions the questions a step asks
+ * @param draft what the person said so far
+ */
 export const answersFrom: AnswersFrom = (questions, draft) =>
   questions.map((q) => {
     const entry = entryOf(draft, q.title);
@@ -55,6 +65,11 @@ export const answersFrom: AnswersFrom = (questions, draft) =>
 /**
  * `draft` with `label` chosen, or no longer chosen, on `q`: the one choice of a question that takes one, its way out taken back; among
  * others of one that takes several, "None of these" taken back and "Something else" kept beside them.
+ *
+ * @param draft what the person said so far
+ * @param q the question the option is of
+ * @param label the option's label
+ * @param on whether it is now chosen, or no longer
  */
 export const chosenDraft: ChosenDraft = (draft, q, label, on) => {
   const before = entryOf(draft, q.title);
@@ -68,6 +83,11 @@ export const chosenDraft: ChosenDraft = (draft, q, label, on) => {
 /**
  * `draft` with `way` taken, or taken back, on `q`: "None of these" takes back every choice; "Something else" takes back the one choice of
  * a question that takes one, and sits beside those of one that takes several; the words are kept either way.
+ *
+ * @param draft what the person said so far
+ * @param q the question the way out is on
+ * @param way the way out pressed
+ * @param on whether it is now taken, or taken back
  */
 export const wayDraft: WayDraft = (draft, q, way, on) => {
   const before = entryOf(draft, q.title);

@@ -1,5 +1,5 @@
 /**
- * `chosenDraft`'s law `severalKeepTheirChoices`, held here while tsverify 0.9.1 answers `inconsistent` on it (its own bug, filed in the
+ * `chosenDraft`'s law severalKeepTheirChoices, held here while tsverify 0.9.1 answers "inconsistent" on it (its own bug, filed in the
  * tsverify factory as card `prover-a-law-that-holds-is-n-8890`): choosing an option of a question that takes several keeps every option
  * chosen before, and adds it. The law's own condition, asserted over planted drafts and a small sweep; it goes back into
  * `contracts/question-draft.contract.ts`, and this file away, once a release of tsverify proves it.

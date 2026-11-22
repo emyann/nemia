@@ -4,7 +4,7 @@ metadata:
   name: sdlc
   description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing, and the front door asks only where it cannot tell; quick lands once its review passes."
 spec:
-  version: 5.0.0
+  version: 5.1.0
   rules:
     path: RULES.md
   parameters:
@@ -37,6 +37,10 @@ spec:
       type: string
       description: "The memory the land step's check asks of the machine, a Kubernetes quantity such as 256Mi, by which the daemon admits it while the check holds the repository's checkout: set it where github is true, where the check only waits on GitHub and needs little. The check keeps the daemon's default limit. Empty (the default) asks the daemon's default request, which a check that runs localCheck on the merged tree needs."
       default: ""
+    lightMemoryRequest:
+      type: string
+      description: "The memory the sessions of the steps that run no test, build or typecheck ask of the machine, a Kubernetes quantity such as 1Gi, by which the daemon admits them: front-door's door and answer, intake's intake, janitor's argus, and build's and quick's land. Each session keeps its limit, the daemon's default. Read the peaks they reached (nemia stats, and a run's step page) before you set it. Empty asks the daemon's default request."
+      default: 1Gi
     roundCheck:
       type: string
       description: "The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."

@@ -7,6 +7,7 @@ spec:
   steps:
     - name: door
       place: git
+      memoryRequest: "${{ parameters.lightMemoryRequest }}"
       routes:
         - intake
         - build
@@ -52,6 +53,7 @@ spec:
       after:
         - door
       place: git
+      memoryRequest: "${{ parameters.lightMemoryRequest }}"
       when:
         - answer
       output:

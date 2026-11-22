@@ -152,6 +152,26 @@ describe("what a render writes into a factory's tree, read back as today's folde
     const set = rendered(dir, ['asks=64Mi']);
     assert.match(fs.readFileSync(path.join(set.tree, 'workflows/dev/ship.md'), 'utf8'), /^checkMemory: 64Mi$/m);
   });
+  test("a step's `memoryRequest:` is rendered from a parameter as its line, and a parameter left empty writes no line", () => {
+    const { dir } = exported();
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.parameters = { asks: { type: 'string', description: 'what the sessions ask', default: '' } };
+    });
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      const step = spec.steps.find((one: { name: string }) => one.name === 'review');
+      step.memoryRequest = '${{ parameters.asks }}';
+    });
+    const fills = { factory: 'team', workflow: 'dev', agents: { implement: 'implementer', review: 'reviewer', ship: 'shipper' } };
+    const blank = rendered(dir);
+    assert.deepEqual(blank.out.refusals, []);
+    assert.doesNotMatch(fs.readFileSync(path.join(blank.tree, 'workflows/dev/review.md'), 'utf8'), /^memoryRequest:/m);
+    const unset = loadWorkflows(path.join(blank.tree, 'workflows', 'dev'), {}, fills);
+    assert.equal(unset.find((step) => step.name === 'review')?.memoryRequest, undefined);
+    const set = rendered(dir, ['asks=1Gi']);
+    assert.match(fs.readFileSync(path.join(set.tree, 'workflows/dev/review.md'), 'utf8'), /^memoryRequest: 1Gi$/m);
+    const asked = loadWorkflows(path.join(set.tree, 'workflows', 'dev'), {}, fills);
+    assert.equal(asked.find((step) => step.name === 'review')?.memoryRequest, '1Gi');
+  });
   test("a manifest's revisions policy is rendered into the tree's wiring, and a manifest that says none renders none", () => {
     const { dir } = exported();
     assert.equal(Object.hasOwn(rendered(dir).out.wiring, 'revisions'), false, 'a manifest that says nothing leaves the factory pinned');

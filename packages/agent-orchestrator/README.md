@@ -507,7 +507,14 @@ is set. What the check asks of the machine is the step's `checkMemory: 256Mi`, a
 load where the runtime reads no quantity off it and on a step with no `check:` (`checkMemoryOf`): the check is filed with it as its
 request alone, admitted by it, and run under the engine's default limit beside it, as a LimitRange's default limit lands on a container
 that names a request alone. A check that only waits on another service asks little, and is admitted while sessions that ask more wait.
-Absent, the check asks the daemon's `WF_MEMORY_REQUEST`. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
+Absent, the check asks the daemon's `WF_MEMORY_REQUEST`. What each session of the step asks is its `memoryRequest: 1Gi`, a container's `resources.requests.memory`, apart from its
+limit: refused at load where the runtime reads no quantity off it, above the step's own `memory:`, and on a remote agent
+(`memoryRequestOf`); each session is filed with it beside its limit, admitted by it, and given the engine's default limit where the step
+names no `memory:`. Absent, a session asks the daemon's `WF_MEMORY_REQUEST`, else its limit. A step whose sessions run no test, build or
+typecheck asks little, and starts while a heavy one waits for room. Pick it from the peaks measured: `nemia stats` says, for each
+workflow step, the median, p90 and highest peak its sessions reached, what they asked and how many passed it, and a run's step page says
+the peak of each try beside its request and limit (`tryPeakOf`); a peak is kept only for a session run under a memory limit, and Nemia
+sets no request from it. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
 variable to unset (`limitRefusal`). A session or a check the kernel killed a process of at its limit says so in its step's note — on the
 feed, `nemia ls` and the run page — with the limit, the peak, and the knob to raise: the step's `memory:` where it names one, else
 `WF_MEMORY_LIMIT` (`outOfMemoryWords`). The runtime's record tells that kill apart from the machine's: `oomKills` counts the processes

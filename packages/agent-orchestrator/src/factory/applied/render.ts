@@ -189,6 +189,7 @@ const STEP_WORDS = [
   'retries',
   'deadlineSeconds',
   'memory',
+  'memoryRequest',
   'reads',
   'tally',
 ];
@@ -208,12 +209,12 @@ function routeEvalOf(route: unknown) {
 }
 
 /**
- * Whether `key` is a step's `checkMemory:` or `relabel:` that renders blank, as an empty parameter writes it: no line, so the check asks
- * the daemon's default request and the node edits no label. A blank `checkMemory:` in a person's step file is still refused by the
- * parser.
+ * Whether `key` is a step's `checkMemory:`, `memoryRequest:` or `relabel:` that renders blank, as an empty parameter writes it: no line,
+ * so the check or the sessions ask the daemon's default request and the node edits no label. A blank `checkMemory:` or `memoryRequest:`
+ * in a person's step file is still refused by the parser.
  */
 const blankAsked = (key: string, value: unknown) =>
-  (key === 'checkMemory' || key === 'relabel') && lineOf(value).replaceAll(',', '').trim() === '';
+  (key === 'checkMemory' || key === 'memoryRequest' || key === 'relabel') && lineOf(value).replaceAll(',', '').trim() === '';
 
 /** A template's `checkFailurePolicy:` as the parser reads it, refused as a step's line would be; nothing for none. */
 const policyOf = (step: string, policy: unknown) =>

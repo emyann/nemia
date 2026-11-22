@@ -180,10 +180,18 @@ export type StepSpec = {
    * `memory: 4Gi`: the most memory the step's sessions may use, a container's `resources.limits.memory` — a Kubernetes quantity the
    * runtime reads (`8Gi`, `512Mi`, `4G`, `1073741824`), refused at load where it reads none. Filed as each session's
    * `resources.limits.memory`: its harness and every child it starts run in a cgroup of their own under it, and a process that passes it
-   * is killed there alone. Its check takes the engine's default limit (`WF_MEMORY_LIMIT`), never this, and asks `checkMemory:`. Absent:
-   * the engine's default, else no limit. Refused on a remote agent, whose process is not ours.
+   * is killed there alone. It is the session's limit, not what admission counts, where the step names a `memoryRequest:`. Its check takes
+   * the engine's default limit (`WF_MEMORY_LIMIT`), never this, and asks `checkMemory:`. Absent: the engine's default, else no limit.
+   * Refused on a remote agent, whose process is not ours.
    */
   memory?: string;
+  /**
+   * `memoryRequest: 1Gi`: the memory the step's sessions ask of the machine, a container's `resources.requests.memory` — a Kubernetes
+   * quantity the runtime reads, refused at load where it reads none, and refused above the step's own `memory:`. Filed beside the
+   * session's limit: the runtime admits the session by it and gives a request alone the engine's default limit beside it. Absent: the
+   * engine's default request (`WF_MEMORY_REQUEST`), else the limit. Refused on a remote agent, whose process is not ours.
+   */
+  memoryRequest?: string;
   /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
@@ -451,6 +459,7 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'remote',
   'deadlineSeconds',
   'memory',
+  'memoryRequest',
   'budget',
   'check',
   'checks',
@@ -560,7 +569,9 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     '`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` only',
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
   memory:
-    "the most memory each session of the step may use, a container's limit — `4Gi`, `512Mi`: a process past it is killed in the session's own scope alone; its check keeps the daemon's default limit (`WF_MEMORY_LIMIT`) and asks `checkMemory:`",
+    "the most memory each session of the step may use, a container's limit — `4Gi`, `512Mi`: a process past it is killed in the session's own scope alone; admission counts `memoryRequest:` where the step names one; its check keeps the daemon's default limit (`WF_MEMORY_LIMIT`) and asks `checkMemory:`",
+  memoryRequest:
+    "the memory each session of the step asks of the machine, a container's request — `1Gi`: the session is admitted by it, under its `memory:` or the daemon's default limit; unset asks the daemon's default (`WF_MEMORY_REQUEST`)",
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   checks:

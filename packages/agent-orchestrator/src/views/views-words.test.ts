@@ -6,7 +6,8 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { killedMemoryOf, type AttemptMemory, type WordAttempt, type WordView } from './views-words.ts';
-import { memoryBytesWord, outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
+import { memoryBytesWord, outOfMemory, outOfMemoryWords } from '../out-of-memory/index.ts';
+import { memoryBytesWord as objectsBytesWord } from 'objects';
 
 const GI = 1024 ** 3;
 const KILLED: AttemptMemory = { limitBytes: 4 * GI, peakBytes: 4 * GI, oomKills: 1 };
@@ -49,6 +50,25 @@ describe('memoryBytesWord prints a quantity memory: takes back', () => {
   test('4G as memory.max reads it, one decimal of Gi', () => assert.equal(memoryBytesWord(3999997952), '3.7Gi'));
   test('whole Mi below 1Gi', () => assert.equal(memoryBytesWord(512 * 1024 ** 2), '512Mi'));
   test('whole Ki below 1Mi, rounded up', () => assert.equal(memoryBytesWord(1000), '1Ki'));
+  test("the same spelling as objects' own, which the cli and the board say a peak in", () => {
+    const sizes = [
+      0,
+      1,
+      1000,
+      1024,
+      1024 ** 2 - 1,
+      1024 ** 2,
+      812 * 1024 ** 2,
+      GI - 1,
+      GI,
+      3999997952,
+      1.25 * GI,
+      4 * GI,
+      5.8 * GI,
+      64 * GI,
+    ];
+    assert.deepEqual(sizes.map(objectsBytesWord), sizes.map(memoryBytesWord));
+  });
 });
 
 describe('outOfMemoryWords says the kill, the limit, the peak and what to raise', () => {

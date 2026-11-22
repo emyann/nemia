@@ -53,7 +53,6 @@ const factory = (name: string, hires: Record<string, string>) =>
     workflows: null,
     hires,
     error: null,
-    schedules: [],
     commands: { attach: '', rm: '', add: '', schedule: '', trust: '', volume: '', trigger: '', home: null },
     untrusted: [],
     volumes: [],

@@ -2,8 +2,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, waitFor, within } from 'storybook/test';
 import { DEFAULT_NAMESPACE, type Proposal } from 'objects';
-import { factoriesQuery } from '@/lib/api/factories';
-import { inboxQuery } from '@/lib/api/inbox';
+import { factoriesQuery, factoryPlacesQuery } from '@/lib/api/factories';
+import { factoryInboxQuery } from '@/lib/api/inbox';
 import { waitingProposalsQuery } from '@/lib/api/proposals';
 import { frameRunsQuery } from '../nav/nav';
 import { FactoryPane } from './FactoryPane';
@@ -24,7 +24,14 @@ const drawn = ({ path, search, factory, lit }: Parameters<typeof FactoryPane>[0]
   <QueryClientProvider
     client={seeded([
       [factoriesQuery.queryKey, [factoryView(DEFAULT_NAMESPACE, true), factoryView(FACTORY)]],
-      [inboxQuery.queryKey, Array.from({ length: reads.cards }, (_, i) => unstartedCard(`card-${i + 1}`, factory))],
+      [
+        factoryPlacesQuery.queryKey,
+        [
+          { name: DEFAULT_NAMESPACE, default: true },
+          { name: FACTORY, default: false },
+        ],
+      ],
+      [factoryInboxQuery(factory).queryKey, Array.from({ length: reads.cards }, (_, i) => unstartedCard(`card-${i + 1}`, factory))],
       [frameRunsQuery(path).queryKey, openRuns(reads.runs)],
       [waitingProposalsQuery(factory).queryKey, reads.waiting],
     ])}

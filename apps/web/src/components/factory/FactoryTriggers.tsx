@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Trigger } from 'objects';
 import { Button, Tag } from '@/components/ui/ds';
 import { Pending, Reading, ReadingLines } from '@/components/look';
-import { deleteTrigger, factoryTriggersQuery } from '@/lib/api/factories';
+import { deleteTrigger, factorySchedulesQuery, factoryTriggersQuery } from '@/lib/api/factories';
 import { firesWhen, queuesWords, quotaWords } from '@/lib/triggers';
 import { fireWord } from '@/lib/schedules';
 import { useNow } from '@/lib/useNow';
@@ -72,23 +72,15 @@ function TriggerRow({
 }
 
 /**
- * The triggers of the factory `name`, read now; `line`, the line that writes a card trigger of it, as the api answered it; `schedules`,
- * its schedules, the details of its time triggers; and `scheduleLine`, the line that schedules a workflow, shown while it has none.
+ * The triggers of the factory `name`, read now, and its schedules, the details of its time triggers (`factorySchedulesQuery`), read now
+ * too; `line`, the line that writes a card trigger of it, as the api answered it; and `scheduleLine`, the line that schedules a workflow,
+ * shown once its schedules are read and it has none.
  */
-export function FactoryTriggers({
-  name,
-  line,
-  schedules,
-  scheduleLine,
-}: {
-  name: string;
-  line: string;
-  schedules: readonly FactorySchedule[];
-  scheduleLine: string;
-}) {
+export function FactoryTriggers({ name, line, scheduleLine }: { name: string; line: string; scheduleLine: string }) {
   const queryClient = useQueryClient();
   const now = new Date(useNow(60_000));
   const { data } = useQuery(factoryTriggersQuery(name));
+  const schedules = useQuery(factorySchedulesQuery(name)).data;
   const remove = useMutation({
     mutationFn: (trigger: string) => deleteTrigger(name, trigger),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: factoryTriggersQuery(name).queryKey, exact: true }),
@@ -116,7 +108,7 @@ export function FactoryTriggers({
             <TriggerRow
               key={t.metadata.name}
               trigger={t}
-              schedule={t.spec.when.kind === 'time' ? schedules.find((s) => s.workflow === t.spec.target.name) : undefined}
+              schedule={t.spec.when.kind === 'time' ? schedules?.find((s) => s.workflow === t.spec.target.name) : undefined}
               now={now}
               pending={remove.isPending && remove.variables === t.metadata.name}
               onRemove={() => remove.mutate(t.metadata.name)}
@@ -125,7 +117,7 @@ export function FactoryTriggers({
         </ul>
       )}
       <CommandText text={line} />
-      {schedules.length === 0 && (
+      {schedules?.length === 0 && (
         <div data-no-schedules className="flex flex-col gap-1">
           <p className="text-body-medium text-muted-foreground">No schedule: to start one of its workflows on a cron, type:</p>
           <CommandText text={scheduleLine} />

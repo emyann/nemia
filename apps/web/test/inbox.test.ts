@@ -14,8 +14,9 @@ import {
   cardQuery,
   dropCard,
   fileCard,
+  factoryInboxQuery,
   inboxAllQuery,
-  inboxQuery,
+  inboxSelectedQuery,
   queueCard,
   startCard,
   type CardState,
@@ -572,7 +573,6 @@ const factoryOn = (name: string, repos: string[], error: string | null = null) =
     workflows: name === 'default' ? null : ['good'],
     hires: {},
     error,
-    schedules: [],
     commands: {
       attach: `nemia factory attach ${name} <workflow>`,
       rm: `nemia factory rm ${name}`,
@@ -748,10 +748,28 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
       ['/api/cards?limit=500', '/api/cards?limit=500&labelSelector=team%3Dcore'],
       "a selected read is one read: each queued place is the api's, among every card",
     );
-    assert.equal(all.queryKey[0], inboxQuery.queryKey[0], "under ['inbox'], so every write and the feed read it again");
+    assert.equal(all.queryKey[0], factoryInboxQuery('pair').queryKey[0], "under ['inbox'], so every write and the feed read it again");
     assert.notDeepEqual(all.queryKey, cardQuery('all').queryKey, 'a card named all keeps its page');
-    const inPlayRead = await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)();
-    assert.equal(inPlayRead.length, 0, 'the in-play read leaves a card whose run ended out');
+  });
+  test("the floor's cards are its factory's in play, asked of the api, never every card of every factory", async (t) => {
+    const sent = sending(t, () => answered(200, cardList()));
+    await (factoryInboxQuery('pair').queryFn as unknown as () => Promise<InboxEntry[]>)();
+    await (factoryInboxQuery('default').queryFn as unknown as () => Promise<InboxEntry[]>)();
+    const urls = sent.map((r) => new URL(r.url, 'http://board'));
+    assert.deepEqual(
+      urls.map((u) => u.pathname),
+      ['/api/namespaces/pair/cards', '/api/namespaces/default/cards'],
+    );
+    assert.deepEqual(
+      urls.map((u) => u.searchParams.get('fieldSelector')),
+      ['status.inPlay=true', 'status.inPlay=true'],
+      'the api keeps the cards in play',
+    );
+    const key = factoryInboxQuery('pair').queryKey;
+    assert.equal(key[0], 'inbox', "under ['inbox'], so every write and the feed read it again");
+    assert.notDeepEqual(key, cardQuery('pair').queryKey, 'a card named as the factory keeps its page');
+    assert.notDeepEqual(key, inboxAllQuery(undefined).queryKey);
+    assert.notDeepEqual(key, factoryInboxQuery('default').queryKey, 'each factory its own key');
   });
   test("a Card is the board's entry: its factory its namespace, its file its name, its place the one the api answers", () => {
     const queued = (name: string, at: string, place: number, namespace = 'pair') =>
@@ -776,18 +794,17 @@ describe("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory 
     assert.equal(byName.get('late')?.file, 'late.md');
     assert.deepEqual(cardEntryOf(cardObject({ metadata: { labels: { team: 'core' } } })).labels, { team: 'core' });
   });
-  test('the in-play reads keep exactly the cards the api says are in play (`status.inPlay`)', async (t) => {
-    const inPlay = (state: string) => CARD_KIND[state as keyof typeof CARD_KIND] !== 'ended';
-    sending(t, () =>
-      answered(
-        200,
-        cardList(...CARD_STATES.map((state) => cardObject({ metadata: { name: state }, status: { state, inPlay: inPlay(state) } }))),
-      ),
+  test("the in-play reads are the api's: a selector's in-play cards are asked in one read, and every card it answers kept", async (t) => {
+    const sent = sending(t, () =>
+      answered(200, cardList(...CARD_STATES.map((state) => cardObject({ metadata: { name: state }, status: { state, inPlay: true } })))),
     );
-    const kept = (await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)()).map((e) => e.state);
-    assert.deepEqual(kept, CARD_STATES.filter(inPlay));
-    sending(t, () => answered(200, cardList(cardObject({ metadata: { name: 'filed' }, status: { state: 'filed', inPlay: false } }))));
-    assert.equal((await (inboxQuery.queryFn as unknown as () => Promise<InboxEntry[]>)()).length, 0, 'the api says, not the state');
+    const kept = (await (inboxSelectedQuery('team=core').queryFn as unknown as () => Promise<InboxEntry[]>)()).map((e) => e.state);
+    assert.deepEqual(kept, [...CARD_STATES], 'the api filters, the board keeps what it answers');
+    assert.equal(sent.length, 1);
+    const url = new URL(sent[0]?.url ?? '', 'http://board');
+    assert.equal(url.pathname, '/api/cards');
+    assert.equal(url.searchParams.get('labelSelector'), 'team=core');
+    assert.equal(url.searchParams.get('fieldSelector'), 'status.inPlay=true');
   });
   test("each card state has a person's word, its sentence and a hue: a run called off is never said cancelled", () => {
     for (const state of CARD_STATES) {

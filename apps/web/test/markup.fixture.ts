@@ -532,7 +532,6 @@ export const filed = (name: string, extra: Partial<import('../src/lib/api/factor
     workflows: ['build'],
     hires: {},
     error: null,
-    schedules: [],
     commands: {
       attach: `nemia factory attach ${name} <workflow>`,
       rm: `nemia factory rm ${name}`,
@@ -599,7 +598,6 @@ export const listedFactory = (name: string, repos: string[], error: string | nul
   workflows: name === 'default' ? null : ['dev'],
   hires: {},
   error,
-  schedules: [],
   commands: { attach: '', rm: '', add: '', schedule: '' },
   workflowRepos: {},
   template: null,

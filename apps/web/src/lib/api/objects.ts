@@ -484,13 +484,30 @@ export const files = {
 /** What a card's start answers: its new run, and the card's name. */
 const Started = Schema.Struct({ id: Schema.String, card: Schema.String });
 
+/** What a list of cards is asked by: its labels, and whether each is still in play (`status.inPlay=true`). */
+export type CardListQuery = { labelSelector?: string; fieldSelector?: string };
+
+/** The query a list of cards is sent with: each key given. */
+const cardListQueryOf = (query: CardListQuery) => ({
+  ...(query.labelSelector === undefined ? {} : { labelSelector: query.labelSelector }),
+  ...(query.fieldSelector === undefined ? {} : { fieldSelector: query.fieldSelector }),
+});
+
 /** The inbox's cards as objects: a card is named by its namespace (its factory, `default` for none) and its name. */
 export const cards = {
-  /** Every card, of every namespace, that `labelSelector` keeps by its labels, or every card for none (`GET /api/cards`), every page. */
-  listAll: (labelSelector?: string) =>
+  /**
+   * Every card, of every namespace, that the query keeps (`GET /api/cards`), every page: by its labels (`labelSelector`), and in play or
+   * not (`fieldSelector`, `status.inPlay=true`); every card for neither.
+   */
+  listAll: (query: CardListQuery = {}) =>
+    everyPage((asked) =>
+      call((c) => c.cards.listAll({ query: { ...asked, ...cardListQueryOf(query) } }).pipe(Effect.flatMap(listed)), read(CardList)),
+    ),
+  /** The cards of `namespace` the query keeps (`GET /api/namespaces/:namespace/cards`), every page, as `listAll` asks them. */
+  list: (namespace: string, query: CardListQuery = {}) =>
     everyPage((asked) =>
       call(
-        (c) => c.cards.listAll({ query: labelSelector === undefined ? asked : { ...asked, labelSelector } }).pipe(Effect.flatMap(listed)),
+        (c) => c.cards.list({ params: { namespace }, query: { ...asked, ...cardListQueryOf(query) } }).pipe(Effect.flatMap(listed)),
         read(CardList),
       ),
     ),

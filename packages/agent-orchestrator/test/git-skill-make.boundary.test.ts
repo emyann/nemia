@@ -213,3 +213,131 @@ test(".worktreeinclude: paths to copy, a leading / anchored at the root as gitig
     "a leading / is the repository's root, as in a .gitignore",
   );
 });
+
+/** An inputs folder as a run keeps one: a text file, a binary file and a card under `cards/`; its path. */
+function inputsFolder() {
+  const from = scratch('wf-git-make-inputs-');
+  fs.writeFileSync(path.join(from, 'DESIGN.md'), '# a draft\n\nkept byte for byte\n');
+  fs.writeFileSync(path.join(from, 'shot.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x0d, 0x0a, 0x1a]));
+  fs.mkdirSync(path.join(from, 'cards'));
+  fs.writeFileSync(path.join(from, 'cards', 'x.md'), '---\ntitle: x\n---\n');
+  return from;
+}
+
+/** Every file under `dir`, by its path from it, sorted. */
+const filesUnder = (dir: string) =>
+  fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
+    .sort();
+
+test('make with `given` copies the folder whole into the worktree at `to`, out of git: the tree stays clean, a hand-off commits nothing, and the worktree is removed as any other', () => {
+  const repo = repository();
+  const at = atOf('a');
+  const from = inputsFolder();
+  const made = madeOf(make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [], given: { from, to: 'given/inputs' } }));
+  assert.equal(made.given, 'given/inputs');
+  const copy = path.join(at, 'given', 'inputs');
+  assert.deepEqual(
+    filesUnder(copy).filter((f) => f !== '.gitignore'),
+    filesUnder(from),
+  );
+  for (const file of filesUnder(from))
+    assert.ok(fs.readFileSync(path.join(copy, file)).equals(fs.readFileSync(path.join(from, file))), file);
+  assert.equal(git(at, 'status', '--porcelain', '--untracked-files=all'), '', 'git sees nothing new');
+  const handed = gitPlace({ env: ENV }).askNow('handoff', { workspace: at, step: 'a', why: '' });
+  assert.deepEqual(handed, { answer: { commit: null } });
+  const removed = gitPlace({ env: ENV }).askNow('remove', { repo, workspaces: [at], branches: [] });
+  assert.ok('answer' in removed && removed.answer.removed.includes(at), JSON.stringify(removed));
+  assert.equal(fs.existsSync(at), false);
+});
+
+test('make with `given`, asked again after an input is gone from the folder, leaves no copy of it: the copy is written anew, never merged over', () => {
+  const repo = repository();
+  const at = atOf('a');
+  const from = inputsFolder();
+  const asked = { repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [], given: { from, to: 'given/inputs' } };
+  madeOf(make(asked));
+  fs.rmSync(path.join(from, 'shot.png'));
+  fs.writeFileSync(path.join(at, 'given', 'inputs', 'stray.txt'), 'left by a step\n');
+  assert.equal(madeOf(make(asked)).given, 'given/inputs');
+  assert.deepEqual(filesUnder(path.join(at, 'given', 'inputs')), ['.gitignore', 'DESIGN.md', 'cards/x.md']);
+});
+
+test('make without `given` writes no `given/`', () => {
+  const repo = repository();
+  const at = atOf('a');
+  const made = madeOf(make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [] }));
+  assert.equal(made.given, undefined);
+  assert.equal(fs.existsSync(path.join(at, 'given')), false);
+});
+
+test('REFUSED: make with `given` where the repository tracks a file under `to`, where `to` is a link in the worktree, and where the folder holds a `.gitignore` at its top; each leaves what it found untouched', () => {
+  const tracking = repository();
+  fs.mkdirSync(path.join(tracking, 'given', 'inputs'), { recursive: true });
+  fs.writeFileSync(path.join(tracking, 'given', 'inputs', 'a.md'), 'tracked\n');
+  git(tracking, 'add', '-A');
+  git(tracking, 'commit', '-q', '-m', 'tracks given/inputs/a.md');
+  const tracked = atOf('a');
+  const one = make({
+    repo: tracking,
+    at: tracked,
+    run: 'r-1',
+    leaf: 'a',
+    from: 'main',
+    also: [],
+    given: { from: inputsFolder(), to: 'given/inputs' },
+  });
+  assert.ok('refused' in one, JSON.stringify(one));
+  assert.equal(fs.readFileSync(path.join(tracked, 'given', 'inputs', 'a.md'), 'utf8'), 'tracked\n');
+
+  const linking = repository();
+  const target = scratch('wf-git-make-target-');
+  fs.writeFileSync(path.join(target, 'kept.txt'), 'kept\n');
+  const linked = atOf('a');
+  madeOf(make({ repo: linking, at: linked, run: 'r-1', leaf: 'a', from: 'main', also: [] }));
+  fs.symlinkSync(target, path.join(linked, 'given'));
+  const two = make({
+    repo: linking,
+    at: linked,
+    run: 'r-1',
+    leaf: 'a',
+    from: 'main',
+    also: [],
+    given: { from: inputsFolder(), to: 'given/inputs' },
+  });
+  assert.ok('refused' in two, JSON.stringify(two));
+  assert.deepEqual(fs.readdirSync(target), ['kept.txt']);
+
+  const ignoring = inputsFolder();
+  fs.writeFileSync(path.join(ignoring, '.gitignore'), 'a person handed this\n');
+  const three = make({
+    repo: repository(),
+    at: atOf('a'),
+    run: 'r-1',
+    leaf: 'a',
+    from: 'main',
+    also: [],
+    given: { from: ignoring, to: 'given/inputs' },
+  });
+  assert.ok('refused' in three, JSON.stringify(three));
+});
+
+test('REFUSED: make with a `given.to` that climbs out of the worktree, that is absolute, or whose parent is a file; each leaves what is there untouched', () => {
+  const repo = repository();
+  const at = atOf('a');
+  madeOf(make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [] }));
+  const beside = path.join(path.dirname(at), 'x');
+  fs.writeFileSync(beside, 'beside the worktree\n');
+  const absolute = path.join(scratch('wf-git-make-abs-'), 'kept.txt');
+  fs.writeFileSync(absolute, 'kept\n');
+  const ask = (to: string) => make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [], given: { from: inputsFolder(), to } });
+  for (const to of ['../x', absolute, 'f/inputs']) {
+    const outcome = ask(to);
+    assert.ok('refused' in outcome, `${to}: ${JSON.stringify(outcome)}`);
+  }
+  assert.equal(fs.readFileSync(beside, 'utf8'), 'beside the worktree\n');
+  assert.equal(fs.readFileSync(absolute, 'utf8'), 'kept\n');
+  assert.equal(fs.readFileSync(path.join(at, 'f'), 'utf8'), 'base\n');
+});

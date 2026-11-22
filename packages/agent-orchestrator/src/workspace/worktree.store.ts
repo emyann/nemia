@@ -20,6 +20,7 @@ import {
   depsPlan,
   isModuleKey,
   lockfilePackages,
+  inputsGiven,
   inside,
   lockfileParting,
   workspaceModules,
@@ -29,7 +30,7 @@ import {
   type Installed,
   type Provisioned,
 } from './workspace.ts';
-import { folderPlace } from '../record/places.store.ts';
+import { folderPlace, inputsRoot } from '../record/places.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import { lstatOf, runsDir } from '../record/record.store.ts';
@@ -552,8 +553,8 @@ function madeAt(made: string, at: string) {
 
 /**
  * What `place` answers when asked to cut `request` (`make`, off the event loop): the workspace it made, or why there is none, in words
- * for the run's log — its refusal, why it was not heard, or an answer that names a workspace other than `at`, which is read as unread: a
- * step is never filed where nobody cut it.
+ * for the run's log — its refusal, why it was not heard, or an answer that names a workspace other than `at`, or that does not say it made
+ * the copy `given` asked, either read as unread: a step is never filed where nobody cut it, nor told of a copy nobody made.
  */
 const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceRequests['make']) {
   const outcome = yield* place.ask('make', request);
@@ -562,6 +563,10 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
   if (!madeAt(outcome.answer.workspace, request.at))
     return uncut(
       `the place's make answered ${outcome.answer.workspace}, where it was asked for ${request.at}: read as not heard, and asked again on the next pass`,
+    );
+  if (request.given && outcome.answer.given !== request.given.to)
+    return uncut(
+      `the place's make did not say it copied ${request.given.from} to ${request.given.to}, which it was asked: read as not heard, and asked again on the next pass`,
     );
   return { made: outcome.answer } as const;
 });
@@ -608,7 +613,9 @@ const followedBy = Effect.fn('followedBy')(function* (place: Place, repo: string
  * off the event loop of `place`, for a workspace of their own at `<home>/worktrees/<run>/<leaf>` on the branch its place names for the run
  * and the leaf, the leaf `cutName` gives it — `run` for the run's own line of work, one workspace and one branch per card, and the step's
  * own name for a fork beside it or a fan-in's merge — merged with the line of work of each other step a merge waits on: what stops two
- * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. A merge that
+ * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. Where the run was
+ * handed files or cards (`inputsGiven`), the place is asked to copy the run's `inputs/` into the workspace too, at `given/inputs`, anew on
+ * every cut, a take-up included, out of what a hand-off commits; a step that continues a worktree finds the copy its cut made. A merge that
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
  * provisioned after, in the workspace the place made, on the merged tree and its lockfile — once a checkout Nemia cloned has its own
  * install brought current (`keepCheckoutInstalled`), so they are hardlinked from it; a clone whose install failed and has no tree to
@@ -652,6 +659,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
       notes: [...followed, ...(again ? reinstalledNotes(run.repo, again) : [])],
     });
   }
+  const to = inputsGiven(run, plan);
   const asked = yield* madeBy(place, {
     repo: run.repo,
     at: path.join(home, 'worktrees', run.id, cutName(frozen, routed)),
@@ -659,6 +667,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
     leaf: cutName(frozen, routed),
     from: plan.kind === 'merge' ? of(plan.from).branch : plan.from ? of(plan.from).branch : run.baseRef,
     also: plan.kind === 'merge' ? plan.also.map((other) => of(other).branch) : [],
+    ...(to ? { given: { from: inputsRoot(runsDir(home), run.id), to } } : {}),
   });
   if (!('made' in asked)) return asked;
   const { made } = asked;

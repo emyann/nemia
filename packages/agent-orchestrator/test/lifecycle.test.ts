@@ -294,6 +294,39 @@ describe('a diamond fans out and in: two roots side by side, and a step after bo
       assert.ok(!stage.board().filings.includes(`${run.id}-a`), 'nothing filed');
     },
   );
+  s.test(
+    'REFUSED: a make that does not say it made the copy of the inputs it was asked is read as not heard; one that makes it files the step, told of the copy',
+    async () => {
+      const input = path.join(scratch('wf-lifecycle-input-'), 'DESIGN.md');
+      fs.writeFileSync(input, 'a draft\n');
+      const run = await stage.runPlaced(
+        startRun({ brief: 'put the draft in place', repo: aRepo(), workflowDir: folderOf({ a: [] }), inputs: [input] }),
+      );
+      const real = stage.place().place;
+      let asked: unknown;
+      const forgetting = placeOver(real, {
+        make: (request) => {
+          asked = request.given;
+          const outcome = real.askNow('make', request);
+          if (!('answer' in outcome)) return outcome;
+          const { given: _given, ...answer } = outcome.answer;
+          return { answer };
+        },
+      });
+      const ticked = await stage.runWith(
+        stage.board().e,
+        advanceRun(runRecord(ROOT, run.id)).pipe(Effect.provide(PlaceService.layer(forgetting))),
+      );
+      assert.deepEqual(asked, { from: path.join(ROOT, 'runs', run.id, 'inputs'), to: 'given/inputs' });
+      assert.deepEqual(ticked.filed, []);
+      namesFor('without the copy', ticked.notes.at(-1) ?? '', 'a: not cut', 'given/inputs', 'asked again on the next pass');
+      assert.deepEqual((await tick(run.id)).filed, ['a'], 'a place that makes the copy files the step');
+      const at = runRecord(ROOT, run.id).steps.a.workspace!;
+      assert.equal(fs.readFileSync(path.join(at, 'given', 'inputs', 'DESIGN.md'), 'utf8'), 'a draft\n');
+      assert.deepEqual(world().changes(at), [], 'the copy is no change of the workspace');
+      assert.ok(briefOf(`${run.id}-a`).includes('`given/inputs`'), 'the brief names the copy');
+    },
+  );
 });
 
 describe("a run on a clone works from its remote's base: the checkout is brought up to it before each step, and left when it cannot be", () => {

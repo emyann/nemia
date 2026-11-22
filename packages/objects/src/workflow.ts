@@ -47,6 +47,7 @@ export const STEP_KEYS = [
   'remote',
   'deadlineSeconds',
   'memory',
+  'memoryRequest',
   'budget',
   'check',
   'checks',
@@ -126,6 +127,7 @@ export const STEP_KEY_FORM = {
   remote: 'flag',
   deadlineSeconds: 'count',
   memory: 'text',
+  memoryRequest: 'text',
   budget: 'dollars',
   check: 'text',
   checks: 'text',
@@ -249,6 +251,12 @@ const stepKeyFields = {
     Text.annotate({
       description:
         "The most memory each session of the step may use, as a container's limit such as 4Gi; unset takes the daemon's default.",
+    }),
+  ),
+  memoryRequest: Schema.optionalKey(
+    Text.annotate({
+      description:
+        "The memory each session of the step asks of the machine, as a container's request such as 1Gi, which admission counts; at most its memory, and unset asks the daemon's default request.",
     }),
   ),
   budget: Schema.optionalKey(

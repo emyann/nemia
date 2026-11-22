@@ -5,7 +5,7 @@
  * (`composedRefusal`). The tool rules are `tools.ts`'s.
  */
 import path from 'node:path';
-import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
+import { memoryBytesOf, memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { CLOSEOUT_FIELDS, COUNTS, type OutputSchema, refuse, shapesKept, type StepSpec } from '../step/step.ts';
 import {
   declarationOf,
@@ -154,6 +154,30 @@ export function memoryOf(step: string, memory: string | undefined) {
   return refuse(
     `${step}: \`memory: ${memory}\` is not a memory limit: ${why} \`memory\` is the most memory each session of the step may use, a container's limit, as a Kubernetes quantity — for example \`memory: 4Gi\`.`,
   );
+}
+
+/**
+ * `memoryRequest:` as written, refused where the runtime reads no request off it (`memoryQuantityRefusal`, in its words), and refused above
+ * the step's own `memory:`, which the runtime refuses at filing: a Kubernetes quantity, `1Gi`, which each session of the step is filed
+ * under as its `resources.requests.memory`.
+ * @param step The step's name, which a refusal starts with.
+ * @param memoryRequest The `memoryRequest:` line's value, undefined where the step has none.
+ * @param memory The step's `memory:` line, undefined where it has none.
+ */
+export function memoryRequestOf(step: string, memoryRequest: string | undefined, memory: string | undefined) {
+  if (memoryRequest === undefined) return undefined;
+  const why = memoryQuantityRefusal(memoryRequest);
+  if (why !== undefined)
+    return refuse(
+      `${step}: \`memoryRequest: ${memoryRequest}\` is not a memory request: ${why} \`memoryRequest\` is the memory each session of the step asks of the machine, a container's request, as a Kubernetes quantity — for example \`memoryRequest: 1Gi\`.`,
+    );
+  const asked = memoryBytesOf(memoryRequest);
+  const held = memory === undefined ? undefined : memoryBytesOf(memory);
+  if (asked !== undefined && held !== undefined && asked > held)
+    return refuse(
+      `${step}: \`memoryRequest: ${memoryRequest}\` asks more than the step's own \`memory: ${memory}\`, the most each session may use. Lower \`memoryRequest:\` to \`${memory}\` or under, or raise \`memory:\`.`,
+    );
+  return memoryRequest;
 }
 
 /**

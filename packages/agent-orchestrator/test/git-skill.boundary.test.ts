@@ -281,6 +281,12 @@ const UNREAD: readonly { name: string; verb: PlaceVerb; request: object; field: 
     request: { repo: '/', at: '/a', run: 'r-1', leaf: 'a', from: 'main' },
     field: 'also',
   },
+  {
+    name: 'make whose given has no string to',
+    verb: 'make',
+    request: { repo: '/', at: '/a', run: 'r-1', leaf: 'a', from: 'main', also: [], given: { from: '/inputs', to: 1 } },
+    field: 'given',
+  },
   { name: 'handoff with no step', verb: 'handoff', request: { workspace: '/', why: '' }, field: 'step' },
   {
     name: 'report whose diffOf is no list',

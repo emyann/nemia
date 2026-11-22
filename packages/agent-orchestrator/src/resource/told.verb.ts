@@ -1,7 +1,7 @@
 /**
  * What a step was told and filed with, for the run page: the brief whole, and by layer from what the run froze (`toldLayers`); and what
  * the engine filed its current try with (`StepFiled`): the model, the fence, the mode its session runs in, the remote agent it was sent to
- * and its bridge, off the engine's record of its task.
+ * and its bridge, and the memory its session asked and peaked at, off the engine's record of its task.
  */
 import { handedParts, type HandedPart, type Run, type StepRecord, type ToldLayers, toldLayers } from '../run.ts';
 import { remoteNameOf, type StepSpec } from '../workflow.ts';
@@ -12,6 +12,8 @@ import { type Bridge, bridgeOf } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { remoteAgents } from '../runtime-client.ts';
 import { runsInOf } from './runs-in.ts';
+import { askedBytesOf, tryMemoryOf, type AttemptResources } from '../out-of-memory/index.ts';
+import type { AttemptMemory } from '../views/views-words.ts';
 import type { HandedHow, RunsInBy, TaskSource } from 'objects';
 
 /**
@@ -54,6 +56,18 @@ export type StepFiled = {
   bridge: Bridge | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
+  /**
+   * What its session ran under in memory and peaked at (`memoryFiledOf`): its request and limit as its last attempt ran under them, else as
+   * the task was filed; what admission counted it at in bytes; and the largest peak its attempts measured with that attempt's limit
+   * (`tryMemoryOf`). Each null where not said; the whole null where none of them is.
+   */
+  memory: {
+    request: string | null;
+    limit: string | null;
+    askedBytes: number | null;
+    peakBytes: number | null;
+    peakLimitBytes: number | null;
+  } | null;
 };
 
 /**
@@ -140,7 +154,31 @@ export function filedOf(record: StepRecord | undefined, views: Views, home: stri
     bridge: bridgeOf(views)(view.id),
     tools: tools ?? null,
     deadlineSeconds: deadlineSeconds ?? null,
+    memory: memoryFiledOf(view.state),
   };
+}
+
+/**
+ * What a try's session ran under in memory and peaked at (`StepFiled.memory`): its last attempt's resources, else the task's as filed; what
+ * admission counted it at; and the largest peak its attempts measured; null where it ran under no request or limit and measured no peak.
+ * @param state The engine's record of the task: its resources as filed, and its attempts, each with what it ran under and its memory.
+ */
+export function memoryFiledOf(state: {
+  readonly resources?: AttemptResources;
+  readonly attempts: ReadonlyArray<{ readonly resources?: AttemptResources; readonly memory?: AttemptMemory }>;
+}) {
+  const resources = state.attempts.at(-1)?.resources ?? state.resources;
+  const { peak } = tryMemoryOf(state.attempts);
+  const request = resources?.requests?.memory ?? null;
+  const limit = resources?.limits?.memory ?? null;
+  if (request === null && limit === null && peak === null) return null;
+  return {
+    request,
+    limit,
+    askedBytes: askedBytesOf(resources),
+    peakBytes: peak?.peakBytes ?? null,
+    peakLimitBytes: peak?.limitBytes ?? null,
+  } satisfies StepFiled['memory'];
 }
 
 /**

@@ -3,6 +3,7 @@ export {
   BUDGET_EXAMPLE,
   budgetOf,
   checkMemoryOf,
+  memoryRequestOf,
   checkOf,
   commandRunOf,
   composedRefusal,

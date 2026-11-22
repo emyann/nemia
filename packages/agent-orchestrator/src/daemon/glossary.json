@@ -63,7 +63,7 @@
     },
     {
       "term": "Memory request",
-      "meaning": "`WF_MEMORY_REQUEST`, the memory each session asks of the machine when its step names no `memory:`, a Kubernetes quantity: handed to the engine as its default request (`storeLimits`), which admits a session while the requests it holds and this one fit the machine above its reserved memory. Unset, each asks its limit; refused above `WF_MEMORY_LIMIT` (`memoryRequest`, `packages/agent-orchestrator/src/config/config.store.ts`, `packages/agent-orchestrator/src/runtime-client.ts`).",
+      "meaning": "`WF_MEMORY_REQUEST`, the memory each session asks of the machine when its step names no `memoryRequest:`, a Kubernetes quantity: handed to the engine as its default request (`storeLimits`), which admits a session while the requests it holds and this one fit the machine above its reserved memory. Unset, each asks its limit, its step's `memory:` where it names one; refused above `WF_MEMORY_LIMIT` (`memoryRequest`, `packages/agent-orchestrator/src/config/config.store.ts`, `packages/agent-orchestrator/src/runtime-client.ts`).",
       "type": "Settings"
     },
     {

@@ -383,6 +383,11 @@
       ]
     },
     {
+      "term": "Memory peak",
+      "meaning": "the most memory a try's session reached, read off the cgroup's `memory.peak` the runtime records on each attempt (`Attempt.memory`), the largest over its attempts with the limit of the attempt that reached it (`tryPeakOf`, proved by `packages/agent-orchestrator/contracts/try-peak.contract.ts`), or none where none was measured, since the kernel keeps one only for a session run under a memory limit: never 0. Shown beside what the session asked, a step's `memoryRequest:` or the daemon's `WF_MEMORY_REQUEST`, on the run's step page (`StepFiled.memory`), and over a workflow step's tries, median, p90 and highest, by `nemia stats` (`memoryRowsOf`, `packages/agent-orchestrator/src/stats/stats.ts`), so a person picks the request from measures: Nemia sets none from it.",
+      "type": "TryPeak"
+    },
+    {
       "term": "Pass phase",
       "meaning": "a part of a tick's pass its time is counted in (`PHASES`): records, asks, journals, revisions, observe, runtime, place, assess, act, the `phase` label of a series line (`pass.phase.ms`). The place phase was `git` while the place was git's alone; a stored line that still says `git` reads as `place` (`FORMER_PHASES`). Never a step's phase.",
       "type": "Phase"

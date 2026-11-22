@@ -28,7 +28,9 @@ const GI = MI * KI;
 
 /**
  * A number of bytes as a Kubernetes binary quantity a person can type back into `memory:`: a whole number of `Gi` as `4Gi`, one decimal at
- * or past 1Gi (`3.7Gi`), whole `Mi` below that, rounded, and whole `Ki` below 1Mi, rounded up.
+ * or past 1Gi (`3.7Gi`), whole `Mi` below that, rounded, and whole `Ki` below 1Mi, rounded up. The same words as `objects`' own, which the
+ * cli and the board say a peak in: this copy keeps the run's and the workflow's entries from loading `objects` (`test/refusal.test.ts`),
+ * and `src/views/views-words.test.ts` holds the two to one spelling.
  * @param n The number of bytes.
  */
 export const memoryBytesWord = (n: number) => {

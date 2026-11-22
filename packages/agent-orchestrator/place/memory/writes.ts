@@ -6,11 +6,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkoutAt, commitMade, committed, dirty, headOf, mergedIn, repositoryAt, takenBack } from './acts.ts';
-import { isDirectory, OWN, real, writeChanges } from './disk.ts';
+import { checkoutAt, commitMade, committed, dirty, headOf, mergedIn, repositoryAt, takenBack, treeOf } from './acts.ts';
+import { isDirectory, OWN, real, SELF_IGNORED, writeChanges } from './disk.ts';
 import { noRepository, refused, runBranch, type Reply } from './reads.ts';
 import { commitAt, commitOf, within, type Held, type Repository } from './world.ts';
-import type { PlaceRequests } from '../../src/place/place.ts';
+import type { Made, PlaceRequests } from '../../src/place/place.ts';
 
 /**
  * `follow`: a checkout of a repository the test place cloned brought up to the branch it follows in the repository it was cloned from,
@@ -58,11 +58,42 @@ function cut(repo: Repository, at: string, name: string, from: string) {
 }
 
 /**
+ * The folder `from` written whole at `to` of the workspace `found` holds, with a `.gitignore` of `*` at its top that keeps it out of the
+ * checkout's files (`readTree`), as the git place's `givenCopy` writes it: the path, or why not where it refuses — a `to` that leaves the
+ * workspace or passes a link or a file, a file the checkout's commit holds under it, and a `from` with a `.gitignore` at its top.
+ */
+function givenCopy(found: NonNullable<ReturnType<typeof checkoutAt>>, at: string, given: NonNullable<PlaceRequests['make']['given']>) {
+  const { from, to } = given;
+  if (!isDirectory(from)) return `${from} is not a directory, so nothing can be copied to ${to}: give the run its folder again`;
+  const parts = to.split(/[\\/]/).filter(Boolean);
+  if (path.isAbsolute(to) || parts.length === 0 || parts.some((p) => p === '.' || p === '..'))
+    return `${JSON.stringify(to)} is no path inside the workspace: name the copy by a path from it, with no \`..\``;
+  for (let i = 1; i <= parts.length; i++) {
+    const seen = fs.lstatSync(path.join(at, ...parts.slice(0, i)), { throwIfNoEntry: false });
+    if (!seen) break;
+    if (seen.isSymbolicLink() || !seen.isDirectory())
+      return `${parts.slice(0, i).join('/')} in ${at} is a link or a file: remove it, and the run writes the copy there on its next pass`;
+  }
+  const under = `${parts.join('/')}/`;
+  const tracked = Object.keys(treeOf(found.repo, found.checkout)).filter((f) => f.startsWith(under));
+  if (tracked.length) return `the repository holds ${tracked.join(', ')} under ${to}: move them out of ${to} on the base branch`;
+  if (fs.lstatSync(path.join(from, SELF_IGNORED), { throwIfNoEntry: false }))
+    return `${from} holds a ${SELF_IGNORED} at its top, which the one that keeps the copy out of the checkout would replace: rename it`;
+  const into = path.join(at, ...parts);
+  fs.rmSync(into, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(into), { recursive: true });
+  fs.cpSync(from, into, { recursive: true, filter: (src) => !fs.lstatSync(src).isSymbolicLink() });
+  fs.writeFileSync(path.join(into, SELF_IGNORED), '*\n');
+  return { given: to };
+}
+
+/**
  * `make`: the workspace at `at` on `name`, the branch of the run's leaf (`runBranch`), cut from `from` or taken up as it stands while its
  * directory is one, with each branch of `also` merged into it: one the repository lacks, or asked while a conflict stands, is a note,
- * dropped where a conflict is left.
+ * dropped where a conflict is left. Asked with `given`, the folder is then copied in (`givenCopy`), and a copy it refuses refuses the
+ * verb.
  */
-export function make(held: Held, { repo: dir, at, run, leaf, from, also }: PlaceRequests['make']) {
+export function make(held: Held, { repo: dir, at, run, leaf, from, also, given }: PlaceRequests['make']) {
   const name = runBranch(run, leaf);
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so no workspace can be cut from it`);
   const repo = repositoryAt(held, dir);
@@ -82,7 +113,15 @@ export function make(held: Held, { repo: dir, at, run, leaf, from, also }: Place
     else mergedIn(held, found, tip.id, true, `Merge branch '${branch}' into ${name}`);
   }
   const conflicts = [...(found.checkout.staged?.conflicts ?? [])];
-  return { workspace: at, branch: name, conflicts, notes: conflicts.length ? [] : notes };
+  return givenMade(found, { workspace: at, branch: name, conflicts, notes: conflicts.length ? [] : notes }, given);
+}
+
+/** `made`, with the copy `given` asks made in its workspace and said (`givenCopy`); a refusal where the copy is refused. */
+function givenMade(found: NonNullable<ReturnType<typeof checkoutAt>>, made: Made, given: PlaceRequests['make']['given']) {
+  if (!given) return made;
+  const copy = givenCopy(found, made.workspace, given);
+  if (typeof copy === 'string') return refused(`the copy of ${given.from} was not made: ${copy}`);
+  return { ...made, notes: [...made.notes, `${copy.given}: ${given.from} copied in, which the checkout ignores`], given: copy.given };
 }
 
 /** `handoff`: what a step left uncommitted in its workspace, committed on its branch; null where it left nothing. */

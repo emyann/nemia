@@ -1,8 +1,8 @@
 /**
  * The directories the test place works in, read and written with `node:fs` and no process: a checkout's files as a tree (`readTree`),
  * a tree's files put in a directory (`writeChanges`), and the place's own folder in a checkout, `OWN`, which holds the file that says a
- * merge is staged there (`stagedFile`) and marks a tree `export` wrote. A checkout's `node_modules` and the place's own folder are no
- * part of its files; a link is read as no file.
+ * merge is staged there (`stagedFile`) and marks a tree `export` wrote. A checkout's `node_modules`, the place's own folder and a folder
+ * whose `.gitignore` holds `*` alone are no part of its files; a link is read as no file.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,13 +34,26 @@ export function inside(dir: string, p: string) {
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
-/** The files of `dir` as a tree, in folders too: none where it is no directory. */
+/** The file that keeps the folder it stands in out of a checkout's files when it holds `*` alone, as git reads a `.gitignore` of `*`. */
+export const SELF_IGNORED = '.gitignore';
+
+/** Whether the folder `at` keeps itself out of a checkout's files: its `.gitignore` holds `*` alone. */
+const selfIgnored = (at: string) => {
+  try {
+    return fs.readFileSync(path.join(at, SELF_IGNORED), 'utf8').trim() === '*';
+  } catch {
+    return false;
+  }
+};
+
+/** The files of `dir` as a tree, in folders too, but a folder that ignores itself (`SELF_IGNORED`): none where it is no directory. */
 export function readTree(dir: string) {
   const tree: Record<string, string> = {};
   const read = (at: string, prefix: string) => {
     for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
       if (prefix === '' && SKIPPED.has(entry.name)) continue;
       const rel = `${prefix}${entry.name}`;
+      if (entry.isDirectory() && selfIgnored(path.join(at, entry.name))) continue;
       if (entry.isDirectory()) read(path.join(at, entry.name), `${rel}/`);
       else if (entry.isFile()) tree[rel] = fs.readFileSync(path.join(at, entry.name), 'utf8');
     }

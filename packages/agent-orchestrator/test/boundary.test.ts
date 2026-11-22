@@ -107,6 +107,7 @@ const STORE_BOTTOM = [
   'src/config/config.store.ts',
   'src/whole-file/whole-file.store.ts',
   'src/process/alive.store.ts',
+  'src/keyspace/keyspace.store.ts',
 ];
 
 /**
@@ -144,6 +145,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/config/config.store.ts': [],
   'src/whole-file/whole-file.store.ts': [],
   'src/process/alive.store.ts': [],
+  'src/keyspace/keyspace.store.ts': [],
   'src/config/root.store.ts': ['src/config/config.store.ts'],
   'src/agents/read.store.ts': ['src/skills/read.store.ts'],
   'src/folder/folder.store.ts': ['src/agents/read.store.ts', 'src/skills/read.store.ts'],
@@ -248,7 +250,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/skills/read.store.ts',
   ],
   'src/script/script.store.ts': [],
-  'src/proposal/proposal.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts', 'src/whole-file/whole-file.store.ts'],
+  'src/proposal/proposal.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts', 'src/keyspace/keyspace.store.ts'],
   'src/delegation/delegation.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts', 'src/whole-file/whole-file.store.ts'],
   'src/release/release.store.ts': [],
 };

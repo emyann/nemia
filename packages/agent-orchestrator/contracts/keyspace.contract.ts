@@ -78,8 +78,7 @@ const live = (held: Held | null) => held !== null && !held.deleted;
 const overCeiling = (write: KeyWrite, ceiling: number) => write.verb !== 'delete' && write.size > ceiling;
 
 /** Whether `write` names a revision other than the one the live key `held` is at. */
-const namesOther = (held: Held | null, write: KeyWrite) =>
-  held !== null && write.expected !== null && write.expected !== held.modRevision;
+const namesOther = (held: Held | null, write: KeyWrite) => held !== null && write.expected !== null && write.expected !== held.modRevision;
 
 /**
  * Whether `held` is a row the store can hold at `head`: whole revisions, its life's first at or before its own, its own at or before

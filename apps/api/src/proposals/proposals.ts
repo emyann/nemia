@@ -1,7 +1,8 @@
 /**
  * The proposals group's handlers (`objects`' `Api`): a factory's Proposals, in its namespace, each a named action over its definitions and
- * wiring. Listed (those in one phase by `?fieldSelector=status.phase=<phase>`), at the keyspace's revision they were read at, and read by anyone; made by any caller of the factory
- * (`proposeProgram`, 201), the caller read off the request (`caller`, caller/caller.ts) and never off the body; approved by the person,
+ * wiring. Listed (those in one phase by `?fieldSelector=status.phase=<phase>`), at the keyspace's revision they were read at
+ * (`proposalsListed`), and read by anyone; made by any caller of the factory (`proposeProgram`, 201), the caller read off the request
+ * (`caller`, caller/caller.ts) and never off the body; approved by the person,
  * or by an agent at auto within its delegation and under a confirmed rule, then applied at once where it is due (`approveProgram`);
  * declined by the person alone (`declineProgram`). Every judgement is the package's: a handler hands it the caller and the place, and
  * answers what it answers.

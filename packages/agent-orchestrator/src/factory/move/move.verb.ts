@@ -30,7 +30,17 @@ import { cloned } from '../clones/clones.verb.ts';
 import { volumeRefusal } from '../volume/volume.ts';
 import { isDirectory, runId } from '../../record/record.store.ts';
 import { firstPiece } from '../../piece/piece.ts';
-import { FOLDER_STAYS, cardMoved, factoryOnTarget, fileTextOf, folderOnTarget, renamedFolders, repoOnTarget, volumeKey, volumeOnTarget } from './move.ts';
+import {
+  FOLDER_STAYS,
+  cardMoved,
+  factoryOnTarget,
+  fileTextOf,
+  folderOnTarget,
+  renamedFolders,
+  repoOnTarget,
+  volumeKey,
+  volumeOnTarget,
+} from './move.ts';
 
 /** The top folder a factory's folder is packed under: a fixed word, since an archive's top is a name a factory's need not be. */
 const PACKED_AS = 'factory';

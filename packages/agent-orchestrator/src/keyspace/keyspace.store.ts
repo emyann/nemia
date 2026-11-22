@@ -76,7 +76,7 @@ export class KeyRefused extends Data.TaggedError('KeyRefused')<{
 /** A watch's answer: the changes after the revision it asked from, or why it cannot start there. */
 export type Since = { readonly changes: readonly KeyChange[]; readonly head: number } | { readonly refused: 'gone' | 'ahead' };
 
-/** The keyspace of one file, each method an Effect. */
+/** The keyspace of one file, each method an Effect; `settings` its connection's journal mode and synchronous level, as SQLite says. */
 export type Keyspace = {
   readonly head: Effect.Effect<number>;
   readonly get: (key: string) => Effect.Effect<KeyRecord | undefined>;
@@ -85,6 +85,7 @@ export type Keyspace = {
   readonly txn: (writes: readonly (readonly [key: string, write: KeyWriteOf])[]) => Effect.Effect<readonly KeyRecord[], KeyRefused>;
   readonly since: (revision: number, prefix: string) => Effect.Effect<Since>;
   readonly compact: (retain: number) => Effect.Effect<number>;
+  readonly settings: Effect.Effect<{ readonly journal: string; readonly synchronous: number }>;
 };
 
 /** A row of `kine` as a read selects it. */
@@ -249,6 +250,14 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
           }),
         ),
       ),
+    settings: read(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const [journal] = yield* sql<{ journal_mode: string }>`PRAGMA journal_mode`;
+        const [synchronous] = yield* sql<{ synchronous: number }>`PRAGMA synchronous`;
+        return { journal: journal?.journal_mode ?? '', synchronous: synchronous?.synchronous ?? -1 };
+      }),
+    ),
   } satisfies Keyspace;
 }
 
@@ -275,6 +284,14 @@ const opened = (file: string, scope: Scope.Scope) =>
     ),
     Effect.catchTag('SqlError', (err) => Effect.die(err)),
   );
+
+/**
+ * A keyspace of `file` with a client of its own, opened, set and migrated into `scope` and closed with it: what another process opening
+ * the file is, beside the one `keyspaceAt` keeps. Refused `Invalid` where a newer release of nemia wrote the file.
+ * @param file The SQLite file, created with its folder where none is, or `:memory:`.
+ * @param scope The scope the client lives in.
+ */
+export const keyspaceIn = (file: string, scope: Scope.Scope) => Effect.map(opened(file, scope), keyspaceOver);
 
 /** The scope every keyspace's client lives in: the process's, never closed. */
 const PROCESS_SCOPE = Scope.makeUnsafe();

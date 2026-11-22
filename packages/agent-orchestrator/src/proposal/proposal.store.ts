@@ -25,14 +25,7 @@ import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
-import {
-  keyspaceAt,
-  keyspaceFile,
-  RECORD_CEILING,
-  type KeyRecord,
-  type KeyRefused,
-  type Keyspace,
-} from '../keyspace/keyspace.store.ts';
+import { keyspaceAt, keyspaceFile, RECORD_CEILING, type KeyRecord, type KeyRefused, type Keyspace } from '../keyspace/keyspace.store.ts';
 
 /** The Proposal door's shape: a factory's proposals listed (with the revision they were read at), one read, one made, one written back. */
 export type ProposalDoorShape = {
@@ -289,7 +282,7 @@ export const proposalsImported = Effect.fnUntraced(function* (home: string, keys
       }),
     );
   let made = 0;
-  for (const factory of [...new Set(files.map((f) => f.factory))]) {
+  for (const factory of new Set(files.map((f) => f.factory))) {
     const read: { name: string; file: string; proposal: Proposal }[] = [];
     for (const f of files.filter((one) => one.factory === factory)) {
       const proposal = yield* Effect.result(fromThrow(() => readProposal(f.file)));

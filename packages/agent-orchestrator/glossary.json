@@ -186,7 +186,7 @@
     },
     {
       "term": "Door",
-      "meaning": "the one way an aggregate is read and written: an Effect service whose methods answer Effects failing with a refusal, with a files layer and a memory one held to one table of walks, each refusing a write that breaks the aggregate's invariants. Its pattern is `packages/agent-orchestrator/src/door/door.store.ts`; a door whose files are under the store's root is rooted (`rootedDoor`), reading the root a program is given when a method runs, as the Factory door does, while the Run door's default still reads its module's.",
+      "meaning": "the one way an aggregate is read and written: an Effect service whose methods answer Effects failing with a refusal, with a files layer and a memory one held to one table of walks, each refusing a write that breaks the aggregate's invariants. Its pattern is `packages/agent-orchestrator/src/door/door.store.ts`; a door whose files are under the store's root is rooted (`rootedDoor`), reading the root a program is given when a method runs, as the Factory door does, while the Run door's default still reads its module's. A door whose records are in the keyspace (the Proposal door) answers its Effects itself, its stand-in the same code over a keyspace in memory.",
       "type": "DoorOf"
     },
     {
@@ -524,6 +524,31 @@
       "term": "Revision ledger",
       "meaning": "the numbers given to each content of a workflow, an agent, a skill or a factory's rules, one file per kind and name under `<WF_ROOT>/revisions/`: a content keeps the number it was first given, a new one is numbered past the highest; read and appended to through the Ledger door.",
       "type": "LedgerLayer"
+    },
+    {
+      "term": "Keyspace",
+      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client (`@effect/sql-sqlite-node`) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`.",
+      "type": "Keyspace"
+    },
+    {
+      "term": "Keyspace revision",
+      "meaning": "the number the keyspace gives each write, one store-wide that only grows: a row's `id`, a record's `resourceVersion` written as decimal digits, and the revision a list was read at. A write back that names a revision its record is no longer at is refused `Conflict`, one that names none overwrites; a transaction's records take consecutive revisions, as Kine's do (`keyspaceWrite`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`). Not a ledger's `Revision`.",
+      "type": "WriteRefusal"
+    },
+    {
+      "term": "Write verb",
+      "meaning": "what a write of the keyspace does to its key: `create` makes it and is refused where it is live, `update` changes it and `delete` writes its tombstone, each refused where it is not (`keyspaceWrite`).",
+      "type": "WriteVerb"
+    },
+    {
+      "term": "Compaction",
+      "meaning": "the keyspace's removal of the rows a later row supersedes and of its tombstones, older than the last 1,000 revisions, every 5 minutes in the daemon (`packages/agent-orchestrator/src/keyspace/compact.verb.ts`, `compactTo`): a watch from a revision compacted away is refused `gone`, the api's 410, and one past the head `ahead` (`watchStart`).",
+      "type": "WatchRefusal"
+    },
+    {
+      "term": "Schema due",
+      "meaning": "what opening a keyspace file asks of its table: the migrations after the highest it recorded up to the code's, or its refusal where a newer release wrote it (`newer`), asked by the Migrator's loader inside the Migrator's transaction (`schemaDue`).",
+      "type": "SchemaDue"
     },
     {
       "term": "Rm",

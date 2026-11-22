@@ -43,6 +43,8 @@ const selectorOf = (fieldSelector: string | undefined) => {
 /**
  * The proposals of `factory`, by name, that `fieldSelector` keeps: every one where it is empty or none, else those in the phase it asks
  * (`proposalPhaseSelector`, `phaseTakes`); `Invalid` naming the forms it takes where it spells none, before a proposal is read.
+ * @param factory The factory whose proposals are listed.
+ * @param fieldSelector The phase the list keeps; every proposal where it is empty or none.
  */
 export const proposalsList = Effect.fn('proposalsList')(function* (factory: string, fieldSelector?: string) {
   const selector = yield* selectorOf(fieldSelector);
@@ -53,6 +55,8 @@ export const proposalsList = Effect.fn('proposalsList')(function* (factory: stri
 /**
  * The proposals of `factory` as `proposalsList` answers them, and the revision of the keyspace they were read at, as a list's
  * `resourceVersion` says it: read in one transaction, so the revision is at least each item's.
+ * @param factory The factory whose proposals are listed.
+ * @param fieldSelector The phase the list keeps, as `?fieldSelector=status.phase…` spells it; every proposal where it is empty or none.
  */
 export const proposalsListed = Effect.fn('proposalsListed')(function* (factory: string, fieldSelector?: string) {
   const selector = yield* selectorOf(fieldSelector);

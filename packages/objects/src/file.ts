@@ -43,7 +43,11 @@ export const FILE_DIGEST = /^sha256:[0-9a-f]{64}$/;
 /** A file's digest, `sha256:<hex>`, checked by `FILE_DIGEST`. */
 const FileDigest = Schema.String.annotate({
   description: 'sha256 of its bytes, written sha256:<64 lowercase hexadecimal digits>, as an OCI descriptor writes a digest.',
-}).check(Schema.isPattern(FILE_DIGEST, { message: 'a digest is sha256:<64 lowercase hexadecimal digits> of the bytes, as the upload answered it' }));
+}).check(
+  Schema.isPattern(FILE_DIGEST, {
+    message: 'a digest is sha256:<64 lowercase hexadecimal digits> of the bytes, as the upload answered it',
+  }),
+);
 
 /** A file kept for a start: its id, the name and media type it was sent with, its size, its digest, and when it was uploaded. */
 export const FileObject = Schema.Struct({

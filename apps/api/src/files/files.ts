@@ -1,15 +1,16 @@
 /**
  * A factory's files (`objects`' `FilesGroup`): one uploaded for a start in its namespace to hand its run's steps, as the model APIs'
  * Files API takes one — a form of one part, `file` (`multipart/form-data`), read as the stream of its parts and written to the store as
- * its bytes come (`fileBegun`, the package's), never held whole in memory, then kept (`fileKept`) and answered as the file object. A
+ * its bytes come (the package's File door, `begin`), hashed as they come and never held whole in memory, then kept (`keep`) and answered
+ * as the file object, its digest sha256 of its bytes. A
  * start names it by its id (runs/start.ts, `withInputs`). The form's limits are its endpoint's (`FILE_LIMIT`, one part): a file past the
  * cap is `TooLarge`, a 413 naming it; a form with no file part, a second part or a file with no name, `Invalid`; one that does not parse,
- * `BadRequest`. What was written of a file refused is let go of (`fileDropped`).
+ * `BadRequest`. What was written of a file refused is let go of (`drop`).
  */
 import path from 'node:path';
 import { ByteSize, Cause, Effect, Exit, Stream } from 'effect';
 import { HttpServerResponse, Multipart } from 'effect/http';
-import { type FileBegun, fileAt, fileBegun, fileBytes, fileDropped, fileKept } from 'agent-orchestrator';
+import { type FileBegun, FileDoor, fileBytes } from 'agent-orchestrator';
 import { Api, BadRequest, FILE_LIMIT, type FileObject, Invalid, Missing, PICTURE_TYPES, type PictureMediaType, TooLarge } from 'objects';
 import { ServedNow } from '../objects/refused.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
@@ -78,23 +79,25 @@ const written = (parts: Stream.Stream<Multipart.Part, Multipart.MultipartError>,
 const uploaded = (namespace: string, parts: Stream.Stream<Multipart.Part, Multipart.MultipartError>) =>
   Effect.gen(function* () {
     const now = Date.now();
-    const begun = yield* answeredWriteIn(namespace, async (s) => ({ home: s.home, at: fileBegun(s.home, namespace, now) }));
-    if (begun.at === undefined)
+    const begun = yield* answeredWriteIn(namespace, (s) =>
+      s.inRequest(Effect.flatMap(FileDoor, (door) => door.files.begin(namespace, now))),
+    );
+    if (begun === undefined)
       return yield* Effect.fail(
         new Invalid({
           error: `${ROUTE} keeps files for a factory, and \`${namespace}\` names none: upload it to a namespace nemia factory ls lists, or to default.`,
         }),
       );
-    const { id } = begun.at;
-    const exit = yield* Effect.exit(written(parts, begun.at));
+    const { id } = begun;
+    const exit = yield* Effect.exit(written(parts, begun));
     if (Exit.isFailure(exit)) {
-      fileDropped(begun.home, namespace, id);
+      yield* answeredWriteIn(namespace, (s) => s.inRequest(Effect.flatMap(FileDoor, (door) => door.files.drop(namespace, id))));
       const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');
       if (failure === undefined) return yield* Effect.die(Cause.squash(exit.cause));
       return yield* Effect.fail(refusalOf(failure.error));
     }
-    const file: FileObject = { id, ...exit.value, createdAt: new Date(now).toISOString() };
-    return fileKept(begun.home, namespace, file);
+    const file: FileObject = { id, ...exit.value, digest: begun.digest(), createdAt: new Date(now).toISOString() };
+    return yield* answeredWriteIn(namespace, (s) => s.inRequest(Effect.flatMap(FileDoor, (door) => door.files.keep(namespace, file))));
   });
 
 /**
@@ -104,8 +107,8 @@ const uploaded = (namespace: string, parts: Stream.Stream<Multipart.Part, Multip
  */
 const keptAt = (namespace: string, id: string) =>
   Effect.gen(function* () {
-    const { home } = yield* ServedNow;
-    const at = fileAt(home, namespace, id);
+    const served = yield* ServedNow;
+    const at = yield* Effect.promise(() => served.inRequest(Effect.flatMap(FileDoor, (door) => door.files.read(namespace, id))));
     if (at === undefined)
       return yield* Effect.fail(
         new Missing({

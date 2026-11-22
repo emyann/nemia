@@ -251,6 +251,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   ],
   'src/script/script.store.ts': [],
   'src/proposal/proposal.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts', 'src/keyspace/keyspace.store.ts'],
+  'src/start/files.store.ts': ['src/door/door.store.ts', 'src/keyspace/keyspace.store.ts'],
   'src/delegation/delegation.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts', 'src/whole-file/whole-file.store.ts'],
   'src/release/release.store.ts': [],
 };
@@ -271,6 +272,7 @@ const STAND_INS: readonly string[] = [
   'src/skills/skill-memory.store.ts',
   'src/agents/agent-memory.store.ts',
   'src/proposal/memory.store.ts',
+  'src/start/memory.store.ts',
   'src/delegation/memory.store.ts',
 ];
 

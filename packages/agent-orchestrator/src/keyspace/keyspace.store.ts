@@ -184,7 +184,9 @@ const notLive = (targets: readonly string[]) =>
 const referrersOf = (key: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<{ readonly name: string }>`SELECT name FROM kine_pointers WHERE target = ${key} AND name != ${key} ORDER BY name`;
+    const rows = yield* sql<{
+      readonly name: string;
+    }>`SELECT name FROM kine_pointers WHERE target = ${key} AND name != ${key} ORDER BY name`;
     return rows.map((row) => row.name);
   });
 

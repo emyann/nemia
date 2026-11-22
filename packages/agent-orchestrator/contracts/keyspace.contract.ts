@@ -179,8 +179,7 @@ export type PointerCheck = { readonly verb: WriteVerb; readonly dangling: number
 export type PointerDecision = { readonly held: true } | { readonly refused: PointerRefusal };
 
 const pointersHoldSpec = spec<(check: PointerCheck) => PointerDecision>({
-  requires: ({ input: [check] }) =>
-    whole(check.dangling) && whole(check.referrers) && (check.verb !== 'delete' || check.dangling === 0),
+  requires: ({ input: [check] }) => whole(check.dangling) && whole(check.referrers) && (check.verb !== 'delete' || check.dangling === 0),
   ensures: {
     danglingNeverWritten: {
       description: 'A create or an update whose record points to a key that is not live is refused dangling',

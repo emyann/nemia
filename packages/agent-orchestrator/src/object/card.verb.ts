@@ -24,8 +24,7 @@ import {
 } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardVersion } from '../card-write/card-write.verb.ts';
-import { StoreRoot } from '../config/root.store.ts';
-import { fileAt } from '../start/files.store.ts';
+import { FileDoor } from '../start/files.store.ts';
 import { namedInText } from '../start/index.ts';
 
 /** The Card's whole write, served beside its reads (`update`): the api reads it off the package's entry with them. */
@@ -143,34 +142,36 @@ const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
   const text = yield* door.cards.read(name);
   const filedAt = yield* door.cards.filedAt(name);
   if (text === null || filedAt === null) return null;
-  const root = yield* Effect.serviceOption(StoreRoot);
-  return cardOf(l, text, filedAt, source, filesOf(root._tag === 'Some' ? root.value : undefined, l, bodyOf(l, text).body ?? ''));
+  return cardOf(l, text, filedAt, source, yield* filesOf(l, bodyOf(l, text).body ?? ''));
 });
 
 /**
- * The files the listed card `l` carries, as its status says them: each with what its File is where its namespace keeps it, whether its
- * text names it, and whether it is kept.
- * @param home The store's root, whose Files are read; none where the program is given none, every File then read as not kept.
+ * The files the listed card `l` carries, as its status says them: each with what its File is where its namespace keeps it (read through
+ * the File door; a program given no store's root, nor the door's memory, reads every File as not kept), whether its text names it, and
+ * whether it is kept.
  * @param l The listed card.
  * @param body The card's body, read for the names it uses.
  */
-function filesOf(home: string | undefined, l: InboxListing, body: string) {
+const filesOf = Effect.fnUntraced(function* (l: InboxListing, body: string) {
   const files = l.files ?? [];
   const named = namedInText(
     body,
     files.map((f) => f.name),
   );
-  return files.map((f) => {
-    const at = home === undefined ? undefined : fileAt(home, namespaceOf(l), f.file);
-    return {
-      name: f.name,
-      file: f.file,
-      ...(at !== undefined ? { mediaType: at.file.mediaType, size: at.file.size } : {}),
-      inText: named.includes(f.name),
-      kept: at !== undefined,
-    };
-  });
-}
+  const door = yield* FileDoor;
+  return yield* Effect.forEach(files, (f) =>
+    Effect.map(
+      Effect.orElseSucceed(door.files.read(namespaceOf(l), f.file), () => undefined),
+      (at) => ({
+        name: f.name,
+        file: f.file,
+        ...(at !== undefined ? { mediaType: at.file.mediaType, size: at.file.size } : {}),
+        inText: named.includes(f.name),
+        kept: at !== undefined,
+      }),
+    ),
+  );
+});
 
 /**
  * The entries of `listing` that `fieldSelector` keeps: every one where it is empty or none, else those whose `cardInPlay` is what it

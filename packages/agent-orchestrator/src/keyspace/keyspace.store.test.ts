@@ -3,7 +3,8 @@
  * changes all of its records or none; a write that was answered is on disk (write-ahead log, `synchronous=FULL`, read again after its
  * client closed); two clients writing one key from one revision write it once; Kine's unique index refuses a second row after one
  * revision; a watch from a revision and a compaction answer rows, `gone` and `ahead`; a list answers live keys at its revision; a pointer
- * never dangles, judged in the write's transaction and kept through a compaction. And the table's migrations: applied once, what a file lacks applied, a file a newer release wrote refused `Invalid` and left as it was.
+ * never dangles, judged in the write's transaction and kept through a compaction. And the table's migrations: applied once, what a file
+ * lacks applied, a file a newer release wrote refused `Invalid` and left as it was.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -29,7 +30,10 @@ const pointing = (value: string, points: readonly string[]) => ({ verb: 'create'
 const remove = { verb: 'delete', expected: null, value: '' } satisfies KeyWriteOf;
 
 /** What an Effect answered, or the tag of what it failed with. */
-async function answered<A>(effect: Effect.Effect<A, { readonly _tag: string; readonly refusal?: string; readonly pointer?: string | null }>) {
+/** What a refusal of the keyspace carries: its tag, why, and the key at fault for a pointer's. */
+type Refused = { readonly _tag: string; readonly refusal?: string; readonly pointer?: string | null };
+
+async function answered<A>(effect: Effect.Effect<A, Refused>) {
   const exit = await Effect.runPromiseExit(effect);
   if (Exit.isSuccess(exit)) return exit.value;
   const failed = exit.cause.reasons.find((r) => r._tag === 'Fail');

@@ -7,6 +7,7 @@ import { HttpApiEndpoint, HttpApiGroup, OpenApi } from 'effect/http-api';
 import { Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized } from './api-errors.ts';
 import { Proposal, ProposalCreate, ProposalList } from './proposal.ts';
 import { Delegation, DelegationList, DelegationWrite } from './delegation.ts';
+import { Table } from './table.ts';
 
 /** An object a namespace holds, by its namespace and its name. */
 const cardParams = {
@@ -35,6 +36,8 @@ const namespaceParams = { namespace: cardParams.namespace };
 /** The proposals and the delegations over them, and a page of each, named so that the document holds each as a component. */
 const ProposalObject = Proposal.annotate({ identifier: 'Proposal' });
 const ProposalListObject = ProposalList.annotate({ identifier: 'ProposalList' });
+/** A page of proposals, or the same page as a `Table` where the request asks for one, as the agents'. */
+const ProposalListOrTable = [ProposalListObject, Table] as const;
 const DelegationObject = Delegation.annotate({ identifier: 'Delegation' });
 const DelegationListObject = DelegationList.annotate({ identifier: 'DelegationList' });
 
@@ -50,11 +53,11 @@ export class ProposalsGroup extends HttpApiGroup.make('proposals').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/proposals', {
     params: namespaceParams,
     query: proposalListQuery,
-    success: ProposalListObject,
+    success: ProposalListOrTable,
     error: proposalErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's proposals in its namespace, a page at a time, read by anyone; ?fieldSelector=status.phase=<phase> keeps those in one phase. Answers a ProposalList.",
+    "Lists a factory's proposals in its namespace, a page at a time, read by anyone; ?fieldSelector=status.phase=<phase> keeps those in one phase. Answers a ProposalList, or the same page as a Table where the request asks for one: a row per proposal, none of its objects.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/proposals/:name', {
     params: cardParams,

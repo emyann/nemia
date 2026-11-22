@@ -3,7 +3,7 @@
  * the factory page lists them in (`proposalBefore`, `proposalsInOrder`), both proved by `contracts/proposal.contract.ts`; and the
  * resources a delegation may grant (`DELEGABLE`). Pure.
  */
-import { PROPOSABLE_KINDS, RESOURCE_PLURALS, type Proposal, type ProposalPhase } from 'objects';
+import { PROPOSABLE_KINDS, RESOURCE_PLURALS, type ProposalPhase } from 'objects';
 import type { ProposalBefore, ProposalOffersOf, ProposalOrderFacts } from '../../contracts/proposal.contract.ts';
 
 export type { ProposalOffers } from '../../contracts/proposal.contract.ts';
@@ -24,17 +24,21 @@ const proposalBefore: ProposalBefore = (a: ProposalOrderFacts, b: ProposalOrderF
   return a.at > b.at ? -1 : 1;
 };
 
+/** What the order is read off: a proposal's phase and when it was made, as its list's row says them. */
+type Ordered = { readonly phase: ProposalPhase; readonly creationTimestamp: string };
+
 /** What the order reads of `proposal`: whether it waits, and when it was made (none read as the oldest). */
-const orderFactsOf = (proposal: Proposal) => {
-  const at = Date.parse(proposal.metadata.creationTimestamp);
-  return { waiting: proposal.status.phase === 'waiting', at: Number.isFinite(at) && at >= 0 ? at : 0 };
+const orderFactsOf = (proposal: Ordered) => {
+  const at = Date.parse(proposal.creationTimestamp);
+  return { waiting: proposal.phase === 'waiting', at: Number.isFinite(at) && at >= 0 ? at : 0 };
 };
 
 /**
  * `list` in the order the factory page lists it (`proposalBefore`), a new array; the api's order kept where nothing tells two apart.
- * @param list The factory's proposals, in the api's order.
+ * @param list The factory's proposals, as the rows of their list (`ProposalRow`), in the api's order.
  */
-export const proposalsInOrder = (list: readonly Proposal[]) => [...list].sort((a, b) => proposalBefore(orderFactsOf(a), orderFactsOf(b)));
+export const proposalsInOrder = <P extends Ordered>(list: readonly P[]) =>
+  [...list].sort((a, b) => proposalBefore(orderFactsOf(a), orderFactsOf(b)));
 
 /** The resources a delegation may grant: each kind a proposal may change, by its plural, as the orchestrator computes them. */
 export const DELEGABLE: readonly string[] = PROPOSABLE_KINDS.map((kind) => RESOURCE_PLURALS[kind]);

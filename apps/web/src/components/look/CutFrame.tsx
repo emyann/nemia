@@ -80,12 +80,14 @@ const FRAMED_END = '[&::-webkit-scrollbar-track:horizontal]:ml-6';
 const TABLE_CUT = 24;
 
 /**
- * The state layer of the interactive row at the foot of a table that ends its frame: laid over that row (its anchor, `--framed-foot`,
- * which `FRAMED_ROW` names), as wide as the box and still while the table scrolls sideways, clipped to the frame's bottom-left cut,
+ * The state layer of the interactive row at the foot of a table that ends its frame: from that row's top (its anchor, `--framed-foot`,
+ * which `FRAMED_ROW` names) down to the box's foot, past the lane a sideways scroll bar takes under the row where one is drawn, so its
+ * clip lies on the frame's diagonal with a lane or none; as wide as the box and still while the table scrolls sideways, clipped to the
+ * frame's bottom-left cut,
  * and painted in the kit's colours and strengths for the row's states: `on-surface` at 8% under the pointer, 10% pressed and focused.
  */
 const FOOT_LAYER = [
-  'pointer-events-none absolute inset-x-0 [top:anchor(--framed-foot_top)] [bottom:anchor(--framed-foot_bottom)]',
+  'pointer-events-none absolute inset-x-0 bottom-0 [top:anchor(--framed-foot_top)]',
   'transition-colors duration-short-4',
   '[@media(hover:hover)]:group-has-[tbody>tr[data-interactive]:last-child:hover:not([data-pressed],[data-focus-visible])]/foot:bg-on-surface/8',
   'group-has-[tbody>tr[data-interactive][data-pressed]:last-child]/foot:bg-on-surface/10',

@@ -51,8 +51,15 @@ export const InFlight: Story = {
     await userEvent.unhover(label);
     await rowOpens(userEvent, lgll, `/runs/${TARGET_RUNS.lgll.metadata.name}`);
     const foot = rowOf(canvasElement, UNJUDGED.id);
-    const [layer, row] = [canvasElement.querySelector('[data-framed-foot]')!.getBoundingClientRect(), foot.getBoundingClientRect()];
-    await expect([layer.top, layer.bottom], "the foot's state layer lies on the last row").toEqual([row.top, row.bottom]);
+    const [layer, row, box] = [
+      canvasElement.querySelector('[data-framed-foot]')!.getBoundingClientRect(),
+      foot.getBoundingClientRect(),
+      canvasElement.querySelector('[data-framed-end]')!.getBoundingClientRect(),
+    ];
+    await expect([layer.top, layer.bottom], "the foot's state layer runs from the last row's top to the box's foot").toEqual([
+      row.top,
+      box.bottom,
+    ]);
     await rowOpens(userEvent, foot, `/runs/${UNJUDGED.id}`);
   },
 };

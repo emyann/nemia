@@ -1068,7 +1068,7 @@ describe('`statsOf`: the facts bucketed by UTC day and by a key, filtered, total
         r.run.steps.design = {
           ...r.run.steps.design,
           pictures: { shown: ['a.png', 'b.png'], held: [{ name: 'c.png', reason: 'size' }] },
-        } as Run['steps'][string];
+        };
         const rows = statsOf(factsOfAll(r), {}, JOBS_NOW).all.steps;
         assert.deepEqual(
           ['design', 'implement'].map((name) => rows.find((row) => row.step === name)?.pictures),

@@ -7,7 +7,7 @@ const PageLink = routeLink(AriaLink);
 
 /** An outlined button of the pager, in the label face: quiet, dimmed by its ink where it leads nowhere, and ringed as the kit rings. */
 const BUTTON = cn(
-  'inline-flex h-8 items-center border border-outline px-3 font-plain text-label-large uppercase text-on-surface hover:bg-accent data-disabled:border-outline-variant data-disabled:text-muted-foreground data-disabled:hover:bg-transparent',
+  'inline-flex h-8 items-center border border-outline px-3 font-label-large text-label-large uppercase text-on-surface hover:bg-surface-container-high data-disabled:border-outline-variant data-disabled:text-on-surface-variant data-disabled:hover:bg-transparent',
   focusRing(),
 );
 

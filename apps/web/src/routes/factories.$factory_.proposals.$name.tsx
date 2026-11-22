@@ -28,7 +28,7 @@ function ProposalPage() {
         />
         <div className="flex flex-col gap-1">
           <h1 className="text-title-large">A proposal of {factory}</h1>
-          <p className="text-body-medium text-muted-foreground">
+          <p className="text-body-medium text-on-surface-variant">
             A change to this factory's definitions, waiting on an approval or judged by one.
           </p>
         </div>

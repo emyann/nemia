@@ -58,7 +58,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
   return (
     <form
       aria-label="File a card"
-      className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
+      className="space-y-3 rounded-lg border border-outline-variant bg-surface-container-low p-4 shadow-sm"
       onPaste={(event) => {
         const pasted = [...event.clipboardData.files];
         if (pasted.length > 0) setGiven(inputsAdded(given, pasted));
@@ -91,7 +91,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         <Button icon={file.isPending ? Pending : undefined} type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}
         </Button>
-        <span className="text-body-small text-muted-foreground">Parked, not started: nothing runs until you start it.</span>
+        <span className="text-body-small text-on-surface-variant">Parked, not started: nothing runs until you start it.</span>
       </div>
       {filed && !keptBy(shown)(filed) && <Hidden name={filed.name} shown={shown!} />}
       {file.isError && <NotFiled message={file.error.message} />}
@@ -160,7 +160,7 @@ function FactoryField({
       </Select>
       {error && <ReadTrouble what="the factories" error={error} className="text-body-small" />}
       {picked === '' && (
-        <p data-parked className="text-body-small text-muted-foreground">
+        <p data-parked className="text-body-small text-on-surface-variant">
           Parked with no factory: it gets its factory, workflow and repository when you start it.
         </p>
       )}
@@ -172,7 +172,7 @@ function FactoryField({
         </div>
       )}
       {!error && read && offered.length === 0 && store && (
-        <p data-no-factory className="text-body-small text-muted-foreground">
+        <p data-no-factory className="text-body-small text-on-surface-variant">
           The store has no factory yet: file one with {code(store.fileFactory)}.
         </p>
       )}
@@ -206,7 +206,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
           ))}
         </Select>
         {offered.length === 0 && (
-          <p data-no-workflow className="text-body-small text-muted-foreground">
+          <p data-no-workflow className="text-body-small text-on-surface-variant">
             {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </p>
         )}
@@ -218,7 +218,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
             {on.why}
           </p>
         ) : (
-          <p data-factory-repo className="py-1.5 font-mono text-body-small break-all text-muted-foreground">
+          <p data-factory-repo className="py-1.5 font-mono text-body-small break-all text-on-surface-variant">
             {on !== null
               ? on.repo
               : only !== undefined && !more.length
@@ -236,7 +236,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
 /** The note for a card just filed that the page's filter, on the factory `shown`, does not list: its name, and the way to see it. */
 function Hidden({ name, shown }: { name: string; shown: string }) {
   return (
-    <p data-filed-hidden className="text-body-small text-muted-foreground">
+    <p data-filed-hidden className="text-body-small text-on-surface-variant">
       Filed as <span className="font-mono">{name}</span>, which the cards below, of the factory <span className="font-mono">{shown}</span>,
       do not list.{' '}
       <Link to="/inbox" search={{}} replace className="underline underline-offset-2">

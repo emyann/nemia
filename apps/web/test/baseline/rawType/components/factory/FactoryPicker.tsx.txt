@@ -1,0 +1,2 @@
+apps/web/src/components/factory/FactoryPicker.tsx#text-body-small
+apps/web/src/components/factory/FactoryPicker.tsx#text-title-medium

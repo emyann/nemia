@@ -2,16 +2,17 @@ import type { Page } from 'playwright';
 import { Refused } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 
-/** The look's four faces as the board loads them: the family its package registers, and a font that asks for it. */
+/** The look's five faces as the board loads them: the family its package registers, and a font that asks for it. */
 const FACES = [
-  { family: 'Chakra Petch', font: '400 16px "Chakra Petch"' },
+  { family: 'Barlow', font: '400 16px "Barlow"' },
+  { family: 'Chakra Petch', font: '600 16px "Chakra Petch"' },
   { family: 'Michroma', font: '400 16px "Michroma"' },
-  { family: 'Share Tech Mono', font: '400 16px "Share Tech Mono"' },
+  { family: 'JetBrains Mono', font: '400 16px "JetBrains Mono"' },
   { family: 'Archivo Variable', font: '800 expanded 16px "Archivo Variable"' },
 ] as const;
 
 /**
- * The board's typefaces: the page is set in the plain face, each of the look's four faces loads — the label face at its widest and
+ * The board's typefaces: the page is set in the read face, each of the look's five faces loads — the label face at its widest and
  * heavy — mono text, by the `font-mono` class or in a `code` element, is set in the mono face, and every font file the page asked for
  * came from the board's own origin, never a font service.
  */
@@ -38,13 +39,11 @@ async function expectTypefaces(page: Page) {
       elsewhere: files.filter((name) => new URL(name).origin !== location.origin),
     };
   }, FACES);
-  if (!/^"?Chakra Petch"?,/.test(seen.body))
-    throw new Refused(`the page is set in the plain face, Chakra Petch — it is set in ${seen.body}`);
+  if (!/^"?Barlow"?,/.test(seen.body)) throw new Refused(`the page is set in the read face, Barlow — it is set in ${seen.body}`);
   if (!/^\s*['"]Archivo Variable['"],/.test(seen.label))
     throw new Refused(`the label face is Archivo Variable (--font-label) — it is ${seen.label || 'not set'}`);
   for (const [what, family] of Object.entries(seen.mono))
-    if (!/^"?Share Tech Mono"?,/.test(family))
-      throw new Refused(`${what} is set in the mono face, Share Tech Mono — it is set in ${family}`);
+    if (!/^"?JetBrains Mono"?,/.test(family)) throw new Refused(`${what} is set in the mono face, JetBrains Mono — it is set in ${family}`);
   for (const { family } of FACES)
     if (!seen.loaded[family]) throw new Refused(`${family} loads — the page has no face of that family to load`);
   if (seen.files.length < FACES.length)

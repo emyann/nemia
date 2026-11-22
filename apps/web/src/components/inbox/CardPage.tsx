@@ -40,12 +40,12 @@ export function CardPage({ name }: { name: string }) {
       <CardTrail name={card.name} />
 
       <header className="space-y-1">
-        <h1 className="font-mono text-body-medium text-muted-foreground">{card.name}</h1>
-        <p className="flex flex-wrap gap-x-3 gap-y-1 text-body-small text-muted-foreground">
+        <h1 className="font-mono text-body-medium text-on-surface-variant">{card.name}</h1>
+        <p className="flex flex-wrap gap-x-3 gap-y-1 text-body-small text-on-surface-variant">
           <span>{card.error === null ? 'inbox card' : 'in the inbox, not a card'}</span>
           {card.workflow && (
             <span data-workflow={card.workflow} title={card.workflow}>
-              workflow <span className="font-mono text-foreground">{workflowNameOf(card.workflow)}</span>
+              workflow <span className="font-mono text-on-surface">{workflowNameOf(card.workflow)}</span>
             </span>
           )}
           {card.filedAt && (

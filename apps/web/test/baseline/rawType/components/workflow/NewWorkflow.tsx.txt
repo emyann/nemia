@@ -1,0 +1,3 @@
+apps/web/src/components/workflow/NewWorkflow.tsx#text-body-medium
+apps/web/src/components/workflow/NewWorkflow.tsx#text-body-small
+apps/web/src/components/workflow/NewWorkflow.tsx#text-title-small

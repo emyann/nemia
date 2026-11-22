@@ -40,7 +40,7 @@ export function FactoryCostLines({ factory }: { factory: Pick<Factory, 'name' | 
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {factory.default || factory.workflows === null ? (
-          <p data-no-cost-lines className="text-body-medium text-muted-foreground">
+          <p data-no-cost-lines className="text-body-medium text-on-surface-variant">
             The default factory offers every workflow found and keeps no file, so it sets no cost line: a factory a person makes does.
           </p>
         ) : factory.workflows.length === 0 ? (
@@ -83,7 +83,7 @@ function CostLineRow({ factory, workflow, usd }: { factory: string; workflow: st
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="min-w-0 font-mono text-body-medium [overflow-wrap:anywhere]">{workflow}</span>{' '}
         {usd === null ? (
-          <span data-cost-line-said="none" className="text-body-medium text-muted-foreground">
+          <span data-cost-line-said="none" className="text-body-medium text-on-surface-variant">
             no cost line
           </span>
         ) : (
@@ -94,7 +94,7 @@ function CostLineRow({ factory, workflow, usd }: { factory: string; workflow: st
       </div>
       <CostLineForm key={usd ?? ''} workflow={workflow} usd={usd} pending={change.isPending} onChange={ask} />
       {change.isSuccess && said && (
-        <p data-cost-line-done className="text-body-medium text-muted-foreground">
+        <p data-cost-line-done className="text-body-medium text-on-surface-variant">
           {said.done}
         </p>
       )}

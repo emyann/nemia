@@ -27,14 +27,14 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   if (quota.state !== 'fresh') {
     const last = lastWords(quota, now);
     return (
-      <div data-quota={quota.state} title={title} className="max-w-2xl basis-full text-body-small text-muted-foreground">
+      <div data-quota={quota.state} title={title} className="max-w-2xl basis-full text-body-small text-on-surface-variant">
         <p>
           <Lead /> {quota.said}
         </p>
         {last && (
           <p
             data-quota-last
-            className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-foreground opacity-70 [&_[data-marked]]:text-foreground"
+            className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-on-surface opacity-70 [&_[data-marked]]:text-on-surface"
           >
             {last.windows.map((w) => (
               <Window key={w.key} words={w} markAt={quota.markAt} data={{ 'data-quota-last-window': w.key }} />
@@ -50,7 +50,7 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
     <p
       data-quota="fresh"
       title={title}
-      className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-body-medium text-muted-foreground"
+      className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-body-medium text-on-surface-variant"
     >
       <Lead />
       {quota.windows.map((w) => (
@@ -85,7 +85,7 @@ function Window({
       {words.label}{' '}
       <span
         className={
-          words.marked ? 'font-semibold tabular-nums' : emphasis ? 'font-medium text-foreground tabular-nums' : 'font-medium tabular-nums'
+          words.marked ? 'font-semibold tabular-nums' : emphasis ? 'font-medium text-on-surface tabular-nums' : 'font-medium tabular-nums'
         }
       >
         {words.used}

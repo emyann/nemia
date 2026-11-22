@@ -37,7 +37,7 @@ export function FactoryTrust({
         <ul className="flex flex-col gap-2">
           {untrusted.map((u) => (
             <li key={`${u.harness} ${u.place}`} data-untrusted-place={u.place} className="min-w-0">
-              <span className="font-mono text-body-small break-all text-foreground">{u.place}</span> is not trusted for {u.harness}.
+              <span className="font-mono text-body-small break-all text-on-surface">{u.place}</span> is not trusted for {u.harness}.
               Withheld: <span className="break-words">{u.withheld}.</span>
               {u.never !== null && <span data-untrusted-never> {u.never}</span>}
             </li>
@@ -47,7 +47,7 @@ export function FactoryTrust({
           <p data-trust-command className="flex items-start gap-1">
             <span className="min-w-0">
               Trust {untrusted.length === 1 ? 'it' : 'them'}:{' '}
-              <code className="font-mono text-body-small [overflow-wrap:anywhere] text-foreground">{factory.commands.trust}</code>
+              <code className="font-mono text-body-small [overflow-wrap:anywhere] text-on-surface">{factory.commands.trust}</code>
             </span>
             <CopyButton text={factory.commands.trust} />
           </p>

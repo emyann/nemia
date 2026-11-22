@@ -7,7 +7,7 @@ const meta: Meta = { title: 'Look/Marker' };
 export default meta;
 
 /** Where a marker stands in its story: a panel's width, on the card's ground. */
-const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
+const PANEL = { width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)' };
 
 /** A line in a conversation's own type, as a conversation draws it. */
 export const Quiet: StoryObj<{ words: string }> = {

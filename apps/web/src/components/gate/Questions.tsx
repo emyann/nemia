@@ -73,7 +73,7 @@ function QuestionHead({ q, n }: { q: Frozen<Question>; n: number }) {
       <Title size="medium" component="span" className="block text-on-surface">
         {q.title}
       </Title>
-      <Markdown className="text-foreground">{q.body}</Markdown>
+      <Markdown className="text-on-surface">{q.body}</Markdown>
       <Body component="p" data-takes={q.multiple ? 'any' : 'one'} className="text-on-surface-variant">
         {q.multiple ? SERIES.takesAny : SERIES.takesOne}
       </Body>
@@ -222,7 +222,7 @@ export function QuestionSeries({
   if (!onDraft) {
     return (
       <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
-        {field && <h4 className="font-mono text-body-small text-muted-foreground">{field}</h4>}
+        {field && <h4 className="font-mono text-body-small text-on-surface-variant">{field}</h4>}
         <ol className="space-y-4 text-body-medium">
           {questions.map((q, i) => (
             <QuestionRead key={q.title} q={q} n={i + 1} />
@@ -281,7 +281,7 @@ export function AskedRow({ step, said }: { step: string; said: string }) {
   return (
     <li data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
       <strong>{step}</strong>{' '}
-      <span data-note className="font-mono text-body-small text-muted-foreground">
+      <span data-note className="font-mono text-body-small text-on-surface-variant">
         {said}
       </span>
     </li>
@@ -301,7 +301,7 @@ function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; 
     >
       {(['continue', 'fresh'] as const).map((m) => (
         <Radio key={m} value={m}>
-          {MODES[m]} <code className="text-muted-foreground">--{m}</code>
+          {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
         </Radio>
       ))}
     </RadioGroup>
@@ -328,11 +328,11 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
       data-kind={offer.kind}
       data-questions
       data-step={offer.step}
-      className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
+      className="space-y-2 rounded border border-yours bg-surface-container-low p-3 text-body-medium"
     >
       <p data-said>
         <strong>{offer.step}</strong> asks {offer.questions.length === 1 ? 'a question' : `${offer.questions.length} questions`}
-        {offer.needs && <span className="text-muted-foreground">: {offer.needs}</span>}
+        {offer.needs && <span className="text-on-surface-variant">: {offer.needs}</span>}
       </p>
       <form
         aria-label={OFFERS.answer.form(offer.step)}

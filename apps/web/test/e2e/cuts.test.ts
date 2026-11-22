@@ -710,7 +710,7 @@ async function tagRing(page: Page, name: string, given?: Rgb) {
  * the first of Tailwind's layers, as the border of `BORDERED_TAG` is, to win over the tag's important utility that takes it off.
  */
 const HELD_RING = `[data-cut-tag] [data-cut-ring] { display: none !important; }
-@layer theme { ${TAG_SHAPE} :focus-visible { outline: 3px solid var(--ring) !important; outline-offset: -3px !important; } }`;
+@layer theme { ${TAG_SHAPE} :focus-visible { outline: 3px solid var(--color-ring) !important; outline-offset: -3px !important; } }`;
 
 test(
   "REFUSED: a cut tag around a link draws the focus ring in its cut shape, the held link's own taken off; the link's own ring is seen",

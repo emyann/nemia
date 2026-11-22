@@ -126,12 +126,12 @@ export function AgentForm({
       <Identity form={form} setForm={setForm} listing={listing} readOnly={readOnly} />
 
       <fieldset className="space-y-3">
-        <legend className="mb-2 text-label-medium text-muted-foreground uppercase">What it can do</legend>
+        <legend className="mb-2 text-label-medium text-on-surface-variant uppercase">What it can do</legend>
         <GeneratedCard listing={listing} />
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="mb-2 text-label-medium text-muted-foreground uppercase">How its sessions run</legend>
+        <legend className="mb-2 text-label-medium text-on-surface-variant uppercase">How its sessions run</legend>
         <div className="grid gap-4 @md/page:grid-cols-2 @3xl/page:grid-cols-3">
           {choice('harness')}
           {text('model')}
@@ -157,7 +157,7 @@ export function AgentForm({
       <ResultSchema form={form} setForm={setForm} listing={listing} readOnly={readOnly} />
 
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-label-medium text-muted-foreground uppercase">What its sessions are told</legend>
+        <legend className="mb-2 text-label-medium text-on-surface-variant uppercase">What its sessions are told</legend>
         {readOnly ? (
           <div className="space-y-2">
             <p className="text-body-small font-medium">Skills</p>
@@ -200,7 +200,7 @@ export function AgentForm({
               Discard changes
             </Button>
           )}
-          <p className="text-body-small text-muted-foreground">
+          <p className="text-body-small text-on-surface-variant">
             A save changes what a run started later freezes. A run already started keeps the agent it froze.
           </p>
           {footer}
@@ -220,7 +220,7 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
     'Generated from its skills: an entry for each, read off its SKILL.md — title, description, tags and examples — or one from its description when it gives none.';
   if (!listing)
     return (
-      <p data-card-generated className="text-body-small text-muted-foreground">
+      <p data-card-generated className="text-body-small text-on-surface-variant">
         {how} Shown once it is saved.
       </p>
     );
@@ -233,7 +233,7 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
       ) : (
         <Skills skills={listing.card} none={listing.error !== null ? 'Nothing, while its file does not read.' : undefined} />
       )}
-      <p className="text-body-small text-muted-foreground">{how} To change it, change its skills.</p>
+      <p className="text-body-small text-on-surface-variant">{how} To change it, change its skills.</p>
     </div>
   );
 }
@@ -255,7 +255,7 @@ function ResultSchema({
 }) {
   return (
     <fieldset className="space-y-3">
-      <legend className="mb-2 text-label-medium text-muted-foreground uppercase">Result schema</legend>
+      <legend className="mb-2 text-label-medium text-on-surface-variant uppercase">Result schema</legend>
       <div className="grid gap-4 @md/page:grid-cols-3">
         <Field
           label="Schema file"
@@ -396,10 +396,10 @@ function MarkdownField({
       {value.trim() ? (
         <Markdown className={`rounded-md border px-3 py-2 text-body-medium ${READ_ONLY}`}>{value}</Markdown>
       ) : (
-        <p className={`rounded-md border px-3 py-2 text-body-medium text-muted-foreground italic ${READ_ONLY}`}>Nothing written</p>
+        <p className={`rounded-md border px-3 py-2 text-body-medium text-on-surface-variant italic ${READ_ONLY}`}>Nothing written</p>
       )}
       {hint && (
-        <Body size="small" className="leading-snug text-muted-foreground">
+        <Body size="small" className="leading-snug text-on-surface-variant">
           {hint}
         </Body>
       )}
@@ -496,7 +496,7 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
     <Radio key={choice.value} value={choice.value} className={CHOICE} data-harness-prompt={choice.value}>
       <span className="space-y-0.5">
         <span className="block text-body-small font-medium">{choice.label}</span>
-        <span className="block text-body-small leading-snug text-muted-foreground">{choice.says}</span>
+        <span className="block text-body-small leading-snug text-on-surface-variant">{choice.says}</span>
       </span>
     </Radio>
   );

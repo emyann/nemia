@@ -8,7 +8,7 @@ import { Avatar, Body, Label, Meter, Tag } from '@/components/ui/ds';
 import { ink } from '@/lib/meaning';
 import type { CardNote, CardSpend, CardTime, PartHead as Head, PartSize } from '@/lib/stepPart';
 import { cn } from '@/lib/utils';
-import { CutTag, Reading, ReadingLines, TextLink } from '../../look';
+import { CutTag, MeaningTag, Reading, ReadingLines, TextLink } from '../../look';
 
 /** The ink of the time box's figure, by its kind's meaning. */
 const TIME_INK: Record<CardTime['ink'], string> = {
@@ -34,9 +34,15 @@ function Key({ children, className }: { children: string; className?: string }) 
 function StateTag({ head }: { head: Head }) {
   return (
     <CutTag edge={head.tag.variant === 'outlined'}>
-      <Tag data-step-tag color={head.tag.color} variant={head.tag.variant} className="uppercase">
-        {head.tag.word}
-      </Tag>
+      {head.tag.color === 'alive' ? (
+        <MeaningTag data-step-tag hue="alive" className="uppercase">
+          {head.tag.word}
+        </MeaningTag>
+      ) : (
+        <Tag data-step-tag color={head.tag.color} variant={head.tag.variant} className="uppercase">
+          {head.tag.word}
+        </Tag>
+      )}
     </CutTag>
   );
 }

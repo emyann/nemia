@@ -8,7 +8,7 @@ const meta: Meta<typeof SessionQueuedBand> = {
   title: 'Run/SessionQueuedBand',
   component: SessionQueuedBand,
   render: (args) => (
-    <div style={{ width: 460, padding: 16, background: 'var(--card)' }}>
+    <div style={{ width: 460, padding: 16, background: 'var(--md-sys-color-surface-container-low)' }}>
       <SessionQueuedBand {...args} />
     </div>
   ),

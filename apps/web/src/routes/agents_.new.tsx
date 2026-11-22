@@ -57,7 +57,7 @@ function NewAgentPage() {
       <DefinitionTrail kind="agent" name="New agent" place={{}} />
       <header className="space-y-1">
         <h1 className="text-title-medium">New agent</h1>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           Written to <code className="font-mono text-body-small">{store.agents}/&lt;name&gt;.md</code>, beside your workflows. A node of one
           of them takes it with <code className="font-mono text-body-small">agent: &lt;name&gt;</code>.
         </p>
@@ -78,11 +78,11 @@ function NewAgentPage() {
 /** The step the agent will be hired into once written, linked to its page in the factory. */
 function HiredInto({ place: { factory, workflow, step } }: { place: HirePlace }) {
   return (
-    <p data-hire-into={`${workflow}/${step}`} className="text-body-medium text-muted-foreground">
+    <p data-hire-into={`${workflow}/${step}`} className="text-body-medium text-on-surface-variant">
       Once created, {factory} hires it into{' '}
       <RouteLink
         {...workflowLink({ factory }, 'user', workflow, step)}
-        className="font-mono text-body-small text-foreground underline underline-offset-2"
+        className="font-mono text-body-small text-on-surface underline underline-offset-2"
       >
         {workflow}/{step}
       </RouteLink>

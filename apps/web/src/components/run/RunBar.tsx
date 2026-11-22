@@ -42,7 +42,7 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
     <>
       <AsksOfYou run={run} onStep={onStep} />
       <section aria-label="Steps" className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">Steps</h3>
+        <h3 className="text-label-medium text-on-surface-variant">Steps</h3>
         <ul className="space-y-0.5">
           {run.steps.map((step) => (
             <li key={step.name}>
@@ -59,7 +59,7 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
         </ul>
       </section>
       <section aria-label="Brief" className="space-y-1">
-        <h3 className="text-label-medium text-muted-foreground">Brief</h3>
+        <h3 className="text-label-medium text-on-surface-variant">Brief</h3>
         <Markdown className="text-body-medium">{run.brief}</Markdown>
       </section>
     </>

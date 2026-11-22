@@ -209,7 +209,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
  */
 function Where({ workflow, repo, factory, card }: { workflow: WorkflowRow; repo?: string; factory?: string; card: boolean }) {
   return (
-    <span className="min-w-0 text-body-small text-muted-foreground">
+    <span className="min-w-0 text-body-small text-on-surface-variant">
       {workflow.folderTeam ? (
         'Works in folders it makes for each step'
       ) : (
@@ -246,11 +246,11 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
       <legend id={legend} className="text-body-medium font-medium">
         After
       </legend>
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         Waits until it lands: nothing of it is filed until each has landed, and it is handed what each concluded.
       </p>
       {!repo ? (
-        <p data-no-repo className="text-body-small text-muted-foreground">
+        <p data-no-repo className="text-body-small text-on-surface-variant">
           No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.
         </p>
       ) : runs.error ? (
@@ -265,7 +265,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
           ))}
         </Reading>
       ) : !onRepo.length ? (
-        <p className="text-body-small text-muted-foreground">No run on this repository to wait on.</p>
+        <p className="text-body-small text-on-surface-variant">No run on this repository to wait on.</p>
       ) : (
         <ul aria-label="Runs to wait on" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {onRepo.map((run) => (
@@ -274,14 +274,14 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
                 value={run.id}
                 isSelected={selected.includes(run.id)}
                 onChange={(checked) => onChange(checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
-                className="flex w-full cursor-pointer px-2 hover:bg-accent"
+                className="flex w-full cursor-pointer px-2 hover:bg-surface-container-high"
               >
                 <span className="flex min-w-0 flex-1 items-baseline gap-2 text-body-medium">
                   <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
                     {titleOf(run)}
                   </span>
-                  <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
-                  <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.waiting?.advice}>
+                  <span className="hidden shrink-0 font-mono text-body-small text-on-surface-variant @md/page:inline">{run.id}</span>
+                  <span data-standing className="shrink-0 text-body-small text-on-surface-variant" title={run.waiting?.advice}>
                     {standingOf(run)}
                   </span>
                 </span>

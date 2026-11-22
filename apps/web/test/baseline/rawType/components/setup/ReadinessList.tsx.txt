@@ -1,0 +1,4 @@
+apps/web/src/components/setup/ReadinessList.tsx#text-body-medium
+apps/web/src/components/setup/ReadinessList.tsx#text-body-small
+apps/web/src/components/setup/ReadinessList.tsx#text-label-medium
+apps/web/src/components/setup/ReadinessList.tsx#text-title-small

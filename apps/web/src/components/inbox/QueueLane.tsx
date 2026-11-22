@@ -25,10 +25,10 @@ export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
   return (
     <aside
       aria-label="Queued cards"
-      className="flex shrink-0 gap-2 overflow-x-auto border-b bg-muted/30 p-3 @lg/page:w-64 @lg/page:flex-col @lg/page:overflow-x-hidden @lg/page:overflow-y-auto @lg/page:border-r @lg/page:border-b-0"
+      className="flex shrink-0 gap-2 overflow-x-auto border-b bg-surface-container-highest/30 p-3 @lg/page:w-64 @lg/page:flex-col @lg/page:overflow-x-hidden @lg/page:overflow-y-auto @lg/page:border-r @lg/page:border-b-0"
     >
-      <p className="hidden text-body-small text-muted-foreground @lg/page:block">
-        <span className="font-medium text-foreground">Queued</span> · started in this order as run slots free
+      <p className="hidden text-body-small text-on-surface-variant @lg/page:block">
+        <span className="font-medium text-on-surface">Queued</span> · started in this order as run slots free
       </p>
       <ol className="flex gap-2 @lg/page:flex-col">
         {cards.map((card) => (
@@ -51,7 +51,7 @@ function Ghost({ card, now, factories }: { card: InboxEntry; now: number; factor
       params={{ name: card.name }}
       data-ghost={card.name}
       data-place={place}
-      className="block rounded-lg border border-dashed border-outline bg-background/60 px-3 py-2 text-muted-foreground transition-colors hover:border-on-surface-variant hover:bg-background hover:text-foreground"
+      className="block rounded-lg border border-dashed border-outline bg-background/60 px-3 py-2 text-on-surface-variant transition-colors hover:border-on-surface-variant hover:bg-background hover:text-on-surface"
     >
       <span className="flex items-center justify-between gap-2 text-body-small">
         <span data-ghost-place className="rounded-full border border-dashed border-current px-1.5 font-medium">
@@ -61,7 +61,7 @@ function Ghost({ card, now, factories }: { card: InboxEntry; now: number; factor
           queued {agoWords(new Date(queued!.at), new Date(now))}
         </time>
       </span>
-      <span data-ghost-title title={title} className="mt-1 line-clamp-2 text-body-medium font-medium break-words text-foreground/80">
+      <span data-ghost-title title={title} className="mt-1 line-clamp-2 text-body-medium font-medium break-words text-on-surface/80">
         {title}
       </span>
       <span className="mt-0.5 flex items-center justify-between gap-2 text-body-small">
@@ -76,7 +76,7 @@ function Ghost({ card, now, factories }: { card: InboxEntry; now: number; factor
         <span
           data-ghost-tried={tried.refused ? 'refused' : 'failed'}
           title={tried.why}
-          className={`mt-1 line-clamp-2 text-body-small break-words ${tried.refused ? 'text-yours' : 'text-muted-foreground'}`}
+          className={`mt-1 line-clamp-2 text-body-small break-words ${tried.refused ? 'text-yours' : 'text-on-surface-variant'}`}
         >
           {tried.refused ? 'not started, refused: ' : 'failed, tried again: '}
           {tried.why}

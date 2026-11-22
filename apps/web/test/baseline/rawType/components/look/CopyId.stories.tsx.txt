@@ -1,0 +1,1 @@
+apps/web/src/components/look/CopyId.stories.tsx#text-title-medium

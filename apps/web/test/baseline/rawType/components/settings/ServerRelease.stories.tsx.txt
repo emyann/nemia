@@ -1,0 +1,1 @@
+apps/web/src/components/settings/ServerRelease.stories.tsx#text-title-small

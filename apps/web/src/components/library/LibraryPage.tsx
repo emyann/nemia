@@ -24,7 +24,7 @@ export function LibraryPage({ query, onQuery }: { query: string; onQuery: (query
   const kinds = LIBRARY_KINDS.filter((kind) => !filtering || kept.some((one) => one.kind === kind));
   return (
     <article className="flex flex-col gap-8" data-library-page>
-      <p className="text-body-medium text-muted-foreground">
+      <p className="text-body-medium text-on-surface-variant">
         What the store keeps for every factory: the user library and Nemia's builtins. A factory resolves an item once it has added it, on
         its settings page; a workflow is attached.
       </p>
@@ -44,7 +44,7 @@ function LibrarySection({ kind, items }: { kind: LibraryKind; items: readonly Li
     <section aria-label={HEADINGS[kind]} data-library-kind={kind} className="flex flex-col gap-2">
       <h2 className="text-title-medium">{HEADINGS[kind]}</h2>
       {items.length === 0 ? (
-        <p className="text-body-medium text-muted-foreground">None in the library.</p>
+        <p className="text-body-medium text-on-surface-variant">None in the library.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((item) => (
@@ -55,7 +55,7 @@ function LibrarySection({ kind, items }: { kind: LibraryKind; items: readonly Li
                   {item.origin === 'builtin' ? "Nemia's" : 'the user library'}
                 </Tag>
                 {item.builtinChanged && <Tag data-builtin-changed>the builtin changed since this copy</Tag>}
-                <span className="text-body-small text-muted-foreground">
+                <span className="text-body-small text-on-surface-variant">
                   {item.factories.length === 0 ? 'used by no factory' : 'used by'}
                 </span>
                 {item.factories.map((factory) => (
@@ -65,7 +65,7 @@ function LibrarySection({ kind, items }: { kind: LibraryKind; items: readonly Li
                 ))}
               </div>
               {item.description && (
-                <p data-library-description className="text-body-small text-muted-foreground">
+                <p data-library-description className="text-body-small text-on-surface-variant">
                   {item.description}
                 </p>
               )}

@@ -46,7 +46,7 @@ export function LibraryAdds({ name }: { name: string }) {
     <section aria-label="From the library" data-library-adds className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-title-medium">From the library</h2>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           The agents, skills and MCP servers of the store's library this factory resolves. An item is a reference, never a copy: an edit in
           the library reaches every factory that adds it.
         </p>
@@ -54,7 +54,7 @@ export function LibraryAdds({ name }: { name: string }) {
       {adds.data ? (
         <AddList adds={adds.data} pending={change.isPending} onRemove={(added) => change.mutate({ kind: 'remove', name: added })} />
       ) : adds.error instanceof Error ? (
-        <ReadTrouble what="the adds" error={adds.error} className="text-muted-foreground" />
+        <ReadTrouble what="the adds" error={adds.error} className="text-on-surface-variant" />
       ) : (
         <Reading label="Reading the adds…">
           <ReadingLines widths={['w-48', 'w-40', 'w-56']} className="gap-2 text-body-medium" />
@@ -105,7 +105,7 @@ function AddList({ adds, pending, onRemove }: { adds: readonly LibraryAdd[]; pen
             {STATE_WORDS[add.status.state]}
           </Badge>
           {add.status.shadowedBy !== undefined && (
-            <span className="text-body-small text-muted-foreground">the factory's own {add.status.shadowedBy} holds the name first</span>
+            <span className="text-body-small text-on-surface-variant">the factory's own {add.status.shadowedBy} holds the name first</span>
           )}
           {add.status.message !== undefined && <span className="text-body-small text-failure">{add.status.message}</span>}
           <Button
@@ -120,7 +120,7 @@ function AddList({ adds, pending, onRemove }: { adds: readonly LibraryAdd[]; pen
           </Button>
         </li>
       ))}
-      {adds.length === 0 && <li className="text-body-medium text-muted-foreground">Nothing added from the library yet.</li>}
+      {adds.length === 0 && <li className="text-body-medium text-on-surface-variant">Nothing added from the library yet.</li>}
     </ul>
   );
 }

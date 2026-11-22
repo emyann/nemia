@@ -195,7 +195,7 @@ function TurnOn({ line }: { line: string | null }) {
   }
   return (
     <div data-nemia-off className="flex flex-col gap-2 border-t border-outline-variant pt-4">
-      <p className="text-body-medium text-muted-foreground">
+      <p className="text-body-medium text-on-surface-variant">
         Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -203,13 +203,13 @@ function TurnOn({ line }: { line: string | null }) {
           Turn Nemia on
         </Button>
         {line !== null && (
-          <span className="text-body-small text-muted-foreground">
+          <span className="text-body-small text-on-surface-variant">
             or <code className="font-mono">{line}</code>
           </span>
         )}
       </div>
       {turnOn.error && (
-        <p data-nemia-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">
+        <p data-nemia-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-failure">
           {turnOn.error.message}
         </p>
       )}

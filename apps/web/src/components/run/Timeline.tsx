@@ -27,14 +27,14 @@ export function Timeline({ run }: { run: RunDetail }) {
   return (
     <section aria-label="Timeline" className="space-y-2">
       <h2 className="text-title-small">Timeline</h2>
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more
         than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
         session at, once it ended; a check costs nothing.
       </p>
       <div className="overflow-x-auto rounded border border-outline-variant">
         <table className="w-full text-left text-body-small tabular-nums">
-          <thead className="bg-surface-container text-muted-foreground">
+          <thead className="bg-surface-container text-on-surface-variant">
             <tr>
               {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (
                 <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">
@@ -88,7 +88,7 @@ function TryRow({ step, t }: { step: string; t: StepTimelineTry }) {
     <tr data-step={step} data-try={t.try} data-task="session" data-at="rechecked">
       <td className={`${CELL} font-medium`}>{step}</td>
       <td className={`${CELL} font-mono`}>{tryLabel(t)}</td>
-      <td colSpan={7} className={`${CELL} text-muted-foreground`}>
+      <td colSpan={7} className={`${CELL} text-on-surface-variant`}>
         its session is try {t.sessionOf}'s, checked again
       </td>
     </tr>
@@ -116,11 +116,11 @@ function SpanRow({
 }) {
   const lost = span.at === 'unknown';
   return (
-    <tr data-step={step} data-task={task} data-at={span.at} className={task === 'check' ? 'text-muted-foreground' : undefined}>
+    <tr data-step={step} data-task={task} data-at={span.at} className={task === 'check' ? 'text-on-surface-variant' : undefined}>
       <td className={`${CELL} font-medium`}>{task === 'session' ? step : ''}</td>
       <td className={`${CELL} font-mono`}>{label}</td>
       {lost ? (
-        <td colSpan={7} data-cell="lost" className={`${CELL} text-muted-foreground`}>
+        <td colSpan={7} data-cell="lost" className={`${CELL} text-on-surface-variant`}>
           no record of {span.taskId}
         </td>
       ) : (
@@ -134,10 +134,10 @@ function SpanRow({
           <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-alive' : ''}`}>
             {span.ran}
           </td>
-          <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-muted-foreground' : ''}`}>
+          <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-on-surface-variant' : ''}`}>
             {cost ?? ''}
           </td>
-          <td data-cell="used" className={`${CELL} font-mono text-muted-foreground`}>
+          <td data-cell="used" className={`${CELL} font-mono text-on-surface-variant`}>
             {used ?? ''}
           </td>
         </>
@@ -171,7 +171,7 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
           {total.cost.said}
         </td>
       ) : (
-        <td data-cell="cost" className={`${CELL} font-mono text-muted-foreground`}>
+        <td data-cell="cost" className={`${CELL} font-mono text-on-surface-variant`}>
           not measured
         </td>
       )}
@@ -186,7 +186,7 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
  * browser's time zone, whole on hover (`instantWhole`); `none` where there is none.
  */
 function instant(at: string | null, none: string) {
-  if (at === null) return <span className="text-muted-foreground">{none}</span>;
+  if (at === null) return <span className="text-on-surface-variant">{none}</span>;
   const date = new Date(at);
   return (
     <time dateTime={at} title={instantWhole(date)} className="font-mono">

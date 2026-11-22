@@ -186,7 +186,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
 
       {refusal && <SaveRefused refusal={refusal} rereading={reread.isPending} onReread={() => reread.mutate()} />}
       {saved && !dirty && (
-        <p data-saved className="text-body-small text-muted-foreground">
+        <p data-saved className="text-body-small text-on-surface-variant">
           Saved to <code className="font-mono break-all">{saved.workflow.dir}</code>: {fileLine(saved)}.
         </p>
       )}
@@ -294,7 +294,7 @@ function BuilderToolbar(props: {
     <div role="toolbar" aria-label={`Build ${name}`} className="flex flex-wrap items-center gap-2">
       <span
         data-unsaved={dirty || undefined}
-        className={`rounded-full px-2 py-0.5 text-body-small font-medium ${dirty ? ringed.yours : 'bg-muted text-muted-foreground'}`}
+        className={`rounded-full px-2 py-0.5 text-body-small font-medium ${dirty ? ringed.yours : 'bg-surface-container-highest text-on-surface-variant'}`}
       >
         {dirty ? 'Unsaved changes' : 'Saved'}
       </span>
@@ -322,9 +322,9 @@ function BuilderToolbar(props: {
 function ReadmeField({ text, changed, onChange }: { text: string; changed: boolean; onChange: (text: string) => void }) {
   return (
     <div className="space-y-1">
-      <p className="flex items-baseline gap-2 text-body-small font-medium text-foreground">
+      <p className="flex items-baseline gap-2 text-body-small font-medium text-on-surface">
         README
-        <span className="font-normal text-muted-foreground">what the workflow is for, its first paragraph its description</span>
+        <span className="font-normal text-on-surface-variant">what the workflow is for, its first paragraph its description</span>
         {changed && (
           <span data-readme-unsaved className="font-normal text-yours">
             unsaved
@@ -472,7 +472,7 @@ const layersOf = (listing: WorkflowListing, name: string) => listing.steps.find(
 /** The aside while no step is picked: how to pick one, and how to wire two. */
 function NoStepPicked() {
   return (
-    <p className="text-body-small text-muted-foreground">
+    <p className="text-body-small text-on-surface-variant">
       Click a step to set its keys. Drag from a step&apos;s right-hand dot to another&apos;s left-hand dot to have it wait; from the violet
       dot underneath, to loop back.
     </p>

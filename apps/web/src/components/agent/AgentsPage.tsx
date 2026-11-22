@@ -45,7 +45,7 @@ export function AgentsPage({ query, onQuery }: { query: string; onQuery: (query:
   return (
     <article className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-body-medium text-muted-foreground">
+        <p className="min-w-0 flex-1 text-body-medium text-on-surface-variant">
           An agent is a file in the {code('agents/')} folder beside the workflows: what a node that names it ({code('agent: <name>')}) is
           told first, and how its sessions run. Yours are under {code(`${store.agents}/`)} and are edited here; a repository's, under its{' '}
           {code('workflows/agents/')}, are read in the factory that works on it. An edit changes what a run started later freezes, never a
@@ -85,7 +85,7 @@ function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]
           ))}
         </ul>
       ) : (
-        <p className="text-body-medium text-muted-foreground">{empty}</p>
+        <p className="text-body-medium text-on-surface-variant">{empty}</p>
       )}
     </section>
   );
@@ -101,29 +101,29 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
     <section id="skills" aria-label="Skills" className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-title-small">Skills</h2>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           A skill is a folder with a {code('SKILL.md')}: instructions an agent gives its sessions, by name. Yours are under{' '}
           {code(`${library}/`)} and are written here.
         </p>
       </div>
       {places.map((place) => (
         <section key={place.from} aria-label={`Skills: ${PLACE_LABELS[place.from]}`} data-skill-place={place.from} className="space-y-2">
-          <h3 className="text-label-medium text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
+          <h3 className="text-label-medium text-on-surface-variant uppercase">{PLACE_LABELS[place.from]}</h3>
           {place.skills.length ? (
             <ul className="grid gap-x-6 gap-y-1.5 @3xl/page:grid-cols-2">
               {place.skills.map((skill) => (
                 <li key={skill.name} data-skill-row={skill.name} className="min-w-0 text-body-small leading-snug">
-                  <SkillLink from={skill.from} name={skill.name} className="font-medium text-foreground" />{' '}
+                  <SkillLink from={skill.from} name={skill.name} className="font-medium text-on-surface" />{' '}
                   {skill.error !== null ? (
                     <span className="text-failure">does not read</span>
                   ) : (
-                    <span className="text-muted-foreground">{skill.entry?.description}</span>
+                    <span className="text-on-surface-variant">{skill.entry?.description}</span>
                   )}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-body-small text-muted-foreground">
+            <p className="text-body-small text-on-surface-variant">
               {place.from === 'user' ? <>None yet. New skill writes one.</> : 'None.'}
             </p>
           )}

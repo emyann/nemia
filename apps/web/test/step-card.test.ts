@@ -100,7 +100,7 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     ]);
     assert.equal(card.kind, 'work');
     assert.equal(card.hue, 'alive');
-    assert.deepEqual(card.tag, { word: PERSON.working.rail, color: 'secondary', variant: 'tonal' });
+    assert.deepEqual(card.tag, { word: PERSON.working.rail, color: 'alive', variant: 'tonal' });
     assert.deepEqual(card.agent, { name: 'Ada', initial: 'A', role: 'Software engineer' });
     assert.equal(card.place, 'try 1 · round 1 of 3');
     assert.equal(card.time?.label, 'At work');
@@ -169,7 +169,7 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     ]);
     assert.equal(card.kind, 'come');
     assert.equal(card.hue, 'none');
-    assert.deepEqual(card.tag, { word: PERSON.waiting.rail, color: 'secondary', variant: 'outlined' });
+    assert.deepEqual(card.tag, { word: PERSON.waiting.rail, color: 'neutral', variant: 'outlined' });
     assert.equal(card.place, 'up to 3 rounds');
     assert.deepEqual(card.time, { label: 'Starts', value: 'after implement', note: '', ink: 'muted' });
     assert.deepEqual(card.spend, { kind: 'words', label: 'Budget', said: '$16', note: '' });

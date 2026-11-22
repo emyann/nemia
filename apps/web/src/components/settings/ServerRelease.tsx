@@ -440,7 +440,7 @@ function ReleaseUnread({ error }: { error: unknown }) {
           <Skeleton shape="rectangle" className="h-10 w-36 rounded-none" />
         </Reading>
       ) : (
-        <p className="text-body-medium break-words text-muted-foreground">
+        <p className="text-body-medium break-words text-on-surface-variant">
           The server's release could not be read: {troubleOf(error).words}
         </p>
       )}

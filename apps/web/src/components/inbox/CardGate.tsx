@@ -104,7 +104,7 @@ export function CardGate({
           params={{ runId: run.id }}
           {...('step' in read ? { search: { bar: barValue({ kind: 'step', run: run.id, step: read.step }) } } : { hash: read.hash })}
           data-read={gate.step}
-          className="ml-auto min-w-0 truncate rounded-sm text-body-small font-medium text-foreground underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="ml-auto min-w-0 truncate rounded-sm text-body-small font-medium text-on-surface underline decoration-outline underline-offset-2 outline-none hover:decoration-on-surface focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           {read.words}
         </RouteLink>

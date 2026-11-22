@@ -1,0 +1,1 @@
+apps/web/src/components/look/CopyId.tsx#text-body-small

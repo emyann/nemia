@@ -1,0 +1,1 @@
+apps/web/src/components/look/Marker.stories.tsx#text-body-small

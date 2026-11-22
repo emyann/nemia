@@ -1,0 +1,1 @@
+apps/web/src/components/welcome/WelcomePage.tsx#text-body-medium

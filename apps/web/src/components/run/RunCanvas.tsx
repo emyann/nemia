@@ -240,7 +240,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         fitViewOptions={FIT}
         minZoom={LEAST_ZOOM}
       >
-        <Panel position="top-left" className="text-body-small text-muted-foreground">
+        <Panel position="top-left" className="text-body-small text-on-surface-variant">
           Drag to arrange · kept in this browser
         </Panel>
         <Buttons running={running} onReset={resetLayout} />

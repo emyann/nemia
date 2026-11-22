@@ -39,7 +39,7 @@ export const loadAgent = (client: QueryClient, from: string, name: string, place
     from === 'user' ? client.prefetchQuery(customInstructionsQuery(name)) : null,
   ]);
 
-const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+const code = (text: string) => <code className="font-mono text-body-small wrap-anywhere">{text}</code>;
 
 /**
  * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, with its Source, when it is the
@@ -142,7 +142,7 @@ function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean;
     );
   return (
     <>
-      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-muted-foreground">{agent.file}</p>
+      <p className="border-b border-outline-variant pb-2 font-mono text-body-small break-all text-on-surface-variant">{agent.file}</p>
       {children}
     </>
   );
@@ -174,20 +174,20 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
             <h1 className="text-title-large">{personOf(agent.name)}</h1>
             <FromBadge from={agent.from} />
           </div>
-          <p data-agent-role className="text-body-medium text-muted-foreground">
+          <p data-agent-role className="text-body-medium text-on-surface-variant">
             {agent.role ?? 'No role yet'} · <span className="font-mono text-body-small">agent: {agent.name}</span>
           </p>
         </div>
       </div>
-      {agent.description && <p className="text-body-medium text-foreground">{agent.description}</p>}
+      {agent.description && <p className="text-body-medium text-on-surface">{agent.description}</p>}
       <UsedBy listing={agent} />
       {!mine && agent.from === 'factory' && (
-        <p data-read-only data-way="factory" className="text-body-small text-muted-foreground">
+        <p data-read-only data-way="factory" className="text-body-small text-on-surface-variant">
           A factory&apos;s own agents are read here, not written: {FACTORY_WAY}.
         </p>
       )}
       {!mine && agent.from !== 'factory' && (
-        <p data-read-only className="text-body-small text-muted-foreground">
+        <p data-read-only className="text-body-small text-on-surface-variant">
           The repository's agents are read here, not written: they change with the repository, in a commit.
           {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}
         </p>
@@ -210,7 +210,7 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
       </Button>
     );
   return (
-    <span data-remove-asks className="ml-auto flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+    <span data-remove-asks className="ml-auto flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
       Remove {code(`agents/${agent.name}.md`)}
       {beside.length > 0 && (
         <>

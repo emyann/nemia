@@ -64,7 +64,7 @@ function Rows({ runs }: { runs: readonly ListedRun[] }) {
           <Column id="now" style={{ width: 360 }}>
             Now
           </Column>
-          <Column id="clock" align="end" style={{ width: 144 }}>
+          <Column id="clock" align="end" style={{ width: 160 }}>
             Clock
           </Column>
           <Column id="cost" align="end" style={{ width: 96 }}>

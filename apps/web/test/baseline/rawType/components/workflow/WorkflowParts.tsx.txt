@@ -1,0 +1,2 @@
+apps/web/src/components/workflow/WorkflowParts.tsx#text-body-medium
+apps/web/src/components/workflow/WorkflowParts.tsx#text-body-small

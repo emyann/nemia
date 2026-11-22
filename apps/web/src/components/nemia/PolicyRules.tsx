@@ -40,7 +40,7 @@ export function PolicyRules({ agent }: { agent: string }) {
   return (
     <div data-auto-rules className="flex flex-col gap-3 border-t pt-4">
       <h3 className="text-title-small">Her rules at Auto</h3>
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         In a factory at Auto, an answer these rules allow in the run's state is given without asking you; anything else is asked, as at
         Semi-auto. She proposes rules from your custom instruction, and none is in force until you confirm it here.
       </p>
@@ -48,7 +48,7 @@ export function PolicyRules({ agent }: { agent: string }) {
       {data ? (
         <PolicyParts list={data} pending={write.isPending} onAsk={ask} />
       ) : error instanceof Error ? (
-        <ReadTrouble what="her rules" error={error} className="text-muted-foreground" />
+        <ReadTrouble what="her rules" error={error} className="text-on-surface-variant" />
       ) : (
         <Reading label="Reading her rules…" className="flex flex-col gap-2">
           <Skeleton className="w-32 text-title-small" />
@@ -56,9 +56,9 @@ export function PolicyRules({ agent }: { agent: string }) {
         </Reading>
       )}
       {write.error && (
-        <div data-auto-refused className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-          <p className="text-body-medium font-medium text-destructive">Not written:</p>
-          <p className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">{write.error.message}</p>
+        <div data-auto-refused className="flex flex-col gap-1 rounded-lg border border-failure/40 bg-failure/5 px-3 py-2">
+          <p className="text-body-medium font-medium text-failure">Not written:</p>
+          <p className="font-mono text-body-small break-words whitespace-pre-wrap text-failure">{write.error.message}</p>
         </div>
       )}
     </div>
@@ -90,7 +90,7 @@ function PolicyParts({ list, pending, onAsk }: { list: PolicyList; pending: bool
 function Sub({ heading, children, ...data }: { heading: string; children: ReactNode } & Record<`data-${string}`, string | boolean>) {
   return (
     <div {...data} className="flex flex-col gap-1.5">
-      <h4 className="text-label-medium text-muted-foreground">{heading}</h4>
+      <h4 className="text-label-medium text-on-surface-variant">{heading}</h4>
       {children}
     </div>
   );
@@ -160,7 +160,7 @@ function InForce({ list, pending, onAsk }: { list: PolicyList; pending: boolean;
           ))}
         </ul>
       ) : (
-        <p data-auto-none className="text-body-medium text-muted-foreground">
+        <p data-auto-none className="text-body-medium text-on-surface-variant">
           None: at Auto, every answer is asked of you, as at Semi-auto.
         </p>
       )}
@@ -188,14 +188,14 @@ function Proposed({ list, pending, onAsk }: { list: PolicyList; pending: boolean
   if (proposed === null)
     return (
       <Sub heading="Proposed" data-auto-proposed={false}>
-        <p className="text-body-medium text-muted-foreground">She has proposed none: ask her to, from your custom instruction.</p>
+        <p className="text-body-medium text-on-surface-variant">She has proposed none: ask her to, from your custom instruction.</p>
       </Sub>
     );
   return (
     <>
       <Sub heading={`Proposed at ${clockWord(new Date(proposed.at), new Date(now))}`} data-auto-proposed>
         {proposed.stale && (
-          <p data-auto-stale className="text-body-small text-muted-foreground">
+          <p data-auto-stale className="text-body-small text-on-surface-variant">
             Your custom instruction changed since she proposed these: ask her to propose again.
           </p>
         )}
@@ -214,7 +214,7 @@ function Proposed({ list, pending, onAsk }: { list: PolicyList; pending: boolean
       </Sub>
       {proposed.guidance.length > 0 && (
         <Sub heading="Kept as guidance" data-auto-guidance>
-          <p className="text-body-small text-muted-foreground">
+          <p className="text-body-small text-on-surface-variant">
             Words of yours the machinery cannot hold as a rule: she reads them, and nothing enforces them.
           </p>
           <ul className="flex flex-col gap-1">

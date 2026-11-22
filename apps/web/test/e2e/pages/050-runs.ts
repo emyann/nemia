@@ -298,7 +298,7 @@ const copyOf = (holder: Locator) =>
 
 /**
  * The copy control as the canvas draws it, on a card and in each table: its glyph 12 pixels across, 7 from the id; and on a card its
- * line, the meta line, 16 pixels tall, over the title.
+ * line, the meta line, 18 pixels tall (body-small's line), over the title.
  */
 async function copyDrawn(page: Page, open: OpenRuns, finished: FinishedPage) {
   const card = cardOf(page, open.waiting[0].id);
@@ -317,7 +317,7 @@ async function copyDrawn(page: Page, open: OpenRuns, finished: FinishedPage) {
     return Math.round(title.top - copy.getBoundingClientRect().bottom);
   });
   const { line } = await copyOf(holders[0][0]);
-  if (line !== 16 || over < 0) throw new Refused(`on a card the id's line is 16 pixels tall, over the title — ${line} tall, ${over} over`);
+  if (line !== 18 || over < 0) throw new Refused(`on a card the id's line is 18 pixels tall, over the title — ${line} tall, ${over} over`);
 }
 
 /** A title long enough to run under the copy control over it, and short enough to stay on one line of a card. */

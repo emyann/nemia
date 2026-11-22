@@ -15,8 +15,8 @@ export function ListFilter({ label, text, onText }: { label: string; text: strin
 export function NothingMatches({ text, onClear }: { text: string; onClear: () => void }) {
   return (
     <div data-nothing-matches className="flex flex-wrap items-center gap-3">
-      <p className="text-body-medium text-muted-foreground">
-        Nothing matches <span className="font-mono text-foreground">{text.trim()}</span>.
+      <p className="text-body-medium text-on-surface-variant">
+        Nothing matches <span className="font-mono text-on-surface">{text.trim()}</span>.
       </p>
       <Button variant="outlined" onPress={onClear}>
         Clear the filter

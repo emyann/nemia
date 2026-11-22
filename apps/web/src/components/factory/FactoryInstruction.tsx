@@ -62,7 +62,7 @@ export function FactoryInstruction({ name }: { name: string }) {
     <section aria-label="Instruction" data-factory-instruction className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-title-medium">Instruction</h2>
-        <p className="text-body-medium text-muted-foreground">
+        <p className="text-body-medium text-on-surface-variant">
           What Nemia is to know about this factory: what it is for, how its work goes, what to ask you first. She reads it before she acts
           here; no step of a run is told it. One text, read where it is kept.
         </p>
@@ -70,7 +70,7 @@ export function FactoryInstruction({ name }: { name: string }) {
       {data ? (
         <Kept data={data} pending={change.isPending} onChange={ask} />
       ) : error instanceof Error ? (
-        <ReadTrouble what="the instruction" error={error} className="text-muted-foreground" />
+        <ReadTrouble what="the instruction" error={error} className="text-on-surface-variant" />
       ) : (
         <Reading label="Reading the instruction…" className="flex flex-col gap-2">
           <Skeleton shape="rectangle" className="h-32 rounded-none" />
@@ -78,7 +78,7 @@ export function FactoryInstruction({ name }: { name: string }) {
         </Reading>
       )}
       {change.isSuccess && said && (
-        <p data-instruction-done className="text-body-medium text-muted-foreground">
+        <p data-instruction-done className="text-body-medium text-on-surface-variant">
           {said.done}
         </p>
       )}
@@ -97,7 +97,7 @@ function Kept({ data, pending, onChange }: { data: Instruction; pending: boolean
     <div data-instruction-kept={data.store ? 'store' : 'folder'} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <p className="text-body-medium font-medium">{data.store ? 'Kept in the store' : "Kept in a file of the factory's folder"}</p>
-        <p data-instruction-file className="font-mono text-body-small break-all text-muted-foreground">
+        <p data-instruction-file className="font-mono text-body-small break-all text-on-surface-variant">
           {data.file}
         </p>
       </div>
@@ -126,16 +126,16 @@ function FolderText({ data }: { data: Instruction }) {
         </div>
       ) : (
         data.error === null && (
-          <p data-instruction-none className="text-body-medium text-muted-foreground">
+          <p data-instruction-none className="text-body-medium text-on-surface-variant">
             No file there yet: the factory has no instruction until one is written there.
           </p>
         )
       )}
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         It is edited in the checkout, with the code it speaks of, and read as it is on each request: this page does not write it.
       </p>
       {data.stored && (
-        <p data-instruction-unread className="text-body-small text-muted-foreground">
+        <p data-instruction-unread className="text-body-small text-on-surface-variant">
           The store still holds an instruction for this factory, unread while the folder's file is: keep it in the store to read it again.
         </p>
       )}
@@ -171,7 +171,7 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
         </Button>
         {data.stored &&
           (asking ? (
-            <span data-instruction-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-muted-foreground">
+            <span data-instruction-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
               Remove the words the store keeps?
               <Button
                 color="error"
@@ -248,9 +248,9 @@ function Place({ data, pending, onChange }: { data: Instruction; pending: boolea
 /** Words the api refused, or why a file does not read, under a heading. */
 function Refused({ heading, children, ...data }: { heading: string; children: ReactNode } & Record<`data-${string}`, boolean>) {
   return (
-    <div {...data} className="flex flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2">
-      <p className="text-body-medium font-medium text-destructive">{heading}</p>
-      <p className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">{children}</p>
+    <div {...data} className="flex flex-col gap-1 rounded-lg border border-failure/40 bg-failure/5 px-3 py-2">
+      <p className="text-body-medium font-medium text-failure">{heading}</p>
+      <p className="font-mono text-body-small break-words whitespace-pre-wrap text-failure">{children}</p>
     </div>
   );
 }

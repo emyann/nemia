@@ -14,7 +14,7 @@ import { AgentLink, RouteLink } from '../agent/AgentParts';
 import { YoursFolder } from '../workflow/WorkflowParts';
 
 const LINK =
-  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
+  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-on-surface focus-visible:ring-2 focus-visible:ring-ring/50';
 
 /** What a person asks of a step's hire: an agent hired into it, or the one hired fired. */
 type Ask = { kind: 'hire'; agent: string } | { kind: 'fire' };
@@ -60,8 +60,8 @@ function Hiring({ page, where, place }: { page: WorkflowStepPage; where: 'page' 
     <div data-step-hire={page.step} className="space-y-1.5">
       {factory && hired ? (
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-small">
-          <span className="text-muted-foreground">
-            {factory} hires <AgentLink from={page.from} name={hired} place={place} className="text-foreground" /> into this step.
+          <span className="text-on-surface-variant">
+            {factory} hires <AgentLink from={page.from} name={hired} place={place} className="text-on-surface" /> into this step.
           </span>
           <Button
             variant="outlined"
@@ -75,7 +75,7 @@ function Hiring({ page, where, place }: { page: WorkflowStepPage; where: 'page' 
           </Button>
         </p>
       ) : hiring.refused !== null ? (
-        <p data-hire-refused className="text-body-small text-muted-foreground">
+        <p data-hire-refused className="text-body-small text-on-surface-variant">
           {hiring.refused}
         </p>
       ) : (
@@ -103,7 +103,7 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
   const { agents } = page.hiring;
   if (agents.length === 0)
     return (
-      <p data-hire-none className="text-body-small text-muted-foreground">
+      <p data-hire-none className="text-body-small text-on-surface-variant">
         {page.from === 'user' ? 'None of your agents reads' : `None of ${whose(page)} agents reads`}, so there is no agent to hire into this
         step in {page.factory}.
       </p>
@@ -153,14 +153,14 @@ function NewAgent({ page, where }: { page: WorkflowStepPage; where: 'page' | 'ro
         to="/agents/new"
         search={{ into: page.factory ?? undefined, workflow: page.workflow, step: page.step }}
         data-new-agent
-        className={`text-body-small text-muted-foreground ${LINK}`}
+        className={`text-body-small text-on-surface-variant ${LINK}`}
       >
         New agent, hired into this step
       </RouteLink>
     );
   if (where === 'row') return null;
   return (
-    <p data-new-agent-repo className="text-body-small text-muted-foreground">
+    <p data-new-agent-repo className="text-body-small text-on-surface-variant">
       A new agent for {whose(page)} workflow is added through a card on the{' '}
       <RouteLink to="/inbox" className={LINK}>
         Inbox

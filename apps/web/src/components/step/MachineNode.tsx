@@ -16,11 +16,11 @@ export function ByActionList({ list, children }: { list: readonly ByAction[]; ch
       {list.map((group) => (
         <div key={group.action} data-action={group.action}>
           {group.events.map((event, i) => (
-            <div key={i} data-edge-line className="text-foreground">
+            <div key={i} data-edge-line className="text-on-surface">
               {event}
             </div>
           ))}
-          <div className="text-muted-foreground">→ {group.action}</div>
+          <div className="text-on-surface-variant">→ {group.action}</div>
         </div>
       ))}
       {children}
@@ -32,7 +32,7 @@ export function ByActionList({ list, children }: { list: readonly ByAction[]; ch
 const kindOf = ({ initial, final }: Pick<StateBox, 'initial' | 'final'>) => (initial ? 'initial state' : final ? 'final state' : 'state');
 
 /** The fill and ring of a box: alive while lit. */
-const markOf = ({ lit }: MachineFlowNode['data']) => (lit ? 'bg-alive-container ring-4 ring-alive' : 'bg-card');
+const markOf = ({ lit }: MachineFlowNode['data']) => (lit ? 'bg-alive-container ring-4 ring-alive' : 'bg-surface-container-low');
 
 /**
  * A state of a machine, in the box its layout gave it: its kind and its name, and under them the edges that come back to it. The first
@@ -47,11 +47,11 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
       data-initial={data.initial || undefined}
       data-final={data.final || undefined}
       data-lit={data.lit || undefined}
-      className={`size-full overflow-hidden rounded-md text-foreground shadow-sm ${edge} ${markOf(data)}`}
+      className={`size-full overflow-hidden rounded-md text-on-surface shadow-sm ${edge} ${markOf(data)}`}
     >
       <Handle type="target" position={Position.Top} isConnectable={false} className="opacity-0" />
       <div className="px-2.5 pt-1.5">
-        <p className={`text-label-small uppercase text-muted-foreground`}>{kindOf(data)}</p>
+        <p className={`text-label-small uppercase text-on-surface-variant`}>{kindOf(data)}</p>
         <p data-state-name className="text-body-medium font-semibold">
           {data.id}
         </p>

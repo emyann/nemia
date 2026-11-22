@@ -1,0 +1,3 @@
+apps/web/src/components/welcome/FolderPick.tsx#text-body-large
+apps/web/src/components/welcome/FolderPick.tsx#text-body-medium
+apps/web/src/components/welcome/FolderPick.tsx#text-body-small

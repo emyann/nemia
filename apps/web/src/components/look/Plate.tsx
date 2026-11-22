@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { filled, paint } from '@/lib/meaning';
+import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 
 /** Bars of the plate's own ink, `widths` in pixels, an inked bar and a gap in turn, repeated along the barcode. */
@@ -52,14 +52,14 @@ export function Plate({ count, title, hue = 'yours', quiet = false }: { count: n
 /** The rule under a page's name, a hairline the whole width of the `h1`. */
 const HAIRLINE: CSSProperties = { backgroundColor: 'var(--md-sys-color-outline-variant)' };
 
-/** The rule's lit part, under the name alone, in the hue of a session at work. */
-const LIT: CSSProperties = { backgroundColor: paint.alive };
+/** The rule's lit part, under the name alone, in the name's own ink: it says no meaning, so it takes no hue. */
+const LIT: CSSProperties = { backgroundColor: 'var(--md-sys-color-on-surface)' };
 
 /**
  * A page's name in the look: the brand face in capitals, as the page's `h1`, 18 pixels over its rule; a display's size in a page's column
  * of 512 pixels or more, a headline's in a narrower one, the column beside a factory's pane at 768 among them, so a long name stays in it.
- * The rule is a line of its own nobody reads, under the name, so the name keeps a ground a contrast measure can read: lit in the hue of a
- * session at work exactly as wide as the name, whatever its length, and a hairline on to the end of the `h1`.
+ * The rule is a line of its own nobody reads, under the name, so the name keeps a ground a contrast measure can read: lit in the name's own
+ * ink exactly as wide as the name, whatever its length, and a hairline on to the end of the `h1`.
  */
 export function PageName({ children }: { children: ReactNode }) {
   return (

@@ -1,0 +1,4 @@
+apps/web/src/components/agent/AgentsPage.tsx#text-body-medium
+apps/web/src/components/agent/AgentsPage.tsx#text-body-small
+apps/web/src/components/agent/AgentsPage.tsx#text-label-medium
+apps/web/src/components/agent/AgentsPage.tsx#text-title-small

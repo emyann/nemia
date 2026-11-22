@@ -1,0 +1,2 @@
+apps/web/src/components/inbox/CardPage.tsx#text-body-medium
+apps/web/src/components/inbox/CardPage.tsx#text-body-small

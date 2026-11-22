@@ -1,0 +1,1 @@
+apps/web/src/components/field/AmountField.stories.tsx#text-body-medium

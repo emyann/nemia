@@ -151,7 +151,7 @@ function FloorButtons({
 }) {
   return (
     <>
-      <Panel position="top-left" className="hidden text-body-small text-muted-foreground @4xl:block">
+      <Panel position="top-left" className="hidden text-body-small text-on-surface-variant @4xl:block">
         Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
       </Panel>
       <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
@@ -256,8 +256,8 @@ function FloorCounts({ open, undecided }: { open: OpenRuns; undecided: readonly 
   const waiting = runs.filter((run) => judged(run) && waitsOnYou(run)).length;
   const toDecide = [...runs, ...undecided].filter((run) => judged(run) && toDecideOf(run) !== null).length;
   return (
-    <p className="text-body-medium text-muted-foreground">
-      <span className="font-medium text-foreground">{flying}</span> in flight
+    <p className="text-body-medium text-on-surface-variant">
+      <span className="font-medium text-on-surface">{flying}</span> in flight
       {finished > 0 && ` · ${finished} finished`}
       {toDecide > 0 && <span className="text-yours"> · {toDecide} to decide</span>}
       {waiting > 0 && ` · ${waiting} waiting on you`}
@@ -658,7 +658,7 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
       ? `Runs in flight against the cap, ${by}. A run takes a slot while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs, which the floor counts in flight, takes none until it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
       : `No cap on runs in flight, ${by}: every run is filed as soon as it is ready.`;
   return (
-    <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-body-medium text-muted-foreground">
+    <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-body-medium text-on-surface-variant">
       {capLine(data, queued)}
       {data.pass && (
         <span data-pass={Math.round(data.pass.ms)} title={passTitle(data.pass, now)}>

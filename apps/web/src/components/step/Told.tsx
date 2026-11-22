@@ -113,7 +113,7 @@ export function Told({
   if (layers && homes) return <WillBeTold layers={layers} homes={homes} level={level} />;
   return (
     <details className="text-body-medium" data-told>
-      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+      <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">
         {filed ? 'What it was told' : 'What it would be told now'}
       </summary>
       {layers ? <Layers layers={layers} parts={parts} level={level} /> : <Words level={level} text={told ?? ''} />}
@@ -129,10 +129,10 @@ function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: F
   return (
     <div className="mt-2 flex flex-col gap-3">
       {layers.agent === null ? (
-        <p className="text-body-small text-muted-foreground">{noAgent(false)}</p>
+        <p className="text-body-small text-on-surface-variant">{noAgent(false)}</p>
       ) : (
         <>
-          <p className="text-body-small text-muted-foreground">
+          <p className="text-body-small text-on-surface-variant">
             {layers.factory === null ? "The agent's instructions and yours" : "The agent's instructions, yours and the factory's rules"}{' '}
             were frozen at the start of the run and given{' '}
             {layers.via === 'prompt' ? "in the session's system prompt" : 'at the head of its brief'}. {PRECEDENCE_NOTE}
@@ -148,7 +148,7 @@ function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: F
       )}
       {layers.folderFiles && (
         <Layer level={level} name="folder" title={FOLDER_FILES}>
-          <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
+          <p className="text-body-small text-on-surface-variant">{FOLDER_FILES_SAID}</p>
         </Layer>
       )}
       {layers.factory !== null && (
@@ -180,21 +180,21 @@ function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: F
 function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; homes: LayerHomes; level: LayerLevel }) {
   return (
     <details open className="text-body-medium" data-told data-will-be-told>
-      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">What it will be told</summary>
+      <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">What it will be told</summary>
       <div className="mt-2 flex flex-col gap-3">
-        <p data-read-now className="text-body-small text-muted-foreground">
+        <p data-read-now className="text-body-small text-on-surface-variant">
           Read now from the files, and frozen when a run starts: a run is told what they say then
           {layers.agent === null
             ? '.'
             : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}. ${PRECEDENCE_NOTE}`}
         </p>
         {layers.agent === null ? (
-          <p className="text-body-small text-muted-foreground">{noAgent(true)}</p>
+          <p className="text-body-small text-on-surface-variant">{noAgent(true)}</p>
         ) : (
           <>
             <Layer level={level} name="instructions" title={INSTRUCTIONS(layers.agent)} home={homes.instructions}>
               <details data-instructions-fold>
-                <summary className="cursor-pointer text-body-small text-muted-foreground hover:text-foreground">Read them</summary>
+                <summary className="cursor-pointer text-body-small text-on-surface-variant hover:text-on-surface">Read them</summary>
                 <Words level={UNDER[level]} text={layers.instructions} none="Its file gives no instructions" />
               </details>
               <Skills word="Its skills:" skills={layers.agentSkills} link={homes.skill} />
@@ -206,7 +206,7 @@ function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; home
         )}
         {layers.folderFiles && (
           <Layer level={level} name="folder" title={FOLDER_FILES}>
-            <p className="text-body-small text-muted-foreground">{FOLDER_FILES_SAID}</p>
+            <p className="text-body-small text-on-surface-variant">{FOLDER_FILES_SAID}</p>
           </Layer>
         )}
         {(layers.factory !== null || homes.factory) && (
@@ -219,7 +219,7 @@ function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; home
           <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
           <Fence agent={layers.agent} fence={layers.fence} />
         </Layer>
-        <p data-layer="task" className="text-body-small text-muted-foreground">
+        <p data-layer="task" className="text-body-small text-on-surface-variant">
           Then the task: the brief a run is started with.
         </p>
       </div>
@@ -252,7 +252,7 @@ export function StepPolicy({ layers }: { layers: Frozen<StepLayers> | null }) {
         <Skills word="Adds the skills:" skills={layers.addedSkills} />
         <Fence agent={agent} fence={layers.fence} />
       </Layer>
-      <p className="text-body-small text-muted-foreground">
+      <p className="text-body-small text-on-surface-variant">
         Told after {toldBefore(agent, layers)}; where they conflict, this wins. Every layer is under “What it was told”.
       </p>
     </div>
@@ -276,7 +276,7 @@ function TaskParts({ parts, level }: { parts: Frozen<TaskPart[]>; level: LayerLe
         if (!part.how) return <Words level={UNDER[level]} key={i} text={`## From run ${part.run}\n\n${part.body}`} />;
         return (
           <section key={i} data-from-run={part.run} data-how={part.how} className="flex flex-col gap-1 rounded border p-2">
-            <Heading title={part.run} className="min-w-0 text-label-medium text-muted-foreground">
+            <Heading title={part.run} className="min-w-0 text-label-medium text-on-surface-variant">
               <RouteLink to="/runs/$runId" params={{ runId: part.run }} underline="hover" className="block truncate">
                 {HANDED[part.how]} · {part.asked || part.run} ↗
               </RouteLink>
@@ -307,11 +307,11 @@ export function Layer({
   return (
     <section data-layer={name} className="flex flex-col gap-1">
       {home === undefined ? (
-        <Heading className="text-label-medium text-muted-foreground">{title}</Heading>
+        <Heading className="text-label-medium text-on-surface-variant">{title}</Heading>
       ) : (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <Heading className="text-label-medium text-muted-foreground">{title}</Heading>
-          <span data-home={name} className="min-w-0 text-body-small break-all text-muted-foreground">
+          <Heading className="text-label-medium text-on-surface-variant">{title}</Heading>
+          <span data-home={name} className="min-w-0 text-body-small break-all text-on-surface-variant">
             {home}
           </span>
         </div>
@@ -335,9 +335,9 @@ export function Words({
   none?: string;
   level?: LayerLevel | (typeof DEEPER)[LayerLevel];
 }) {
-  if (text === null) return <p className="text-body-small text-muted-foreground italic">{none}</p>;
+  if (text === null) return <p className="text-body-small text-on-surface-variant italic">{none}</p>;
   return (
-    <Markdown level={level} top className="rounded bg-muted/60 p-3">
+    <Markdown level={level} top className="rounded bg-surface-container-highest/60 p-3">
       {text}
     </Markdown>
   );
@@ -347,7 +347,7 @@ export function Words({
 export function Skills({ word, skills, link }: { word: string; skills: readonly string[]; link?: (name: string) => ReactNode }) {
   if (!skills.length) return null;
   return (
-    <p className="flex flex-wrap items-center gap-1 text-body-small text-muted-foreground">
+    <p className="flex flex-wrap items-center gap-1 text-body-small text-on-surface-variant">
       {word}{' '}
       {skills.map((skill) => (
         <Tag key={skill} variant="outlined" data-skill={skill}>
@@ -362,12 +362,12 @@ export function Skills({ word, skills, link }: { word: string; skills: readonly 
 function Fence({ agent, fence }: { agent: string | null; fence: Frozen<StepLayers['fence']> }) {
   if (!fence.length) return null;
   return (
-    <div className="flex flex-col gap-1 text-body-small text-muted-foreground">
+    <div className="flex flex-col gap-1 text-body-small text-on-surface-variant">
       <p>Tightens {agent}'s fence:</p>
       <ul className="flex flex-col gap-1">
         {fence.map(({ key, value }) => (
           <li key={key} data-fence={key}>
-            <code className="rounded bg-muted px-1 py-0.5 font-mono break-all text-foreground">
+            <code className="rounded bg-surface-container-highest px-1 py-0.5 font-mono break-all text-on-surface">
               {key}: {value}
             </code>
           </li>

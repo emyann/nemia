@@ -20,7 +20,7 @@ import {
   Words,
 } from './Told';
 
-const LINE = 'text-body-small leading-snug text-muted-foreground';
+const LINE = 'text-body-small leading-snug text-on-surface-variant';
 
 /**
  * What agent `agent` brings a step, from the listing's `layers`: its instructions, folded, with its skills, your custom instructions for
@@ -38,7 +38,7 @@ export function AgentLayers({ agent, layers }: { agent: string; layers: StepLaye
     <>
       <Layer name="instructions" title={INSTRUCTIONS(agent)}>
         <details className="text-body-small">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Read them</summary>
+          <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">Read them</summary>
           <Words text={layers.instructions} none={`None: agents/${agent}.md says nothing`} />
         </details>
         <Skills word="Its skills:" skills={layers.agentSkills} />

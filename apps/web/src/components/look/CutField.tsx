@@ -3,10 +3,11 @@ import { cn } from '@/lib/utils';
 import { cutHold, cutPoints, cutShape, type CutSize } from './cut';
 
 /**
- * The edge of a field: a pixel of the outline's hue while nothing in it has the focus, two of a session's hue when something does.
+ * The edge of a field: a pixel of the outline's hue while nothing in it has the focus, two of the focus ring's ink, the kit's `ring`,
+ * when something does.
  * Each class is written whole, since Tailwind finds a class by its text in a source file.
  */
-const EDGE = 'bg-outline-variant group-focus-within/field:bg-alive';
+const EDGE = 'bg-outline-variant group-focus-within/field:bg-ring';
 
 /** How far what a field holds is kept inside its diagonals, in pixels: the width of its edge with the focus in it. */
 const FOCUSED_EDGE = 2;

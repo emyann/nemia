@@ -51,7 +51,7 @@ const KEPT_INK = '[data-copied] [data-run-id] { color: var(--md-sys-color-on-sur
  */
 export const Short: StoryObj = {
   play: async ({ canvasElement, userEvent }) => {
-    await idsHold(canvasElement, ['2e13: 0px, 0px 0px, 16px tall']);
+    await idsHold(canvasElement, ['2e13: 0px, 0px 0px, 18px tall']);
     const id = canvasElement.querySelector('[data-run-id]')!;
     await expect(await tipOf(userEvent, id), "the whole id in the kit's tooltip").toHaveTextContent('the-tool-errors-panels-2e13');
     await expect(id).not.toHaveAttribute('title');
@@ -81,7 +81,7 @@ export const Short: StoryObj = {
 
 /** The whole id, in no box. */
 export const Whole: StoryObj = {
-  play: ({ canvasElement }) => idsHold(canvasElement, ['lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall']),
+  play: ({ canvasElement }) => idsHold(canvasElement, ['lay-the-diamond-top-e2e4: 0px, 0px 0px, 18px tall']),
   render: () => (
     <div data-id-ground style={ON_CARD}>
       <CopyId id="lay-the-diamond-top-e2e4" />
@@ -92,7 +92,7 @@ export const Whole: StoryObj = {
 /** The whole id under a run's title, four pixels from it, as a card lays it out: the line it stands on is as tall as the id. */
 export const UnderTitle: StoryObj = {
   play: async ({ canvasElement }) => {
-    await idsHold(canvasElement, ['lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall']);
+    await idsHold(canvasElement, ['lay-the-diamond-top-e2e4: 0px, 0px 0px, 18px tall']);
     const [title, copy] = [...canvasElement.querySelector('[data-under-title]')!.children].map((child) => child.getBoundingClientRect());
     await expect(copy.top - title.bottom, 'under a title, the id stands four pixels from it').toBe(4);
   },
@@ -110,8 +110,8 @@ export const UnderTitle: StoryObj = {
 export const Lined: StoryObj = {
   play: ({ canvasElement }) =>
     idsHold(canvasElement, [
-      'lay-the-diamond-top-e2e4: 0px, 0px 0px, 16px tall',
-      'the-board-s-frame-on-the-kit-04ys: 0px, 0px 0px, 16px tall',
+      'lay-the-diamond-top-e2e4: 0px, 0px 0px, 18px tall',
+      'the-board-s-frame-on-the-kit-04ys: 0px, 0px 0px, 18px tall',
     ]),
   render: () => (
     <div data-id-ground style={ON_CARD}>

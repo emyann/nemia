@@ -37,8 +37,7 @@ import { howOf } from '../summary/how.verb.ts';
 import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 import { editCard } from '../card-write/card-edit.verb.ts';
 import { attachToCard, type CardReplaced, detachFromCard, filesKept } from '../card-write/card-write.verb.ts';
-import { StoreRoot } from '../config/root.store.ts';
-import { filesPruned } from '../start/files.store.ts';
+import { FileDoor } from '../start/files.store.ts';
 import { resendCard, type Resent } from './resend.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -235,7 +234,7 @@ export const INBOX_RM: Served<InboxDropped, InboxRmInput> = {
   input: InboxRmInput,
   handler: ({ name }) =>
     dropFromInbox(name).pipe(
-      Effect.tap((dropped) => (dropped.removed ? Effect.map(StoreRoot, (home) => filesPruned(home, Date.now())) : Effect.void)),
+      Effect.tap((dropped) => (dropped.removed ? Effect.flatMap(FileDoor, (door) => door.files.pruned(Date.now())) : Effect.void)),
     ),
 };
 

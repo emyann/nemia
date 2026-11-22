@@ -2,7 +2,8 @@
  * A file a factory keeps for a start to hand its run's steps, as the model APIs' Files API keeps one: uploaded once, each file its own
  * request (`POST /api/namespaces/<namespace>/files`, a form of one part, `file`), streamed to disk and never held whole in memory or in a
  * JSON body, and answered as a file object (`FileObject`) whose id a start names in an input (`RunInput`'s `file`). How large one may be
- * (`FILE_LIMIT`), and how long one is kept (`FILE_KEPT_FOR`).
+ * (`FILE_LIMIT`), and how long one is kept (`FILE_KEPT_FOR`). A record that carries a file names it by one pointer (`FilePointer`), OCI's
+ * content descriptor with the File's id in place of its `urls`.
  */
 import { ByteSize, Schema } from 'effect';
 
@@ -36,7 +37,19 @@ export type PictureMediaType = (typeof PICTURE_TYPES)[number];
 /** The prefix of every file's id, as the model APIs' ids say what they name (`file_…`). */
 export const FILE_ID_PREFIX = 'file_';
 
-/** A file kept for a start: its id, the name and media type it was sent with, its size, and when it was uploaded. */
+/** A file's digest as OCI's descriptor writes one, `<algorithm>:<encoded>`: sha256 of its bytes, in 64 lowercase hexadecimal digits. */
+export const FILE_DIGEST = /^sha256:[0-9a-f]{64}$/;
+
+/** A file's digest, `sha256:<hex>`, checked by `FILE_DIGEST`. */
+const FileDigest = Schema.String.annotate({
+  description: 'sha256 of its bytes, written sha256:<64 lowercase hexadecimal digits>, as an OCI descriptor writes a digest.',
+}).check(
+  Schema.isPattern(FILE_DIGEST, {
+    message: 'a digest is sha256:<64 lowercase hexadecimal digits> of the bytes, as the upload answered it',
+  }),
+);
+
+/** A file kept for a start: its id, the name and media type it was sent with, its size, its digest, and when it was uploaded. */
 export const FileObject = Schema.Struct({
   id: Schema.String.annotate({ description: "The file's id, file_…, which a start names as an input's file in the same namespace." }),
   name: Schema.String.annotate({
@@ -44,8 +57,22 @@ export const FileObject = Schema.Struct({
   }),
   mediaType: Schema.String.annotate({ description: "Its media type, as the form's part said it (application/octet-stream where none)." }),
   size: Schema.Int.annotate({ description: 'Its size in bytes, as the api kept it.' }),
+  digest: FileDigest,
   createdAt: Schema.String.annotate({
     description: 'When it was uploaded, as an ISO 8601 time: a day later it is let go of, whether a run took it or not.',
   }),
 }).annotate({ identifier: 'File' });
 export type FileObject = typeof FileObject.Type;
+
+/**
+ * How a record names a file it carries, which the record never holds itself: OCI's content descriptor (`mediaType`, `digest`, `size`),
+ * with the File's id in its record's namespace (`file`) where OCI gives the places it is downloaded from (`urls`), since a File is served
+ * by its id. The store refuses a record whose pointer names no File it holds, and keeps a File while a record points to it.
+ */
+export const FilePointer = Schema.Struct({
+  file: Schema.String.annotate({ description: "The File's id, file_…, in the namespace of the record that points to it." }),
+  mediaType: Schema.String.annotate({ description: "The File's media type, as it was uploaded." }),
+  size: Schema.Int.annotate({ description: "The File's size in bytes." }),
+  digest: FileDigest,
+}).annotate({ identifier: 'FilePointer' });
+export type FilePointer = typeof FilePointer.Type;

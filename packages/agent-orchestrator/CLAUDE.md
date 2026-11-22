@@ -203,6 +203,11 @@ of its kind, never from an older file that looks alike:
   proposal moved since; an empty one overwrites. A change of the keyspace's table is a migration appended to `KEYSPACE_MIGRATIONS`, never
   an edit of one there. A test that opens a second client of one file, or closes one, uses `keyspaceIn` with a scope of its own, and
   never races two clients of one process on a file: `node:sqlite` waits for a lock on the event loop.
+- **A File is read and written through the File door (`FileDoor`, `src/start/files.store.ts`), over the keyspace**, rooted as the
+  Proposal door is: a test gives a program `fileDoorMemory(root, keyspace?)` (`src/start/memory.store.ts`), its bytes under the root it
+  is given, and walks it with `test/file-walks.ts`. A record that names a File says its key in its write's `points` (`fileKey`); the
+  keyspace refuses a write whose points name no live key (`KeyRefused`, `dangling`) and the delete of a key a live record points to
+  (`referenced`), each naming the key at fault in `pointer`. Cards keep their Files through the prune's inbox scan until they are records.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.

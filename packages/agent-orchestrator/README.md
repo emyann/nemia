@@ -3437,8 +3437,8 @@ run 'wf tick' (or 'wf up') to start it
   name given twice. `nemia inbox detach <name> <file>...` takes one off and `nemia inbox files <name>
   [--get <file>]` lists them or writes one out. A card carries 32 files and 256 MiB at most, each name a file's own, never
   `cards`, and its files change only until a run is started from it (`cardFilesRefusal`, `src/inbox/card-files.ts`, proved by
-  `contracts/card-files.contract.ts`). A File is kept while any inbox entry's text names its id, and let go of a day after its
-  last write once none does (`filesPruned`). Every run started from the card has its files copied into its `inputs/`, beside
+  `contracts/card-files.contract.ts`). A File is kept while any inbox entry's text names its id, or a record of the keyspace points
+  to it, and let go of a day after its upload once none does (the File door's `pruned`). Every run started from the card has its files copied into its `inputs/`, beside
   each `--input`, a name the two share refused; and a step that waits on none, filed a session of its own on a harness that shows
   pictures, is shown the pictures among them in its first message (`picturesShown`, `src/filed/pictures/pictures.ts`, proved by
   `contracts/pictures-shown.contract.ts`; the harness argument `pictures`), each held back named in its brief with why, and both

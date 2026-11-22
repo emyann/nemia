@@ -629,6 +629,16 @@ layer: its shape's Effects are the keyspace's, its stand-in (`proposalDoorMemory
 `doorOf` or `atOnce` reaches it. A store's proposal files of before it are imported the first time a process opens its keyspace, then
 moved aside under `<root>/imported/proposals/`, never deleted.
 
+A record stays under 1.5 MiB (`RECORD_CEILING`, etcd's) and names what is larger by a pointer: a write says the keys its record points
+to (`KeyWriteOf.points`), kept beside `kine` in `kine_pointers` (migration `0002_pointers`), current state that a compaction leaves and a
+watch never reads. Each write's pointers are judged by `pointersHold` (`src/keyspace/keyspace.ts`, proved by the same contract) in its
+own transaction, so a record that points to a key not live is refused `dangling` and the delete of a key a live record points to is
+refused `referenced`. Files are the kind a pointer names: the File door (`src/start/files.store.ts`, its stand-in `fileDoorMemory`) holds
+each under `/registry/files/<namespace>/<id>`, its `digest` sha256 of its bytes, which stay a file under `<root>/files/<namespace>/`,
+written before the record and removed after it, and named by objects' `FilePointer` (OCI's descriptor with the File's id). Its prune lets
+go of a File through the keyspace, so one a live record points to is kept, and removes bytes no record names once they are a day old. A
+store's File records of before it are imported once, each hashed, and moved aside under `<root>/imported/files/`.
+
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the
 files and the memory layers. Its methods take and give a branded `TaskId`, nominal on read, so a journal written under any id still

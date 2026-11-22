@@ -55,7 +55,7 @@ import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { defaultStartRefusal, unattachedRefusal, wiredRepo, type Factory } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { fileAt, filesDir } from '../start/files.store.ts';
+import { FileDoor, filesDir } from '../start/files.store.ts';
 import { keptParent, passParents, type Parents } from '../views/views.verb.ts';
 import { over, type Engine } from '../runtime-client.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
@@ -202,10 +202,13 @@ const cardFactory = Effect.fn('cardFactory')(function* (
  * @param home The store's root.
  * @param card The card, its factory and its files.
  */
-const cardFilesAt = (home: string, card: InboxCard) => {
+const cardFilesAt = Effect.fnUntraced(function* (home: string, card: InboxCard) {
   const at = card.factory ?? DEFAULT_NAMESPACE;
-  return (card.files ?? []).map((f) => ({ name: f.name, path: fileAt(home, at, f.file)?.path ?? path.join(filesDir(home, at), f.file) }));
-};
+  const door = yield* FileDoor;
+  return yield* Effect.forEach(card.files ?? [], (f) =>
+    Effect.map(door.files.read(at, f.file), (held) => ({ name: f.name, path: held?.path ?? path.join(filesDir(home, at), f.file) })),
+  );
+});
 
 /**
  * `nemia start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name>
@@ -263,7 +266,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const ids = new Set(yield* runs.runs.ids());
   const context = cardContext(card, opts, (id) => ids.has(id));
 
-  const cardFiles = cardFilesAt(yield* StoreRoot, card);
+  const cardFiles = yield* cardFilesAt(yield* StoreRoot, card);
   const waitedOn = yield* waitedOnNow(card, opts.landed);
 
   const run = yield* startRun({

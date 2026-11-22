@@ -2,7 +2,7 @@
  * A card's files (agent-orchestrator, src/inbox/card-files.ts): the files a card names by the api's File id under its `files:` key, each
  * by the name its text and its run find it by. Why a card's files as given cannot be written (`cardFilesRefusal`), asked wherever a
  * card's `files:` is written — filed, written whole, edited from its text — before anything is written; and whether a kept File is let go
- * of (`fileLetGo`), asked by the files' prune (`filesPruned`, src/start/files.store.ts) of every file it reads.
+ * of (`fileLetGo`), asked by the files' prune (the File door's `pruned`, src/start/files.store.ts) of every file it reads.
  *
  * Each spec exports its type under the function's name, and the code takes it. What the store keeps under an id, which ids a card
  * names, and the bytes of the files given together (the sum of their kept Files' sizes), are read by the stores and handed in as data.

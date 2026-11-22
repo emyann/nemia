@@ -374,6 +374,23 @@ describe('`statsLines` and `statsLine`: the stats in words, — where nothing wa
     assert.doesNotMatch(statsLine(stats(group({ slowLandings: [{ ...slow, day: '2026-09-01' }] }))), /over half/);
     assert.ok(!statsLines(stats()).some((l) => l.startsWith('landing checks over half')));
   });
+  test("each workflow step's memory peaks are said as quantities, — where none was measured, with when a peak is kept", () => {
+    const MI = 1024 ** 2;
+    const GI = 1024 * MI;
+    const row = { workflow: 'build', tries: 4, measured: 3, medianBytes: 812 * MI, p90Bytes: 1.2 * GI, maxBytes: 3 * GI };
+    const memory = [
+      { ...row, step: 'implement', askedBytes: 2 * GI, aboveAsked: 1 },
+      { ...row, step: 'land', tries: 2, measured: 0, medianBytes: null, p90Bytes: null, maxBytes: null, askedBytes: null, aboveAsked: 0 },
+    ];
+    const words = statsLines(stats(group({ memory })));
+    hasLine(words, /^memory each step peaked at/);
+    hasLine(words, /^build\s+implement\s+4\s+3\s+812Mi\s+1\.2Gi\s+3Gi\s+2Gi\s+1 of 3$/);
+    hasLine(words, /^build\s+land\s+2\s+0\s+—\s+—\s+—\s+—\s+—$/);
+    hasLine(words, /^a peak is kept only for a session run under a memory limit/);
+    const all = statsLines(stats(group({ memory: [{ ...row, step: 'implement', tries: 3, askedBytes: 2 * GI, aboveAsked: 1 }] })));
+    assert.ok(!all.some((l) => l.startsWith('a peak is kept only')), 'every try measured: no line on when a peak is kept');
+    assert.ok(!statsLines(stats()).some((l) => l.startsWith('memory each step')), 'no memory rows, no table');
+  });
   test("the system's health is said under `system` where the series kept some, and nothing where none", () => {
     const health: StatsHealth = {
       pass: { p50: 12.3, p95: 80 },

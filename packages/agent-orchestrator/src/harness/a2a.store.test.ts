@@ -96,6 +96,7 @@ const LOCAL_ONLY: Record<string, string> = {
   denials: 'fail',
   budget: '5',
   memory: '4Gi',
+  memoryRequest: '1Gi',
   output: 'schema.json',
   tally: 'issues',
   resume: 'plan',

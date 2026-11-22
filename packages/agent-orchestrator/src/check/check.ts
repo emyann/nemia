@@ -25,7 +25,7 @@
  */
 import { isRepositoryRun, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { endsOnBase, type CheckSpec, type StepSpec } from '../step/step.ts';
-import { outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
+import { outOfMemoryWords } from '../out-of-memory/index.ts';
 import { firstPiece } from '../piece/piece.ts';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import { checksPhase } from './checks-due.ts';

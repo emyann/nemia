@@ -40,10 +40,11 @@ const TREES = await rendered([
       'landingRefresh=node x.ts cut',
       'landingDerives=a.json',
       'landingCheckMemory=256Mi',
+      'lightMemoryRequest=768Mi',
     ],
   },
   { name: 'plain', template: COPY },
-  { name: 'own', template: COPY, sets: ['implementCheck=echo own'] },
+  { name: 'own', template: COPY, sets: ['implementCheck=echo own', 'lightMemoryRequest='] },
 ]);
 
 /** The tree of the factory `name`, which the controller seeded. */
@@ -217,6 +218,31 @@ test("build's and quick's land check asks the memory the factory sets, and the d
       false,
       `plain: ${workflow}/land writes no line`,
     );
+  }
+});
+
+test("the light steps' sessions ask the memory the factory sets, 1Gi where it sets none, and the daemon's default where it sets it empty", () => {
+  const light = [
+    ['front-door', 'door'],
+    ['front-door', 'answer'],
+    ['intake', 'intake'],
+    ['janitor', 'argus'],
+    ['build', 'land'],
+    ['quick', 'land'],
+  ];
+  for (const [workflow, step] of light) {
+    const front = (name: string) => stepIn(treeOf(name), workflow, step).front;
+    assert.equal(front('plain').memoryRequest, '1Gi', `plain: ${workflow}/${step}`);
+    assert.equal(front('set').memoryRequest, '768Mi', `set: ${workflow}/${step}`);
+    assert.equal(Object.hasOwn(front('own'), 'memoryRequest'), false, `own: ${workflow}/${step} writes no line`);
+  }
+  for (const workflow of ['build', 'quick']) {
+    const asked = (name: string, step: string) => loaded(name, workflow).find((one) => one.name === step)?.memoryRequest;
+    assert.equal(asked('plain', 'land'), '1Gi', `plain: ${workflow}/land loads asking it`);
+    assert.equal(asked('set', 'land'), '768Mi', `set: ${workflow}/land loads asking it`);
+    assert.equal(asked('own', 'land'), undefined, `own: ${workflow}/land loads asking the default`);
+    for (const step of workflow === 'build' ? ['design', 'implement', 'review'] : ['implement', 'review'])
+      assert.equal(asked('plain', step), undefined, `${workflow}/${step} asks the default`);
   }
 });
 

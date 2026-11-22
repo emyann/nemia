@@ -5,7 +5,8 @@
  * write carries them, its labels are those served, and what the kind takes over the api (`KIND_CALLS`). Each prints
  * `<plural>/<name> created|configured|unchanged`.
  *
- * Refused, exit 2, each naming the command to type next: an object of a kind that is made no other way than its own (the Card's `nemia
+ * Refused, exit 2, each naming the command to type next: an item of a List the api served, which lacks its files' content (`partial`:
+ * `nemia get <resource> <name> -o yaml` prints it whole); an object of a kind that is made no other way than its own (the Card's `nemia
  * inbox add`, the Proposal's `nemia propose`) or takes no create, missing; one of a kind that takes no write, changed (`nemia explain`
  * says the kind's verbs, and the Proposal's refusal names `nemia propose`); an `apiVersion` other than `nemia/v1`; a kind the api does
  * not serve; a namespace in the file other than `-n`'s; a spec that is not the kind's. A refusal of one object does not stop the next:
@@ -13,7 +14,7 @@
  */
 import fs from 'node:fs';
 import { parseAllDocuments } from 'yaml';
-import { API_VERSION, type APIResource, DEFAULT_NAMESPACE } from 'objects';
+import { API_VERSION, type APIResource, DEFAULT_NAMESPACE, filesHeld, filesLeftOut, LISTED_WITHOUT } from 'objects';
 import type { ApplyOf } from '../../contracts/apply.contract.ts';
 import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
@@ -21,11 +22,14 @@ import { KIND_CALLS, orNone, type Prepared, type Served } from './kinds.ts';
 import { isObject } from 'effect/Predicate';
 
 /**
- * What apply does with one object, by what its read found and what its kind takes (`contracts/apply.contract.ts`).
+ * What apply does with one object, by what its read found, what its kind takes, and whether the file holds it whole
+ * (`contracts/apply.contract.ts`).
  * @param found What the object's read found: whether it is served and, where it is, whether the file says what is served.
  * @param writes What the object's kind takes over the api: a create, an update, and whether its update makes one missing.
+ * @param whole Whether the file holds the object whole, its files' content in its spec: false for one copied from a list.
  */
-export const applyOf: ApplyOf = (found, writes) => {
+export const applyOf: ApplyOf = (found, writes, whole) => {
+  if (!whole) return 'partial';
   if (!found.exists) return writes.create ? 'create' : writes.upsert && writes.update ? 'update' : 'no-create';
   if (found.same) return 'unchanged';
   return writes.update ? 'update' : 'no-update';
@@ -64,14 +68,14 @@ const stringsOf = (value: unknown) =>
     : undefined;
 
 /**
- * The objects of `text`, each document's, a `List`'s items in its place; refused where a document does not parse, naming the verb that
- * read it (`apply`, `propose`).
+ * The objects of `text`, each document's, a `List`'s items in its place, each saying whether it was an item of a List (`listed`);
+ * refused where a document does not parse, naming the verb that read it (`apply`, `propose`).
  * @param text The file's text: YAML or JSON, one document or several.
  * @param file The file's name as typed, named in the refusal.
  * @param verb The verb that read it, named in the refusal: `apply` where it is left out.
  */
-export function objectsOf(text: string, file: string, verb = 'apply') {
-  const objects: unknown[] = [];
+function documentsOf(text: string, file: string, verb = 'apply') {
+  const objects: { object: unknown; listed: boolean }[] = [];
   for (const doc of parseAllDocuments(text)) {
     if (!('errors' in doc)) continue;
     const [error] = doc.errors;
@@ -82,11 +86,19 @@ export function objectsOf(text: string, file: string, verb = 'apply') {
     const value: unknown = doc.toJS();
     if (value === null || value === undefined) continue;
     if (isObject(value) && typeof value.kind === 'string' && value.kind.endsWith('List') && Array.isArray(value.items))
-      objects.push(...value.items);
-    else objects.push(value);
+      objects.push(...value.items.map((object: unknown) => ({ object, listed: true })));
+    else objects.push({ object: value, listed: false });
   }
   return objects;
 }
+
+/**
+ * The objects of `text`, each document's, a `List`'s items in its place (`documentsOf`).
+ * @param text The file's text: YAML or JSON, one document or several.
+ * @param file The file's name as typed, named in the refusal.
+ * @param verb The verb that read it, named in the refusal: `apply` where it is left out.
+ */
+export const objectsOf = (text: string, file: string, verb = 'apply') => documentsOf(text, file, verb).map(({ object }) => object);
 
 /** What `args` ask of apply: the file, and the namespace `-n` names. */
 function parsed(args: readonly string[]) {
@@ -191,6 +203,28 @@ function refusal({ resource, name }: Read, action: 'no-create' | 'no-update', ma
   );
 }
 
+/** The paths of `read`'s kind's spec that hold a file's content (`LISTED_WITHOUT`). */
+const filePathsOf = ({ resource }: Read) => LISTED_WITHOUT[resource.kind].filter((path) => path.startsWith('spec.'));
+
+/** The paths of a file's content `read`'s spec could hold and lacks: those a list left out. */
+const leftOutOf = (read: Read) => filesLeftOut(filePathsOf(read), { spec: read.spec });
+
+/**
+ * Whether the file holds `read` whole. Only an item of a List the api served (`listed`, carrying the `status` it served) can be a list's
+ * copy: one lacking its files' content and holding none of it is not whole. A document of its own is whole, written by hand or printed by
+ * a read of one, whatever optional file key it leaves out (an agent with no instructions, a proposal that only removes).
+ */
+const wholeOf = (read: Read, listed: boolean, object: unknown) =>
+  !(listed && isObject(object) && isObject(object.status)) ||
+  leftOutOf(read).length === 0 ||
+  filesHeld(filePathsOf(read), { spec: read.spec }).length > 0;
+
+/** Why apply does not write `read`, an object copied from a list: its files' content is not in it, and the read of one holds it. */
+const partial = (read: Read) =>
+  new Refused(
+    `nemia apply: ${read.resource.name}/${read.name} lacks ${leftOutOf(read).join(', ')}, which a list leaves out: read it whole with \`nemia get ${read.resource.name} ${read.name} -o yaml\`, then apply that`,
+  );
+
 /** Whether what the file says of `read` is what `served` holds: its spec, and its labels where the kind's write carries them. */
 const sameAs = (read: Read, spec: unknown, served: Served, labels: boolean) => {
   const said = stringsOf(read.meta.labels);
@@ -212,10 +246,16 @@ const appliedAt = ({ name, meta, where }: Read, served: Served | null) => ({
 });
 
 /** `object` applied, among `resources`, with `-n`'s `namespace`: what happened to it, or a `Refused` naming what to type. */
-async function applied(object: unknown, resources: readonly APIResource[], namespace: string | undefined) {
+async function applied(
+  { object, listed }: { object: unknown; listed: boolean },
+  resources: readonly APIResource[],
+  namespace: string | undefined,
+) {
   const read = readOf(object, resources, namespace);
   const { resource, name } = read;
   const served = await servedOf(read);
+  const whole = wholeOf(read, listed, object);
+  if (!whole) throw partial(read);
   const writes = KIND_CALLS[resource.kind].writes;
   const prepared: Prepared | string = writes === undefined ? { spec: read.spec } : writes.prepared(read.spec, served);
   if (typeof prepared === 'string')
@@ -226,6 +266,7 @@ async function applied(object: unknown, resources: readonly APIResource[], names
   const action = applyOf(
     served === null ? { exists: false } : { exists: true, same: sameAs(read, prepared.spec, served, writes?.labels === true) },
     { create: create !== undefined, update: update !== undefined, upsert: writes?.upsert === true },
+    whole,
   );
   const at = appliedAt(read, served);
   const said = (word: Said) => `${resource.name}/${name} ${word}`;
@@ -261,7 +302,7 @@ export async function apply(args: readonly string[]) {
     return 0;
   }
   const { file, namespace } = parsed(args);
-  const objects = objectsOf(textOf(file), file);
+  const objects = documentsOf(textOf(file), file);
   if (objects.length === 0) throw new Refused(`nemia apply: ${file} holds no object: write one, then \`nemia apply -f ${file}\``);
   const resources = await discovered('apply');
   let code = 0;

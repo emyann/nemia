@@ -198,7 +198,7 @@ describe("a person queues cards, reads their order and the tick's tries, and tak
         assert.ok(card, `${entry.name} is listed`);
         const { state: _state, ...rest } = asListed(card);
         assert.deepEqual(rest, packageListed(entry), `${entry.name}: every key the package lists that a Card holds, as it lists it`);
-        assert.equal(typeof card.spec.body, 'string');
+        assert.equal('body' in card.spec, false, 'a list carries no body');
         assert.equal(typeof card.metadata.creationTimestamp, 'string');
       }
       assert.deepEqual(

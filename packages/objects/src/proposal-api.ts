@@ -96,11 +96,11 @@ export class DelegationsGroup extends HttpApiGroup.make('delegations').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/delegations', {
     params: namespaceParams,
     query: listQuery,
-    success: DelegationListObject,
+    success: [DelegationListObject, Table],
     error: proposalErrors,
   }).annotate(
     OpenApi.Description,
-    "Lists a factory's delegations in its namespace, a page at a time, each named by its agent, read by anyone. Answers a DelegationList.",
+    "Lists a factory's delegations in its namespace, a page at a time, each named by its agent, read by anyone. Answers a DelegationList, or the same page as a Table where the request asks for one.",
   ),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/delegations/:name', {
     params: cardParams,

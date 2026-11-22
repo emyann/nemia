@@ -30,7 +30,7 @@ const standing = (client: ObjectsClient) =>
       Effect.forEach(
         factories.items,
         ({ metadata: { name } }) =>
-          everyPage((page) => client.schedules.list({ params: { namespace: name }, query: page })).pipe(
+          pageOf(everyPage((page) => client.schedules.list({ params: { namespace: name }, query: page }))).pipe(
             Effect.map((listed) => ({ factory: name, schedules: listed.items })),
           ),
         { concurrency: 'unbounded' },

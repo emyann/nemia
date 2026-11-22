@@ -32,7 +32,7 @@ import type { Served } from '../../layer.ts';
 import { factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 import { writeGoes } from '../../definitions/served.ts';
-import { wantsTable } from '../../objects/table.ts';
+import { listOrTable, wantsTable } from '../../objects/table.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** The route of the server `name` of `namespace`, as a refusal says it. */
@@ -61,7 +61,12 @@ const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcp
 
 export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
   handlers
-    .handle('listLibrary', ({ query }) => answered((s) => s.inRequest(libraryServerList(s.home, queryOf(query)))))
+    .handle('listLibrary', ({ query }) =>
+      listOrTable(
+        answered((s) => s.inRequest(libraryServerList(s.home, queryOf(query)))),
+        mcpServerTable,
+      ),
+    )
     .handle('getLibrary', ({ params: { name } }) => answered(async (s) => libraryServerIn(s, name)))
     .handle('putLibrary', ({ params: { name }, payload }) =>
       answered(async (s) => {

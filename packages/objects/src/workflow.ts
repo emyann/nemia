@@ -8,7 +8,7 @@
  *
  * Beside it, the bodies a write is sent (`WorkflowWrite`, `WorkflowCreate`). Plain Schemas of JSON, as every object of this package is.
  */
-import { Schema } from 'effect';
+import { Schema, Struct } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { TypedGraph } from './graph.ts';
 import { CardSkill, WriteMeta, definitionStatus } from './definition.ts';
@@ -522,8 +522,47 @@ export const Workflow = Schema.Struct({
 });
 export type Workflow = typeof Workflow.Type;
 
-/** A page of a namespace's workflows. */
-export const WorkflowList = listOf('Workflow', Workflow);
+/** A step as a list serves it: its name and the keys its file sets, without its note. */
+const ListedStep = WorkflowStep.mapFields(Struct.omit(['body']));
+
+/** A step resolved as a list serves it: its keys, the agent hired into it and its MCP servers, without what it is told. */
+const ListedStepStatus = WorkflowStepStatus.mapFields((fields) => ({
+  ...Struct.omit(fields, ['body', 'own', 'layers']),
+  own: Schema.NullOr(Schema.Struct({ keys: Strings.annotate({ description: 'The keys its own file sets.' }) })).annotate({
+    description: 'The keys its own file sets, for a step with an agent; null for one without.',
+  }),
+}));
+
+/** A workflow as a list serves it: its object without its README, its steps' notes or its files' text, which a read of it answers. */
+export const WorkflowListed = Schema.Struct({
+  ...Workflow.fields,
+  spec: WorkflowSpec.mapFields(() => ({
+    steps: Schema.Array(ListedStep).annotate({
+      description: "Each step's file, in file-name order, by its name and the keys it writes, without its note.",
+    }),
+    files: Schema.optionalKey(
+      Schema.Array(
+        Schema.Struct({ path: Schema.String.annotate({ description: "The file's name in the folder, with / between folders." }) }),
+      ).annotate({ description: "The folder's other text files, by name alone: a read of the workflow answers their text." }),
+    ),
+  })).annotate({
+    description:
+      "The workflow as its files hold it, without its README, its steps' notes or its files' text, which a read of the workflow answers.",
+  }),
+  status: WorkflowStatus.mapFields((fields) => ({
+    ...Struct.omit(fields, ['readmeBody', 'steps']),
+    steps: Schema.Array(ListedStepStatus).annotate({
+      description: "Each step resolved, in the workflow's order, without what it is told, which a read of the workflow answers.",
+    }),
+  })).annotate({
+    description:
+      'What Nemia reads of the workflow, without its README or what its steps are told: where it was found, its folder, its graph, its steps, why it does not load or cannot start in the factory, and its revision.',
+  }),
+}).annotate({ description: "A workflow as a list serves it, without its files' content (LISTED_WITHOUT)." });
+export type WorkflowListed = typeof WorkflowListed.Type;
+
+/** A page of a namespace's workflows, each without its files' content. */
+export const WorkflowList = listOf('Workflow', WorkflowListed);
 export type WorkflowList = typeof WorkflowList.Type;
 
 /** A JSON Schema file beside the steps, which an `output:` may name, by its file and its text. */

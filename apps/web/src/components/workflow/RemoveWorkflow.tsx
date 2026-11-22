@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/ds';
-import { removeWorkflow, type WorkflowListing } from '../../lib/api/workflows.ts';
+import { removeWorkflow, type WorkflowRow } from '../../lib/api/workflows.ts';
 import { rereadWorkflows } from '../../lib/placed';
 import { Pending } from '@/components/look';
 
@@ -12,7 +12,7 @@ import { Pending } from '@/components/look';
  * of the workflow gone, and reads the workflows again. The api's refusal — a folder changed since, or one a run, a queued card or a
  * factory still needs — is shown here.
  */
-export function RemoveWorkflow({ workflow, onRemoved }: { workflow: WorkflowListing; onRemoved?: () => Promise<void> | void }) {
+export function RemoveWorkflow({ workflow, onRemoved }: { workflow: WorkflowRow; onRemoved?: () => Promise<void> | void }) {
   const { name, dir, steps, error, version } = workflow;
   const [asking, setAsking] = useState(false);
   const queryClient = useQueryClient();

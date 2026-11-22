@@ -72,7 +72,6 @@ const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> 
     startedAs: [],
     state: 'filed',
     error: null,
-    body: name,
     filedAt,
     factoryRepo: null,
     ...extra,

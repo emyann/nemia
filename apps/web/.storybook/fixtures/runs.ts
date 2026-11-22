@@ -479,11 +479,12 @@ const finishedOf = (counts: { waiting: number; inFlight: number; finished: numbe
   metadata: { asOf: AS_OF, counts, continue: 'f.older' },
 }) satisfies RunList;
 
-/** The page's reads answered with `open`, the runs not finished, and the targets' finished runs. */
+/** The page's reads answered with `open`, the runs not finished, the targets' finished runs, and each run's lines (`linesOf`). */
 const answering = (open: Run[], counts: { waiting: number; inFlight: number; finished: number }) => [
   http.get('/api/runs', ({ request }) =>
     HttpResponse.json(asksFinished(request) ? finishedOf(counts) : listOf(open, counts)),
   ),
+  http.get('/api/runs/:name/lines', ({ params }) => HttpResponse.json(linesOf(String(params.name)))),
 ];
 
 /** A run whose implement failed, waiting on nobody: the targets have none, and a part's story draws it. */

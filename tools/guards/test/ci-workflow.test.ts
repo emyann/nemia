@@ -46,6 +46,9 @@ import {
   LOOK,
   LOOK_FLAG,
   OWN_JOB,
+  STORIES,
+  STORIES_COMMAND,
+  STORIES_FOLDER,
   readWorkflow,
   runSteps,
   ALLOWLIST_STEP,
@@ -807,6 +810,27 @@ function lookDrift(workflow: Workflow) {
   return sentences satisfies string[];
 }
 
+/** The stories job's step that runs them. */
+const storiesRunStep = (workflow: Workflow) =>
+  runSteps(workflow, STORIES).find((step) => step.run?.includes(STORIES_COMMAND) === true) satisfies Step | undefined;
+
+/**
+ * A stories job that is not there, or runs other than every story from the board's folder: a file named runs only that file, and
+ * `--update` writes the pictures that differ, so a job given it would pass every picture it was meant to compare.
+ */
+function storiesDrift(workflow: Workflow) {
+  if (workflow.jobs[STORIES] === undefined)
+    return [
+      `${FILE} has no ${STORIES} job: add one that runs \`${STORIES_COMMAND}\` from ${STORIES_FOLDER}, or nothing in CI runs the stories, which the ${LOOK} job does not`,
+    ] satisfies string[];
+  const step = storiesRunStep(workflow);
+  if (step?.run?.trim() !== STORIES_COMMAND || step['working-directory'] !== STORIES_FOLDER)
+    return [
+      `the ${STORIES} job in ${FILE} does not run \`${STORIES_COMMAND}\` alone: write its step \`${STORIES_COMMAND}\`, with working-directory: ${STORIES_FOLDER} and no file, --update or -u, so it compares every story`,
+    ] satisfies string[];
+  return [] satisfies string[];
+}
+
 /** Where Playwright keeps the browsers it downloads, the one path the e2e job may cache. */
 const BROWSERS = '~/.cache/ms-playwright';
 
@@ -1257,8 +1281,10 @@ const drift = (
     ...shardDrift(workflow, pages),
     ...boundDrift(workflow),
     ...lookDrift(workflow),
+    ...storiesDrift(workflow),
     ...browserDrift(workflow, E2E),
     ...browserDrift(workflow, LOOK),
+    ...browserDrift(workflow, STORIES),
     ...buildDrift(workflow),
     ...scanDrift(workflow, config),
     ...allowDrift(config, stubs),
@@ -1840,6 +1866,38 @@ test('REFUSED: no look job, one that runs other than the look alone, a shard tha
   const uncached = structuredClone(shipped);
   uncached.jobs[LOOK].steps = (uncached.jobs[LOOK].steps ?? []).filter((each) => each.uses?.startsWith('actions/cache') !== true);
   refused(browserDrift(uncached, LOOK), 'alone', 'the look job installing Chromium on every push');
+});
+
+test('REFUSED: no stories job, one dropped from the gate, one that runs other than every story, and one with no browsers cached', () => {
+  const shipped = readWorkflow();
+  assert.deepEqual(storiesDrift(shipped), [], 'the stories run in their own job today');
+  assert.deepEqual(browserDrift(shipped, STORIES), [], 'and restore their browsers as the shards do');
+  const refused = (drift: string[], token: string, why: string) => {
+    assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+
+  const gone = structuredClone(shipped);
+  delete gone.jobs[STORIES];
+  refused(storiesDrift(gone), `no ${STORIES} job`, 'the job deleted');
+  const unneeded = structuredClone(shipped);
+  unneeded.jobs[GATE].needs = (unneeded.jobs[GATE].needs ?? []).filter((job) => job !== STORIES);
+  refused(gateDrift(unneeded), STORIES, 'the stories job dropped from the gate');
+
+  for (const [tail, why] of [
+    [' -- --update', 'the pictures written rather than compared'],
+    [' -- src/components/look/Tag.stories.tsx', 'one story file alone'],
+  ] as const) {
+    const changed = structuredClone(shipped);
+    const step = storiesRunStep(changed);
+    assert.ok(step?.run !== undefined, 'the stories job runs them today');
+    step.run = `${step.run.trim()}${tail}`;
+    refused(storiesDrift(changed), 'alone', why);
+  }
+
+  const uncached = structuredClone(shipped);
+  uncached.jobs[STORIES].steps = (uncached.jobs[STORIES].steps ?? []).filter((each) => each.uses?.startsWith('actions/cache') !== true);
+  refused(browserDrift(uncached, STORIES), 'alone', 'the stories job installing Chromium on every push');
 });
 
 test('REFUSED: no build job, a generator not run, a staleness step that names one generated path, and a path this repository has not', () => {

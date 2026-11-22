@@ -140,6 +140,7 @@ type Plan<P> = {
   shard?: { i: number; of: number };
   whole: boolean;
   look: boolean;
+  stories: boolean;
 };
 
 /**
@@ -161,7 +162,9 @@ type Plan<P> = {
  * Whether it runs the `look`'s browser tests (`test/e2e/*.test.ts`, `LOOK_TESTS` in look.ts), before it builds anything: with `--look`, or
  * with no selector at all (`--pages`, `--shard`, `--look`), the whole e2e. `--look` alone visits no page and is no whole run; `--look
  * --pages <name,…>` runs both. Refuses `--look` with `--shard`, since the look runs once per push (CI's `e2e-look` job) and not once per
- * shard, and `--look` with no `--pages` beside `--photos`, `--contrast` or `--workers`, which are about pages it would not visit.
+ * shard, and `--look` with no `--pages` beside `--photos`, `--contrast` or `--workers`, which are about pages it would not visit. Whether
+ * it runs every story after the look's tests (`stories`, `npm run stories`): in the whole e2e alone, `--photos` and its kin included,
+ * never under `--look`, since CI runs the stories in a job of their own (`e2e-stories`) beside the look's (`e2e-look`).
  */
 export function planOf<P extends { name: string }>(argv: readonly string[], pages: readonly P[]) {
   let look = false;
@@ -231,10 +234,22 @@ export function planOf<P extends { name: string }>(argv: readonly string[], page
       shard: { i: shard, of },
       whole: false,
       look: false,
+      stories: false,
     } satisfies Plan<P>;
   }
   if (look && !named)
-    return { visit: [], themes, pictured: () => false, photos, light, measured, workers, whole: false, look } satisfies Plan<P>;
+    return {
+      visit: [],
+      themes,
+      pictured: () => false,
+      photos,
+      light,
+      measured,
+      workers,
+      whole: false,
+      look,
+      stories: false,
+    } satisfies Plan<P>;
   if (!named)
     return {
       visit: [...pages],
@@ -246,6 +261,7 @@ export function planOf<P extends { name: string }>(argv: readonly string[], page
       workers,
       whole: !photos,
       look: true,
+      stories: true,
     } satisfies Plan<P>;
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
@@ -262,6 +278,7 @@ export function planOf<P extends { name: string }>(argv: readonly string[], page
     workers,
     whole: false,
     look,
+    stories: false,
   } satisfies Plan<P>;
 }
 

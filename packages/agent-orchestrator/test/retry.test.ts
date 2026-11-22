@@ -637,7 +637,11 @@ describe("a checked step, from its check's filing to `retries:` spent and the ru
       const pass = await tick(id());
       assert.deepEqual([pass.tried, pass.filed, pass.unreachable, pass.status], [['implement'], [], [], 'running']);
       const spec = b.tasks.get(try2())!.spec;
-      assert.deepEqual(spec.resources, { limits: { memory: '4Gi' } }, "a try is filed under the step's `memory:` as its first was");
+      assert.deepEqual(
+        spec.resources,
+        { limits: { memory: '4Gi' }, requests: { memory: '1Gi' } },
+        "a try is filed under the step's `memory:` and `memoryRequest:` as its first was",
+      );
       assert.deepEqual(
         { cwd: spec.cwd, resumeFrom: spec.resumeFrom, harness: spec.harness },
         { cwd: run.repo, resumeFrom: `native-${id()}-implement`, harness: undefined },

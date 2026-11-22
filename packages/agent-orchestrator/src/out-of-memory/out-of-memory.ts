@@ -4,7 +4,6 @@
  * a step's note says it in (`outOfMemoryWords`), pure and importing no file of the package: the listing reads them (src/list/list.ts), and
  * which attempt's record they are read off is `killedMemoryOf`'s (src/views/views-words.ts).
  */
-import { memoryBytesWord } from 'objects';
 import type { OutOfMemoryKill, OutOfMemory } from '../../contracts/out-of-memory.contract.ts';
 
 /**
@@ -21,6 +20,23 @@ export const outOfMemory: OutOfMemory = (memory, own) => {
   return memory.oom === undefined || memory.oom >= 1
     ? { by: 'limit', ...said, raise: own === undefined ? 'default' : 'step' }
     : { by: 'machine', ...said };
+};
+
+const KI = 1024;
+const MI = KI * KI;
+const GI = MI * KI;
+
+/**
+ * A number of bytes as a Kubernetes binary quantity a person can type back into `memory:`: a whole number of `Gi` as `4Gi`, one decimal at
+ * or past 1Gi (`3.7Gi`), whole `Mi` below that, rounded, and whole `Ki` below 1Mi, rounded up. The same words as `objects`' own, which the
+ * cli and the board say a peak in: this copy keeps the run's and the workflow's entries from loading `objects` (`test/refusal.test.ts`),
+ * and `src/views/views-words.test.ts` holds the two to one spelling.
+ * @param n The number of bytes.
+ */
+export const memoryBytesWord = (n: number) => {
+  if (n >= GI) return Number.isInteger(n / GI) ? `${n / GI}Gi` : `${(Math.round((n / GI) * 10) / 10).toString()}Gi`;
+  if (n >= MI) return `${Math.round(n / MI)}Mi`;
+  return `${Math.ceil(n / KI)}Ki`;
 };
 
 /**

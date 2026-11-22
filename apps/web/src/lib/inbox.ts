@@ -248,9 +248,9 @@ export const waitWords = (name: string, waits: readonly CardWait[]) => {
     if (w.kind === 'cycle') return `${w.card} (a cycle: ${(w.cycle ?? []).join(' → ')})`;
     return `${w.card}${at} (${w.state ?? 'not read'})`;
   };
-  const stuck = waits.filter((w) => w.stuck);
+  const stalled = waits.filter((w) => w.stalled);
   const said = `Waiting on ${waits.map(one).join('; ')}.`;
-  return stuck.length ? `Needs you: ${said} Send the work on (nemia inbox resend), change ${name}'s after:, or start it by hand.` : said;
+  return stalled.length ? `Needs you: ${said} Send the work on, change ${name}'s after:, or start it by hand.` : said;
 };
 
 /**

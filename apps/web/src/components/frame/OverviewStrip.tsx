@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
-import { CutFrame, CutTag, StatTile, Sticker } from '@/components/look';
+import { CutFrame, CutTag, MeaningTag, StatTile, Sticker } from '@/components/look';
 import { Avatar, Body, Label, Meter, Tag } from '@/components/ui/ds';
 import { ceilingsQuery } from '@/lib/api/ceilings';
 import { daemonQuery } from '@/lib/api/daemon';
@@ -15,9 +15,9 @@ import { dayStartOf, quotaLineOf, readoutOf, type Strip, stripOf } from '@/lib/s
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
 
-/** The daemon's tag colour by its tone: alive while it ticks, neutral while read or warned of, failure when nothing ticks. */
-const DAEMON_TAG: Record<DaemonTone, 'secondary' | 'neutral' | 'error'> = {
-  ok: 'secondary',
+/** The daemon's tag colour by its tone: alive while it ticks (a meaning's tag), neutral while read or warned of, failure when nothing ticks. */
+const DAEMON_TAG: Record<DaemonTone, 'alive' | 'neutral' | 'error'> = {
+  ok: 'alive',
   warn: 'neutral',
   reading: 'neutral',
   down: 'error',
@@ -108,6 +108,7 @@ function Heading({ children }: { children: ReactNode }) {
  * daemon's word.
  */
 function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
+  const daemonTag = DAEMON_TAG[dot.tone];
   return (
     <div data-strip="today" className="flex flex-col gap-2.5 pt-3 pr-5 pb-3.5 pl-[18px]">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -120,9 +121,15 @@ function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
           {readoutOf(strip)}
         </span>
         <CutTag>
-          <Tag data-strip-daemon={dot.kind} title={dot.title} variant="tonal" color={DAEMON_TAG[dot.tone]} className="uppercase">
-            {dot.word}
-          </Tag>
+          {daemonTag === 'alive' ? (
+            <MeaningTag data-strip-daemon={dot.kind} title={dot.title} hue="alive" className="uppercase">
+              {dot.word}
+            </MeaningTag>
+          ) : (
+            <Tag data-strip-daemon={dot.kind} title={dot.title} variant="tonal" color={daemonTag} className="uppercase">
+              {dot.word}
+            </Tag>
+          )}
         </CutTag>
       </div>
       <div className="flex flex-wrap gap-1.5">

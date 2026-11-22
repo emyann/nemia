@@ -47,8 +47,8 @@ export type StepKind = 'work' | 'gate' | 'done' | 'come' | 'failed';
 /** The hue of the head's frame: the look's `FrameHue`, said here where no component is loaded. */
 type HeadHue = 'alive' | 'yours' | 'none';
 
-/** The kit's `Tag` a kind is drawn with. */
-type HeadTag = { word: string; color: 'secondary' | 'primary' | 'neutral' | 'error'; variant: 'tonal' | 'filled' | 'outlined' };
+/** The tag a kind is drawn with: the kit's `Tag` in a role, or the look's `MeaningTag` in `alive`, which the theme has no role for. */
+type HeadTag = { word: string; color: 'alive' | 'primary' | 'neutral' | 'error'; variant: 'tonal' | 'filled' | 'outlined' };
 
 /** The time box: what it measures, its figure, a note beside it, and the ink of its figure. */
 export type CardTime = { label: string; value: string; note: string; ink: 'alive' | 'yours' | 'failure' | 'plain' | 'muted' };
@@ -102,10 +102,10 @@ export type HeadInput = {
 };
 
 const TAGS: Record<StepKind, Omit<HeadTag, 'word'>> = {
-  work: { color: 'secondary', variant: 'tonal' },
+  work: { color: 'alive', variant: 'tonal' },
   gate: { color: 'primary', variant: 'filled' },
   done: { color: 'neutral', variant: 'tonal' },
-  come: { color: 'secondary', variant: 'outlined' },
+  come: { color: 'neutral', variant: 'outlined' },
   failed: { color: 'error', variant: 'tonal' },
 };
 

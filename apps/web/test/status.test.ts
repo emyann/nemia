@@ -278,21 +278,6 @@ describe('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work do
 const web = path.resolve(import.meta.dirname, '..');
 const given = (state: StepState, drawn: Drawn) => ({ ...stateDrawn, [state]: drawn });
 
-const ROLE_OF = { yours: 'primary', alive: 'secondary', money: 'tertiary', failure: 'error' } as const;
-
-const readsRole = (css: string, meaning: keyof typeof ROLE_OF) =>
-  new RegExp(`--meaning-${meaning}:\\s*var\\(\\s*--md-sys-color-${ROLE_OF[meaning]}\\s*\\)\\s*;`).test(css);
-
-const WRITTEN = { primary: '#f5e61a', secondary: '#c4a8ff', tertiary: '#e0a15e', error: '#ff7676' } as const;
-
-/** The roles of `WRITTEN` a look's front matter does not write at their value, by name. */
-const unwritten = (look: string) => {
-  const front = look.slice(0, look.indexOf('\n---', 4));
-  return Object.entries(WRITTEN)
-    .filter(([role, value]) => !front.includes(`\n  ${role}: "${value}"\n`))
-    .map(([role]) => role);
-};
-
 const HUE = /\b(?:sky|blue|orange|amber|yellow|emerald|green|red|violet)-\d{2,3}\b/;
 
 const STATE_DRAWERS = [
@@ -310,7 +295,7 @@ const STATE_DRAWERS = [
   'look/StepGraph.tsx',
 ];
 
-describe("the meanings of a state's colour: one thing each, read from the look's roles, never a hand-picked hue", () => {
+describe("the meanings of a state's colour: one thing each, the look's meanings (meanings.test.ts), never a hand-picked hue", () => {
   test('a colour says one thing: a state that waits on a person is yours, a failure is failure and nothing else is, and no state is money', () => {
     assert.equal(brokenMeanings(stateDrawn).length, 0, brokenMeanings(stateDrawn).join('; '));
     const states = Object.keys(stateDrawn) as StepState[];
@@ -333,25 +318,6 @@ describe("the meanings of a state's colour: one thing each, read from the look's
     ]);
     assert.deepEqual(brokenMeanings(given('failed', { hue: 'grey', form: 'container' })), ['failed is a failure and is rest']);
     assert.deepEqual(brokenMeanings(given('verified', { hue: 'yours', form: 'filled' })), ['verified waits on nobody and is yours']);
-  });
-  test("the meanings are the look's: each reads its role of the theme once, and the look writes yellow, a violet, amber and red", () => {
-    const css = fs.readFileSync(path.join(web, 'src', 'styles.css'), 'utf8');
-    for (const meaning of Object.keys(ROLE_OF) as Array<keyof typeof ROLE_OF>) {
-      assert.equal(readsRole(css, meaning), true, `--meaning-${meaning} reads --md-sys-color-${ROLE_OF[meaning]}`);
-      assert.equal(css.split(`--meaning-${meaning}:`).length, 2, `--meaning-${meaning} has one writer`);
-    }
-    const swapped = '--meaning-yours: var(--md-sys-color-tertiary);\n--meaning-money:\n  var(--md-sys-color-tertiary);';
-    assert.equal(readsRole(swapped, 'yours'), false, 'a wait read from the amber role is refused');
-    assert.equal(readsRole(swapped, 'money'), true, 'across a line break too');
-
-    const look = fs.readFileSync(path.join(web, 'DESIGN.md'), 'utf8');
-    assert.equal(unwritten(look).length, 0, `the look writes ${unwritten(look).join(', ')} at another value`);
-    const old = look
-      .replace('  secondary: "#c4a8ff"\n', '  secondary: "#39ff5a"\n')
-      .replace('  error: "#ff7676"\n', '  error: "#e8695b"\n');
-    assert.deepEqual(unwritten(old), ['secondary', 'error'], 'the neon green and the terracotta put back are named');
-    const below = look.replace('  error: "#ff7676"\n', '').replace('\n---\n\n', '\n---\n\n  error: "#ff7676"\n');
-    assert.deepEqual(unwritten(below), ['error'], 'a value under the front matter is no written role');
   });
   test('no hand-picked hue says a state: the chips, the minimap and the canvases draw the meanings alone', () => {
     assert.match('border-2 border-amber-500', HUE, 'the pattern names a hand-picked hue');

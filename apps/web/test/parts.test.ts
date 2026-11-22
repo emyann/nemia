@@ -155,7 +155,7 @@ describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each w
     const edge = tagWith(html, 'data-cut-edge');
     assert.match(edge, /clip-path:polygon\(0px 0px, calc\(100% - 10px\) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc\(100% - 10px\)\)/);
     assert.match(edge, /\bbg-outline-variant\b/, "quiet, the outline's hue");
-    assert.match(edge, /\bgroup-focus-within\/field:bg-alive\b/, "with the focus in it, a session's hue, the diagonals with the sides");
+    assert.match(edge, /\bgroup-focus-within\/field:bg-ring\b/, "with the focus in it, the focus ring's ink, the diagonals with the sides");
     assert.match(
       tagWith(html, 'data-cut-ground="quiet"'),
       /group-focus-within\/field:hidden[^>]*clip-path:polygon\(1px 1px,/,
@@ -442,7 +442,7 @@ describe("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and
     assert.match(lit, /aria-hidden="true"/);
     assert.match(lit, /\binset-x-0\b/, "the lit part spans the name's box");
     assert.match(lit, /\s-bottom-4\.5\s/, "on the h1's rule, 18 pixels under the name");
-    assert.match(lit, /background-color:var\(--meaning-alive\)/);
+    assert.match(lit, /background-color:var\(--md-sys-color-on-surface\)/, "in the name's own ink, no meaning's hue");
     assert.doesNotMatch(lit, /\bw-|\d+px|width/, 'the lit part has no width of its own');
     assert.match(
       html,
@@ -456,14 +456,15 @@ describe("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and
     assert.match(tagWith(html, 'data-sticker'), /data-sticker="money"[^>]*bg-money text-on-money/);
     assert.match(html, />Cost<\/span><span[^>]*>\$4\.25</);
   });
-  test('the scan lines: a glow and lines in the hue of a session at work, thinned, and the glow alone without lines', async () => {
+  test('the scan lines: a glow and lines in the ink of what is read, thinned, no meaning\'s hue, and the glow alone without lines', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const html = await drawn(createElement(ScanLines, { children: 'page' }));
     const ground = tagWith(html, 'data-scan-lines');
     assert.match(ground, /radial-gradient\(/);
     assert.match(ground, /repeating-linear-gradient\(/);
-    assert.match(ground, /var\(--meaning-alive\) 7%/);
-    assert.match(ground, /var\(--meaning-alive\) 4%/);
+    assert.match(ground, /var\(--md-sys-color-on-surface\) 7%/);
+    assert.match(ground, /var\(--md-sys-color-on-surface\) 4%/);
+    assert.doesNotMatch(ground, /--meaning-/, 'the ground says no meaning');
     assert.doesNotMatch(ground, /#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i, 'no colour written by hand');
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const plain = tagWith(await drawn(createElement(ScanLines, { lines: false, children: 'page' })), 'data-scan-lines');

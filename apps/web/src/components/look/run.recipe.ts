@@ -58,7 +58,7 @@ export const runRecipe = tv({
       card: {},
     },
     tone: {
-      alive: { ground: 'bg-[color-mix(in_srgb,var(--md-sys-color-secondary-container)_22%,var(--md-sys-color-surface-container-low))]' },
+      alive: { ground: 'bg-[color-mix(in_srgb,var(--meaning-alive-container)_22%,var(--md-sys-color-surface-container-low))]' },
       yours: {
         ground: 'bg-surface-container-low dark:bg-[color-mix(in_srgb,var(--md-sys-color-primary)_3%,var(--md-sys-color-surface-container-low))]',
         clock: 'text-yours',

@@ -1,6 +1,6 @@
 /**
  * The board's source names no colour of Tailwind's palette and writes no raw colour (a hex, `rgb()`, `oklch()` and their kin) outside a
- * comment: a ground, an outline or an ink reads a role of the theme, and a hue one of the look's five meanings (`src/lib/meaning.ts`,
+ * comment: a ground, an outline or an ink reads a role of the theme, and a hue one of the look's four meanings (`src/lib/meaning.ts`,
  * `src/styles.css`), so one class serves both schemes. The vendored kit (`src/components/ui/ds`) is another repository's and stays out,
  * and nothing else does; the few raw colours no role gives are `KEPT`, each in its file alone, with its reason.
  */
@@ -137,8 +137,37 @@ export interface Kept {
   why: string;
 }
 
+/** Why a meaning's colour is written by hand in the stylesheet. */
+const MEANING = "A meaning's value, written beside the theme since the kit's generator gives no colour of the board's own: DESIGN.md's table of the four meanings, held to it and to contrast by meanings.test.ts.";
+
+/** Why money's amber is. */
+const MONEY = "Money's amber, kept by hand until the board-look's second card takes money off its last part (test/baseline/money/).";
+
 /** The raw colours no role gives yet, each valid in its file alone. */
-export const KEPT: Kept[] = [];
+export const KEPT: Kept[] = [
+  { file: 'src/styles.css', colour: '#0c1416', why: MEANING },
+  { file: 'src/styles.css', colour: '#0d0d0d', why: MEANING },
+  { file: 'src/styles.css', colour: '#141300', why: MEANING },
+  { file: 'src/styles.css', colour: '#1c1105', why: MONEY },
+  { file: 'src/styles.css', colour: '#2f3031', why: MEANING },
+  { file: 'src/styles.css', colour: '#45218a', why: MEANING },
+  { file: 'src/styles.css', colour: '#4d4800', why: MEANING },
+  { file: 'src/styles.css', colour: '#5e00c1', why: MEANING },
+  { file: 'src/styles.css', colour: '#676000', why: MEANING },
+  { file: 'src/styles.css', colour: '#683c00', why: MONEY },
+  { file: 'src/styles.css', colour: '#7732d9', why: MEANING },
+  { file: 'src/styles.css', colour: '#855317', why: MONEY },
+  { file: 'src/styles.css', colour: '#a9aaa8', why: MEANING },
+  { file: 'src/styles.css', colour: '#c4a8ff', why: MEANING },
+  { file: 'src/styles.css', colour: '#e0a15e', why: MONEY },
+  { file: 'src/styles.css', colour: '#e9ddff', why: MEANING },
+  { file: 'src/styles.css', colour: '#ecdcff', why: MEANING },
+  { file: 'src/styles.css', colour: '#f2f0f1', why: MEANING },
+  { file: 'src/styles.css', colour: '#f5e61a', why: MEANING },
+  { file: 'src/styles.css', colour: '#f5e61b', why: MEANING },
+  { file: 'src/styles.css', colour: '#ffdcbd', why: MONEY },
+  { file: 'src/styles.css', colour: '#ffffff', why: MEANING },
+];
 
 /** Every raw colour in `root`'s `src` outside the kit that `kept` does not list for its file, as `file:line:column (colour)`. */
 export function rawIn(root: string, kept: Kept[] = KEPT) {

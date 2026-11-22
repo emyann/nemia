@@ -31,6 +31,7 @@ export default meta;
 
 /** Asked, whether it was merged still read. */
 export const Reading: StoryObj<typeof meta> = {
+  tags: ['network'],
   play: async (context) => {
     await saysReading('Reading whether it was merged…')(context);
   },
@@ -58,6 +59,7 @@ export const Choices: StoryObj<typeof meta> = {
 
 /** Pruned with nothing left behind: the form closes, and the snackbar the frame hosts names the run pruned. */
 export const Pruned: StoryObj<typeof meta> = {
+  tags: ['network'],
   args: { run: CALLED_OFF },
   parameters: {
     msw: [

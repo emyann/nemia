@@ -144,6 +144,7 @@
           "packages/agent-runtime/vitest.config.ts": 2,
           "packages/objects/vitest.config.ts": 2,
           "packages/templates/vitest.config.ts": 2,
+          "tools/design-system/vitest.config.ts": 2,
           "tools/guards/vitest.config.ts": 2,
           "tools/test-kit/vitest.config.ts": 2
         }

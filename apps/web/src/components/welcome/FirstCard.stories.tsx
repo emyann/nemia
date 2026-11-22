@@ -8,6 +8,7 @@ import { FirstCard } from './FirstCard';
  * each story over a store of its own, one story a state.
  */
 const meta: Meta<typeof FirstCard> = {
+  tags: ['network'],
   title: 'Pages/Welcome first card',
   args: {},
   parameters: { msw: firstCardStore() },

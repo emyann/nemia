@@ -45,6 +45,7 @@ const answered = (args: Parameters<typeof HoldQuestion>[0]) => (
 
 /** Asked on the runs of its repository: the runs to wait on, each a box to tick, one ticked, the why and Hold. */
 export const Picks: StoryObj<typeof meta> = {
+  tags: ['network'],
   parameters: { msw: oneWaits },
   render: answered,
   play: async ({ canvasElement }) => {
@@ -63,6 +64,7 @@ export const Picks: StoryObj<typeof meta> = {
 
 /** Asked where no other run of its repository may still land: held until a person lifts it, which the form says. */
 export const NoneToWaitOn: StoryObj<typeof meta> = {
+  tags: ['network'],
   parameters: { msw: noRuns },
   render: answered,
   play: async ({ canvasElement }) => {
@@ -73,6 +75,7 @@ export const NoneToWaitOn: StoryObj<typeof meta> = {
 
 /** Held, waiting on none: the form closes, and the snackbar the frame hosts names the run held. */
 export const Held: StoryObj<typeof meta> = {
+  tags: ['network'],
   parameters: {
     msw: [
       ...noRuns,

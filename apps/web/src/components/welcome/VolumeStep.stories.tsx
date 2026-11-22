@@ -11,6 +11,7 @@ type Args = { factory?: string; again: boolean };
  * (`.storybook/fixtures/folders.ts`), each story over a store of its own, one story a state.
  */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Pages/Welcome volume',
   args: { again: false },
   parameters: { msw: volumeStore() },

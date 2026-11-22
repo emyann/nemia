@@ -67,6 +67,7 @@ type Story = StoryObj<typeof ViewerSheet>;
 
 /** A markdown file, the first of two: the kit's modal side sheet titled by its path, Next to the other, and the notes drawn. */
 export const Markdown: Story = {
+  tags: ['overlay'],
   play: async () => {
     const sheet = await screen.findByRole('dialog', { name: 'notes.md' });
     await expect(sheet).toHaveAttribute('data-slot', 'side-sheet');
@@ -78,6 +79,7 @@ export const Markdown: Story = {
 
 /** A path the step has no file at: said in place of the file. */
 export const Missing: Story = {
+  tags: ['overlay'],
   parameters: { at: `/?bar=${barValue({ kind: 'run', run: RUN.metadata.name })}&view=${STEP.name}/gone.txt` },
   play: async () => {
     const sheet = await screen.findByRole('dialog', { name: 'gone.txt' });
@@ -87,6 +89,7 @@ export const Missing: Story = {
 
 /** The run still read: the sheet over the page, the shape of the file's lines while it waits. */
 export const ReadingTheRun: Story = {
+  tags: ['overlay'],
   parameters: { at: '/?bar=run:r-1&view=design/plan.md' },
   render: () => (
     <Unread>

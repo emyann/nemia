@@ -13,6 +13,7 @@ type Args = { templates: readonly Template[]; onMade: (name: string) => void };
  * (`.storybook/fixtures/templates.ts`), which keeps what it was sent.
  */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Pages/Template form',
   args: { templates: [SDLC], onMade: fn() },
   parameters: { msw: templatesServed },

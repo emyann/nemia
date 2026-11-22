@@ -8,6 +8,7 @@ type Args = { factory: string; onClone: (address: string) => void; pending: bool
 
 /** The address way's panel: this factory's missing needs with their fixes (MSW's readiness read), then the address and Clone. */
 const meta: Meta<Args> = {
+  tags: ['network'],
   title: 'Pages/Address pick',
   args: { factory: ACME, onClone: fn(), pending: false },
   parameters: { msw: volumeStore() },

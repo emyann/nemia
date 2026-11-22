@@ -14,6 +14,7 @@
  * `src/factory/upgrade/upgrade.verb.test.ts`; the three-way merge itself, `src/factory/upgrade/merge.test.ts`. Its store is its own at
  * `ROOT`, given as `ENV`.
  */
+import { proposalHeld, proposalsHeld } from './proposal-walks.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -123,18 +124,11 @@ const SCRIPT_AT = {
 /** Where a proposal is read and applied: this test's store. */
 const PLACE = { home: ROOT, repo: ROOT };
 
-/** The proposal `name` of the factory `factory`, as the store holds it. */
-const proposalIn = (factory: string, name: string) =>
-  JSON.parse(fs.readFileSync(path.join(FACTORIES, factory, 'proposals', `${name}.json`), 'utf8'));
+/** The proposal `name` of the factory `factory`, as the store holds it, through the Proposal door. */
+const proposalIn = async (factory: string, name: string) => JSON.parse(JSON.stringify(await proposalHeld(ROOT, factory, name)));
 
-/** The proposals of the factory `factory` the store holds, by name. */
-const proposalsOf = (factory: string) => {
-  const dir = path.join(FACTORIES, factory, 'proposals');
-  {
-    const made: string[] = fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => f.replace(/\.json$/, '')) : [];
-    return made;
-  }
-};
+/** The proposals of the factory `factory` the store holds, by name, through the Proposal door. */
+const proposalsOf = (factory: string) => proposalsHeld(ROOT, factory);
 
 /** The proposal recorded for the owner `owner` (`<Kind>/<name>`) of `factory`'s upgrade, in `resolutions.json`. */
 const recordedFor = (factory: string, owner: string) =>
@@ -308,7 +302,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     await assert.rejects(resolve(ROUNDS, '--file', path.join(dir, 'gone.md')), refusedWith('Invalid', /no file at/));
     assert.ok(!fs.existsSync(resolutionsFile(ROOT, 'crew')), 'a refused resolve writes nothing');
     assert.deepEqual((await resolvedBy(ROUNDS, '--theirs')).left, [LINE, SCRIPT_LINE], 'two conflicts still wait');
-    assert.deepEqual(proposalsOf('crew'), [], "the workflow's other conflict has no choice yet, so nothing is proposed");
+    assert.deepEqual(await proposalsOf('crew'), [], "the workflow's other conflict has no choice yet, so nothing is proposed");
     assert.deepEqual(
       (await reconciled(factory('crew'))).upgrade?.conflicts.map((c) => [c.at, c.proposal]),
       [
@@ -321,9 +315,9 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     assert.deepEqual(bytesUnder(tree()), waitingTree, 'nothing merged');
     const proposing = await resolvedBy(SCRIPT_LINE, '--file', scriptChoice());
     proposal = recordedFor('crew', 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf('crew'), [proposal], 'each conflict of the workflow has a choice: it is proposed, once');
+    assert.deepEqual(await proposalsOf('crew'), [proposal], 'each conflict of the workflow has a choice: it is proposed, once');
     assert.deepEqual(proposing.proposed, { kind: 'Workflow', name: 'dev', proposal }, 'the Workflow dev, as the choices compose it');
-    const made = proposalIn('crew', proposal);
+    const made = await proposalIn('crew', proposal);
     assert.equal(made.status.phase, 'waiting');
     assert.deepEqual(made.status.proposedBy, {}, 'the person, from a shell with no session token');
     assert.deepEqual(
@@ -350,7 +344,7 @@ describe('an upgrade with a conflict: previewed, filed, waited on with the statu
     assert.deepEqual(last.left, [], 'every conflict has a choice');
     for (const p of [proposal, rules]) assert.ok(last.waits.includes(p), `the merge waits on ${p}: ${last.waits.join(', ')}`);
     assert.deepEqual(
-      proposalIn('crew', rules).spec.objects.map((o: { kind: string; spec: { rules?: string } }) => [o.kind, o.spec.rules]),
+      (await proposalIn('crew', rules)).spec.objects.map((o: { kind: string; spec: { rules?: string } }) => [o.kind, o.spec.rules]),
       [['Factory', 'Never push on a Friday, nor on a weekend.\n\nWrite the tests first, always.\n']],
       'the rules as the choice composes them with what merged cleanly',
     );
@@ -461,7 +455,7 @@ describe("a workflow's resolution declined: the status says to resolve again, an
     await scripted(t, 'refused');
     await printedBy(t, 'factory', 'resolve', 'refused', SCRIPT_LINE, '--file', scriptChoice());
     first = recordedFor('refused', 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf('refused'), [first]);
+    assert.deepEqual(await proposalsOf('refused'), [first]);
   });
   s.test('declined, the conflict carries its phase, and the status says to resolve it again', async () => {
     await stage.runWith(stage.board().e, declineProgram(PERSON, 'refused', first));
@@ -479,8 +473,8 @@ describe("a workflow's resolution declined: the status says to resolve again, an
     await printedBy(t, 'factory', 'resolve', 'refused', SCRIPT_LINE, '--theirs');
     const second = recordedFor('refused', 'Workflow/dev') ?? '';
     assert.notEqual(second, first);
-    assert.deepEqual(proposalsOf('refused').sort(), [first, second].sort());
-    assert.equal(proposalIn('refused', second).status.phase, 'waiting');
+    assert.deepEqual((await proposalsOf('refused')).sort(), [first, second].sort());
+    assert.equal((await proposalIn('refused', second)).status.phase, 'waiting');
     assert.deepEqual(
       (await reconciled(factory('refused'))).upgrade?.conflicts.map((c) => c.proposal),
       [{ name: second, phase: 'waiting' }],
@@ -519,7 +513,7 @@ describe("a workflow's resolution made from a session: its agent's in its own fa
       (err: Error & { _tag?: string; reason?: string; exitCode?: number }) =>
         err._tag === 'Forbidden' && err.reason === 'other-factory' && err.exitCode === 2,
     );
-    assert.deepEqual(proposalsOf('theirs'), []);
+    assert.deepEqual(await proposalsOf('theirs'), []);
     const record = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'theirs'), 'utf8'));
     assert.deepEqual([record.choices, record.proposals], [{ [SCRIPT_LINE]: 'theirs' }, undefined]);
   });
@@ -528,7 +522,7 @@ describe("a workflow's resolution made from a session: its agent's in its own fa
     vi.spyOn(console, 'log');
     await resolveIn(token, 'theirs', SCRIPT_LINE, '--theirs');
     const made = recordedFor('theirs', 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalIn('theirs', made).status.proposedBy, { agent: 'implementer' });
+    assert.deepEqual((await proposalIn('theirs', made)).status.proposedBy, { agent: 'implementer' });
   });
 });
 
@@ -567,8 +561,10 @@ describe('a workflow whose step writes checkFailurePolicy as a block map: a conf
   s.test('resolved with a file, the workflow is proposed, its policy carried as the text the loader reads', async (t) => {
     await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf(name), [proposed]);
-    const implement = proposalIn(name, proposed).spec.objects[0].spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.deepEqual(await proposalsOf(name), [proposed]);
+    const implement = (await proposalIn(name, proposed)).spec.objects[0].spec.steps.find(
+      (step: { name: string }) => step.name === 'implement',
+    );
     assert.equal(typeof implement.keys.checkFailurePolicy, 'string', "StepKeys' text, as readKeys keeps it");
     assert.deepEqual(JSON.parse(implement.keys.checkFailurePolicy), {
       rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: ['78'] } }],
@@ -621,8 +617,10 @@ describe("an upgrade onto a version whose step writes named checks: the tree's o
   s.test("resolved with the template's side, the workflow is proposed, its checks the text a step's key takes", async (t) => {
     await printedBy(t, 'factory', 'resolve', name, CHECK, '--theirs');
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf(name), [proposed]);
-    const implement = proposalIn(name, proposed).spec.objects[0].spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.deepEqual(await proposalsOf(name), [proposed]);
+    const implement = (await proposalIn(name, proposed)).spec.objects[0].spec.steps.find(
+      (step: { name: string }) => step.name === 'implement',
+    );
     assert.equal(typeof implement.keys.checks, 'string', "StepKeys' text, as readKeys keeps it");
     assert.equal('check' in implement.keys, false, "the tree's `check:` gone, as the template's side has it");
   });
@@ -692,8 +690,8 @@ describe("a tree edited after its apply: the resolution is proposed on the tree 
   s.test("resolved with a file, the workflow is proposed with the factory's own edits", async (t) => {
     await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    assert.deepEqual(proposalsOf(name), [proposed]);
-    const spec = proposalIn(name, proposed).spec.objects[0].spec;
+    assert.deepEqual(await proposalsOf(name), [proposed]);
+    const spec = (await proposalIn(name, proposed)).spec.objects[0].spec;
     const implement = spec.steps.find((step: { name: string }) => step.name === 'implement');
     assert.deepEqual([implement.keys.check, implement.keys.skills], ['npm test && npm run typecheck', ['look']]);
     assert.deepEqual(
@@ -743,7 +741,7 @@ describe("a tree whose step carries a harness's block: the resolution's proposal
   s.test('resolved with a file, the workflow is proposed with the block read as its fence', async (t) => {
     await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
     proposed = recordedFor(name, 'Workflow/dev') ?? '';
-    const spec = proposalIn(name, proposed).spec.objects[0].spec;
+    const spec = (await proposalIn(name, proposed)).spec.objects[0].spec;
     const implement = spec.steps.find((step: { name: string }) => step.name === 'implement');
     assert.deepEqual(implement.keys.disallowedTools, ['Bash(*:4318*)', 'Bash(*:4317*)']);
   });

@@ -4,6 +4,7 @@
  * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; a step's own closeout schema; the factory's rules,
  * `RULES.md`, carried as any file of the tree is; choices made for another version; a status lost; and a swap whose rename fails.
  */
+import { proposalsHeld } from '../../../test/proposal-walks.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -455,7 +456,7 @@ test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with tex
   const broken = path.join(scratch('wf-upgrade-unread-'), 'rounds.md');
   fs.writeFileSync(broken, 'rounds: [5\n');
   await assert.rejects(main(['factory', 'resolve', 'unread', `${REVIEW}#rounds`, '--file', broken], noEngine()), refusedWith('Invalid'));
-  assert.equal(fs.existsSync(path.join(FACTORIES, 'unread', 'proposals')), false, 'nothing is proposed');
+  assert.deepEqual(await proposalsHeld(ROOT, 'unread'), [], 'nothing is proposed');
   const kept = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'unread'), 'utf8'));
   assert.deepEqual([kept.choices, kept.proposals], [{ [`${REVIEW}#rounds`]: { text: 'rounds: [5\n' } }, undefined]);
 });

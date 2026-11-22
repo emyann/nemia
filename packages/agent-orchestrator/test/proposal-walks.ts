@@ -10,7 +10,9 @@
 import type { Proposal } from 'objects';
 import type { AsyncDoorWalk } from './door-walks.ts';
 import { acted, settled } from './door-walks.ts';
-import type { ProposalDoorShape } from '../src/proposal/proposal.store.ts';
+import { Effect } from 'effect';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { ProposalDoor, type ProposalDoorShape } from '../src/proposal/proposal.store.ts';
 
 type Walk = AsyncDoorWalk<ProposalDoorShape>;
 
@@ -194,4 +196,39 @@ export const PROPOSAL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { refused: 'Missing' },
     },
   ],
+};
+
+/**
+ * The proposals of the factory `factory` the store at `root` holds, by name, read through the rooted Proposal door.
+ * @param root The store's root folder.
+ * @param factory The factory read.
+ */
+export const proposalsHeld = async (root: string, factory: string) =>
+  (
+    await Effect.runPromise(
+      Effect.provideService(
+        Effect.flatMap(ProposalDoor, (door) => door.proposals.list(factory)),
+        StoreRoot,
+        root,
+      ),
+    )
+  ).map((p) => p.metadata.name);
+
+/**
+ * The proposal `name` of the factory `factory` the store at `root` holds, read through the rooted Proposal door; a test fails where none
+ * is.
+ * @param root The store's root folder.
+ * @param factory The factory read.
+ * @param name The proposal read.
+ */
+export const proposalHeld = async (root: string, factory: string, name: string) => {
+  const read = await Effect.runPromise(
+    Effect.provideService(
+      Effect.flatMap(ProposalDoor, (door) => door.proposals.read(factory, name)),
+      StoreRoot,
+      root,
+    ),
+  );
+  if (read === undefined) throw new Error(`${factory} holds no proposal ${name}`);
+  return read;
 };

@@ -80,6 +80,7 @@ test('a store’s proposal files are imported on the first open, each moved asid
     path.join('zeta', 'implementer-ccccc.json'),
   ]);
   planted(root, 'acme', 'implementer-aaaaa');
+  assert.equal(await Effect.runPromise(proposalsImported(root, await Effect.runPromise(proposalKeyspace(root)))), 0, 'none made twice');
   assert.deepEqual(
     (await settled(rootedAt(root).proposals.list('acme'))).map((p) => p.metadata.name),
     ['implementer-aaaaa', 'shipper-bbbbb'],

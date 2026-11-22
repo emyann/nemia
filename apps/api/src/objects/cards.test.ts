@@ -3,8 +3,8 @@
  * counting down, and refuses a limit or a token that is not one; the namespaces are the cards' factories, `default` those that name none;
  * `labelSelector` and its retired spelling select alike. The guard before every write is `test/guarded.test.ts`'s.
  */
-import { dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { root } from '../../test/harness.ts';
+import { dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -182,11 +182,12 @@ describe("a person's words to a working session: the package's `sayRun` hands th
   let said!: Said | undefined;
   const s = story(test);
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
-  let records: Record<string, string> = {};
+  let records: Omit<ReturnType<typeof written>, 'said'> | undefined;
   s.test(
     "words as the board sends them are a 202 with the engine's entry — `at`, `attempt`, `text`, `after` — handed to the engine as given, once, and on the task",
     async () => {
-      records = written().files;
+      const { said: _said, ...stored } = written();
+      records = stored;
       const res = await sayTo('implement', { text: words });
       assert.equal(res.status, 202, await res.clone().text());
       const answer = (await res.json()) as RunSaid;
@@ -220,7 +221,8 @@ describe("a person's words to a working session: the package's `sayRun` hands th
       );
       const summary = (await listedOf(app(), R)).status;
       assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
-      assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
+      const { said: _now, ...stored } = written();
+      assert.deepEqual(stored, records, "the runs' records untouched, and no file of the api's");
     },
   );
 });
@@ -302,7 +304,8 @@ test("words to a step not filed yet are kept for its first try, not delivered: t
   const answer = (await res.json()) as { kept?: true; text: string; attempt: number; after: unknown };
   assert.deepEqual([answer.kept, answer.text, answer.attempt, answer.after], [true, 'Look at the parser first.', 1, null]);
   assert.deepEqual([...standIn().said], before.said, 'no session was told anything');
-  assert.equal(recordText(root, runKey(R)) ?? '', before.files[`${R}.json`], "the run's record untouched: the words are kept beside it");
+  assert.ok(before.records[runKey(R)] !== undefined, 'the run has a record to keep');
+  assert.equal(recordText(root, runKey(R)), before.records[runKey(R)], "the run's record untouched: the words are kept beside it");
   assert.deepEqual(
     runsNow(root)
       .runs.read(R)

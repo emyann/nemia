@@ -1,5 +1,5 @@
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import './harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';

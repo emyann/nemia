@@ -603,6 +603,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
     workflow: PLAIN,
     steps: { implement: { taskId: 'r-plain-implement', branch: 'wf/r-plain/implement' } },
   });
+  fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(path.join(root, 'runs', 'r-off.cancelled'), at);
 
   const before = gitCount();

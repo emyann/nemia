@@ -6,8 +6,8 @@
  * the harness's scratch ones (`root`, `config`). A live step followed as its session writes, and the stream let go once its reader
  * leaves, are `following.test.ts`'s.
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { config, root } from '../../test/harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';

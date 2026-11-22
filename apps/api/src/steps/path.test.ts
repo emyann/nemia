@@ -5,8 +5,8 @@
  * At shipped defaults: the api's own engine over the harness's store (`root`), which this file seeds, and its fake `claude` first on PATH.
  * The path is read off the journal alone, so no harness is asked.
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { root } from '../../test/harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';

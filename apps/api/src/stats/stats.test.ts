@@ -5,8 +5,8 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
-import { plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
 import { root } from '../../test/harness.ts';
+import { plantRecord, recordText, runKey } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';

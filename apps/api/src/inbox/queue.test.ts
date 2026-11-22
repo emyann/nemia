@@ -38,7 +38,7 @@ import {
   type StoreRoot,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
-import { plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
+import { emptyRuns, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const repo = scratch('nemia-api-queue-repo-');
 /**
@@ -75,6 +75,7 @@ const JSON_TYPE = { 'content-type': 'application/json' };
 const clear = () => {
   for (const dir of ['inbox', 'queue', 'runs', 'engine']) fs.rmSync(path.join(root, dir), { recursive: true, force: true });
   for (const file of ['tick.json', 'tick-stats.json']) fs.rmSync(path.join(root, file), { force: true });
+  emptyRuns(root);
 };
 
 /** The inbox folder as it is: each file's name and text, to show a refusal wrote nothing. */

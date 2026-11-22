@@ -8,8 +8,8 @@
  * every page. The builtin templates and the library's MCP servers are as many as the package ships, fewer than a page, and the volumes
  * none: their pages are read, and not planted past one.
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { root } from './harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

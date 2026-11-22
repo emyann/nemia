@@ -2,8 +2,8 @@
  * A card's files: the files it names by the api's File id under its `files:` key, each by the name its text and its run find it by. Why
  * the files as given cannot be written (`cardFilesRefusal`), asked wherever a card's `files:` is written, before anything is written;
  * whether a file the card holds is taken off as more are attached (`cardFileReplaced`), a gone reference replaced by a file attached under
- * its name; and whether a kept File is let go of (`fileLetGo`), asked by the files' prune (the File door's `pruned`) of every file it reads. Each
- * pure, proved by `contracts/card-files.contract.ts`. Beside them, the refusal's words, each naming the fix.
+ * its name; and whether a kept File is let go of (`fileLetGo`), asked by the files' prune (the File door's `pruned`) of every file it
+ * reads. Each pure, proved by `contracts/card-files.contract.ts`. Beside them, the refusal's words, each naming the fix.
  */
 import type {
   CardFileGiven,

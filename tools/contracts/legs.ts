@@ -51,6 +51,8 @@ export const ROOTS = [
   'apps/web/test/e2e/stories/touched.ts',
   'apps/web/test/e2e/pages.ts',
   'apps/web/.storybook/approved.ts',
+  'apps/web/.storybook/network.ts',
+  'apps/web/.storybook/workers.ts',
   'apps/web/test/baseline.ts',
   'apps/web/test/stories.ts',
   'packages/templates/released.ts',

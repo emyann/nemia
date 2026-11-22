@@ -301,6 +301,8 @@ describe('fileCard, dropCard, startCard, queueCard: what the board sends the api
       'never a repository nor an origin, whatever the caller held',
     );
     assert.equal(sent[1]?.url, '/api/namespaces/default/cards', 'a card that names no factory is filed in default');
+    await fileCard({ body: '---\nfactory: acme\n---\nAn idea' });
+    assert.equal(sent[2]?.url, '/api/namespaces/acme/cards', 'an idea whose own factory: line names one, none picked, is filed in it');
 
     answer = () => answered(422, { error: 'the idea names no directory' });
     await assert.rejects(

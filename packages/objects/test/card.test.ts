@@ -1,12 +1,13 @@
 /**
  * The Card (`src/card.ts`): a card and a page of cards as the Api's endpoints answer them, every key kept, its optional keys absent where
- * they were; its state a closed word; and the bodies of its verbs as the Api's endpoints take them.
+ * they were; its state a closed word; and the bodies of its verbs as the Api's endpoints take them. Beside them, the namespace a client
+ * files an idea in (`filedNamespace`).
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { OpenApi } from 'effect/http-api';
-import { API_VERSION, Api, CARD_KEYS, CARD_KEY_MEANINGS, CARD_STATES, Card, CardEdit, CardFile, CardWrite } from 'objects';
+import { API_VERSION, Api, CARD_KEYS, CARD_KEY_MEANINGS, CARD_STATES, Card, CardEdit, CardFile, CardWrite, filedNamespace } from 'objects';
 import { answered, taken } from './served.ts';
 
 const filed = {
@@ -116,4 +117,17 @@ test("each of a card's keys has one meaning, and the Card's spec fields carry th
   const spec = resolve(resolve(schemas['Card']).properties.spec);
   for (const key of ['workflow', 'repo', 'gate', 'model', 'from', 'queued'] as const)
     assert.equal(spec.properties[key].description, CARD_KEY_MEANINGS[key], key);
+});
+
+test("filedNamespace: the factory given, else the idea's own factory: line, else default", () => {
+  const rows: [string, string | undefined, string, string][] = [
+    ['---\nworkflow: dev\nfactory: acme\n---\nFix it\n', undefined, 'acme', "the idea's factory: line"],
+    ['---\r\nfactory: "acme"\r\n---\r\nFix it\r\n', undefined, 'acme', 'quoted, CRLF'],
+    ['---\nfactory: acme\n---\nFix it\n', 'other', 'other', 'the factory given wins'],
+    ['---\nfactory: acme\n---\nFix it\n', '', 'acme', 'an empty one given is none'],
+    ['---\nworkflow: dev\n---\nFix it\n', undefined, 'default', 'a frontmatter naming none'],
+    ['Fix it\n\n---\nfactory: acme\n---\n', undefined, 'default', 'a block that does not open the text'],
+    ['---\nfactory: acme\nFix it, never closed\n', undefined, 'default', 'a frontmatter that never closes'],
+  ];
+  for (const [body, factory, namespace, why] of rows) assert.equal(filedNamespace(body, factory), namespace, why);
 });

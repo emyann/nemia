@@ -993,6 +993,19 @@ const givenMaps = (labels: Labels | undefined, files: CardFiles | undefined) => 
 });
 
 /**
+ * The factory an idea's own frontmatter names (its `factory:` line, read as `ideaCard` reads it), or undefined where it names none or
+ * does not read: what a filing compares with the namespace it is sent to, whose refusal of a text that does not read is `ideaCard`'s own.
+ * @param text The idea as given: a note, or a file's text.
+ */
+export function ideaFactory(text: string) {
+  try {
+    return parseInboxCard('the idea', ideaCard('the idea', text, {}).text).factory;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The file `nemia inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
  * (`parseInboxCard`).
  *

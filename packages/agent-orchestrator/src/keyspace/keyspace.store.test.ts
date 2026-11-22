@@ -302,7 +302,10 @@ describe("the keyspace's table, migrated by Effect's Migrator", () => {
     const reopened = await Effect.runPromise(keyspaceIn(file, again));
     assert.equal((await Effect.runPromise(reopened.get('/registry/t/a')))?.value, 'a');
     await Effect.runPromise(reopened.write('/registry/t/b', pointing('b', ['/registry/t/a'])));
-    assert.deepEqual(raw(file, 'SELECT name, target FROM kine_pointers'), [{ name: '/registry/t/b', target: '/registry/t/a' }]);
+    assert.deepEqual(
+      raw(file, 'SELECT name, target FROM kine_pointers').map((row) => ({ ...row })),
+      [{ name: '/registry/t/b', target: '/registry/t/a' }],
+    );
     await Effect.runPromise(Scope.close(again, Exit.void));
   });
 

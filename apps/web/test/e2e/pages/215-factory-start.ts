@@ -1,11 +1,46 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import type { Locator, Page } from 'playwright';
 import { photograph, pickIn, startOf, themeOf, isRunStart } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store, takeBackRuns } from '../world.ts';
+
+/**
+ * The File records the page's uploads made in the store's keyspace (`<store>/db/state.db`, laid out as Kine's), taken back: a tombstone
+ * row appended for each live `/registry/files/<factory>/<id>` of `names`, at the store's next revision, as the store deletes one, and its
+ * pointers dropped. What the File door keeps of an upload beside its bytes, which the page removes itself.
+ * @param factory The factory the files were uploaded to.
+ * @param names The names the uploads left in the factory's files folder, a File's id among them.
+ */
+function fileRecordsTakenBack(factory: string, names: readonly string[]) {
+  const file = path.join(store!, 'db', 'state.db');
+  if (!fs.existsSync(file)) return;
+  const db = new DatabaseSync(file, { timeout: 30_000 });
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    for (const id of new Set(names.map((name) => name.replace(/\.part$/, '')))) {
+      const key = `/registry/files/${factory}/${id}`;
+      const last = db.prepare('SELECT id, create_revision, deleted, value FROM kine WHERE name = ? ORDER BY id DESC LIMIT 1').get(key) as
+        | { id: number; create_revision: number; deleted: number; value: string | Uint8Array }
+        | undefined;
+      if (last === undefined || last.deleted) continue;
+      const head = (db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'kine'").get() as { seq: number }).seq;
+      db.prepare(
+        'INSERT INTO kine (id, name, created, deleted, create_revision, prev_revision, lease, value, old_value) VALUES (?, ?, 0, 1, ?, ?, 0, ?, ?)',
+      ).run(head + 1, key, last.create_revision, last.id, last.value, last.value);
+      db.prepare('DELETE FROM kine_pointers WHERE name = ?').run(key);
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    if (db.isTransaction) db.exec('ROLLBACK');
+    throw err;
+  } finally {
+    db.close();
+  }
+}
 
 /** The brief the page starts its run with. */
 const BRIEF = 'Start a run from the floor of its factory';
@@ -202,7 +237,9 @@ export default {
     } finally {
       await other.close();
       takeBackRuns(runsDir, runsBefore);
-      for (const name of kept()) if (!filesBefore.has(name)) fs.rmSync(path.join(filesDir, name), { force: true });
+      const added = kept().filter((name) => !filesBefore.has(name));
+      for (const name of added) fs.rmSync(path.join(filesDir, name), { force: true });
+      fileRecordsTakenBack(factory, added);
       fs.rmSync(reviewerFile, { force: true });
       fs.writeFileSync(factoryFile, factoryText);
     }

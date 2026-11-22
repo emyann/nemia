@@ -1,7 +1,8 @@
 /**
- * `nemia get` against a served store (`served.ts`): a resource's objects listed as a table, `-l` taking those its selector takes, one
- * read by its name, `-o yaml` read back by `nemia apply` as unchanged, and a word that names no resource refused exit 2 naming
- * `nemia explain`. The client's own verb: its help is its own, and `--local` is refused by the route, naming the command without it.
+ * `nemia get` against a served store (`served.ts`): a resource's objects listed as the api's table of their kind, `-l` taking those its
+ * selector takes, one read by its name, `-o yaml` read back by `nemia apply` as unchanged, and a word that names no resource refused
+ * exit 2 naming `nemia explain`. The client's own verb: its help is its own, and `--local` is refused by the route, naming the command
+ * without it.
  */
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -15,18 +16,29 @@ const store = await servedStore('nemia-cli-get-', (root) => {
 });
 afterAll(() => store.stop());
 
-test('`nemia get cards` lists every card of the default namespace as a table: NAME, STATE, AGE', async () => {
+test("`nemia get cards` lists every card of the default namespace as the api's table of cards: its columns, a row each", async () => {
   const listed = await store.nemia(['get', 'cards']);
   assert.equal(listed.code, 0, listed.err);
-  assert.match(listed.out, /^NAME +STATE +AGE$/m);
-  assert.match(listed.out, /^cache-the-views +filed +\d+[smhd]$/m);
-  assert.match(listed.out, /^tidy-the-docs +filed /m);
+  assert.match(listed.out, /^NAME +TITLE +WORKFLOW +.*STATE/m);
+  assert.match(listed.out, /^cache-the-views +Cache the views\. +dev /m);
+  assert.match(listed.out, /^tidy-the-docs +Tidy the docs\. /m);
+});
+
+test("`nemia get templates` prints the api's table of templates; an empty list of schedules says so on stderr", async () => {
+  const templates = await store.nemia(['get', 'templates']);
+  assert.equal(templates.code, 0, templates.err);
+  assert.match(templates.out, /^NAME +VERSION +DESCRIPTION/m);
+  assert.match(templates.out, /^sdlc +\d/m);
+  const schedules = await store.nemia(['get', 'schedules']);
+  assert.equal(schedules.code, 0, schedules.err);
+  assert.equal(schedules.out, '');
+  assert.match(schedules.err, /^No schedules found/);
 });
 
 test('`-l team=core` lists the cards its selector takes, and no other; `-A` adds their namespace', async () => {
   const core = await store.nemia(['get', 'cards', '-l', 'team=core', '-A']);
   assert.equal(core.code, 0, core.err);
-  assert.match(core.out, /^NAMESPACE +NAME +STATE +AGE$/m);
+  assert.match(core.out, /^NAMESPACE +NAME +TITLE /m);
   assert.match(core.out, /^default +cache-the-views /m);
   assert.doesNotMatch(core.out, /tidy-the-docs/);
   const none = await store.nemia(['get', 'cards', '-l', 'team=nope']);

@@ -62,3 +62,24 @@ const missingAt = (value: unknown, segments: readonly string[]): boolean => {
  * @param object The object they are looked for in, as a file or an answer holds it.
  */
 export const filesLeftOut = (paths: readonly string[], object: unknown) => paths.filter((path) => missingAt(object, path.split('.')));
+
+/** Whether the path's `segments` are held at `value`: the key there, and for a path through an array, held by some item of it. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- recursive: its type cannot be inferred through its own call
+const heldAt = (value: unknown, segments: readonly string[]): boolean => {
+  const [segment, ...rest] = segments;
+  if (segment === undefined) return true;
+  const many = segment.endsWith('[]');
+  const key = many ? segment.slice(0, -2) : segment;
+  if (!isRecord(value) || !(key in value)) return false;
+  const inner = value[key];
+  if (!many) return heldAt(inner, rest);
+  return Array.isArray(inner) && inner.some((item) => heldAt(item, rest));
+};
+
+/**
+ * Each of `paths` that `object` holds: a field of a file's content it carries, which no list's item does. An object a list served holds
+ * none of them; one written by hand, or read alone, holds those it has. Pure.
+ * @param paths The paths to look for, as `LISTED_WITHOUT` writes them.
+ * @param object The object they are looked for in, as a file or an answer holds it.
+ */
+export const filesHeld = (paths: readonly string[], object: unknown) => paths.filter((path) => heldAt(object, path.split('.')));

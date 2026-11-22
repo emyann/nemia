@@ -4,9 +4,13 @@
  * priority 0 by default and 1 when asked wide, a row per item of the page in its order, and the item's metadata beside its cells
  * (`PartialObjectMetadata`). It reads only what a list serves of each, never a file's content (`LISTED_WITHOUT`). Pure.
  */
-import type { Table, TableColumnDefinition, TemplateList, TemplateListed, WorkflowList, WorkflowListed } from 'objects';
+import type { Table, TableColumnDefinition, TemplateList, WorkflowList } from 'objects';
 import { definitionNote } from './kind-table.ts';
 import { column, firstLine, tableOf } from './table-of.ts';
+
+/** A workflow and a template as a list serves each: without its files' content (`LISTED_WITHOUT`). */
+type WorkflowListed = WorkflowList['items'][number];
+type TemplateListed = TemplateList['items'][number];
 
 /** The columns of a workflow's row, in the order its cells are. */
 export const WORKFLOW_COLUMNS: readonly TableColumnDefinition[] = [

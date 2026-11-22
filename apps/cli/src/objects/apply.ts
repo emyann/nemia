@@ -5,7 +5,8 @@
  * write carries them, its labels are those served, and what the kind takes over the api (`KIND_CALLS`). Each prints
  * `<plural>/<name> created|configured|unchanged`.
  *
- * Refused, exit 2, each naming the command to type next: an object of a kind that is made no other way than its own (the Card's `nemia
+ * Refused, exit 2, each naming the command to type next: an object copied from a list, which lacks its files' content (`partial`: `nemia
+ * get <resource> <name> -o yaml` prints it whole); an object of a kind that is made no other way than its own (the Card's `nemia
  * inbox add`, the Proposal's `nemia propose`) or takes no create, missing; one of a kind that takes no write, changed (`nemia explain`
  * says the kind's verbs, and the Proposal's refusal names `nemia propose`); an `apiVersion` other than `nemia/v1`; a kind the api does
  * not serve; a namespace in the file other than `-n`'s; a spec that is not the kind's. A refusal of one object does not stop the next:
@@ -13,7 +14,7 @@
  */
 import fs from 'node:fs';
 import { parseAllDocuments } from 'yaml';
-import { API_VERSION, type APIResource, DEFAULT_NAMESPACE } from 'objects';
+import { API_VERSION, type APIResource, DEFAULT_NAMESPACE, filesHeld, filesLeftOut, LISTED_WITHOUT } from 'objects';
 import type { ApplyOf } from '../../contracts/apply.contract.ts';
 import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
@@ -21,11 +22,14 @@ import { KIND_CALLS, orNone, type Prepared, type Served } from './kinds.ts';
 import { isObject } from 'effect/Predicate';
 
 /**
- * What apply does with one object, by what its read found and what its kind takes (`contracts/apply.contract.ts`).
+ * What apply does with one object, by what its read found, what its kind takes, and whether the file holds it whole
+ * (`contracts/apply.contract.ts`).
  * @param found What the object's read found: whether it is served and, where it is, whether the file says what is served.
  * @param writes What the object's kind takes over the api: a create, an update, and whether its update makes one missing.
+ * @param whole Whether the file holds the object whole, its files' content in its spec: false for one copied from a list.
  */
-export const applyOf: ApplyOf = (found, writes) => {
+export const applyOf: ApplyOf = (found, writes, whole) => {
+  if (!whole) return 'partial';
   if (!found.exists) return writes.create ? 'create' : writes.upsert && writes.update ? 'update' : 'no-create';
   if (found.same) return 'unchanged';
   return writes.update ? 'update' : 'no-update';
@@ -191,6 +195,24 @@ function refusal({ resource, name }: Read, action: 'no-create' | 'no-update', ma
   );
 }
 
+/** The paths of `read`'s kind's spec that hold a file's content (`LISTED_WITHOUT`). */
+const filePathsOf = ({ resource }: Read) => LISTED_WITHOUT[resource.kind].filter((path) => path.startsWith('spec.'));
+
+/** The paths of a file's content `read`'s spec could hold and lacks: those a list left out. */
+const leftOutOf = (read: Read) => filesLeftOut(filePathsOf(read), { spec: read.spec });
+
+/**
+ * Whether the file holds `read` whole: it lacks none of its files' content, or holds some of it, as a file written by hand does that
+ * leaves out a key it need not give (a workflow's `readme`); an object a list served holds none of it.
+ */
+const wholeOf = (read: Read) => leftOutOf(read).length === 0 || filesHeld(filePathsOf(read), { spec: read.spec }).length > 0;
+
+/** Why apply does not write `read`, an object copied from a list: its files' content is not in it, and the read of one holds it. */
+const partial = (read: Read) =>
+  new Refused(
+    `nemia apply: ${read.resource.name}/${read.name} lacks ${leftOutOf(read).join(', ')}, which a list leaves out: read it whole with \`nemia get ${read.resource.name} ${read.name} -o yaml\`, then apply that`,
+  );
+
 /** Whether what the file says of `read` is what `served` holds: its spec, and its labels where the kind's write carries them. */
 const sameAs = (read: Read, spec: unknown, served: Served, labels: boolean) => {
   const said = stringsOf(read.meta.labels);
@@ -226,9 +248,11 @@ async function applied(object: unknown, resources: readonly APIResource[], names
   const action = applyOf(
     served === null ? { exists: false } : { exists: true, same: sameAs(read, prepared.spec, served, writes?.labels === true) },
     { create: create !== undefined, update: update !== undefined, upsert: writes?.upsert === true },
+    wholeOf(read),
   );
   const at = appliedAt(read, served);
   const said = (word: Said) => `${resource.name}/${name} ${word}`;
+  if (action === 'partial') throw partial(read);
   if (action === 'no-create' || action === 'no-update') throw refusal(read, action, writes?.madeBy);
   if (action === 'create' && create !== undefined) await asked('apply', create(at));
   if (action === 'update' && update !== undefined) await asked('apply', update(at));

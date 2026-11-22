@@ -1,7 +1,8 @@
 /**
  * `nemia apply -f` against a served store (`served.ts`): a Workflow of yours made, then left alone, then written after an edit; a Card
  * written whole with a new `spec.from`; and the refusals, each exit 2 naming the command to type: a missing Card (`nemia inbox add`), a
- * changed Run, which the api writes no way (`nemia explain`), and an `apiVersion` other than `nemia/v1`.
+ * changed Run, which the api writes no way (`nemia explain`), an `apiVersion` other than `nemia/v1`, and a list's objects, which lack
+ * their files (`nemia get <resource> <name> -o yaml`).
  */
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -123,4 +124,22 @@ test('`nemia apply --help` is its own; `--local` is refused exit 2 by the route,
   const local = await store.nemia(['apply', '-f', '-', '--local']);
   assert.equal(local.code, 2, local.err);
   assert.match(local.err, /`nemia apply -f -`/);
+});
+
+test('REFUSED: the List `nemia get workflows -o yaml` prints is applied as nothing, exit 2 naming `nemia get`: its items lack their files', async () => {
+  const file = path.join(store.home, 'kept.yaml');
+  fs.writeFileSync(file, workflow('Keep it.').replace('name: tidy', 'name: kept'));
+  const made = await store.nemia(['apply', '-f', file]);
+  assert.equal(made.code, 0, made.err);
+  const listed = await store.nemia(['get', 'workflows', '-o', 'yaml']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /^kind: WorkflowList$/m);
+  assert.doesNotMatch(listed.out, /Keep it\./, 'a list carries no step note');
+  const applied = await store.nemia(['apply', '-f', '-'], listed.out);
+  assert.equal(applied.code, 2, applied.err);
+  assert.equal(applied.out, '', 'nothing written');
+  assert.match(applied.err, /workflows\/kept/);
+  assert.match(applied.err, /nemia get workflows kept -o yaml/);
+  const read = await store.nemia(['get', 'workflow', 'kept', '-o', 'yaml']);
+  assert.match(read.out, /body: Keep it\./, 'the workflow as it was');
 });

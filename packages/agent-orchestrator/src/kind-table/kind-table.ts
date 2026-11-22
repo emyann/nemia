@@ -11,18 +11,20 @@
 import {
   DEFAULT_NAMESPACE,
   type AgentList,
-  type AgentListed,
   type Factory,
   type FactoryList,
   type McpServer,
   type McpServerList,
-  type ProposalListed,
   type ProposalList,
   type SkillList,
-  type SkillListed,
   type Table,
   type TableColumnDefinition,
 } from 'objects';
+
+/** An agent, a skill and a proposal as a list serves each: without its files' content (`LISTED_WITHOUT`). */
+type AgentListed = AgentList['items'][number];
+type SkillListed = SkillList['items'][number];
+type ProposalListed = ProposalList['items'][number];
 import { column, firstLine, tableOf } from './table-of.ts';
 
 /**

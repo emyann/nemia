@@ -5,7 +5,10 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import type { TemplateListed, WorkflowListed } from 'objects';
+import type { TemplateList, WorkflowList } from 'objects';
+
+type WorkflowListed = WorkflowList['items'][number];
+type TemplateListed = TemplateList['items'][number];
 import { templateTable, workflowTable } from './definition-table.ts';
 
 const meta = (name: string) => ({ name, namespace: 'default', creationTimestamp: '2026-11-01T00:00:00Z', resourceVersion: '1' });

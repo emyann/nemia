@@ -1,11 +1,12 @@
 /**
  * What a list leaves out (`src/listed.ts`): `filesLeftOut` names each path of `LISTED_WITHOUT` an object lacks where it holds the path's
  * parent, so an object a list served is told apart from one a read of one served, and a parent that is null or absent names nothing.
- * That each kind's list serves its items without those paths, every other key kept, is held by each kind's own test.
+ * And `filesHeld` names those it holds, none for an object a list served. That each kind's list serves its items without those paths,
+ * every other key kept, is held by each kind's own test.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { KINDS, LISTED_WITHOUT, filesLeftOut } from 'objects';
+import { KINDS, LISTED_WITHOUT, filesHeld, filesLeftOut } from 'objects';
 
 const whole = {
   spec: { role: 'Architect', output: { file: 'a.schema.json', text: '{}' }, instructions: 'Design.' },
@@ -45,4 +46,13 @@ test('every kind says what its list leaves out, each path under its spec or its 
   assert.deepEqual(Object.keys(LISTED_WITHOUT).sort(), [...KINDS].sort());
   for (const paths of Object.values(LISTED_WITHOUT))
     for (const path of paths) assert.ok(path.startsWith('spec.') || path.startsWith('status.'), path);
+});
+
+test('an object a list served holds none of its files; one written by hand holds those it has, and a whole one every one', () => {
+  const paths = LISTED_WITHOUT.Workflow;
+  const listed = { spec: { steps: [{ name: 'a', keys: {} }], files: [{ path: 'check.ts' }] }, status: { steps: [] } };
+  assert.deepEqual(filesHeld(paths, listed), []);
+  const byHand = { spec: { steps: [{ name: 'a', keys: {}, body: 'Do it.' }] } };
+  assert.deepEqual(filesHeld(paths, byHand), ['spec.steps[].body']);
+  assert.deepEqual(filesHeld(LISTED_WITHOUT.Agent, whole), LISTED_WITHOUT.Agent);
 });

@@ -10,8 +10,9 @@
  * (`.storybook/fixtures/`). A request none of them answers, to the api or to another origin, never leaves the browser: it is answered
  * with a network error and the story fails after it is drawn, naming it (`strayHandler`, `straysSaid`, `network.ts`). Every story is
  * held to axe in the accessibility addon as `error`, so a violation fails `npm run stories`; a story that fails it today has its a11y
- * test set to warn only, in its own file, a count `test/stories.test.ts` holds to its baseline. A story the holder caught throwing, or one that draws nothing, fails after it is drawn (`afterEach`, `undrawn`), so a
- * broken story is a failing test and not a quiet `data-broken`. Once Storybook has finished a story, its play function and `afterEach`
+ * test set to warn only, in its own file, a count `test/stories.test.ts` holds to its baseline. A story the holder caught throwing, or
+ * one that draws nothing, fails after it is drawn (`afterEach`, `undrawn`), so a broken story is a failing test and not a quiet
+ * `data-broken`. Once Storybook has finished a story, its play function and `afterEach`
  * run, the document's body says which (`data-story-finished`), so a browser test that opens it alone (`test/e2e/stories/built.ts`)
  * presses nothing while the play still moves the focus. The stage a story is drawn on is `stage.tsx`, which the design system's
  * producer (`tools/design-system`) bundles too, so its cards draw under the same one.
@@ -37,12 +38,12 @@ let marking = false;
 const strays: string[] = [];
 
 /**
- * MSW's worker for every story, started quiet: its one handler of its own is the strays' (`strayHandler`), which the handlers a story
- * names are put before, and which each story's reset keeps.
+ * MSW's worker for every story, started quiet and strict: its one handler of its own is the strays' (`strayHandler`), which answers
+ * every request, the handlers a story names put before it, and which each story's reset keeps.
  */
 async function strayWorker() {
   const worker = setupWorker(strayHandler(location.origin, (request) => strays.push(request)));
-  await worker.start({ quiet: true, onUnhandledRequest: 'bypass' });
+  await worker.start({ quiet: true, onUnhandledFrame: 'error' });
   return worker;
 }
 

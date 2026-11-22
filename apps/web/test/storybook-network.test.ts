@@ -1,11 +1,12 @@
 /**
  * What the stories' network holds with no browser: a request no story's handler answers, to the board's api or to another origin, is
  * recorded and answered with a network error by the preview's fallback (`strayHandler`, `.storybook/network.ts`), so it never leaves
- * the browser; the stories' own files pass through it; a story's own handler, put before it, wins; and the story is failed naming each
- * stray (`straysSaid`, which the preview's `afterEach` runs). Which request is a stray is proved by `contracts/story-stray.contract.ts`.
+ * the browser; the stories' own files are passed through it; a story's own handler, put before it, wins; and the story is failed
+ * naming each stray (`straysSaid`, which the preview's `afterEach` runs). Which request is a stray is proved by
+ * `contracts/story-stray.contract.ts`.
  */
 import assert from 'node:assert/strict';
-import { getResponse, http, HttpResponse } from 'msw';
+import { getResponse, http, HttpResponse, isPassthroughResponse } from 'msw';
 import { test } from 'vitest';
 import { strayHandler, straysSaid } from '../.storybook/network.ts';
 
@@ -20,7 +21,7 @@ const ORIGIN = 'http://story.test';
 const asked = async (url: string, own: Parameters<typeof getResponse>[0] = []) => {
   const strays: string[] = [];
   const response = await getResponse([...own, strayHandler(ORIGIN, (request) => strays.push(request))], new Request(url));
-  return { type: response?.type, strays };
+  return { type: response && isPassthroughResponse(response) ? 'passthrough' : response?.type, strays };
 };
 
 test("REFUSED: the board's api and another origin are answered with a network error and recorded", async () => {
@@ -29,7 +30,7 @@ test("REFUSED: the board's api and another origin are answered with a network er
 });
 
 test("the stories' own files pass through, and a story's own handler wins over the fallback", async () => {
-  assert.deepEqual(await asked(`${ORIGIN}/src/x.tsx`), { type: undefined, strays: [] });
+  assert.deepEqual(await asked(`${ORIGIN}/src/x.tsx`), { type: 'passthrough', strays: [] });
   const own = [http.get(`${ORIGIN}/api/runs/:name/lines`, () => HttpResponse.json({ lines: [] }))];
   assert.deepEqual(await asked(`${ORIGIN}/api/runs/x/lines`, own), { type: 'default', strays: [] });
 });

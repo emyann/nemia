@@ -15,7 +15,9 @@ import { askedCount } from '../.storybook/asked.ts';
 export type WorkersAsked = { readonly ci: boolean; readonly asked: string | undefined; readonly cores: number };
 
 /** The bound: as many story files at once, or a refusal of the ask, saying what to set instead. */
-export type StoriesWorkers = { readonly kind: 'workers'; readonly workers: number } | { readonly kind: 'refused'; readonly message: string };
+export type StoriesWorkers =
+  | { readonly kind: 'workers'; readonly workers: number }
+  | { readonly kind: 'refused'; readonly message: string };
 
 /**
  * How many story files an ask says (`.storybook/asked.ts`), or nothing where it is no whole number of one or more as decimal digits
@@ -41,8 +43,7 @@ const storiesWorkersOfSpec = spec<(asked: WorkersAsked) => StoriesWorkers>({
   ensures: {
     oneAtATimeByDefault: {
       description: "Off CI, with nothing asked, one story file at a time: a person's or a step's machine shares its memory",
-      condition: ({ input: [asked], output }) =>
-        asked.ci || !unasked(asked.asked) || (output.kind === 'workers' && output.workers === 1),
+      condition: ({ input: [asked], output }) => asked.ci || !unasked(asked.asked) || (output.kind === 'workers' && output.workers === 1),
     },
     aCoreEachOnCi: {
       description: 'Under CI, with nothing asked, one story file a core, as many as the runner reports',

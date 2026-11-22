@@ -69,6 +69,7 @@ const ENV: Record<string, string | undefined> = {
   WF_VERIFY_REST: '1',
   WF_MAX_RUNS: undefined,
   WF_MAX_CONCURRENT: undefined,
+  WF_KEPT_TURNS: undefined,
 };
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>) =>

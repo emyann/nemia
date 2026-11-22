@@ -39,7 +39,7 @@ type Which = 'upgrade' | 'back';
  * without colour, its tag's hue and frame's.
  */
 const PHASE: Record<UpgradePhase | 'restarting', { word: string; icon: LucideIcon | null; className: string; hue: FrameHue }> = {
-  pending: { word: 'Waiting for a slot', icon: null, className: container.grey, hue: 'none' },
+  pending: { word: 'Waiting to start', icon: null, className: container.grey, hue: 'none' },
   running: { word: 'Upgrading', icon: null, className: ringed.alive, hue: 'alive' },
   restarting: { word: 'Restarting', icon: null, className: ringed.alive, hue: 'alive' },
   succeeded: { word: 'Upgraded', icon: CircleCheck, className: container.sage, hue: 'none' },
@@ -75,7 +75,7 @@ function PhaseTag({ phase }: { phase: keyof typeof PHASE }) {
 }
 
 /**
- * An upgrade as it runs: its phase — waiting for a slot on the server, upgrading, or restarting while the daemon that serves the board
+ * An upgrade as it runs: its phase — waiting to start on the server, upgrading, or restarting while the daemon that serves the board
  * restarts onto the new release (`reconnecting`) — the tag it goes to, and what it printed so far, which stays shown while the daemon
  * restarts. While it waits, `queuedFor` says why (`queuedSaid`): memory, a slot or the server paused; with none said yet, that it starts
  * on the engine's next pass. `unread` is an end the board could not read.

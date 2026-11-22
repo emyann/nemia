@@ -4,6 +4,8 @@ keyspace import: 1070 records in 1.6 s; largest run record: board-look-design-md
 AMD EPYC-Genoa Processor, 8 cores, 16366.5 MB, node v24.16.0, load 2.18; commit ce61c90e4341; 2026-11-22T14:52:55.407Z; median of 3
 runs read: finished a-red-ci-that-is-a-real-fail-faza, open board-look-a-cost-is-ink-and-x5js; feed from byte 5466921, 1000 lines; her chat: task nemia-20261121051038481, 45 events listed, cursor 3.44.6.5.5.0.1.1.0
 
+run records read: the runs/<id>.json files a read opened; the runs are records of the keyspace here, read off it uncounted, so this column counts none of them and its 0 is no gain
+
 | read | cold ms | cold heap MB | warm ms | warm heap MB | run records read, cold / warm | answer KB |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | tickPass | 3218.7 | 0.5 | 459.1 | 0.4 | — | — |
@@ -41,6 +43,8 @@ runs read: finished a-red-ci-that-is-a-real-fail-faza, open board-look-a-cost-is
 spawned: git read (read) ×98, git read (pass) ×102; place writes refused: none
 
 against 8d1f10b0c8f2 of 2026-11-22T14:42:12.502Z: 295 runs now, 295 then; 2699 tasks now, 2699 then; 369 cards now, 369 then
+
+run records read: the runs/<id>.json files a read opened; the runs are records of the keyspace here, read off it uncounted, so this column counts none of them and its 0 is no gain
 
 | read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline | answer KB now | baseline |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

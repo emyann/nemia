@@ -124,6 +124,7 @@ export function rendered(report: StoreMeasure) {
     `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}, load ${report.machine.load}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
     `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines; her chat: task ${report.asked.chat?.task ?? '—'}, ${report.asked.chat?.events ?? 0} events listed, cursor ${report.asked.chat?.cursor ?? '—'}`,
     '',
+    ...(report.keyspace ? [RECORDS_IN_KEYSPACE, ''] : []),
     '| read | cold ms | cold heap MB | warm ms | warm heap MB | run records read, cold / warm | answer KB |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...MEASURES.map(row),
@@ -140,6 +141,13 @@ export function rendered(report: StoreMeasure) {
   ].join('\n');
 }
 
+/**
+ * What the column of run records read counts once runs are records of the keyspace: the files `runs/<id>.json` read, which no read opens
+ * then, so its 0 is no gain against a baseline that read files.
+ */
+const RECORDS_IN_KEYSPACE =
+  'run records read: the runs/<id>.json files a read opened; the runs are records of the keyspace here, read off it uncounted, so this column counts none of them and its 0 is no gain';
+
 /** Each number of `now` beside `baseline`'s, and their ratio, as markdown: `—` for a read or a count the baseline lacks. */
 export function comparedWith(now: StoreMeasure, baseline: StoreMeasure) {
   const records = (m: Measured | null | undefined) => (m?.records ? `${m.records.cold} / ${m.records.warm}` : '—');
@@ -149,6 +157,7 @@ export function comparedWith(now: StoreMeasure, baseline: StoreMeasure) {
   return [
     `against ${baseline.commit.slice(0, 12)} of ${baseline.date}: ${now.counts.runs} runs now, ${baseline.counts.runs} then; ${now.counts.tasks} tasks now, ${baseline.counts.tasks} then; ${now.counts.cards.listed} cards now, ${baseline.counts.cards?.listed ?? '—'} then`,
     '',
+    ...(now.keyspace && !baseline.keyspace ? [RECORDS_IN_KEYSPACE, ''] : []),
     '| read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline | answer KB now | baseline |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...MEASURES.map(

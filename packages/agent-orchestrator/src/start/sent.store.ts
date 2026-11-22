@@ -10,7 +10,7 @@ import path from 'node:path';
 
 /**
  * A file sent to hand a run's steps: its own name, and its text where its bytes are UTF-8, else its bytes in base64, else the path of the
- * file the factory keeps for it (`from`, `fileAt`), uploaded before the start.
+ * file the factory keeps for it (`from`, the File door's `read`), uploaded before the start.
  */
 export type SentInput = { readonly name: string; readonly text?: string; readonly base64?: string; readonly from?: string };
 

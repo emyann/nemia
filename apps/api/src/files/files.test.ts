@@ -103,6 +103,11 @@ test('three pictures of 3 MB in all, each uploaded, start a card whose run holds
     const file = (await res.json()) as FileObject;
     assert.match(file.id, /^file_[0-9a-f]{32}$/);
     assert.deepEqual([file.name, file.mediaType, file.size], [name, 'image/png', bytes.length]);
+    assert.equal(
+      file.digest,
+      `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
+      'its digest is sha256 of the bytes sent',
+    );
     files.push(file);
   }
   write(path.join(root, 'inbox', 'pictured-card.md'), '---\nworkflow: dev\nfactory: acme\n---\nMatch the pictures.\n');

@@ -14,7 +14,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { INBOX_ADD, INBOX_ATTACH, inboxDir, runWith, startFromInbox } from '../src/runner.ts';
-import { fileBegun, fileKept } from '../src/start/files.store.ts';
+import { Effect } from 'effect';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { FileDoor } from '../src/start/files.store.ts';
 import { inputsDir } from '../src/record/record.store.ts';
 import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -46,21 +48,26 @@ const aRepo = () => {
   return repo;
 };
 
-/** A File of the default namespace kept with `bytes`, as an upload keeps one. */
-const kept = (bytes: Buffer, name = 'upload.png') => {
-  const now = Date.now();
-  const begun = fileBegun(ROOT, 'default', now);
-  assert.ok(begun);
-  begun.write(bytes);
-  begun.close();
-  return fileKept(ROOT, 'default', {
-    id: begun.id,
-    name,
-    mediaType: 'image/png',
-    size: bytes.length,
-    createdAt: new Date(now).toISOString(),
-  });
-};
+/** A File of the default namespace kept with `bytes`, as an upload keeps one, through the File door at the store's root. */
+const kept = (bytes: Buffer, name = 'upload.png') =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const now = Date.now();
+      const door = yield* FileDoor;
+      const begun = yield* door.files.begin('default', now);
+      assert.ok(begun);
+      begun.write(bytes);
+      begun.close();
+      return yield* door.files.keep('default', {
+        id: begun.id,
+        name,
+        mediaType: 'image/png',
+        size: bytes.length,
+        digest: begun.digest(),
+        createdAt: new Date(now).toISOString(),
+      });
+    }).pipe(Effect.provideService(StoreRoot, ROOT)),
+  );
 
 /** Files the card `name` on the workflow `look`, carrying `files`, its text naming the first. */
 const card = (name: string, files: Record<string, string>) => {
@@ -80,7 +87,7 @@ describe("a card's files reach the run started from it", () => {
   test("the card's File is copied into the run's inputs under the card's name for it, and frozen on the record", async () => {
     const repo = aRepo();
     const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
-    const file = kept(bytes);
+    const file = await kept(bytes);
     const { run } = await runPlaced(startFromInbox({ name: card('look-a1b2', { 'shot.png': file.id }), callerRepo: repo, isolate: false }));
     const record = runRecord(ROOT, run.id);
     assert.deepEqual(record.inputs, ['shot.png']);
@@ -95,7 +102,7 @@ describe("a card's files reach the run started from it", () => {
     );
     const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'shot.png');
     fs.writeFileSync(given, 'another\n');
-    const file = kept(Buffer.from('x'));
+    const file = await kept(Buffer.from('x'));
     await assert.rejects(
       runPlaced(startFromInbox({ name: card('look-e5f6', { 'shot.png': file.id }), callerRepo: repo, isolate: false, inputs: [given] })),
       (err: Error & { _tag?: string }) => err._tag === 'Invalid',
@@ -110,11 +117,11 @@ describe("a card's files reach the run started from it", () => {
       (err: Error & { _tag?: string }) => err._tag === 'Invalid',
     );
     const bytes = Buffer.from('again');
-    const again = kept(bytes);
+    const again = await kept(bytes);
     await served(INBOX_ATTACH.handler({ name, namespace: 'default', files: [{ file: again.id, name: 'shot.png' }] }));
     const text = fs.readFileSync(path.join(inboxDir(ROOT), `${name}.md`), 'utf8');
     assert.ok(text.includes(again.id) && !text.includes(`file_${'0'.repeat(32)}`), text);
-    const twice = kept(Buffer.from('twice'));
+    const twice = await kept(Buffer.from('twice'));
     await assert.rejects(
       served(INBOX_ATTACH.handler({ name, namespace: 'default', files: [{ file: twice.id, name: 'shot.png' }] })),
       (err: Error & { _tag?: string }) => err._tag === 'Invalid',
@@ -123,7 +130,7 @@ describe("a card's files reach the run started from it", () => {
     assert.deepEqual(fs.readFileSync(path.join(inputsDir(ROOT, runRecord(ROOT, run.id)), 'shot.png')), bytes);
   });
   test('REFUSED: an idea whose factory: is not the namespace it is filed in, nothing filed, naming where to file it; one naming default by name is filed there', async () => {
-    const file = kept(Buffer.from('pic'));
+    const file = await kept(Buffer.from('pic'));
     fs.mkdirSync(inboxDir(ROOT), { recursive: true });
     const before = fs.readdirSync(inboxDir(ROOT)).sort();
     await assert.rejects(

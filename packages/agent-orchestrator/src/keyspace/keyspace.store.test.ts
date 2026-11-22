@@ -2,8 +2,9 @@
  * What the keyspace's I/O holds that no law of its contract can (`contracts/keyspace.contract.ts` proves the decisions): a transaction
  * changes all of its records or none; a write that was answered is on disk (write-ahead log, `synchronous=FULL`, read again after its
  * client closed); two clients writing one key from one revision write it once; Kine's unique index refuses a second row after one
- * revision; a watch from a revision and a compaction answer rows, `gone` and `ahead`; a list answers live keys at its revision. And the
- * table's migrations: applied once, what a file lacks applied, a file a newer release wrote refused `Invalid` and left as it was.
+ * revision; a watch from a revision and a compaction answer rows, `gone` and `ahead`; a list answers live keys at its revision; a pointer
+ * never dangles, judged in the write's transaction and kept through a compaction. And the table's migrations: applied once, what a file
+ * lacks applied, a file a newer release wrote refused `Invalid` and left as it was.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -22,12 +23,25 @@ const create = (value: string) => ({ verb: 'create', expected: null, value }) sa
 /** A write that changes its key from `expected`, or overwrites where it is null. */
 const update = (value: string, expected: number | null) => ({ verb: 'update', expected, value }) satisfies KeyWriteOf;
 
+/** A write that makes its key, its record pointing to `points`. */
+const pointing = (value: string, points: readonly string[]) => ({ verb: 'create', expected: null, value, points }) satisfies KeyWriteOf;
+
+/** A write that deletes its key, whatever its revision. */
+const remove = { verb: 'delete', expected: null, value: '' } satisfies KeyWriteOf;
+
 /** What an Effect answered, or the tag of what it failed with. */
-async function answered<A>(effect: Effect.Effect<A, { readonly _tag: string; readonly refusal?: string }>) {
+/** What a refusal of the keyspace carries: its tag, why, and the key at fault for a pointer's. */
+type Refused = { readonly _tag: string; readonly refusal?: string; readonly pointer?: string | null };
+
+async function answered<A>(effect: Effect.Effect<A, Refused>) {
   const exit = await Effect.runPromiseExit(effect);
   if (Exit.isSuccess(exit)) return exit.value;
   const failed = exit.cause.reasons.find((r) => r._tag === 'Fail');
-  if (failed?._tag === 'Fail') return { refused: failed.error.refusal ?? failed.error._tag };
+  if (failed?._tag === 'Fail')
+    return {
+      refused: failed.error.refusal ?? failed.error._tag,
+      ...(failed.error.pointer !== undefined && failed.error.pointer !== null ? { pointer: failed.error.pointer } : {}),
+    };
   throw exit.cause;
 }
 
@@ -211,6 +225,88 @@ describe('the keyspace on disk', () => {
   });
 });
 
+describe('a pointer never dangles', () => {
+  const FILE = '/registry/files/acme/file_a';
+  const CARD = '/registry/cards/acme/one';
+
+  test('REFUSED dangling: a record that points to a key never written, the head unchanged and nothing listed', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const head = await Effect.runPromise(ks.head);
+    assert.deepEqual(await answered(ks.write(CARD, pointing('c', [FILE]))), { refused: 'dangling', pointer: FILE });
+    assert.equal(await Effect.runPromise(ks.head), head);
+    assert.deepEqual(await Effect.runPromise(ks.keys('/registry/')), []);
+  });
+
+  test('REFUSED dangling: a record that points to a key deleted', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    await Effect.runPromise(ks.write(FILE, create('f')));
+    await Effect.runPromise(ks.write(FILE, remove));
+    assert.deepEqual(await answered(ks.write(CARD, pointing('c', [FILE]))), { refused: 'dangling', pointer: FILE });
+  });
+
+  test('REFUSED referenced: the delete of a key a live record points to, and the key still listed', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    await Effect.runPromise(ks.write(FILE, create('f')));
+    await Effect.runPromise(ks.write(CARD, pointing('c', [FILE])));
+    assert.deepEqual(await answered(ks.write(FILE, remove)), { refused: 'referenced', pointer: CARD });
+    assert.deepEqual(await Effect.runPromise(ks.keys('/registry/files/')), [FILE]);
+  });
+
+  test('a transaction that makes the key, then the record that points to it, is written', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const rows = await Effect.runPromise(
+      ks.txn([
+        [FILE, create('f')],
+        [CARD, pointing('c', [FILE])],
+      ]),
+    );
+    assert.equal(rows.length, 2);
+  });
+
+  test('a transaction whose second write dangles writes neither', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const txn = await answered(
+      ks.txn([
+        [FILE, create('f')],
+        [CARD, pointing('c', [FILE, '/registry/files/acme/file_b'])],
+      ]),
+    );
+    assert.deepEqual(txn, { refused: 'dangling', pointer: '/registry/files/acme/file_b' });
+    assert.equal(await Effect.runPromise(ks.get(FILE)), undefined);
+  });
+
+  test('an update that points elsewhere frees the key it pointed to; a delete of the record frees its own', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const other = '/registry/files/acme/file_b';
+    await Effect.runPromise(ks.write(FILE, create('f')));
+    await Effect.runPromise(ks.write(other, create('g')));
+    const card = await Effect.runPromise(ks.write(CARD, pointing('c', [FILE])));
+    await Effect.runPromise(ks.write(CARD, { verb: 'update', expected: card.revision, value: 'c2', points: [other] }));
+    await Effect.runPromise(ks.write(FILE, remove));
+    assert.deepEqual(await answered(ks.write(other, remove)), { refused: 'referenced', pointer: CARD });
+    await Effect.runPromise(ks.write(CARD, remove));
+    await Effect.runPromise(ks.write(other, remove));
+    assert.deepEqual(await Effect.runPromise(ks.keys('/registry/')), []);
+  });
+
+  test('an update that names no points keeps none: it frees what the record pointed to', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    await Effect.runPromise(ks.write(FILE, create('f')));
+    const card = await Effect.runPromise(ks.write(CARD, pointing('c', [FILE])));
+    await Effect.runPromise(ks.write(CARD, update('c2', card.revision)));
+    await Effect.runPromise(ks.write(FILE, remove));
+  });
+
+  test('a compaction keeps the pointers of the live records', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    await Effect.runPromise(ks.write(FILE, create('f')));
+    const card = await Effect.runPromise(ks.write(CARD, pointing('c', [FILE])));
+    await Effect.runPromise(ks.write(CARD, { verb: 'update', expected: card.revision, value: 'c2', points: [FILE] }));
+    await Effect.runPromise(ks.compact(0));
+    assert.deepEqual(await answered(ks.write(FILE, remove)), { refused: 'referenced', pointer: CARD });
+  });
+});
+
 describe("the keyspace's table, migrated by Effect's Migrator", () => {
   test('a new file records every migration of the code, once, however many clients open it', async () => {
     const file = fileOf();
@@ -232,10 +328,30 @@ describe("the keyspace's table, migrated by Effect's Migrator", () => {
     await Effect.runPromise(Scope.close(scope, Exit.void));
     raw(file, 'DELETE FROM effect_sql_migrations');
     raw(file, 'DROP TABLE kine');
+    raw(file, 'DROP TABLE kine_pointers');
     const again = Scope.makeUnsafe();
     const ks = await Effect.runPromise(keyspaceIn(file, again));
     await Effect.runPromise(ks.write('/registry/t/a', create('a')));
     assert.equal(raw(file, 'SELECT migration_id FROM effect_sql_migrations').length, KEYSPACE_SCHEMA);
+    await Effect.runPromise(Scope.close(again, Exit.void));
+  });
+
+  test('a file that recorded only the first migration is given the pointers, its records still read', async () => {
+    const file = fileOf();
+    const scope = Scope.makeUnsafe();
+    const ks = await Effect.runPromise(keyspaceIn(file, scope));
+    await Effect.runPromise(ks.write('/registry/t/a', create('a')));
+    await Effect.runPromise(Scope.close(scope, Exit.void));
+    raw(file, 'DELETE FROM effect_sql_migrations WHERE migration_id > 1');
+    raw(file, 'DROP TABLE kine_pointers');
+    const again = Scope.makeUnsafe();
+    const reopened = await Effect.runPromise(keyspaceIn(file, again));
+    assert.equal((await Effect.runPromise(reopened.get('/registry/t/a')))?.value, 'a');
+    await Effect.runPromise(reopened.write('/registry/t/b', pointing('b', ['/registry/t/a'])));
+    assert.deepEqual(
+      raw(file, 'SELECT name, target FROM kine_pointers').map((row) => ({ ...row })),
+      [{ name: '/registry/t/b', target: '/registry/t/a' }],
+    );
     await Effect.runPromise(Scope.close(again, Exit.void));
   });
 

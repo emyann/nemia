@@ -16,13 +16,14 @@ import {
   sentInputRefusal,
   sentInputsRemoved,
   sentInputsWritten,
-  fileAt,
+  FileDoor,
   startedFacts,
   startFactoryAtOnce,
   wiredRepoFor,
   type Factory,
   type StartInput,
 } from 'agent-orchestrator';
+import { Effect } from 'effect';
 import { type CardStart, Conflict, Invalid, Missing, type RunStart } from 'objects';
 import { declaredAs } from '../objects/refused.ts';
 import type { Refusal } from '../guard.ts';
@@ -62,13 +63,18 @@ const extrasOf = (body: Pick<RunStart, 'models' | 'gates' | 'noWorktree'>) => ({
 
 /**
  * The inputs a start's body sends, as the package hands them: each named by its file's own name, a file uploaded first (`file`, its id)
- * found in the factory's files of `namespace` (`fileAt`) and handed by its path, its name the one it was uploaded with where the body
- * gives none. Refused (422), before anything is written, for an id no file of `namespace` is kept under, naming the upload that makes
- * one.
+ * found in the factory's files of `namespace` (the File door's `read`) and handed by its path, its name the one it was uploaded with
+ * where the body gives none. Refused (422), before anything is written, for an id no file of `namespace` is kept under, naming the
+ * upload that makes one.
  */
-function sentOf(home: string, namespace: string, inputs: NonNullable<RunStart['inputs']>) {
-  return inputs.map(({ name, file, text, base64 }) => {
-    const kept = file === undefined ? undefined : fileAt(home, namespace, file);
+async function sentOf(s: Served, namespace: string, inputs: NonNullable<RunStart['inputs']>) {
+  const held = await s.inRequest(
+    Effect.flatMap(FileDoor, (door) =>
+      Effect.forEach(inputs, ({ file }) => (file === undefined ? Effect.succeed(undefined) : door.files.read(namespace, file))),
+    ),
+  );
+  return inputs.map(({ name, file, text, base64 }, i) => {
+    const kept = held[i];
     if (file !== undefined && kept === undefined)
       throw declaredAs(START_REFUSALS, {
         status: 422,
@@ -89,7 +95,7 @@ function sentOf(home: string, namespace: string, inputs: NonNullable<RunStart['i
  */
 async function withInputs<A>(s: Served, namespace: string, inputs: RunStart['inputs'], start: (files: string[] | undefined) => Promise<A>) {
   if (inputs === undefined || !inputs.length) return start(undefined);
-  const sent = sentOf(s.home, namespace, inputs);
+  const sent = await sentOf(s, namespace, inputs);
   const refused = sentInputRefusal(sent);
   if (refused !== null) throw declaredAs(START_REFUSALS, { status: 422, error: refused });
   const here = sentInputsWritten(sent);

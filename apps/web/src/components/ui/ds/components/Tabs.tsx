@@ -53,7 +53,7 @@ const styles = tv({
   variants: {
     variant: {
       primary: {
-        indicator: "h-[3px] w-full min-w-6 rounded-t-[3px] bg-primary",
+        indicator: "h-[3px] w-full min-w-6 rounded-t-[3px] bg-[color:var(--md-comp-primary-navigation-tab-active-indicator-color,var(--md-sys-color-primary))]",
       },
       secondary: {
         // Full-tab width and square, so it is positioned against the tab
@@ -81,10 +81,10 @@ const styles = tv({
       variant: "primary",
       isSelected: true,
       class: {
-        label: "text-primary",
-        icon: "text-primary",
+        label: "text-[color:var(--md-comp-primary-navigation-tab-with-label-text-active-label-text-color,var(--md-sys-color-primary))]",
+        icon: "text-[color:var(--md-comp-primary-navigation-tab-with-icon-active-icon-color,var(--md-sys-color-primary))]",
         indicator: "opacity-100",
-        stateLayer: "bg-primary",
+        stateLayer: "bg-[color:var(--md-comp-primary-navigation-tab-with-label-text-active-label-text-color,var(--md-sys-color-primary))]",
       },
     },
     {
@@ -95,7 +95,7 @@ const styles = tv({
         icon: "text-on-surface-variant",
         // `…inactive.pressed.state-layer.color` is `primary`, unlike hover and
         // focus, which are `on-surface`.
-        stateLayer: "bg-on-surface group-data-pressed/tab:bg-primary",
+        stateLayer: "bg-on-surface group-data-pressed/tab:bg-[color:var(--md-comp-primary-navigation-tab-with-label-text-active-label-text-color,var(--md-sys-color-primary))]",
       },
     },
     {

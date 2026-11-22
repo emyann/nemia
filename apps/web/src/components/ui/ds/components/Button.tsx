@@ -50,7 +50,8 @@ const styles = tv({
         stateLayer: "bg-on-surface-variant",
       },
       text: {
-        base: "bg-transparent text-primary",
+        base: "bg-transparent text-[color:var(--md-comp-button-text-label-text-color,var(--md-sys-color-primary))]",
+        stateLayer: "bg-[color:var(--md-comp-button-text-label-text-color,var(--md-sys-color-primary))]",
       },
       elevated: {
         base: "bg-surface-container-low text-primary shadow-elevation-1 hover:shadow-elevation-2",
@@ -335,6 +336,11 @@ export type ButtonProps = StandardButtonProps | ToggleButtonProps;
  * each answers over an invisible area 48 pixels tall (and at least 48 wide)
  * centred on it. Leave that much room around it.
  *
+ * With `href` it is React Aria's `Link`, and takes what a router's own link
+ * hands the component it wraps: its hover, focus and touch handlers,
+ * `aria-current` and any `data-*`. What only a button takes (`type`, the
+ * `form*` props, `isPending`, `render`) stays off the link.
+ *
  * In a `ButtonGroup` it takes the group's size where it sets none, and the
  * group's corners and pressed width.
  *
@@ -440,6 +446,33 @@ function ButtonContent({
   );
 }
 
+/** What only a `<button>` takes: a link given `href` submits no form, has no
+ *  pending state, and is not drawn by the button's `render`. */
+const buttonOnlyProps = [
+  "type",
+  "form",
+  "formAction",
+  "formEncType",
+  "formMethod",
+  "formNoValidate",
+  "formTarget",
+  "name",
+  "value",
+  "isPending",
+  "preventFocusOnPress",
+  "render",
+  "isToggle",
+] as const;
+
+/** The button's props less those only a `<button>` takes. */
+function withoutButtonOnly<P extends object>(
+  props: P,
+): Omit<P, (typeof buttonOnlyProps)[number]> {
+  const rest = { ...props } as Record<string, unknown>;
+  for (const key of buttonOnlyProps) delete rest[key];
+  return rest as Omit<P, (typeof buttonOnlyProps)[number]>;
+}
+
 const StandardButton = React.forwardRef<HTMLButtonElement, StandardButtonProps>(
   (props, ref) => {
     const {
@@ -518,22 +551,24 @@ const StandardButton = React.forwardRef<HTMLButtonElement, StandardButtonProps>(
     };
 
     if (href !== undefined) {
-      const { isDisabled, onPress, onPressStart, onPressEnd, onPressChange } =
-        buttonProps;
+      // What only a button takes stays off the link: it submits no form and
+      // has no pending state. The rest is the link's own (its press, hover,
+      // focus and keyboard handlers, `aria-*`, `data-*`, the DOM events a
+      // router's link passes, such as `onMouseEnter` to preload), and React
+      // Aria's `Link` keeps of it what an anchor takes (`filterDOMProps`).
+      // The button's `render` draws a `<button>`, and stays off too.
+      const linkProps = withoutButtonOnly(buttonProps);
       return (
         <AriaLink
           {...dataProps}
+          // The handlers are typed on the button's element, as the ref is;
+          // the anchor is the element they are given when `href` is set.
+          {...(linkProps as unknown as Omit<AriaLinkProps, "className" | "children">)}
           href={href}
           target={target}
           rel={rel}
           routerOptions={routerOptions}
           download={download}
-          isDisabled={isDisabled}
-          onPress={onPress}
-          onPressStart={onPressStart}
-          onPressEnd={onPressEnd}
-          onPressChange={onPressChange}
-          aria-label={buttonProps["aria-label"]}
           className={baseStyles}
           // The public ref type stays the button's; an anchor is what lands
           // in it when `href` is set.

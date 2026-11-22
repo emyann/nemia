@@ -65,16 +65,11 @@ const drawn = (read: WorkflowStepPage, where: 'page' | 'row' = 'page') => (
 /**
  * Hiring into a step, one story a state: the picker of the agents beside it with Hire, and the picker opened; the agent hired, with Fire;
  * none to hire; and the package's refusal, said in place.
- *
- * Axe's `label-content-name-mismatch` alone is off, for the picker: the ds kit's `Select` draws its value before its floating label
- * inside its trigger, while React Aria names the trigger label first, so a kit select fails it wherever it is drawn. That is the kit's to
- * mend, upstream (as on `Frame/FactoryPane`); every other rule holds the hire.
  */
 const meta: Meta<typeof StepHire> = {
   title: 'Run/StepHire',
   component: StepHire,
   args: { from: 'user', workflow: 'release', step: 'review', place: PLACE, where: 'page' },
-  parameters: { a11y: { config: { rules: [{ id: 'label-content-name-mismatch', enabled: false }] } } },
 };
 export default meta;
 

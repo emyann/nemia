@@ -12,9 +12,7 @@ import { saysReading, Unread } from '../../../.storybook/unread';
 
 /**
  * The box that files a card: here while the factories it lists are read, the shape of its line under the list; and, filed, the
- * frame's snackbar that names the card and offers Open, to its page. Axe's
- * `label-content-name-mismatch` alone is off, for the Factory list: the ds kit's `Select` draws its value before its floating label and
- * is named by the label first, which axe reads as visible text left out of its name, an ask of the kit.
+ * frame's snackbar that names the card and offers Open, to its page.
  *
  * The kit's snackbar queue lives outside React, one for the page, and a snackbar with an action stays until it is pressed: each story
  * starts on an empty queue and leaves one, so none reads the snackbar the story before it left, whose Open would follow that story's
@@ -24,7 +22,6 @@ const meta: Meta<typeof FileCard> = {
   title: 'Store/FileCard',
   component: FileCard,
   args: { shown: 'solo' },
-  parameters: { a11y: { config: { rules: [{ id: 'label-content-name-mismatch', enabled: false }] } } },
   beforeEach: () => {
     snackbarQueue.clear();
     return () => snackbarQueue.clear();

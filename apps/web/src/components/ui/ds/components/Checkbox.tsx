@@ -35,19 +35,19 @@ const styles = tv({
       "flex size-[18px] items-center justify-center rounded-[2px] border-2 transition-colors duration-short-2",
       "group-data-focus-visible/cb:outline-none",
     ],
-    icon: "size-[18px] text-on-primary",
+    icon: "size-[18px] text-[color:var(--md-comp-checkbox-selected-icon-color,var(--md-sys-color-on-primary))]",
   },
   variants: {
     isSelected: {
       false: {
         box: "border-on-surface-variant bg-transparent group-data-invalid/cb:border-error group-data-disabled/cb:border-on-surface/38",
         stateLayer:
-          "bg-on-surface group-data-invalid/cb:bg-error group-data-pressed/cb:bg-primary",
+          "bg-on-surface group-data-invalid/cb:bg-error group-data-pressed/cb:bg-[color:var(--md-comp-checkbox-selected-container-color,var(--md-sys-color-primary))]",
       },
       true: {
-        box: "border-primary bg-primary group-data-invalid/cb:border-error group-data-invalid/cb:bg-error group-data-disabled/cb:border-transparent group-data-disabled/cb:bg-on-surface/38",
+        box: "border-[color:var(--md-comp-checkbox-selected-container-color,var(--md-sys-color-primary))] bg-[color:var(--md-comp-checkbox-selected-container-color,var(--md-sys-color-primary))] group-data-invalid/cb:border-error group-data-invalid/cb:bg-error group-data-disabled/cb:border-transparent group-data-disabled/cb:bg-on-surface/38",
         stateLayer:
-          "bg-primary group-data-invalid/cb:bg-error group-data-pressed/cb:bg-on-surface",
+          "bg-[color:var(--md-comp-checkbox-selected-container-color,var(--md-sys-color-primary))] group-data-invalid/cb:bg-error group-data-pressed/cb:bg-on-surface",
         icon: "group-data-invalid/cb:text-on-error group-data-disabled/cb:text-surface",
       },
     },

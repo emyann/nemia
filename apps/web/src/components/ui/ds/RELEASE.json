@@ -1,5 +1,5 @@
 {
-  "version": "0.11.0",
+  "version": "0.12.0",
   "kit": {
     "DESIGN.md": {
       "exact": "b69a94a40d70a369e1ea253ebb6620c9ce7d1fd1e83581ec68fcccd23c588257",
@@ -46,8 +46,8 @@
       "loose": "0e92669517654444435f71dee0032b19aaddf09a5ff99e03557b95c9ee423ac2"
     },
     "components/Button.tsx": {
-      "exact": "9ec47e720e7dd6e48c2079cb09fbe68a420295d55286cec0f682ba77df0cde89",
-      "loose": "c9a759737bf82f6bedb565450c9ee6b37bb7e70a84f4eea5ed2b6379d377698e"
+      "exact": "036bd42a8efde792f18ccff015579393576026c071c12ae926401329a57b3c81",
+      "loose": "0a74133aed7d28fd2455140e1623cbcd217c9200ebb2362a17d9816fb68e041e"
     },
     "components/ButtonGroup.tsx": {
       "exact": "553f15fce4aee51f2e135475136420335eb369ede75ce0109155b0ddabfcbf04",
@@ -62,8 +62,8 @@
       "loose": "e265ca2edcc0bc2d1963add138fb567a2dd8384c685774c6a4a2b805da6da2f5"
     },
     "components/Checkbox.tsx": {
-      "exact": "f28d2963d2beed4b7245e626a51aa775df4514503865e5105e3137a2abe79c2a",
-      "loose": "f75ad04eb6f5458245432a29baa08285e2590c64fdc80e96938f8cce33b06b53"
+      "exact": "261e85c1781eb3f9f52e418bc20843228009351f73fc147bc0147536415631ac",
+      "loose": "dd3aca8634a4594f0a86f72b81ba261008e173e9ce76ab1e9033f9d065e075df"
     },
     "components/Chip.tsx": {
       "exact": "6218231154071a8ac0cc758bba94dc975fcb3597ac3888802153b384defd3a70",
@@ -118,8 +118,8 @@
       "loose": "5d94b86e85cebb3cf245c20e69d3c0e741a3f97eb1bdb27f76e45f6e623ca776"
     },
     "components/IconButton.tsx": {
-      "exact": "45079374c064c9abc7a698c978331480c739fd482ea47b06fa94a7e0e9c4893c",
-      "loose": "324c02a21280f7d18f6adf635923c1809328ce775fe1b91eff0e8cb9a83b2c1f"
+      "exact": "919b90570ab2cdd2551fbac650fb08eb00e73c6f2456f606eff46243cfe0c3f3",
+      "loose": "13abf61e7a898caf9ffd5e494daf5d54c84e896417554fb7ae33e82e877b8283"
     },
     "components/ImageField.tsx": {
       "exact": "9e828d7f85d1ec3a360ba05f701648ab7ddcf47755b1b7b4180bacbc824e42d6",
@@ -142,8 +142,8 @@
       "loose": "17b3f052f01109a4bb4dcc7a3a7a9e6b8fc098de5891be7bbd5e6383ec3562e9"
     },
     "components/MenuItem.tsx": {
-      "exact": "14c854afe7c239a45ddbcced45ed84a54f50979fbd1945c3dd0f81d0afec1597",
-      "loose": "cde8491b4b4795e157a26a700c12c8f1d482aef7d2041ee68e6ae5bc54ce9fe6"
+      "exact": "0ab522415607353fe3a9355fc6276d97bd5479499e994d8d7bbbdddd42fc671c",
+      "loose": "a41b5dc28a4509fad6b7b9ed94f7248c63db6557dc18c958d563697f089b1a1c"
     },
     "components/Meter.tsx": {
       "exact": "78dd0a448aa80da1d20d29d6d5de42428057c183dc857f253c63b2b43e789b66",
@@ -190,8 +190,8 @@
       "loose": "fba26799dc8977fe70269a344b3be6c47e8acb20fb64eac4318554955b77994f"
     },
     "components/Radio.tsx": {
-      "exact": "197a80a82bee889732bd8ea74467901c94b03623c77678614dbed2e66d58f41d",
-      "loose": "8191bff62264d38a683f54912b2992a4da35170c4de3d44f78cb4ba4724bf7bd"
+      "exact": "46f354f8718b8cb9c05d7ac2f47996e7cc96cfa8a2a7b605a58207b2ab76f749",
+      "loose": "0c01fe7340d0d3773e8128ae8db0198df87581edce6eef7371beb249d4513d27"
     },
     "components/Search.tsx": {
       "exact": "d745ffc99406df6ad12c69c5157e6325e24769c92f287aca9e5ad94bdc4272ac",
@@ -202,8 +202,8 @@
       "loose": "575f0fc0a9fa33b065deaa6d2ace3b5731177ddef711db14c4036c9cb506348d"
     },
     "components/Select.tsx": {
-      "exact": "f7e20f394df70c26549338711d4912557ea13bc0c83f5916f966df95c2ef645a",
-      "loose": "57143fda8fc287500018a5053daee3604e6a27dd1e6f4f401c2511d771f5534d"
+      "exact": "66207fae2adef48afad23e86f9283f8d4aef001cb579c31f41ed27a6888bfaf0",
+      "loose": "1aac36fb121d15a12fdbf191d25cc6d5dcff6be18149c533556ce89fdee621dd"
     },
     "components/SideSheet.tsx": {
       "exact": "ed2a1d946e88af099a01075e85a1960c3570bb76d006a8d4391ab0478f95df86",
@@ -214,8 +214,8 @@
       "loose": "07891fcd929df18fda03df60f6c4dfbbaa2501665d6e39bb879e48cbe5002b2c"
     },
     "components/Slider.tsx": {
-      "exact": "5b740806c70623b4c3b0b615ed18ef5809ecbe4689013250653adbf0d5eb9912",
-      "loose": "538877bd296b5cd6bddc7537e83095f999d6d3f3d20231a064abcf2b635f0b39"
+      "exact": "81c854a73d11b0e6537a392dddf70715370894126fa292825d2d949588ac7ad5",
+      "loose": "4bbab87388a5b3808e0042d7171137abcae559932daa2133127b83dd19f2ada9"
     },
     "components/Snackbar.tsx": {
       "exact": "9dc137813948faf676c941e937ac25ca780b4fa325e318b4324be54dca46649b",
@@ -226,16 +226,16 @@
       "loose": "ab7f99eaf5cdc9342a106e568bb5ce46cd8f6386acac8c33311071df97472563"
     },
     "components/Switch.tsx": {
-      "exact": "4fbef54b4d2d84afef1ebfd03f00e245fbffb246b78d90168cdc53925104df43",
-      "loose": "5800cd04d84e556a5adf66aff9c4eaebb5f4e4fafb6b1953f22d29086de2efb1"
+      "exact": "2b878cc4f32b76c62f4d8c586ea375f1072150db922e78b1b05c50122fbb0b52",
+      "loose": "db6e6769ba70854c10ebdf1009099640a3b5e43a6f4b86938b8f851e0b87add8"
     },
     "components/Table.tsx": {
       "exact": "2b6e86ef0fd6fa2764560eccb0896cc237350867b82572ecfac4e03b127be018",
       "loose": "0a29d855ba3913de8f5abfadd85f92ac55d50a72560b539be6e0bee9719ee122"
     },
     "components/Tabs.tsx": {
-      "exact": "f195366116d0055c6f5ca3886d3b87d4a9d5c4350758db9dae64431cfb4c176d",
-      "loose": "b35218f8723f0ef4aa79c4aad6cdb2a5d87841cd73e77d1f3a691c4c22c4cd29"
+      "exact": "b3028090ca4947ab380c770019d5b1b62ab928496cae9737303ec256516cdc2e",
+      "loose": "5e6ba6a01486e65b11254b293ae4a2faf5a741042d6864b68da24db774a0f9d7"
     },
     "components/Tag.tsx": {
       "exact": "c4cf1ebafe1b00690c2715d9a431a165e168a8dcd670ea6fad92ef0fabaaf501",
@@ -334,8 +334,8 @@
       "loose": "cb0b2f4f16e4cbf0c46c40256514b088602a8c000aeef16993d6a86aadaf545c"
     },
     "tokens/design-md.mjs": {
-      "exact": "92981d937fce51e7fc1c31259b2543641ab8af5210c8b1a83684c3d814eb8ad0",
-      "loose": "531bb8dce56da14ef2a4e0e5ce41543c2addcf9895d6035a9aabe09a452feeee"
+      "exact": "f2e8c1c1badf2bd9fbe562fa11c0e6ce2cfe5d6b50b833506a52125573ac922f",
+      "loose": "4864c7d12812bebb569b3f38a107f2df438005f03cb794956edf5477da67a23e"
     },
     "tokens/generate-theme.mjs": {
       "exact": "0a7f19678cee574e34fbc5cde94afc8026bc5d57dba6e99b6d41a989663f6603",
@@ -360,8 +360,8 @@
   },
   "project": {
     ".claude/skills/ds-build/SKILL.md": {
-      "exact": "4b99cece6c6d7371e728f77b184721f8c140df9ed62df0b8244552f60b61228d",
-      "loose": "9d69780e7e106ee295dd27adbe2cea2e3111e0e76259b539e0ba0d8d40b74b07"
+      "exact": "b9382e176af2ab24cf70fba28fdb0a6f87e64f803addc463575adb9fa6b38a16",
+      "loose": "d5f489fc5f74be90583f2d4ab4174654d73a9c837facdc5c9d7e40b4b4d9783a"
     },
     ".claude/skills/ds-spec/SKILL.md": {
       "exact": "96df5b9d9585d4dfb4f5ef97d0baa936a5d7176111ef5247d29a04670d8fd25e",
@@ -372,12 +372,12 @@
       "loose": "4d99089debfece419b5da2cb23b96638022d7e6a5ebe9048a36f6c07a9ff5097"
     },
     ".claude/skills/ds-theme/SKILL.md": {
-      "exact": "e3ff060aa1e0c52b8953e52014a7afb4d6d9fa0b860916362466a9a147c5724b",
-      "loose": "a0e4cddc886e82769a9364f72f641cafffbdd6d79bdd51d0d48db758c5dcf5c7"
+      "exact": "45340e192e189ce43c377a797f1c190908d31875976c62a064f213d6f7455939",
+      "loose": "bdeb55bee2be51b1c7ed77878a85eea9bef778a8012aec6984d10aacee4bb4da"
     },
     ".claude/skills/ds-theme/design-md.md": {
-      "exact": "3dfe96e43b49a8f255a98e716a583d60572c87b5614bc29a92b7c3e3678dfb6a",
-      "loose": "d69c23b700c83d0fb5229ecd988d245899df071b57490834971772e64217082d"
+      "exact": "8359d0b871aaab7371e98be3229409ce1ca1fe0543da4043b5fb31853c9fec7f",
+      "loose": "a09729b39e2bb32581c2816188078d1df72fdd1dac88e90c71fc96b3ca447471"
     }
   },
   "optional": {

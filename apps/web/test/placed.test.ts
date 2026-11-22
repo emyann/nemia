@@ -41,7 +41,7 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, factories: F
 test("REFUSED: a write of a folder of yours reads again the list read with no factory, every factory's and each workflow read whole — never a step's page keyed under it", async () => {
   const client = new QueryClient();
   const step = ['workflows', 'yours', 'mine', 'plan', null, null];
-  const whole = ['workflow', 'user', 'mine', 'pipao', '/code/pipao'];
+  const whole = ['workflow', 'user', 'mine', 'quay', '/a'];
   const kept = [['workflows'], ['factory-workflows', 'pipao', '/code/pipao'], ['factory-workflows', 'quay', '/a'], step, whole];
   for (const key of kept) client.setQueryData(key, []);
   await rereadWorkflows(client);

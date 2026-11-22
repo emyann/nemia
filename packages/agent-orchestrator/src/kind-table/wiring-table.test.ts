@@ -97,10 +97,10 @@ test('a hire prints the agent that fills its step and its model; a library add i
     apiVersion: 'nemia/v1',
     kind: 'Hire',
     metadata: meta('build.design'),
-    spec: { workflow: 'build', step: 'design', agent: 'seldon' },
+    spec: { workflow: 'build', step: 'design', agent: 'reviewer' },
     status: {
       filled: 'factory',
-      agent: 'seldon',
+      agent: 'reviewer',
       settings: {
         model: { value: 'opus', from: 'agent' },
         effort: setting,
@@ -116,18 +116,18 @@ test('a hire prints the agent that fills its step and its model; a library add i
   } satisfies Hire;
   const hires = hireTable(page('HireList', [hire]));
   wellFormed(hires, ['build.design']);
-  assert.deepEqual(hires.rows[0]?.cells, ['build.design', 'seldon', 'factory', '', 'opus', '']);
+  assert.deepEqual(hires.rows[0]?.cells, ['build.design', 'reviewer', 'factory', '', 'opus', '']);
 
   const add = {
     apiVersion: 'nemia/v1',
     kind: 'LibraryAdd',
-    metadata: meta('Agent.grace'),
-    spec: { kind: 'Agent', name: 'grace' },
+    metadata: meta('Agent.implementer'),
+    spec: { kind: 'Agent', name: 'implementer' },
     status: { state: 'missing', recorded: true, message: 'Add it.\nThen again.' },
   } satisfies LibraryAdd;
   const adds = libraryAddTable(page('LibraryAddList', [add]));
-  wellFormed(adds, ['Agent.grace']);
-  assert.deepEqual(adds.rows[0]?.cells, ['Agent.grace', 'Agent', 'grace', 'missing', '', '', 'Add it.']);
+  wellFormed(adds, ['Agent.implementer']);
+  assert.deepEqual(adds.rows[0]?.cells, ['Agent.implementer', 'Agent', 'implementer', 'missing', '', '', 'Add it.']);
 
   const volume = {
     apiVersion: 'nemia/v1',
@@ -145,7 +145,7 @@ test("a delegation prints its rules' verbs and resources once each; a subscripti
   const delegation = {
     apiVersion: 'nemia/v1',
     kind: 'Delegation',
-    metadata: meta('agora'),
+    metadata: meta('shipper'),
     spec: {
       rules: [
         { resources: ['workflows'], resourceNames: [], verbs: ['update'] },
@@ -154,8 +154,8 @@ test("a delegation prints its rules' verbs and resources once each; a subscripti
     },
   } satisfies Delegation;
   const delegations = delegationTable(page('DelegationList', [delegation]));
-  wellFormed(delegations, ['agora']);
-  assert.deepEqual(delegations.rows[0]?.cells, ['agora', 2, 'update, create', 'workflows, agents']);
+  wellFormed(delegations, ['shipper']);
+  assert.deepEqual(delegations.rows[0]?.cells, ['shipper', 2, 'update, create', 'workflows, agents']);
 
   const subscription = {
     apiVersion: 'nemia/v1',

@@ -145,7 +145,7 @@ export const agentRowOf = (agent: AgentList['items'][number]) => {
  * result schema and its file as written.
  * @param agent The Agent object a read of one serves.
  */
-export const agentViewOf = (agent: Agent) => ({
+const agentViewOf = (agent: Agent) => ({
   ...agentRowOf(agent),
   body: agent.spec.instructions ?? '',
   schema: agent.spec.output ? { ...agent.spec.output } : null,

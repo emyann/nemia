@@ -78,7 +78,7 @@ export type WorkflowListing = {
 };
 
 /** A step as a list of workflows carries it: a listed step without its file's content — its body, its own note and its layers. */
-export type StepRow = Omit<ListedStep, 'body' | 'own' | 'layers'> & { own: Omit<StepOwn, 'body'> | null };
+type StepRow = Omit<ListedStep, 'body' | 'own' | 'layers'> & { own: Omit<StepOwn, 'body'> | null };
 
 /**
  * A workflow as a list carries it: a `WorkflowListing` without its files' content — its README and each step's body, own note and layers —

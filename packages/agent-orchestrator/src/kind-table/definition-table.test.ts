@@ -75,9 +75,17 @@ test('a template prints its version and description, and its first problem with 
     kind: 'Template',
     metadata: meta('sdlc'),
     spec: { version: '3.11.0', description: 'The team that builds Nemia.', parameters: {}, hires: {} },
-    status: { source: '/t/sdlc', workflows: ['build', 'quick'], agents: ['grace'], skills: [], problems: ['a\nb', 'c'] },
+    status: { source: '/t/sdlc', workflows: ['build', 'quick'], agents: ['implementer'], skills: [], problems: ['a\nb', 'c'] },
   } satisfies TemplateListed;
   const table = templateTable(page('TemplateList', [template]));
-  assert.deepEqual(table.rows[0]?.cells, ['sdlc', '3.11.0', 'The team that builds Nemia.', 'a (and 1 more)', 'build, quick', 'grace', '']);
+  assert.deepEqual(table.rows[0]?.cells, [
+    'sdlc',
+    '3.11.0',
+    'The team that builds Nemia.',
+    'a (and 1 more)',
+    'build, quick',
+    'implementer',
+    '',
+  ]);
   assert.equal(table.rows[0]?.cells.length, table.columnDefinitions.length);
 });

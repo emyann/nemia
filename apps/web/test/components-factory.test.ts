@@ -496,13 +496,14 @@ test("a factory's Proposals page lists its rows, what waits first; a read that f
         .build(client, proposalsQuery('acme'))
         .setState({ status: 'error', error, fetchStatus: 'idle', errorUpdatedAt: 1, errorUpdateCount: 1, fetchFailureCount: 1 }),
     );
-  for (const error of [
-    new ReadRefusal('too long', 422),
-    new UnreadAnswer('GET /api/namespaces/acme/proposals', 'unread'),
-    new TypeError('fetch failed'),
-  ]) {
+  for (const [error, kind] of [
+    [new ReadRefusal('too long', 422), 'refused'],
+    [new UnreadAnswer('GET /api/namespaces/acme/proposals', 'unread'), 'unread'],
+    [new TypeError('fetch failed'), 'unanswered'],
+  ] as const) {
     const line = failed(error);
-    assert.match(line, /data-proposals-trouble/, error.name);
-    assert.ok(!line.includes('npm run dev'), error.name);
+    assert.match(line, new RegExp(`data-read-trouble="${kind}"`), error.name);
+    assert.ok(line.includes(error.message), error.name);
+    assert.ok(!line.includes('npm run'), error.name);
   }
 });

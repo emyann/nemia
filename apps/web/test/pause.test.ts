@@ -8,6 +8,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Paused } from '../src/lib/api/pause.ts';
+import { ReadRefusal } from '../src/lib/api/read.ts';
 import { clockWord } from '../src/lib/quota.ts';
 import { finishingSentence, interruptSentence, parkedSentence, pauseWords } from '../src/lib/pause.ts';
 
@@ -76,7 +77,7 @@ describe('pauseWords: what the pause says, from none to Pausing to Paused', () =
   });
   test('nothing read yet is reading, and a read that failed says why', () => {
     assert.equal(pauseWords(undefined, null, NOW).state, 'reading');
-    const failed = pauseWords(undefined, new Error('the api answered 500'), NOW);
+    const failed = pauseWords(undefined, new ReadRefusal('the api answered 500', 500), NOW);
     assert.equal(failed.state, 'reading');
     assert.equal(failed.line, 'Whether all factories are paused could not be read: the api answered 500');
   });

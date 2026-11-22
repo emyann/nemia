@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { CapabilitiesPage, CapabilitiesReading } from '../components/settings/CapabilitiesPage';
 import { capabilitiesQuery } from '../lib/api/capabilities.ts';
 import { pagePlaceOf } from '../lib/factories';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** What the repository of the default factory offers a step, on the repository its search names (`?repo=`). */
 export const Route = createFileRoute('/capabilities')({
@@ -10,12 +11,7 @@ export const Route = createFileRoute('/capabilities')({
   loader: ({ context, deps }) => context.queryClient.ensureQueryData(capabilitiesQuery({ ...deps })),
   component: Page,
   pendingComponent: CapabilitiesReading,
-  errorComponent: ({ error }) => (
-    <p className="text-body-medium text-failure">
-      Could not load the capabilities: {error instanceof Error ? error.message : String(error)}. Is the api running (
-      <code>npm run dev</code>)?
-    </p>
-  ),
+  errorComponent: ({ error }) => <ReadTrouble what="the capabilities" error={error} />,
 });
 
 /** The page, read off its address. */

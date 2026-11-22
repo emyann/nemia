@@ -1,8 +1,9 @@
 /**
  * The Card's edit (`editCard`) over the Run and Card doors' memory: a card written from its text keeps its name, its labels, its factory
- * and its `queued:`, and takes the text's body and keys; each refusal by its kind and exit code with the file left as it was, byte for
- * byte: a started card, a key that does not read, a factory moved, labels changed, a `queued:` changed, a stale version, no body, a
- * `from:` naming a run the store lacks, and a card in another namespace. A text the card already reads as writes nothing.
+ * and its `queued:`, and takes the text's body and keys, its `after:` among them, a text with none taking the wait off; each refusal
+ * by its kind and exit code with the file left as it was, byte for byte: a started card, a key that does not read, a factory moved,
+ * labels changed, a `queued:` changed, a stale version, no body, a `from:` naming a run the store lacks, and a card in another namespace.
+ * A text the card already reads as writes nothing.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -101,6 +102,22 @@ describe("a text in the card's own words is written: its factory or its labels s
       if (row.planted === QUEUED_CARD) assert.match(text ?? '', new RegExp(`queued: ${QUEUED}`));
     });
   }
+});
+
+const WAITING = PLANTED.replace('gate: plan\n', 'gate: plan\nafter: first-a1b2\n');
+
+test("a card's after: is the text's", () => {
+  const source = card(['workflow: build', 'after: other-c3d4']);
+  const { exit, text } = over(editCard('add-a-cache-x1y2', 'default', edit(source)), { text: WAITING });
+  assert.equal(Exit.isSuccess(exit), true, String(exit));
+  assert.match(text ?? '', /^after: other-c3d4$/m);
+  assert.doesNotMatch(text ?? '', /first-a1b2/);
+});
+
+test('a text with no after: takes the wait off', () => {
+  const { exit, text } = over(editCard('add-a-cache-x1y2', 'default', edit(card(['workflow: build']))), { text: WAITING });
+  assert.equal(Exit.isSuccess(exit), true, String(exit));
+  assert.doesNotMatch(text ?? '', /^after:/m);
 });
 
 test('a text the card already reads as writes nothing, and its version stays', () => {

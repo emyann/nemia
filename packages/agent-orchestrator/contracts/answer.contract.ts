@@ -54,25 +54,32 @@ const severalOfOne = (asked: readonly Question[], a: Answer) =>
 const saysSomething = (a: Answer) => a.chose.length > 0 || hasWords(a) || saysNone(a);
 
 /** Whether no question is answered twice in `answers`. */
-const onceEach = (answers: readonly Answer[]) =>
-  answers.every((a, i) => answers.every((b, j) => i === j || b.question !== a.question));
+const onceEach = (answers: readonly Answer[]) => answers.every((a, i) => answers.every((b, j) => i === j || b.question !== a.question));
 
-/** Whether every question of `asked` is answered in `answers`. */
-const everyAnswered = (asked: readonly Question[], answers: readonly Answer[]) =>
-  asked.every((q) => answers.some((a) => a.question === q.title));
+/**
+ * Whether every question of `asked` is answered in `answers`, read as no fewer answers than questions: with each answer naming a
+ * question asked (`onlyAQuestionAsked`) and none twice (`eachQuestionOnce`), titles being unique (`requires`), that is every question
+ * answered. Read so because `asked.every(q => answers.some(…))` beside a rule that searches `asked` for each answer loops the solver
+ * (each finds the other a new element), and it runs out of work.
+ */
+const everyAnswered = (asked: readonly Question[], answers: readonly Answer[]) => answers.length >= asked.length;
 
-/** Whether `answers` answer `asked`: every rule of an answer kept, each question once. */
+/** Whether `answers` answer `asked`: every rule of an answer kept, each question once; a rule at a time, as the laws above read each. */
 const fits = (asked: readonly Question[], answers: readonly Answer[]) =>
   asked.length > 0 &&
   onceEach(answers) &&
   everyAnswered(asked, answers) &&
-  answers.every(
-    (a) =>
-      namesAsked(asked, a) && offered(asked, a) && !severalOfOne(asked, a) && saysSomething(a) && !(saysNone(a) && a.chose.length > 0),
-  );
+  answers.every((a) => namesAsked(asked, a)) &&
+  answers.every((a) => offered(asked, a)) &&
+  answers.every((a) => !severalOfOne(asked, a)) &&
+  answers.every((a) => !(saysNone(a) && a.chose.length > 0)) &&
+  answers.every(saysSomething);
 
 const answerRefusalSpec = spec<(asked: readonly Question[], answers: readonly Answer[], instead?: string) => string | null>({
-  /** What every caller hands it: questions as `questionsOf` reads them, each title once (`askedQuestions` drops a closeout that asks one twice). */
+  /**
+   * What every caller hands it: questions as `questionsOf` reads them, each title once (`askedQuestions` drops a closeout that asks one
+   * twice).
+   */
   requires: ({ input: [asked] }) => asked.every((q, i) => asked.every((r, j) => i === j || r.title !== q.title)),
   ensures: {
     nothingAskedNothingAnswered: {
@@ -115,3 +122,17 @@ const answerRefusalSpec = spec<(asked: readonly Question[], answers: readonly An
 });
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type AnswerRefusal = Implementation<typeof answerRefusalSpec>;
+
+const refusalWordsSpec = spec<(asked: readonly Question[], answers: readonly Answer[]) => string>({
+  ensures: {
+    aSentence: {
+      description: 'The words of a refusal are never empty',
+      condition: ({ output }) => output !== '',
+    },
+  },
+});
+/**
+ * The type of what names why `answers` do not answer `asked` (`answerRefusal` calls it only where they do not): a sentence the verifier
+ * reads by this spec alone at the call, so the refusal's laws are proved on its decision, never on its words.
+ */
+export type RefusalWords = Implementation<typeof refusalWordsSpec>;

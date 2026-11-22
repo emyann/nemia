@@ -1136,7 +1136,8 @@ Its arguments:
     <runId> prints them, with the option its letter names; once for each
     question: "<n>=a,c" chooses several where it takes several,
     "<n>=a: <words>" adds your own words, "<n>: <words>" says words
-    alone; --message is then the note under your answers
+    alone, "<n>=none" says none of its options fits; --message is
+    then the note under your answers
 ```
 
 Asks for another try or round of the step, written as a file the next pass acts on. Answers RunAsked with a 202: the ask's file and what it asked for.
@@ -1153,7 +1154,7 @@ Its arguments:
 - round (--round at a shell): Whether this asks another round of the loop the step closes (--round), not another try.
 - message (--message at a shell): The words the try is told: an answer to its needs, or what to do differently.
 - budget (--budget at a shell): A raise of the step's cap in dollars (--budget), above what its tries have cost.
-- answers: One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where the question takes several (multiple); own your own words, beside a choice or instead of one.
+- answers: One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where the question takes several (multiple); own your own words, beside a choice or instead of one; none true where none of its options fits, with chose empty and own, if given, saying why.
 - check (--check at a shell): With mode recheck, the one refused check of the step to run again (--check), by its name under checks:, every other check's task kept; left out, every check that did not pass runs again.
 
 ## approve
@@ -1175,7 +1176,8 @@ Its arguments:
     <runId> prints them, with the option its letter names; once for each
     question: "<n>=a,c" chooses several where it takes several,
     "<n>=a: <words>" adds your own words, "<n>: <words>" says words
-    alone; --message is then the note under your answers
+    alone, "<n>=none" says none of its options fits; --message is
+    then the note under your answers
     --budget <step>=<amount>: the cap of a step after the gate, in
     dollars, over what the step proposed for it; once for each step.
     Your approval makes the budgets the step proposed the caps of the
@@ -1197,7 +1199,7 @@ Its arguments:
 - step (<step> at a shell): The step's name.
 - off (--off at a shell): Takes back the approval of a step that stands approved while nothing it approved has been filed (--off), with none of the keys below.
 - message (--message at a shell): The words given with the approval, which the steps after it are told.
-- answers: One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where the question takes several (multiple); own your own words, beside a choice or instead of one.
+- answers: One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where the question takes several (multiple); own your own words, beside a choice or instead of one; none true where none of its options fits, with chose empty and own, if given, saying why.
 - budgets: The caps the approval sets on the steps after it, each a step and its dollars.
 
 ## route

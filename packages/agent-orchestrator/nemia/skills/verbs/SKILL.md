@@ -916,7 +916,8 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
-                               alone; --message is then the note under your answers
+                               alone, "<n>=none" says none of its options fits; --message is
+                               then the note under your answers
                                each tool's words: tools.md#retry
                                on the port: retry
   nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"] | <runId> <step> --off
@@ -935,7 +936,8 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
-                               alone; --message is then the note under your answers
+                               alone, "<n>=none" says none of its options fits; --message is
+                               then the note under your answers
                                --budget <step>=<amount>: the cap of a step after the gate, in
                                dollars, over what the step proposed for it; once for each step.
                                Your approval makes the budgets the step proposed the caps of the

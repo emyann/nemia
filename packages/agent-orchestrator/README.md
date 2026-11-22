@@ -2208,9 +2208,11 @@ and it says one, else with the run's own title, and carries the run's labels as 
 run's own card as it was given — its body and its labels, read through the Card door from the card the run was started from, else the
 run's brief — with the route taken and the reason the condition's producer signed off with (`Its reason:`), so a routing workflow
 hands a raw card on as it came; and `backlog`, which names no `workflow:` and files the run's card back to the inbox naming none and
-unqueued, without the label keys its `unlabel:` lists (an empty list, as a template parameter left empty renders it, removes none). A
+unqueued, its labels after the edits its `relabel:` lists, kubectl's — `key=value` sets a key and `key-` removes it, each taken over the
+value the card had, so `relabel: [stage=backlog, ready-]` moves the card to the backlog and keeps its other labels (an empty list, as a
+template parameter left empty renders it, edits none). A
 card node runs no agent, a check, a gate or a workspace, as a workflow node does not; load refuses `card: backlog` with a `workflow:`,
-`given` or `routed` without one, and `unlabel:` off a backlog node. A judge's brief says a backlog node files the card back.
+`given` or `routed` without one, `relabel:` off a backlog node, and an edit `nemia label` would refuse (`parseLabelEdits`). A judge's brief says a backlog node files the card back.
 
 On a route not taken, a node that was never filed reads **`skipped`**, and so does a node whose parents are all skipped; it is worked
 out on every pass from the conditions' answers and carries nothing between passes. `skipped` neither satisfies `after` nor stops a
@@ -3143,7 +3145,7 @@ as `POST /api/namespaces/<factory>/runs/<id>/hold`, `{ "until": ["<run>", …], 
 
 ## Labels: following an initiative — `--label`, `nemia label` and `-l`
 
-A person puts free `key=value` labels on inbox cards and runs, in Kubernetes' spelling with no prefix (a name segment of 63 at most),
+A person puts free `key=value` labels on inbox cards and runs, in Kubernetes' spelling: a key an optional prefix, a DNS subdomain of 253 at most, then `/` and a name segment of 63 at most (`team.example/stage`, `labelKeyShape`),
 and changes them at any time, in flight or finished. They sit in one map beside `factory` and `workflow`, which Nemia sets itself; those
 two and the keys a feed line or a selector reads itself (`run`, `step`, `agent`, `kind`, `reason`, `on`, `via`, `type`, `waits`,
 `source`, `message`) are refused, naming both lists (`src/labels/labels.ts`).

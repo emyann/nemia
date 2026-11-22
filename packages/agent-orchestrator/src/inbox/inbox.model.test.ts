@@ -1,6 +1,6 @@
 /**
  * The planning model: a card's name refuses what `inboxNameRefusal` refuses and takes what `nemia inbox add` mints, a card decodes as
- * `parseInboxCard` reads one, and a card breaking what its reader upholds is refused.
+ * `parseInboxCard` reads one, a prefixed label key included, and a card breaking what its reader upholds is refused.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -30,6 +30,10 @@ describe("a card's name is checked on create by inboxNameRefusal's rule and read
 describe('a card decodes as parseInboxCard reads one, and one breaking what its reader upholds is refused', () => {
   test('every key set', () => assert.equal(Schema.decodeUnknownResult(Card)(CARD)._tag, 'Success'));
   test('none set', () => assert.equal(Schema.is(Card)(parseInboxCard('x-k2q9.md', 'Cache the views.\n')), true));
+  test('a label whose key has a prefix reads', () => {
+    const card = parseInboxCard('x-k2q9.md', '---\nlabels: { team.example/stage: sprint }\n---\nCache the views.\n');
+    assert.deepEqual(card.labels, { 'team.example/stage': 'sprint' });
+  });
   const rows: Record<string, object> = {
     'a file that is not its name with .md': { ...CARD, file: 'other.md' },
     'queued with no workflow': { name: 'x', file: 'x.md', queued: '2026-09-16T10:00:00.000Z', body: 'x' },

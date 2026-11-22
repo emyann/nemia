@@ -10,7 +10,7 @@ import { stepStatus, type SpendOf } from '../status/status.ts';
 import { CardDoor, type CardDoorShape } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import type { Labels } from '../labels/labels.ts';
+import { inheritedLabels, parseLabelEdits, type Labels } from '../labels/labels.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 import { CardName } from '../inbox/inbox.model.ts';
 import { parseInboxCard } from '../inbox/index.ts';
@@ -98,20 +98,22 @@ function whyLines(run: Run, node: StepSpec, why: Why) {
   return [where, ...(reason ? ['', `Its reason: ${reason}`] : [])];
 }
 
-/** `labels` without each key of `unlabel`. */
-const withoutKeys = (labels: Labels, unlabel: readonly string[]) =>
-  Object.fromEntries(Object.entries(labels).filter(([key]) => !unlabel.includes(key)));
+/** `labels` after the edits of `relabel`, kubectl's, each taken with overwrite since the workflow's author wrote it; checked at load. */
+const relabelled = (labels: Labels, relabel: readonly string[]) => {
+  const parsed = parseLabelEdits(relabel);
+  return inheritedLabels({ parents: [], card: labels, edits: 'edits' in parsed ? parsed.edits : [] }).labels;
+};
 
 /**
  * The text of the card a node files, by its `card:`. `routed` (the default): queued, on the node's workflow, handed the caller as context
  * (`from:`), its repository and factory kept, the run's labels (`labels`, `runs/<id>.labels`) as its own `labels:`, so a card routed out
  * of a labelled run is selected by the same labels, and `title` its first line. `given`: the same, but the run's own card as it was given
  * (`given`), its body and its labels, else the run's brief, then why it was routed and the producer's reason. `backlog`: the run's card
- * filed back to the inbox naming no workflow and unqueued, without the label keys the node's `unlabel:` names. `given` and `backlog`
+ * filed back to the inbox naming no workflow and unqueued, its labels after the edits the node's `relabel:` lists. `given` and `backlog`
  * keep the given card's files (`files:`), the same Files by id, where the card's namespace is the run's factory, whose inbox the card
  * is filed in: a File of another namespace is none the onward card's factory keeps, so it is left off there.
  * @param run The run the card is routed from: its id, repository and factory.
- * @param node The node that files the card: its name, its workflow, its `card:` and `unlabel:`.
+ * @param node The node that files the card: its name, its workflow, its `card:` and `relabel:`.
  * @param why The name of the condition whose route filed the card, the route it took where one is said, and the producer's reason.
  * @param at When the card is queued, ISO.
  * @param title The card's first line (`sentCardTitle`), for a routed card.
@@ -121,7 +123,7 @@ const withoutKeys = (labels: Labels, unlabel: readonly string[]) =>
 export function sentCardText(run: Run, node: StepSpec, why: Why, at: string, title: string, labels: Labels, given: GivenCard | undefined) {
   const kind = node.card ?? 'routed';
   const own = given?.labels ?? labels;
-  const carried = kind === 'backlog' ? withoutKeys(own, node.unlabel ?? []) : kind === 'given' ? own : labels;
+  const carried = kind === 'backlog' ? relabelled(own, node.relabel ?? []) : kind === 'given' ? own : labels;
   const keys: FrontmatterPair[] = [
     ...(kind === 'backlog' ? [] : [['workflow', node.workflow ?? ''] as const]),
     ...(isRepositoryRun(run) ? [['repo', run.repo] as const] : []),

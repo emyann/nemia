@@ -1,8 +1,9 @@
 /**
- * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling with no prefix, put on inbox cards and runs and
- * changed at any time. What a label may be spelled (`labelRefusal`), kubectl's edits of a map (`parseLabelEdits`, `labelEdits`), and
- * what a start copies once, at creation (`inheritedLabels`); and a run's labels as a selection reads them (`runLabelMap`, `selectedRuns`,
- * `labelSegments`). No Effect: every caller wraps a refusal in the package's `Invalid`.
+ * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling, a key an optional prefix and a name
+ * (`team.example/stage`), put on inbox cards and runs and changed at any time. What a label may be spelled (`labelRefusal`), kubectl's
+ * edits of a map (`parseLabelEdits`, `labelEdits`), and what a start copies once, at creation (`inheritedLabels`); and a run's labels
+ * as a selection reads them (`runLabelMap`, `selectedRuns`, `labelSegments`). No Effect: every caller wraps a refusal in the package's
+ * `Invalid`.
  *
  * **One map, beside the closed keys.** A run's and a card's labels sit in one map with `factory` and `workflow`, which Nemia gives
  * itself and a person may not set (`CLOSED_LABEL_KEYS`). Nor may a label take a key a feed line or a selector already gives a meaning
@@ -12,115 +13,22 @@ import type { LabelEdits } from '../../contracts/labels.contract.ts';
 import path from 'node:path';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
-import { LABEL_KEYS, RESERVED_KEYS, selectsLabels, type Selectors } from '../watch/selector.ts';
+import { selectsLabels, type Selectors } from '../watch/selector.ts';
+
+export {
+  CLOSED_LABEL_KEYS,
+  LABEL_CAP,
+  LABEL_NAME,
+  labelKeyRefusal,
+  labelRefusal,
+  labelsRefusal,
+  labelValueRefusal,
+  parseLabelEdits,
+  RESERVED_LABEL_KEYS,
+} from '../label-spelling/label-spelling.ts';
 import type { Labels, LabelChange } from '../../contracts/labels.contract.ts';
 
 export type { Labels, LabelChange, Edited } from '../../contracts/labels.contract.ts';
-
-/** The keys Nemia sets on every run's map itself, which a person's label may not take. */
-export const CLOSED_LABEL_KEYS: readonly string[] = ['factory', 'workflow'];
-
-/** The keys a feed line or a selector reads of itself, which a person's label may not take: the line's own, the signed ones, its prose. */
-export const RESERVED_LABEL_KEYS: readonly string[] = [
-  ...LABEL_KEYS.filter((key) => !CLOSED_LABEL_KEYS.includes(key)),
-  ...RESERVED_KEYS,
-  'message',
-];
-
-/** The longest a label's key or value may be, as Kubernetes holds it. */
-export const LABEL_CAP = 63;
-
-/** Kubernetes' name segment: alphanumerics at both ends, `-`, `_` and `.` between. */
-export const LABEL_NAME = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
-
-const LISTS = `the closed keys are ${CLOSED_LABEL_KEYS.join(', ')} and the reserved ones ${RESERVED_LABEL_KEYS.join(', ')}`;
-
-/**
- * Why `key` cannot be a person's label key, or undefined where it can. Pure.
- * @param key The key as given.
- */
-export function labelKeyRefusal(key: string) {
-  if (key.includes('/'))
-    return `${JSON.stringify(key)} has a prefix, and a label takes none for now: drop what is before the /, as in ${key.slice(key.lastIndexOf('/') + 1) || 'team'}=…`;
-  if (key.length > LABEL_CAP)
-    return `the label key ${JSON.stringify(key)} is ${key.length} characters long: keep it to ${LABEL_CAP} at most`;
-  if (!LABEL_NAME.test(key))
-    return `${JSON.stringify(key)} is no label key: begin and end it with a letter or a digit, with - _ . between, as in team or my.key_2`;
-  if (CLOSED_LABEL_KEYS.includes(key)) return `${key} is a key Nemia sets itself and no label of a person's: ${LISTS}`;
-  if (RESERVED_LABEL_KEYS.includes(key))
-    return `${key} is a key a feed line or a selector reads itself: name the label otherwise — ${LISTS}`;
-  return undefined;
-}
-
-/**
- * Why `value` cannot be the value of the label `key`, or undefined where it can: empty, or a name segment of 63 at most. Pure.
- * @param key The label's key, which the refusal names.
- * @param value The value as given; empty takes the key's value away.
- */
-export function labelValueRefusal(key: string, value: string) {
-  if (value === '') return undefined;
-  if (value.length > LABEL_CAP) return `the value of ${key} is ${value.length} characters long: keep it to ${LABEL_CAP} at most`;
-  if (!LABEL_NAME.test(value))
-    return `${JSON.stringify(value)} is no value of ${key}: leave it empty, or begin and end it with a letter or a digit, with - _ . between`;
-  return undefined;
-}
-
-/**
- * Why `key=value` cannot be a person's label, or undefined. Pure.
- * @param key The label's key.
- * @param value The label's value.
- */
-export const labelRefusal = (key: string, value: string) => labelKeyRefusal(key) ?? labelValueRefusal(key, value);
-
-/**
- * Why `labels` cannot be a person's map, in the words of its first wrong pair, or undefined. Pure.
- * @param labels The map as given.
- */
-export function labelsRefusal(labels: Labels) {
-  for (const [key, value] of Object.entries(labels)) {
-    const refusal = labelRefusal(key, value);
-    if (refusal) return refusal;
-  }
-  return undefined;
-}
-
-/** The command words that end a refusal of an edit's spelling. */
-const EDIT_FORM = 'label edits are key=value to set a key and key- to remove one';
-
-/**
- * The edits `texts` spell, or the refusal of the first that is wrong: a word that is neither `key=value` nor `key-`, a key or a value
- * a label cannot hold, and one key edited twice in one list, which says nothing of which edit wins. Pure.
- * @param texts The edits as typed, each `key=value` or `key-`.
- */
-export function parseLabelEdits(texts: readonly string[]) {
-  const edits: LabelChange[] = [];
-  for (const text of texts) {
-    const at = text.indexOf('=');
-    const edit: LabelChange | undefined =
-      at > 0
-        ? { key: text.slice(0, at), op: 'set', value: text.slice(at + 1) }
-        : at < 0 && text.length > 1 && text.endsWith('-')
-          ? { key: text.slice(0, -1), op: 'remove' }
-          : undefined;
-    if (edit === undefined)
-      return { refused: `${JSON.stringify(text)} is no label edit: ${EDIT_FORM}` } satisfies
-        | { readonly edits: readonly LabelChange[] }
-        | { readonly refused: string } as { readonly edits: readonly LabelChange[] } | { readonly refused: string };
-    const refusal = edit.op === 'set' ? labelRefusal(edit.key, edit.value) : labelKeyRefusal(edit.key);
-    if (refusal)
-      return { refused: refusal } satisfies { readonly edits: readonly LabelChange[] } | { readonly refused: string } as
-        | { readonly edits: readonly LabelChange[] }
-        | { readonly refused: string };
-    if (edits.some((e) => e.key === edit.key))
-      return { refused: `${edit.key} is edited twice in one list: give each key one edit` } satisfies
-        | { readonly edits: readonly LabelChange[] }
-        | { readonly refused: string } as { readonly edits: readonly LabelChange[] } | { readonly refused: string };
-    edits.push(edit);
-  }
-  return { edits } satisfies { readonly edits: readonly LabelChange[] } | { readonly refused: string } as
-    | { readonly edits: readonly LabelChange[] }
-    | { readonly refused: string };
-}
 
 /**
  * `current` after `edits`, as `kubectl label` applies them: each `key=value` sets its key, each `key-` removes it (no change where it

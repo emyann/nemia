@@ -81,7 +81,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   loop: null,
   rounds: null,
   card: null,
-  unlabel: null,
+  relabel: null,
   routes: null,
   route: null,
   when: null,

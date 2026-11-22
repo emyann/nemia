@@ -66,10 +66,10 @@ test("nemia ls selects by -l, two of them either; the labels it prints beside ea
 });
 
 test('REFUSED by kind: nemia ls -l of no selector, by its handler, before anything is read', async () => {
-  await assert.rejects(runWith(noEngine(), LS.handler({ selector: ['no/pe=x'] })), (err: Error & { exitCode?: number }) => {
+  await assert.rejects(runWith(noEngine(), LS.handler({ selector: ['No/pe=x'] })), (err: Error & { exitCode?: number }) => {
     assert.ok(err instanceof Invalid, String(err));
     assert.equal(err.exitCode, 2);
-    names(err.message, 'no/pe');
+    names(err.message, 'No/pe');
     return true;
   });
 });
@@ -96,10 +96,10 @@ test('nemia stats -l sums the facts of the runs the selector takes alone', async
 
 test("REFUSED by kind: nemia stats -l of no selector, the api's refusal, which the command line exits on", async () => {
   const STATS = COMMANDS.find((c) => c.name === 'stats')!;
-  await assert.rejects(runWith(noEngine(), STATS.handler({ selector: 'no/pe=x' })), (err: Error & { exitCode?: number }) => {
+  await assert.rejects(runWith(noEngine(), STATS.handler({ selector: 'No/pe=x' })), (err: Error & { exitCode?: number }) => {
     assert.ok(err instanceof Invalid, String(err));
     assert.equal(err.exitCode, 2);
-    names(err.message, 'no/pe');
+    names(err.message, 'No/pe');
     return true;
   });
 });

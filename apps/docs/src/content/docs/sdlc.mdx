@@ -33,9 +33,10 @@ fence refuses an edit of your store's factories, workflows and inbox.
 
 ## Its workflows
 
-- **front-door** routes a raw card to the workflow it needs, with no gate: where the factory's `frontDoorLabel` names a label key,
-  each card carrying it that names no workflow is queued here, and Iris, as a read-only judge, sends it as given to intake, build or
-  quick, answers it, or files it back to the inbox unlabelled. She asks you only where she cannot tell.
+- **front-door** routes a raw card to the workflow it needs, with no gate: sdlc's `front-door` trigger queues here each card in the
+  sprint and ready to work (`sdlc/stage=sprint` and `sdlc/state=ready-to-work`, [its labels](#its-labels)) that names no workflow,
+  and Iris, as a read-only judge, sends it as given to intake, build or quick, answers it, or files it back to the backlog. She asks
+  you only where she cannot tell.
 - **intake** turns an idea into an intent, Iris asking you what it leaves open.
 - **build** takes an intent to your base branch: a design, an implement in rounds, a review, and a landing a person approves.
 - **quick** takes a card that settles its change to your base branch: an implement, then a review whose pass lands it, with no gate.
@@ -57,7 +58,6 @@ What your repository decides is a parameter, given with `--set` when you apply t
 | roundCheck     | on GitHub: the command implement's check runs after each round, before CI                                              | npm run --if-present lint && npm run --if-present typecheck                              |
 | implementCheck | either way: a command of your own that implement's check runs after sdlc's scripts, before the push or the local check | true (checks nothing)                                                                    |
 | areas          | the areas of the repository a card names, in the factory's rules                                                       | the top-level folders of the repository                                                  |
-| frontDoorLabel | the label key whose cards, naming no workflow, the front door's trigger queues on front-door                           | empty (no trigger)                                                                       |
 | storeRoot      | the store the agents' fences keep them out of                                                                          | ~/.agent-workflows                                                                       |
 
 github is a boolean, refused at apply unless it is `true` or `false`. A factory reads localCheck where it is false, and ciCheck and
@@ -65,9 +65,9 @@ roundCheck where it is true, and implementCheck either way: set it to add a chec
 implement's check in build and quick, rather than editing their check lines, and an upgrade that changes those lines merges with no
 conflict on them.
 
-On the board, the welcome that makes a factory from sdlc asks frontDoorLabel, which sdlc marks `ask: true`, in a field drawn
-open, and folds the others under More parameters. github is drawn nowhere: the factory's first writable volume sets it. A field you
-leave empty or at its default sends no `--set`, so leaving frontDoorLabel empty makes no trigger.
+On the board, the welcome that makes a factory from sdlc asks nothing: sdlc marks no parameter `ask: true`, so its parameters wait
+under More parameters, each at its default. github is drawn nowhere: the factory's first writable volume sets it. A field you leave
+empty or at its default sends no `--set`.
 
 storeRoot is written as Claude Code reads a path in a permission rule: `~/` for a store under your home, and two slashes for any
 other absolute path, `--set storeRoot=//srv/nemia` for a store at `/srv/nemia`. With one slash Claude Code reads the path from the
@@ -76,6 +76,25 @@ settings' folder, so the fence would deny nothing.
 To change a parameter later without a new version of sdlc, preview it at the version the factory is applied at with
 `nemia factory diff`, its `--to` that version and a `--set` for each parameter, then type the upgrade line it prints
 ([change a template's parameter](/factories/#change-a-templates-parameter)).
+
+## Its labels
+
+sdlc plans its cards with labels of its own, prefixed sdlc/ so you tell them from yours:
+
+| Label       | Values                    | What it says                                 | Read by                  |
+| ----------- | ------------------------- | -------------------------------------------- | ------------------------ |
+| sdlc/stage  | `backlog`, `sprint`       | where the card sits in your planning         | the `front-door` trigger |
+| sdlc/state  | `refine`, `ready-to-work` | how ready the card is                        | the `front-door` trigger |
+| sdlc/sprint | a week, such as `w48`     | which sprint the card is in, a planning mark | nothing                  |
+
+Every factory made from sdlc has the card trigger `front-door`, its selector `sdlc/stage=sprint,sdlc/state=ready-to-work`: a card in
+the sprint and ready to work that names no workflow is queued on the front door, and one that names its workflow on that one. A card
+with no sdlc/stage is in the backlog, and a card in the backlog is never queued, whatever its state. `refine` starts nothing: it marks
+an idea you know is to be refined, and any other state is simply not ready. The door alone routes; no label routes a card past it, and
+when it files a card back it sets `sdlc/stage=backlog`, so the card keeps its sprint and its state and is selected no more.
+
+To plan a later week ahead, file the card with `sdlc/stage=backlog` and `sdlc/sprint=w49`, and move it to the sprint when the week
+starts: `nemia label inbox <card> sdlc/stage=sprint --overwrite`.
 
 ## Apply it
 
@@ -127,6 +146,12 @@ that should stay on GitHub is given `github: true` as it upgrades: preview it wi
 `nemia factory diff <name> --to 2.0.0 --set github=true`, which names each parameter the factory holds that 2.0.0 does not declare (`dropped:`), then type the upgrade line it
 prints (`… files it`), which carries the same `--set` and the plan's `--plan`. A new factory is given it at apply, `--set github=true`.
 
+## Upgrading to 5.0.0
+
+sdlc 5.0.0 removes the frontDoorLabel parameter, with no alias, and ships the `front-door` trigger on [its labels](#its-labels).
+Preview it with `nemia factory diff <name> --to 5.0.0`, which names frontDoorLabel `dropped:`, then type the upgrade line it prints. A card that carried the
+old key is no longer queued: label it `sdlc/stage=sprint` and `sdlc/state=ready-to-work` for the door to route it.
+
 ## Moving onto it from another template
 
 A factory applied from a template of another name, such as one you made by hand, can move onto sdlc by an upgrade. It is a template
@@ -172,7 +197,8 @@ Once the daemon has rendered the factory, its tree is yours to change. Four chan
 
 ## Sources
 
-This page is written from `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml` and
+This page is written from `packages/templates/CLAUDE.md`, `packages/templates/sdlc/nemia.yaml`,
+`packages/templates/sdlc/workflows/front-door/README.md` (_Its labels_) and
 `packages/agent-orchestrator/src/template/door/templates.store.ts` (`templatePlace` and `BUILTIN_TEMPLATES`). _Moving onto it from another
 template_ is written from `packages/agent-orchestrator/src/factory/upgrade/merge.ts`. _Fit it to your repository_ is written from `packages/agent-orchestrator/src/factory/factory.verb.ts`, `packages/agent-orchestrator/src/step/step.ts`,
 `packages/agent-orchestrator/src/agents/agents.ts`, `packages/templates/sdlc/carried/landing.ts`,

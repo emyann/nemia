@@ -306,9 +306,9 @@ test('GET /api/stats?selector= keeps the facts of the runs one of its selectors 
   assert.equal(await tries('&selector=factory%3Dother'), 1, 'a closed key selects as a person key does');
   assert.equal(await tries('&selector=team%3Dcore&selector=factory%3Dother'), 2, 'two selectors are either');
   assert.equal(await tries('&selector=team%3Dinfra'), 0, 'and none where it takes no run');
-  const refused = await asked(`${day}&selector=no%2Fpe%3Dx`);
+  const refused = await asked(`${day}&selector=No%2Fpe%3Dx`);
   assert.equal(refused.status, 422);
-  names(refused.body.error, 'no/pe');
+  names(refused.body.error, 'No/pe');
 });
 
 test('GET /api/stats?labelSelector= keeps the facts as the former key does, given again for another, beside it or alone', async () => {
@@ -322,9 +322,9 @@ test('GET /api/stats?labelSelector= keeps the facts as the former key does, give
   assert.equal(await tries('&labelSelector=team%3Dcore&labelSelector=factory%3Dother'), 2, 'two label queries are either');
   assert.equal(await tries('&labelSelector=team%3Dcore&selector=factory%3Dother'), 2, 'and either beside the former key');
   assert.equal(await tries('&labelSelector=team%3Dinfra'), 0, 'and none where it takes no run');
-  const refused = await asked(`${day}&labelSelector=no%2Fpe%3Dx`);
+  const refused = await asked(`${day}&labelSelector=No%2Fpe%3Dx`);
   assert.equal(refused.status, 422);
-  names(refused.body.error, 'no/pe');
+  names(refused.body.error, 'No/pe');
 });
 
 test("GET /api/stats reads no run's journal again while the store is as it was, and reads again only the run whose record changed", async () => {

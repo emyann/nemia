@@ -921,7 +921,7 @@ const EVERY: Record<
     | 'ends'
     | 'workflow'
     | 'card'
-    | 'unlabel'
+    | 'relabel'
     | 'checkFailurePolicy'
     | 'checks'
     | 'run'

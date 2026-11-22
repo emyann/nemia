@@ -180,7 +180,7 @@ test('`nemia stats` prints its tiles and rows, one line with --line, the whole a
   const json = JSON.parse((await typed(['stats', '--json', '--by', 'factory'])).out) as { by: string; groups: unknown[] };
   assert.equal(json.by, 'factory');
   assert.match((await typed(['stats', '-l', 'team=core', '-l', 'team=infra'])).out, /^last 14 days/m);
-  assert.match((await typed(['stats', '-l', 'no/pe=x'], 2)).err, /no\/pe/);
+  assert.match((await typed(['stats', '-l', 'No/pe=x'], 2)).err, /No\/pe/);
   for (const [argv, named] of [
     [['stats', '--by', 'colour'], /--by/],
     [['stats', '--from', '2026-13-40'], /--from/],

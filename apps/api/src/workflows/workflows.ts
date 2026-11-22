@@ -451,7 +451,7 @@ const routingOf = (step: StepSpec) => ({
   ends: step.ends ?? null,
   workflow: step.workflow ?? null,
   card: step.card ?? null,
-  unlabel: step.unlabel ?? null,
+  relabel: step.relabel ?? null,
 });
 
 /** A step's `checks:` as its line writes it, in YAML flow (JSON, which YAML reads): each check's name, line and waits. */

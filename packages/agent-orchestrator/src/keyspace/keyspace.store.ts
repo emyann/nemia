@@ -321,7 +321,8 @@ const loader = Effect.gen(function* () {
 
 /**
  * The keyspace over a client already opened and migrated. A read makes no span, as a file read made none: a list that reads a record per
- * run keeps its trace bounded whatever the number of runs; a write is traced.
+ * run keeps its trace bounded whatever the number of runs; a write is traced. A write reads the head once it has committed, so the WAL's
+ * read mark stands at its commit and a read after it, in any process, leaves the store's files as they were: a preview writes nothing.
  */
 function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
   const inTxn = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
@@ -333,14 +334,15 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
     Effect.withTracerEnabled(Effect.orDie(Effect.provide(effect, client)), false);
   const refusing = <A>(effect: Effect.Effect<A, KeyRefused | SqlError.SqlError>) =>
     Effect.catchTag(effect, 'SqlError', (err) => Effect.die(err));
+  const committed = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.tap(effect, () => read(headNow));
   return {
     head: read(headNow),
     get: (key) => read(Effect.map(latestRow(key), (row) => (row === undefined || row.deleted !== 0 ? undefined : recordOf(row)))),
     list: (prefix) => Effect.withTracerEnabled(Effect.orDie(inTxn(Effect.all({ records: liveUnder(prefix), revision: headNow }))), false),
     keys: (prefix) => read(keysUnder(prefix)),
     revisions: (prefix) => read(revisionsUnder(prefix)),
-    write: (key, write) => refusing(inTxn(writeOne(key, write))),
-    txn: (writes) => refusing(inTxn(Effect.forEach(writes, ([key, write]) => writeOne(key, write)))),
+    write: (key, write) => refusing(committed(inTxn(writeOne(key, write)))),
+    txn: (writes) => refusing(committed(inTxn(Effect.forEach(writes, ([key, write]) => writeOne(key, write))))),
     within: (body) =>
       Effect.flatMap(SqlClient.SqlClient, (sql) =>
         sql.withTransaction(
@@ -355,6 +357,7 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
         ),
       ).pipe(
         Effect.provide(client),
+        committed,
         Effect.catchTag('SqlError', (err) => Effect.die(err)),
       ),
     since: (revision, prefix) =>

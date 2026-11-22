@@ -2,10 +2,10 @@
  * What the tick's memo of runs at rest saves a pass, and what takes a run out of it (`advanceResting` in tick.verb.ts). Two tests. A story
  * over one big quiet store, built once: forty finished runs (`FINISHED`) beside three in flight, where a pass costs what is in flight — its
  * records, journals read on disk, observes, questions of its place and spans — and never what has finished, nor how long the runtime's
- * feed has grown; the board's light list and a warm read of it alike. And a table of every input of a run at rest (`restStamps`, the feed,
- * its result branches) and every refusal of `verifyRest`, each row on a small store of its own, made for it and emptied by the next, so no
- * row reads what another changed; the informer (`informerRead`) has its rows there too. What makes a run at rest is pure, and lives
- * in rest.test.ts.
+ * feed has grown; the board's light list and a warm read of it alike. And a table of every input of a run at rest (the Run door's
+ * `stamps`, the feed, its result branches) and every refusal of `verifyRest`, each row on a small store of its own, made for it and
+ * emptied by the next, so no row reads what another changed; the informer (`informerRead`) has its rows there too. What makes a run at
+ * rest is pure, and lives in rest.test.ts.
  *
  * Walked through the runtime itself, `plainEngine` over its own journal on disk, whose reads it counts, and a harness the test signs by
  * hand, which takes what it is said and lets a session go. On one test place for the file; the git processes a pass's place starts are
@@ -14,7 +14,18 @@
  * after, so a store of forty runs is built in a few passes. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ.
  */
-import { acceptKey, approvalKey, emptyRuns, listRuns, plantAsk, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
+import {
+  acceptKey,
+  approvalKey,
+  emptyRuns,
+  listRuns,
+  plantAsk,
+  plantRecord,
+  recordText,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../../testing.ts';
 import { storeGiven } from '../../test/config-given.ts';
 import type { StoreRoot } from '../config/root.store.ts';
 import { type Env, type StoreConfig, verifiesRest } from '../config/config.store.ts';
@@ -35,7 +46,7 @@ import { placeOver, unreadBy } from '../../test/place-over.ts';
 import { story } from '../../test/story.ts';
 import * as verbs from '../runner.ts';
 import { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun } from '../runner.ts';
-import { holdFile, markCancelled, pruneFile, restStamps, runsDir } from '../record/record.store.ts';
+import { holdFile, markCancelled, pruneFile, runsDir } from '../record/record.store.ts';
 import { resumePause, putPause } from '../pause/pause.store.ts';
 import { tickRun, freshRestMemo } from './tick.verb.ts';
 import { feedFile } from '../feed/feed.store.ts';
@@ -947,9 +958,9 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
   test("a run's stamp moves with any file named for it, a marker nobody has named yet included, and not with its own directory", async () => {
     const s = await small();
     const run = s.aResting();
-    const stamp = () => restStamps(ROOT).get(run.id);
+    const stamp = () => runsNow(ROOT).runs.stamps().get(run.id);
     const was = stamp();
-    assert.ok(was?.includes(`${run.id}.json=`), 'the record is stamped');
+    assert.ok(was?.includes('record='), 'the record is stamped');
     fs.mkdirSync(path.join(runsDir(ROOT), run.id, 'inputs'), { recursive: true });
     fs.writeFileSync(path.join(runsDir(ROOT), run.id, 'inputs', 'brief.md'), 'what the run was given\n');
     assert.equal(stamp(), was, 'its directory — its files and inputs — is no input of a pass');
@@ -957,7 +968,7 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
     assert.notEqual(stamp(), was, 'a file named for the run is stamped, whatever it is called');
     fs.rmSync(path.join(runsDir(ROOT), `${run.id}.later`));
     assert.equal(stamp(), was, 'and, gone, the stamp is as it was');
-    assert.equal(restStamps(ROOT).has(`${run.id}-other`), false, 'a run with no files has no stamp');
+    assert.equal(runsNow(ROOT).runs.stamps().has(`${run.id}-other`), false, 'a run with no files has no stamp');
   });
   test('REFUSED: a memo that answers otherwise than a full pass, its inputs unchanged, throws under verifyRest, naming the run', async () => {
     const s = await small();
@@ -981,7 +992,7 @@ describe('every input of a run at rest takes it, and it alone, out of the memo; 
     const id = s.inFlight[0].id;
     const { run: _, ...advanced } = await s.answered(id);
     const run = runRecord(ROOT, id);
-    s.memo.runs.set(id, { stamp: restStamps(ROOT).get(id)!, run, tipped: [], advanced });
+    s.memo.runs.set(id, { stamp: runsNow(ROOT).runs.stamps().get(id)!, run, tipped: [], advanced });
     await assert.rejects(
       s.verified(),
       (err: Error) => err.message.includes(id) && /not at rest/.test(err.message) && /\(status, settled, inFlight\)/.test(err.message),

@@ -65,6 +65,7 @@ import {
   keepSaid,
   markCancelled,
   readAs,
+  readCancelled,
   readPruned,
   recordIn,
   recordValue,
@@ -448,24 +449,32 @@ const stampsOf = (home: string, held: Held) =>
     return new Map([...parts].map(([id, p]) => [id, p.join(';')]));
   });
 
+/** What `run` writes as its record: its cancellation left out where a person's marker in `home` holds it, as it is composed on read. */
+const bareValue = (home: string, run: Run) =>
+  fromThrow(() => {
+    if (readCancelled(home, run.id) === undefined) return recordValue(run);
+    const { cancelledAt: _, cancelledBy: __, ...bare } = run;
+    return recordValue(bare);
+  });
+
 /** The Run door's writes of a run's record in `open`, and its removal from `held` with its markers in `home`. */
 function runWrites(home: string, open: Opened, held: Held) {
   const writes: Pick<Shape['runs'], 'create' | 'rewrite' | 'settle' | 'stamps' | 'forget'> = {
     create: createdRun(open),
     rewrite: (run) =>
-      Effect.flatMap(open, (ks) =>
-        ks.write(runKey(run.id), overwrite(recordValue(run))).pipe(
+      Effect.flatMap(Effect.all([open, bareValue(home, run)]), ([ks, value]) =>
+        ks.write(runKey(run.id), overwrite(value)).pipe(
           Effect.as(true),
           Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(raced(err)))),
         ),
       ),
     settle: (run, spent) =>
-      Effect.flatMap(open, (ks) =>
+      Effect.flatMap(Effect.all([open, bareValue(home, run)]), ([ks, value]) =>
         racedOn(
           ks.within((tx) =>
             Effect.gen(function* () {
               if ((yield* tx.get(runKey(run.id))) === undefined) return false;
-              if (spent.write) yield* tx.write(runKey(run.id), overwrite(recordValue(run)));
+              if (spent.write) yield* tx.write(runKey(run.id), overwrite(value));
               const waiting = waitingOf(run.id, yield* tx.list(asksPrefix(run.id)));
               yield* setAside(tx, run.id, spentNames(run, spent.asks, spent.rounds, spent.voided ?? [], waiting));
               return true;

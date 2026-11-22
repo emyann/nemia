@@ -12,7 +12,7 @@
  * Every story starts its own runs and counts only its own: they share this file's store at `ROOT`, given as `ENV`.
  * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest.
  */
-import { listRuns, plantRecord, runKey, runRecord } from '../testing.ts';
+import { keysUnder, listRuns, plantRecord, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -90,7 +90,7 @@ const statuses = async (id: string) => (await stage.runWith(board().e, list(boar
 /** The brief the engine was filed with for the task `id`. */
 const briefOf = (id: string) => board().tasks.get(id)!.spec.brief;
 /** The runs in the store, by their records (a run's own folder beside each): a refused start writes none. */
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((name) => name.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = () => {

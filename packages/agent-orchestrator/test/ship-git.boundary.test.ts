@@ -15,7 +15,7 @@
  * Its store is its own at `ROOT`, given as `ENV`.
  */
 
-import { listRuns, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { askNames, listRuns, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -729,7 +729,7 @@ const mergeRefused = (id: string, words: RegExp) => (err: Error & { exitCode?: n
   assert.equal(err.exitCode, 2);
   assert.match(err.message, words);
   assert.deepEqual(
-    fs.readdirSync(path.join(ROOT, 'runs', `${id}.asks`)).filter((f) => f.startsWith('merge-')),
+    askNames(ROOT, id).filter((f) => f.startsWith('merge-')),
     [],
   );
   return true;

@@ -65,7 +65,36 @@ export const heard: unknown[] = [];
 
 /** A pass's read of where the store's branches stand, as the tick's pass reads it and writes it down (`passStanding`). */
 const PASS =
-  "import { engine, passStanding, runsAtOnce, runWith, builtin, storeConfigLayer, wfRoot } from 'agent-orchestrator'; import { Effect } from 'effect'; await runWith(engine(process.env), builtin(Effect.provide(passStanding(runsAtOnce(wfRoot(process.env)).runs.list()), storeConfigLayer(process.env))));";
+  "import { engine, passStanding, RunDoor, runWith, builtin, storeConfigLayer } from 'agent-orchestrator'; import { Effect } from 'effect'; await runWith(engine(process.env), builtin(Effect.provide(Effect.flatMap(Effect.flatMap(RunDoor, (door) => door.runs.list()), (runs) => passStanding(runs)), storeConfigLayer(process.env))));";
+
+/**
+ * What `script` prints, run in a process of the api's package on the api's environment, given `input` on its stdin: how the e2e, which
+ * imports no package, reads and writes a run's record, a record of the store's keyspace (`agent-orchestrator/testing`).
+ */
+const inApi = (script: string, input = '') =>
+  execFileSync(process.execPath, ['--input-type=module', '--eval', script], { cwd: API, env: apiEnv, input, encoding: 'utf8' });
+
+/** The record of the run `id` in the seeded store, as the tick wrote it: what a page reads to change it. Throws where there is none. */
+export function storedRecord(id: string) {
+  const text = inApi(
+    `import { recordText, runKey } from 'agent-orchestrator/testing'; process.stdout.write(recordText(process.env.WF_ROOT, runKey(${JSON.stringify(id)})) ?? '');`,
+  );
+  if (!text) throw new Error(`the seeded store holds no record of run ${id}: seed it first`);
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
+/** The record of the run `id` in the seeded store written as `text`, over the one there or none: what a page plants or changes. */
+export function storeRecord(id: string, text: string) {
+  inApi(
+    `import { plantRecord, runKey } from 'agent-orchestrator/testing'; import fs from 'node:fs'; plantRecord(process.env.WF_ROOT, runKey(${JSON.stringify(id)}), fs.readFileSync(0, 'utf8'));`,
+    text,
+  );
+}
+
+/** The record of the run `id` taken out of the seeded store, there or not: a run removed as `nemia rm` leaves its key. */
+export function dropStoredRecord(id: string) {
+  inApi(`import { dropRecord, runKey } from 'agent-orchestrator/testing'; dropRecord(process.env.WF_ROOT, runKey(${JSON.stringify(id)}));`);
+}
 
 /**
  * Where the store's result branches stand, read now and written to its `standing.json` as the tick's pass writes it, in a process of the
@@ -89,7 +118,7 @@ export function standingPass() {
  * the base or not. Throws where the pass read that repository, or did not ask it.
  */
 export function unreadName(id: string) {
-  const { repo } = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as { repo: string };
+  const { repo } = storedRecord(id) as { repo: string };
   const { places } = JSON.parse(fs.readFileSync(path.join(store!, 'standing.json'), 'utf8')) as {
     places: { repo: string; unread?: string }[];
   };

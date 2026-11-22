@@ -225,14 +225,14 @@ test("REFUSED at shipped defaults: a run is never started under an id the store 
   assert.notEqual(second.id, first.id, "the id drawn again: the first run's record has it");
 
   const runs = path.join(ROOT, 'runs');
-  fs.rmSync(path.join(runs, `${first.id}.json`));
+  dropRecord(ROOT, runKey(first.id));
   fs.rmSync(path.join(runs, first.id), { recursive: true });
-  fs.mkdirSync(path.join(runs, `${first.id}.asks`));
+  plantRecord(ROOT, askKeyOf(first.id, 'retry-implement-2'), '{}');
   draws = 0;
   const third = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   assert.notEqual(third.id, first.id, 'drawn again: the asks its record left have the id');
 
-  fs.rmSync(path.join(runs, `${first.id}.asks`), { recursive: true });
+  dropRecord(ROOT, askKeyOf(first.id, 'retry-implement-2'));
   fs.mkdirSync(path.join(runs, first.id));
   draws = 0;
   const fourth = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
@@ -894,7 +894,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
 
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 
-test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone — and a pass that reaches a run's asks as they are removed does not make their directory again; a record gone between the store's listing and its read is no run, and no failure", async () => {
+test('REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone', async () => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'done.txt' });
@@ -918,43 +918,11 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
   const after = await pass;
   assert.equal(after.status, 'succeeded');
   assert.ok(after.run.tips, "the pass after it finished had its branch's tip to write");
-  assert.ok(!under('runs', `${p.run.id}.json`), 'and did not write them into a record it made again');
+  assert.ok(recordText(ROOT, runKey(p.run.id)) === undefined, 'and did not write them into a record it made again');
   assert.deepEqual(
     listRuns(ROOT).filter((r) => r.id === p.run.id),
     [],
   );
-
-  const q = await aParent(repo, b, { work: 'asked.txt' });
-  const asks = path.join(ROOT, 'runs', `${q.run.id}.asks`);
-  fs.mkdirSync(asks);
-  fs.writeFileSync(
-    path.join(asks, 'retry-implement-1'),
-    JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
-  );
-  const mkdir = fs.mkdirSync;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the asks folder removed as made: a race
-  vi.spyOn(fs, 'mkdirSync').mockImplementation(((at: string, ...rest: unknown[]) => {
-    if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
-    return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
-  }) as never);
-  await runWith(b.e, advanceRun(runRecord(ROOT, q.run.id)));
-  vi.mocked(fs.mkdirSync).mockRestore();
-  assert.ok(
-    !fs.existsSync(asks),
-    'a spent ask the pass moves into `done/` as `nemia rm` removes the directory: no asks directory made again',
-  );
-
-  const vanished = path.join(ROOT, 'runs', 'vanished-a1b2.json');
-  fs.symlinkSync(path.join(ROOT, 'nowhere.json'), vanished);
-  try {
-    assert.ok(listRuns(ROOT).length > 0);
-    assert.ok(
-      !listRuns(ROOT).some((r) => r.id === 'vanished-a1b2'),
-      'listed, then gone before it is read: a dangling link reads as exactly that',
-    );
-  } finally {
-    fs.rmSync(vanished);
-  }
 });
 
 test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before `nemia rm` forgot it hands nothing off and collects nothing afterwards — its workspace, the repository, is still there, and its files directory is not made again', async () => {

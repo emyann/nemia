@@ -11,7 +11,7 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { listRuns, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, listRuns, plantRecord, recordText, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns, outlived } from 'test-kit/checkpoints';
@@ -443,9 +443,7 @@ describe('a run held until another lands: said by every screen with why and who,
       assert.doesNotMatch(screen, VERBS, screen);
       assert.equal((await stage.runWith(b.e, decideRun(asking.id))).decision.kind, 'running');
       assert.equal(runRecord(ROOT, asking.id).steps.implement.taskId, `${asking.id}-implement`, 'the step and its closeout are untouched');
-      const asks = path.join(ROOT, 'runs', `${asking.id}.asks`);
-      fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
+      plantRecord(ROOT, askKeyOf(asking.id, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
       const filings = [...b.filings];
       const pass = await tick(b, asking.id);
       assert.deepEqual(
@@ -1143,10 +1141,9 @@ test('the whole decision of a loop a person accepted as it stands, once a pass h
   const loop = await outOfRounds(b);
   committed(runRecord(ROOT, loop.id).steps.implement.workspace!, 'loop.ts');
   await stage.runWith(b.e, acceptRun(loop.id, 'review', 'as it stands'));
-  const asks = path.join(ROOT, 'runs', `${loop.id}.asks`);
-  const [accepted] = fs.readdirSync(asks).filter((f) => f.startsWith('accept-review-'));
-  const file = path.join(asks, accepted);
-  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
+  const [accepted] = askNames(ROOT, loop.id).filter((f) => f.startsWith('accept-review-'));
+  const file = askKeyOf(loop.id, accepted);
+  plantRecord(ROOT, file, JSON.stringify({ ...JSON.parse(recordText(ROOT, file) ?? ''), at: '2026-09-17T08:00:00.000Z' }));
   await tick(b, loop.id);
   await aPass(b.e);
   const repo = runRecord(ROOT, loop.id).repo!;

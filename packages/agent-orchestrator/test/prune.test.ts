@@ -9,7 +9,7 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
-import { listRuns, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { askText, listRuns, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -283,9 +283,9 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.ok(!worktreesOf(repo).includes(wt), 'its place lists it no more');
       assert.ok(hasBranch(repo, branch), 'the branch is kept');
       assert.ok(
-        under('runs', `${run.id}.json`) &&
+        (recordText(ROOT, runKey(run.id)) !== undefined) &&
           under('runs', run.id, 'artifacts', 'implement', 'report.md') &&
-          under('runs', `${run.id}.asks`, 'done'),
+          (askText(ROOT, run.id, 'done') !== undefined),
       );
       const pruned = runRecord(ROOT, run.id).pruned!;
       assert.deepEqual(
@@ -352,7 +352,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       assert.ok(!fs.existsSync(files) && !fs.existsSync(run0.wt), 'the files and the worktree are gone');
       assert.equal(fs.readFileSync(path.join(outside, 'precious.png'), 'utf8'), 'keep me\n', 'a link among the files is not followed');
       for (const kept of ['inputs', 'agents']) assert.ok(under('runs', id, kept, 'kept.md'), `${kept} is kept`);
-      assert.ok(under('runs', `${id}.json`) && under('runs', `${id}.asks`, 'done'), 'the record and the asks are kept');
+      assert.ok((recordText(ROOT, runKey(id)) !== undefined) && (askText(ROOT, id, 'done') !== undefined), 'the record and the asks are kept');
       assert.ok(hasBranch(run0.repo, run0.branch), 'and the branch');
       const pruned = runRecord(ROOT, id).pruned!;
       assert.equal(pruned.worktrees.length, 1);

@@ -5,7 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
-import { plantRecord, runKey, runRecord } from '../testing.ts';
+import { plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -242,7 +242,6 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-implement-check.stderr`), 'boom\n');
   fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-x2-implement-check.stderr`), 'not mine\n');
   writeRun(aRun(`${run.id}-x2`, { implement: { taskId: `${run.id}-x2-implement` } }));
-  fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
   const filings = [...b.filings];
 
   const { printed, forgot, error } = await rmTyped(t, b.e, run.id);
@@ -260,8 +259,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
         [{ step: 'implement', branch, commit }],
         [],
         [
-          `runs/${run.id}.json`,
-          `runs/${run.id}.asks/`,
+          runKey(run.id),
           `runs/${run.id}/`,
           `checks/${run.id}-implement-check.stderr`,
           `worktrees/${run.id}/`,
@@ -289,8 +287,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
     'the work written after the pass that handed the failed step off, and nothing git ignores',
   );
   assert.equal(fs.readFileSync(path.join(outside, 'precious.txt'), 'utf8'), 'keep me\n', 'a link in node_modules is not followed');
-  for (const gone of [[`${run.id}.json`], [run.id], [`${run.id}.asks`]])
-    assert.ok(!under('runs', ...gone), `runs/${gone.join('/')} removed`);
+  assert.ok(recordText(ROOT, runKey(run.id)) === undefined && !under('runs', run.id), 'its record and its directory removed');
   assert.ok(!under('checks', `${run.id}-implement-check.stderr`));
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "another run's check log is left");
   assert.deepEqual(

@@ -9,7 +9,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in scratch repositories no factory holds.
  */
-import { askKeyOf, askNames, dropRecord, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, dropRecord, keysUnder, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -138,7 +138,7 @@ const refusedAs =
     for (const fact of facts) assert.ok(err.message.includes(fact), `${err.message} does not name ${fact}`);
     return true;
   };
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** `nemia start --gate plan` on `plan → implement → review`, run until plan has signed off and waits at its gate (or as `phase` says). */
 const heldAtGate = async (phase: EnginePhase = 'succeeded') => {

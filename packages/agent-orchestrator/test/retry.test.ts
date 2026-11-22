@@ -2328,7 +2328,7 @@ describe("a `--continue` of a try whose session could not start continues the se
 });
 
 describe("REFUSED at `nemia start`: a step named for what a run cuts under a step's name — its check, its try, the run's own line — exit 2, by name, no run written", () => {
-  const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+  const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
   const rows: Array<[string, () => string, string[]]> = [
     [
       "a step named for another step's check",

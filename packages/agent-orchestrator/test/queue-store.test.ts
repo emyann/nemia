@@ -12,7 +12,7 @@
  * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts). The stage's engine keeps no pass of its own: `ticking` hands it
  * one that reports nothing, so a pass reads each task off the stand-in as a person settled it.
  */
-import { dropRecord, listRuns, runKey, runRecord } from '../testing.ts';
+import { dropRecord, keysUnder, listRuns, runKey, runRecord } from '../testing.ts';
 import { settingsOf } from '../src/config/config.store.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
@@ -181,7 +181,7 @@ const started = async (brief: string, createdAt: string, opts: { isolate?: boole
   return runRecord(ROOT, run.id);
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
-const runsWritten = () => fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** What `nemia argv` printed, line by line, over `e` (the stage's engine when none is named). */
 const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {

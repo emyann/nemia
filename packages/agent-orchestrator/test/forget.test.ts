@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`, whose `WF_DEFAULT_FACTORY_STARTS` starts runs in repositories no factory holds.
 
  */
-import { dropRecord, listRuns, plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
+import { askNames, askText, dropRecord, listRuns, plantRecord, recordText, runKey, runRecord, runsNow as filesStoreAt } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -234,7 +234,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     );
     assert.ok(!fs.existsSync(wt) && !under('worktrees', id), 'its worktree is gone');
     assert.ok(hasBranch(repo, runRecord(ROOT, id).steps.implement.branch!), 'its branch kept');
-    assert.ok(under('runs', `${id}.json`), 'and its record');
+    assert.ok((recordText(ROOT, runKey(id)) !== undefined), 'and its record');
   });
   s.test(
     '`nemia prune --artifacts` lists its files and what `nemia rm` would forget of the engine, asked dry; `--yes` removes them alone',
@@ -251,7 +251,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       assert.equal(board().forgets.length, before, 'a preview asks the engine nothing: what rm would forget is no longer counted');
       const done = await stage.runWith(e(), prune(id, { artifacts: true, yes: true }));
       assert.deepEqual([done.kind, done.worktrees], ['pruned', []]);
-      assert.ok(!under('runs', id, 'artifacts') && under('runs', id, 'inputs', 'kept.md') && under('runs', `${id}.json`));
+      assert.ok(!under('runs', id, 'artifacts') && under('runs', id, 'inputs', 'kept.md') && (recordText(ROOT, runKey(id)) !== undefined));
       assert.ok(runRecord(ROOT, id).pruned?.artifacts, 'the mark says its files went');
       assert.deepEqual(
         tasks.filter((task) => !board().tasks.has(task)),
@@ -269,7 +269,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       assert.equal(said.error, undefined);
       assert.deepEqual([said.printed, said.forgot.map((f) => [f.id, f.kind])], [[], [[id, 'forgotten']]], 'one run forgotten, answered');
       const [forgot] = said.forgot;
-      assert.ok(forgot.files.includes(`runs/${id}.json`), forgot.files.join(', '));
+      assert.ok(forgot.files.includes(runKey(id)), forgot.files.join(', '));
       assert.deepEqual(forgot.branches, [{ branch, deleted: false, why: 'default' }], 'its branch kept, as no flag asked otherwise');
       assert.equal(forgot.engine?.forgotten.length, 3, 'the engine forgot its 3 tasks');
       assert.deepEqual(board().forgets.slice(before), [{ taskIds: tasks, yes: true }], 'one call, over its tasks');
@@ -282,7 +282,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       assert.ok(left.includes(kept), "another run's task is the engine's still");
       assert.ok(!fs.existsSync(markerOf(id)), 'no marker is left');
       assert.ok(
-        !under('runs', `${id}.json`) && !under('runs', id) && !under('runs', `${id}.pruned`),
+        recordText(ROOT, runKey(id)) === undefined && !under('runs', id) && !under('runs', `${id}.pruned`),
         'its record, files and mark are gone',
       );
       assert.ok(hasBranch(repo, branch), 'its branch is kept');
@@ -328,7 +328,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
         [[], [[direct.id, 'forgotten', [], false, at, []]]],
         'no worktrees, it worked in the repository itself, and no branch of its own',
       );
-      assert.ok(three.forgot[0].files.includes(`runs/${direct.id}.json`), three.forgot[0].files.join(', '));
+      assert.ok(three.forgot[0].files.includes(runKey(direct.id)), three.forgot[0].files.join(', '));
       assert.ok(
         hasBranch(at, 'main') && world().head(at) === world().tip(at, 'main'),
         'the base branch and the repository are where they were',
@@ -372,7 +372,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       [[`wf/${run.id}/${LINE_NAME}`, true]],
       'what it was asked, honoured',
     );
-    assert.ok(!under('runs', `${run.id}.json`) && !under('worktrees', run.id));
+    assert.ok(recordText(ROOT, runKey(run.id)) === undefined && !under('worktrees', run.id));
     assert.deepStrictEqual(await stage.runWith(e(), forgetRun(run.id)), await program({}), 'no record left: both say so the same');
   });
   s.test('a folder run is forgotten with its folders, and its task on the engine', async () => {
@@ -422,16 +422,15 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
         [[legacy.id, 'forgotten', []]],
         'no worktrees',
       );
-      assert.ok(said.forgot[0].files.includes(`runs/${legacy.id}.json`), said.forgot[0].files.join(', '));
+      assert.ok(said.forgot[0].files.includes(runKey(legacy.id)), said.forgot[0].files.join(', '));
       names(said.forgot[0].unfrozen, legacyDir);
 
       fs.writeFileSync(path.join(ROOT, 'runs', 'gone-run-3c4d.cancelled'), '2026-09-16T00:00:00.000Z');
-      fs.mkdirSync(path.join(ROOT, 'runs', 'gone-run-3c4d.asks', 'done'), { recursive: true });
       const leftover = await typed('rm', 'gone-run-3c4d');
       assert.equal(leftover.error?.exitCode, 2);
       assert.equal(leftover.printed.length, 1);
-      names(leftover.printed[0], 'gone-run-3c4d  no such run', 'runs/gone-run-3c4d.cancelled', 'runs/gone-run-3c4d.asks/');
-      assert.ok(!under('runs', 'gone-run-3c4d.asks') && !under('runs', 'gone-run-3c4d.cancelled'));
+      names(leftover.printed[0], 'gone-run-3c4d  no such run', 'runs/gone-run-3c4d.cancelled');
+      assert.ok(!under('runs', 'gone-run-3c4d.cancelled'));
     },
   );
   s.test("a run with no record takes no live run's check logs, nor those of a run whose record does not read", async (tt) => {
@@ -494,8 +493,8 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
         'four refused on their lines, the run beside them forgotten, its worktree removed',
       );
       for (const id of [running.id, readyRun.id, asked.id, parent.run.id])
-        assert.ok(under('runs', `${id}.json`) && under('worktrees', id, LINE_NAME), `${id}: record and worktree kept`);
-      assert.ok(under('runs', `${asked.id}.asks`, 'retry-implement-2'), 'and the ask');
+        assert.ok((recordText(ROOT, runKey(id)) !== undefined) && under('worktrees', id, LINE_NAME), `${id}: record and worktree kept`);
+      assert.ok((askText(ROOT, asked.id, 'retry-implement-2') !== undefined), 'and the ask');
       assert.deepEqual(board().stopped, [], 'nothing stopped: cancelling is its own verb');
     },
   );
@@ -525,7 +524,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
           'forgotten',
           `${id}: a cancelled run files nothing, a child called off strands nothing`,
         );
-      assert.ok(!under('runs', `${ids.asked}.asks`) && !under('runs', `${ids.asked}.cancelled`), 'its ask and its cancellation go with it');
+      assert.ok(askNames(ROOT, ids.asked).length === 0 && !under('runs', `${ids.asked}.cancelled`), 'its ask and its cancellation go with it');
     },
   );
   s.test(
@@ -540,7 +539,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       markCancelled(ROOT, run.id);
       assert.equal(runRecord(ROOT, run.id).steps.implement.check, undefined, 'the check is filed, and the record never says so');
       names((await stage.runWith(e(), forgetRun(run.id))).refusal, "implement's check is pending", 'cancelled at', `nemia ls ${run.id}`);
-      assert.ok(under('runs', `${run.id}.json`) && under('worktrees', run.id, LINE_NAME));
+      assert.ok((recordText(ROOT, runKey(run.id)) !== undefined) && under('worktrees', run.id, LINE_NAME));
       board().settle(`${run.id}-implement-check`, 'stopped');
       assert.equal((await stage.runWith(e(), forgetRun(run.id))).kind, 'forgotten');
 
@@ -571,7 +570,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       names(forgot.refusal, at, 'the inventory broke', `nemia rm ${p.run.id} again`);
       assert.ok(fs.existsSync(path.join(p.wt, 'uncommitted.txt')) && worktreesOf(at).includes(p.wt), 'the worktree and its work stay');
       assert.ok(hasBranch(at, p.branch), 'the branch stays');
-      assert.ok(under('runs', `${p.run.id}.json`) && under('runs', `${p.run.id}.cancelled`), 'the record and its cancellation stay');
+      assert.ok((recordText(ROOT, runKey(p.run.id)) !== undefined) && under('runs', `${p.run.id}.cancelled`), 'the record and its cancellation stay');
       assert.ok(!under('forgetting', `${p.run.id}.json`), 'no task written down to forget');
       assert.equal((await stage.runWith(e(), forgetRun(p.run.id))).kind, 'forgotten', 'the place reads it, and the run is forgotten');
     },
@@ -592,7 +591,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       );
       assert.deepEqual([forgot.engine, board().forgets.length], [undefined, before], 'no forget asked');
       assert.ok(!fs.existsSync(markerOf(p.run.id)), 'its marker lifted');
-      assert.ok(under('runs', `${p.run.id}.json`) && (await listed()).includes(`${p.run.id}-implement`), 'its record and its task kept');
+      assert.ok((recordText(ROOT, runKey(p.run.id)) !== undefined) && (await listed()).includes(`${p.run.id}-implement`), 'its record and its task kept');
       fs.rmSync(stray, { recursive: true });
       assert.equal((await stage.runWith(e(), forgetRun(p.run.id))).kind, 'forgotten');
     },
@@ -615,7 +614,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
         assert.equal(printed.length, 1);
         names(printed[0], `${id}${suffix}  not forgotten`, suffix, `nemia rm ${id}.`);
       }
-      assert.ok(under('runs', `${id}.json`) && under('runs', `${id}.cancelled`) && under('runs', `${id}.asks`, 'retry-implement-2'));
+      assert.ok((recordText(ROOT, runKey(id)) !== undefined) && under('runs', `${id}.cancelled`) && (askText(ROOT, id, 'retry-implement-2') !== undefined));
       assert.ok(runRecord(ROOT, id).cancelledAt);
     },
   );
@@ -677,7 +676,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
         (x: unknown) => x,
       );
       assert.equal(face, boom);
-      assert.ok(under('runs', `${run.id}.json`), 'nothing removed');
+      assert.ok((recordText(ROOT, runKey(run.id)) !== undefined), 'nothing removed');
       board().settle(`${run.id}-implement`, 'succeeded', SIGNED);
     },
   );
@@ -697,7 +696,7 @@ describe('REFUSED before any run is read: what `nemia rm` does not take, each re
     assert.deepEqual([error?._tag, error?.exitCode], ['Invalid', 2], `${args.join(' ')}: ${error?.message}`);
     names(error?.message, ...facts);
     assert.deepEqual(printed, [], 'refused before any run is read');
-    assert.ok(under('runs', `${p.run.id}.json`) && hasBranch(repo, p.branch));
+    assert.ok((recordText(ROOT, runKey(p.run.id)) !== undefined) && hasBranch(repo, p.branch));
   };
   test('`--force-unmerged` alone, which would delete nothing', () =>
     refused([p.run.id, '--force-unmerged'], '--force-unmerged', '--delete-branches'));
@@ -709,7 +708,7 @@ describe('REFUSED before any run is read: what `nemia rm` does not take, each re
       assert.equal(error?.exitCode, 2, '`..` would be the store itself');
       assert.equal(printed.length, 1);
       names(printed[0], `${id}  not forgotten`, JSON.stringify(id), 'WF_ROOT', 'nemia rm add-a-flag-x1y2');
-      assert.ok(under('runs', `${p.run.id}.json`) && under('worktrees', p.run.id, LINE_NAME));
+      assert.ok((recordText(ROOT, runKey(p.run.id)) !== undefined) && under('worktrees', p.run.id, LINE_NAME));
     });
 });
 
@@ -788,7 +787,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
           [[p.run.id, 'forgotten', marker, []]],
         );
         names(said.forgot[0]?.engine?.refusal, 'read-only');
-        assert.ok(!under('runs', `${p.run.id}.json`), 'the record is gone');
+        assert.ok(recordText(ROOT, runKey(p.run.id)) === undefined, 'the record is gone');
         assert.deepEqual(files.forgetting.read(p.run.id), [task], 'the marker keeps its id');
         const before = board().forgets.length;
         const done = await tick();

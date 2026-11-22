@@ -3,7 +3,7 @@
  * (`models`) and on the step it names, which the tick files on it, while the run's other steps and every other run keep their agents'; a
  * revision the run takes keeps it; and a model the step cannot run on is refused before a run is written.
  */
-import { runRecord } from '../testing.ts';
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -98,7 +98,7 @@ const refusedWith =
     for (const fact of facts) assert.ok(err.message.includes(fact), `${err.message} does not name ${fact}`);
     return true;
   };
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 describe("a step's model named at start, from `nemia start --model` to the step filed on it", () => {
   let repo!: string;

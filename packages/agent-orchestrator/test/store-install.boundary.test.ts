@@ -7,7 +7,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { runRecord } from '../testing.ts';
+import { recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -481,7 +481,7 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia cancel` 
   await release();
 
   assert.deepEqual(b.filings, [], 'the step is not filed into a worktree that is gone');
-  assert.ok(!under('runs', `${run.id}.json`) && !under('runs', run.id) && !under('worktrees', run.id), 'nothing of the run made again');
+  assert.ok(recordText(ROOT, runKey(run.id)) === undefined && !under('runs', run.id) && !under('worktrees', run.id), 'nothing of the run made again');
 });
 
 test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `nemia cancel` lands files no session for it — the worktree it cut stays, and `nemia rm` then forgets the run, with nothing in flight", async (t) => {

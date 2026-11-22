@@ -90,8 +90,10 @@ and no process between, and you need not ask any of them. What each takes and an
   says what to do, which the run's log carries. So the base your step merges (`main-worktree/HEAD`) is the remote's, whoever landed
   on it.
 - `make` — a step's worktree: `{ "repo", "at", "name", "from", "also" }` cuts one at `at` on a new branch `name` from `from`, or takes up
-  the one already there on `name`, merges each branch of `also`, and copies in what `.worktreeinclude` lists and git ignores; it answers
-  `{ "workspace", "branch", "conflicts", "notes" }`, `conflicts` the paths a merge left unmerged.
+  the one already there on `name`, merges each branch of `also`, and copies in what `.worktreeinclude` lists and git ignores; asked
+  with `"given": { "from", "to" }`, it writes the folder `from` whole at `to` under the worktree, anew on every ask, and keeps it out of
+  git with a `.gitignore` of `*` at its top; it answers `{ "workspace", "branch", "conflicts", "notes", "given" }`, `conflicts` the
+  paths a merge left unmerged, `given` the `to` it copied to.
 - `handoff` — commit what a step left uncommitted: `{ "workspace", "step", "why" }` answers `{ "commit" }`, null when the tree is clean.
 - `status` — the merge staged in a checkout: `{ "checkout", "tips" }` answers `{ "merging", "conflicted", "missing", "head" }`.
 - `report` — what each result branch changed against a run's base, from git's object store: `{ "repo", "baseRef", "onto", "branches",

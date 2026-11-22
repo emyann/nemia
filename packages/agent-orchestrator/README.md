@@ -2313,6 +2313,14 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
 
   On a folder run the directory is outside the step's fence, so the run copies the files into each folder it makes and
   the line names the copy: ``… They are copied into `given/inputs` in this folder.``
+
+  A run that cuts worktrees copies them into each worktree too, at the same `given/inputs`, through its place's `make`
+  (asked with `given`, written anew at every cut, kept out of git by a `.gitignore` of `*` at its top), and the line names
+  the copy after the folder: ``… The run copied the same files into `given/inputs` in your workspace, which git ignores
+  …``. A step then puts a file in place whole with a copy inside its workspace (`cp given/inputs/DESIGN.md apps/web/`),
+  which no harness refuses as it refuses one that reads from outside it; its fence is unchanged. A step on the base, and
+  every step of a run without isolation, work in a checkout a person works in, and are given no copy (`inputsGiven`,
+  `contracts/inputs-given.contract.ts`).
 - **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
 - **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
   that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
@@ -4839,7 +4847,7 @@ holding a concurrency slot forever.
 | `src/cap/cap.ts` | which queued tasks a pass lets start, the only ceiling on sessions since the runtime retired its own — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`); **`runAdmitted`**, whether the cap on runs in flight leaves a run a slot, and which runs it holds (`heldRuns`), one run's step in a repository's own checkout at a time (`heldCheckouts`), and what is still in flight when a run is called off (`inFlight`) |
 | `src/rest/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick/tick.verb.ts`'s |
 | `src/check/check.ts` | the check — pure: the command the run files on the command harness, the verdict, the contract |
-| `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
+| `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), where a step finds the run's inputs copied into its workspace, a folder or a worktree (`inputsGiven`), and which finished steps hand their work off on a pass (`handOffDue`) |
 | `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`runRecord`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, refused as `Missing`, `Conflict` — with the steps that still name the agent as `users` — or `Invalid`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/agents/read.store.ts` | the agents read: every agent a workflow's steps may name, in its own folder and its places (`agentsFor`), the agents of one folder (`loadAgents`) and an agent's version (`agentVersion`), with a person's custom instructions for each (`customInstructionsFile`, `readCustomInstructions`); one level above the bottom of the store's tree, on the skills read alone |

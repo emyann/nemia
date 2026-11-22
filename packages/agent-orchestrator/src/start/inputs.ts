@@ -4,7 +4,7 @@
  * folders its run mounts (`mountsLine`), the folders of the runs it is handed among them; and where a run came from (`fromNote`). Pure.
  */
 import path from 'node:path';
-import { GIVEN } from '../workspace/workspace.ts';
+import type { GivenInputs } from '../workspace/workspace.ts';
 import { declarationOf, DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { StepSpec } from '../step/step.ts';
 import { CARDS_FOLDER, type Mount, type Run } from '../record/record.ts';
@@ -156,16 +156,20 @@ export function namedInText(body: string, names: readonly string[]) {
  * each card by name, copied under `cards/` (`CARDS_FOLDER`); then where they are and what the step may do with them. It obliges no step
  * to open one. Undefined for a run given none, or with no directory to name.
  *
- * `inFolder` for a step of a folder run, which is fenced to its own folder, a job that asks nobody: the run's own
- * `inputs/` sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say
- * so. The run copies them in instead (`givenPlan`, `folderPlace.make`), and the line names the copy, by its path from the folder.
+ * `copied`, where the run copies them into the step's workspace (`inputsGiven`): for a step of a folder run, fenced to its own folder, a
+ * job that asks nobody, the run's own `inputs/` sits beside that folder, outside the fence, and named it the session would be denied the
+ * read with no prompt and no way to say so, so the line names the copy alone (`givenPlan`, `folderPlace.make`). For a step in a worktree
+ * its place cut, the line names the copy beside the folder, which git ignores and the run writes anew at each cut (the place's `make`,
+ * asked with `given`): a file is put in place whole with a copy inside the workspace, which a harness asks nothing of where it would refuse
+ * one that reads from outside it.
  *
  * `folders`, the folders the step is filed with (`filedFolders` in filed.ts): where they hold the run's inputs folder, mounted read-only
  * (`inputsMounts`), the line names it by the mount's path, to read and never write. Without it, the folder is named as it is on disk: a
  * harness fenced by a sandbox reads it there, and the board's preview composes without folders.
  * @param dir The run's inputs folder, or undefined where there is none to name.
  * @param names The files given, by name in that folder, or undefined where none was given.
- * @param inFolder Whether the step is of a folder run, which gets a copy of the inputs in its folder.
+ * @param copied Where the run copied them into the step's workspace, by the path from it, and whether that workspace is a folder run's
+ *   folder; null where it copied none.
  * @param folders The folders the step is filed with, whose inputs mount is named where there is one; undefined where it is filed none.
  * @param cards The inbox cards handed, by name; none where not given.
  * @param named The files of `names` that what was asked names by a markdown image or link (`namedInText`): each file is then said to be
@@ -174,7 +178,7 @@ export function namedInText(body: string, names: readonly string[]) {
 export const inputsLine = (
   dir: string | undefined,
   names: readonly string[] | undefined,
-  inFolder = false,
+  copied: { readonly at: GivenInputs; readonly inFolder: boolean } | null = null,
   folders?: Pick<FiledFolders, 'inputs'>,
   cards: readonly string[] = [],
   named?: readonly string[],
@@ -188,10 +192,13 @@ export const inputsLine = (
     ? `The person handed these inbox cards with it (\`nemia start --card\`), each copied as it read when the run started, under \`${CARDS_FOLDER}/\` as \`<name>.md\`: ${cards.map((c) => `\`${c}\``).join(', ')}.`
     : undefined;
   const said = [files, handed].filter((x) => x !== undefined).join(' ');
-  const mounted = inFolder ? undefined : folders?.inputs[0];
-  if (mounted)
-    return `${said} You may read them and must not write them, in \`${mounted.path}\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
-  return `${said} They are ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}.`;
+  if (copied?.inFolder) return `${said} They are copied into \`${copied.at}\` in this folder.`;
+  const mounted = folders?.inputs[0];
+  const found = mounted
+    ? `You may read them and must not write them, in \`${mounted.path}\`. The folder is mounted read-only; read them with Read, Grep and Glob.`
+    : `They are in \`${dir}\`.`;
+  if (!copied) return `${said} ${found}`;
+  return `${said} ${found} The run copied the same files into \`${copied.at}\` in your workspace, which git ignores and the run writes anew each time it cuts the workspace: to put one in place whole, copy it from there with a command inside your workspace, such as \`cp ${copied.at}/<file> <where it goes>\`.`;
 };
 
 /** The heading a brief gives the files handed with what was asked for, over `inputsLine`: a section of its own, beside the request. */

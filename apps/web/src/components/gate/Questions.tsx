@@ -69,7 +69,7 @@ function OptionTitle({ label, recommended }: { label: string; recommended: boole
 function QuestionHead({ q, n }: { q: Frozen<Question>; n: number }) {
   return (
     <>
-      <span className="block font-mono text-label-small uppercase tracking-wide text-on-surface-variant">{SERIES.eyebrow(n)}</span>
+      <span className="block text-label-small text-on-surface-variant uppercase">{SERIES.eyebrow(n)}</span>
       <Title size="medium" component="span" className="block text-on-surface">
         {q.title}
       </Title>

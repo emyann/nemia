@@ -67,10 +67,12 @@ holds what every change needs.
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages
   <…>`, or `--look` alone) when the change touches a part of the look (`src/components/look`), a story, `test/e2e/stories/` or a runner
-  file beside the pages; Storybook is built static once for them, they run two files at a time, then every story through Vitest in Chromium (`npm run stories`, from
-  `apps/web`, which also runs alone, or one file of it: `npx vitest run --project=storybook <file>.stories.tsx`).
-  `ci`'s `e2e-look` job runs the look's tests and the stories once and its `e2e` shards every page, on the commit implement's round check pushed, which is the commit the landing
-  merges; the landing's check runs no page.
+  file beside the pages; Storybook is built static once for them, and they run two files at a time. Every story runs through Vitest
+  in Chromium by `npm run stories`, from `apps/web` (one file of it: `npx vitest run --project=storybook <file>.stories.tsx`), and
+  after the look's tests in a whole `npm run e2e`, never under `--look`: one story file at a time, as many as `STORIES_WORKERS=<n>`
+  asks, and one a core under CI (`storiesWorkersOf`, `apps/web/.storybook/workers.ts`).
+  `ci`'s `e2e-look` job runs the look's tests once, its `e2e-stories` job every story beside it, and its `e2e` shards every page, on
+  the commit implement's round check pushed, which is the commit the landing merges; the landing's check runs no page.
 - `node tools/observe/render/render.ts --out <dir>` when you touch `tools/observe`: it renders the checkout's dashboards on a throwaway
   stack with fake data, never the live one, and a step hands over the `dashboard-<name>.png` and `.txt` it writes (`see-a-dashboard`).
   It needs `docker`, takes a minute and a half, and is never run by the suite.

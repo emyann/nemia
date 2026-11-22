@@ -3,6 +3,7 @@ import { expect, userEvent, within } from 'storybook/test';
 import { TryAgent, TryRun } from './TryAgent';
 import { saysReading, Unread } from '../../../.storybook/unread';
 import { critic, scribe } from '../../../.storybook/fixtures/agents';
+import { noRuns } from '../../../.storybook/fixtures/runs';
 
 /** Try it, under an agent's form: a brief and Try it for an agent of yours, or why it cannot be tried. */
 const meta: Meta<typeof TryAgent> = { title: 'Store/TryAgent', component: TryAgent, args: { agent: scribe } };
@@ -10,8 +11,10 @@ export default meta;
 
 type Story = StoryObj<typeof TryAgent>;
 
-/** Never tried: Try it held until a brief is written. */
+/** Never tried: Try it held until a brief is written, no run of it read. */
 export const NoBrief: Story = {
+  tags: ['network'],
+  parameters: { msw: noRuns },
   play: async ({ canvasElement }) => {
     const panel = within(canvasElement);
     await expect(panel.getByRole('button', { name: 'Try it' })).toBeDisabled();

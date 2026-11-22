@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { http, HttpResponse } from 'msw';
 import { expect, waitFor } from 'storybook/test';
 import { finishedOf } from '@/lib/api/runs';
-import { finishedList, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
+import { finishedList, linesOf, TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 import { rowOpens, standing } from '../../../.storybook/play';
 import { FinishedTable } from './FinishedTable';
 
@@ -13,6 +14,7 @@ const meta: Meta<typeof FinishedTable> = {
   title: 'Run/FinishedTable',
   component: FinishedTable,
   args: { page: PAGE, trail: [] },
+  parameters: { msw: [http.get('/api/runs/:name/lines', ({ params }) => HttpResponse.json(linesOf(String(params.name))))] },
   render: (args) => (
     <div style={{ width: 1100 }}>
       <FinishedTable {...args} />

@@ -50,22 +50,11 @@ const PLACE = { factory: FACTORY };
  * A workflow's step, read in a factory: its trail in its head (the factory, its workflows, the workflow and the step), its agent, what a
  * run of it will be told, and its file. Its reads are seeded under the keys the page asks them by (`stepQuery`, and `storeQuery` for
  * your workflows' folder), so it asks the network nothing.
- *
- * One of axe's rules is off, `label-content-name-mismatch`, for the hire's picker (`StepHire`): the ds kit's `Select` draws its
- * value before its floating label inside its trigger, while React Aria names the trigger label first, so a populated kit select fails it
- * wherever it is drawn, which is the kit's to mend, upstream. Every other rule holds the page.
  */
 const meta: Meta<typeof WorkflowStepPage> = {
   title: 'Pages/WorkflowStepPage',
   component: WorkflowStepPage,
   args: { from: 'repo', workflow: 'build', step: 'review', place: PLACE },
-  parameters: {
-    a11y: {
-      config: {
-        rules: [{ id: 'label-content-name-mismatch', enabled: false }],
-      },
-    },
-  },
   render: (args) => (
     <QueryClientProvider
       client={seeded([

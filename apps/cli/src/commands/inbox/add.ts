@@ -14,7 +14,7 @@ import { asked } from '../../objects.ts';
 import { listArg, said, textArg } from '../requests.ts';
 import { inputsOf, uploaded } from '../runs/start.ts';
 import { cardFileLines } from './attach.ts';
-import { factoryLine, fileOf, labelsText, textOrFile, workflowNamed } from './card-lines.ts';
+import { afterLines, factoryLine, fileOf, labelsText, textOrFile, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_ADD_WORDS;
 
@@ -35,7 +35,7 @@ export const filedLines = (card: Card) => {
   const title = (spec.body ?? '').split('\n')[0] ?? '';
   return [
     `${name}  ${title.slice(0, 56)}${spec.workflow ? `  workflow: ${spec.workflow}` : ''}${factoryLine(card)}${labels && Object.keys(labels).length ? `  labels: ${labelsText(labels)}` : ''}`,
-    ...(spec.after?.length ? [`  after: ${spec.after.join(', ')} — queued and started once each has landed`] : []),
+    ...afterLines(spec.after),
     ...leftOutLines(card),
     `filed: ${fileOf(card)} — start it with nemia start ${name}${spec.workflow ? '' : ' --workflows <w>'}`,
   ];

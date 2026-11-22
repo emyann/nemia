@@ -131,14 +131,18 @@ const IN_PLAY = 'status.inPlay=true';
 /** `selector` as the api is sent it: trimmed, and none for a blank one. */
 const pickedOf = (selector: string | undefined) => (selector === undefined || selector.trim() === '' ? undefined : selector.trim());
 
-/** Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none. */
-const cardsListed = async (selector: string | undefined) => {
+/**
+ * Every card that `selector` takes by its labels (`?labelSelector=`), or every card for none: of every factory, or of `factory`'s
+ * namespace alone where one is given.
+ */
+const cardsListed = async (selector: string | undefined, factory: string | undefined) => {
   const picked = pickedOf(selector);
-  return cards.listAll(picked === undefined ? {} : { labelSelector: picked });
+  const query = picked === undefined ? {} : { labelSelector: picked };
+  return factory === undefined ? cards.listAll(query) : cards.list(namespaceOf(factory), query);
 };
 
-/** Every card that `selector` takes, as entries. */
-const cardsSelected = async (selector: string | undefined) => entriesOf(await cardsListed(selector));
+/** Every card that `selector` takes, of every factory or of `factory`'s alone, as entries. */
+const cardsSelected = async (selector: string | undefined, factory: string | undefined) => entriesOf(await cardsListed(selector, factory));
 
 /** The cards of `selector` still in play, as the api keeps them (`?fieldSelector=status.inPlay=true`). */
 const inPlaySelected = async (selector: string | undefined) => {
@@ -181,14 +185,17 @@ export const inboxSelectedQuery = (selector: string | undefined) =>
 
 /**
  * Every card of the inbox, its run ended or not, that `selector` takes by its labels, or every card for none: the Inbox page's read, which
- * splits them into in play and ended itself (`CARD_KIND`). Under `['inbox']`, read again with it; keyed by an object, which no card's name
- * can be, so a card named `all` keeps its page's key (`cardQuery`, `['inbox', name]`).
+ * splits them into in play and ended itself (`CARD_KIND`). The store's Inbox reads every factory's (`GET /api/cards`); a factory's Inbox
+ * its own namespace's alone (`GET /api/namespaces/:namespace/cards`), each queued card's place still the one of the whole inbox. Under
+ * `['inbox']`, read again with it; keyed by an object, which no card's name can be, so a card named `all` keeps its page's key
+ * (`cardQuery`, `['inbox', name]`), and a factory's key is its own, apart from the floor's (`factoryInboxQuery`).
  * @param selector A label selector, `?labelSelector=`; undefined or blank for every card.
+ * @param factory The factory whose cards alone are read, by its name (`namespaceOf`); undefined for every factory's.
  */
-export const inboxAllQuery = (selector: string | undefined) =>
+export const inboxAllQuery = (selector: string | undefined, factory?: string) =>
   queryOptions({
-    queryKey: ['inbox', { all: true }, ...selectorKey(selector)],
-    queryFn: () => cardsSelected(selector),
+    queryKey: ['inbox', factory === undefined ? { all: true } : { all: true, factory }, ...selectorKey(selector)],
+    queryFn: () => cardsSelected(selector, factory),
   });
 
 /**

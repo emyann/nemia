@@ -3,6 +3,7 @@ import { RunTrail } from '../components/run/RunPage';
 import { StepPage } from '../components/step/StepPage';
 import { loadRun } from '../lib/runView';
 import { objectHome } from '../lib/factoryAddress';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of a step's session, at /factories/$factory/runs/$runId/steps/$step: `$runId_` draws it on its own, not inside the run's page,
@@ -34,7 +35,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3 p-4">
       <RunTrail runId={runId} step={step} />
-      <p className="text-body-medium text-failure">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this run" error={error} />
     </div>
   );
 }

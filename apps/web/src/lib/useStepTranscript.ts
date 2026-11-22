@@ -4,6 +4,7 @@ import { transcriptPath, transcriptQuery } from './api/steps.ts';
 import { animationFrames } from './follow.ts';
 import { followedFrom, followStep, unread, type Following } from './following.ts';
 import { mergeEvents } from './transcript';
+import { troubleOf } from './api/read.ts';
 
 export type { Following } from './following.ts';
 
@@ -56,7 +57,7 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
         stop = followStep(stream, setState, animationFrames);
       },
       (err: unknown) => {
-        if (!left) setState({ ...unread(false), error: err instanceof Error ? err.message : String(err) });
+        if (!left) setState({ ...unread(false), error: troubleOf(err).words });
       },
     );
 

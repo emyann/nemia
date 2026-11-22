@@ -3,6 +3,7 @@ import { CardTrail, CardPage } from '../components/inbox/CardPage';
 import { cardQuery } from '../lib/api/inbox.ts';
 import { namespaceOf } from '../lib/api/namespace.ts';
 import { objectHome } from '../lib/factoryAddress';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The page of an inbox card, at /inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no outlet for it.
@@ -29,7 +30,7 @@ function Failed({ error }: { error: unknown }) {
   return (
     <div className="space-y-3">
       <CardTrail name={Route.useParams().name} />
-      <p className="text-body-medium text-failure">Could not load this card: {error instanceof Error ? error.message : String(error)}</p>
+      <ReadTrouble what="this card" error={error} />
     </div>
   );
 }

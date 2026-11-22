@@ -468,7 +468,10 @@ test('the run bar says a run not read yet, a read that failed, and a run gone fr
   const run = atGate();
   const body = (props: { run: RunDetail | undefined; error: unknown }) => pagedWith(createElement(RunBody, { id: run.id, ...props }));
   assert.match(await body({ run: undefined, error: null }), />Reading the run…</);
-  assert.match(await body({ run: undefined, error: new Error('the api is down') }), /Could not read the run r-1: the api is down/);
+  const down = await body({ run: undefined, error: new Error('the api is down') });
+  assert.match(down, /data-read-trouble="unanswered"/);
+  assert.match(down, /the run r-1/);
+  assert.match(down, /the api is down/);
   const gone = await body({ run, error: new ReadRefusal('gone', 404) });
   assert.match(gone, /data-run-gone="r-1"/);
   assert.doesNotMatch(gone, /aria-label="Steps"/);

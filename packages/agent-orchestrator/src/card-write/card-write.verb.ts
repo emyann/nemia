@@ -108,11 +108,11 @@ const cardToWrite = Effect.fn('cardToWrite')(function* (name: string, namespace:
 
 /**
  * The card `name` of the namespace `namespace` (its factory, `default` for a card that names none) written whole from `write` (the Card's
- * update): its `workflow:`, `gate:`, `model:`, `from:`, `files:` and body as `write.spec` says — a key it leaves out taken off — its labels
- * as `write.metadata.labels` says where it says (`{}` takes them all off; absent keeps them), its `queued:` and `factory:` kept, and an old
- * card's retired `repo:` written back only where `spec.repo` sends it as read, taken off where it is left out. Written
- * through the Card door as `nemia inbox from` writes one (`cardText`), and not written at all where the file would read the same, so a
- * write of every key as it is leaves the file and its `resourceVersion` as they were.
+ * update): its `workflow:`, `gate:`, `model:`, `from:`, `after:`, `files:` and body as `write.spec` says — a key it leaves out taken
+ * off — its labels as `write.metadata.labels` says where it says (`{}` takes them all off; absent keeps them), its `queued:` and
+ * `factory:` kept, and an old card's retired `repo:` written back only where `spec.repo` sends it as read, taken off where it is left
+ * out. Written through the Card door as `nemia inbox from` writes one (`cardText`), and not written at all where the file would read
+ * the same, so a write of every key as it is leaves the file and its `resourceVersion` as they were.
  *
  * Refused before anything is written, exit 2: a name that is not a card's (`inboxNameRefusal`), no card of that name in the namespace
  * (`Missing`), a card that does not read, and what `cardWriteRefusal` refuses — a started card and a stale `resourceVersion` (`Conflict`,

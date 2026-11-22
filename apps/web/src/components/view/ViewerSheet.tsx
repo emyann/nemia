@@ -21,6 +21,7 @@ import { Markdown } from '../markdown/Markdown';
 import { Json } from '../step/Outcome';
 import { bytesWord } from '../run/Artifacts';
 import { Reading, ReadingLines } from '@/components/look';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** A file the api serves: its name, its link and its kind. */
 type Served = Extract<StepArtifact, { url: string }>;
@@ -151,12 +152,7 @@ function Drawn({ file }: { file: StepArtifact }) {
  */
 export function TextFile({ file, viewer }: { file: Served; viewer: Exclude<Viewer, 'picture' | 'none'> }) {
   const read = useQuery(stepFileQuery(file.url));
-  if (read.error)
-    return (
-      <p className="text-body-medium text-failure">
-        Could not read {file.name}: {read.error.message}
-      </p>
-    );
+  if (read.error) return <ReadTrouble what={file.name} error={read.error} />;
   if (read.data === undefined)
     return (
       <Reading label={`Reading ${file.name}…`}>

@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { FactoryStep } from '@/components/welcome/FactoryStep';
 import { milestonesQuery } from '@/lib/api/readiness';
 import { templatesQuery } from '@/lib/api/templates';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /**
  * The welcome's factory step, at /welcome/factory: `welcome_` draws it on its own, not inside the welcome, which sends a store with its
@@ -13,9 +14,6 @@ export const Route = createFileRoute('/welcome_/factory')({
     Promise.all([context.queryClient.ensureQueryData(milestonesQuery), context.queryClient.ensureQueryData(templatesQuery)]),
   component: FactoryStep,
   errorComponent: ({ error }) => (
-    <p className="p-4 text-body-medium text-failure">
-      Could not read this server&apos;s milestones or templates: {error instanceof Error ? error.message : String(error)}. Open the board at
-      /, or reload the page once the api answers.
-    </p>
+    <ReadTrouble what="this server's milestones or templates" error={error} className="p-4" then="Open the board at /." />
   ),
 });

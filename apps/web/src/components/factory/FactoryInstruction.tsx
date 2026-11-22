@@ -12,6 +12,7 @@ import {
 import { Markdown } from '../markdown/Markdown';
 import { Pending, Reading } from '@/components/look';
 import { Skeleton } from '@/components/ui/ds';
+import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 /** What a person asks of a factory's instruction: its words saved or cleared in the store, or the place it is read from changed. */
 type Change = { kind: 'save'; words: string } | { kind: 'clear' } | { kind: 'store' } | { kind: 'path'; path: string } | { kind: 'reset' };
@@ -69,7 +70,7 @@ export function FactoryInstruction({ name }: { name: string }) {
       {data ? (
         <Kept data={data} pending={change.isPending} onChange={ask} />
       ) : error instanceof Error ? (
-        <p className="text-body-medium text-muted-foreground">Could not read the instruction: {error.message}</p>
+        <ReadTrouble what="the instruction" error={error} className="text-muted-foreground" />
       ) : (
         <Reading label="Reading the instruction…" className="flex flex-col gap-2">
           <Skeleton shape="rectangle" className="h-32 rounded-none" />

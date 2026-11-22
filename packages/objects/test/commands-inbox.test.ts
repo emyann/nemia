@@ -75,13 +75,31 @@ test("the group is the ten writes and the card's files' read, in the order the h
   );
 });
 
-test('`nemia inbox add` takes the idea, then --workflow and --factory once each, and --label once per label', () => {
-  assert.deepEqual(read(INBOX_ADD_WORDS, ['an idea', '--workflow', 'dev', '--factory', 'f', '--label', 'a=b', '--label', 'c-']), {
-    idea: 'an idea',
-    workflow: 'dev',
-    factory: 'f',
-    label: ['a=b', 'c-'],
-  });
+test('`nemia inbox add` takes the idea, then --workflow and --factory once each, --after once per card and --label once per label', () => {
+  assert.deepEqual(
+    read(INBOX_ADD_WORDS, [
+      'an idea',
+      '--workflow',
+      'dev',
+      '--factory',
+      'f',
+      '--after',
+      'a-1',
+      '--after',
+      'b-2',
+      '--label',
+      'a=b',
+      '--label',
+      'c-',
+    ]),
+    {
+      idea: 'an idea',
+      workflow: 'dev',
+      factory: 'f',
+      after: ['a-1', 'b-2'],
+      label: ['a=b', 'c-'],
+    },
+  );
 });
 
 test('REFUSED by `nemia inbox add`: no idea, two, a flag it does not take, --repo, retired, one given twice or with no value', () => {

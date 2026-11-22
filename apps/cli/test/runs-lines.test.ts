@@ -252,12 +252,13 @@ test('nemia start prints the run it started, worded off the answer, line for lin
       ],
     ],
     [
-      'a card queued, its retired repo:, after a run, reading two, a label not inherited, in a paused store',
+      'a card queued, its retired repo:, started by hand though it waits on a card, after a run, reading two, a label not inherited, in a paused store',
       {
         id: 'r-2',
         card: 'cache-card',
         queueLeft: 'queued: 2026-11-01',
         ignoredRepo: '/old/place',
+        waitedOn: ['first-card'],
         landed: ['r-0'],
         hints: ['dev/implement.md still writes `nudge`'],
         paused: { pause: { at: 't', by: 'ann', why: 'upgrade' }, finishing: [], parked: [], staged: [], held: [] },
@@ -293,6 +294,7 @@ test('nemia start prints the run it started, worded off the answer, line for lin
         'Paused since t by ann: upgrade — nothing runs and nothing new starts; nemia resume resumes it: nothing of this run is filed until then',
         'dev/implement.md still writes `nudge`',
         "the card's repo: /old/place is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line",
+        'started although cache-card waits on first-card, not landed yet — its run starts from the base as it is now, without their work',
       ],
     ],
     [

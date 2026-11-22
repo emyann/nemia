@@ -41,6 +41,7 @@ import {
   type FeedConflicts,
   type FeedMissing,
   type FeedClashes,
+  type FeedWaits,
   type FeedReadiness,
   type FeedWords,
   lineAsRead,
@@ -313,6 +314,7 @@ export const feedPass = (
     missing,
     readiness,
     clashes,
+    waits,
   }: {
     at?: string;
     unjudged?: ReadonlySet<string>;
@@ -323,6 +325,7 @@ export const feedPass = (
     missing?: FeedMissing;
     readiness?: FeedReadiness;
     clashes?: FeedClashes;
+    waits?: FeedWaits;
   } = {},
 ) =>
   Effect.gen(function* () {
@@ -336,7 +339,7 @@ export const feedPass = (
     foldFeed(memo.fold, read.lines);
     memo.cursor = read.cursor;
     memo.generation = end?.generation;
-    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels, conflicts, readiness, resumed, missing, clashes);
+    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels, conflicts, readiness, resumed, missing, clashes, waits);
     const size = end?.cursor ?? 0;
     if (!lines.length) return { lines, before: size, after: size, leading: '' };
     const appended = yield* door.lines.append(lines);
@@ -378,6 +381,7 @@ export const recordFeed = (
     missing?: FeedMissing;
     readiness?: FeedReadiness;
     clashes?: FeedClashes;
+    waits?: FeedWaits;
   } = {},
 ) => within('act', () => ran(feedPass(doorAt(home), memo, now, pass)));
 

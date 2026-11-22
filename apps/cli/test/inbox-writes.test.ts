@@ -155,6 +155,14 @@ test("under this machine's context: a card filed from a file, queued, taken back
   await lifeOfACard((argv) => store.nemia(argv), store.root, ideaFile('here.md'));
 });
 
+test('a card filed with --after names each card it waits on, written as its after: and said under it', async () => {
+  const added = await store.nemia(['inbox', 'add', 'Land the second slice', '--after', 'first-a1b2', '--after', 'zero-c3d4']);
+  ok(added, 'inbox add --after');
+  const name = nameIn(added.out);
+  assert.match(added.out, /^ {2}after: first-a1b2, zero-c3d4 — /m);
+  assert.match(cardOn(store.root, name) ?? '', /^after: first-a1b2, zero-c3d4$/m);
+});
+
 test('a card carries the picture its idea file names beside it and a --file, and names the one in a folder it does not; attach, files, --get and detach', async () => {
   const dir = scratch('nemia-inbox-files-');
   const shot = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);

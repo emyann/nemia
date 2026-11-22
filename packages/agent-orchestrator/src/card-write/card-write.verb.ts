@@ -21,6 +21,7 @@ import { CardName } from '../inbox/inbox.model.ts';
 import {
   cardText,
   cardWorkflowRefusal,
+  afterLine,
   fromLine,
   inboxNameRefusal,
   parseInboxCard,
@@ -151,6 +152,7 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
         gate: spec.gate,
         model: spec.model && modelsText(spec.model),
         from: fromLine(spec.from),
+        after: afterLine(spec.after),
         labels: { ...labels },
         files,
       },

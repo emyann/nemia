@@ -2,18 +2,8 @@
  * The four decisions of the producer (`contracts/produce.contract.ts`): what becomes of a story, why a drawn cell fails the build,
  * which caps of the artifact a build passed, and what became of one path against the last build.
  */
-import {
-  FILES_CAP,
-  LEAST_DRAWN,
-  MOST_COVERED,
-  SCRIPT_CAP,
-  STYLESHEET_CAP,
-  type Cap,
-  type CapsPassed,
-  type CellFaultOf,
-  type FileChangeOf,
-  type StoryFateOf,
-} from '../contracts/produce.contract.ts';
+import type { Cap, CapsPassed, CellFaultOf, FileChangeOf, StoryFateOf } from '../contracts/produce.contract.ts';
+import { FILES_CAP, LEAST_DRAWN, MOST_COVERED, SCRIPT_CAP, STYLESHEET_CAP } from './limits.ts';
 
 /** A story tagged `network` is left out, then one tagged `overlay`; one that names MSW handlers and says neither is refused; else drawn. */
 export const storyFate: StoryFateOf = (story) => {

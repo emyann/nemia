@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      # Every leg runs: one package's failure on one node says nothing about the other nineteen.
+      # Every leg runs: one package's failure on one node says nothing about the other twenty-one.
       fail-fast: false
       matrix:
         # The orchestrator is not here: its suite is run in halves, and a matrix cannot split one combination, so its four legs arrive

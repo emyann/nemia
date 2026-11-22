@@ -154,7 +154,7 @@ const iconsBlock = (icons: readonly string[]) => {
   ].join('\n');
 };
 
-/** Each line not of a comment, with a type the entry reaches through a module import (`m71.FrameHue`) written by its own name. */
+/** Each line not of a comment, with a type the entry reaches through a module import (an alias, a dot, a name) written by its name. */
 const plainNames = (text: string) => {
   const comment = (line: string) => /^\s*(\/\*\*|\*)/.test(line);
   const plain = text

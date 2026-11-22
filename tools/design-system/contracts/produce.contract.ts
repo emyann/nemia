@@ -5,6 +5,7 @@
  * files are the build's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import { FILES_CAP, LEAST_DRAWN, MOST_COVERED, SCRIPT_CAP, STYLESHEET_CAP } from '../src/limits.ts';
 
 /**
  * What the producer does with a story, read from the story's module before anything is drawn: drawn in a card (`card`), left out
@@ -71,12 +72,6 @@ export type CellDrawn = {
   readonly apiPicture: boolean;
 };
 
-/** The least height, in pixels, of a cell that drew something: a frame around an empty box measures under it. */
-export const LEAST_DRAWN = 4;
-
-/** The largest share of a card's frame a fixed layer may cover before the story is taken for one that opens over the whole window. */
-export const MOST_COVERED = 0.3;
-
 /** Whether a cell that did not throw drew something. */
 const drew = (cell: CellDrawn) => cell.threw === null && cell.height >= LEAST_DRAWN;
 
@@ -127,15 +122,6 @@ export type CellFaultOf = Implementation<typeof cellFaultSpec>;
 
 /** A cap of the artifact type a build may pass. */
 export type Cap = 'script' | 'stylesheet' | 'files';
-
-/** The script's cap, in bytes: 6 MB. */
-export const SCRIPT_CAP = 6 * 1024 * 1024;
-
-/** The stylesheet's cap, in bytes: 2 MB. */
-export const STYLESHEET_CAP = 2 * 1024 * 1024;
-
-/** The most files a build may hold. */
-export const FILES_CAP = 1024;
 
 /** What a build measures against the caps: the script's bytes, the stylesheet's bytes and how many files it holds. */
 export type Measured = { readonly scriptBytes: number; readonly stylesheetBytes: number; readonly files: number };

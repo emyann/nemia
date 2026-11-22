@@ -1,7 +1,7 @@
 /**
  * The artifact's words: each board card's README from the doc comments its code carries, each kit card's from its guideline, the
  * brand book (`README.md`, from `brand.md` beside this file), the cover's card, and the index (`design-system.json`), copied from
- * `index.seed.json` so a build never rewrites its birth; the publishing session revises the artifact's own index, its `lastChange` alone.
+ * `index.seed.json` so a build never rewrites its birth; the publishing session revises the artifact's own index, its last change alone.
  */
 import fs from 'node:fs';
 import path from 'node:path';

@@ -3,13 +3,3 @@ apps/web/src/components/settings/ServerRelease.tsx#text-body-small
 apps/web/src/components/settings/ServerRelease.tsx#text-label-medium
 apps/web/src/components/settings/ServerRelease.tsx#text-title-medium
 apps/web/src/components/settings/ServerRelease.tsx#text-title-small
-apps/web/src/components/settings/ServerRelease.tsx#text-body-medium
-apps/web/src/components/settings/ServerRelease.tsx#text-body-small
-apps/web/src/components/settings/ServerRelease.tsx#text-label-medium
-apps/web/src/components/settings/ServerRelease.tsx#text-title-medium
-apps/web/src/components/settings/ServerRelease.tsx#text-title-small
-apps/web/src/components/settings/ServerRelease.tsx#text-body-medium
-apps/web/src/components/settings/ServerRelease.tsx#text-body-small
-apps/web/src/components/settings/ServerRelease.tsx#text-label-medium
-apps/web/src/components/settings/ServerRelease.tsx#text-title-medium
-apps/web/src/components/settings/ServerRelease.tsx#text-title-small

@@ -1,9 +1,3 @@
 apps/web/src/components/gate/ProposalCard.tsx#text-body-medium
 apps/web/src/components/gate/ProposalCard.tsx#text-body-small
 apps/web/src/components/gate/ProposalCard.tsx#text-title-medium
-apps/web/src/components/gate/ProposalCard.tsx#text-body-medium
-apps/web/src/components/gate/ProposalCard.tsx#text-body-small
-apps/web/src/components/gate/ProposalCard.tsx#text-title-medium
-apps/web/src/components/gate/ProposalCard.tsx#text-body-medium
-apps/web/src/components/gate/ProposalCard.tsx#text-body-small
-apps/web/src/components/gate/ProposalCard.tsx#text-title-medium

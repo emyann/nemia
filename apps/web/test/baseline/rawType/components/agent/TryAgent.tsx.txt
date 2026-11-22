@@ -1,6 +1,2 @@
 apps/web/src/components/agent/TryAgent.tsx#text-body-small
 apps/web/src/components/agent/TryAgent.tsx#text-title-small
-apps/web/src/components/agent/TryAgent.tsx#text-body-small
-apps/web/src/components/agent/TryAgent.tsx#text-title-small
-apps/web/src/components/agent/TryAgent.tsx#text-body-small
-apps/web/src/components/agent/TryAgent.tsx#text-title-small

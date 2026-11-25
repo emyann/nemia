@@ -62,6 +62,7 @@ test("a start by a token of the person's files the upgrade and answers it pendin
   assert.equal(started.status, 200, await started.clone().text());
   const upgrade = (await started.json()) as Upgrade;
   assert.equal(upgrade.phase, 'pending');
+  assert.match(upgrade.id, /-[0-9a-f]{32}$/, 'its id ends in 128 random bits, the handle of an MCP task');
   const filed = engine().tasks.get(upgrade.id)?.spec;
   assert.ok(filed, 'filed on the engine');
   assert.equal(filed.harness, 'command', 'filed on the engine as a command task');

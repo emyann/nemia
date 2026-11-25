@@ -238,5 +238,10 @@ export const WAIT_WORDS = {
   check: waitRefusal,
   writes: false,
   class: 'read',
-  served: [{ endpoint: 'server.wait' }],
+  served: [
+    {
+      endpoint: 'server.wait',
+      task: { kind: 'again', cursor: 'cursor', from: 'from', until: { key: 'ended', value: 'matched' } },
+    },
+  ],
 } as const satisfies CommandWords;

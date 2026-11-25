@@ -6,13 +6,14 @@
  * the endpoint's method and path, which keys fill the path and the query, whether the endpoint answers a `Table`, and the query values its
  * link sends where a call gives none (`defaults`). The api's MCP port describes each tool by these words (`toolDescriptionOf`), and
  * Nemia's verbs skill says them to her shell seat, so the two cannot drift. A link to a stream, a method that is not a call, a key two of
- * the three say, a default for a key the query has not, or an endpoint that says nothing of what it does is thrown as the words are read.
+ * the three say, a default for a key the query has not, or an endpoint that says nothing of what it does is thrown as the words are read,
+ * and so is a link's task the port could not answer (`taskOf`).
  * Pure, over the Schemas.
  */
 import { Context, Option, Schema } from 'effect';
 import { OpenApi } from 'effect/http-api';
 import type { ApiEndpointName } from './api.ts';
-import { CLI, type CommandWords } from './command.ts';
+import { type AskedAgainTask, CLI, type CommandWords, type FollowedTask, type LinkTask } from './command.ts';
 import { type EndpointShape, keysOfEndpoint, streamsOf } from './endpoint-keys.ts';
 import { READS } from './reads.ts';
 import { Table } from './table.ts';
@@ -52,9 +53,15 @@ export type ToolInput = {
 export type KeySaid = { readonly key: string; readonly words: string };
 
 /**
+ * How a tool answers as an MCP task, as its link says it (`LinkTask`): a followed task carries, besides, the path of its read and the one
+ * key of that path its id fills.
+ */
+export type ToolTask = AskedAgainTask | (FollowedTask & { readonly path: string; readonly pathKey: string });
+
+/**
  * A tool's words: its name, the entry whose link it is, the endpoint it calls, its method and path, the keys that fill the path and the
- * query, its input, whether it answers a `Table`, the defaults its link sends, what the endpoint says it does (`said`), and each key of
- * its input that says what it takes.
+ * query, its input, whether it answers a `Table`, the defaults its link sends, what the endpoint says it does (`said`), each key of
+ * its input that says what it takes, and how it answers as an MCP task (`task`, null where its link says none).
  */
 export type ToolWords = {
   readonly name: string;
@@ -69,14 +76,19 @@ export type ToolWords = {
   readonly defaults: Readonly<Record<string, string>>;
   readonly said: string;
   readonly keys: readonly KeySaid[];
+  readonly task: ToolTask | null;
 };
 
-/** A tool of the MCP port: the endpoint it calls, its name, the entry whose link it is, and the query its link sends by default. */
+/**
+ * A tool of the MCP port: the endpoint it calls, its name, the entry whose link it is, the query its link sends by default, and how it
+ * answers as an MCP task (null where its link says none).
+ */
 export type LinkedTool = {
   readonly endpoint: ApiEndpointName;
   readonly tool: string;
   readonly entry: string;
   readonly query: Readonly<Record<string, string>>;
+  readonly task: LinkTask | null;
 };
 
 /**
@@ -87,7 +99,9 @@ export type LinkedTool = {
 export const toolsOf = (entry: Pick<CommandWords, 'name' | 'served'>) =>
   (entry.served ?? []).flatMap((link, i) => {
     const tool = i === 0 ? entry.name.replaceAll(' ', '_') : link.as;
-    return tool === undefined ? [] : [{ endpoint: link.endpoint, tool, entry: entry.name, query: link.query ?? {} } satisfies LinkedTool];
+    return tool === undefined
+      ? []
+      : [{ endpoint: link.endpoint, tool, entry: entry.name, query: link.query ?? {}, task: link.task ?? null } satisfies LinkedTool];
   });
 
 /** The methods a tool calls by. */
@@ -257,8 +271,37 @@ const defaultsOf = (tool: string, query: Readonly<Record<string, string>>, query
   return { ...query };
 };
 
+/** The endpoints of an `Api`, by their names (`<group>.<endpoint>`). */
+type Endpoints = ReadonlyMap<string, DescribedEndpoint>;
+
+/**
+ * How `link`'s tool answers as a task, thrown where the port could not answer it: a followed task whose read is no GET of the `Api`, one
+ * that streams, or one whose path takes other than one key; a task asked again of a tool that is no GET, or whose `from` its query does
+ * not take.
+ */
+const taskOf = (link: LinkedTool, method: ToolMethod, queryKeys: readonly string[], endpoints: Endpoints) => {
+  const task = link.task;
+  if (task === null) return null;
+  if (task.kind === 'again') {
+    if (method !== 'GET')
+      throw new Error(`${link.tool}'s link asks its task again, which the port does on a GET alone: drop the task from the link`);
+    if (!queryKeys.includes(task.from))
+      throw new Error(`${link.tool}'s task reads on from ${task.from}, which its endpoint's query does not take: name a key it takes`);
+    return task satisfies ToolTask as ToolTask;
+  }
+  const read = endpoints.get(task.read);
+  if (read === undefined) throw new Error(`${link.tool}'s task reads ${task.read}, no endpoint of the Api: name a GET it declares`);
+  if (read.method !== 'GET' || [...read.success].some(streamsOf))
+    throw new Error(`${link.tool}'s task reads ${task.read}, which is no GET answered once: name a GET that answers once`);
+  const { pathKeys } = keysOfEndpoint(read);
+  const [pathKey, ...more] = pathKeys;
+  if (pathKey === undefined || more.length > 0)
+    throw new Error(`${link.tool}'s task reads ${task.read}, whose path takes other than one key: name a read of one thing by its id`);
+  return { ...task, path: read.path, pathKey } satisfies ToolTask as ToolTask;
+};
+
 /** The words of the tool `link` names, its endpoint `endpoint` read by reflection; thrown where it streams or says nothing. */
-function wordsOfLink(link: LinkedTool, endpoint: DescribedEndpoint) {
+function wordsOfLink(link: LinkedTool, endpoint: DescribedEndpoint, endpoints: Endpoints) {
   if ([...endpoint.success].some(streamsOf))
     throw new Error(`${link.tool} links ${link.endpoint}, which answers a stream: a tool answers once, so link an endpoint that does`);
   const method = methodOf(link.endpoint, endpoint.method);
@@ -274,6 +317,7 @@ function wordsOfLink(link: LinkedTool, endpoint: DescribedEndpoint) {
     defaults: defaultsOf(link.tool, link.query, input.queryKeys),
     said: endpointSaid(link.endpoint, endpoint),
     keys: keysSaid(input.inputSchema),
+    task: taskOf(link, method, input.queryKeys, endpoints),
   } satisfies ToolWords;
 }
 
@@ -295,7 +339,7 @@ export function toolWordsOf<V extends ToolVerb>(table: readonly V[], verbs: read
     toolsOf(verb).map((link) => {
       const endpoint = endpoints.get(link.endpoint);
       if (endpoint === undefined) throw new Error(`${link.tool} links ${link.endpoint}, no endpoint of the Api: link one it declares`);
-      return { verb, words: wordsOfLink(link, endpoint) };
+      return { verb, words: wordsOfLink(link, endpoint, endpoints) };
     }),
   );
 }

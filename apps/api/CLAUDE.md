@@ -82,6 +82,11 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   asked through the app's `fetch` with the holder's token, released when the SDK's response ends, is cancelled or its request aborts,
   and closed with its streams when the api refuses it. A read answers the view's newest `PORT_PAGE` events within `ANSWER_BOUND`, and
   an empty page at the feed's end for a URI no listen holds. A test waits for `liveViews()` to fall with `until`.
+  A tool answers as an MCP task (`src/mcp/tasks.ts`) only where its link says one (`LinkTask`, `objects`), on 2026-07-28 alone, to a
+  request that declares the extension: a followed task (`upgrade`) keeps nothing in the port and reads its thing again on each
+  `tasks/get`, with the reader's token; a held one (`wait`) lives in the api's memory, lost at a restart, and a test waits for
+  `liveTasks()` to fall with `until`. The 2026 era asks a raw request for its `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name`
+  headers (a task's id is its name), and the SDK lifts `inputResponses` off a request before its handler reads it.
   It says what Nemia is on `initialize` and `server/discover`, and which tools come first, for a host that defers its tools (`PORT_INSTRUCTIONS`,
   `src/mcp/instructions.ts`, each paragraph's port form of `objects`' `GUIDANCE`), every tool it names one the port lists. Every store, marked exposed (`WF_EXPOSED=1`) or not, loopback
   included, refuses a request with no token on every route of the api (`/api`, `/openapi`) but its three open routes (a pairing asked

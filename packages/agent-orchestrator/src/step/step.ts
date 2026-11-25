@@ -12,9 +12,16 @@ import type { FieldShape, PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEY
 
 /**
  * One of a step's named checks, as the loader resolved it: its name (`[a-z][a-z0-9-]*`), the shell line it runs, and the checks it waits
- * on, each by name, none where it waits on nothing.
+ * on, each by name, none where it waits on nothing. `usesCheckout: false`, on an ending's check alone, says the check reads and writes
+ * nothing of the repository's own checkout: the checkout is given back once every check that uses it has passed (`checksHoldCheckout`).
+ * Absent, the check uses the step's workspace.
  */
-export type CheckSpec = { readonly name: string; readonly run: string; readonly after: readonly string[] };
+export type CheckSpec = {
+  readonly name: string;
+  readonly run: string;
+  readonly after: readonly string[];
+  readonly usesCheckout?: false;
+};
 
 /** The name `check: <line>` is read under: the step's one check, whose task keeps the id it always had (`checkTaskId`). */
 export const SHORTHAND_CHECK = 'check';

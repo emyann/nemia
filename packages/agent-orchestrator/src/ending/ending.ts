@@ -1,6 +1,8 @@
 /**
- * A run's ending step: when its merge lands on its check (`landingDue`, `landingOpen`), what landed (`landedWords`), the one checkout
- * it holds (`checkoutLine`), and what is left for a person to decide (`toDecide`, `gateRefusal`). Pure: the tick merges and commits.
+ * A run's ending step: when its merge lands on its check (`landingDue`), how long it holds the one checkout (`landingOpen`,
+ * `checksHoldCheckout`: until every check that uses it has passed, a check with `usesCheckout: false` running after it is given back),
+ * what landed (`landedWords`), the checkout's line (`checkoutLine`), and what is left for a person to decide (`toDecide`, `gateRefusal`).
+ * Pure: the tick merges and commits.
  */
 import type { Verdict } from '../check/index.ts';
 import type { MergeState } from '../place/place.ts';
@@ -33,7 +35,9 @@ import type { CheckoutHold } from '../cap/cap.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { ClaimedAt } from '../../contracts/checkout-claim.contract.ts';
-import { checksPhase } from '../check/index.ts';
+import { checksPhase, checkStandings } from '../check/index.ts';
+import { stepChecks } from '../step/step.ts';
+import type { ChecksHoldCheckout } from '../../contracts/checkout-checks.contract.ts';
 
 /**
  * The deny list a step is filed with, each try and each round: its own, and `landingDenied` — what its place denies a landing session
@@ -191,9 +195,22 @@ const refusedBase = (tip: string | undefined, check: TaskPhase, verdict: Verdict
   tip && refusedCheck(check, verdict) ? { refusedOn: tip } : {};
 
 /**
+ * Whether an ending's checks still hold the repository's own checkout, proved by contracts/checkout-checks.contract.ts: a check that uses
+ * the checkout and runs there holds it; an ending that signed off done holds it while a check that uses it has not passed (still to be
+ * filed, running, or refused before its landing is recorded); once every check that uses it has passed the checks hold nothing, whatever
+ * the checks with `usesCheckout: false` are doing. Pure.
+ * @param checks The ending's checks, each whether it uses the checkout and where it stands on the current try.
+ * @param signedDone Whether the ending signed off done, its checks due or running (`own` is `checking`).
+ */
+export const checksHoldCheckout: ChecksHoldCheckout = (checks, signedDone) =>
+  checks.some((c) => c.usesCheckout && (c.standing === 'running' || (signedDone && c.standing !== 'passed')));
+
+/**
  * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its
- * session or its check in flight, its check due, or its merge staged. What keeps another run's ending out of the checkout (`mainClaim`) and
- * `nemia rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
+ * session in flight, its checks holding it (`checksHoldCheckout`: a check that uses it running, or, for a step that signed off done, one
+ * not passed), or its merge staged. A check with `usesCheckout: false` holds nothing: once every check that uses the checkout has passed,
+ * another run's ending may be filed there while it still runs, and the step is still judged on it. What keeps another run's ending out of
+ * the checkout (`mainClaim`) and `nemia rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
  * @param step The ending's spec.
  * @param run The run's record.
  * @param own How the step ended on its own work.
@@ -210,9 +227,9 @@ export const landingOpen = (
   const record = run.steps[step.name];
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return false;
   const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
-  return (
-    busy(phaseOf(record.taskId)) || busy(record.check && checksPhase(record.check, phaseOf)) || own === 'checking' || merging() === 'ours'
-  );
+  const standing = checkStandings(run, step, phaseOf);
+  const checks = stepChecks(step).map((c) => ({ usesCheckout: c.usesCheckout !== false, standing: standing(c.name) }));
+  return busy(phaseOf(record.taskId)) || checksHoldCheckout(checks, own === 'checking') || merging() === 'ours';
 };
 
 /**

@@ -23,6 +23,8 @@ export {
   labelRefusal,
   labelsRefusal,
   labelValueRefusal,
+  labelValuesOf,
+  labelValuesRefused,
   parseLabelEdits,
   RESERVED_LABEL_KEYS,
 } from '../label-spelling/label-spelling.ts';

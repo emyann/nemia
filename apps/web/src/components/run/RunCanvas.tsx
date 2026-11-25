@@ -156,7 +156,7 @@ function Buttons({ running, onReset }: { running: string[]; onReset: () => void 
 function ArrangeHint() {
   return (
     <Panel position="top-left">
-      <Body size="small" component="span" colorRole="on-surface-variant">
+      <Body size="small" component="span">
         Drag to arrange · kept in this browser
       </Body>
     </Panel>

@@ -546,7 +546,7 @@ export function Checks({
 function Stream({ name, log }: { name: string; log: Frozen<StepLog> }) {
   if (!log.lines.length)
     return (
-      <Body size="small" colorRole="on-surface-variant">
+      <Body size="small">
         No {name}.
       </Body>
     );

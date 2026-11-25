@@ -172,7 +172,7 @@ function CompactSkill({ skill }: { skill: AgentSkill }) {
   return (
     <Body size="medium" component="li" data-agent-skill={skill.id} className="leading-snug">
       <span className="block font-semibold text-on-surface">{skill.name}</span>{' '}
-      <Body size="small" component="span" colorRole="on-surface-variant" className="line-clamp-2">
+      <Body size="small" component="span" className="line-clamp-2">
         {skill.description}
       </Body>
     </Body>
@@ -419,12 +419,12 @@ export function GivenSkills({
               <SkillSourceBadge from={row.from} foundIn={row.foundIn} />
             </p>
             {row.from === null && row.foundIn !== null && (
-              <Body size="small" colorRole="on-surface-variant" data-found-in>
+              <Body size="small" data-found-in>
                 Read from <code className="font-mono break-all">{row.foundIn}</code>
               </Body>
             )}
             {row.entry && (
-              <Body size="small" colorRole="on-surface-variant">
+              <Body size="small">
                 {row.entry.description}
               </Body>
             )}

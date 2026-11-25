@@ -38,7 +38,7 @@ function Words({ asks }: { asks: Asks }) {
       {asks.waitingFor && (
         <p data-asks-waiting className="break-words">
           {asks.waitingFor.words}
-          <Body size="small" component="span" colorRole="on-surface-variant" className="block">
+          <Body size="small" component="span" className="block">
             {asks.waitingFor.advice}
           </Body>
         </p>

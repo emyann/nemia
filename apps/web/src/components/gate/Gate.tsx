@@ -465,7 +465,7 @@ function GateTaken({ step, taken }: { step: string; taken: { named: string; said
     <Body size="medium" component="div" className="contents">
       <section aria-label={`The gate of ${step}`} data-gate="taken" className="rounded border border-outline-variant px-3 py-2">
         <strong>{taken.named}</strong>{' '}
-        <Body size="small" component="span" colorRole="on-surface-variant" data-note className="font-mono">
+        <Body size="small" component="span" data-note className="font-mono">
           {taken.said}
         </Body>
       </section>

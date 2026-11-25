@@ -131,7 +131,7 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { case: 'raise' }>;
             {OFFERS.answer.said}
           </p>
         ))}
-      <Body size="small" colorRole="on-surface-variant" className="break-words">
+      <Body size="small" className="break-words">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
         {offer.by === 'round' ? ", with its loop's next round" : ''}: the button below raises it.
         {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}

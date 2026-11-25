@@ -51,7 +51,7 @@ function UnjudgedCard({ run }: { run: UnjudgedRun }) {
           </Title>
           <CopyId id={run.id} />
         </div>
-        <Body size="medium" colorRole="on-surface-variant" data-sentence className="m-0">
+        <Body size="medium" data-sentence className="m-0">
           {run.unjudged}
         </Body>
         <div data-foot className="mt-2 flex flex-wrap items-end justify-between gap-4">

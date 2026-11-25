@@ -204,7 +204,7 @@ function Agents({ strip }: { strip: Strip }) {
         </Body>
       )}
       {strip.rows.length === 0 && (
-        <Body size="small" colorRole="on-surface-variant" className="contain-inline-size">
+        <Body size="small" className="contain-inline-size">
           No agent at work.
         </Body>
       )}

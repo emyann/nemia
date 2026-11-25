@@ -189,7 +189,7 @@ function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; home
       <details open data-told data-will-be-told>
         <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">What it will be told</summary>
         <div className="mt-2 flex flex-col gap-3">
-          <Body size="small" colorRole="on-surface-variant" data-read-now>
+          <Body size="small" data-read-now>
             Read now from the files, and frozen when a run starts: a run is told what they say then
             {layers.agent === null
               ? '.'
@@ -232,7 +232,7 @@ function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; home
             <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
             <Fence agent={layers.agent} fence={layers.fence} />
           </Layer>
-          <Body size="small" colorRole="on-surface-variant" data-layer="task">
+          <Body size="small" data-layer="task">
             Then the task: the brief a run is started with.
           </Body>
         </div>
@@ -270,7 +270,7 @@ export function StepPolicy({ layers }: { layers: Frozen<StepLayers> | null }) {
         <Skills word="Adds the skills:" skills={layers.addedSkills} />
         <Fence agent={agent} fence={layers.fence} />
       </Layer>
-      <Body size="small" colorRole="on-surface-variant">
+      <Body size="small">
         Told after {toldBefore(agent, layers)}; where they conflict, this wins. Every layer is under “What it was told”.
       </Body>
     </div>

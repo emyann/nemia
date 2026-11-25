@@ -31,7 +31,7 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
   const { from, workflow, step, factory, hired, hiredIn } = page;
   if (factory && hired) {
     return (
-      <Body size="small" colorRole="on-surface-variant" data-step-agent className="leading-6">
+      <Body size="small" data-step-agent className="leading-6">
         Its agent: <AgentLink from={from} name={hired} place={place} className="text-on-surface" />{' '}
         <Tag variant="outlined" data-hired={factory}>
           hired by {factory}
@@ -54,7 +54,7 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
         )}
       </Body>
       {!factory && hiredIn.length > 0 && (
-        <Body size="small" colorRole="on-surface-variant" className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <Body size="small" className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           Hired into this step by:
           {hiredIn.map((hire) => (
             <RouteLink
@@ -189,7 +189,7 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
         Recent runs
       </Label>
       {page.recentRuns.length === 0 ? (
-        <Body size="medium" colorRole="on-surface-variant">
+        <Body size="medium">
           No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.
         </Body>
       ) : (

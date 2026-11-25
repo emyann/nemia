@@ -50,7 +50,7 @@ export function Decide({ run }: { run: RunDetail }) {
     );
   if (!decidable || !isDecidable(data))
     return (
-      <Body size="medium" colorRole="on-surface-variant">
+      <Body size="medium">
         Nothing to decide on it now.
       </Body>
     );
@@ -67,7 +67,7 @@ function DecideFrame({ children }: { children: ReactNode }) {
     <section aria-label="Decide" id="decide" className="scroll-mt-4 space-y-5 rounded border border-outline-variant p-4">
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
-        <Body size="small" colorRole="on-surface-variant">
+        <Body size="small">
           What there is to decide on this run. Copy a command to run it yourself; each step's own answer is in its part, where the board
           runs its command as the command line would.
         </Body>
@@ -110,7 +110,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       <div className="space-y-4">
         {inFolders ? (
           <div data-in-folders className="space-y-1">
-            <Body size="medium" colorRole="on-surface-variant">
+            <Body size="medium">
               Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.
             </Body>
             <Facts rows={[['work', pathRow(run.work)]]} />
@@ -118,7 +118,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
-          <Body size="medium" colorRole="on-surface-variant">
+          <Body size="medium">
             No branch to read: no step worked on one.
           </Body>
         )}
@@ -367,7 +367,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
           <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
         </>
       ) : (
-        <Body size="medium" colorRole="on-surface-variant">
+        <Body size="medium">
           nothing — the branch changed no file against the base
         </Body>
       )}
@@ -597,7 +597,7 @@ function Commands({ commands }: { commands: readonly DecideCommand[] }) {
           ))}
         </ul>
       ) : (
-        <Body size="medium" colorRole="on-surface-variant">
+        <Body size="medium">
           None yet: the run is still moving.
         </Body>
       )}

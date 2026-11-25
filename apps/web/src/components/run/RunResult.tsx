@@ -144,7 +144,7 @@ export function RunResult({ run }: { run: RunDetail }) {
         </Label>
         <Markdown>{run.brief}</Markdown>
         {run.fromNote && (
-          <Body size="medium" colorRole="on-surface-variant" data-from={run.from?.inbox}>
+          <Body size="medium" data-from={run.from?.inbox}>
             {run.fromNote}
           </Body>
         )}

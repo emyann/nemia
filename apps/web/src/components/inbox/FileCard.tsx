@@ -95,7 +95,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         <CutPress pending={file.isPending} type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}
         </CutPress>
-        <Body size="small" component="span" colorRole="on-surface-variant">
+        <Body size="small" component="span">
           Parked, not started: nothing runs until you start it.
         </Body>
       </div>
@@ -170,7 +170,7 @@ function FactoryField({
       </Select>
       {error && <ReadTrouble what="the factories" error={error} size="small" />}
       {picked === '' && (
-        <Body size="small" colorRole="on-surface-variant" data-parked>
+        <Body size="small" data-parked>
           Parked with no factory: it gets its factory, workflow and repository when you start it.
         </Body>
       )}
@@ -184,7 +184,7 @@ function FactoryField({
         </div>
       )}
       {!error && read && offered.length === 0 && store && (
-        <Body size="small" colorRole="on-surface-variant" data-no-factory>
+        <Body size="small" data-no-factory>
           The store has no factory yet: file one with {code(store.fileFactory)}.
         </Body>
       )}
@@ -218,7 +218,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
           ))}
         </Select>
         {offered.length === 0 && (
-          <Body size="small" colorRole="on-surface-variant" data-no-workflow>
+          <Body size="small" data-no-workflow>
             {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </Body>
         )}
@@ -250,7 +250,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
 /** The note for a card just filed that the page's filter, on the factory `shown`, does not list: its name, and the way to see it. */
 function Hidden({ name, shown }: { name: string; shown: string }) {
   return (
-    <Body size="small" colorRole="on-surface-variant" data-filed-hidden>
+    <Body size="small" data-filed-hidden>
       Filed as <span className="font-mono">{name}</span>, which the cards below, of the factory <span className="font-mono">{shown}</span>,
       do not list.{' '}
       <Link to="/inbox" search={{}} replace className="underline underline-offset-2">

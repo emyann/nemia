@@ -104,7 +104,7 @@ export function RunsFailed({ error }: { error: unknown }) {
         <Body size="medium" className={`m-0 ${ink.failure}`}>
           The runs could not be loaded.
         </Body>
-        <Body size="small" colorRole="on-surface-variant" data-error-reason className="m-0 break-words">
+        <Body size="small" data-error-reason className="m-0 break-words">
           {troubleOf(error).words}
         </Body>
       </div>
@@ -196,7 +196,7 @@ function AcrossFactories() {
 /** What a section says when it holds nothing. */
 function Nothing({ children }: { children: string }) {
   return (
-    <Body size="medium" colorRole="on-surface-variant" data-nothing className="m-0">
+    <Body size="medium" data-nothing className="m-0">
       {children}
     </Body>
   );

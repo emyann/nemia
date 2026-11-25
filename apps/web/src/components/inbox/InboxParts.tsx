@@ -67,7 +67,7 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
 export function NoQueue({ entry }: { entry: InboxEntry }) {
   if (!queueNeedsFactory(entry)) return null;
   return (
-    <Body size="small" colorRole="on-surface-variant" data-no-queue>
+    <Body size="small" data-no-queue>
       No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.
     </Body>
   );
@@ -138,7 +138,7 @@ export function CardStateChip({ state }: { state: CardState }) {
  */
 export function StartedAs({ startedAs, state, after }: { startedAs: readonly string[]; state: CardState | null; after?: ReactNode }) {
   return (
-    <Body size="medium" colorRole="on-surface-variant" data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+    <Body size="medium" data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
       <span>
         Started as{' '}
         {startedAs.map((id, i) => (
@@ -249,7 +249,7 @@ export function CardQueue({ entry }: { entry: InboxEntry }) {
         </Body>
       )}
       {entry.clash && (
-        <Body size="small" colorRole="on-surface-variant" data-card-clash={entry.clash.join(' ')}>
+        <Body size="small" data-card-clash={entry.clash.join(' ')}>
           {clashWords(entry.clash)}
         </Body>
       )}

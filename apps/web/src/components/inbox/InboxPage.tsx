@@ -70,7 +70,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
 
   return (
     <article className="space-y-6">
-      <Body size="medium" colorRole="on-surface-variant">
+      <Body size="medium">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
         command line parks one. Starting a card writes its run&apos;s record as any start does, and keeps the card, which reads its
         run&apos;s phase from then on: in play while the run waits its turn, works or waits on you, ended once it is over. A card queued
@@ -105,7 +105,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
         )}
         {cards.length === 0 && all.length > 0 && <NoneShown ended={ended} over={over.length} />}
         {all.length === 0 && factory !== undefined && (
-          <Body size="medium" colorRole="on-surface-variant" data-filtered-out>
+          <Body size="medium" data-filtered-out>
             No card of the factory <span className="font-mono">{factory}</span>.{' '}
             <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
               Show every factory&apos;s
@@ -114,7 +114,7 @@ export function InboxPage({ at, onSearch }: { at: InboxAt; onSearch: (patch: Par
           </Body>
         )}
         {all.length === 0 && factory === undefined && (
-          <Body size="medium" colorRole="on-surface-variant" data-empty>
+          <Body size="medium" data-empty>
             The inbox is empty. File an idea in the box above, or from the command line.
           </Body>
         )}
@@ -165,7 +165,7 @@ function CardsSwitch({
 /** What the page says where the segment picked lists none of the cards the filters keep, and a link to the other segment. */
 function NoneShown({ ended, over }: { ended: boolean; over: number }) {
   return ended ? (
-    <Body size="medium" colorRole="on-surface-variant" data-none-ended>
+    <Body size="medium" data-none-ended>
       No card&apos;s run has ended: every card here is still in play.{' '}
       <Link to="." search={(prev) => ({ ...prev, cards: undefined })} className="underline underline-offset-2">
         Show the cards in play
@@ -173,7 +173,7 @@ function NoneShown({ ended, over }: { ended: boolean; over: number }) {
       .
     </Body>
   ) : (
-    <Body size="medium" colorRole="on-surface-variant" data-none-in-play>
+    <Body size="medium" data-none-in-play>
       No card is in play: every card here was started, and its run has ended.{' '}
       <Link to="." search={(prev) => ({ ...prev, cards: 'ended' as const })} className="underline underline-offset-2">
         Show the {over} ended

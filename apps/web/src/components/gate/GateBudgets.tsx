@@ -151,7 +151,7 @@ function BudgetRow({
         )}
       </div>
       {row.why !== null && (
-        <Body size="small" colorRole="on-surface-variant" data-why className="break-words">
+        <Body size="small" data-why className="break-words">
           {row.why}
         </Body>
       )}

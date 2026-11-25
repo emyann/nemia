@@ -30,7 +30,7 @@ export function Timeline({ run }: { run: RunDetail }) {
       <Title size="small" component="h2">
         Timeline
       </Title>
-      <Body size="small" colorRole="on-surface-variant">
+      <Body size="small">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more
         than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
         session at, once it ended; a check costs nothing.

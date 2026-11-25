@@ -195,7 +195,7 @@ function TurnOn({ line }: { line: string | null }) {
   }
   return (
     <div data-nemia-off className="flex flex-col gap-2 border-t border-outline-variant pt-4">
-      <Body size="medium" colorRole="on-surface-variant">
+      <Body size="medium">
         Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
       </Body>
       <div className="flex flex-wrap items-center gap-2">

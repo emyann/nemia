@@ -76,7 +76,7 @@ const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined) 
       {calls.join(', ')}
     </Body>
     {cause && (
-      <Body size="small" component="span" colorRole="on-surface-variant" data-denied-cause={cause.factory}>
+      <Body size="small" component="span" data-denied-cause={cause.factory}>
         Likely cause: <span className="font-mono break-all">{cause.place.place}</span> is not trusted for {cause.place.harness}, which
         withholds {cause.place.withheld}.{' '}
         {cause.place.never ?? (
@@ -166,7 +166,7 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
 function StepTimeline({ step }: { step: StepView }) {
   if (step.timeline.length === 0)
     return (
-      <Body size="small" colorRole="on-surface-variant">
+      <Body size="small">
         Nothing of it on the clock yet.
       </Body>
     );
@@ -234,7 +234,7 @@ export function PartDetail({ run, step, detail, open = false }: { run: RunDetail
           {detail.spec ? (
             <Facts rows={specRows(detail.spec, step.filed)} />
           ) : (
-            <Body size="small" colorRole="on-surface-variant">
+            <Body size="small">
               No spec: the workflow the run is judged by does not have this step — the one it froze as it started, or on a record from
               before runs froze one, its folder.
             </Body>

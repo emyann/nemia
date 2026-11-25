@@ -36,7 +36,7 @@ export function ContextPicker({
       <Body size="medium" component="legend" id={legend} className="font-medium">
         {label}
       </Body>
-      <Body size="small" colorRole="on-surface-variant">
+      <Body size="small">
         Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not landed, not judged.
       </Body>
       {runs.error ? (
@@ -52,7 +52,7 @@ export function ContextPicker({
           ))}
         </Reading>
       ) : !listed.length ? (
-        <Body size="small" colorRole="on-surface-variant">
+        <Body size="small">
           No run to read.
         </Body>
       ) : (

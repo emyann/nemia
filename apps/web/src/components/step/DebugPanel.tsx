@@ -140,7 +140,7 @@ function PathDrawn({
 }) {
   if (read.taskId === null)
     return (
-      <Body size="medium" colorRole="on-surface-variant">
+      <Body size="medium">
         Not filed yet, so there is no path to show.
       </Body>
     );
@@ -254,7 +254,7 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleTransition[];
         showOutput={false}
         className="px-2"
       />
-      <Body size="small" colorRole="on-surface-variant" data-shown>
+      <Body size="small" data-shown>
         Entry {at + 1} of {path.length}
         {at === path.length - 1 ? ', the newest' : ''}
       </Body>
@@ -282,7 +282,7 @@ function Timeline({
   const routes = new Set(machine.edges.map((e) => `${e.from}->${e.to}`));
   if (path.length === 0)
     return (
-      <Body size="medium" colorRole="on-surface-variant">
+      <Body size="medium">
         Its journal has nothing on it yet.
       </Body>
     );

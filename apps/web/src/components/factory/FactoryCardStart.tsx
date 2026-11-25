@@ -128,7 +128,7 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
           <Body size="small" data-no-workflow className="text-yours">
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </Body>
-          <Body size="small" colorRole="on-surface-variant">
+          <Body size="small">
             The workflows the factory {code(factory.name)} offers.
           </Body>
         </div>
@@ -182,7 +182,7 @@ function Wired({ factory, workflow, on }: { factory: Pick<Factory, 'name'>; work
       <Body size="small" colorRole="on-surface-variant" data-factory-repo className="font-mono break-all">
         {on.repo}
       </Body>
-      <Body size="small" colorRole="on-surface-variant">
+      <Body size="small">
         Where the factory {code(factory.name)} runs {code(workflow)}: its wiring decides, never the card.
       </Body>
     </div>

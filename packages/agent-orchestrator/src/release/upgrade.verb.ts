@@ -468,7 +468,20 @@ const UPGRADE: Command<Upgraded> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: 'builds for minutes and restarts the daemon that serves the api' },
-  served: [{ endpoint: 'upgrades.start' }],
+  served: [
+    {
+      endpoint: 'upgrades.start',
+      task: {
+        kind: 'follow',
+        read: 'upgrades.upgradeOf',
+        idKey: 'id',
+        phaseKey: 'phase',
+        sinceKey: 'startedAt',
+        succeeded: ['succeeded'],
+        failed: ['failed'],
+      },
+    },
+  ],
   handler: (args) => Effect.flatMap(StoreRoot, (home) => Effect.flatMap(timedHost(args, home, 'upgrade'), (host) => upgrade(args, host))),
   print: (data) => data.lines,
 };

@@ -35,6 +35,7 @@ import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort, PORT_LIST_TTL_MS, SKILLS_CACHE_HINT } from './port.ts';
 import { portTools } from './tools.ts';
 import { FILES_EXTENSION } from './files.ts';
+import { TASKS_EXTENSION } from './tasks.ts';
 import { fileRead, fileUriOf } from './links.ts';
 
 const stand = eachTest(testPlace);
@@ -476,8 +477,8 @@ test('on 2026-07-28 tools/list carries resultType complete, ttlMs PORT_LIST_TTL_
   assert.equal(discovered?.resultType, 'complete');
   assert.deepEqual(
     (discovered?.capabilities as { extensions?: unknown } | undefined)?.extensions,
-    { ...FILES_EXTENSION, [SKILLS_EXTENSION_ID]: { directoryRead: true } },
-    "server/discover advertises the files extension, inline alone, and the skills extension, whose catalog reads a skill's folder",
+    { ...FILES_EXTENSION, ...TASKS_EXTENSION, [SKILLS_EXTENSION_ID]: { directoryRead: true } },
+    "server/discover advertises the files extension, inline, the tasks extension, and the skills extension, whose catalog reads a skill's folder",
   );
   await client.close();
 });

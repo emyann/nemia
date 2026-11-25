@@ -50,6 +50,31 @@ test('volume set sets a switch, and is refused, naming its switches, where it is
   assert.equal(refusedBy('factory volume set', ['mill', 'notes', '--skills', 'off']), null);
 });
 
+test('retry --off takes back an ask and asks nothing: refused beside each flag that asks, taken alone and with --round', () => {
+  for (const asks of [
+    ['--fresh'],
+    ['--model', 'm'],
+    ['--recheck'],
+    ['--recheck', '--check', 'lint'],
+    ['--message', 'why'],
+    ['--answer', '1=a'],
+    ['--budget', '5'],
+  ])
+    names(refusedBy('retry', ['r-1', 'impl', '--off', ...asks]), '--off', 'nemia retry r-1 impl --off');
+  names(refusedBy('retry', ['r-1', '--round', '--off', '--budget', '5']), 'nemia retry r-1 --round --off');
+  assert.equal(refusedBy('retry', ['r-1', 'impl', '--off']), null);
+  assert.equal(refusedBy('retry', ['r-1', 'impl', '--continue', '--off']), null);
+  assert.equal(refusedBy('retry', ['r-1', '--round', '--off']), null);
+  assert.equal(refusedBy('retry', ['r-1', 'review', '--round', '--off']), null);
+});
+
+test('refresh --off goes with --base alone', () => {
+  names(refusedBy('refresh', ['r-1', '--off']), '--base --off', 'nemia refresh r-1');
+  names(refusedBy('refresh', ['r-1', 'review', '--off']), 'nemia refresh r-1 review --base --off');
+  assert.equal(refusedBy('refresh', ['r-1', '--base', '--off']), null);
+  assert.equal(refusedBy('refresh', ['r-1', 'review', '--base', '--off']), null);
+});
+
 test("retry's command line keeps today's refusals", () => {
   names(refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec), 'nemia retry', '--continue, --fresh, --model <m>, --recheck');
   names(

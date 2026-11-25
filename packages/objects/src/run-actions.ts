@@ -287,10 +287,18 @@ export const RETRY_ASKED_MODES = [...RETRY_MODES, 'nudge'] as const;
  * another round of the loop it closes.
  */
 export const RunRetry = Schema.Struct({
-  mode: Schema.Literals(RETRY_ASKED_MODES).annotate({
-    description:
-      "How the step is tried again: continue its session, start it fresh, or recheck its work; nudge is continue's former spelling.",
-  }),
+  mode: Schema.optionalKey(
+    Schema.Literals(RETRY_ASKED_MODES).annotate({
+      description:
+        "How the step is tried again: continue its session, start it fresh, or recheck its work; nudge is continue's former spelling. Left out, continue.",
+    }),
+  ),
+  off: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description:
+        'Takes back the try asked of the step and not yet filed (--off), or with round the round asked of its loop, setting the ask aside: no model, words, budget, answers or check beside it.',
+    }),
+  ),
   model: Schema.optionalKey(Schema.String.annotate({ description: "The model a fresh try runs on; left out, the step's own." })),
   round: Schema.optionalKey(
     Schema.Boolean.annotate({ description: 'Whether this asks another round of the loop the step closes (--round), not another try.' }),
@@ -311,6 +319,12 @@ export const RunRetry = Schema.Struct({
 }).annotate({ identifier: 'RunRetry' });
 export type RunRetry = typeof RunRetry.Type;
 
+/** When and by whom a person took an ask back (`--off`): it is set aside under the run's asks' done/, never deleted. */
+const TakenBack = Schema.Struct({
+  at: Schema.String.annotate({ description: 'When the ask was taken back.' }),
+  actor: Schema.optionalKey(Actor),
+});
+
 /**
  * What an ask of a try answers, taken and not yet done: the try asked for, the ask's file and whether the tick stops a blocked session
  * first; or, of a round, the looping step and the round. `hint` names the spelling to send where the body said a former one.
@@ -323,6 +337,16 @@ export const RunAsked = Schema.Struct({
   round: Schema.optionalKey(Schema.Finite.annotate({ description: 'The round asked for, for a round.' })),
   budget: Schema.optionalKey(Schema.Finite.annotate({ description: 'The raise of the cap the ask carries, in dollars; absent for none.' })),
   hint: Schema.optionalKey(Schema.String.annotate({ description: 'The spelling to send, where the body said a former one (nudge).' })),
+  takenBack: Schema.optionalKey(
+    TakenBack.annotate({
+      description: "Of an ask taken back (--off), when and by whom; its file is then where it was set aside in the run's done/.",
+    }),
+  ),
+  stray: Schema.optionalKey(
+    Schema.Literal(true).annotate({
+      description: 'Of a take-back, true where what was set aside read as no ask: a stray record at the ask\'s key, kept as it was.',
+    }),
+  ),
 }).annotate({ identifier: 'RunAsked' });
 export type RunAsked = typeof RunAsked.Type;
 
@@ -390,11 +414,13 @@ export const RunApproved = Schema.Struct({
     }),
   ),
   takenBack: Schema.optionalKey(
-    Schema.Struct({
-      at: Schema.String.annotate({ description: 'When the approval was taken back.' }),
-      actor: Schema.optionalKey(Actor),
-    }).annotate({
-      description: 'When and by whom the approval was taken back (--off); absent for one given.',
+    TakenBack.annotate({
+      description: 'When and by whom the approval, or a loop\'s acceptance, was taken back (--off); absent for one given.',
+    }),
+  ),
+  stray: Schema.optionalKey(
+    Schema.Literal(true).annotate({
+      description: "Of a take-back, true where what was set aside at the gate's key read as no approval: a stray record, kept as it was.",
     }),
   ),
 }).annotate({ identifier: 'RunApproved' });
@@ -454,6 +480,11 @@ export const RunRefresh = Schema.Struct({
       description: "Whether the loop's work is sent to merge its base (--base), rather than the run pinned to the new revisions.",
     }),
   ),
+  off: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "With base, takes back the merge of the base asked of the loop and not yet filed (--off), setting the ask aside.",
+    }),
+  ),
 }).annotate({ identifier: 'RunRefresh' });
 export type RunRefresh = typeof RunRefresh.Type;
 
@@ -474,6 +505,16 @@ export const RunRefreshed = Schema.Struct({
   round: Schema.optionalKey(Schema.Finite.annotate({ description: 'The round the merge is asked in, of a merge of the base.' })),
   file: Schema.optionalKey(Schema.String.annotate({ description: "The ask's file, of a merge of the base." })),
   said: Schema.optionalKey(Schema.String.annotate({ description: 'What the refresh did, in words.' })),
+  takenBack: Schema.optionalKey(
+    TakenBack.annotate({
+      description: "Of a merge taken back (--off), when and by whom; its file is then where it was set aside in the run's done/.",
+    }),
+  ),
+  stray: Schema.optionalKey(
+    Schema.Literal(true).annotate({
+      description: "Of a take-back, true where what was set aside read as no merge ask: a stray record at the ask's key, kept as it was.",
+    }),
+  ),
 }).annotate({ identifier: 'RunRefreshed' });
 export type RunRefreshed = typeof RunRefreshed.Type;
 

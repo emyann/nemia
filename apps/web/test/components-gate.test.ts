@@ -155,7 +155,7 @@ test("the agent-facing files are the kit's outlined Tag in its hairline and the 
 
 test('the lesson chip is sage with what was written, a grey ring when nothing was, and dashed when a branch could not be read', () => {
   const chip = (lesson: { said: string; state: 'written' | 'nothing' | 'unknown' }) => {
-    const m = /<span data-lesson="(\w+)" title="[^"]*" class="([^"]+)">([^<]+)<\/span>/.exec(
+    const m = /<span (?=[^>]*data-lesson="(\w+)" title="[^"]*")[^>]*class="([^"]+)"[^>]*>([^<]+)<\/span>/.exec(
       renderToStaticMarkup(createElement(LessonChip, { lesson })),
     );
     assert.ok(m, lesson.state);
@@ -281,9 +281,11 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   );
   assert.match(html, /^<section aria-label="Answer"/);
   const rows = new Map(
-    [...html.matchAll(/<li (?:data-offer="([^"]+)" data-kind="([^"]+)"|data-asked="true") data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map(
-      (m) => [m[3], { offer: m[1] ? [m[1], m[2]] : 'asked', html: m[4] }],
-    ),
+    [
+      ...html.matchAll(
+        /<li [^>]*?(?:data-offer="([^"]+)" data-kind="([^"]+)"|data-asked="true") data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g,
+      ),
+    ].map((m) => [m[3], { offer: m[1] ? [m[1], m[2]] : 'asked', html: m[4] }]),
   );
   assert.deepEqual(
     [...rows].map(([name, { offer }]) => [name, offer]),
@@ -366,7 +368,10 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
     { step: 'bare', case: 'denied', kind: 'retry', calls: null },
   ]);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="denied" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2]]),
+    [...html.matchAll(/<li [^>]*?data-offer="denied" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
+      m[1],
+      m[2],
+    ]),
   );
   const said = (name: string) => unescaped(textsOf(/<p [^>]*data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' '));
   assert.equal(said('notes'), `notes ${OFFERS.denied.said('denied: Write(/tmp/w/notes.md)')}`, 'the calls the api named');
@@ -390,9 +395,9 @@ test('a step asking questions as data is answered by choosing: radios where it t
     { step: 'spec', case: 'answer', kind: 'retry', needs: 'One question.', questions: [where] },
   ]);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="answer" data-kind="retry" data-questions="true" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map(
-      (m) => [m[1], m[2]],
-    ),
+    [
+      ...html.matchAll(/<li [^>]*?data-offer="answer" data-kind="retry" data-questions="true" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g),
+    ].map((m) => [m[1], m[2]]),
   );
   const design = rows.get('design')!;
   assert.ok(design, html);
@@ -519,7 +524,7 @@ test('a loop out of rounds is approved as it stands from the Answer section, wit
     createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision, offers })),
   );
   const answer = /<section aria-label="Answer"[\s\S]*?<\/section>/.exec(html)![0];
-  const row = /<li data-offer="enough" data-kind="approve" data-step="review"[\s\S]*?<\/li>/.exec(answer)![0];
+  const row = /<li [^>]*?data-offer="enough" data-kind="approve" data-step="review"[\s\S]*?<\/li>/.exec(answer)![0];
   assert.match(
     row,
     /<code>nemia approve r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/,

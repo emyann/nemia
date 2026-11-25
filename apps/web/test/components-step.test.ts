@@ -654,7 +654,7 @@ test('the legend draws an edge in each state as the canvas draws it: dashed and 
     html
       .split('<span class="flex items-center gap-1">')
       .slice(1)
-      .map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]),
+      .map((item) => [/([a-z ]+)<\/span>(?:<\/div>){0,2}$/.exec(item)?.[1], item]),
   );
   assert.deepEqual([...items.keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
   assert.match(items.get('to come')!, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
@@ -1968,7 +1968,7 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
       html
         .split(/<span class="flex items-center gap-1"(?: title="[^"]*")?>/)
         .slice(1)
-        .map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]),
+        .map((item) => [/([a-z ]+)<\/span>(?:<\/div>){0,2}$/.exec(item)?.[1], item]),
     );
   assert.deepEqual([...itemsOf(legendOf(false)).keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
   const items = itemsOf(legendOf(true));
@@ -2171,7 +2171,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     },
   ]);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="([^"]+)" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
+    [...html.matchAll(/<li [^>]*?data-offer="([^"]+)" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
       m[2],
       { kind: m[1], html: m[3] },
     ]),

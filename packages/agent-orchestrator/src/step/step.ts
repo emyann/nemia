@@ -582,7 +582,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   checks:
-    "the step's named checks, a YAML list of `{ name, run, after, enabled }`: each runs once the checks it waits on passed (the one above it where it names none, `after: []` for none), `enabled: false` turns one off, and the step is verified once every one exits 0",
+    "the step's named checks, a YAML list of `{ name, run, after, enabled, usesCheckout }`: each runs once the checks it waits on passed (the one above it where it names none, `after: []` for none), `enabled: false` turns one off, `usesCheckout: false` on an ending gives the checkout back before it runs, and the step is verified once every one exits 0",
   run: "a command node's shell line: the node runs it with no agent session, signs off `done` on exit 0 with an answer its `output:` decodes, and `failed` on any other exit",
   checkMemory:
     "the memory the step's check asks of the machine, a container's request — `256Mi`: the check is admitted by it and keeps the daemon's default limit; unset asks the daemon's default (`WF_MEMORY_REQUEST`)",

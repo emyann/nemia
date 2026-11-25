@@ -1549,7 +1549,6 @@ describe("an ending whose check uses no checkout gives the checkout back once it
   });
   const s = story(test);
   const CHECKS = 'checks:\n  - name: receipt\n    run: npm test\n  - name: base-ci\n    run: npm run wait\n    usesCheckout: false';
-  /** `implement → ship`, ship judged by `receipt`, in the checkout, then `base-ci`, which uses none. */
   const twoChecksFolder = () => {
     const dir = at.folder();
     const file = path.join(dir, 'ship.md');
@@ -1558,7 +1557,6 @@ describe("an ending whose check uses no checkout gives the checkout back once it
     fs.writeFileSync(file, text.replace(/^check: .*$/m, CHECKS));
     return dir;
   };
-  /** Two runs of one repository on that folder, each approved at its gate, the second's approval the older. */
   const twoChecksApproved = async () => {
     const { e } = stage.board();
     const repo = at.aRepo();

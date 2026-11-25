@@ -28,7 +28,8 @@ notes of implement, review and land each open with the answer and hold a part fo
   place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
 - **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes and opens a pull request, its check runs
-  `roundCheck` and waits on the CI context `ciCheck` names, and land merges that pull request on GitHub; the land step's check is a receipt.
+  `roundCheck` and waits on the CI context `ciCheck` names, and land merges that pull request on GitHub; the land step's checks are a
+  receipt, then `base-ci`, the wait on the base branch's CI, which runs once the checkout is given back to the next run's ending.
   Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still waited on) and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
   The rest of this README, but where it says otherwise, is this way's.
 
@@ -110,24 +111,26 @@ derived file side by side both land: the landed commit differs from the reviewed
 check then merges a head so refreshed, where none is merged and `refreshed.json` names this run's open pull request at it: once the CI
 context is green there (red refuses, with the `nemia retry <run> review --message "…"` that sends the work back) and while it holds the
 base (a base that moved past it refuses with the land retry line), with `--match-head-commit <head>` and the session's subject and body,
-then fast-forwards the checkout. Past that, land's check is the receipt alone — the pull request `MERGED` with a merge commit reachable
+then fast-forwards the checkout. Past that, land's first check, `receipt`, is the receipt alone — the pull request `MERGED` with a merge commit reachable
 from HEAD, the checkout clean on the base with no merge in progress, every commit of every branch of the run with an equivalent patch on
 HEAD (`git cherry`, so a part taken as a commit of its own counts as taken) — which is what the run needs to record `landed` on the
-commit that landed. It runs no suite: CI judged the head the review read, and the merge commit's first parent is the base. Last, where
-the factory's `landingWaitsOnCi` is true (the default), the receipt waits on the CI context at the merge commit on the base branch
-(`receipt --run <id> --check <name> --wait-on-ci <true|false>`; up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS`
+commit that landed. It runs no suite: CI judged the head the review read, and the merge commit's first parent is the base. Once it
+passed, the checkout is given back: the land step's second check, `base-ci`, says `usesCheckout: false`, so another run's ending is
+filed into the checkout while it runs, and it reads nothing of the checkout's working tree, index or HEAD. Where the factory's
+`landingWaitsOnCi` is true (the default), `base-ci` waits on the CI context at the merge commit on the base branch
+(`base-ci --run <id> --check <name> --wait-on-ci <true|false>`; up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS`
 while another check there still runs, and `WHOLE_SECONDS` in all, the bounds the implement step's wait keeps in `exec.ts`, inside the
-landing check's own deadline). Green passes. A red is first re-run, once, any red it judged, failing lines or not, where the implement step's wait first reports one whose job's
+check's own deadline); a merge commit whose tree is the refreshed head's the receipt waited at is not waited on again. Green passes. A red is first re-run, once, any red it judged, failing lines or not, where the implement step's wait first reports one whose job's
 log names a failing line (`rerun.ts`, which both scripts import): the failed jobs of each red workflow run at the merge, only a run GitHub says is on its first attempt, so a retry
 of the land step never re-runs it twice, waited on within the same bound; green the second time passes, naming each job re-run and how
 it ended. Red still fails the step though the merge stands — nothing is taken back — naming the jobs that did not pass and each job
 re-run: red twice is a real break of the base, and the refusal says so and points at the merge commit's checks, where a person lands a
-fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, the receipt passes and
+fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, `base-ci` passes and
 says so. A merge whose own run was cancelled — a CI
 that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where GitHub's compare says it
 holds the merge: green there passes, naming the commit read and why; red there fails the step naming that commit; anything else waits
 on, to the bounds. Still running at the bound fails with the same retry line. Never reported fails too, naming `landingWaitsOnCi`: a
-repository whose CI does not run on pushes to the base sets it false (`--set landingWaitsOnCi=false`), and the receipt then waits on
+repository whose CI does not run on pushes to the base sets it false (`--set landingWaitsOnCi=false`), and `base-ci` then waits on
 nothing.
 
 The implement step's check runs `probe.ts`, read from the frozen files as well: a session a step starts to measure something, a probe, is named

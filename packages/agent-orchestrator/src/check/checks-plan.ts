@@ -1,10 +1,10 @@
 /**
  * A step's `checks:` as the loader reads it (`checksOf`): a list of named checks, each a shell line (`run:`) and the checks it waits on
  * (`after:`), resolved into the plan the pass files by (`CheckSpec`), and on an ending whether it uses the repository's own checkout
- * (`usesCheckout: false` where it does not, which gives the checkout back before it runs). A check that names no `after:` waits on the enabled check above
- * it, `after: []` on none; a check turned off (`enabled: false`) is taken out, and the checks that waited on it wait on what it waited
- * on. `check: <line>` is the one-check shorthand, read beside it by `stepChecks` (`src/step/step.ts`). The words follow GitHub Actions,
- * whose step's `run:` is a shell line and whose jobs wait by name.
+ * (`usesCheckout: false` where it does not, which gives the checkout back before it runs). A check that names no `after:` waits on the
+ * enabled check above it, `after: []` on none; a check turned off (`enabled: false`) is taken out, and the checks that waited on it wait
+ * on what it waited on. `check: <line>` is the one-check shorthand, read beside it by `stepChecks` (`src/step/step.ts`). The words follow
+ * GitHub Actions, whose step's `run:` is a shell line and whose jobs wait by name.
  */
 import { readFrontmatter, type FrontmatterValue } from '../frontmatter/frontmatter.ts';
 import { refuse, type CheckSpec } from '../step/step.ts';
@@ -161,9 +161,10 @@ function throughDisabled(checks: readonly (Written & { after: readonly string[] 
 /**
  * A step's checks resolved from its `checks:` (the JSON text the reader keeps of its list), refused in `step`'s words: both `check:` and
  * `checks:` on one step, an item that is no map, a name outside `CHECK_NAME` or written twice, a key a check does not take, an empty
- * `run:`, an `enabled:` or a `usesCheckout:` that is not a boolean, an `after:` naming no check of the step or the check itself, and a cycle of waits. A check
- * with no `after:` waits on the check above it; a check turned off is taken out, its waits handed to the checks that waited on it.
- * Undefined where the step has no `checks:`; refused where every check is turned off, which reads as checks to a person and runs none.
+ * `run:`, an `enabled:` or a `usesCheckout:` that is not a boolean, an `after:` naming no check of the step or the check itself, and a
+ * cycle of waits. A check with no `after:` waits on the check above it; a check turned off is taken out, its waits handed to the checks
+ * that waited on it. Undefined where the step has no `checks:`; refused where every check is turned off, which reads as checks to a person
+ * and runs none.
  * @param step The step's name, which a refusal starts with.
  * @param check The step's `check:` line, refused beside `checks:`.
  * @param text The JSON text of the step's `checks:` list, or undefined where it has none.

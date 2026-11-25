@@ -4,7 +4,7 @@ metadata:
   name: sdlc
   description: "For building software on a repository, each change reviewed before it lands. Five workflows: front-door routes a raw card in the sprint and ready to work (sdlc's own labels, sdlc/stage=sprint and sdlc/state=ready-to-work) to the workflow it needs, intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing, and the front door asks only where it cannot tell; quick lands once its review passes."
 spec:
-  version: 5.2.0
+  version: 5.3.0
   rules:
     path: RULES.md
   parameters:
@@ -19,11 +19,11 @@ spec:
       default: node "$WF_CARRIED_FILES/local-check.ts" --runner npm
     ciCheck:
       type: string
-      description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on; where landingWaitsOnCi is true, the landing's check then waits on it at the merge commit on the base branch. Read only where github is true."
+      description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on; where landingWaitsOnCi is true, the land step's base-ci check then waits on it at the merge commit on the base branch. Read only where github is true."
       default: ci
     landingWaitsOnCi:
       type: boolean
-      description: "Whether the landing's check, where github is true, waits on the CI context ciCheck names at the merge commit on the base branch, and fails the step where the merge turned the base red. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
+      description: "Whether the land step's base-ci check, where github is true, waits on the CI context ciCheck names at the merge commit on the base branch, and fails the step where the merge turned the base red; it runs once the checkout is given back to the next run's ending. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
       default: true
     landingRefresh:
       type: string

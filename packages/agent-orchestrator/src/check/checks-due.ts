@@ -141,11 +141,9 @@ export const stepChecksDue = (run: Run, step: StepSpec, phaseOf: (taskId: string
  * @param step The step, by its name.
  * @param phaseOf The phase of a task the engine holds, by its id: `unknown` for one it has no record of.
  */
-export const checkStandings =
-  (run: Run, step: Pick<StepSpec, 'name'>, phaseOf: (taskId: string) => TaskPhase) =>
-  (name: string) => {
-    const filed = run.steps[step.name]?.check;
-    const standing: CheckStanding =
-      filed === undefined ? 'waiting' : standingOf(filedPhase(filed, phaseOf(currentCheckTask(run, step.name, name))), true);
-    return standing;
-  };
+export const checkStandings = (run: Run, step: Pick<StepSpec, 'name'>, phaseOf: (taskId: string) => TaskPhase) => (name: string) => {
+  const filed = run.steps[step.name]?.check;
+  const standing: CheckStanding =
+    filed === undefined ? 'waiting' : standingOf(filedPhase(filed, phaseOf(currentCheckTask(run, step.name, name))), true);
+  return standing;
+};

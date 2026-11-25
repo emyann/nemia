@@ -2,7 +2,8 @@
  * sdlc's landing refresh (`sdlc/carried/refresh.ts`, which `landing.ts merge` runs where it is given the factory's `--refresh`): a
  * run's branch that lacks its base is brought up to it at the landing, the base merged into it in the run's own worktree, the
  * factory's command run to derive again the files `--derives` names, and the result pushed for CI to judge, never forced; the land
- * step's check, `landing.ts receipt`, then merges that head once CI is green at it. Two runs that change the same derived files side by
+ * step's first check, `landing.ts receipt`, then merges that head once CI is green at it, and its second, `base-ci`, waits at
+ * the merge only where its tree is not that head's. Two runs that change the same derived files side by
  * side both land so, with no person sequencing them.
  *
  * The bound the refresh keeps is mechanical: the head it pushes is git's plain merge of the reviewed head and the base, differing from
@@ -285,10 +286,13 @@ const receiptRules = (w: World & { head: string; merge: string }, runs: string[]
   { when: 'pr merge', out: 'Merged pull request #7' },
 ];
 
-/** The receipt's arguments, waiting on `ci` at the merge, with polls at no interval. */
-const receipt = (w: World) => land(w, 'receipt', ['--run', RUN, '--check', 'ci', '--wait-on-ci', 'true'], { WF_CI_POLL_SECONDS: '0' });
+/** The receipt's arguments, on `ci`, with polls at no interval. */
+const receipt = (w: World) => land(w, 'receipt', ['--run', RUN, '--check', 'ci'], { WF_CI_POLL_SECONDS: '0' });
 
-test('the receipt merges a refreshed head once ci is green at it, fast-forwards, and does not wait again on the same tree', () => {
+/** `base-ci`'s arguments, waiting on `ci` at the merge, with polls at no interval. */
+const baseCi = (w: World) => land(w, 'base-ci', ['--run', RUN, '--check', 'ci', '--wait-on-ci', 'true'], { WF_CI_POLL_SECONDS: '0' });
+
+test('the receipt merges a refreshed head once ci is green at it and fast-forwards; base-ci does not wait again on the same tree', () => {
   const w = refreshed();
   w.gh.answers(receiptRules(w, ['', 'success']));
   const r = receipt(w);
@@ -297,8 +301,11 @@ test('the receipt merges a refreshed head once ci is green at it, fast-forwards,
   assert.equal(merges.length, 1);
   assert.deepEqual(merges[0].argv.slice(0, 8), ['pr', 'merge', '7', '--merge', '--match-head-commit', w.head, '--subject', SUBJECT]);
   assert.deepEqual(stands(w.repo), { branch: 'main', head: w.merge, clean: true, merging: false }, 'main is fast-forwarded');
-  assert.equal(r.calls.filter((call) => call.argv.join(' ').includes(`commits/${w.merge}/`)).length, 0, 'no second wait');
-  assert.match(r.out, /same tree/);
+  assert.equal(r.calls.filter((call) => call.argv.join(' ').includes(`commits/${w.merge}/`)).length, 0, 'the receipt waits at no merge');
+  const b = baseCi(w);
+  assert.equal(b.code, 0, b.err);
+  assert.equal(b.calls.filter((call) => call.argv.join(' ').includes(`commits/${w.merge}/`)).length, 0, 'no second wait');
+  assert.match(b.out, /same tree/);
 });
 
 test('REFUSED: a receipt whose refreshed head is red merges nothing and names the send-back', () => {

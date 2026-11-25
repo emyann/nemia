@@ -71,7 +71,12 @@ spec:
       workspace: base
       gate: true
       budget: 10
-      check: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" receipt --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\" --wait-on-ci \"${{ parameters.landingWaitsOnCi }}\"; else { ${{ parameters.localCheck }}; }; fi"
+      checks:
+        - name: receipt
+          run: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" receipt --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\"; else { ${{ parameters.localCheck }}; }; fi"
+        - name: base-ci
+          run: "if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: landing.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/landing.ts\" base-ci --run \"$WF_RUN\" --check \"${{ parameters.ciCheck }}\" --wait-on-ci \"${{ parameters.landingWaitsOnCi }}\"; fi"
+          usesCheckout: false
       checkMemory: "${{ parameters.landingCheckMemory }}"
       memoryRequest: "${{ parameters.lightMemoryRequest }}"
     - name: review

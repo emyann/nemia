@@ -134,7 +134,10 @@ test('applied with every parameter set, each is written where the template says,
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);
     assert.ok(check.includes(branchOn(true)), `${workflow}/${step} branches on GitHub:\n${check}`);
-    assert.ok(check.endsWith('; else { echo local; }; fi'), `and its other way is the local check the factory set:\n${check}`);
+    assert.ok(
+      check.includes('; else { echo local; }; fi'),
+      `and its other way is the local check the factory set (land's \`base-ci\`, after it, has none):\n${check}`,
+    );
     assert.match(stepIn(tree, workflow, step).body, answer(true), `${workflow}/${step}'s note opens with the way`);
   }
   assert.ok(fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').includes('a, b'));
@@ -160,7 +163,7 @@ test('applied with no --set, each parameter takes its default', () => {
     const check = checkOf(tree, workflow, step);
     assert.ok(check.includes(branchOn(false)), `${workflow}/${step} is in the checkout by default:\n${check}`);
     assert.ok(
-      check.endsWith('; else { node "$WF_CARRIED_FILES/local-check.ts" --runner npm; }; fi'),
+      check.includes('; else { node "$WF_CARRIED_FILES/local-check.ts" --runner npm; }; fi'),
       `and the local check it runs there is the carried local-check.ts:\n${check}`,
     );
     assert.match(stepIn(tree, workflow, step).body, answer(false), `${workflow}/${step}'s note opens with the way`);

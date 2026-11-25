@@ -330,7 +330,11 @@ describe('landingOpen gives the checkout back once every check that uses it pass
   ];
   for (const [name, r, own, receipt, baseCi, merging, open] of rows)
     test(name, () => {
-      const ph = phases({ 't-ship': 'succeeded', ...(receipt ? { 't-receipt': receipt } : {}), ...(baseCi ? { 't-base-ci': baseCi } : {}) });
+      const ph = phases({
+        't-ship': 'succeeded',
+        ...(receipt ? { 't-receipt': receipt } : {}),
+        ...(baseCi ? { 't-base-ci': baseCi } : {}),
+      });
       assert.equal(
         landingOpen(TWO_CHECK_LANDER, r, own, ph, () => merging),
         open,

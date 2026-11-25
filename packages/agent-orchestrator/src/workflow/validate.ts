@@ -180,8 +180,8 @@ function validateBaseChecks(steps: readonly StepSpec[]) {
 }
 
 /**
- * Why nobody may file an ending's `check:` or `checks:`: it has no `gate: true`, so no approval starts it, and it waits on no step with a `loop:`,
- * so no pass of a step that could send the work back routes it either. Undefined where one of the two holds.
+ * Why nobody may file an ending's `check:` or `checks:`: it has no `gate: true`, so no approval starts it, and it waits on no step with a
+ * `loop:`, so no pass of a step that could send the work back routes it either. Undefined where one of the two holds.
  *
  * A `check:` there is the run's own: it runs the command on the merge the step staged and commits that merge onto the base branch on its
  * word (`landingDue`). Nothing may start that but a person's approval, or the pass of a step the ending waits on that can send the work
@@ -194,7 +194,12 @@ function unfilableCheck(steps: readonly StepSpec[], s: StepSpec) {
   if (s.after.some((name) => steps.some((x) => x.name === name && x.loop))) return undefined;
   const waits = s.after.length ? `no step with a \`loop:\` (it waits on ${s.after.join(', ')})` : 'nothing';
   const before = s.after.length === 1 ? s.after[0] : 'the step before it';
-  const said = s.check === undefined ? `\`checks:\` (${stepChecks(s).map((c) => c.name).join(', ')}) are commands` : `\`check: ${s.check}\` is a command`;
+  const said =
+    s.check === undefined
+      ? `\`checks:\` (${stepChecks(s)
+          .map((c) => c.name)
+          .join(', ')}) are commands`
+      : `\`check: ${s.check}\` is a command`;
   return (
     `, and ${said} the run executes there on the merge the step leaves staged, committing it onto the base` +
     ` branch when it passes — which is nobody's to start unless a person approves it or a step that can send the work back has passed,` +

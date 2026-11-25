@@ -333,7 +333,7 @@ async function titleKeepsItsBox(page: Page, open: OpenRuns) {
   await card.scrollIntoViewIfNeeded();
   const hit = await card.evaluate((article, over) => {
     const link = article.querySelector('h3 a')!;
-    const text = [...link.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)!;
+    const text = document.createTreeWalker(link, NodeFilter.SHOW_TEXT).nextNode()!;
     const was = text.nodeValue;
     text.nodeValue = over;
     try {

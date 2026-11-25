@@ -193,11 +193,17 @@ async function datesFit(page: Page) {
     await settled(page);
     await photographBothWidths(page, OUT, 'runs-pages', 'another-year');
     const tight = tightOf(page);
-    const said = await tight.evaluateAll((all) => all.map((text) => text.firstChild?.nodeValue ?? ''));
+    const said = await tight.evaluateAll((all) =>
+      all.map((text) => (text.querySelector(':scope > [data-slot=typography]') ?? text).firstChild?.nodeValue ?? ''),
+    );
     const wide = page.viewportSize();
     try {
       for (const words of LONGEST_AGO) {
-        await tight.evaluateAll((all, word) => all.forEach((text) => (text.firstChild!.nodeValue = word)), words);
+        await tight.evaluateAll(
+          (all, word) =>
+            all.forEach((text) => ((text.querySelector(':scope > [data-slot=typography]') ?? text).firstChild!.nodeValue = word)),
+          words,
+        );
         await expectRoom(page, `and so have the longest words a column takes, "${words}"`);
         if (wide) {
           await page.setViewportSize({ width: 560, height: wide.height });
@@ -207,7 +213,11 @@ async function datesFit(page: Page) {
       }
     } finally {
       if (wide) await page.setViewportSize(wide);
-      await tight.evaluateAll((all, was) => all.forEach((text, i) => (text.firstChild!.nodeValue = was[i] ?? '')), said);
+      await tight.evaluateAll(
+        (all, was) =>
+          all.forEach((text, i) => ((text.querySelector(':scope > [data-slot=typography]') ?? text).firstChild!.nodeValue = was[i] ?? '')),
+        said,
+      );
     }
     const named = await workflowsOf(page).evaluateAll((all) => all.map((link) => link.textContent ?? ''));
     try {

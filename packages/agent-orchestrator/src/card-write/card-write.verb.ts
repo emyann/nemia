@@ -8,6 +8,7 @@ import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardFileRef, type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import { cardFilesJudged } from '../inbox/inbox.store.ts';
+import { labelValuesJudged } from '../factory/door/label-values.ts';
 import { FileDoor } from '../start/files.store.ts';
 import type { CardWriteRefusal } from '../../contracts/card-write.contract.ts';
 import { CardDoor } from '../cards/cards.store.ts';
@@ -124,7 +125,8 @@ const cardToWrite = Effect.fn('cardToWrite')(function* (name: string, namespace:
  * the version compared with the digest of the file as it reads now, which `cardObject` serves), a `queued` changed, a retired `repo` set
  * or changed, and no body (`Invalid`) — then a `spec.workflow` changed to what is no workflow's name (`cardWorkflowRefusal`; an old
  * card's path sent back as read is kept), what `contextRefusal` refuses of `spec.from` (a run the store does not have, `Missing`), and
- * what `parseInboxCard` refuses of the card it would write (`Invalid`): a bad label, say.
+ * what `parseInboxCard` refuses of the card it would write (`Invalid`): a bad label, say; and a label it changes whose key the factory
+ * names with a value it does not take (`labelValuesJudged`, `Invalid`), a value that stands on the card sent back as it is never judged.
  */
 export const replaceCard = Effect.fn('replaceCard')(function* (name: string, namespace: string, write: CardWrite) {
   const { card, card$, file, started, text } = yield* cardToWrite(name, namespace);
@@ -149,6 +151,9 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
   if (refusedRuns) return yield* Effect.fail(refusedRuns);
   const files = yield* cardFilesJudged(card.name, yield* filesKept(namespace, spec.files ?? []), card.files ?? [], started.length > 0);
   const labels = metadata.labels ?? card.labels ?? {};
+  const standing: Readonly<Record<string, string>> = card.labels ?? {};
+  const changed = Object.fromEntries(Object.entries(labels).filter(([key, value]) => standing[key] !== value));
+  yield* labelValuesJudged(namespace === DEFAULT_NAMESPACE ? undefined : namespace, changed, 'Nothing was written.');
   const written = yield* tried(() =>
     cardText(
       { ...card, body: spec.body ?? '' },

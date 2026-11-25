@@ -15,6 +15,7 @@ import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
 import { startedFacts } from './commands.verb.ts';
 import type { Env } from '../config/config.store.ts';
+import { addFactoryAt } from '../factory/factory.store.ts';
 
 const ROOT = scratch('wf-start-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -122,4 +123,35 @@ describe('REFUSED before any file is written: a reserved key, a closed key and a
       );
       assert.deepEqual(fs.existsSync(RUNS_DIR) ? fs.readdirSync(RUNS_DIR).sort() : [], before, 'nothing written');
     });
+});
+
+describe("a start's own --label is judged against its factory's label values; a label that stands on its card is not", () => {
+  let repo!: string;
+  beforeAll(() => {
+    repo = aRepo();
+    addFactoryAt(ROOT, { name: 'lv', volumes: [`${repo}:rw`] });
+    const file = path.join(ROOT, 'factories', 'lv.json');
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), labelValues: { work: ['feature', 'fix'] } }));
+  });
+  test('REFUSED: --label work=store in a factory that takes work=feature|fix is Invalid, naming it, before any file is written', async () => {
+    const before = fs.existsSync(RUNS_DIR) ? fs.readdirSync(RUNS_DIR).sort() : [];
+    await assert.rejects(
+      runPlaced(startRun({ brief: 'refused', repo, factory: 'lv', workflowDir: folder(), labels: { edits: ['work=store'] } })),
+      (err: Error & { _tag?: string; exitCode?: number }) => {
+        assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2], err.message);
+        names(err.message, 'work=store', 'lv', 'feature');
+        return true;
+      },
+    );
+    assert.deepEqual(fs.existsSync(RUNS_DIR) ? fs.readdirSync(RUNS_DIR).sort() : [], before, 'nothing written');
+  });
+  test("a card's standing work=store, with no --label, is never what refuses its start", async () => {
+    const started = await runPlaced(
+      startRun({ brief: 'queued', repo, factory: 'lv', workflowDir: folder(), labels: { card: { work: 'store' }, edits: [] } }),
+    ).then(
+      () => '',
+      (err: Error) => err.message,
+    );
+    assert.equal(started.includes('work=store'), false, started);
+  });
 });

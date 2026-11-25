@@ -2343,7 +2343,7 @@ describe('a loop out of rounds before its ending: accepted as it stands, sent ba
         assert.match(err.message, /^a merge of main into implement's work is asked \(at \S+\)/);
         for (const fact of [
           'the next tick files it once, on round 1: ',
-          " merge-implement-2, in the run's .asks directory",
+          ' --base --off — then',
           ` — then: ${verb}.`,
         ])
           assert.ok(err.message.includes(fact), `${err.message} names ${fact}`);

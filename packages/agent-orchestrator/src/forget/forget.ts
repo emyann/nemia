@@ -62,10 +62,23 @@ export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'read' = '
 }
 
 /**
- * An ask as `nemia rm` names it: a try (`retry`), a round (`round`) or a merge (`merge`, of the loop's target and its try), of which step,
- * and its number — what `askAt` finds its file by.
+ * An ask as `nemia rm` names it: a try (`retry`), a round (`round`) or a merge (`merge`, of the loop's target and its try, and the looping
+ * step it is asked of, `loop`), of which step, and its number — what `offOf` names the command that takes it back by.
  */
-export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
+export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number; loop?: string };
+
+/**
+ * The command that takes an ask back, as `nemia rm` names it: `nemia retry <id> <step> --off`, with `--round` for a round, and `nemia
+ * refresh <id> <looping step> --base --off` for a merge.
+ * @param id The run's id.
+ * @param ask The ask taken back.
+ */
+export const askOffLine = (id: string, ask: AskName) =>
+  ask.of === 'try'
+    ? `nemia retry ${id} ${ask.step} --off`
+    : ask.of === 'round'
+      ? `nemia retry ${id} ${ask.step} --round --off`
+      : `nemia refresh ${id} ${ask.loop ?? ask.step} --base --off`;
 
 /**
  * Why `nemia rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every
@@ -81,7 +94,7 @@ export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
  *   filing it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they land, and
  *   is held the same way.
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
- *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by deleting its file (`askAt`).
+ *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by its verb's `--off` (`offOf`).
  * - **a step waiting at its gate** (`awaiting approval`), on a run nobody called off: something is due to be asked for, and an approval
  *   files what waits on it — or, at an ending step's gate, the step itself, which has not run. Approve it, or call the run off first.
  * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
@@ -108,7 +121,7 @@ export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
  * @param asks The asks for a try in the run's directory.
  * @param roundAsks The asks for a round in the run's directory.
  * @param spendOf What a task's sessions cost, by its id, or undefined for a task nobody read.
- * @param askAt Where an ask's file is, for the command that takes it back.
+ * @param offOf The command that takes an ask back (`askOffLine`).
  * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.store.ts): an
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
  * @param verb The verb the fixes name: `nemia prune` is held by every reason `nemia rm` is (`pruneRefusal`), and its fixes end in `nemia
@@ -131,7 +144,7 @@ export function forgetRefusal(
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
-  askAt: (ask: AskName) => string = (a) => askKey(run.id, a),
+  offOf: (ask: AskName) => string = (a) => askOffLine(run.id, a),
   standings: readonly BranchStanding[] = [],
   verb: 'rm' | 'prune' = 'rm',
   merging: MergeState['merging'] = 'none',
@@ -151,7 +164,7 @@ export function forgetRefusal(
     asks,
     roundAsks,
     spendOf,
-    askAt,
+    offOf,
     standings,
     verb,
     merging,
@@ -176,7 +189,7 @@ type Forgetting = {
   asks: readonly RetryAsk[];
   roundAsks: readonly RoundAsk[];
   spendOf: SpendOf;
-  askAt: (ask: AskName) => string;
+  offOf: (ask: AskName) => string;
   standings: readonly BranchStanding[];
   verb: 'rm' | 'prune';
   merging: MergeState['merging'];
@@ -325,7 +338,11 @@ function unheardOf(f: Forgetting, a: Assessment | undefined) {
   }
   for (const ask of roundAsks) {
     if (spentRoundAsks(run, [ask]).length || a?.round.some((r) => roundHeard(r, ask))) continue;
-    unheard.push(ask.merge ? { of: 'base', step: ask.merge.target, n: ask.merge.try } : { of: 'round', step: ask.step, n: ask.round });
+    unheard.push(
+      ask.merge
+        ? { of: 'base', step: ask.merge.target, n: ask.merge.try, loop: ask.step }
+        : { of: 'round', step: ask.step, n: ask.round },
+    );
   }
   return unheard;
 }
@@ -435,11 +452,11 @@ function cancelFix(c: Facts) {
   return undefined;
 }
 
-/** Take the unheard asks back, by their files. */
+/** Take the unheard asks back, each by its verb's `--off`. */
 function unheardFix(c: Facts) {
-  const { unheard, again, askAt } = c;
+  const { unheard, again, offOf } = c;
   if (!unheard.length) return undefined;
-  return `Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then ${again}: rm ${unheard.map(askAt).join(' ')}`;
+  return `Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then ${again}: ${[...new Set(unheard.map(offOf))].join(', ')}`;
 }
 
 /** Wait for the next tick to land the ending's merge. */

@@ -117,7 +117,7 @@ export const approveRun = Effect.fn('approve')(function* (
       () =>
         refusal(now, asksAfter) ??
         (stray !== null
-          ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: nemia approve ${id} ${stepName}.`
+          ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Take it back — nemia approve ${id} ${stepName} --off, which sets it aside as it is — then approve again: nemia approve ${id} ${stepName}.`
           : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: nemia ls ${id}.`),
     );
     return yield* Effect.fail(new Conflict({ message: why }));

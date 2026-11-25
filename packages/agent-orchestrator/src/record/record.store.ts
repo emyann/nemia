@@ -623,7 +623,7 @@ export function approvalsIn(asks: readonly AskEntry[]) {
     const [, step, n] = /^approve-(.+)-(\d+)$/.exec(name) ?? [];
     if (step === undefined || n === undefined) continue;
     const read = approvalIn(text, step, Number(n));
-    if (typeof read === 'string') notes.push(`${where}: ${read}, so it opens no gate — remove it, and approve with nemia approve`);
+    if (typeof read === 'string') notes.push(`${where}: ${read}, so it opens no gate — take it back with nemia approve <runId> <step> --off, and approve with nemia approve`);
     else approvals.push(read);
   }
   return { approvals, notes };
@@ -744,7 +744,7 @@ export function acceptancesIn(asks: readonly AskEntry[]) {
     const [, step, n] = /^accept-(.+)-(\d+)$/.exec(name) ?? [];
     if (step === undefined || n === undefined) continue;
     const read = acceptanceIn(text, step, Number(n));
-    if (typeof read === 'string') notes.push(`${where}: ${read}, so it ends no loop — remove it, and accept with nemia approve`);
+    if (typeof read === 'string') notes.push(`${where}: ${read}, so it ends no loop — take it back with nemia approve <runId> <step> --off, and accept with nemia approve`);
     else acceptances.push(read);
   }
   return { acceptances, notes };
@@ -787,11 +787,11 @@ export function asksIn(asks: readonly AskEntry[]) {
     const [, again, againN] = /^round-(.+)-(\d+)$/.exec(name) ?? [];
     if (tried !== undefined && triedN !== undefined) {
       const ask = askIn(text, tried, Number(triedN));
-      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
+      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — take it back with nemia retry <runId> <step> --off, and ask with nemia retry`);
       else read.asks.push(ask);
     } else if (again !== undefined && againN !== undefined) {
       const ask = roundAskIn(text, again, Number(againN));
-      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — remove it, and ask with nemia retry --round`);
+      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — take it back with nemia retry <runId> [<step>] --round --off, and ask with nemia retry --round`);
       else read.rounds.push(ask);
     }
   }

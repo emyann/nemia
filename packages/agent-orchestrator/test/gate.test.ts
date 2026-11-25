@@ -848,7 +848,7 @@ describe('`nemia approve`, REFUSED with nothing written', () => {
     plantRecord(ROOT, askKeyOf(stray.id, 'approve-plan-1'), 'yes please');
     await assert.rejects(
       runWith(stray.e, approveRun(stray.id, 'plan')),
-      refusedAs('Conflict', 'try 1 of plan cannot be approved', 'approve-plan-1 is already there', '(rm ', 'then approve again'),
+      refusedAs('Conflict', 'try 1 of plan cannot be approved', 'approve-plan-1 is already there', `nemia approve ${stray.id} plan --off`, 'then approve again'),
     );
   });
 });

@@ -182,3 +182,19 @@ test("a field's value is read in its colour, its placeholder in the placeholder'
   assert.equal(hex(said(pairs, 'hint').ink), '#999999');
   assert.equal(hex(said(pairs, 'drawn').ink), '#123456');
 });
+
+test('a placeholder painted transparent and a field with no text shown are not measured; a painted placeholder still is', async () => {
+  const { pairs } = await pairsOf(
+    '<style>.clear::placeholder{color:transparent}.seen::placeholder{color:#999999}</style>' +
+      '<input class="clear" placeholder="unpainted" style="color:#111111;background:#fff">' +
+      '<textarea class="clear" placeholder="unpainted too" style="color:#111111;background:#fff"></textarea>' +
+      '<input class="seen" placeholder=" " style="color:#111111;background:#fff">' +
+      '<input class="seen" value="  " style="color:#111111;background:#fff">' +
+      '<input class="seen" placeholder="painted" style="color:#111111;background:#fff">',
+  );
+  assert.deepEqual(
+    pairs.map((pair) => pair.text),
+    ['painted'],
+  );
+  assert.equal(hex(said(pairs, 'painted').ink), '#999999');
+});

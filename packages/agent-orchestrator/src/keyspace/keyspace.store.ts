@@ -471,3 +471,19 @@ export const keyspaceAt = (file: string) =>
  * @param home The store's root folder.
  */
 export const keyspaceFile = (home: string) => path.join(home, 'db', 'state.db');
+
+/**
+ * A keyspace in memory of its own, opened when it is first asked and kept: what a door's memory stand-in holds its records in, so the
+ * stand-in is the door's own code over a keyspace no file holds.
+ */
+export function memoryKeyspace() {
+  let held: Keyspace | undefined;
+  return Effect.suspend(() =>
+    held === undefined
+      ? Effect.map(keyspaceAt(':memory:'), (keyspace) => {
+          held ??= keyspace;
+          return held;
+        })
+      : Effect.succeed(held),
+  ) satisfies Effect.Effect<Keyspace, Invalid>;
+}

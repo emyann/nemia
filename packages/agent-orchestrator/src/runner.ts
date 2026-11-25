@@ -622,7 +622,7 @@ export { workflowSpecOf, type WorkflowSpecRead } from './propose/index.ts';
 export { approveProgram, declineProgram, proposalGet, proposalsList, proposalsListed } from './approval/approve.verb.ts';
 export { ProposalDoor, type ProposalDoorShape } from './proposal/proposal.store.ts';
 export { delegationGet, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
-export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';
+export { DelegationDoor, type DelegationDoorShape } from './delegation/delegation.store.ts';
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
 export { CEILINGS } from './cap/commands.verb.ts';
 export { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './pause/commands.verb.ts';

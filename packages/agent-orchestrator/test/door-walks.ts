@@ -11,6 +11,7 @@
  */
 import assert from 'node:assert/strict';
 import { Cause, Effect, Exit, Layer, type Context } from 'effect';
+import { StoreRoot } from '../src/config/root.store.ts';
 
 /** One side of a door's contract: the door as its layer gives it, the root its paths are named under, and the layer's name. */
 export type DoorSide<D> = { readonly door: D; readonly root: string; readonly layer: string };
@@ -127,4 +128,23 @@ export function walkedOn<D extends object>(walks: Readonly<Record<string, readon
       ),
     ),
   ] satisfies Array<readonly [name: string, body: () => Promise<void>]>;
+}
+
+/**
+ * A rooted door (`rootedDoor`) at the store `root`: each method of each group given the store's root, as a program composed at it is.
+ * @param door The door, as its service's default gives it.
+ * @param root The store's root folder.
+ */
+export function rootedOn<D extends object>(door: D, root: string) {
+  return Object.fromEntries(
+    Object.entries(door).map(([group, methods]) => [
+      group,
+      Object.fromEntries(
+        Object.entries(methods as Record<string, (...a: never[]) => Effect.Effect<unknown>>).map(([name, method]) => [
+          name,
+          (...args: never[]) => Effect.provideService(method(...args), StoreRoot, root),
+        ]),
+      ),
+    ]),
+  ) as D;
 }

@@ -41,7 +41,6 @@ const PINNED: Record<string, string[]> = {
     'ProposalDoor',
     'approveProgram',
     'declineProgram',
-    'delegationDoorFiles',
     'delegationGet',
     'delegationPut',
     'delegationRemove',

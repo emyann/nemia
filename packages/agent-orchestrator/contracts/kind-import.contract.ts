@@ -42,7 +42,8 @@ const importActSpec = spec<(file: ImportFile, ceiling: number) => ImportAct>({
   requires: ({ input: [file, ceiling] }) => whole(file.size) && whole(ceiling) && (file.read !== 'gone' || file.size === 0),
   ensures: {
     overCeilingStops: {
-      description: 'A file there that is larger than a record holds stops the whole import, whatever it holds and whatever the keyspace holds',
+      description:
+        'A file there that is larger than a record holds stops the whole import, whatever it holds and whatever the keyspace holds',
       condition: ({ input: [file, ceiling], output }) => !over(file, ceiling) || output === 'stop',
     },
     stopsOnlyOverCeiling: {

@@ -17,11 +17,8 @@ import { WorkflowsUnread } from '../workflow/WorkflowOptions';
 import { Reading, ReadingLines } from '@/components/look';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
-const code = (text: string) => (
-  <Body size="small" component="span" className="contents">
-    <code className="font-mono">{text}</code>
-  </Body>
-);
+/** A command or a name in mono, at the size of the small body it is said in. */
+const code = (text: string) => <code className="font-mono">{text}</code>;
 
 /** What a card's start is told: a start the api took, and a refusal to show, null when the start is asked again. */
 type Told = { onStarted: (started: Started) => void; onRefused: (message: string | null) => void };

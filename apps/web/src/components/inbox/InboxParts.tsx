@@ -138,7 +138,7 @@ export function CardStateChip({ state }: { state: CardState }) {
  */
 export function StartedAs({ startedAs, state, after }: { startedAs: readonly string[]; state: CardState | null; after?: ReactNode }) {
   return (
-    <Body size="medium" data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+    <Body size="medium" colorRole="on-surface-variant" data-started-as className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
       <span>
         Started as{' '}
         {startedAs.map((id, i) => (

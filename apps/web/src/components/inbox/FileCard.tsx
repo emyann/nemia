@@ -19,11 +19,8 @@ import { inputsAdded } from '@/lib/startInputs';
 import { StartInputs } from '../run/StartInputs';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
-const code = (text: string) => (
-  <Body size="small" component="span" className="contents">
-    <code className="font-mono">{text}</code>
-  </Body>
-);
+/** A command or a name in mono, at the size of the small body it is said in. */
+const code = (text: string) => <code className="font-mono">{text}</code>;
 
 /**
  * The box: the idea, the Factory list (`FactoryField`) and, under a factory, the workflow it runs and the repository the factory gives it

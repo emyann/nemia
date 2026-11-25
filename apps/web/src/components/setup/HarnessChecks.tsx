@@ -1,6 +1,7 @@
 import { CircleCheck, CircleDashed, CircleX, type LucideIcon } from 'lucide-react';
 import type { HarnessCheck, HarnessCheckState, ReadinessPiece } from 'objects';
 import { CutPress, Pending } from '@/components/look';
+import { Button } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import { container, dashed, ringed } from '@/lib/meaning';
 import { dollars } from '@/lib/money';
@@ -29,7 +30,8 @@ type TurnRun = { onRun: () => void; pending?: boolean; refused?: string };
 
 /**
  * One check: its mark, its name and what it found, and under a failed one its fixes, the install started again or the sign-in to type;
- * the turn's own press, which runs it, its cap said; and once it passed, what it cost and the quota beside it as information.
+ * the turn's own press, which runs it, its cap said, filled until it passed and outlined after, when the view's next step is its one
+ * filled action; and once it passed, what it cost and the quota beside it as information.
  */
 function CheckRow({
   check,
@@ -64,7 +66,7 @@ function CheckRow({
             </p>
           )}
         </div>
-        {turn !== undefined && check.name === 'turn' && (
+        {turn !== undefined && check.name === 'turn' && check.state !== 'passed' && (
           <CutPress
             data-harness-turn
             pending={turn.pending === true || check.state === 'running'}
@@ -73,6 +75,18 @@ function CheckRow({
           >
             {turnWord(check, turn.pending === true)}
           </CutPress>
+        )}
+        {turn !== undefined && check.name === 'turn' && check.state === 'passed' && (
+          <Button
+            variant="outlined"
+            size="xsmall"
+            data-harness-turn
+            icon={turn.pending === true ? Pending : undefined}
+            isDisabled={turn.pending === true}
+            onPress={turn.onRun}
+          >
+            {turnWord(check, turn.pending === true)}
+          </Button>
         )}
       </div>
       {check.state === 'failed' && <PieceFixes piece={{ ...install, state: 'missing', fixes: check.fixes }} starts={starts} />}

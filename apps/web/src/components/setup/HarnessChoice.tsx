@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ReadinessPiece } from 'objects';
-import { CutFrame, CutPress } from '@/components/look';
+import { CutFrame, Pending } from '@/components/look';
 import { Button } from '@/components/ui/ds';
 import { fixKeyOf, type HarnessChoiceRow, shownFixes, startOf } from '@/lib/setup';
 import { PieceFixes, type Starts } from './ReadinessList';
@@ -29,14 +29,16 @@ function Option({ choice, starts }: { choice: Choice; starts: Starts }) {
           <span className="font-mono text-body-small break-all text-on-surface-variant">{choice.name}</span>
         </div>
         {shown !== undefined && key !== undefined && shown.fix.startable && (
-          <CutPress
-            pending={pending}
+          <Button
+            variant="outlined"
+            size="xsmall"
+            icon={pending ? Pending : undefined}
             data-harness-activate
             isDisabled={pending}
             onPress={() => starts.onStart(startOf(install, shown.fix, shown.i, {}), key)}
           >
             {pending ? 'Starting…' : 'Activate'}
-          </CutPress>
+          </Button>
         )}
       </div>
       {refused !== undefined && (

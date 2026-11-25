@@ -984,7 +984,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
         'Invalid',
         '`default`',
         '`factory: <name>`',
-        'by-name.md',
+        'nemia get card by-name',
         'pipao',
       );
       aCard('plain', 'Build it.\n');

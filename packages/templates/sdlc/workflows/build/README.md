@@ -102,8 +102,10 @@ out — then merges it with a merge commit whose subject and body are his (`gh p
 origin/<base>`). On a refusal he changes nothing and signs off `blocked` with the `nemia retry` line it printed. Where the factory names
 a refresh — `landingRefresh`, a command of its own that derives files from the tree, and `landingDerives`, the paths it owns, which the
 merge takes as `--refresh` and `--derives` — and the pull request's head lacks the base, the merge first refreshes the branch
-(`refresh.ts`, beside it): it merges the base into the branch in the run's worktree, runs the command there, refuses and takes the merge
-back where anything is left unmerged, the command fails, or the result differs from git's plain merge outside the derived paths, and
+(`refresh.ts`, beside it): it merges the base into the branch in the run's worktree, runs there the factory's `landingInstall` first
+where it names one (`--install`), so the command reads the dependencies the merged tree names and not the branch's, the two sharing one
+time bound, then runs the command there, refuses and takes the merge back where anything is left unmerged, the install or the command
+fails, or the result differs from git's plain merge outside the derived paths, and
 otherwise commits it, pushes the branch with no force and leaves `refreshed.json` in the step's files, merging nothing yet. A refresh
 the command changed nothing of, on a merge that went clean, is taken back, and the merge goes on as before. So two runs that change one
 derived file side by side both land: the landed commit differs from the reviewed head only in the files `landingDerives` names. Land's

@@ -128,7 +128,7 @@ export function StartRun({
 /** The form's Start: disabled while its press is out (`pending`, the kit's small ProgressIndicator drawn in it) or while `held`. */
 function StartPress({ pending, held, children }: { pending: boolean; held: boolean; children: string }) {
   return (
-    <Button icon={pending ? Pending : undefined} type="submit" size="xsmall" isDisabled={pending || held}>
+    <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" size="xsmall" isDisabled={pending || held}>
       {children}
     </Button>
   );

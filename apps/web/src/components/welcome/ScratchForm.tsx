@@ -1,5 +1,5 @@
-import { Pending } from '@/components/look';
-import { Button, TextField } from '@/components/ui/ds';
+import { CutPress } from '@/components/look';
+import { TextField } from '@/components/ui/ds';
 import { createFactory } from '@/lib/api/factories';
 import { useFactoryWrite } from '@/lib/useFactoryWrite';
 
@@ -31,9 +31,9 @@ export function ScratchForm({ onMade }: { onMade: (name: string) => void }) {
         </p>
       )}
       <div>
-        <Button type="submit" variant="filled" data-factory-make isDisabled={!form.ready} icon={form.pending ? Pending : undefined}>
+        <CutPress type="submit" data-factory-make isDisabled={!form.ready} pending={form.pending}>
           Make an empty factory
-        </Button>
+        </CutPress>
       </div>
     </form>
   );

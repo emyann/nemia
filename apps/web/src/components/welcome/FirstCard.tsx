@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { PageName, RadioTile, RadioTileGroup } from '@/components/look';
-import { Button, TextField } from '@/components/ui/ds';
+import { PageName, RadioTile, RadioTileGroup, TextLink, CutPress } from '@/components/look';
+import { TextField } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { factoryWorkflowsQuery } from '@/lib/api/workflows';
 import { startRepo } from '@/lib/factories';
@@ -71,7 +71,6 @@ export function FirstCard() {
   const [body, setBody] = useState('');
   const gates = useFirstGates(factory, workflow);
   const { pending, refused, start } = useFirstStart();
-  const navigate = useNavigate();
   const own = factories.filter((f) => !f.default);
   return (
     <article
@@ -108,18 +107,18 @@ export function FirstCard() {
         </>
       )}
       <footer className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="text" size="small" data-welcome-skip onPress={() => void navigate({ to: '/' })}>
+        <TextLink to="/" data-welcome-skip>
           Skip, go to the board
-        </Button>
+        </TextLink>
         {factory !== undefined && (
-          <Button
-            variant="filled"
+          <CutPress
             data-first-start
+            pending={pending}
             isDisabled={pending || workflow === undefined || gates === undefined || body.trim() === ''}
             onPress={() => workflow !== undefined && gates !== undefined && start(factory.name, workflow, body.trim(), gates)}
           >
             {gates !== undefined && gates.length > 0 ? 'Start, gated before it lands' : 'Start'}
-          </Button>
+          </CutPress>
         )}
       </footer>
     </article>

@@ -52,7 +52,7 @@ export const Choose: Story = {
     await expect(page).toHaveAttribute('data-factory-step', 'choose');
     await expect(page.querySelectorAll('[data-factory-way]')).toHaveLength(3);
     await expect(page.querySelector('[data-factory-panel]')).toBeNull();
-    await expect(within(page).getByRole('button', { name: 'Skip for now' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip for now' })).toBeEnabled();
     await expect(within(page).queryByRole('link', { name: /Next|On to/ })).toBeNull();
   },
 };
@@ -66,7 +66,7 @@ export const NemiaChosen: Story = {
     await userEvent.click(within(page).getByRole('button', { name: 'Talk to Nemia' }));
     await expect(canvasElement.querySelector('[data-her-open]')).toHaveAttribute('data-her-open', 'true');
     await expect(page).toHaveAttribute('data-factory-step', 'nemia');
-    await expect(within(page).getByRole('button', { name: 'Skip for now' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip for now' })).toBeEnabled();
   },
 };
 
@@ -76,7 +76,7 @@ export const TemplateChosen: Story = {
     const page = await loaded(canvasElement);
     await choose(page, 'template', userEvent);
     await expect(page.querySelector('[data-factory-panel="template"] [data-template-offer="sdlc"]')).not.toBeNull();
-    await expect(within(page).getByRole('button', { name: 'Skip for now' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip for now' })).toBeEnabled();
   },
 };
 
@@ -102,7 +102,7 @@ export const MadeFromTemplate: Story = {
     await expect(page.querySelector('[data-factory-way]')).toBeNull();
     await expect(page.querySelector('[data-factory-guide]')).toBeNull();
     await expect(within(page).getByRole('link', { name: 'Next: a volume' })).toBeVisible();
-    await expect(within(page).getByRole('button', { name: 'Skip for now' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip for now' })).toBeEnabled();
   },
 };
 
@@ -116,7 +116,7 @@ export const Guide: Story = {
     await waitFor(() => expect(page).toHaveAttribute('data-factory-step', 'guide'), { timeout: 5000 });
     await expect(page.querySelector('[data-factory-made]')).not.toBeNull();
     await expect(page.querySelectorAll('[data-guide]')).toHaveLength(3);
-    await expect(within(page).getByRole('button', { name: 'Skip for now' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip for now' })).toBeEnabled();
   },
 };
 
@@ -129,7 +129,7 @@ export const AlreadyFiled: Story = {
     await waitFor(() => expect(page.querySelector('[data-factory-named]')).toHaveTextContent('Your factory: shop.'), { timeout: 5000 });
     await expect(page.querySelector('[data-factory-no-volume]')).not.toBeNull();
     await expect(within(page).getByRole('link', { name: 'Next: a volume' })).toBeVisible();
-    await expect(within(page).getByRole('button', { name: 'Skip for now' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip for now' })).toBeEnabled();
   },
 };
 

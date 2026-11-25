@@ -40,8 +40,9 @@ export function Note({ what, marks, children }: { what: string; marks: string; c
 }
 
 /**
- * The agent's words: the sentence as it stands, markdown and all, and each page it named as a filled button under it, its address cut
- * into the path, search and hash the router's link takes (`routeOfHref`), so its preload reads the page the address names.
+ * The agent's words: the sentence as it stands, markdown and all, and each page it named as the look's quiet cut button under it,
+ * since it repeats down the conversation, its address cut into the path, search and hash the router's link takes (`routeOfHref`), so
+ * its preload reads the page the address names.
  */
 function Theirs({ said, marks }: { said: Spoken; marks: string }) {
   return (
@@ -51,7 +52,7 @@ function Theirs({ said, marks }: { said: Spoken; marks: string }) {
       {said.links.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {said.links.map((link) => (
-            <CutButton key={`${link.href} ${link.words}`} {...routeOfHref(link.href)}>
+            <CutButton key={`${link.href} ${link.words}`} {...routeOfHref(link.href)} quiet>
               {link.words}
             </CutButton>
           ))}

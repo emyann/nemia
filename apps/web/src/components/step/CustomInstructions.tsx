@@ -188,7 +188,7 @@ function CustomForm({
       )}
       <TextField label="Words" multiline value={draft} onChange={setDraft} placeholder={reach.placeholder(custom.name)} />
       <div className="flex flex-wrap items-center gap-2">
-        <Button icon={pending ? Pending : undefined} type="submit" isDisabled={pending || !draft.trim() || unchanged}>
+        <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" isDisabled={pending || !draft.trim() || unchanged}>
           {pending ? 'Writing…' : 'Save'}
         </Button>
         {held && (
@@ -231,10 +231,10 @@ function Clear({
   return (
     <span data-custom-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
       {asks}
-      <Button icon={pending ? Pending : undefined} color="error" onPress={onClear} isDisabled={pending}>
+      <Button icon={pending ? Pending : undefined} variant="outlined" color="error" onPress={onClear} isDisabled={pending}>
         {pending ? 'Clearing…' : 'Clear'}
       </Button>
-      <Button variant="text" onPress={() => onAsk(false)} isDisabled={pending}>
+      <Button variant="outlined" onPress={() => onAsk(false)} isDisabled={pending}>
         Keep them
       </Button>
     </span>

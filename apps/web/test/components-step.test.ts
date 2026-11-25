@@ -2046,12 +2046,12 @@ const pricedRun = (status: Word, cost: ReturnType<typeof priced>, waitingOnYou: 
   return { ...run, steps: [{ ...run.steps[0], ...cost }] } satisfies RunDetail;
 };
 
-test("a step's node says what its tries cost, of its cap where it has one — in money's amber once they cost it or more — and a step past its budget is a human gate", () => {
+test("a step's node says what its tries cost, of its cap where it has one — in failure's red once they cost it or more — and a step past its budget is a human gate", () => {
   const over = nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), ['review']));
   const costOf = (html: string) => /<p data-cost="(\w+)"[^>]*class="([^"]*)"><span[^>]*>cost <\/span>([^<]*)<\/p>/.exec(html);
   const [, state, className, said] = costOf(over) ?? [];
   assert.deepEqual([state, said], ['over', '$4.25 of $3'], over);
-  assert.match(className, /\btext-money\b/);
+  assert.match(className, /\btext-failure\b/);
   assert.equal(gateDrawn(over), true, 'over budget waits on you: a human gate');
   assert.equal(
     gateDrawn(nodeMarkup(pricedRun('budget exhausted $3.02 of $3', priced(3.02, 3, true), ['review']))),
@@ -2060,7 +2060,7 @@ test("a step's node says what its tries cost, of its cap where it has one — in
   );
 
   const within = costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, 3))));
-  assert.deepEqual([within?.[1], within?.[3], /\btext-money\b/.test(within?.[2] ?? '')], ['within', '$1.20 of $3', false]);
+  assert.deepEqual([within?.[1], within?.[3], /\btext-failure\b/.test(within?.[2] ?? '')], ['within', '$1.20 of $3', false]);
   assert.equal(costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, null))))?.[3], '$1.20', 'no cap: what its tries cost');
   assert.equal(
     costOf(nodeMarkup(pricedRun('running (working)', priced(null, 3))))?.[3],
@@ -2094,7 +2094,7 @@ test("a step's detail says what every try cost of its cap — `spent`, red once 
   const step = run.steps[0];
   const over = { ...step, ...priced(4.25, 3, true) };
   assert.equal((await rows(over)).spent, '$4.25 of $3');
-  assert.match(await markup(over), /<span data-spent="over" class="[^"]*\btext-money\b[^"]*">\$4\.25 of \$3<\/span>/);
+  assert.match(await markup(over), /<span data-spent="over" class="[^"]*\btext-failure\b[^"]*">\$4\.25 of \$3<\/span>/);
   assert.match(
     await markup({ ...step, ...priced(1.2, 3) }),
     /<span data-spent="within" class="font-mono text-body-small ">\$1\.20 of \$3<\/span>/,

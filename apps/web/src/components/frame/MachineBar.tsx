@@ -8,7 +8,6 @@ import { versionQuery } from '@/lib/api/version';
 import type { Bar } from '@/lib/bar';
 import type { FeedStatus } from '@/lib/feed';
 import { atWork, atWorkWords, type DaemonTone, daemonDot, feedWords, quotaShort, tickWord, versionWords } from '@/lib/footer';
-import { ink } from '@/lib/meaning';
 import type { Presence } from '@/lib/presence';
 import { useBar } from '@/lib/useBar';
 import { useNow } from '@/lib/useNow';
@@ -45,8 +44,8 @@ export function presenceWord(presence: Presence) {
  * The machine bar, at the window's foot across the whole frame, one line as tall as `--frame-foot` on `surface-container`: the machine in
  * short, the kit's `Pressable`, the line pressed whole, that opens and closes its gauges in the side sheet (`GaugesBar`, `?bar=gauges`),
  * the daemon's state said on hover — the daemon's dot and whether the store ticks or is paused, the runs and sessions at work, the feed
- * (`feed`), Nemia's session at the page at `path`, the quota (in money while it nears its limit) and the version the api runs — then Pause
- * every factory (`PauseButton`).
+ * (`feed`), Nemia's session at the page at `path`, the quota (marked by weight while it nears its limit) and the version the api
+ * runs — then Pause every factory (`PauseButton`).
  */
 export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
   const now = new Date(useNow(30_000));
@@ -88,7 +87,11 @@ export function MachineBar({ path, feed }: { path: string; feed: FeedStatus }) {
           <span aria-hidden className={`size-2 shrink-0 rounded-full ${DOT[dot.tone]}`} />
           <span className="min-w-0 truncate">{parts.join(' · ')}</span>
           <span aria-hidden>·</span>
-          <span data-quota-line data-quota-mark={short.marked ? '' : undefined} className={cn('shrink-0', short.marked && ink.money)}>
+          <span
+            data-quota-line
+            data-quota-mark={short.marked ? '' : undefined}
+            className={cn('shrink-0', short.marked && 'font-semibold text-on-surface')}
+          >
             {short.text}
           </span>
           {version.data && (

@@ -171,7 +171,7 @@ function QuestionWords({ q, draft, onDraft }: { q: Frozen<Question>; draft: Draf
   }, [asked]);
   if (!way && !asked && own === '') {
     return (
-      <Button variant="text" data-add-words onPress={() => setAsked(true)}>
+      <Button variant="outlined" data-add-words onPress={() => setAsked(true)}>
         {SERIES.addWords}
       </Button>
     );
@@ -354,7 +354,12 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined} className="inline-flex">
-            <Button icon={ask.isPending ? Pending : undefined} type="submit" isDisabled={ask.isPending || left.length > 0}>
+            <Button
+              icon={ask.isPending ? Pending : undefined}
+              variant="outlined"
+              type="submit"
+              isDisabled={ask.isPending || left.length > 0}
+            >
               {ask.isPending ? 'Asking…' : OFFERS.answer.button}
             </Button>
           </span>

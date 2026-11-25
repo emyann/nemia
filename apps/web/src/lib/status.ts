@@ -182,8 +182,7 @@ const GATE: Drawn = { hue: 'yours', form: 'filled', mark: 'font-semibold' };
  * for a session at work. `failure` for a failure and nothing else. The rest is at rest or done: sage for a check that runs, a step that is
  * done (ringed when only its own word says so, and `StatusChip` marks it too) and a step to come, a hairline; grey for a step a person
  * holds, one called off, and one the engine does not know, grey dashed and italic for a node its route passed by, sage filled for a
- * workflow node that filed its card, and grey ringed for a session the store's pause parked between two calls. No state is `money`:
- * amber is an amount, drawn beside the chip.
+ * workflow node that filed its card, and grey ringed for a session the store's pause parked between two calls.
  */
 export const stateDrawn: Record<StepState, Drawn> = {
   working: { hue: 'alive', form: 'container' },
@@ -218,15 +217,13 @@ export const classOf = ({ hue, form, mark }: Drawn) => [form === 'hairline' ? ha
 
 /**
  * The states of `table` that break the look's rule, each with why; none for a table that keeps it. A state that waits on a person
- * (`waitsOnPerson`: a gate, a session asking, work to try again) is `yours`; a failure is `failure`, and no other state is; no state is
- * `money`.
+ * (`waitsOnPerson`: a gate, a session asking, work to try again) is `yours`; a failure is `failure`, and no other state is.
  * @param table How each state is drawn.
  */
 export function brokenMeanings(table: Record<StepState, Drawn>) {
   const states = Object.keys(table) as StepState[];
   return states.flatMap((state) => {
     const meaning = meaningOf(table[state].hue);
-    if (meaning === 'money') return [`${state} is money: amber is an amount, never a state`];
     if (waitsOnPerson(state, false)) return meaning === 'yours' ? [] : [`${state} waits on a person and is ${meaning}, not yours`];
     if (FAILURES.has(state)) return meaning === 'failure' ? [] : [`${state} is a failure and is ${meaning}`];
     if (meaning === 'yours') return [`${state} waits on nobody and is yours`];

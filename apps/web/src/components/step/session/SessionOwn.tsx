@@ -119,7 +119,7 @@ function Closeout({ call, step, marks }: { call: ToolCall; step: string; marks: 
           </span>
         )}
         {closeout && (
-          <Button variant="text" size="xsmall" {...mark(marks, 'to-said')} onPress={(event) => toSaid(event.target, step)}>
+          <Button variant="outlined" size="xsmall" {...mark(marks, 'to-said')} onPress={(event) => toSaid(event.target, step)}>
             Read what it said, above
           </Button>
         )}

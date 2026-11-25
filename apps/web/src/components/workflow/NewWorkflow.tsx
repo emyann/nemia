@@ -5,7 +5,7 @@ import type { WorkflowStepSpec } from '../../lib/api/library.ts';
 import { firstStep, listedWith } from '../../lib/builder';
 import { rereadWorkflows } from '../../lib/placed';
 import { Button, Radio, RadioGroup, TextField } from '@/components/ui/ds';
-import { Pending } from '@/components/look';
+import { CutPress } from '@/components/look';
 
 /** Where a workflow's steps may work, each with the words a person chooses it by: none is chosen for them. */
 const PLACES: ReadonlyArray<{ place: NonNullable<WorkflowStepSpec['place']>; label: string; hint: string }> = [
@@ -106,9 +106,9 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
       <TextField label="What it is told" multiline value={body} onChange={setBody} />
       <PlaceChoice place={place} onChange={setPlace} />
       <div className="flex flex-wrap items-center gap-2">
-        <Button icon={create.isPending ? Pending : undefined} type="submit" isDisabled={!name.trim() || !first || create.isPending}>
+        <CutPress pending={create.isPending} type="submit" isDisabled={!name.trim() || !first || create.isPending}>
           {create.isPending ? 'Making…' : 'Make it'}
-        </Button>
+        </CutPress>
         <Button
           variant="outlined"
           onPress={() => {

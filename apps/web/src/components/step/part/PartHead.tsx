@@ -112,8 +112,7 @@ function Facts({ facts }: { facts: ReadonlyArray<{ key: string; value: string }>
 }
 
 /**
- * The spend: the kit's meter in the money colour, its label the head's small caps, where a spend and a budget are measured, else its
- * words in money.
+ * The spend: the kit's meter, its label the head's small caps, where a spend and a budget are measured, else its words in ink.
  */
 function Spend({ spend }: { spend: CardSpend }) {
   if (spend.kind === 'meter')
@@ -132,7 +131,7 @@ function Spend({ spend }: { spend: CardSpend }) {
   return (
     <div data-step-spend="words" className="flex flex-wrap items-baseline gap-x-2.5 border-t border-outline-variant pt-3">
       <Key className="w-24">{spend.label}</Key>
-      <span className={cn('font-mono text-body-medium', ink.money)}>{spend.said}</span>
+      <span className={'font-mono text-body-medium text-on-surface'}>{spend.said}</span>
       <span className="font-mono text-body-small text-on-surface-variant">{spend.note}</span>
     </div>
   );

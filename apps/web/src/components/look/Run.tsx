@@ -155,10 +155,10 @@ function ClockSaid({ run, look, asOf }: { run: PartRun; look: Look; asOf: Date }
   );
 }
 
-/** The run's cost, in money's ink, with its tokens by kind over it; nothing where none was measured. */
+/** The run's cost, in ink, with its tokens by kind over it; nothing where none was measured. */
 function CostSaid({ run, className }: { run: PartRun; className?: string }) {
   return (
-    <span data-cost {...saying('cost')} className={cn('inline-flex shrink-0', ink.money)}>
+    <span data-cost {...saying('cost')} className="inline-flex shrink-0 text-on-surface">
       <RunCost run={run} className={className} />
     </span>
   );

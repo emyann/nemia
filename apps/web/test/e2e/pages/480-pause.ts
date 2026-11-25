@@ -125,6 +125,10 @@ export default {
     const size = page.viewportSize();
     try {
       await expectVisible(button.and(page.locator('[data-pause="running"]')), 'the machine bar has the pause, all factories running');
+      await expectVisible(
+        button.and(page.locator('.border-outline-variant:not([data-cut-button])')),
+        'the pause is outlined: the machine bar holds no filled button',
+      );
       await afterTheGauges(page);
       if (fs.existsSync(file)) throw new Refused(`no pause before the page puts one — ${file} is there`);
       await opened(page, 'running');

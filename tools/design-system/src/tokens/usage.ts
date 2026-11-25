@@ -60,14 +60,13 @@ export const USAGE: Readonly<Record<string, string>> = {
 
 /**
  * The look's four meanings, each a word and what it says, their values written by the board beside the theme (`src/styles.css`,
- * `--meaning-*`), and money's amber, which is no meaning any more and goes with the board-look's second card.
+ * `--meaning-*`). A cost is no meaning: it is drawn in ink.
  */
 export const MEANING: readonly (readonly [string, string])[] = [
   ['yours', 'What waits on a person: a gate, a waiting tag, the one filled button.'],
   ['alive', 'A session at work: a running step, the live step on a rail.'],
   ['failure', "What failed, and nothing else: Material's error."],
   ['rest', "What is at rest: the label's grey of a count, a clock, a finished run."],
-  ['money', 'Retiring: an amount, drawn in ink once the board-look takes it off its last part.'],
 ];
 
 /** The look's further names, each over a role, as Tailwind's classes name them. */

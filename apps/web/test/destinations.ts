@@ -38,7 +38,6 @@ export const DESTINATIONS: Readonly<Record<string, Destination>> = {
   '@/components/ui/alert:AlertTitle': ALERT,
   '@/components/ui/badge:Badge': kit('Tag'),
   '@/components/ui/button:Button': kit('Button'),
-  '@/components/ui/button:LinkButton': kit('Button', 'with href'),
   '@/components/ui/card:Card': kit('Card'),
   '@/components/ui/card:CardContent': kit('CardContent'),
   '@/components/ui/card:CardDescription': kit('Body'),

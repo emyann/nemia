@@ -83,7 +83,12 @@ function TryForm({ agent }: { agent: AgentListing }) {
           className="w-full"
         />
         <div className="flex flex-wrap items-center gap-3">
-          <Button icon={start.isPending ? Pending : undefined} type="submit" isDisabled={held !== null || start.isPending}>
+          <Button
+            icon={start.isPending ? Pending : undefined}
+            variant="outlined"
+            type="submit"
+            isDisabled={held !== null || start.isPending}
+          >
             {start.isPending ? 'Starting…' : 'Try it'}
           </Button>
           {held && (

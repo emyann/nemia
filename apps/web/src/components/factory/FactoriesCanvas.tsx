@@ -199,7 +199,7 @@ function TurnOn({ line }: { line: string | null }) {
         Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="xsmall" data-nemia-turn-on isDisabled={turnOn.isPending} onPress={() => turnOn.mutate()}>
+        <Button variant="outlined" size="xsmall" data-nemia-turn-on isDisabled={turnOn.isPending} onPress={() => turnOn.mutate()}>
           Turn Nemia on
         </Button>
         {line !== null && (

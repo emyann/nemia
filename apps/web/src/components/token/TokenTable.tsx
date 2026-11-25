@@ -64,7 +64,7 @@ function ConfirmRetire({
         <CutPress pending={pending} data-token-confirm-press isDisabled={pending} onPress={onConfirm}>
           {pending ? 'Retiring…' : `Retire ${name}`}
         </CutPress>
-        <Button variant="text" size="xsmall" isDisabled={pending} onPress={onCancel}>
+        <Button variant="outlined" size="xsmall" isDisabled={pending} onPress={onCancel}>
           Cancel
         </Button>
       </div>

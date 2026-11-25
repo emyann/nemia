@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pending } from '@/components/look';
+import { CutPress } from '@/components/look';
 import { Button, ComboBox, ComboBoxItem } from '@/components/ui/ds';
 import { folderNamesQuery } from '@/lib/api/folders';
 import { troubleOf } from '@/lib/api/read';
@@ -86,15 +86,9 @@ export function FolderPick({
         </p>
       )}
       <div>
-        <Button
-          type="submit"
-          variant="filled"
-          data-folder-use
-          isDisabled={!path.startsWith('/') || pending}
-          icon={pending ? Pending : undefined}
-        >
+        <CutPress type="submit" data-folder-use isDisabled={!path.startsWith('/') || pending} pending={pending}>
           Use this folder
-        </Button>
+        </CutPress>
       </div>
     </form>
   );
@@ -144,15 +138,15 @@ export function InitOffer({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="filled" data-init-yes onPress={onYes} isDisabled={pending} icon={pending ? Pending : undefined}>
+        <CutPress data-init-yes onPress={onYes} isDisabled={pending} pending={pending}>
           {declined ? 'Make it a repository' : 'Yes, make it one'}
-        </Button>
+        </CutPress>
         {!declined && (
           <Button variant="outlined" data-init-no onPress={onNo} isDisabled={pending}>
             No
           </Button>
         )}
-        <Button variant="text" data-init-another onPress={onAnother} isDisabled={pending}>
+        <Button variant="outlined" data-init-another onPress={onAnother} isDisabled={pending}>
           Choose another folder
         </Button>
       </div>

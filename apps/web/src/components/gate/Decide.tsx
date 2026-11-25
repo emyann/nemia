@@ -569,7 +569,7 @@ function Commands({ commands }: { commands: readonly DecideCommand[] }) {
 /** An ask's submit: `Asking…` while its press is out, the kit's small ProgressIndicator in it, else its words; disabled then or `held`. */
 function AskPress({ pending, held, children }: { pending: boolean; held: boolean; children: string }) {
   return (
-    <Button icon={pending ? Pending : undefined} type="submit" isDisabled={pending || held}>
+    <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" isDisabled={pending || held}>
       {pending ? 'Asking…' : children}
     </Button>
   );

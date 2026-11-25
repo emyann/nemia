@@ -191,10 +191,6 @@
   --color-on-alive: var(--meaning-on-alive);
   --color-alive-container: var(--meaning-alive-container);
   --color-on-alive-container: var(--meaning-on-alive-container);
-  --color-money: var(--meaning-money);
-  --color-on-money: var(--meaning-on-money);
-  --color-money-container: var(--meaning-money-container);
-  --color-on-money-container: var(--meaning-on-money-container);
   --color-failure: var(--meaning-failure);
   --color-on-failure: var(--meaning-on-failure);
   --color-failure-container: var(--meaning-failure-container);
@@ -216,9 +212,8 @@
  * The look's four meanings, a colour of the board's own beside the theme (DESIGN.md, *The four meanings*, the table that
  * `test/meanings.test.ts` holds them to): a colour says one thing on every page. Yours is what waits on a person, alive a session at
  * work, failure what failed and nothing else, Material's error; rest is the label's grey, and sage, filled, a step that is done. Each is
- * written in light here and in dark below. Money, an amount, is no meaning any more: it keeps its amber here until the board-look's
- * second card takes it off its last part (`test/baseline/money/`). The four faces the theme names by a hook are given their loaded
- * families here. The page says it is drawn in both schemes, so that what the browser draws itself (a list of choices, a scroll bar it
+ * written in light here and in dark below. A cost is no meaning: it is drawn in ink. The four faces the theme names by a hook are
+ * given their loaded families here. The page says it is drawn in both schemes, so that what the browser draws itself (a list of choices, a scroll bar it
  * styles alone) follows the system as the theme does.
  * The theme's own scroll bar colour gives way to the look's bar, drawn in the base layer: in Chromium a `scrollbar-color` set on the
  * root would hide every `::-webkit-scrollbar` rule, and elsewhere it would show the window's thumb at rest.
@@ -238,10 +233,6 @@
   --meaning-on-alive: #ffffff;
   --meaning-alive-container: #ecdcff;
   --meaning-on-alive-container: #5e00c1;
-  --meaning-money: #855317;
-  --meaning-on-money: #ffffff;
-  --meaning-money-container: #ffdcbd;
-  --meaning-on-money-container: #683c00;
   --meaning-failure: var(--md-sys-color-error);
   --meaning-on-failure: var(--md-sys-color-on-error);
   --meaning-failure-container: var(--md-sys-color-error-container);
@@ -263,10 +254,6 @@
     --meaning-on-alive: #0c1416;
     --meaning-alive-container: #45218a;
     --meaning-on-alive-container: #e9ddff;
-    --meaning-money: #e0a15e;
-    --meaning-on-money: #1c1105;
-    --meaning-money-container: #683c00;
-    --meaning-on-money-container: #ffdcbd;
     --meaning-rest: #a9aaa8;
     --meaning-on-rest: #0d0d0d;
   }

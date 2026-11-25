@@ -177,7 +177,7 @@ function Confirm({ which, tag, onConfirm, onCancel }: { which: Which; tag: strin
         <CutPress data-upgrade-confirm-press onPress={onConfirm}>
           {which === 'upgrade' ? `Upgrade to ${tag}` : `Go back to ${tag}`}
         </CutPress>
-        <Button variant="text" size="xsmall" onPress={onCancel}>
+        <Button variant="outlined" size="xsmall" onPress={onCancel}>
           Cancel
         </Button>
       </div>

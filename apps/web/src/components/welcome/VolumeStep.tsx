@@ -1,5 +1,4 @@
-import { useNavigate } from '@tanstack/react-router';
-import { CutButton, PageName, RadioTile, RadioTileGroup, Reading, ReadingLines } from '@/components/look';
+import { CutButton, PageName, RadioTile, RadioTileGroup, Reading, ReadingLines, TextLink } from '@/components/look';
 import { Button } from '@/components/ui/ds';
 import type { Factory } from '@/lib/api/factories';
 import { MILESTONE_NAMES } from '@/lib/gettingStarted';
@@ -79,21 +78,19 @@ function StepFoot({
   noFactory: boolean;
   next: ReturnType<typeof useVolumeStep>['next'];
 }) {
-  const navigate = useNavigate();
   const toSettings = again && given !== undefined;
   const skip = screen !== 'done' ? 'Skip, set it later' : toSettings ? 'Back to its Settings' : 'Leave for the board';
   return (
     <footer className="flex flex-wrap items-center justify-between gap-3">
-      <Button
-        variant="text"
-        size="small"
-        data-welcome-skip
-        onPress={() =>
-          void (toSettings ? navigate({ to: '/factories/$factory/settings', params: { factory: given } }) : navigate({ to: '/' }))
-        }
-      >
-        {skip}
-      </Button>
+      {toSettings ? (
+        <TextLink to="/factories/$factory/settings" params={{ factory: given }} data-welcome-skip>
+          {skip}
+        </TextLink>
+      ) : (
+        <TextLink to="/" data-welcome-skip>
+          {skip}
+        </TextLink>
+      )}
       {noFactory && <CutButton to="/welcome/factory">Make a factory</CutButton>}
       {screen === 'done' && !again && (
         <CutButton data-welcome-next to={next?.link ?? '/'}>
@@ -179,7 +176,7 @@ function WorkInPlace({
           : `${added.path} is ${factory.name}'s ${added.readOnly ? 'read-only volume' : 'work, writable and trusted'}.`}
       </p>
       {again && (
-        <Button variant="text" data-volume-another onPress={onAnother}>
+        <Button variant="outlined" data-volume-another onPress={onAnother}>
           Add another
         </Button>
       )}

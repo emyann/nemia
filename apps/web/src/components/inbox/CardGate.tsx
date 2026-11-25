@@ -230,10 +230,10 @@ function ApproveForm({
         onChange={setWords}
       />
       <div className="flex items-center gap-2">
-        <Button icon={pending ? Pending : undefined} type="submit" size="xsmall" isDisabled={pending}>
+        <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" size="xsmall" isDisabled={pending}>
           {pending ? 'Approving…' : gate.ends ? `Run ${gate.step} now` : 'Approve'}
         </Button>
-        <Button variant="text" size="xsmall" onPress={onCancel}>
+        <Button variant="outlined" size="xsmall" onPress={onCancel}>
           Not yet
         </Button>
       </div>
@@ -291,10 +291,10 @@ function SendBackForm({
         </RadioGroup>
       )}
       <div className="flex items-center gap-2">
-        <Button icon={pending ? Pending : undefined} type="submit" size="xsmall" isDisabled={pending || !message.trim()}>
+        <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" size="xsmall" isDisabled={pending || !message.trim()}>
           {pending ? 'Sending back…' : 'Send back'}
         </Button>
-        <Button variant="text" size="xsmall" onPress={onCancel}>
+        <Button variant="outlined" size="xsmall" onPress={onCancel}>
           Not yet
         </Button>
       </div>

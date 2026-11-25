@@ -8,7 +8,6 @@ import { durationWords } from '@/lib/duration';
 import { repoName } from '@/lib/factory';
 import { dollars } from '@/lib/money';
 import { instantWords } from '@/lib/instant';
-import { ink } from '@/lib/meaning';
 import { waitersOf } from '@/lib/nowChip';
 import { railStates, type Now } from '@/lib/runWords';
 import { OPENS } from '@/lib/words';
@@ -113,7 +112,7 @@ export function Facts({
   return (
     <span data-run-facts className={className}>
       <Fact name="Clock" value={clock} under={started} />
-      <Fact name="Cost" value={<span className={ink.money}>{run.cost?.said ?? '—'}</span>} under={step} />
+      <Fact name="Cost" value={<span className="text-on-surface">{run.cost?.said ?? '—'}</span>} under={step} />
       <Fact name="Tokens" value={run.tokens?.said ?? '—'} under={run.read ? `${run.read.said} context` : null} />
       <Fact name="Gates" value={gates.value} under={gates.under} />
       <WorksIn run={run} />

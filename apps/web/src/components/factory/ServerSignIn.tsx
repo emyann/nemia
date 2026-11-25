@@ -14,8 +14,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { TextField } from '@/components/ui/ds';
-import { CutPress, TEXT_LINK } from '@/components/look';
+import { Button, TextField } from '@/components/ui/ds';
+import { Pending, TEXT_LINK } from '@/components/look';
 import { Instant } from '../time/Instant';
 import {
   completeSignIn,
@@ -71,9 +71,16 @@ function PasteBack({ pending, pasting }: { pending: boolean; pasting: Pasting })
         inputClassName="font-mono"
         className="min-w-64 flex-1"
       />
-      <CutPress pending={pending} isDisabled={pending || pasting.pasted.trim() === ''} onPress={pasting.onComplete} className="mt-2">
+      <Button
+        variant="outlined"
+        size="xsmall"
+        icon={pending ? Pending : undefined}
+        isDisabled={pending || pasting.pasted.trim() === ''}
+        onPress={pasting.onComplete}
+        className="mt-2"
+      >
         Complete
-      </CutPress>
+      </Button>
     </div>
   );
 }
@@ -105,9 +112,9 @@ export function SignInView({
     <div data-server-sign-in={shown.at} className="flex flex-col gap-2">
       {shown.at === 'connected' ? (
         <div className="flex flex-wrap items-center gap-3">
-          <CutPress pending={pending} isDisabled={pending} onPress={onSignOut}>
+          <Button variant="outlined" size="xsmall" icon={pending ? Pending : undefined} isDisabled={pending} onPress={onSignOut}>
             Sign out
-          </CutPress>
+          </Button>
           <span className="text-body-small text-on-surface-variant">
             Every session of this factory finds the sign-in, and refreshes it on its own.
           </span>
@@ -124,9 +131,9 @@ export function SignInView({
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <CutPress pending={pending} isDisabled={pending} onPress={onSignIn}>
+          <Button variant="outlined" size="xsmall" icon={pending ? Pending : undefined} isDisabled={pending} onPress={onSignIn}>
             {shown.at === 'ended' ? 'Sign in again' : 'Sign in'}
-          </CutPress>
+          </Button>
           <span className="text-body-small text-on-surface-variant">
             {shown.at === 'ended' ? shown.why : `Opens ${name}'s sign-in in your browser: you approve there, and type nothing here.`}
           </span>

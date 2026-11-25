@@ -1,13 +1,9 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { LinkButton } from '@/components/ui/button';
 import type { FactorySchedule } from '../../lib/api/factories.ts';
 import { fireWord } from '../../lib/schedules';
 import { CopyButton } from '../command/CopyButton';
-import { routeLink } from '../nav/routeLink';
-
-/** A link to a run's page, drawn as a link button (`routeLink`). */
-const RouterLinkButton = routeLink(LinkButton);
+import { TextLink } from '@/components/look';
 
 /** A line a person types, as the api answered it, and the button that copies it. */
 export function CommandText({ text }: { text: string }) {
@@ -46,9 +42,9 @@ export function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; n
         <dd data-schedule-last>
           {s.last ? (
             <>
-              <RouterLinkButton to="/runs/$runId" params={{ runId: s.last.run }} variant="link" size="sm" className="h-auto px-0">
+              <TextLink to="/runs/$runId" params={{ runId: s.last.run }}>
                 {s.last.run}
-              </RouterLinkButton>{' '}
+              </TextLink>{' '}
               <span className="text-on-surface-variant">{fireWord(new Date(s.last.at), now)}</span>
             </>
           ) : (

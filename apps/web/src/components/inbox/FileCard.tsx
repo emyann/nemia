@@ -11,8 +11,8 @@ import { fileCard } from '../../lib/api/inbox.ts';
 import { storeQuery } from '../../lib/api/store.ts';
 import { keptBy, startRepo } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
-import { Button, Select, SelectItem, TextField } from '@/components/ui/ds';
-import { Pending, Reading, ReadingLines } from '@/components/look';
+import { Select, SelectItem, TextField } from '@/components/ui/ds';
+import { Reading, ReadingLines, CutPress } from '@/components/look';
 import { CARD_FILES_MOST } from 'objects';
 import { sayWritten } from '@/lib/written';
 import { inputsAdded } from '@/lib/startInputs';
@@ -88,9 +88,9 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         isDisabled={file.isPending}
       />
       <div className="flex flex-wrap items-center gap-3">
-        <Button icon={file.isPending ? Pending : undefined} type="submit" isDisabled={!idea.trim() || file.isPending}>
+        <CutPress pending={file.isPending} type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}
-        </Button>
+        </CutPress>
         <span className="text-body-small text-on-surface-variant">Parked, not started: nothing runs until you start it.</span>
       </div>
       {filed && !keptBy(shown)(filed) && <Hidden name={filed.name} shown={shown!} />}

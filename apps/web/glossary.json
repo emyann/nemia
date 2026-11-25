@@ -276,6 +276,11 @@
       "term": "Way out",
       "meaning": "one of the two answers the board supplies on every question a step asks, after its options, as the Agent SDK's `AskUserQuestion` supplies \"Other\": \"Something else\" (`else`), which needs the person's words, and \"None of these\" (`none`), which stands without words, chooses no option and is sent as `none: true`. Held in the draft the series of questions writes (`apps/web/contracts/question-draft.contract.ts`, `apps/web/src/lib/question-draft/questionDraft.ts`), drawn by `QuestionSeries` (`apps/web/src/components/gate/Questions.tsx`).",
       "type": "WayOut"
+    },
+    {
+      "term": "View",
+      "meaning": "the page, and each thing that opens over it: a dialog, a popover's form, a side sheet. It holds at most one filled action, the look's cut button (`apps/web/DESIGN.md`, *Ink and the one action*), counted in each drawn story by `filledViews` and judged by `overFilled` (`apps/web/.storybook/filled.ts`, proved by `apps/web/contracts/one-filled.contract.ts`); a button of the kit's or shadcn's drawn filled or as words alone is refused where it is written (`buttonForms`, `apps/web/test/stories.ts`).",
+      "type": "ViewFilled"
     }
   ]
 }

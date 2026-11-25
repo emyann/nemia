@@ -8,7 +8,7 @@ import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardFileRef, type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import { cardFilesJudged } from '../inbox/inbox.store.ts';
-import { labelValuesJudged } from '../factory/door/label-values.ts';
+import { labelValuesJudged } from '../factory/door/label-values.store.ts';
 import { FileDoor } from '../start/files.store.ts';
 import type { CardWriteRefusal } from '../../contracts/card-write.contract.ts';
 import { CardDoor } from '../cards/cards.store.ts';

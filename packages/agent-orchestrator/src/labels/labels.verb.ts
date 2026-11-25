@@ -16,7 +16,7 @@ import { CardName } from '../inbox/inbox.model.ts';
 import { inboxNameRefusal, labelledText, noCardLine, parseInboxCard } from '../inbox/index.ts';
 import { inboxCards } from '../inbox/inbox.store.ts';
 import { tried } from '../runtime-client.ts';
-import { labelValuesJudged } from '../factory/door/label-values.ts';
+import { labelValuesJudged } from '../factory/door/label-values.store.ts';
 
 /** The labels of `labels` whose value is not the one `was` holds: what an edit gives, never a value that stands. */
 const changedOf = (was: Labels, labels: Labels) => Object.fromEntries(Object.entries(labels).filter(([key, value]) => was[key] !== value));

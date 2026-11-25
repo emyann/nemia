@@ -74,7 +74,7 @@ import {
   DEFAULT_NAMESPACE,
 } from '../factory/factory.ts';
 import { factoryOrNone, filedAtOnce } from '../factory/door/factories.store.ts';
-import { labelValuesJudged } from '../factory/door/label-values.ts';
+import { labelValuesJudged } from '../factory/door/label-values.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';

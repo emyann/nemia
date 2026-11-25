@@ -42,7 +42,7 @@ import { CardName } from './inbox.model.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError } from '../step/step.ts';
 import { FactoryDoor, factoryOrNone } from '../factory/door/factories.store.ts';
-import { labelValuesJudged } from '../factory/door/label-values.ts';
+import { labelValuesJudged } from '../factory/door/label-values.store.ts';
 import { unattachedRefusal, type Factory } from '../factory/factory.ts';
 import { runId } from '../record/record.store.ts';
 import { keptRuns } from '../runs/runs.store.ts';

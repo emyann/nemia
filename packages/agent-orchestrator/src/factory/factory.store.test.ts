@@ -665,13 +665,14 @@ describe('REFUSED: a detach of a workflow its template still triggers', () => {
 
 describe('the values each label key takes: a hand-made factory reads its file, a templated one its tree', () => {
   test("a hand-made factory's file states them, and a verb that writes it back keeps them", () => {
-    pipao();
-    const file = path.join(FACTORIES, 'pipao.json');
-    fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), labelValues: { work: ['feature', 'fix'] } }));
-    assert.deepEqual(readFactoryAt(ROOT, 'pipao').labelValues, { work: ['feature', 'fix'] });
-    attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' });
-    assert.deepEqual(fileOf('pipao').labelValues, { work: ['feature', 'fix'] });
-    assert.deepEqual(readFactoryAt(ROOT, 'pipao').labelValues, { work: ['feature', 'fix'] });
+    const repo = fresh();
+    addFactoryAt(ROOT, { name: 'mill', volumes: [`${repo}:rw`] });
+    const file = path.join(FACTORIES, 'mill.json');
+    fs.writeFileSync(file, JSON.stringify({ ...fileOf('mill'), labelValues: { work: ['feature', 'fix'] } }));
+    assert.deepEqual(readFactoryAt(ROOT, 'mill').labelValues, { work: ['feature', 'fix'] });
+    attachWorkflowAt(ROOT, { factory: 'mill', workflow: 'build' });
+    assert.deepEqual(fileOf('mill').labelValues, { work: ['feature', 'fix'] });
+    assert.deepEqual(readFactoryAt(ROOT, 'mill').labelValues, { work: ['feature', 'fix'] });
   });
   test("a templated factory reads its tree's wiring, never its file's", () => {
     fresh();

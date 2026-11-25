@@ -74,7 +74,7 @@ export const SHIPPED_NEMIA = path.join(import.meta.dirname, '..', '..', 'nemia')
  */
 export const NEMIA_SKILLS = path.join(SHIPPED_NEMIA, 'skills');
 
-/** The file that defines her, frontmatter and instruction: the plugin's agent, read by the keeper and by a coding agent alike. */
+/** The file that defines her, frontmatter and instruction: the plugin's agent, read by the keeper and rendered as her `operate` skill. */
 export const nemiaDefinition = () => path.join(SHIPPED_NEMIA, 'agents', 'nemia.md');
 
 /** The level file as `nemia level` writes it. */

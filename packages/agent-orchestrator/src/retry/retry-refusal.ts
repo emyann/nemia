@@ -247,7 +247,7 @@ function pendingRefusal(c: Judged) {
   const { run, name, command, asks, next, pending, sendsBack, back, stoppedAt } = c;
   if (pending && !carries(pending, c.raise, c.floor)) return uncarriedRefusal(c, pending);
   if (pending && !heard(pending, sendsBack)) {
-    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${back ? `sends the work back from ${back.join(', ')}` : gateWords(run, name)}, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --message "<objection>".`;
+    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${back ? `sends the work back from ${back.join(', ')}` : gateWords(run, name)}, so no tick honours it: a send-back says what to change. Take that ask back — nemia retry ${run.id} ${name} --off — and ask again: ${command} --message "<objection>".`;
   }
   if (pending) {
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`;
@@ -256,7 +256,7 @@ function pendingRefusal(c: Judged) {
   if (landing) {
     return (
       `try ${landing.try} of ${landing.step} is asked for (${modeWord(landing)}, at ${landing.at}): it does the act again on the work as it stands, and a send-back would take that try back. ` +
-      `Wait for it: nemia ls ${run.id} — or, if the work is what must change, delete that ask — retry-${landing.step}-${landing.try}, in the run's .asks directory — and send the work back: ${command} --message "<objection>".`
+      `Wait for it: nemia ls ${run.id} — or, if the work is what must change, take that ask back — nemia retry ${run.id} ${landing.step} --off — and send the work back: ${command} --message "<objection>".`
     );
   }
   if (stoppedAt?.name === name) {
@@ -270,9 +270,9 @@ function pendingRefusal(c: Judged) {
 
 /** An ask already waiting that no tick honours for its budget: one missing past the cap, or one the step cannot take. */
 function uncarriedRefusal(c: Judged, pending: RetryAsk) {
-  const { name, command, next, status, raise, floor } = c;
+  const { run, name, command, next, status, raise, floor } = c;
   const asked = `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at})`;
-  const again = `Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again`;
+  const again = `Take that ask back — nemia retry ${run.id} ${name} --off — and ask again`;
   if (pending.budget === undefined && raise !== undefined) {
     return `${asked} without a --budget above ${aboveWord(raise)}, and ${name} ${raiseWords(status, raise)}, so no tick honours it. ${again}: ${command} --budget <amount>.`;
   }

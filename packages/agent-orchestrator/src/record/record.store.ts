@@ -623,7 +623,10 @@ export function approvalsIn(asks: readonly AskEntry[]) {
     const [, step, n] = /^approve-(.+)-(\d+)$/.exec(name) ?? [];
     if (step === undefined || n === undefined) continue;
     const read = approvalIn(text, step, Number(n));
-    if (typeof read === 'string') notes.push(`${where}: ${read}, so it opens no gate — remove it, and approve with nemia approve`);
+    if (typeof read === 'string')
+      notes.push(
+        `${where}: ${read}, so it opens no gate — at the step's try now, take it back with nemia approve <runId> <step> --off and approve with nemia approve; one at any other key blocks no ask, and goes with the run (nemia rm)`,
+      );
     else approvals.push(read);
   }
   return { approvals, notes };
@@ -744,7 +747,10 @@ export function acceptancesIn(asks: readonly AskEntry[]) {
     const [, step, n] = /^accept-(.+)-(\d+)$/.exec(name) ?? [];
     if (step === undefined || n === undefined) continue;
     const read = acceptanceIn(text, step, Number(n));
-    if (typeof read === 'string') notes.push(`${where}: ${read}, so it ends no loop — remove it, and accept with nemia approve`);
+    if (typeof read === 'string')
+      notes.push(
+        `${where}: ${read}, so it ends no loop — at the step's try now, take it back with nemia approve <runId> <step> --off and end the loop with nemia approve; one at any other key blocks no ask, and goes with the run (nemia rm)`,
+      );
     else acceptances.push(read);
   }
   return { acceptances, notes };
@@ -787,11 +793,17 @@ export function asksIn(asks: readonly AskEntry[]) {
     const [, again, againN] = /^round-(.+)-(\d+)$/.exec(name) ?? [];
     if (tried !== undefined && triedN !== undefined) {
       const ask = askIn(text, tried, Number(triedN));
-      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
+      if (typeof ask === 'string')
+        read.notes.push(
+          `${where}: ${ask}, so it is not honoured — at the step's next try, take it back with nemia retry <runId> <step> --off and ask with nemia retry; one at any other key blocks no ask, and goes with the run (nemia rm)`,
+        );
       else read.asks.push(ask);
     } else if (again !== undefined && againN !== undefined) {
       const ask = roundAskIn(text, again, Number(againN));
-      if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — remove it, and ask with nemia retry --round`);
+      if (typeof ask === 'string')
+        read.notes.push(
+          `${where}: ${ask}, so it is not honoured — at the loop's next round, take it back with nemia retry <runId> [<step>] --round --off and ask with nemia retry --round; one at any other key blocks no ask, and goes with the run (nemia rm)`,
+        );
       else read.rounds.push(ask);
     }
   }
@@ -873,17 +885,23 @@ export function askIn(text: string, step: string, n: number) {
 /**
  * Every ask that carried a message — still waiting, or consumed under `done/` — for what `nemia ls` and `nemia decide` say of a try that
  * was answered (`answerOf`). Composed on read, as the ask itself is: the run's record keeps no message. An ask that cannot be read is left
- * out; the tick's own read (`asksIn`) says why.
+ * out; the tick's own read (`asksIn`) says why. An ask a person took back (`takenBack`) is no answer, and is left out too.
  * @param asks The run's asks, waiting and spent, each by its name, a spent one's under `done/`.
  */
 export function answersIn(asks: readonly AskEntry[]) {
   const answers: RetryAsk[] = [];
   for (const { name, text } of asks) {
     const [, step, n] = /^(?:done\/)?retry-(.+)-(\d+)(?:\.\d+)?$/.exec(name) ?? [];
-    const ask = step !== undefined && n !== undefined ? askIn(text, step, Number(n)) : undefined;
+    const ask = step !== undefined && n !== undefined && !takenBackIn(text) ? askIn(text, step, Number(n)) : undefined;
     if (ask && typeof ask !== 'string' && ask.message !== undefined) answers.push(ask);
   }
   return answers;
+}
+
+/** Whether an ask's text says a person took it back (`takenBack`): its words were never told to a step, so are no answer. */
+function takenBackIn(text: string) {
+  const held = heldText(text);
+  return 'read' in held && held.read !== null && typeof held.read === 'object' && 'takenBack' in held.read;
 }
 
 /**

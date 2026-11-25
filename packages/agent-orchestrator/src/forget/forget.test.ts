@@ -18,6 +18,7 @@ import {
   runWorktrees,
   type AskName,
   type Forgot,
+  askOffLine,
 } from './forget.ts';
 import type { RepositoryRun, Run, RoundAsk, StepRecord, TaskPhase } from '../run.ts';
 import type { Held } from '../place/place.ts';
@@ -61,10 +62,8 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
 const askFor = (n: number, mode: RetryMode = 'continue') =>
   ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' }) satisfies RetryAsk;
 const roundAskFor = (round: number) => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' }) satisfies RoundAsk;
-/** Where an ask's file is, as the store says it. */
-/** The file each ask is named by, as the store names it: a try's `retry-…`, a round's `round-…`, a merge of the base's `merge-…`. */
-const FILE_OF = { try: 'retry', round: 'round', base: 'merge' } as const;
-const at = (a: AskName) => `/wf/runs/r-1.asks/${FILE_OF[a.of]}-${a.step}-${a.n}`;
+/** The command that takes an ask back, as `nemia rm` names it. */
+const at = (a: AskName) => askOffLine('r-1', a);
 const until = (id: string) => ({ hold: { at: '2026-01-01T01:00:00Z', until: [id] } });
 /** A run held until r-1 lands. */
 const heldBy = (id: string) => run({ implement: 't9' }, { id, ...until('r-1') });
@@ -214,13 +213,13 @@ describe('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each ot
       'nemia cancel r-1',
     );
     const recheck = forgetRefusal(STEPS, unsigned, p, [], none, asked, undefined, [askFor(2, 'recheck')], [], undefined, at);
-    inOrder(recheck, 'try 2 of implement is asked for', 'nemia rm r-1', 'rm /wf/runs/r-1.asks/retry-implement-2');
+    inOrder(recheck, 'try 2 of implement is asked for', 'nemia rm r-1', 'nemia retry r-1 implement --off');
     lacks(recheck, 'nemia cancel');
     const loop = LOOP.slice(0, 2);
     inOrder(
       forgetRefusal(loop, inRound(1), ALL_SUCCEEDED, [], saidIn(1, false), asked, undefined, [], [roundAskFor(2)], undefined, at),
       "round 2 of review's loop is asked for",
-      'rm /wf/runs/r-1.asks/round-review-2',
+      'nemia retry r-1 review --round --off',
     );
 
     const tried = run(
@@ -307,7 +306,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       'h-1 is held until it lands',
       'nemia cancel r-1',
       '(nemia ls r-1)',
-      'rm /wf/runs/r-1.asks/retry-implement-2',
+      'nemia retry r-1 implement --off',
       'nemia cancel c-1',
       'nemia hold h-1 --off',
     );
@@ -398,7 +397,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       ),
       'try 2 of implement and try 3 of implement are asked for',
       'those asks',
-      'rm /wf/runs/r-1.asks/retry-implement-2 /wf/runs/r-1.asks/retry-implement-3',
+      'nemia retry r-1 implement --off',
     );
     const holders = [heldBy('h-2'), heldBy('h-1')];
     inOrder(
@@ -422,7 +421,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       'try 5 of implement is asked for',
       'c-1 waits on it',
       'h-1 is held until it lands',
-      'rm /wf/runs/r-1.asks/retry-implement-5',
+      'nemia retry r-1 implement --off',
       'The next tick lands it',
       "what became of ship's merge",
       'nemia cancel c-1',
@@ -473,7 +472,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       'it waits on p-1',
       'try 5 of implement is asked for',
       'nemia cancel r-1',
-      'rm /wf/runs/r-1.asks/retry-implement-5',
+      'nemia retry r-1 implement --off',
     );
     inOrder(
       forgetRefusal(
@@ -492,7 +491,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
       "implement's check is due",
       'try 5 of implement is asked for',
       'nemia cancel r-1',
-      'rm /wf/runs/r-1.asks/retry-implement-5',
+      'nemia retry r-1 implement --off',
     );
   });
 });

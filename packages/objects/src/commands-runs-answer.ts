@@ -76,20 +76,43 @@ function checkRefusal(args: Args) {
 }
 
 /**
- * The refusal of `nemia retry`'s arguments before anything is read, of what needs nothing of the orchestrator: a round given answers,
- * words or a model; no step and no round; answers beside a recheck; `--check` on a try that is no recheck. A message or a budget a try
- * does not take, and a `--check` that names no refused check of the step, is the handler's to refuse.
+ * The refusal of `--off` beside what asks something: a way other than continue, a model, a check, words, answers or a cap. A take-back
+ * asks nothing, it sets the ask aside.
+ */
+function offRefusal(args: Args) {
+  if (args.off !== true) return null;
+  const asks =
+    (args.mode !== undefined && args.mode !== 'continue' && args.mode !== 'nudge') ||
+    args.model !== undefined ||
+    args.check !== undefined ||
+    args.message !== undefined ||
+    typedOf(args).length > 0 ||
+    args.budget !== undefined;
+  if (!asks) return null;
+  const runId = textOf(args, 'runId') ?? '<runId>';
+  const step = textOf(args, 'step');
+  const line =
+    args.round === true
+      ? `nemia retry ${runId}${step === undefined ? '' : ` ${step}`} --round --off`
+      : `nemia retry ${runId} ${step ?? '<step>'} --off`;
+  return `--off takes back an ask and asks nothing, so it takes no --fresh, --model, --recheck, --check, --message, --answer or --budget: ${line}. To ask again once it is taken back, leave --off out.`;
+}
+
+/**
+ * The refusal of `nemia retry`'s arguments before anything is read, of what needs nothing of the orchestrator: `--off` beside what asks
+ * something; a round given answers, words or a model; no step and no round; answers beside a recheck; `--check` on a try that is no
+ * recheck. A message or a budget a try does not take, and a `--check` that names no refused check of the step, is the handler's to refuse.
  * @param args The command line's arguments, by key.
  */
 export const retryRefusal = (args: Args) =>
-  args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args) ?? checkRefusal(args));
+  offRefusal(args) ?? (args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args) ?? checkRefusal(args)));
 
 /** `nemia retry`: another try of a step, or with `--round` another round of a loop out of rounds. */
 export const RETRY_WORDS = {
   name: 'retry',
   served: [{ endpoint: 'runs.retry' }],
   usage:
-    '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
+    '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>] | <runId> <step> --off | <runId> [<step>] --round --off',
   help: [
     'try a step waiting on you again, once, on the next tick:',
     '--continue (default) continues its session, told what happened;',
@@ -108,6 +131,9 @@ export const RETRY_WORDS = {
     'cap raised to that many dollars, above its cap and what it has cost;',
     'with --round, the cap of a step of the loop over its budget;',
     ...ANSWER_HELP,
+    '--off: take back the try asked of the step and not yet filed, or with',
+    '--round the round asked of its loop: the ask is set aside, never',
+    'deleted, and the step waits on you again',
   ],
   spec: {
     positionals: [
@@ -133,6 +159,7 @@ export const RETRY_WORDS = {
         takes: '--check takes the refused check to run again, by its name: nemia retry <runId> <step> --recheck --check <name>',
       },
       { flag: '--round', kind: 'switch', key: 'round', way: true },
+      { flag: '--off', kind: 'switch', key: 'off' },
       {
         flag: '--message',
         kind: 'text',
@@ -152,7 +179,7 @@ export const RETRY_WORDS = {
     ],
     defaults: { mode: 'continue' },
     unknown: (arg) =>
-      `nemia retry does not take ${arg}. It takes one of --continue, --fresh, --model <m>, --recheck, --round, and --check <name>, --message "<answer>" and --budget <amount>.`,
+      `nemia retry does not take ${arg}. It takes one of --continue, --fresh, --model <m>, --recheck, --round, and --check <name>, --message "<answer>" and --budget <amount>, or --off.`,
     oneWay: 'nemia retry asks for one try, one way: pick one of --continue, --fresh, --model <m>, --recheck, --round.',
     apart: (flag) =>
       `--message takes what to tell the step, and ${flag} is one of nemia retry's own flags, so the answer was left out: nemia retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,
@@ -205,7 +232,9 @@ export const APPROVE_WORDS = {
     "a step's own budget",
     '--off: take back the approval of a step that stands approved while',
     'nothing it approved has been filed — an ending waiting on the base',
-    'branch, held, or not yet ticked. The step waits at its gate again',
+    'branch, held, or not yet ticked. The step waits at its gate again.',
+    'Of a loop ended as it stands, while nothing waiting on its step is',
+    'filed: that acceptance taken back, and the loop waits on you again',
   ],
   spec: {
     positionals: [

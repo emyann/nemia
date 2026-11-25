@@ -125,7 +125,7 @@ export const retryRun = Effect.fn('retry')(function* (
     const why = yield* tried(
       () =>
         refusal(asksNow) ??
-        strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `nemia retry ${id} ${stepName}`) ??
+        strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `nemia retry ${id} ${stepName}`, `nemia retry ${id} ${stepName} --off`) ??
         `try ${ask.try} of ${stepName} is already asked for. Wait for it: nemia ls ${id}.`,
     );
     return yield* Effect.fail(new Conflict({ message: why }));

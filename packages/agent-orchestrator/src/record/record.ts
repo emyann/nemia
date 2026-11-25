@@ -14,6 +14,7 @@ import type { Pin } from '../revisions/revisions.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor, PlaceKind, StepStatusWord } from 'objects';
 import type { EndedForGood, HonoursAsks } from '../../contracts/honours-asks.contract.ts';
+import type { AskHeld } from '../../contracts/ask-take-back.contract.ts';
 import type { FolderRun as FolderRunModel, RepositoryRun as RepositoryRunModel } from './record.model.ts';
 import { MARK_MEANS, runMarkOf } from '../run-marks/run-marks.ts';
 
@@ -143,9 +144,10 @@ export type Approval = {
 };
 
 /**
- * That a person took an approval back (`nemia approve <run> <step> --off`) while nothing it approved had been filed: when, and
- * who (objects' `Actor`, absent where the caller is not known). Written on the approval's file as the take-back sets it aside in
- * the run's `done/`, as a spent approval is set aside, beside what the approval said; never on an approval in force.
+ * That a person took an ask back before the pass spent it — an approval or a loop's acceptance (`nemia approve <run> <step> --off`), a
+ * try (`nemia retry <run> <step> --off`), a round (`nemia retry <run> [<step>] --round --off`), a merge of the base (`nemia refresh <run>
+ * [<step>] --base --off`): when, and who (objects' `Actor`, absent where the caller is not known). Written on the ask's record as the
+ * take-back sets it aside in the run's `done/`, as a spent ask is set aside, beside what the ask said; never on an ask in force.
  */
 export type TakenBack = { at: string; actor?: Actor };
 
@@ -714,12 +716,15 @@ export type RunStore = {
     readonly write: (id: string, ask: PersonRequest) => AskWritten;
     /** Where a person finds the ask `key` of the run: the key a message names for them to read. */
     readonly where: (id: string, key: AskKey) => string;
+    /** What waits at the ask `key` of the run: an ask of its kind, a record that reads as none (a stray), or nothing. */
+    readonly held: (id: string, key: AskKey) => AskHeld;
     /**
-     * Set aside the approval of try `n` of `step`, taken back by a person: its file moved into the run's `done/` as a spent one is, at the
-     * first name there no file holds, with `takenBack` written beside what it said — never deleted, never over a file in `done/`. Answers
-     * where it was set aside, or null where no approval was at its name, taken back or spent since it was read.
+     * Set aside the record at the ask `key`, taken back by a person: moved into the run's `done/` as a spent ask is, at the first name
+     * there no record holds, with `takenBack` written beside what it said — or, of a stray, beside its text kept whole under `stray` —
+     * never deleted, never over a record in `done/`. Answers where it was set aside and whether it was a stray, or null where nothing was
+     * at the key, spent since it was read.
      */
-    readonly takeBack: (id: string, step: string, n: number, takenBack: TakenBack) => string | null;
+    readonly takeBack: (id: string, key: AskKey, takenBack: TakenBack) => { where: string; stray: boolean } | null;
     /**
      * Write a person's route for try `n` of the condition `step` (`nemia route`), whole over the one there: never spent, read on every
      * pass. Answers where a person finds it.

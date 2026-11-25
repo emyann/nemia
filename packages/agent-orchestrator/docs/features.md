@@ -321,7 +321,8 @@ leaked `WF_STDERR`, a missing package, and three checks the harness killed for "
 - A check that **did not finish** (`stopped`, or `failed` without an exit code) spends no try. It waits on
   the person, and `wf decide` offers `wf retry <run> <step> --recheck`.
 - `wf retry <run> <step> [--continue | --fresh | --model <m> | --recheck]` writes `runs/<id>.asks/retry-<step>-<n>`
-  exclusively. The next tick honours it once and moves it into `done/`.
+  exclusively. The next tick honours it once and moves it into `done/`. Since the asks are records of the store, a person takes one
+  back with `wf retry <run> <step> --off`, which sets it aside under `done/` with when and by whom.
 - `steps[name].taskId` and `.check` stay the current try's, and the tries before go under `steps[name].tries`.
   The derived ids (`<run>-<step>-try<n>`, `…-try<n>-check`) let the next pass adopt a try a crashed pass filed.
 
@@ -375,7 +376,7 @@ the loop replaced it, and its three honest answers moved into the contract the r
   schema from round 1, where the answer is `[]` and goes nowhere (*one closeout schema for a loop's target*, below).
 - At the cap with `again: true`: `rounds exhausted`, waiting on a person. `wf decide` says so, prints the
   last findings and offers `nemia retry <run> [<step>] --round`, which writes `runs/<id>.asks/round-<step>-<n>`,
-  honoured once. Refused while a round runs or the run would go round itself, on a loop that ended, on a
+  honoured once, and taken back with `--round --off`. Refused while a round runs or the run would go round itself, on a loop that ended, on a
   step of the loop that stopped, and on a cancelled run.
 - A round is F's tries: `then: 'round'`, ids `<run>-<step>-try<n>`, adoption after a dead pass as for a
   try, and `round 2 of 3` in the row's `note`. `retries:` now counts within a round.
@@ -906,7 +907,9 @@ run shipped. `wf decide` hid the failure, and a run waiting on it with `--after`
 A file at `runs/<id>.asks/retry-<step>-<n>` that does not read as an ask, such as `{}`, is honoured by no pass, and
 `wf ls` shows nothing asked. Yet `retry()` refused to write over it with "try n of step is already asked for. Wait
 for it", and the wait would have been for ever. Now `retry()` names the file, says why it is not an ask, and says to
-delete it and ask again. `nemia retry --round` had the same shape with `round-<step>-<n>` and got the same fix.
+delete it and ask again. `nemia retry --round` had the same shape with `round-<step>-<n>` and got the same fix. Since the asks are
+records of the store, which a person cannot delete, the refusal names the take-back instead (`nemia retry <run> <step> --off`, and
+`--round --off`), which sets the record aside under `done/` as it is.
 
 What was measured:
 

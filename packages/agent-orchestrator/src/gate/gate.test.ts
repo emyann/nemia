@@ -413,15 +413,14 @@ describe('approvalRefusal: approved already, and a send-back asked', () => {
   test("an ask of another step's try is not this step's: it may be approved", () => {
     assert.equal(refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [{ ...WORDLESS, step: 'review', try: 1 }]), null);
   });
-  test('REFUSED a wordless ask at its gate, which no tick honours: delete it, then approve', () => {
+  test('REFUSED a wordless ask at its gate, which no tick honours: take it back, then approve', () => {
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [WORDLESS]),
       'try 2 of plan is asked for',
       '(--continue, at 2026-09-16T23:00:00.000Z)',
       'with no words',
       'plan is at its gate',
-      'retry-plan-2',
-      '.asks',
+      'nemia retry r-1 plan --off',
       'nemia retry r-1 plan --message "<objection>"',
     );
   });

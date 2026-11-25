@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { seamUses, sourcesUnder } from 'test-kit/debt';
 import { Effect } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { keyspaceFile } from '../keyspace/keyspace.store.ts';
@@ -193,4 +194,44 @@ test('where a token of the person is already named local, the credential is mint
   mintPersonToken(home, 'local');
   assert.deepEqual(credentialKeptNow(home), { kind: 'minted', name: 'local-2' });
   assert.deepEqual(keptAs(home, held(home)), { name: 'local-2', holder: 'person' });
+});
+
+/** The package's root, whose `src` the seam's refusal reads. */
+const PKG = path.join(import.meta.dirname, '..', '..');
+
+/** The door's synchronous spellings, each the door run at once over the keyspace: a test's. */
+const SEAM = [
+  'mintToken',
+  'readToken',
+  'mintPersonToken',
+  'mintPersonTokenFree',
+  'personTokenOf',
+  'personTokens',
+  'revokePersonToken',
+  'credentialKeptNow',
+];
+
+/** The door's own files: where the seam is defined, not a use. */
+const OWN = ['src/token/token.store.ts'];
+
+/** The seam's uses in each file — a call, or the function handed on — comment lines and bindings left out. */
+const SEAM_USE = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})(?![\\w$])`, 'g');
+
+/** Each file of `sources` that uses a synchronous spelling of the Token door rather than yielding it, as a refusal. */
+const seamRefusals = (sources: Record<string, string>) =>
+  [...seamUses(sources, SEAM_USE, { bindings: true })].map(
+    ([file, n]) => `${file} uses the Token door's synchronous spellings ${n} time(s): yield TokenDoor (src/token/token.store.ts) instead`,
+  );
+
+test("no file of src uses the Token door's synchronous spellings: every caller yields TokenDoor", () => {
+  assert.deepEqual(seamRefusals(sourcesUnder(PKG, 'src', OWN)), []);
+});
+
+test('REFUSED: a file of src that uses one again', () => {
+  const sources = sourcesUnder(PKG, 'src', OWN);
+  const again = {
+    ...sources,
+    'src/token/caller.verb.ts': `${sources['src/token/caller.verb.ts']}\nconst x = personTokens('/s');\n`,
+  };
+  assert.equal(seamRefusals(again).length, 1);
 });

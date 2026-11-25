@@ -16,7 +16,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Effect, Layer, Logger } from 'effect';
-import { credentialKeptNow, emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
+import { emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
+import { credentialKeptNow } from 'agent-orchestrator/testing';
 import { ambient } from './ambient.ts';
 
 const CLI = path.join(import.meta.dirname, '..');

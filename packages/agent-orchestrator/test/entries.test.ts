@@ -59,7 +59,6 @@ const PINNED: Record<string, string[]> = {
     'TOKEN_LS',
     'TOKEN_RM',
     'credentialKept',
-    'credentialKeptNow',
     'COMMANDS',
     'Conflict',
     'DEFAULT_EVERY_MS',
@@ -992,6 +991,7 @@ const PINNED: Record<string, string[]> = {
     'plantCard',
     'emptyCards',
     'kindsTakenUp',
+    'credentialKeptNow',
   ],
   'agent-orchestrator/workflow': [
     'checkFailurePolicyLine',

@@ -41,6 +41,7 @@ import { kindKeyspaceHeld } from './src/keyspace/import.store.ts';
 import { LEDGER_FILES } from './src/revisions/revisions.store.ts';
 import { SUBSCRIPTION_FILES } from './src/subscription/subscription.store.ts';
 import { TOKEN_FILES } from './src/token/token.store.ts';
+export { credentialKeptNow } from './src/token/token.store.ts';
 import { CardName } from './src/inbox/inbox.model.ts';
 
 /**

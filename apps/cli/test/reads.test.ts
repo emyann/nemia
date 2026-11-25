@@ -15,14 +15,13 @@
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder. Every child is waited on for
  * its end, or for the line it says, never for a length of time.
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
+import { credentialKeptNow, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { credentialKeptNow } from 'agent-orchestrator';
 import { CHECK_OUTPUT_PAGE, type CheckOutput, LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';

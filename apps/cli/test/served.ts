@@ -9,7 +9,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { credentialKeptNow } from 'agent-orchestrator';
+import { credentialKeptNow } from 'agent-orchestrator/testing';
 import { ambient } from './ambient.ts';
 import { scratch } from 'test-kit/scratch';
 

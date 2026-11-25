@@ -32,9 +32,18 @@ schema says its arguments. The `verbs` skill names each verb's tools, and which 
 
 Keep it short: each part a line or a short list. A card is a brief, not a design: the workflow's own steps design and build it.
 
+## Its labels
+
+A factory's workflows may read a card's labels, `key=value`, to route it or to file its run: which labels a card carries is the
+factory's to say, never yours. Before you file it, read what the factory says of its cards' labels: its instruction (`nemia factory
+instruction <factory>`) and its rules (`nemia factory rules <factory>`). Label the card with the keys and values they name, as they
+name them, and with no other: never invent a key or a value, nor carry one over from another factory. Where the factory names none,
+file the card with none, and say so to the person; where it names a key but not the value this card takes, ask them.
+
 ## File, queue or start
 
-- **File** is park: `nemia inbox add <file> --factory <factory> --workflow <workflow>`. The card waits in the inbox. A card not started is changed where it lives,
+- **File** is park: `nemia inbox add <file> --factory <factory> --workflow <workflow>`, with `--label key=value` for each of its labels
+  (*Its labels*). The card waits in the inbox. A card not started is changed where it lives,
   keeping its name: `nemia inbox edit <name> <file>`, the card's whole text; its labels with `nemia label inbox <name> key=value`.
 - **Queue**: `nemia inbox queue <name>`. The tick starts it once a run slot is free.
 - **Start**: `nemia start <store>/inbox/<name>.md`, the card's own file, with `--after <run>` where it waits on one. It runs in the

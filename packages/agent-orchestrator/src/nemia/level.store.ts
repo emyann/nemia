@@ -63,10 +63,16 @@ export const sessionFile = (home: string) => path.join(nemiaDir(home), 'session.
 export const untrustedFile = (home: string) => path.join(nemiaDir(home), 'untrusted.json');
 
 /**
- * What is built in with her, a plugin folder: her definition, `agents/nemia.md`, which a coding agent that installs the plugin is given
- * too, her skills, `skills/`, and the store's MCP port as its server, `.mcp.json`.
+ * What is built in with her, a plugin folder her inside session loads: her definition, `agents/nemia.md`, and her skills, `skills/`,
+ * which the store's MCP port serves too, to a session outside the store (`NEMIA_SKILLS`).
  */
 export const SHIPPED_NEMIA = path.join(import.meta.dirname, '..', '..', 'nemia');
+
+/**
+ * Her skills folder: a folder of skill folders, each with its `SKILL.md`, as her inside session loads them and as the store's MCP port
+ * serves them to a session outside it (`operate`, her role said to that seat, among them).
+ */
+export const NEMIA_SKILLS = path.join(SHIPPED_NEMIA, 'skills');
 
 /** The file that defines her, frontmatter and instruction: the plugin's agent, read by the keeper and by a coding agent alike. */
 export const nemiaDefinition = () => path.join(SHIPPED_NEMIA, 'agents', 'nemia.md');

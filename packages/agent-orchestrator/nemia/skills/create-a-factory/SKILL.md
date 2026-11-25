@@ -94,6 +94,8 @@ tells nothing.
 **Its instruction** is yours: what you are to know about the factory, which wins over your habits there. No step is told it. Draft it
 in `drafts/<factory>/NEMIA.md` and show it. The person may keep it in the repository (`NEMIA.md` in its first folder, which they place); or, kept in the store,
 `nemia factory instruction <factory> --store`, then `nemia factory instruct <factory> --file drafts/<factory>/NEMIA.md`.
+Where the factory's workflows read a card's labels, its instruction says which keys its cards carry and the values each takes, so a
+card written for it is labelled by them (the `write-a-card` skill, *Its labels*).
 
 Words a person adds to one agent without rewriting it are its custom instructions: `nemia agents custom <name> --file <path>`.
 

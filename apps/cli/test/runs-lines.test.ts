@@ -174,6 +174,38 @@ test('nemia approve --off prints the approval taken back, that the step waits at
   assert.ok(lines[0]?.includes('nemia approve r-1 ship'), lines[0]);
   assert.ok(lines[0]?.includes('taken back'), lines[0]);
   assert.equal(lines.at(-1), '   done/approve-ship-1');
+  const accepted = approveLines({ ...given, loop: true, takenBack: { at: 'u' } }, 'r-1', false);
+  assert.ok(accepted[0]?.includes('acceptance'), accepted[0]);
+  assert.ok(accepted[0]?.includes('nemia retry r-1 ship --round'), accepted[0]);
+  const stray = approveLines({ ...given, stray: true, takenBack: { at: 'u' } }, 'r-1', false);
+  assert.ok(stray[0]?.includes('read as no approval'), stray[0]);
+});
+
+test('nemia retry --off, and with --round, prints the ask taken back, the command that asks it again, and where it was set aside', () => {
+  const typed = { runId: 'r-1', step: 'implement', round: false, mode: 'continue', answered: false };
+  const tried = retryLines({ try: 3, file: 'done/retry-implement-3', takenBack: { at: 'u' } }, typed);
+  assert.ok(tried[0]?.includes('taken back'), tried[0]);
+  assert.ok(tried[0]?.includes('try 3 of implement'), tried[0]);
+  assert.ok(tried[0]?.includes('nemia retry r-1 implement'), tried[0]);
+  assert.equal(tried.at(-1), '   done/retry-implement-3');
+  const round = retryLines(
+    { step: 'review', round: 4, file: 'done/round-review-4', takenBack: { at: 'u' } },
+    { ...typed, step: 'review', round: true },
+  );
+  assert.ok(round[0]?.includes('round 4 of review'), round[0]);
+  assert.ok(round[0]?.includes('nemia retry r-1 review --round'), round[0]);
+  assert.equal(round.at(-1), '   done/round-review-4');
+});
+
+test('nemia refresh --base --off prints the merge taken back, the command that asks it again, and where it was set aside', () => {
+  const lines = refreshLines(
+    { step: 'review', target: 'implement', round: 2, file: 'done/merge-implement-3', takenBack: { at: 'u' } },
+    'r-1',
+    true,
+  );
+  assert.ok(lines[0]?.includes('taken back'), lines[0]);
+  assert.ok(lines[0]?.includes('nemia refresh r-1 review --base'), lines[0]);
+  assert.equal(lines.at(-1), '   done/merge-implement-3');
 });
 
 test('nemia say prints where the words went, then the words fenced longer than any run of backticks in them', () => {

@@ -11,7 +11,8 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { askKeyOf, askNames, dropRecord, listRuns, plantRecord, recordText, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, listRuns, plantRecord, recordText, runRecord } from '../testing.ts';
+import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns, outlived } from 'test-kit/checkpoints';
@@ -454,7 +455,8 @@ describe('a run held until another lands: said by every screen with why and who,
       const beside = (await listed(asking.id)).listing;
       assert.doesNotMatch(stepWords(beside), /asked|files it/, 'no try is said to be due');
       asksNothing(beside);
-      dropRecord(ROOT, askKeyOf(asking.id, 'retry-implement-2'));
+      const back = await stage.runWith(b.e, takeBackAsk(asking.id, 'try', 'implement'));
+      assert.equal(back.key.n, 2, 'the try written by hand is taken back, set aside');
       await stage.runWith(b.e, unhold(asking.id));
       assert.deepEqual(await onYou(asking.id), ['implement']);
       const asked = (await decidedOn(stage, asking.id)).closeouts.implement;

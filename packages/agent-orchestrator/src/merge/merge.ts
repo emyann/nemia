@@ -93,7 +93,7 @@ export function mergeWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[
   if (!merge) return undefined;
   return (
     `a merge of ${merge.onto} into ${merge.target}'s work is asked (at ${pending.at}), and the next tick files it once, on round ${roundOf(run, looping.name)}: ${ended}. ` +
-    `Wait for the merge and the review that reads it: nemia ls ${run.id}. To do it now instead, take the merge back first — merge-${merge.target}-${merge.try}, in the run's .asks directory — then: ${instead}.`
+    `Wait for the merge and the review that reads it: nemia ls ${run.id}. To do it now instead, take the merge back first — nemia refresh ${run.id} ${looping.name} --base --off — then: ${instead}.`
   );
 }
 

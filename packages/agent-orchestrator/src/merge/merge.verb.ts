@@ -138,7 +138,13 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
     const why =
       'refusal' in now
         ? now.refusal
-        : strayAsk(written.where, written.stray, `a merge into ${ask.merge.target}'s work`, `nemia refresh ${id} ${ask.step} --base`);
+        : strayAsk(
+            written.where,
+            written.stray,
+            `a merge into ${ask.merge.target}'s work`,
+            `nemia refresh ${id} ${ask.step} --base`,
+            `nemia refresh ${id} ${ask.step} --base --off`,
+          );
     return yield* Effect.fail(
       new Conflict({ message: why ?? `a merge into ${ask.merge.target}'s work is already asked. Wait for it: nemia ls ${id}.` }),
     );

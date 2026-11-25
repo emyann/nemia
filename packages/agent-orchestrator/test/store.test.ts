@@ -657,7 +657,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
   const early = await refusal(runWith(b.e, roundRun(run.id)));
   assert.match(
     early,
-    /^review asked for round 4, and a person accepted its work as it stands at .*Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-review-3, in the run's \.asks directory — then ask again: nemia retry \S+ review --round\.$/,
+    /^review asked for round 4, and a person accepted its work as it stands at .*Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — nemia approve \S+ review --off — then ask again: nemia retry \S+ review --round\.$/,
     'before a tick has acted on it, taking the acceptance back is the way back into the loop: nothing was done on its strength',
   );
 
@@ -672,7 +672,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
     /^review asked for round 4, and a person accepted its work as it stands at .* \(nemia approve\), so its loop is over on their word and there is nothing to go round again\. What waits on it has been filed: nemia ls /,
     'once a tick has acted on it, docs has run on the work and taking the word back takes none of that back: the refusal says what there is',
   );
-  assert.doesNotMatch(late, /take that acceptance back|\.asks directory/, 'and does not send them to delete it');
+  assert.doesNotMatch(late, /take that acceptance back|--off/, 'and does not send them to take it back');
 
   dropRecord(ROOT, file);
   assert.equal(
@@ -745,7 +745,11 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
   assert.deepEqual(pass.tried, []);
   for (const [name, [, why]] of Object.entries(refused)) {
     assert.ok(
-      pass.notes.some((n) => n.endsWith(`${name}: ${why}, so it is not honoured — remove it, and ask with nemia retry`)),
+      pass.notes.some((n) =>
+        n.endsWith(
+          `${name}: ${why}, so it is not honoured — at the step's next try, take it back with nemia retry <runId> <step> --off and ask with nemia retry; one at any other key blocks no ask, and goes with the run (nemia rm)`,
+        ),
+      ),
       pass.notes.join('\n'),
     );
   }
@@ -798,7 +802,7 @@ const aParent = async (
 
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-test("REFUSED by name at shipped defaults: a file at an ask's name that is not an ask — `nemia retry` and `nemia retry --round` name it and say to delete it, never to wait for an ask no pass honours", async () => {
+test("REFUSED by name at shipped defaults: a file at an ask's name that is not an ask — `nemia retry` and `nemia retry --round` name it and say to take it back, never to wait for an ask no pass honours", async () => {
   const { run, e, filings } = await throughCheck('check: npm test', 'failed', 1);
   const file = askKeyOf(run.id, 'retry-implement-2');
   plantRecord(ROOT, file, '{}');
@@ -809,7 +813,7 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
     refusedWith(
       new RegExp(
         `^try 2 of implement cannot be asked for: ${escaped(file)} is already there, and it is not an ask — it asks for no mode nemia retry knows \\(undefined\\)\\. ` +
-          `No tick honours it, and nemia ls shows nothing asked, so waiting would be for ever\\. Delete it \\(rm ${escaped(file)}\\), then ask again: nemia retry ${escaped(run.id)} implement\\.$`,
+          `No tick honours it, and nemia ls shows nothing asked, so waiting would be for ever\\. Take it back — nemia retry ${escaped(run.id)} implement --off, which sets it aside as it is — then ask again: nemia retry ${escaped(run.id)} implement\\.$`,
       ),
     ),
   );
@@ -834,7 +838,7 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
     runWith(b.e, roundRun(looping.id)),
     refusedWith(
       new RegExp(
-        `^round 2 of review's loop cannot be asked for: ${escaped(roundFile)} is already there, and it is not an ask — it is not an ask nemia retry --round wrote\\. .*Delete it \\(rm ${escaped(roundFile)}\\), then ask again: nemia retry ${escaped(looping.id)} review --round\\.$`,
+        `^round 2 of review's loop cannot be asked for: ${escaped(roundFile)} is already there, and it is not an ask — it is not an ask nemia retry --round wrote\\. .*Take it back — nemia retry ${escaped(looping.id)} review --round --off, which sets it aside as it is — then ask again: nemia retry ${escaped(looping.id)} review --round\\.$`,
       ),
     ),
   );

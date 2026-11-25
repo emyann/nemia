@@ -58,7 +58,7 @@ const modeWord = (mode: string, model: string | undefined) => (model !== undefin
  * whether answers were given.
  */
 export const retryLines = (
-  { try: tryNo, file, stopFirst, step: looping, round: n, budget }: RunAsked,
+  { try: tryNo, file, stopFirst, step: looping, round: n, budget, takenBack, stray }: RunAsked,
   typed: {
     runId: string;
     step: string;
@@ -70,6 +70,12 @@ export const retryLines = (
     answered: boolean;
   },
 ) => {
+  if (takenBack) {
+    const what = typed.round ? `round ${n ?? ''} of ${looping ?? typed.step}'s loop` : `try ${tryNo ?? ''} of ${typed.step}`;
+    const again = typed.round ? `nemia retry ${typed.runId} ${looping ?? typed.step} --round` : `nemia retry ${typed.runId} ${typed.step}`;
+    const set = stray ? `a record at the ask of ${what} that read as no ask, set aside as it was` : `the ask of ${what}`;
+    return [`${typed.runId}  taken back: ${set}, at ${takenBack.at} — nothing is filed for it; to ask again: ${again}`, `   ${file}`];
+  }
   if (typed.round)
     return [
       `${typed.runId}  asked: round ${n ?? ''} of ${looping ?? typed.step}'s loop${budget !== undefined ? `, its cap raised to ${budgetWord(budget)}` : ''} — the next tick files it, once`,
@@ -82,6 +88,27 @@ export const retryLines = (
   const words = typed.answered ? ', with your answers' : typed.message !== undefined ? ', with your answer' : '';
   return [`${typed.runId}  asked: try ${tryNo ?? ''} of ${typed.step} (${how})${words} — ${then}`, `   ${file}`];
 };
+
+/** What a retry asks beside its way, each where it was typed. */
+const askedOf = ({
+  model,
+  round,
+  message,
+  budget,
+  check,
+}: {
+  model?: string;
+  round: boolean;
+  message?: string;
+  budget?: number;
+  check?: string;
+}) => ({
+  ...(model !== undefined ? { model } : {}),
+  ...(round ? { round } : {}),
+  ...(message !== undefined ? { message } : {}),
+  ...(budget !== undefined ? { budget } : {}),
+  ...(check !== undefined ? { check } : {}),
+});
 
 /**
  * `nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer]... [--message]
@@ -101,22 +128,20 @@ export async function retry(args: Args) {
   const budget = amountArg(args, 'budget');
   const check = textArg(args, 'check');
   const way: RunRetry['mode'] = mode === 'fresh' || mode === 'recheck' ? mode : 'continue';
-  const payload = {
-    mode: way,
-    ...(model !== undefined ? { model } : {}),
-    ...(round ? { round } : {}),
-    ...(message !== undefined ? { message } : {}),
-    ...(budget !== undefined ? { budget } : {}),
-    ...(check !== undefined ? { check } : {}),
-    ...(round ? {} : await answersOf(command, runId, step, typedAnswers)),
-  };
+  const payload = switchArg(args, 'off')
+    ? { off: true, ...(round ? { round } : {}) }
+    : {
+        mode: way,
+        ...askedOf({ model, round, message, budget, check }),
+        ...(round ? {} : await answersOf(command, runId, step, typedAnswers)),
+      };
   const answer = await asked(command, (c) => c.runs.retry({ params: { namespace, name: runId, step }, payload }));
   said(
     retryLines(answer, {
       runId,
       step,
       round,
-      mode: payload.mode,
+      mode: way,
       ...(model !== undefined ? { model } : {}),
       ...(budget !== undefined ? { budget } : {}),
       ...(message !== undefined ? { message } : {}),
@@ -162,7 +187,17 @@ const thenWords = ({ step, next }: RunApproved) =>
  * @param answered Whether answers were given with the approval.
  */
 export const approveLines = (approved: RunApproved, runId: string, answered: boolean) => {
-  const { step, try: tryNo, message, file, loop, caps, takenBack } = approved;
+  const { step, try: tryNo, message, file, loop, caps, takenBack, stray } = approved;
+  if (takenBack && stray)
+    return [
+      `${runId}  taken back: a record at the approval of try ${tryNo} of ${step} that read as no approval, set aside as it was — ${loop ? `${step}'s loop waits on you again` : `${step} waits at its gate again`}: nemia approve ${runId} ${step}`,
+      `   ${file}`,
+    ];
+  if (takenBack && loop)
+    return [
+      `${runId}  taken back: the acceptance of try ${tryNo} of ${step} as it stands, given at ${approved.at} — its loop waits on you again: nemia retry ${runId} ${step} --round, or nemia approve ${runId} ${step} --message "<why>"`,
+      `   ${file}`,
+    ];
   if (takenBack)
     return [
       `${runId}  taken back: the approval of try ${tryNo} of ${step}, given at ${approved.at} — ${step} waits at its gate again: nemia approve ${runId} ${step}`,

@@ -145,10 +145,10 @@ export const approvalRefusal: ApprovalRefusal = (
   if (given) return approvedRefusal(steps, step, run, given, sendsBack);
   const pending = asks.find((a) => a.step === name && a.try === n + 1);
   if (pending && !heard(pending, sendsBack)) {
-    return `try ${n + 1} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} is at its gate, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${n + 1}, in the run's .asks directory — then approve it, or send it back with words: nemia retry ${run.id} ${name} --message "<objection>".`;
+    return `try ${n + 1} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} is at its gate, so no tick honours it: a send-back says what to change. Take that ask back — nemia retry ${run.id} ${name} --off — then approve it, or send it back with words: nemia retry ${run.id} ${name} --message "<objection>".`;
   }
   if (pending) {
-    return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: retry-${name}-${n + 1}, in the run's .asks directory.`;
+    return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: nemia retry ${run.id} ${name} --off.`;
   }
   const filed = Boolean(run.steps[name].taskId);
   const status = gateWord(
@@ -161,7 +161,7 @@ export const approvalRefusal: ApprovalRefusal = (
     if (back) {
       return (
         `try ${back.try} of ${back.step} is asked for (${modeWord(back)}, at ${back.at}), and ${name} acts on what it changes: approving now would take the result that ask objects to. ` +
-        `Approve ${name} once ${back.step} has signed off again — or, to take the result as it stands, take that ask back first: retry-${back.step}-${back.try}, in the run's .asks directory.`
+        `Approve ${name} once ${back.step} has signed off again — or, to take the result as it stands, take that ask back first: nemia retry ${run.id} ${back.step} --off.`
       );
     }
     if (status !== 'awaiting approval') {

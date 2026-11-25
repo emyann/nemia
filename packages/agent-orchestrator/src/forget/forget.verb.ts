@@ -5,7 +5,6 @@
  * (`EngineService`), run with `runWith`. It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs
  * nothing and is settled as it signed: no pass reads the run again to close it.
  */
-import { askKey } from '../runs/run-keys.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
@@ -15,6 +14,7 @@ import { isRepositoryRun, namesInOrder, runTasks, type RepositoryRun, type Run }
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import {
   branchFates,
+  askOffLine,
   checkLogsOf,
   forgetRefusal,
   heldWorktree,
@@ -224,7 +224,7 @@ const asksStanding = (run: Run, steps: readonly StepSpec[] | undefined) =>
  */
 const refusalOf = Effect.fnUntraced(function* (id: string, f: Forgetting, git: BranchReader, place: Place) {
   const { run, steps } = f;
-  const askAt = (a: AskName) => askKey(id, a);
+  const offOf = (a: AskName) => askOffLine(id, a);
   const others = (yield* (yield* RunDoor).runs.list()).filter((o) => o.id !== id);
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const { phaseOf, reader, asked, verdictOf, checkKillOf, asks, rounds, spendOf } = f;
@@ -239,7 +239,7 @@ const refusalOf = Effect.fnUntraced(function* (id: string, f: Forgetting, git: B
     asks,
     rounds,
     spendOf,
-    askAt,
+    offOf,
     standings,
     'rm',
     merging(run, steps, statusMemo(headsOver(git), place)),

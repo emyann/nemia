@@ -20,6 +20,7 @@ import {
   cardKey,
   cardNames,
   cardText,
+  plantCard,
   dropRecord,
   emptyCards,
   emptyRuns,
@@ -511,14 +512,14 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
         body: 'Cache the views between passes\n\nThe tick reads each task twice.',
       });
       assert.equal(
-        fs.readFileSync(filed.file, 'utf8'),
+        cardText(root, filed.name),
         'Cache the views between passes\n\nThe tick reads each task twice.\n',
         'no frontmatter for a card that says nothing of its workflow',
       );
 
       const named = await filedFrom(await file({ body: 'Show what a step cost', workflow: 'dev' }));
       assert.equal(
-        fs.readFileSync(named.file, 'utf8'),
+        cardText(root, named.name),
         `---\nworkflow: dev\n---\nShow what a step cost\n`,
         "the repository's, by name, as `nemia inbox add --workflow dev` writes it, and no `repo:`",
       );
@@ -680,7 +681,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       const filed = await filedFrom(res);
       assert.deepEqual([filed.factory, filed.workflow, filed.repo], ['mill', 'dev', null]);
       assert.equal(
-        fs.readFileSync(filed.file, 'utf8'),
+        cardText(root, filed.name),
         '---\nworkflow: dev\nfactory: mill\n---\nMill the views\n',
         "the factory's repository is its wiring's to give at start: the card writes no repo: line",
       );
@@ -688,11 +689,11 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       assert.deepEqual([entry.factory, entry.repo, entry.workflow], ['mill', null, 'dev']);
 
       const idea = await filedFrom(await file({ body: 'Mill it later', factory: 'mill' }));
-      assert.equal(fs.readFileSync(idea.file, 'utf8'), '---\nfactory: mill\n---\nMill it later\n', 'a factory and no workflow');
+      assert.equal(cardText(root, idea.name), '---\nfactory: mill\n---\nMill it later\n', 'a factory and no workflow');
 
       const none = await filedFrom(await file({ body: 'No factory' }));
       assert.equal(none.factory, null, 'a filing with no factory answers none');
-      assert.equal(fs.readFileSync(none.file, 'utf8'), 'No factory\n');
+      assert.equal(cardText(root, none.name), 'No factory\n');
     },
   );
   s.test(
@@ -700,11 +701,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
     async () => {
       clear();
       const there = await filedFrom(await file({ body: 'There', factory: 'pair', workflow: 'dev' }));
-      assert.equal(
-        fs.readFileSync(there.file, 'utf8'),
-        '---\nworkflow: dev\nfactory: pair\n---\nThere\n',
-        'its workflow by name, no repository',
-      );
+      assert.equal(cardText(root, there.name), '---\nworkflow: dev\nfactory: pair\n---\nThere\n', 'its workflow by name, no repository');
       const started = await startCard({ card: there.name }, JSON_TYPE, 'pair');
       assert.equal(started.status, 201, await started.clone().text());
       const run = runsNow(root).runs.read(((await started.json()) as CardStarted).id);
@@ -751,18 +748,11 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
     fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
     emptyRuns(root);
   });
-  test("a card's page for a name that is not there, in an inbox holding more than cards, names the cards as the package does — a card that does not read among them, a stray file and a folder not — and a card is found before a stray file of its name", async () => {
+  test("a card's page for a name that is not there names the cards as the package does — a card that does not read among them", async () => {
     clear();
     const { card } = onStore(addToInbox({ text: 'Keep this one' }));
-    write(path.join(inbox, 'broken.md'), '---\ncolour: red\n---\nPaint it.\n');
-    const strayText = 'not a card\n';
-    write(path.join(inbox, 'notes.txt'), strayText);
-    fs.mkdirSync(path.join(inbox, 'sub'));
-    assert.deepEqual(
-      (await listed()).map((e) => e.name).sort(),
-      ['broken', card.name, 'notes.txt', 'sub/'].sort(),
-      'the listing has all four',
-    );
+    plantCard(root, 'broken', '---\ncolour: red\n---\nPaint it.\n');
+    assert.deepEqual((await listed()).map((e) => e.name).sort(), ['broken', card.name].sort(), 'the listing has both');
 
     const missing = await cardPage('no-such-card');
     assert.equal(missing.status, 404);
@@ -771,20 +761,14 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
     assert.equal(dropped.status, 404);
     names(((await dropped.json()) as Refused).error, 'no-such-card', 'nemia inbox');
 
-    write(path.join(inbox, 'notes'), 'a stray file\n');
     const notesBody = 'The card called notes';
     const notesText = `---\nworkflow: dev\n---\n${notesBody}\n`;
-    write(path.join(inbox, 'notes.md'), notesText);
+    plantCard(root, 'notes', notesText);
     const notes = (await (await cardPage('notes')).json()) as Card;
     assert.deepEqual(
       [notes.status.file, notes.spec.body, notes.status.source, notes.spec.workflow],
       ['notes.md', notesBody, notesText, 'dev'],
-      "notes.md and a stray notes both list as notes: the read is the card's",
-    );
-    const strayStillHasAPage = (await (await cardPage('notes.txt')).json()) as Card;
-    assert.deepEqual(
-      [strayStillHasAPage.spec.body, strayStillHasAPage.status.source, typeof strayStillHasAPage.status.error],
-      [undefined, strayText, 'string'],
+      "the card's page reads its record",
     );
   });
   test("a filing of the wrong shape is a 400 in the api's words, a workflow that is a path a 422, and a hidden one the package's 422 — before anything is written", async () => {

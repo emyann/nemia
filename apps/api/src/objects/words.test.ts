@@ -5,8 +5,8 @@
  * status and words. A write whose body is over `OBJECT_BODY_LIMIT` is a 413 `{ error }` naming the limit, and one under it is filed as
  * before. And the inbox's routes the Card's verbs replaced answer 404, so a client still reading them fails.
  */
-import { cardKey, cardNames, cardText, dropRecord } from 'agent-orchestrator/testing';
 import { root } from '../../test/harness.ts';
+import { cardKey, cardNames, cardText, dropRecord } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

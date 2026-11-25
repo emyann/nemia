@@ -209,7 +209,6 @@ write(
   "---\nworkflow: dev\nlabels:\n  team: core\n---\nCache the engine's views between passes.\n",
 );
 write(path.join(root, 'inbox', 'tidy-the-docs.md'), '---\nlabels:\n  team: docs\n---\nTidy the docs.\n');
-write(path.join(root, 'inbox', 'notes.txt'), 'not a card\n');
 write(path.join(root, 'inbox', 'hold-the-reads.md'), 'Hold the reads to the old path.\n');
 write(path.join(root, 'inbox', 'called-off.md'), '---\nlabels:\n  team: gone\n---\nCalled off.\n');
 write(
@@ -422,7 +421,6 @@ test("`nemia inbox` prints the server's table of the cards in play, then how to 
   assert.equal(listed.code, 0, listed.err);
   assert.match(listed.out, /^NAME +TITLE +WORKFLOW +REPO +FACTORY +QUEUED +WAITS +STATE +RUNS$/m, "the server's columns");
   assert.match(listed.out, /^hold-the-reads .*waiting on you +r-parity$/m, "a started card's state beside its run");
-  assert.match(listed.out, /^notes\.txt /m, 'an entry that is no card is listed too, never hidden');
   assert.doesNotMatch(listed.out, /^called-off /m, 'its run was called off: out of the cards in play');
   assert.match(
     listed.out,

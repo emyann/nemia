@@ -21,7 +21,17 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import type { Card } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { addFactory, attachWorkflow, cardNames, dropRecord, hireAgent, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import {
+  addFactory,
+  attachWorkflow,
+  cardNames,
+  dropRecord,
+  hireAgent,
+  plantCard,
+  plantRecord,
+  runKey,
+  testPlace,
+} from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
 import { linesOf, listedOf, listedRuns, objectOf, specOf, stepOf } from './run-reads.ts';
 
@@ -367,7 +377,7 @@ const teamInRepo = () => {
  * as the board's start form lets a person pick another: a filing refuses a `repo` now, so it is written as it was. Its name.
  */
 const oldCard = (name: string, body: string, repo: string) => {
-  fs.writeFileSync(path.join(root, 'inbox', `${name}.md`), `---\nworkflow: change\nrepo: ${repo}\n---\n${body}\n`);
+  plantCard(root, name, `---\nworkflow: change\nrepo: ${repo}\n---\n${body}\n`);
   return name;
 };
 

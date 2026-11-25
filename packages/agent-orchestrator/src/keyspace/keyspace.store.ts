@@ -7,6 +7,12 @@
  * the head the one before it left, and is rolled back whole on the first refusal. The file is in write-ahead-log mode with
  * `synchronous=FULL`, so a write that was answered is on disk, and waits 30 s for another process's lock, as Kine does.
  *
+ * A record that holds what is larger than a record names it by a pointer: the write says the keys its record points to (`points`), and the
+ * store keeps the current pointers of each live key beside Kine's table, in `kine_pointers` (one row a key and a key it points to). It is
+ * current state, not history: a compaction leaves it as it is and a watch never reads it. Each write's pointers are judged by
+ * `pointersHold` once `keyspaceWrite` wrote it, in the same transaction, so a record never points to a key that is not live, and a key a
+ * live record points to is never deleted (`KeyRefused`, `dangling` and `referenced`, naming the key at fault in `pointer`).
+ *
  * The table changes over releases by Effect's Migrator, its migrations `KEYSPACE_MIGRATIONS`: a change of the table is a migration
  * appended there. The Migrator applies what a file lacks and skips a file a newer release wrote; the loader refuses that file
  * (`schemaDue`), inside the Migrator's own transaction, and the open is refused `Invalid`, naming `nemia upgrade`, the file untouched.
@@ -21,7 +27,17 @@ import { SqliteClient, SqliteMigrator } from '@effect/sql-sqlite-node';
 import { Context, Data, Duration, Effect, Layer, Scope, Semaphore } from 'effect';
 import { SqlClient, SqlError } from 'effect/sql';
 import { Invalid } from '../refusal/refusal.ts';
-import { compactTo, keyspaceWrite, schemaDue, watchStart, type Held, type WriteRefusal, type WriteVerb } from './keyspace.ts';
+import {
+  compactTo,
+  keyspaceWrite,
+  pointersHold,
+  schemaDue,
+  watchStart,
+  type Held,
+  type PointerRefusal,
+  type WriteRefusal,
+  type WriteVerb,
+} from './keyspace.ts';
 
 /** The largest record the keyspace holds, in bytes: 1.5 MiB, etcd's limit. */
 export const RECORD_CEILING = 1_572_864;
@@ -52,6 +68,16 @@ export const KEYSPACE_MIGRATIONS = {
     yield* sql`CREATE UNIQUE INDEX IF NOT EXISTS kine_name_prev_revision_uindex ON kine (name, prev_revision)`;
     yield* sql`CREATE INDEX IF NOT EXISTS kine_id_compact_rev_key_with_prev_revision_index ON kine(id, name, prev_revision) WHERE name != 'compact_rev_key' AND prev_revision != 0`;
   }),
+  '0002_pointers': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE IF NOT EXISTS kine_pointers
+(
+	name TEXT NOT NULL,
+	target TEXT NOT NULL,
+	PRIMARY KEY (name, target)
+)`;
+    yield* sql`CREATE INDEX IF NOT EXISTS kine_pointers_target_index ON kine_pointers (target)`;
+  }),
 } satisfies Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>>;
 
 /** The highest migration the code knows: the id of the last of `KEYSPACE_MIGRATIONS`. */
@@ -63,14 +89,27 @@ export type KeyRecord = { readonly key: string; readonly value: string; readonly
 /** A change a watch replays: the record a row holds, and whether the row deletes its key. */
 export type KeyChange = KeyRecord & { readonly deleted: boolean };
 
-/** A write of one key: its verb, the revision the writer read it at (null where it names none), and the record's value. */
-export type KeyWriteOf = { readonly verb: WriteVerb; readonly expected: number | null; readonly value: string };
+/**
+ * A write of one key: its verb, the revision the writer read it at (null where it names none), the record's value, and the keys of the
+ * records its record points to (`points`, none where it is not given; a delete's are not read), which replace those it pointed to.
+ */
+export type KeyWriteOf = {
+  readonly verb: WriteVerb;
+  readonly expected: number | null;
+  readonly value: string;
+  readonly points?: readonly string[];
+};
 
-/** A write the keyspace refused: why (`WriteRefusal`), the key, and the revision the key is at (null where it holds none live). */
+/**
+ * A write the keyspace refused: why (`WriteRefusal`, or `PointerRefusal` for its pointers), the key, the revision the key is at (null
+ * where it holds none live), and the key at fault for a pointer's refusal (`pointer`: the key a `dangling` record points to that is not
+ * live, or a live record that points to the key a `referenced` delete would delete), null for any other.
+ */
 export class KeyRefused extends Data.TaggedError('KeyRefused')<{
-  readonly refusal: WriteRefusal;
+  readonly refusal: WriteRefusal | PointerRefusal;
   readonly key: string;
   readonly at: number | null;
+  readonly pointer: string | null;
 }> {}
 
 /** A watch's answer: the changes after the revision it asked from, or why it cannot start there. */
@@ -130,6 +169,27 @@ const latestRow = (key: string) =>
     return rows[0];
   });
 
+/** The keys among `targets` the store holds no live record of, each once, in the order given. */
+const notLive = (targets: readonly string[]) =>
+  Effect.gen(function* () {
+    const missing: string[] = [];
+    for (const target of new Set(targets)) {
+      const row = yield* latestRow(target);
+      if (row === undefined || row.deleted !== 0) missing.push(target);
+    }
+    return missing;
+  });
+
+/** The live keys but `key` whose records point to `key`, by key. */
+const referrersOf = (key: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{
+      readonly name: string;
+    }>`SELECT name FROM kine_pointers WHERE target = ${key} AND name != ${key} ORDER BY name`;
+    return rows.map((row) => row.name);
+  });
+
 /** One write decided against the key's latest row and the head, and appended as its row; refused `KeyRefused` as `keyspaceWrite` says. */
 const writeOne = (key: string, write: KeyWriteOf) =>
   Effect.gen(function* () {
@@ -143,13 +203,26 @@ const writeOne = (key: string, write: KeyWriteOf) =>
       yield* headNow,
       RECORD_CEILING,
     );
-    if ('refused' in decided)
-      return yield* new KeyRefused({ refusal: decided.refused, key, at: held === null || held.deleted ? null : held.modRevision });
+    const at = held === null || held.deleted ? null : held.modRevision;
+    if ('refused' in decided) return yield* new KeyRefused({ refusal: decided.refused, key, at, pointer: null });
+    const targets = write.verb === 'delete' ? [] : [...new Set(write.points ?? [])];
+    const dangling = yield* notLive(targets);
+    const referrers = write.verb === 'delete' ? yield* referrersOf(key) : [];
+    const pointed = pointersHold({ verb: write.verb, dangling: dangling.length, referrers: referrers.length });
+    if ('refused' in pointed)
+      return yield* new KeyRefused({
+        refusal: pointed.refused,
+        key,
+        at,
+        pointer: (pointed.refused === 'dangling' ? dangling[0] : referrers[0]) ?? null,
+      });
     const was = row === undefined ? '' : textOf(row.value);
     const value = write.verb === 'delete' ? was : write.value;
     const w = decided.written;
     yield* sql`INSERT INTO kine (id, name, created, deleted, create_revision, prev_revision, lease, value, old_value)
       VALUES (${w.revision}, ${key}, ${w.created ? 1 : 0}, ${w.deleted ? 1 : 0}, ${w.createRevision}, ${w.prevRevision}, 0, ${value}, ${was})`;
+    yield* sql`DELETE FROM kine_pointers WHERE name = ${key}`;
+    for (const target of targets) yield* sql`INSERT INTO kine_pointers (name, target) VALUES (${key}, ${target})`;
     return { key, value, revision: w.revision, createRevision: w.createRevision } satisfies KeyRecord;
   });
 

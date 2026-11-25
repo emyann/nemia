@@ -31,7 +31,7 @@
  *
  * `files:` is the files the card carries, a YAML map of the name its text and its run find each by to the File it names (`files: {
  * shot.png: file_… }`), uploaded to its factory first: each copied into the `inputs/` of every run started from it (`startFromInbox`),
- * and kept by the files' prune while the card's text names its id (`filesPruned`).
+ * and kept by the files' prune while the card's text names its id (the File door's `pruned`).
  *
  * `labels:` is a person's labels on the card, a YAML map of a key to its value (`labels: { team: core }`), each pair as a label is
  * spelled (`labelRefusal`): what a selector picks the card by, beside its `workflow:` and `factory:` (`cardLabels`), and what the run it

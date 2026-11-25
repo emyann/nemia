@@ -104,7 +104,14 @@ test("a file's upload, the one write sent as a form, carries the form's parts as
   assert.ok(endpointKeysOf(Api, 'files.upload').form);
   answer = {
     status: 201,
-    body: { id: 'file_0', name: 'shot.png', mediaType: 'image/png', size: 3, createdAt: '2026-11-16T00:00:00.000Z' },
+    body: {
+      id: 'file_0',
+      name: 'shot.png',
+      mediaType: 'image/png',
+      size: 3,
+      digest: 'sha256:2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881',
+      createdAt: '2026-11-16T00:00:00.000Z',
+    },
   };
   sent.length = 0;
   const form = new FormData();

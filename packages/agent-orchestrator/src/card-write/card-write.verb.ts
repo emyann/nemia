@@ -8,8 +8,7 @@ import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardFileRef, type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import { cardFilesJudged } from '../inbox/inbox.store.ts';
-import { StoreRoot } from '../config/root.store.ts';
-import { fileAt } from '../start/files.store.ts';
+import { FileDoor } from '../start/files.store.ts';
 import type { CardWriteRefusal } from '../../contracts/card-write.contract.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -69,17 +68,23 @@ const workflowWriteRefusal = (sent: string | undefined, now: string | undefined)
 
 /**
  * The files `refs` names, each with the name it takes — the one given, else its File's own — and the size of the File its id names in
- * `namespace`'s files, null where none is kept there: what `cardFilesJudged` judges. A program given no store's root (`StoreRoot`) finds
- * no File kept.
+ * `namespace`'s files, null where none is kept there: what `cardFilesJudged` judges. A program given no store's root (`StoreRoot`), nor
+ * the File door's memory, finds no File kept.
  * @param namespace The card's namespace, its factory or `default`, whose Files the ids name.
  * @param refs The files, each a File's id and the name it takes where one is given.
  */
 export const filesKept = Effect.fn('filesKept')(function* (namespace: string, refs: readonly CardFileRef[]) {
-  const root = yield* Effect.serviceOption(StoreRoot);
-  return refs.map((ref) => {
-    const at = root._tag === 'Some' ? fileAt(root.value, namespace, ref.file) : undefined;
-    return { name: ref.name ?? at?.file.name ?? ref.file, file: ref.file, size: at?.file.size ?? null };
-  });
+  const door = yield* FileDoor;
+  return yield* Effect.forEach(refs, (ref) =>
+    Effect.map(
+      Effect.orElseSucceed(door.files.read(namespace, ref.file), () => undefined),
+      (at) => ({
+        name: ref.name ?? at?.file.name ?? ref.file,
+        file: ref.file,
+        size: at?.file.size ?? null,
+      }),
+    ),
+  );
 });
 
 /**

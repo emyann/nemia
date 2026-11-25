@@ -532,7 +532,7 @@
     },
     {
       "term": "Keyspace",
-      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`.",
+      "meaning": "the orchestrator's store of records: one SQLite file, `<store>/db/state.db`, opened through Effect's SQL client for SQLite on Node (the package @effect/sql-sqlite-node) and laid out as Kine lays it out, one table `kine` whose every write is a new row (`packages/agent-orchestrator/src/keyspace/keyspace.store.ts`). It gives the six guarantees as etcd and Kubernetes state them: a revision on every write, a change only if still at that revision, a watch from a revision, a transaction across several records, records of at most 1.5 MiB, and a write that was answered on disk. Its table changes by Effect's Migrator (`KEYSPACE_MIGRATIONS`), and a file a newer release wrote is refused, naming `nemia upgrade`. Proposals are its first kind, under `/registry/proposals/<factory>/<name>`, and Files its second, under `/registry/files/<namespace>/<id>`.",
       "type": "Keyspace"
     },
     {
@@ -554,6 +554,16 @@
       "term": "Schema due",
       "meaning": "what opening a keyspace file asks of its table: the migrations after the highest it recorded up to the code's, or its refusal where a newer release wrote it (`newer`), asked by the Migrator's loader inside the Migrator's transaction (`schemaDue`).",
       "type": "SchemaDue"
+    },
+    {
+      "term": "Pointer",
+      "meaning": "the key of a record another record names, said in the write of the record that names it (`KeyWriteOf.points`) and kept beside `kine` in `kine_pointers`, the current pointers of each live key, which a compaction leaves and a watch never reads. A pointer never dangles: a write whose record points to a key not live is refused `dangling`, and the delete of a key a live record points to `referenced`, each naming the key at fault, judged in the write's own transaction (`pointersHold`, proved by `packages/agent-orchestrator/contracts/keyspace.contract.ts`).",
+      "type": "PointerRefusal"
+    },
+    {
+      "term": "File record",
+      "meaning": "a File as the keyspace holds it, under `/registry/files/<namespace>/<id>`: its file object with the sha256 digest of its bytes, which stay a file under `<store>/files/<namespace>/`, written before the record and removed after it. Read and written through the File door (`packages/agent-orchestrator/src/start/files.store.ts`), whose prune lets go of one through the keyspace, so a File a live record points to is kept; a store's `<id>.json` records of before it are imported once and moved aside under `<store>/imported/files/`.",
+      "type": "FileDoorShape"
     },
     {
       "term": "Rm",

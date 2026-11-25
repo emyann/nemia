@@ -354,7 +354,7 @@ export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type 
 export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
 export { Gone, ReadFailed, TooLarge, UnsupportedMediaType } from './api-errors.ts';
 export { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, PICTURE_TYPES, type PictureMediaType } from './file.ts';
-export { FILE_ID_PREFIX, FILE_KEPT_FOR, FILE_LIMIT, FileObject } from './file.ts';
+export { FILE_DIGEST, FILE_ID_PREFIX, FILE_KEPT_FOR, FILE_LIMIT, FileObject, FilePointer } from './file.ts';
 export {
   LifecycleEdge,
   LifecycleGraph,

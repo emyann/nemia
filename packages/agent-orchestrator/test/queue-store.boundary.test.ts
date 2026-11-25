@@ -8,7 +8,18 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
-import { emptyRuns, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import {
+  cardText,
+  cardTryKey,
+  emptyCards,
+  emptyRuns,
+  keysUnder,
+  listRuns,
+  plantRecord,
+  recordText,
+  runKey,
+  runRecord,
+} from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -137,6 +148,7 @@ const board = () => {
 const emptyStore = (cap: string | undefined) => {
   for (const dir of [RUNS, INBOX, path.join(ROOT, 'queue'), path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
   emptyRuns(ROOT);
+  emptyCards(ROOT);
   fs.mkdirSync(RUNS, { recursive: true });
   ENV.WF_MAX_RUNS = cap;
 };
@@ -231,7 +243,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
     /^the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered, stat '.*\.worktreeinclude'\. Nothing was started: start it again$/,
     "a repository whose `.worktreeinclude` is a link to itself: the place's open cannot read it, and an open not heard is no refusal",
   );
-  const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8'));
+  const written = JSON.parse(recordText(ROOT, cardTryKey('odd-include-a1b2')) ?? '');
   assert.deepEqual([written.refused, written.repo, written.why], [false, broken, first.queue.failed]);
   const listed = (await listedLines(b.e)).find((l) => l.startsWith('odd-include-a1b2'))!;
   assert.match(
@@ -271,13 +283,13 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
     [true, []],
     'tried again, and nothing started behind it',
   );
-  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8')).at, written.at, 'not written again');
+  assert.equal(JSON.parse(recordText(ROOT, cardTryKey('odd-include-a1b2')) ?? '').at, written.at, 'not written again');
 
   fs.rmSync(path.join(broken, '.worktreeinclude'));
   const cleared = await runWith(b.e, tickRun());
   const [run] = fromCard('odd-include-a1b2');
   assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id }, 'the link gone: the next pass starts it');
-  const kept = fs.readFileSync(path.join(INBOX, 'odd-include-a1b2.md'), 'utf8');
+  const kept = cardText(ROOT, 'odd-include-a1b2') ?? '';
   assert.doesNotMatch(kept, /^queued:/m, 'the card is kept, its queued: line taken off');
   assert.deepEqual(
     readInbox().find((l) => l.name === 'odd-include-a1b2')?.startedAs,
@@ -286,7 +298,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   const behind = await runWith(b.e, tickRun());
   assert.deepEqual(
-    [behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))],
+    [behind.queue && 'run' in behind.queue && behind.queue.card, keysUnder(ROOT, '/registry/cardtries/')],
     ['behind-c3d4', []],
     'and the pass after removes its try, then starts the card behind it',
   );

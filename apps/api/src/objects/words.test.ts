@@ -5,6 +5,7 @@
  * status and words. A write whose body is over `OBJECT_BODY_LIMIT` is a 413 `{ error }` naming the limit, and one under it is filed as
  * before. And the inbox's routes the Card's verbs replaced answer 404, so a client still reading them fails.
  */
+import { cardKey, cardNames, cardText, dropRecord } from 'agent-orchestrator/testing';
 import { root } from '../../test/harness.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -21,10 +22,9 @@ fs.writeFileSync(path.join(inbox, 'kept-card.md'), 'Keep this card.\n');
 
 /** The inbox folder as it is: each file's name and text, to show a refusal wrote nothing. */
 const inboxAsIs = () =>
-  fs
-    .readdirSync(inbox)
-    .sort()
-    .map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
+  cardNames(root)
+    .map((n) => `${n}.md`)
+    .map((name) => [name, cardText(root, name.slice(0, -3)) ?? '']);
 
 /** The status, the `error` and the `field` of a response, which must be a JSON object. */
 const refusal = async (res: Response) => {
@@ -74,7 +74,7 @@ test('a write whose body is at the limit is answered as before: the card is file
   assert.equal(res.status, 201, await res.clone().text());
   const filed = inboxAsIs().filter(([, text]) => text.length >= limit - 100);
   assert.equal(filed.length, 1, 'the card is in the inbox');
-  for (const [name] of filed) fs.rmSync(path.join(inbox, name));
+  for (const [name] of filed) dropRecord(root, cardKey(name.slice(0, -3)));
 });
 
 test('REFUSED: a list asked with a query of the wrong shape — a key given twice — is a 400 `{ error, field }` naming the key refused', async () => {

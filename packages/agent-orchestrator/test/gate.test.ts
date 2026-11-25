@@ -9,7 +9,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in scratch repositories no factory holds.
  */
-import { askKeyOf, askNames, dropRecord, keysUnder, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
+import { askKeyOf, askNames, cardText, dropRecord, keysUnder, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -745,8 +745,7 @@ describe('`--gate` and a card’s `gate:`, REFUSED before a run is written', () 
     });
   }
   test('the refused cards are where they were, in the inbox', () => {
-    for (const name of ['plan-the-flag-e5f6', 'plan-the-flag-g7h8'])
-      assert.ok(fs.existsSync(path.join(inboxDir(ROOT), `${name}.md`)), name);
+    for (const name of ['plan-the-flag-e5f6', 'plan-the-flag-g7h8']) assert.ok(cardText(ROOT, name) !== null, name);
   });
 });
 

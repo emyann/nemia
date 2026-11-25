@@ -1,5 +1,5 @@
 /**
- * The Card door's contract (`CardDoor`, `src/cards/cards.store.ts`), as walks (`door-walks.ts`): every method's rows, run on the files
+ * The Card door's contract (`CardDoor`, `src/cards/cards.store.ts`), as walks (`door-walks.ts`): every method's rows, run on the keyspace
  * by `src/cards/cards.store.test.ts` and on the memory stand-in by `src/cards/memory.store.test.ts`. A card filed is listed and read
  * back, written back and read again with its filing time kept, dropped and gone; a try written is listed, written over and removed. And
  * the write check: a card under a name that is no card's, at a name taken, or whose text does not read as a card or breaks the model's
@@ -98,7 +98,11 @@ export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     },
   ],
   'cards.add': [
-    { name: 'filed at its name, in the inbox', walk: ({ door }) => filed(door, 'an-idea'), says: '<root>/inbox/an-idea.md' },
+    {
+      name: 'filed at its name, named by the command that shows it',
+      walk: ({ door }) => filed(door, 'an-idea'),
+      says: 'nemia get card an-idea',
+    },
     {
       name: 'REFUSED: a name taken is a Conflict, the first card kept',
       walk: ({ door }) => {
@@ -169,7 +173,7 @@ export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     },
   ],
   'cards.where': [
-    { name: 'its file in the inbox', walk: ({ door }) => done(door.cards.where(nameOf('an-idea'))), says: '<root>/inbox/an-idea.md' },
+    { name: 'the command that shows it', walk: ({ door }) => done(door.cards.where(nameOf('an-idea'))), says: 'nemia get card an-idea' },
   ],
   'tries.list': [
     { name: 'none with no try', walk: ({ door }) => done(door.tries.list()), says: {} },

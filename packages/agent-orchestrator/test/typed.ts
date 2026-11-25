@@ -22,6 +22,7 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { COMMAND_WORDS } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
+import { cardText } from '../testing.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { Invalid, TABLE, parseArgv, renamedIn, runWith, type Command, type Env, type Place } from '../src/runner.ts';
@@ -166,7 +167,7 @@ function foldered(argv: readonly string[], env: Env) {
 /** The card of the store's inbox `given` names, by its file or its name, as the client sends a card it names; else none. */
 function cardNamed(given: string, env: Env) {
   const inbox = path.join(env.WF_ROOT ?? '', 'inbox');
-  const named = !given.includes('/') && fs.existsSync(path.join(inbox, given.endsWith('.md') ? given : `${given}.md`));
+  const named = !given.includes('/') && cardText(env.WF_ROOT ?? '', given.replace(/\.md$/, '')) !== null;
   const inInbox = named ? given : path.relative(inbox, path.resolve(given));
   return (inInbox.startsWith('..') || path.isAbsolute(inInbox) || inInbox === '' ? undefined : inInbox.replace(/\.md$/, '')) satisfies
     | string

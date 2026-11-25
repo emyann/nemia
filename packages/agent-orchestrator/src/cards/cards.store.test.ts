@@ -1,81 +1,68 @@
 /**
- * The Card door's files layer: the door's walks (`test/card-walks.ts`) on a fresh scratch store each, and what only the files can be
- * asked — an entry that is no card, a write back's time and temp file, a try that does not read, the card a path names, the default
- * door's root.
+ * The Card door over the keyspace: the door's walks (`test/card-walks.ts`) on a fresh scratch store each, and what only a store on disk
+ * can be asked — a card file dropped into the inbox imported and moved aside, an entry that is no card left, a write back's time, a try
+ * file that does not read, the card a path names, the default door's root.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { debtBreaks, seamUses, sourcesUnder } from 'test-kit/debt';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aCard, CARD_WALKS } from '../../test/card-walks.ts';
-import { CardDoor, cardDoorFiles, cardNameAt } from './cards.store.ts';
+import { CardDoor, cardDoorAt, cardNameAt } from './cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 for (const [name, body] of walksOn(CARD_WALKS, () => {
   const root = scratch('wf-card-door-');
-  return { door: doorFrom(CardDoor, cardDoorFiles(root)), root, layer: 'files' };
+  return { door: doorFrom(CardDoor, cardDoorAt(root)), root, layer: 'keyspace' };
 }))
   test(name, body);
 
-/** A fresh store, its Card door over the files, and its inbox. */
+/** A fresh store, its Card door over its keyspace, and its inbox. */
 const store = () => {
   const root = scratch('wf-card-door-');
-  return { root, door: doorFrom(CardDoor, cardDoorFiles(root)), inbox: path.join(root, 'inbox') };
+  return { root, door: doorFrom(CardDoor, cardDoorAt(root)), inbox: path.join(root, 'inbox') };
 };
 const nameOf = (name: string) => CardName.read(name);
 
-test("the inbox's entries: a folder by its name and a trailing slash, any other file with no text, a hidden one not listed", () => {
-  const { door, inbox } = store();
+test("a card file dropped into the inbox is filed at its file's time and moved aside; an entry that is no card is left where it is", () => {
+  const { root, door, inbox } = store();
   fs.mkdirSync(path.join(inbox, 'a-folder'), { recursive: true });
   fs.writeFileSync(path.join(inbox, 'an-idea.md'), 'an idea\n');
-  fs.writeFileSync(path.join(inbox, 'notes.txt'), 'not a card');
-  fs.writeFileSync(path.join(inbox, '.an-idea.md.123'), 'half a card');
-  assert.deepEqual(done(door.cards.entries()), [
-    { file: 'a-folder/', text: '' },
-    { file: 'an-idea.md', text: 'an idea\n' },
-    { file: 'notes.txt', text: '' },
-  ]);
-});
-
-test('a card that is there and cannot be read is not read as gone: reading it dies of what the disk said', () => {
-  const { door, inbox } = store();
-  fs.mkdirSync(path.join(inbox, 'c-folder.md'), { recursive: true });
-  assert.throws(
-    () => act(door.cards.read(nameOf('c-folder'))),
-    (err: NodeJS.ErrnoException) => err.code === 'EISDIR',
-  );
-});
-
-test('a card filed makes the inbox; a write back keeps its time and leaves no hidden file', () => {
-  const { door, inbox } = store();
-  assert.equal(fs.existsSync(inbox), false);
-  done(door.cards.add(nameOf('c-rewrite'), aCard('Before')));
   const filed = new Date('2026-01-01T00:00:00.000Z');
-  fs.utimesSync(path.join(inbox, 'c-rewrite.md'), filed, filed);
-  done(door.cards.rewrite(nameOf('c-rewrite'), aCard('After')));
-  assert.equal(fs.readFileSync(path.join(inbox, 'c-rewrite.md'), 'utf8'), aCard('After'));
-  assert.equal(done(door.cards.filedAt(nameOf('c-rewrite'))), filed.toISOString());
-  assert.deepEqual(fs.readdirSync(inbox), ['c-rewrite.md']);
+  fs.utimesSync(path.join(inbox, 'an-idea.md'), filed, filed);
+  fs.writeFileSync(path.join(inbox, 'notes.txt'), 'not a card');
+  assert.deepEqual(done(door.cards.entries()), [{ file: 'an-idea.md', text: 'an idea\n' }]);
+  assert.equal(done(door.cards.filedAt(nameOf('an-idea'))), filed.toISOString());
+  assert.deepEqual(fs.readdirSync(inbox).sort(), ['a-folder', 'notes.txt']);
+  assert.equal(fs.readFileSync(path.join(root, 'imported', 'inbox', 'an-idea.md'), 'utf8'), 'an idea\n');
+  fs.writeFileSync(path.join(inbox, 'an-idea.md'), 'again\n');
+  assert.equal(done(door.cards.read(nameOf('an-idea'))), 'an idea\n', 'a file at a card filed already does not write over it');
+  assert.ok(fs.existsSync(path.join(root, 'imported', 'inbox', 'an-idea.md.2')), 'and is moved aside beside the first');
 });
 
-test('a card that cannot be removed is not read as gone: the drop dies of what the disk said', () => {
+test('a card written back keeps its filing time, and no card file is made', () => {
   const { door, inbox } = store();
-  fs.mkdirSync(path.join(inbox, 'c-stuck.md'), { recursive: true });
-  assert.throws(() => act(door.cards.drop(nameOf('c-stuck'))));
+  done(door.cards.add(nameOf('c-rewrite'), aCard('Before')));
+  const filed = done(door.cards.filedAt(nameOf('c-rewrite')));
+  done(door.cards.rewrite(nameOf('c-rewrite'), aCard('After')));
+  assert.equal(done(door.cards.read(nameOf('c-rewrite'))), aCard('After'));
+  assert.equal(done(door.cards.filedAt(nameOf('c-rewrite'))), filed);
+  assert.equal(fs.existsSync(inbox), false);
 });
 
-test('a try file that does not read as a try is none', () => {
+test('a try file of before the keyspace is imported; one that does not read as a try is left where it is', () => {
   const { root, door } = store();
   const kept = { at: '2026-11-01T00:00:00.000Z', text: 'x', repo: '/repo', why: 'gone', refused: true };
-  done(door.tries.put(nameOf('kept'), kept));
+  fs.mkdirSync(path.join(root, 'queue'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'queue', 'kept.json'), JSON.stringify(kept));
   fs.writeFileSync(path.join(root, 'queue', 'torn.json'), '{"at": "2026');
   fs.writeFileSync(path.join(root, 'queue', 'other.json'), JSON.stringify({ at: 1 }));
   assert.deepEqual([...done(door.tries.list())], [['kept', kept]]);
+  assert.deepEqual(fs.readdirSync(path.join(root, 'queue')).sort(), ['other.json', 'torn.json']);
 });
 
 test('the card a path names: any path under the inbox, links resolved on the way to it and to the inbox, else null', () => {
@@ -96,7 +83,7 @@ test('the card a path names: any path under the inbox, links resolved on the way
   assert.equal(cardNameAt(other, path.join(real, 'c-named.md')), 'c-named', 'an inbox that is itself a link');
 });
 
-test('the default door reads the files at the store root the program is given, and refuses Invalid where it was given none', () => {
+test('the default door reads the keyspace at the store root the program is given, and refuses Invalid where it was given none', () => {
   const { root, door } = store();
   done(door.cards.add(nameOf('an-idea'), aCard('Rooted')));
   const list = Effect.gen(function* () {
@@ -107,25 +94,4 @@ test('the default door reads the files at the store root the program is given, a
     ['an-idea.md'],
   );
   assert.deepEqual(act(list), { refused: 'Invalid' });
-});
-
-const PKG = path.join(import.meta.dirname, '..', '..');
-
-/** Every file of `src` but the tests and the Card door's own folder, by its path from the package. */
-const outsideCards = () => Object.fromEntries(Object.entries(sourcesUnder(PKG, 'src')).filter(([file]) => !file.startsWith('src/cards/')));
-
-/** A call of the door's files layer by hand (`cardFiles(`), not a method of the same name, rather than yielding `CardDoor`. */
-const BY_HAND = /(?<![\w$.])cardFiles\s*\(/g;
-
-test("no file of src but the Card door's reads the inbox's files by hand (`cardFiles`): each yields CardDoor", () => {
-  assert.deepEqual(debtBreaks(seamUses(outsideCards(), BY_HAND), {}), []);
-});
-
-test('REFUSED: a file of src that calls cardFiles', () => {
-  const sources = outsideCards();
-  const again = { ...sources, 'src/cli/start.ts': `${sources['src/cli/start.ts'] ?? ''}\nconst x = cardFiles(home).cards.entries();\n` };
-  assert.deepEqual(
-    debtBreaks(seamUses(again, BY_HAND), {}).map((b) => b.file),
-    ['src/cli/start.ts'],
-  );
 });

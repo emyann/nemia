@@ -8,7 +8,7 @@
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
-import { plantRecord, runKey } from 'agent-orchestrator/testing';
+import { cardNames, cardText, plantRecord, runKey } from 'agent-orchestrator/testing';
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -61,10 +61,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
 const nameIn = (out: string) => /^(\S+) {2}/.exec(out)?.[1] ?? assert.fail(`no card in: ${out}`);
 
 /** The text of the card `name` on the store at `root`, or null where it has none. */
-const cardOn = (root: string, name: string) => {
-  const file = path.join(root, 'inbox', `${name}.md`);
-  return (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null) satisfies string | null;
-};
+const cardOn = (root: string, name: string) => cardText(root, name);
 
 /** `said` exited 0, with nothing on stderr to say why not. */
 const ok = (said: Said, what: string) => assert.equal(said.code, 0, `${what}: ${said.err}`);
@@ -270,7 +267,7 @@ test('`nemia inbox resend` files a started card again as <run>-resent, queued on
 });
 
 test("REFUSED, exit 2, before anything is asked: a folder as the idea or a card's text, a workflow given as a path, a label edit missing", async () => {
-  const before = fs.existsSync(path.join(store.root, 'inbox')) ? fs.readdirSync(path.join(store.root, 'inbox')) : [];
+  const before = cardNames(store.root);
   for (const [argv, named] of [
     [['inbox', 'add', IDEAS], /nemia inbox add/],
     [['inbox', 'add', 'An idea', '--workflow', './workflows/dev'], /--workflow <name>/],
@@ -286,7 +283,7 @@ test("REFUSED, exit 2, before anything is asked: a folder as the idea or a card'
     assert.match(said.err, named, argv.join(' '));
     assert.equal(said.out, '');
   }
-  const after_ = fs.existsSync(path.join(store.root, 'inbox')) ? fs.readdirSync(path.join(store.root, 'inbox')) : [];
+  const after_ = cardNames(store.root);
   assert.deepEqual(after_, before, 'nothing filed');
 });
 

@@ -94,7 +94,7 @@ import {
   type StepTold,
   type Told,
 } from './told.verb.ts';
-import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
+import { found, inboxViewed, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** A task as the engine is asked to file it (`e.file`). */
@@ -379,6 +379,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
   const brief = composed + heldSaid(pictured);
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd, askedOrMomentum(r));
+  yield* inboxViewed(f.home, f.run, step);
   const token = yield* stepToken(f.run, step, taskId, r.try);
   yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told, pictured, token })));
   return undefined;
@@ -521,6 +522,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
       deps: isRemoteHarness(target.harness) ? undefined : (yield* depsBefore(f, r.target, record.workspace ?? run.workspace))?.deps,
     };
+    yield* inboxViewed(home, run, target);
     const token = yield* stepToken(run, target, taskId, tryOf(run, r.target) + 1);
     yield* asked('file', e.file(roundSpec(home, f, r, looping, target, taskId, yield* toldOf(run, target), said, token)));
   }
@@ -790,6 +792,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       targets: landing.targets,
     };
     const pictured = picturesFor(home, f, step);
+    yield* inboxViewed(home, run, step);
     const token = yield* stepToken(run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name));
     const taskId = yield* asked(
       'file',

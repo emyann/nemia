@@ -43,6 +43,8 @@ import { writeInstructionText } from '../src/factory/instruction.store.ts';
 import { factsOf, told, type StartedAnswer } from './typed.ts';
 import { startFactoryAtOnce, wiredRepoFor, workflowFolder, type StartInput } from '../src/runner.ts';
 import { inboxNameAt } from '../src/inbox/inbox.store.ts';
+import { Effect } from 'effect';
+import { StoreRoot } from '../src/config/root.store.ts';
 import { settingsOf } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-factory-start-');
@@ -163,7 +165,7 @@ async function startTypedFrom(cwd: string, argv: string[]) {
   const was = process.cwd();
   process.chdir(cwd);
   try {
-    const card = inboxNameAt(ROOT, text('brief') ?? '');
+    const card = await Effect.runPromise(Effect.provideService(inboxNameAt(ROOT, text('brief') ?? ''), StoreRoot, ROOT));
     const here = fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true;
     if (card !== null)
       return factsOf(

@@ -21,7 +21,7 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import type { Card } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { addFactory, attachWorkflow, dropRecord, hireAgent, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, cardNames, dropRecord, hireAgent, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
 import { linesOf, listedOf, listedRuns, objectOf, specOf, stepOf } from './run-reads.ts';
 
@@ -404,7 +404,7 @@ describe('a folder team as the board finds and files for it, the repository a pl
       assert.equal(refused.status, 422, 'a repo is retired for every team');
       const { error } = (await refused.json()) as { error: string };
       names(error, notARepo, 'nemia factory attach');
-      assert.deepEqual(fs.readdirSync(path.join(root, 'inbox')).length, 1, 'nothing more written');
+      assert.deepEqual(cardNames(root).length, 1, 'nothing more written');
     },
   );
   s.test(

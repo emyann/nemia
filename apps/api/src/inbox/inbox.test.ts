@@ -17,6 +17,11 @@ import { addToInbox, fromNote, inboxDir, startFromInbox, engine, StoreRoot } fro
 import {
   addFactory,
   attachWorkflow,
+  cardKey,
+  cardNames,
+  cardText,
+  dropRecord,
+  emptyCards,
   emptyRuns,
   hireAgent,
   keysUnder,
@@ -80,7 +85,7 @@ attachWorkflow({ factory: 'desk', workflow: 'dev' });
 hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
 const inbox = path.join(root, 'inbox');
-const cards = () => (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []);
+const cards = () => cardNames(root).map((n) => `${n}.md`);
 const runFiles = () =>
   [
     ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
@@ -157,12 +162,13 @@ const listed = async (address = '/api/cards') => {
 /** Every card and record gone, so each test starts from an empty inbox and store. */
 const clear = () => {
   fs.rmSync(inbox, { recursive: true, force: true });
+  emptyCards(root);
   fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
   emptyRuns(root);
 };
 
 /** The inbox folder as it is: each file's name and text, to show a read wrote nothing. */
-const inboxFiles = () => cards().map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
+const inboxFiles = () => cards().map((name) => [name, cardText(root, name.slice(0, -3)) ?? '']);
 /** One card read by its name in whichever factory holds it (`GET /api/cards/:name`): the Card with its file as written. */
 const cardPage = (name: string) => app.request(`/api/cards/${name}`);
 
@@ -605,7 +611,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       );
       assert.equal(broken.state, 'filed', 'every card has its state, one that does not read filed');
 
-      fs.rmSync(path.join(inbox, 'broken.md'));
+      dropRecord(root, cardKey('broken'));
       assert.equal(
         (await listed()).some((e) => e.name === 'broken'),
         false,
@@ -651,7 +657,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
         'an entry that does not read as a card: its refusal and its file',
       );
 
-      fs.rmSync(path.join(inbox, 'broken.md'));
+      dropRecord(root, cardKey('broken'));
       assert.deepEqual(inboxFiles(), before, 'read, and nothing written');
     },
   );

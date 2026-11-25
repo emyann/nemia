@@ -1,85 +1,76 @@
 /**
  * The Card door: the one way a program reads and writes a card of the inbox and the tick's tries of a queued one — an Effect service,
- * `CardDoor`, whose methods take a card's name as `CardName` and answer an Effect failing with a refusal. Its pattern is the Run door's
- * and the Factory door's (`src/door/door.store.ts`).
+ * `CardDoor`, whose methods take a card's name as `CardName` and answer an Effect failing with a refusal.
  *
- * Two layers: the files (`cardFiles`, `<root>/inbox/<name>.md` and `<root>/queue/<name>.json`, so a card is the very bytes a person
- * wrote), and the memory stand-in (`cardDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by
- * `cardDoorOver`, so each write is checked the one way on both: a new card's name as `CardName.OnCreate` checks it, and its text read as
- * a card (`parseInboxCard`, the reader the model's `Card` says holds its invariants — a queued card names its workflow, `from:` names
- * each run once), or `Invalid` names what is broken and nothing is written; a card already at a new one's name is `Conflict`, and
- * a card written back that is not there `Missing`. A try is written under a name `CardName.OnCreate` checks, and decoded through the
- * model's `MissedStart`. The walks of `test/card-walks.ts` hold both layers to one table.
+ * A card is a record of the keyspace, `/registry/cards/<name>`, holding the very text a person wrote and when it was filed (`filedAt`,
+ * kept across a write back), and the tick's try of a queued one is a record of its own, `/registry/cardtries/<name>`. The rooted door
+ * and the memory stand-in (`cardDoorMemory`, `memory.store.ts`, over a keyspace in memory) are both `cardRecords` under `cardDoorOver`,
+ * so each write is checked the one way on both: a new card's name as `CardName.OnCreate` checks it, and its text read as a card
+ * (`parseInboxCard`, the reader the model's `Card` says holds its invariants — a queued card names its workflow, `from:` names each run
+ * once), or `Invalid` names what is broken and nothing is written; a card already at a new one's name is `Conflict`, and a card written
+ * back that is not there `Missing`. A try is written under a name `CardName.OnCreate` checks, and decoded through the model's
+ * `MissedStart`. The walks of `test/card-walks.ts` hold both to one table.
  *
- * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`), refused where it was
- * given none, since this door reads no root of its own module's (`test/root-given.test.ts`). One run per card is the Run door's to hold,
- * at its create (`cardStartedTwice`, `src/runs/runs.store.ts`): only that door knows whether a run's record stands.
+ * A store's card files (`<root>/inbox/<name>.md`, filed at the file's change time) and the tick's tries (`<root>/queue/<name>.json`) are
+ * imported by the kind's import (`CARD_FILES`, `src/keyspace/import.store.ts`), level-triggered, so a card a person drops into `inbox/`
+ * by hand is filed at the next read, and moved aside under `<root>/imported/`; any other entry of the inbox is left where it is. A card
+ * is named in a message by the command that shows it (`where`).
+ *
+ * The door's default is rooted (`rootedDoor`): the keyspace at the store's root the program is given (`StoreRoot`), refused where it
+ * was given none (`test/root-given.test.ts`). One run per card is the Run door's to hold, at its create (`cardStartedTwice`,
+ * `src/runs/runs.store.ts`): only that door knows whether a run's record stands.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Effect, Layer, Option, Schema } from 'effect';
-import { checked, doorOf, fromThrow, rootedDoor, type DoorOf } from '../door/door.store.ts';
-import { Conflict, Missing } from '../refusal/refusal.ts';
+import { checked, fromThrow, rootedDoor } from '../door/door.store.ts';
+import { Conflict, Missing, type Refusal } from '../refusal/refusal.ts';
 import { inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
 import { CardName, MissedStart as MissedStartModel } from '../inbox/inbox.model.ts';
-import { isDirectory } from '../record/record.store.ts';
-import { writeWhole } from '../whole-file/whole-file.store.ts';
+import { asideOf, kindKeyspace, kindKeyspaceHeld, namesIn, type ImportKind } from '../keyspace/import.store.ts';
+import type { KeyRefused, Keyspace, KeyTxn } from '../keyspace/keyspace.store.ts';
+import { FILE_ID_PREFIX } from 'objects';
 
-/**
- * A layer of the Card door, as plain synchronous methods: the inbox's cards (its entries, a card's text, its filing time, filed, written
- * back, dropped, and where a person finds it) and the tick's tries of a queued card's start.
- */
-export type CardLayer = {
+/** The Card door's shape: the inbox's cards and the tick's tries of a queued card's start, each method answering an Effect. */
+export type CardDoorShape = {
   readonly cards: {
-    /**
-     * The inbox's entries, by their file in it, sorted: a folder by its name and a trailing `/`, a markdown file with its text, any other
-     * file with none; a hidden one is not listed. None when there is no inbox yet.
-     */
-    readonly entries: () => Array<{ file: string; text: string }>;
+    /** The inbox's cards, by their name and `.md` (`file`), sorted, each with its text. None when there is no card yet. */
+    readonly entries: () => Effect.Effect<Array<{ file: string; text: string }>, Refusal>;
     /** The text of the card `name`, or null when it is not there. */
-    readonly read: (name: string) => string | null;
+    readonly read: (name: CardName) => Effect.Effect<string | null, Refusal>;
     /** When the card `name` was filed, as an ISO time, kept across a write back. Null when it is gone. */
-    readonly filedAt: (name: string) => string | null;
-    /**
-     * When the inbox's entry was last written, as an ISO time, by its `file` as `entries` lists it, a folder with its trailing `/`: what a
-     * stray entry, no card, is dated by. Null when it is gone. Handed the entry, not a card's name, since a stray's file names no card.
-     */
-    readonly entryAt: (entry: { readonly file: string }) => string | null;
-    /**
-     * The text of the inbox's entry as written, by its `file` as `entries` lists it: a card's file, or a stray file's, which its page
-     * shows. Null for a folder, and when it is gone.
-     */
-    readonly entryText: (entry: { readonly file: string }) => string | null;
-    /** File a person's card, exclusively: where it is filed. A card already at its name is `Conflict`, and left as it is. */
-    readonly add: (name: string, text: string) => string;
-    /** Write the card `name` whole, so a reader never reads half a card, keeping its filing time. `Missing` when it is not there. */
-    readonly rewrite: (name: string, text: string) => void;
+    readonly filedAt: (name: CardName) => Effect.Effect<string | null, Refusal>;
+    /** When the inbox's entry `file` (as `entries` lists it) was filed, as an ISO time; null when it is gone or names no card. */
+    readonly entryAt: (entry: { readonly file: string }) => Effect.Effect<string | null, Refusal>;
+    /** The text of the inbox's entry `file` (as `entries` lists it); null when it is gone or names no card. */
+    readonly entryText: (entry: { readonly file: string }) => Effect.Effect<string | null, Refusal>;
+    /** File a person's card, exclusively: how a message names it (`where`). A card already at its name is `Conflict`, and left as it is. */
+    readonly add: (name: CardName, text: string) => Effect.Effect<string, Refusal>;
+    /** Write the card `name` whole, keeping its filing time. `Missing` when it is not there. */
+    readonly rewrite: (name: CardName, text: string) => Effect.Effect<void, Refusal>;
     /** Remove the card `name`: false when it is not there. */
-    readonly drop: (name: string) => boolean;
-    /** Where a person finds the card `name`: the path a message names. */
-    readonly where: (name: string) => string;
+    readonly drop: (name: CardName) => Effect.Effect<boolean, Refusal>;
+    /** How a message names the card `name`: the command that shows it (`nemia get card <name>`). */
+    readonly where: (name: CardName) => Effect.Effect<string, Refusal>;
   };
   readonly tries: {
     /** The tick's tries of a queued card's start that did not happen, by card name. One that does not read as a try is none. */
-    readonly list: () => Map<string, MissedStart>;
+    readonly list: () => Effect.Effect<Map<string, MissedStart>, Refusal>;
     /** Write down the tick's try of the card `name`, whole over the one there: the tick's alone. */
-    readonly put: (name: string, tried: MissedStart) => void;
+    readonly put: (name: CardName, tried: MissedStart) => Effect.Effect<void, Refusal>;
     /** Remove the tick's try of the card `name`, there or not: the tick's alone. */
-    readonly drop: (name: string) => void;
+    readonly drop: (name: CardName) => Effect.Effect<void, Refusal>;
   };
 };
 
-/** The Card door's shape: each method of `CardLayer` answering an Effect, a card's name taken as `CardName`. */
-export type CardDoorShape = DoorOf<CardLayer, CardName>;
-
 /**
- * A card already at a new card's name, as a refusal: the files say so by `EEXIST`, the memory by its own.
+ * A card already at a new card's name, as a refusal.
  * @param name The new card's name, which the fix's command names.
- * @param file The path of the card filed already.
+ * @param file How a message names the card filed already (`where`), the command that shows it.
  */
 export const cardTaken = (name: string, file: string) =>
   new Conflict({
-    message: `a card is filed already at ${file}: file the new one under another name, or drop that one with nemia inbox rm ${name}`,
+    message: `a card ${name} is filed already (${file}): file the new one under another name, or drop that one with nemia inbox rm ${name}`,
   });
 
 /**
@@ -105,11 +96,10 @@ const textChecked = (name: string, text: string) => fromThrow(() => void parseIn
 const tryChecked = (name: string) => checked(MissedStartModel, () => `the try of the card ${name}`);
 
 /**
- * The door over `layer`: each method as `doorOf` makes it, each write's name and text checked before the layer writes.
- * @param layer The files or the memory the door reads and writes through.
+ * The door over `door`: each write's name and text checked before it is written.
+ * @param door The cards and tries as the door's shape, read and written through.
  */
-export function cardDoorOver(layer: CardLayer) {
-  const door = doorOf<CardLayer, CardName>(layer);
+export function cardDoorOver(door: CardDoorShape) {
   return {
     ...door,
     cards: {
@@ -140,8 +130,30 @@ export function cardDoorOver(layer: CardLayer) {
  */
 export const inboxAt = (home: string) => path.join(home, 'inbox');
 
-/** The tick's tries of the store `home`: outside the inbox, which is a person's. */
+/** The tick's tries of the store `home` before the keyspace: outside the inbox, which is a person's. */
 const queueAt = (home: string) => path.join(home, 'queue');
+
+/** The keyspace's prefix of every card, and of every try of one. */
+const CARDS = '/registry/cards/';
+const TRIES = '/registry/cardtries/';
+
+/**
+ * The key of the card `name`.
+ * @param name The card's name.
+ */
+export const cardKey = (name: string) => `${CARDS}${name}`;
+
+/**
+ * The key of the tick's try of the card `name`.
+ * @param name The card's name.
+ */
+export const cardTryKey = (name: string) => `${TRIES}${name}`;
+
+/** A card's record: the text a person wrote, and when it was filed. */
+const CardRecord = Schema.Struct({ text: Schema.String, filedAt: Schema.String });
+
+/** A card's record as its value reads, or none where it does not. */
+const cardIn = Schema.decodeUnknownOption(Schema.fromJsonString(CardRecord));
 
 /** A try as the tick writes it; any key beside these is left unread. */
 const missedStartIn = Schema.decodeUnknownOption(Schema.fromJsonString(MissedStartModel));
@@ -164,108 +176,223 @@ export function cardNameAt(home: string, given: string) {
   return inboxNameOf(path.join(real(path.dirname(at)), path.basename(at)), real(inboxAt(home)));
 }
 
-/** The tick's tries in the folder `queue`, as the door's files layer reads and writes them. */
-function triesAt(queue: string) {
-  return {
-    list: () => {
-      const tries = new Map<string, MissedStart>();
-      let names: string[];
-      try {
-        names = fs.readdirSync(queue).filter((n) => n.endsWith('.json'));
-      } catch {
+/** A write raced by another, as a refusal. */
+const raced = (err: KeyRefused) =>
+  new Conflict({ message: `${err.key} was written by another while it was written here: run again.` }) satisfies Refusal as Refusal;
+
+/** Every File id written in a card's text, as the File door's prune finds a card's. */
+const FILE_IDS = new RegExp(`${FILE_ID_PREFIX}[0-9a-f]{32}`, 'g');
+
+/** The keyspace's prefix of every File (`src/start/files.store.ts`). */
+const FILES = '/registry/files/';
+
+/** The id of the File a key under `FILES` names, its last piece. */
+const idOfFile = (key: string) => key.slice(key.lastIndexOf('/') + 1);
+
+/** The live Files of `tx` whose id `text` names: what a card's record points to, so the keyspace refuses their delete while it stands. */
+const filesNamed = (tx: KeyTxn, text: string) => {
+  const ids = new Set(text.match(FILE_IDS) ?? []);
+  if (ids.size === 0) return Effect.succeed([] satisfies string[]);
+  return Effect.map(tx.list(FILES), (records) => records.map((r) => r.key).filter((key) => ids.has(idOfFile(key))));
+};
+
+/** How a message names the card `name`: the command that shows it. */
+const shownBy = (name: string) => `nemia get card ${name}`;
+
+/** The card's name an entry's `file` names (`<name>.md`), or none. */
+const nameOfEntry = (file: string) => (file.endsWith('.md') ? file.slice(0, -'.md'.length) : undefined);
+
+/** The tries of the keyspace `held` holds, as the door's `tries`; a write opens it with `open`. */
+const triesOf = (open: Effect.Effect<Keyspace, Refusal>, held: Effect.Effect<Keyspace | undefined, Refusal>) =>
+  ({
+    list: () =>
+      Effect.gen(function* () {
+        const tries = new Map<string, MissedStart>();
+        const keyspace = yield* held;
+        if (keyspace === undefined) return tries;
+        for (const record of (yield* keyspace.list(TRIES)).records) {
+          const r = missedStartIn(record.value);
+          if (Option.isNone(r)) continue;
+          const { at, text, repo, why, refused } = r.value;
+          tries.set(record.key.slice(TRIES.length), { at, text, repo, why, refused });
+        }
         return tries;
-      }
-      for (const file of names.sort()) {
-        try {
-          const r = missedStartIn(fs.readFileSync(path.join(queue, file), 'utf8'));
-          if (Option.isSome(r)) {
-            const { at, text, repo, why, refused } = r.value;
-            tries.set(file.slice(0, -'.json'.length), { at, text, repo, why, refused });
-          }
-        } catch {}
-      }
-      return tries;
+      }),
+    put: (name, tried) =>
+      Effect.gen(function* () {
+        const keyspace = yield* open;
+        const key = cardTryKey(name);
+        yield* keyspace
+          .within((tx) =>
+            Effect.flatMap(tx.get(key), (there) =>
+              tx.write(key, { verb: there === undefined ? 'create' : 'update', expected: null, value: JSON.stringify(tried) }),
+            ),
+          )
+          .pipe(Effect.mapError(raced));
+      }),
+    drop: (name) =>
+      Effect.gen(function* () {
+        const keyspace = yield* held;
+        if (keyspace === undefined) return;
+        const key = cardTryKey(name);
+        yield* keyspace
+          .within((tx) =>
+            Effect.flatMap(tx.get(key), (there) =>
+              there === undefined ? Effect.void : Effect.asVoid(tx.write(key, { verb: 'delete', expected: null, value: '' })),
+            ),
+          )
+          .pipe(Effect.mapError(raced));
+      }),
+  }) satisfies CardDoorShape['tries'];
+
+/**
+ * The door's write back of a card over the keyspace `open` opens: its text replaced and its filing time kept, the Files it names pointed
+ * to, read and written in one transaction; `Missing` where there is no card.
+ * @param open Opens the keyspace the cards are held in.
+ * @param now When a card is filed, as an ISO time, for a record that held none.
+ */
+const rewriteOf = (open: Effect.Effect<Keyspace, Refusal>, now: () => string) =>
+  ((name: CardName, text: string) =>
+    Effect.gen(function* () {
+      const keyspace = yield* open;
+      const key = cardKey(name);
+      const done = yield* keyspace
+        .within((tx) =>
+          Effect.gen(function* () {
+            const there = yield* tx.get(key);
+            const was = there === undefined ? undefined : Option.getOrUndefined(cardIn(there.value));
+            if (there === undefined) return false;
+            yield* tx.write(key, {
+              verb: 'update',
+              expected: there.revision,
+              value: JSON.stringify({ text, filedAt: was?.filedAt ?? now() }),
+              points: yield* filesNamed(tx, text),
+            });
+            return true;
+          }),
+        )
+        .pipe(Effect.mapError(raced));
+      if (!done) return yield* noCardToRewrite(name);
+    })) satisfies CardDoorShape['cards']['rewrite'];
+
+/**
+ * The cards and tries of the keyspace `open` opens when a method runs, as the door's shape. A read asks `held`, and answers none where it
+ * answers no keyspace, so a store read is not a store made.
+ * @param open Opens the keyspace the cards are held in, refused as opening it is.
+ * @param held The keyspace a read reads, or undefined where the store holds none yet; `open` where every read may make it.
+ * @param now When a card is filed, as an ISO time.
+ */
+export function cardRecords(
+  open: Effect.Effect<Keyspace, Refusal>,
+  held: Effect.Effect<Keyspace | undefined, Refusal> = open,
+  now: () => string = () => new Date().toISOString(),
+) {
+  const recordOf = (name: string) =>
+    Effect.gen(function* () {
+      const keyspace = yield* held;
+      const record = keyspace === undefined ? undefined : yield* keyspace.get(cardKey(name));
+      if (record === undefined) return undefined;
+      return Option.getOrUndefined(cardIn(record.value));
+    });
+  return {
+    cards: {
+      entries: () =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          if (keyspace === undefined) return [];
+          return (yield* keyspace.list(CARDS)).records.flatMap((record) => {
+            const card = cardIn(record.value);
+            return Option.isNone(card) ? [] : [{ file: `${record.key.slice(CARDS.length)}.md`, text: card.value.text }];
+          });
+        }),
+      read: (name) => Effect.map(recordOf(name), (r) => r?.text ?? null),
+      filedAt: (name) => Effect.map(recordOf(name), (r) => r?.filedAt ?? null),
+      entryAt: ({ file }) => {
+        const name = nameOfEntry(file);
+        return name === undefined ? Effect.succeed(null) : Effect.map(recordOf(name), (r) => r?.filedAt ?? null);
+      },
+      entryText: ({ file }) => {
+        const name = nameOfEntry(file);
+        return name === undefined ? Effect.succeed(null) : Effect.map(recordOf(name), (r) => r?.text ?? null);
+      },
+      add: (name, text) =>
+        Effect.gen(function* () {
+          const keyspace = yield* open;
+          const value = JSON.stringify({ text, filedAt: now() });
+          yield* keyspace
+            .within((tx) =>
+              Effect.flatMap(filesNamed(tx, text), (points) => tx.write(cardKey(name), { verb: 'create', expected: null, value, points })),
+            )
+            .pipe(Effect.mapError((err) => (err.refusal === 'exists' ? cardTaken(name, shownBy(name)) : raced(err))));
+          return shownBy(name);
+        }),
+      rewrite: rewriteOf(open, now),
+      drop: (name) =>
+        Effect.gen(function* () {
+          const keyspace = yield* held;
+          if (keyspace === undefined) return false;
+          return yield* keyspace.write(cardKey(name), { verb: 'delete', expected: null, value: '' }).pipe(
+            Effect.as(true),
+            Effect.catchTag('KeyRefused', (err) => (err.refusal === 'missing' ? Effect.succeed(false) : Effect.fail(raced(err)))),
+          );
+        }),
+      where: (name) => Effect.succeed(shownBy(name)),
     },
-    put: (name, tried) => {
-      fs.mkdirSync(queue, { recursive: true });
-      fs.writeFileSync(path.join(queue, `${name}.json`), JSON.stringify(tried, null, 2));
-    },
-    drop: (name) => fs.rmSync(path.join(queue, `${name}.json`), { force: true }),
-  } satisfies CardLayer['tries'];
+    tries: triesOf(open, held),
+  } satisfies CardDoorShape;
 }
 
 /**
- * The files of the store `home`, as a layer of the door: the inbox's cards and the queue's tries.
- * @param home The store's root folder.
+ * The keys a card file's text may point to, in the store `home`: each File id it names, in each namespace the store keeps Files in; the
+ * import keeps those that are live.
  */
-export function cardFiles(home: string) {
-  const inbox = inboxAt(home);
-  const fileOf = (name: string) => path.join(inbox, `${name}.md`);
-  return {
-    cards: {
-      entries: () => {
-        let names: string[];
-        try {
-          names = fs.readdirSync(inbox).filter((n) => !n.startsWith('.'));
-        } catch {
-          return [];
-        }
-        return names.sort().map((name) => {
-          const at = path.join(inbox, name);
-          if (isDirectory(at)) return { file: `${name}/`, text: '' };
-          try {
-            return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' };
-          } catch {
-            return { file: name, text: '' };
-          }
-        });
-      },
-      read: (name) => {
-        try {
-          return fs.readFileSync(fileOf(name), 'utf8');
-        } catch (err) {
-          if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-          throw err;
-        }
-      },
-      filedAt: (name) => fs.statSync(fileOf(name), { throwIfNoEntry: false })?.mtime.toISOString() ?? null,
-      entryAt: ({ file }) => fs.statSync(path.join(inbox, file.replace(/\/$/, '')), { throwIfNoEntry: false })?.mtime.toISOString() ?? null,
-      entryText: ({ file }) => {
-        if (file.endsWith('/') || !fs.statSync(path.join(inbox, file), { throwIfNoEntry: false })?.isFile()) return null;
-        return fs.readFileSync(path.join(inbox, file), 'utf8');
-      },
-      add: (name, text) => {
-        fs.mkdirSync(inbox, { recursive: true });
-        try {
-          fs.writeFileSync(fileOf(name), text, { flag: 'wx' });
-        } catch (err) {
-          throw (err as NodeJS.ErrnoException).code === 'EEXIST' ? cardTaken(name, fileOf(name)) : err;
-        }
-        return fileOf(name);
-      },
-      rewrite: (name, text) => {
-        const at = fileOf(name);
-        const filed = fs.statSync(at, { throwIfNoEntry: false })?.mtime;
-        if (!filed) throw noCardToRewrite(name);
-        writeWhole(at, text);
-        try {
-          fs.utimesSync(at, filed, filed);
-        } catch {}
-      },
-      drop: (name) => {
-        try {
-          fs.rmSync(fileOf(name));
-        } catch (err) {
-          if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
-          throw err;
-        }
-        return true;
-      },
-      where: fileOf,
-    },
-    tries: triesAt(queueAt(home)),
-  } satisfies CardLayer;
-}
+const filesOf = (home: string, text: string) => {
+  const ids = [...new Set(text.match(FILE_IDS) ?? [])];
+  const kept = path.join(home, 'files');
+  if (ids.length === 0 || !fs.existsSync(kept)) return [];
+  const namespaces = fs.readdirSync(kept, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? [e.name] : []));
+  return namespaces.flatMap((namespace) => ids.map((id) => `${FILES}${namespace}/${id}`));
+};
+
+/**
+ * The card files of a store from before the keyspace — and a card a person drops into the inbox by hand — `inbox/<name>.md`, filed at
+ * the file's change time, and the tick's tries, `queue/<name>.json`: what the kind's import takes up. A card's text is taken as it is,
+ * and checked as a card when it is read; a try that is not JSON stays where it is.
+ */
+export const CARD_FILES: ImportKind = {
+  name: 'cards',
+  folders: (home) => [inboxAt(home), queueAt(home)],
+  files: (home) => [
+    ...namesIn(inboxAt(home), '.md')
+      .filter((name) => Option.isSome(Schema.decodeUnknownOption(CardName.OnCreate)(name)))
+      .map((name) => {
+        const file = path.join(inboxAt(home), `${name}.md`);
+        return {
+          file,
+          key: cardKey(name),
+          aside: asideOf(home, file),
+          read: (text: string) => {
+            const at = fs.statSync(file, { throwIfNoEntry: false })?.mtime.toISOString() ?? new Date().toISOString();
+            return { value: JSON.stringify({ text, filedAt: at }), points: filesOf(home, text) };
+          },
+        };
+      }),
+    ...namesIn(queueAt(home), '.json')
+      .filter((name) => Option.isSome(Schema.decodeUnknownOption(CardName.OnCreate)(name)))
+      .map((name) => {
+        const file = path.join(queueAt(home), `${name}.json`);
+        return {
+          file,
+          key: cardTryKey(name),
+          aside: asideOf(home, file),
+          read: (text: string) => (Option.isSome(missedStartIn(text)) ? { value: text.trim() } : { unreadable: 'it is no try of a card' }),
+        };
+      }),
+  ],
+};
+
+/** The Card door over the keyspace at the store `root`. */
+const cardsAt = (root: string) => cardDoorOver(cardRecords(kindKeyspace(root, CARD_FILES), kindKeyspaceHeld(root, CARD_FILES)));
 
 /**
  * The Card door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the
@@ -273,11 +400,26 @@ export function cardFiles(home: string) {
  * (`docs/architecture.md`, *The Card door*).
  */
 export const CardDoor = Context.Reference<CardDoorShape>('agent-orchestrator/CardDoor', {
-  defaultValue: () => rootedDoor((root) => cardDoorOver(cardFiles(root)), 'Card door'),
+  defaultValue: () => rootedDoor(cardsAt, 'Card door'),
 });
 
 /**
- * The Card door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
+ * The Card door over the keyspace of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
  * @param root The store's root folder.
  */
-export const cardDoorFiles = (root: string) => Layer.succeed(CardDoor)(cardDoorOver(cardFiles(root)));
+export const cardDoorAt = (root: string) => Layer.succeed(CardDoor)(cardsAt(root));
+
+/**
+ * The inbox's cards written into `dir` as files, `<name>.md` each holding the card's text, replacing what was there: the read-only view a
+ * step that reads the inbox (`reads: inbox`) is filed with, now that a card is a record and no file.
+ * @param dir The folder the view is written to, absolute.
+ */
+export const cardsViewed = (dir: string) =>
+  Effect.gen(function* () {
+    const entries = yield* (yield* CardDoor).cards.entries();
+    yield* fromThrow(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+      for (const entry of entries) fs.writeFileSync(path.join(dir, entry.file), entry.text, { mode: 0o400 });
+    });
+  });

@@ -38,7 +38,7 @@ import {
   type StoreRoot,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
-import { emptyRuns, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
+import { cardNames, cardText as heldText, emptyCards, emptyRuns, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const repo = scratch('nemia-api-queue-repo-');
 /**
@@ -76,11 +76,14 @@ const clear = () => {
   for (const dir of ['inbox', 'queue', 'runs', 'engine']) fs.rmSync(path.join(root, dir), { recursive: true, force: true });
   for (const file of ['tick.json', 'tick-stats.json']) fs.rmSync(path.join(root, file), { force: true });
   emptyRuns(root);
+  emptyCards(root);
 };
 
 /** The inbox folder as it is: each file's name and text, to show a refusal wrote nothing. */
 const inboxAsIs = () =>
-  (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []).map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
+  cardNames(root)
+    .map((n) => `${n}.md`)
+    .map((name) => [name, heldText(root, name.slice(0, -3)) ?? '']);
 
 /** The Card's `queue` (or, `off`, its `unqueue`) of the card `name` in `namespace`, `body` sent where given. */
 const verb =
@@ -166,7 +169,7 @@ const startedFrom = (id: string, card: string) =>
     from: { inbox: card },
   });
 
-const cardText = (name: string) => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
+const cardText = (name: string) => heldText(root, name) ?? '';
 
 describe("a person queues cards, reads their order and the tick's tries, and takes them back", () => {
   const s = story(test);
@@ -373,7 +376,7 @@ describe('the queue verbs: what a queue or a take-back refuses, writing nothing'
 
     const back = await unqueue('older');
     assert.equal(back.status, 200, await back.clone().text());
-    assert.doesNotMatch(fs.readFileSync(path.join(inbox, 'older.md'), 'utf8'), /queued:/);
+    assert.doesNotMatch(heldText(root, 'older') ?? '', /queued:/);
   });
   test("a name that is not a card's is a 422 before the card is read, in the package's words", async () => {
     clear();

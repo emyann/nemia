@@ -186,6 +186,37 @@ export function dropStoredRecord(id: string) {
 }
 
 /**
+ * The text of the card `name` in the seeded store, as the Card door reads it (a card file dropped into its inbox taken up first), or null
+ * where it holds none: what a page reads a card filed or written back by, now that a card is a record and no file.
+ * @param name The card's name.
+ */
+export function storedCard(name: string) {
+  return JSON.parse(inApi('return JSON.stringify(t.cardText(root, input));', name)) as string | null;
+}
+
+/** The names of the cards the seeded store holds, sorted, as the Card door lists them. */
+export function storedCardNames() {
+  return JSON.parse(inApi('return JSON.stringify(t.cardNames(root));')) as string[];
+}
+
+/**
+ * The card `name` in the seeded store written as `text`, over the one there or none: what a page plants or changes by hand.
+ * @param name The card's name.
+ * @param text The card's text.
+ */
+export function storeCard(name: string, text: string) {
+  inApi('t.plantCard(root, input.name, input.text);', { name, text });
+}
+
+/**
+ * The card `name` taken out of the seeded store, there or not: a card dropped as `nemia inbox rm` drops it.
+ * @param name The card's name.
+ */
+export function dropStoredCard(name: string) {
+  inApi('t.dropRecord(root, t.cardKey(input));', name);
+}
+
+/**
  * Where the store's result branches stand, read now and written to its `standing.json` as the tick's pass writes it, in a process of the
  * api's package on the api's environment: the api ticks nothing in the e2e (`--no-tick`), and the board's list reads where a run's result
  * stands off that file alone. Throws, with what the process printed, where the pass failed.

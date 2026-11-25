@@ -8,9 +8,9 @@
  * each a `title`, a `kind`, a `correction`, its `evidence`, the `agent` it is about, the `factory` and `workflow` it is started with
  * (the repository is the factory's, wired to the workflow), and its `labels`, each `<key>=<value>`. And the factory's label rules,
  * `--labels`, which its pull request is labelled by: apart by spaces, each `<key>=<value>:<label>`, empty where the factory names none.
- * It checks the whole closeout first, each card's labels included, then reads the first line of every card in
- * `${WF_ROOT:-~/.agent-workflows}/inbox`, and files each card whose title none has, compared without case or spacing, with `nemia inbox
- * add` run in `WF_WORKSPACE`. It starts, queues and drops nothing, and never writes in the inbox itself.
+ * It checks the whole closeout first, each card's labels included, then reads the title of every card of every factory, as `nemia get
+ * cards -A -o json` serves them, and files each card whose title none has, compared without case or spacing, with `nemia inbox add` run
+ * in `WF_WORKSPACE`. It starts, queues and drops nothing, and never writes in the inbox itself.
  *
  * Where there are rules, a card of the run's own factory (the namespace `nemia get runs/<WF_RUN> -o json` serves the run in) is filed
  * with its labels, one `--label` each, which at least one rule reads, so the run it starts can open its pull request. A card where the
@@ -202,13 +202,21 @@ function firstLine(text: string) {
   return body.split('\n').find((line) => line.trim()) ?? '';
 }
 
-/** The titles of the cards in the inbox, compared as `normal` makes them. */
+/** The titles of the cards in the inbox, every factory's, as `nemia get cards -A` serves them, compared as `normal` makes them. */
 function inboxTitles() {
-  const root = process.env.WF_ROOT || path.join(os.homedir(), '.agent-workflows');
-  const dir = path.join(root, 'inbox');
-  if (!fs.existsSync(dir)) return new Set() satisfies Set<string>;
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('.'));
-  return new Set(files.map((f) => normal(firstLine(fs.readFileSync(path.join(dir, f), 'utf8'))))) satisfies Set<string>;
+  const ran = spawnSync('nemia', ['get', 'cards', '-A', '-o', 'json'], {
+    cwd: process.env.WF_WORKSPACE || process.cwd(),
+    encoding: 'utf8',
+    timeout: 60_000,
+    maxBuffer: 64 << 20,
+  });
+  if (ran.status !== 0)
+    throw new Refusal(
+      `nemia get cards -A failed (${ran.error?.message ?? `exit ${ran.status}`}): ${(ran.stderr ?? '').trim()}; ` +
+        'no card was filed, and the check run again files them once it answers',
+    );
+  const served = JSON.parse(ran.stdout || '{}') as { items?: { spec?: { body?: string }; status?: { title?: string } }[] };
+  return new Set((served.items ?? []).map((card) => normal(card.status?.title ?? firstLine(card.spec?.body ?? '')))) satisfies Set<string>;
 }
 
 /** The card's text as `nemia inbox add` files it: its title first, then the correction, the evidence and who filed it. */

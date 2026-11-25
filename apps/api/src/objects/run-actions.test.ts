@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import { cardText, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { TABLE_ACCEPT } from 'objects';
 import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -338,7 +338,7 @@ describe('each write keeps who acted, by the token its request presented, and th
     const sent = await answered(await send('POST', '/api/namespaces/default/cards/resend-me/resend', { workflow: 'deliver' }));
     assert.equal(sent.status, 201, JSON.stringify(sent.body));
     assert.equal(sent.body.cancelled, 'ra-by-resent', 'the run that waited is called off');
-    assert.ok(fs.existsSync(path.join(root, 'inbox', 'ra-by-resent-resent.md')), 'the card is filed');
+    assert.ok(cardText(root, 'ra-by-resent-resent') !== null, 'the card is filed');
     const called = await status('ra-by-resent');
     assert.equal(typeof called.cancelledAt, 'string', 'the next read judges it called off');
     assert.deepEqual(called.cancelledBy, person, 'kept as who sent the card on');

@@ -6,7 +6,7 @@
  * takeover stopped between its writes is finished by the next. Then what `nemia factory adopt` refuses, each with nothing written.
  * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
-import { plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
+import { cardKey, dropRecord, plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -244,7 +244,7 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
     card('lost', 'carded', 'gone');
     const plan = await planOf(t, 'carded');
     await nothingWritten(['factory', 'adopt', 'carded', '--template', dir, '--plan', plan], refusedWith('Conflict', /lost/, /gone/));
-    fs.rmSync(path.join(INBOX, 'lost.md'));
+    dropRecord(ROOT, cardKey('lost'));
   });
   test('a schedule of a workflow the template does not offer: Conflict, naming the unschedule', async (t) => {
     await madeByHand('timed', repo);

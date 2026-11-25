@@ -35,6 +35,8 @@ import { askKey, askKeyOf, asksPrefix, runKey } from './src/runs/run-keys.ts';
 import { recordValue } from './src/record/record.store.ts';
 import type { Run } from './src/record/record.ts';
 import { RunDoor, type RunDoorShape, type RunsLayer } from './src/runs/runs.store.ts';
+import { CardDoor, cardDoorAt, cardKey, cardTryKey } from './src/cards/cards.store.ts';
+import { CardName } from './src/inbox/inbox.model.ts';
 
 /**
  * A function of the factories' store taking the store's root first, as a test plants a factory by hand: at the root its process's
@@ -322,3 +324,41 @@ export const readAsks = (root: string, id: string) => runsNow(root).asks.read(id
 export const readAnswers = (root: string, id: string) => runsNow(root).asks.answers(id);
 export { RECORD_CEILING } from './src/keyspace/keyspace.store.ts';
 export { deliveryKey, subscriptionKey } from './src/subscription/subscription.store.ts';
+export { cardKey, cardTryKey };
+
+/**
+ * The text of the card `name` the store `root` holds, as the Card door reads it (a card file dropped into its inbox taken up first), or
+ * null where it holds none: what a test reads a card filed or written back by.
+ * @param root The store's root folder.
+ * @param name The card's name.
+ */
+export const cardText = (root: string, name: string) =>
+  Effect.runSync(Effect.flatMap(CardDoor, (door) => door.cards.read(CardName.read(name))).pipe(Effect.provide(cardDoorAt(root))));
+
+/**
+ * The names of the cards the store `root` holds, sorted, as the Card door lists them (a card file dropped into its inbox taken up first).
+ * @param root The store's root folder.
+ */
+export const cardNames = (root: string) =>
+  Effect.runSync(Effect.flatMap(CardDoor, (door) => door.cards.entries()).pipe(Effect.provide(cardDoorAt(root)))).map((e) =>
+    e.file.slice(0, -'.md'.length),
+  );
+
+/**
+ * The card `name` planted in the store `root` with `text`, over what is there: a card filed, or written over by hand, as no verb would.
+ * @param root The store's root folder.
+ * @param name The card's name.
+ * @param text The card's text.
+ * @param filedAt When it was filed, as an ISO time.
+ */
+export const plantCard = (root: string, name: string, text: string, filedAt = new Date().toISOString()) =>
+  plantRecord(root, cardKey(name), JSON.stringify({ text, filedAt }));
+
+/**
+ * Every card and every try of one of the store `root` deleted: what a test that empties its store between stories runs beside removing
+ * `inbox/` and `queue/`, since the keyspace keeps them.
+ * @param root The store's root folder.
+ */
+export const emptyCards = (root: string) => {
+  for (const key of [...keysUnder(root, '/registry/cards/'), ...keysUnder(root, '/registry/cardtries/')]) dropRecord(root, key);
+};

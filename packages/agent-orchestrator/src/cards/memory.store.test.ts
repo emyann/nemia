@@ -1,6 +1,6 @@
 /**
- * The Card door's memory stand-in, held to the door's walks (`test/card-walks.ts`), each on a stand-in of its own: what the files say
- * (`cards.store.test.ts` runs the same walks on them), the stand-in says.
+ * The Card door's memory stand-in, held to the door's walks (`test/card-walks.ts`), each on a stand-in of its own: what the keyspace says
+ * (`cards.store.test.ts` runs the same walks on it), the stand-in says.
  */
 import { test } from 'vitest';
 import { MEMORY_ROOT, cardDoorMemory } from './memory.store.ts';

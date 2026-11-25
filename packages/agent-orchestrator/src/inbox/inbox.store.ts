@@ -13,7 +13,6 @@ import { setting } from '../config/config.store.ts';
 import { CARD_FILES_BYTES_MOST, CARD_FILES_MOST, DEFAULT_NAMESPACE } from 'objects';
 import { type CardFileGiven, cardFilesRefusal, cardFilesWords } from './card-files.ts';
 import fs from 'node:fs';
-import path from 'node:path';
 import { Effect } from 'effect';
 import {
   cardsListed,
@@ -37,7 +36,7 @@ import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts'
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { inheritedLabels, parseLabelEdits, type LeftOut } from '../labels/labels.ts';
-import { CardDoor, cardNameAt, inboxAt } from '../cards/cards.store.ts';
+import { CardDoor, cardNameAt } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError } from '../step/step.ts';
@@ -312,7 +311,7 @@ export const dropFromInbox = Effect.fn('dropFromInbox')(function* (name: string)
         Effect.die(
           Object.assign(
             new Error(
-              `nemia inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`,
+              `nemia inbox rm: the card ${name} (${file}) could not be removed — ${(err as Error).message}. Nothing was dropped: fix what stops it and drop it again.`,
             ),
             { exitCode: 1 },
           ),
@@ -331,14 +330,16 @@ export const dropFromInbox = Effect.fn('dropFromInbox')(function* (name: string)
  * @param home The store's root, whose inbox is read.
  * @param given What was typed: a path, a card's name with or without its `.md`, or any other text.
  */
-export const inboxNameAt = (home: string, given: string) => {
+export const inboxNameAt = Effect.fn('inboxNameAt')(function* (home: string, given: string) {
   const at = cardNameAt(home, given);
   if (at !== null) return at;
   if (inboxNameRefusal(given) !== undefined || fs.existsSync(given)) return null;
   const bare = given.endsWith('.md') ? given.slice(0, -'.md'.length) : undefined;
-  const named = [given, ...(bare ? [bare] : [])];
-  return named.find((name) => fs.existsSync(path.join(inboxAt(home), `${name}.md`))) ?? null;
-};
+  const door = yield* CardDoor;
+  for (const name of [given, ...(bare ? [bare] : [])])
+    if (inboxNameRefusal(name) === undefined && (yield* door.cards.read(CardName.read(name))) !== null) return name;
+  return null;
+});
 
 /**
  * What the card triggers read on a pass (`Triggering`): every factory's that reads, and when each card of `files` was filed, read once

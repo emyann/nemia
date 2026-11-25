@@ -116,12 +116,18 @@ const driftWords = (d: NonNullable<RunRefreshed['drift']>[number]) =>
   `${d.kind} ${d.name}: ${d.step ? `${d.step} ran on rev ${d.pinned}` : `rev ${d.pinned}`}, now ${d.now}`;
 
 /**
- * What `nemia refresh` prints: the new revisions asked for and the kinds it was behind on, or, with `--base`, the merge it asked.
+ * What `nemia refresh` prints: the new revisions asked for and the kinds it was behind on, or, with `--base`, the merge it asked, or
+ * with `--off` too the merge taken back.
  * @param runId The run's id.
  * @param base Whether `--base` was typed: the merge of the base asked rather than the new revisions.
  */
-export const refreshLines = ({ drift, said: merged, file }: RunRefreshed, runId: string, base: boolean) =>
-  base
+export const refreshLines = ({ drift, said: merged, file, step, target, round, takenBack, stray }: RunRefreshed, runId: string, base: boolean) =>
+  base && takenBack
+    ? [
+        `${runId}  taken back: ${stray ? `a record at the merge of the base into ${target ?? ''}'s work that read as no ask, set aside as it was` : `the merge of the base into ${target ?? ''}'s work${round !== undefined ? `, asked on round ${round}` : ''}`}, at ${takenBack.at} — nothing is filed for it; to ask again: nemia refresh ${runId} ${step ?? ''} --base`,
+        `   ${file ?? ''}`,
+      ]
+    : base
     ? [`${runId}  ${merged ?? ''}`, `   ${file ?? ''}`]
     : [
         `${runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
@@ -129,7 +135,8 @@ export const refreshLines = ({ drift, said: merged, file }: RunRefreshed, runId:
       ];
 
 /**
- * `nemia refresh <runId> [<step>] [--base]`: the run pinned to the new revisions, or its loop sent to merge its base.
+ * `nemia refresh <runId> [<step>] [--base [--off]]`: the run pinned to the new revisions, or its loop sent to merge its base, or that
+ * merge taken back.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function refresh(args: Args) {
@@ -137,7 +144,8 @@ export async function refresh(args: Args) {
   const base = switchArg(args, 'base');
   const step = textArg(args, 'step');
   const namespace = await namespaceOfRun(REFRESH_WORDS.name, name);
-  const payload = { ...(base ? { base } : {}), ...(step !== undefined ? { step } : {}) };
+  const off = switchArg(args, 'off');
+  const payload = { ...(base ? { base } : {}), ...(off ? { off } : {}), ...(step !== undefined ? { step } : {}) };
   said(refreshLines(await asked(REFRESH_WORDS.name, (c) => c.runs.refresh({ params: { namespace, name }, payload })), name, base));
   return 0;
 }

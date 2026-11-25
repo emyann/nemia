@@ -310,6 +310,11 @@ test("an agent answers a gate's questions over the port as the tools say: decide
   }
   const approve = tools.find((t) => t.name === 'approve')?.inputSchema.properties ?? {};
   assert.ok('off' in approve, 'approve takes off: an approval taken back, as nemia approve --off');
+  const retry = tools.find((t) => t.name === 'retry')?.inputSchema;
+  assert.ok('off' in (retry?.properties ?? {}), 'retry takes off: a try or a round taken back, as nemia retry --off');
+  assert.ok(!(retry?.required ?? []).includes('mode'), 'retry asks no way of a take-back: mode is optional');
+  const refresh = tools.find((t) => t.name === 'refresh')?.inputSchema.properties;
+  if (refresh) assert.ok('off' in refresh, 'refresh takes off: a merge taken back, as nemia refresh --base --off');
   const decided = await client.callTool({ name: 'decide', arguments: { runId: id } });
   assert.notEqual(decided.isError, true, textOf(decided));
   const { questions } = decided.structuredContent as Decidable;

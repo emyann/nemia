@@ -9,7 +9,7 @@
  * - `money`: money is no meaning (*The four meanings*): no class or variable of it.
  * - `rawType`: text is set through the kit's five primitives, never a raw type class (*How text is written*): `text-body-small`.
  * - `kitSurface`: `surface`, `surface-dim`, `surface-bright`, `surface-variant` and `surface-tint` are the kit's, and the board's
- *   parts write none of them (*Neutrals: the surface ladder*).
+ *   parts write none of them (*Neutrals: the surface ladder*); its list is kept empty, as money's is.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

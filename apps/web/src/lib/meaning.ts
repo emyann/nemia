@@ -22,7 +22,7 @@ export const container: Record<Hue, string> = {
   alive: 'bg-alive-container text-on-alive-container',
   failure: 'bg-failure-container text-on-failure-container',
   grey: 'bg-surface-container-highest text-on-surface-variant',
-  sage: 'bg-surface-variant text-on-surface-variant',
+  sage: 'bg-surface-container-highest text-on-surface-variant',
 };
 
 /** No ground of its own: the hue as a ring, and as the ink where the hue reads on the page's ground. */

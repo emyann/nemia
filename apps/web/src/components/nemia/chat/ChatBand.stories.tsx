@@ -9,7 +9,7 @@ export default meta;
 const SHEET = {
   width: 400,
   padding: 16,
-  background: 'var(--md-sys-color-surface)',
+  background: 'var(--md-sys-color-background)',
   display: 'flex',
   flexDirection: 'column' as const,
   gap: 10,

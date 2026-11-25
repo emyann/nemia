@@ -108,7 +108,7 @@ export function FrameRail({ path, search }: { path: string; search: Record<strin
     <div
       data-frame-rail
       data-rail-scroll
-      className="sticky top-0 z-30 flex h-[calc(100svh-var(--frame-foot))] w-20 shrink-0 flex-col overflow-y-auto bg-surface"
+      className="sticky top-0 z-30 flex h-[calc(100svh-var(--frame-foot))] w-20 shrink-0 flex-col overflow-y-auto bg-background"
     >
       <div className="flex flex-col items-center gap-2 pt-3 pb-2">
         <HerFace path={path} />

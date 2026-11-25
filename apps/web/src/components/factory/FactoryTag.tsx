@@ -6,7 +6,7 @@ import { RouteLink } from '../agent/AgentParts';
 import { focusRing } from '@/components/ui/ds/utils';
 
 const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-body-small leading-none font-medium whitespace-nowrap';
-const NAMED = 'border-sage bg-surface-variant text-on-surface-variant';
+const NAMED = 'border-sage bg-surface-container-highest text-on-surface-variant';
 const MUTED = 'border-outline-variant text-on-surface-variant';
 
 /** A factory's mark, before its name on a tag, so it reads as a factory beside a repository or a place. */

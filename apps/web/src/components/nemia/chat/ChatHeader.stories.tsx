@@ -10,7 +10,7 @@ const meta: Meta<typeof ChatHeader> = {
 export default meta;
 
 /** Where the header stands in its story: her side sheet's width, on its ground. */
-const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-surface)' };
+const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-background)' };
 
 /** In her side sheet: open as a page, and close. */
 export const InHerSheet: StoryObj<typeof ChatHeader> = {

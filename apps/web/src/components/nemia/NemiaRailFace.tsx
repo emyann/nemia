@@ -55,7 +55,7 @@ export function NemiaRailFace({
       <span
         aria-hidden
         data-nemia-face-dot={cues[0]?.hue ?? 'alive'}
-        className={cn('absolute -top-0.5 -right-0.5 size-[11px] rounded-full ring-2 ring-surface', DOT[cues[0]?.hue ?? 'alive'])}
+        className={cn('absolute -top-0.5 -right-0.5 size-[11px] rounded-full ring-2 ring-background', DOT[cues[0]?.hue ?? 'alive'])}
       />
     </>
   );

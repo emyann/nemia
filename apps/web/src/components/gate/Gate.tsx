@@ -616,7 +616,7 @@ export function Approved({
     <section
       aria-label={`The approval of ${step}`}
       data-approval={approval.try}
-      className="space-y-1 rounded border border-sage bg-surface-variant px-3 py-2 text-body-medium text-on-surface-variant"
+      className="space-y-1 rounded border border-sage bg-surface-container px-3 py-2 text-body-medium text-on-surface-variant"
     >
       <p>
         <span className="font-medium text-on-surface">Approved</span>{' '}

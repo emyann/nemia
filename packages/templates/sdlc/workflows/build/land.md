@@ -8,7 +8,7 @@ branch in this checkout. Both acts are the one frozen script this step's check a
 every `git push`. Run it from the run's frozen carried files (`$WF_CARRIED_FILES`):
 
 ```
-node "$WF_CARRIED_FILES/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md" --check "${{ parameters.ciCheck }}" --refresh "${{ parameters.landingRefresh }}" --derives "${{ parameters.landingDerives }}"
+node "$WF_CARRIED_FILES/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md" --check "${{ parameters.ciCheck }}" --refresh "${{ parameters.landingRefresh }}" --derives "${{ parameters.landingDerives }}" --install "${{ parameters.landingInstall }}"
 ```
 
 Write that body first, in a file of your files directory: what landed and why, read off `git log` and `git diff --stat` of the result
@@ -18,9 +18,10 @@ out — then merges it with `--merge` and fast-forwards this checkout onto what 
 
 Where the factory names a refresh (`${{ parameters.landingRefresh }}`, the command that derives `${{ parameters.landingDerives }}`;
 empty, it names none) and the branch lacks the base, the script first brings the branch up to it: it merges the base into the branch
-in the run's worktree, runs that command there, and pushes the result for `${{ parameters.ciCheck }}` to judge. It refuses where the
-merge leaves anything unmerged, the command fails, or the result differs from git's plain merge outside those paths, and takes the
-merge back. A merge that answers it refreshed and pushed the branch has merged nothing yet: sign off `done` all the same, with your
+in the run's worktree, runs the factory's install there first (`${{ parameters.landingInstall }}`; empty, none), so the command
+reads the dependencies the merged tree names, then runs that command there, and pushes the result for `${{ parameters.ciCheck }}` to
+judge. It refuses where the merge leaves anything unmerged, the install or the command fails, or the result differs from git's plain
+merge outside those paths, and takes the merge back. A merge that answers it refreshed and pushed the branch has merged nothing yet: sign off `done` all the same, with your
 subject and body in `message`. This step's check merges that head once `${{ parameters.ciCheck }}` is green at it, with that subject
 and body, and refuses where it is red, naming the `nemia retry` line that sends the work back.
 

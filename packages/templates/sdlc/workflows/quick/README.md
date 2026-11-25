@@ -90,7 +90,8 @@ repository's suite on the commit the check pushed, and the check waits on it. La
 carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its check is the receipt that the merge happened —
 `build`'s land step to the letter but its `after:` and its gate (check, fence and budget, and its note, which is `build`'s own
 `land.md`, which the step's `instruction:` names as a `{ path }`). Where the factory names a refresh (`landingRefresh`,
-`landingDerives`) and the branch lacks the base, the merge first merges the base into the branch, derives those files again and pushes,
+`landingDerives`) and the branch lacks the base, the merge first merges the base into the branch, installs the merged tree's
+dependencies where the factory names its `landingInstall`, derives those files again and pushes,
 and the check merges that head once CI is green at it, as `build`'s README says: the landed commit differs from the reviewed head only
 in the files `landingDerives` names. Main has one guard, whatever the workflow: the required CI context on the head the review read, and
 a merge that refuses anything but this run's own green pull request. Where the factory's `landingWaitsOnCi` is true (the default), the

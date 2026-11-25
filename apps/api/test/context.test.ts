@@ -14,7 +14,7 @@ import type { Card } from 'objects';
 import { addToInbox, StoreRoot } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor } from './placed.ts';
 import { objectOf, toldOf } from './run-reads.ts';
 
@@ -30,8 +30,9 @@ const JSON_TYPE = { 'content-type': 'application/json' };
 
 const writeRun = (run: { id: string } & Record<string, unknown>) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${run.id}.json`),
+  plantRecord(
+    root,
+    runKey(run.id),
     JSON.stringify({
       repo: '/code/app',
       workspace: '/code/app',

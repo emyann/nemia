@@ -34,7 +34,7 @@ export const slotsRead = Effect.fn('slotsRead')(function* () {
   const informer = yield* Informer;
   if (!informer || (lastCeilings(home)?.runs ?? config.maxRuns) <= 0) return yield* slotsOf(e, undefined, config, parents);
   const read = yield* informerRead(e, informer, yield* tried(() => config.verifyRest), git, sameJudgement);
-  const all = storeRunsGiven(home, read.given);
+  const all = yield* storeRunsGiven(read.given);
   read.only(all.map((run) => run.id));
   const settled = new Set(all.filter((run) => slotSettled(read.kept(run)?.judged)).map((run) => run.id));
   if (read.verify) return yield* slotsOf(e, all, config, parents, settled);

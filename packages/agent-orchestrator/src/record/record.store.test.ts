@@ -6,28 +6,15 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import * as store from './record.store.ts';
 import { routeAsk } from '../route/index.ts';
+import { dropRecord, listRuns, plantAsk, plantRecord, recordText, rewriteRun, runKey, runRecord } from '../../testing.ts';
 
 const ROOT = scratch('wf-record-read-');
-/** A person's route file for a condition's try, where `nemia route` writes it. */
-const routeFile = (id: string, step: string, n: number) => path.join(store.asksDir(ROOT, id), routeAsk(step, n));
-const {
-  UnreadableRecord,
-  acceptanceIn,
-  approvalIn,
-  askIn,
-  listRuns,
-  runRecord,
-  rewriteRun,
-  roundAskIn,
-  runFile,
-  runsDir,
-  pruneFile,
-  holdFile,
-} = store;
+/** A person's route for a condition's try, planted where `nemia route` writes it. */
+const plantRoute = (id: string, step: string, n: number, text: string) => plantAsk(ROOT, id, routeAsk(step, n), text);
+const { UnreadableRecord, acceptanceIn, approvalIn, askIn, roundAskIn, runsDir, pruneFile, holdFile } = store;
 
 fs.mkdirSync(runsDir(ROOT), { recursive: true });
 
@@ -51,7 +38,7 @@ const aRecord = (id: string) =>
   }) satisfies Record<string, unknown>;
 
 const put = (id: string, record: unknown) =>
-  fs.writeFileSync(runFile(ROOT, id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
+  plantRecord(ROOT, runKey(id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
 
 /** What `runRecord` is refused with, as its message — exit code 2, and an `UnreadableRecord`. */
 const refusalOf = (id: string) => {
@@ -180,7 +167,7 @@ describe("a record the tick did not write is refused by `runRecord` at its field
       put(id, record);
       const said = refusalOf(id);
       assert.ok(said.includes(says), said);
-      assert.ok(said.startsWith(`run ${id}: its record, ${runFile(ROOT, id)}, `), said);
+      assert.ok(said.startsWith(`run ${id}: its record, ${runKey(id)}, `), said);
       assert.ok(said.includes(FIX), said);
       if (typeof record !== 'string') assert.ok(!said.includes('Expected'), `in wf's words, not the parser's: ${said}`);
     });
@@ -192,7 +179,7 @@ describe("a record the tick did not write is refused by `runRecord` at its field
     const said = refusalOf('r-huge');
     assert.ok(said.includes(`its \`workflow.0.after\` is "${'x'.repeat(59)}…, where nemia writes`), said.slice(0, 300));
     assert.ok(said.length < 2_000, `${said.length} characters`);
-    fs.rmSync(runFile(ROOT, 'r-huge'));
+    dropRecord(ROOT, runKey('r-huge'));
   });
   test('a run id with no record is told to try `nemia ls`, not called unreadable', () => {
     assert.throws(
@@ -221,7 +208,7 @@ describe("a record the tick did not write is refused by `runRecord` at its field
         said.some((l) => l.startsWith(`left out: run ${id}: its record, `) && l.includes(FIX)),
         `${id} said: ${said.join('\n')}`,
       );
-      fs.rmSync(runFile(ROOT, id));
+      dropRecord(ROOT, runKey(id));
     }
   });
 });
@@ -246,7 +233,7 @@ test('`listRuns` lists the run `kept` answers for an id as given, its record nev
   const unkept: string[] = [];
   assert.ok(!listRuns(ROOT, (line) => unkept.push(line)).some((r) => r.id === 'r-kept'), 'with no kept, the record is read, and left out');
   assert.ok(unkept.some((l) => l.startsWith('left out: run r-kept: its record, ')));
-  for (const id of ['r-kept', 'r-read']) fs.rmSync(runFile(ROOT, id));
+  for (const id of ['r-kept', 'r-read']) dropRecord(ROOT, runKey(id));
 });
 
 test("what the tick does not name survives a read and a rewrite: a key on the record and on a frozen step, and a git record's `placeSkill`", () => {
@@ -254,7 +241,7 @@ test("what the tick does not name survives a read and a rewrite: a key on the re
   (record.workflow as Array<Record<string, unknown>>)[0].aNewStepKey = 3;
   put('r-newer', record);
   assert.ok(rewriteRun(ROOT, runRecord(ROOT, 'r-newer')));
-  const written = JSON.parse(fs.readFileSync(runFile(ROOT, 'r-newer'), 'utf8')) as Record<string, unknown>;
+  const written = JSON.parse(recordText(ROOT, runKey('r-newer')) ?? '') as Record<string, unknown>;
   assert.deepEqual(written.fromANewerWf, { kept: true });
   assert.equal((written.workflow as Array<Record<string, unknown>>)[0].aNewStepKey, 3);
 
@@ -263,7 +250,7 @@ test("what the tick does not name survives a read and a rewrite: a key on the re
   const run = runRecord(ROOT, 'r-placed');
   assert.deepEqual(run.placeSkill, placeSkill);
   assert.ok(rewriteRun(ROOT, run));
-  assert.deepEqual((JSON.parse(fs.readFileSync(runFile(ROOT, 'r-placed'), 'utf8')) as Record<string, unknown>).placeSkill, placeSkill);
+  assert.deepEqual((JSON.parse(recordText(ROOT, runKey('r-placed')) ?? '') as Record<string, unknown>).placeSkill, placeSkill);
   put('r-unplaced', { ...aRecord('r-unplaced'), fromAnOlderWf: 1 });
   const older = runRecord(ROOT, 'r-unplaced');
   assert.equal('placeSkill' in older, false, 'one with none reads as before');
@@ -274,17 +261,15 @@ test("a person's route is read onto its condition's record for the try it names,
   const record = aRecord('r-routed');
   (record.steps as Record<string, unknown>).review = { taskId: null, route: { route: 'web', try: 1, by: 'table' } };
   put('r-routed', record);
-  fs.mkdirSync(path.dirname(routeFile('r-routed', 'review', 1)), { recursive: true });
-  fs.writeFileSync(routeFile('r-routed', 'review', 1), JSON.stringify({ route: 'docs', at: '2026-09-01T00:00:00.000Z' }));
-  fs.writeFileSync(routeFile('r-routed', 'review', 2), JSON.stringify({ route: 'backend', at: '2026-09-01T00:00:00.000Z' }));
+  plantRoute('r-routed', 'review', 1, JSON.stringify({ route: 'docs', at: '2026-09-01T00:00:00.000Z' }));
+  plantRoute('r-routed', 'review', 2, JSON.stringify({ route: 'backend', at: '2026-09-01T00:00:00.000Z' }));
   const run = runRecord(ROOT, 'r-routed');
   assert.deepEqual(run.steps.review?.route, { route: 'docs', try: 1, by: 'person' }, 'the try it is on; a later try is not read');
   assert.ok(rewriteRun(ROOT, run));
-  const written = JSON.parse(fs.readFileSync(runFile(ROOT, 'r-routed'), 'utf8')) as { steps: Record<string, { route?: unknown }> };
+  const written = JSON.parse(recordText(ROOT, runKey('r-routed')) ?? '') as { steps: Record<string, { route?: unknown }> };
   assert.equal(written.steps.review?.route, undefined, "the person's route is their file's, never the record's");
   put('r-unrouted', aRecord('r-unrouted'));
-  fs.mkdirSync(path.dirname(routeFile('r-unrouted', 'review', 1)), { recursive: true });
-  fs.writeFileSync(routeFile('r-unrouted', 'review', 1), JSON.stringify({ at: '2026-09-01T00:00:00.000Z' }));
+  plantRoute('r-unrouted', 'review', 1, JSON.stringify({ at: '2026-09-01T00:00:00.000Z' }));
   assert.equal(runRecord(ROOT, 'r-unrouted').steps.review?.route, undefined, 'a file naming no route routes nothing');
 });
 
@@ -307,14 +292,8 @@ test('a marker that does not read still holds its run: a prune marker is pruned,
   assert.deepEqual(run.hold, { at: '', until: [] });
 });
 
-/** An ask file with `body`, as a person might have written it by hand. */
-const ask = (name: string, body: unknown) => {
-  const dir = path.join(ROOT, 'asks');
-  fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, name);
-  fs.writeFileSync(file, typeof body === 'string' ? body : JSON.stringify(body));
-  return file;
-};
+/** An ask's text with `body`, as a person might have written it by hand; `name` says which row it is. */
+const ask = (_name: string, body: unknown) => (typeof body === 'string' ? body : JSON.stringify(body));
 
 const AT = '2026-09-01T00:00:00.000Z';
 

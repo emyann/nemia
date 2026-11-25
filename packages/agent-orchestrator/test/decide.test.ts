@@ -9,6 +9,7 @@
  *
  * The test's store is its own, at `ROOT`, given as `ENV`.
  */
+import { keysUnder, listRuns, plantAsk, recordText, runKey, runRecord } from '../testing.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import { beforeAll, describe, test } from 'vitest';
@@ -44,7 +45,6 @@ import {
   runWith,
   tryNote,
 } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
@@ -223,12 +223,7 @@ const decideSaid = ({ run, listing }: { run: Run; listing: Listing }) => listing
 
 /** An approval as `nemia approve` writes one: a file of a person's beside the retry asks. */
 const approveByHand = (id: string, step: string, n: number) => {
-  const dir = path.join(ROOT, 'runs', `${id}.asks`);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, `approve-${step}-${n}`),
-    `${JSON.stringify({ step, try: n, at: '2026-09-17T10:00:00.000Z' }, null, 2)}\n`,
-  );
+  plantAsk(ROOT, id, `approve-${step}-${n}`, `${JSON.stringify({ step, try: n, at: '2026-09-17T10:00:00.000Z' }, null, 2)}\n`);
 };
 
 describe('a run waiting on you, read and landed: its screens, and what approving its ending does', () => {
@@ -718,7 +713,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
     async () => {
       const repo = aRepo();
       const dir = ending('ship', 'Ship it.\n');
-      const before = fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+      const before = keysUnder(ROOT, '/registry/runs/').length;
       await assert.rejects(
         stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
         (err: Error & { exitCode?: number; _tag?: string }) => {
@@ -728,7 +723,7 @@ describe('a run waiting on you, read and landed: its screens, and what approving
           return true;
         },
       );
-      assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length, before, 'nothing written');
+      assert.equal(keysUnder(ROOT, '/registry/runs/').length, before, 'nothing written');
       assert.ok(await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir })), 'with worktrees, it starts');
     },
   );
@@ -783,10 +778,7 @@ describe('a step retried, answered, over its budget and nudged: what `nemia deci
       ['blocked', 'And the README, too?'],
       'and what the try made of them',
     );
-    assert.ok(
-      !fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8').includes('The flag is public'),
-      'composed on read: the record keeps no message',
-    );
+    assert.ok(!(recordText(ROOT, runKey(id)) ?? '').includes('The flag is public'), 'composed on read: the record keeps no message');
   });
   s.test('what a step consumed is summed over its attempts — one that never started left out, the one in flight read off the view', () => {
     const views: Record<string, unknown> = {

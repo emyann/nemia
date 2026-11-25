@@ -13,8 +13,18 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
-import { addToInbox, fromNote, inboxDir, startFromInbox, runsAtOnce, engine, StoreRoot } from 'agent-orchestrator';
-import { addFactory, attachWorkflow, hireAgent, removeFactory } from 'agent-orchestrator/testing';
+import { addToInbox, fromNote, inboxDir, startFromInbox, engine, StoreRoot } from 'agent-orchestrator';
+import {
+  addFactory,
+  attachWorkflow,
+  emptyRuns,
+  hireAgent,
+  keysUnder,
+  plantRecord,
+  removeFactory,
+  runKey,
+  runsNow,
+} from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { TEAM } from '../../test/team.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
@@ -71,7 +81,11 @@ hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
 const inbox = path.join(root, 'inbox');
 const cards = () => (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []);
-const runFiles = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
+const runFiles = () =>
+  [
+    ...(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []),
+    ...keysUnder(root, '/registry/runs/'),
+  ].sort();
 const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** The factory a card's namespace names: none for `default`. */
@@ -144,6 +158,7 @@ const listed = async (address = '/api/cards') => {
 const clear = () => {
   fs.rmSync(inbox, { recursive: true, force: true });
   fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
+  emptyRuns(root);
 };
 
 /** The inbox folder as it is: each file's name and text, to show a read wrote nothing. */
@@ -209,7 +224,7 @@ describe('a person starts a card: the run carries where it came from, and the ca
       assert.ok(answered.run?.steps.length, JSON.stringify(answered.run));
       assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
-      const run = runsAtOnce(root).runs.read(answered.id);
+      const run = runsNow(root).runs.read(answered.id);
       assert.deepEqual(
         { from: run.from, brief: run.brief, workflowDir: run.workflowDir, repo: run.repo, after: run.after },
         {
@@ -233,7 +248,7 @@ describe('a person starts a card: the run carries where it came from, and the ca
       const { card: plain } = onStore(addToInbox({ text: 'Keep the brief\n\nAs the card says it.' }));
       const bodied = await startCard({ workflow: 'dev', card: plain.name });
       assert.equal(bodied.status, 201, await bodied.clone().text());
-      const bodiedRun = runsAtOnce(root).runs.read(((await bodied.json()) as CardStarted).id);
+      const bodiedRun = runsNow(root).runs.read(((await bodied.json()) as CardStarted).id);
       assert.deepEqual(
         [bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from],
         ['Keep the brief\n\nAs the card says it.', dev, { inbox: plain.name }],
@@ -254,7 +269,7 @@ describe('a person starts a card: the run carries where it came from, and the ca
       const lines = await linesOf(app, id);
       assert.equal(
         lines.fromNote,
-        fromNote(runsAtOnce(root).runs.read(id)),
+        fromNote(runsNow(root).runs.read(id)),
         "`nemia decide`'s sentence is the lines read's alone: the object leaves it out",
       );
       assert.equal(lines.fromNote, `from inbox card ${card.name}`);
@@ -332,7 +347,7 @@ describe('POST /api/runs with `card`: what a start of a card refuses, writing no
   test('a card started already is a 409, a blank brief, a card that does not read and a run it cannot wait on are 422s — and nothing is written or removed', async () => {
     clear();
     const { card: started } = onStore(addToInbox({ text: 'Started once' }));
-    write(path.join(root, 'runs', 'started-once-k2q9.json'), startedFrom('started-once-k2q9', started.name));
+    plantRecord(root, runKey('started-once-k2q9'), startedFrom('started-once-k2q9', started.name));
     const { card } = onStore(addToInbox({ text: 'Not started' }));
     write(path.join(inbox, 'broken.md'), '---\nafer: dev\n---\nMisspelt.\n');
     const before = runFiles();
@@ -558,7 +573,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       assert.equal(started.status, 201, await started.clone().text());
       const answered = (await started.json()) as CardStarted;
       assert.equal(answered.ignoredRepo, `${elsewhere}/`, "the card's `repo:`, said as not read");
-      const run = runsAtOnce(root).runs.read(answered.id);
+      const run = runsNow(root).runs.read(answered.id);
       assert.deepEqual([run.repo, run.workflowDir], [repo, dev], "started on desk's repository, its workflow found there by name");
     },
   );
@@ -569,7 +584,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       write(path.join(inbox, 'broken.md'), '---\nafter: broken\n---\nWait for it.\n');
       write(path.join(inbox, 'notes.txt'), 'not a card\n');
       const { card } = onStore(addToInbox({ text: 'Started at the command line' }));
-      write(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', card.name));
+      plantRecord(root, runKey('started-run-k2q9'), startedFrom('started-run-k2q9', card.name));
 
       const entries = await listed();
       const broken = entries.find((e) => e.name === 'broken')!;
@@ -686,7 +701,7 @@ describe("a person files cards, in a factory and out of one, lists them, opens a
       );
       const started = await startCard({ card: there.name }, JSON_TYPE, 'pair');
       assert.equal(started.status, 201, await started.clone().text());
-      const run = runsAtOnce(root).runs.read(((await started.json()) as CardStarted).id);
+      const run = runsNow(root).runs.read(((await started.json()) as CardStarted).id);
       assert.deepEqual(
         [run.factory, run.repo, run.workflowDir],
         ['pair', second, path.join(second, 'workflows', 'dev')],
@@ -712,7 +727,7 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
   test("a card read by a name that is not a card's is a 422, and one that is not there a 404 — and nothing is read outside the inbox or written", async () => {
     clear();
     const { card } = onStore(addToInbox({ text: 'Keep this one' }));
-    write(path.join(root, 'runs', 'r-1.json'), '{"id":"r-1"}');
+    plantRecord(root, runKey('r-1'), '{"id":"r-1"}');
     const before = inboxFiles();
 
     for (const sent of ['.hidden', '..%2Fruns%2Fr-1', 'a%2Fb', 'a%5Cb']) {
@@ -728,6 +743,7 @@ describe("what a filing, a card's page or a drop refuses, writing nothing", () =
 
     assert.deepEqual(inboxFiles(), before);
     fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
+    emptyRuns(root);
   });
   test("a card's page for a name that is not there, in an inbox holding more than cards, names the cards as the package does — a card that does not read among them, a stray file and a folder not — and a card is found before a stray file of its name", async () => {
     clear();
@@ -986,7 +1002,7 @@ test("a card started through its factory's namespace runs in that factory, on th
 
   const own = await start('by-its-own', {});
   assert.equal(own.status, 201, await own.clone().text());
-  const ownRun = runsAtOnce(root).runs.read(((await own.json()) as CardStarted).id);
+  const ownRun = runsNow(root).runs.read(((await own.json()) as CardStarted).id);
   assert.deepEqual(
     [ownRun.workflowDir, ownRun.factory, ownRun.repo],
     [acmeDev, 'acme', acmeRepo],
@@ -995,7 +1011,7 @@ test("a card started through its factory's namespace runs in that factory, on th
 
   const named = await start('by-the-start', { workflow: 'dev' });
   assert.equal(named.status, 201, await named.clone().text());
-  const namedRun = runsAtOnce(root).runs.read(((await named.json()) as CardStarted).id);
+  const namedRun = runsNow(root).runs.read(((await named.json()) as CardStarted).id);
   assert.deepEqual(
     [namedRun.workflowDir, namedRun.factory, namedRun.repo],
     [acmeDev, 'acme', acmeRepo],

@@ -15,6 +15,7 @@
  * Its store is its own at `ROOT`, given as `ENV`.
  */
 
+import { askNames, listRuns, runRecord, runsNow } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -44,7 +45,6 @@ import {
   runWith as runEngine,
   gitPlaceLayer,
 } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { checkOutputFile } from '../src/check/check.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { roundOf } from '../src/run.ts';
@@ -54,7 +54,6 @@ import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { filedDenies } from '../src/ending/ending.ts';
 import { landingContract } from '../src/check/check.ts';
 import { passStanding, standingLive } from '../src/standing/standing.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-ship-git-');
@@ -65,7 +64,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 /** A pass of the tick's over every run of the store, on the git place: where their branches stand, written down for every reader. */
 const aPass = () => runPlaced(passStanding(listRuns(ROOT)));
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
 type Place = import('../src/place/place.store.ts').Place;
 type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
@@ -730,7 +729,7 @@ const mergeRefused = (id: string, words: RegExp) => (err: Error & { exitCode?: n
   assert.equal(err.exitCode, 2);
   assert.match(err.message, words);
   assert.deepEqual(
-    fs.readdirSync(path.join(ROOT, 'runs', `${id}.asks`)).filter((f) => f.startsWith('merge-')),
+    askNames(ROOT, id).filter((f) => f.startsWith('merge-')),
     [],
   );
   return true;

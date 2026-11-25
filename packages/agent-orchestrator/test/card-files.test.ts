@@ -7,6 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { keysUnder, runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +17,7 @@ import { INBOX_ADD, INBOX_ATTACH, inboxDir, runWith, startFromInbox } from '../s
 import { Effect } from 'effect';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { FileDoor } from '../src/start/files.store.ts';
-import { inputsDir, runRecord } from '../src/record/record.store.ts';
+import { inputsDir } from '../src/record/record.store.ts';
 import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { staged } from './story.ts';
@@ -80,7 +81,7 @@ const card = (name: string, files: Record<string, string>) => {
 };
 
 /** The store's runs, by their directory: what a refused start must leave as it was. */
-const runsNow = () => fs.readdirSync(path.join(ROOT, 'runs')).sort() satisfies string[];
+const runsNow = () => [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort() satisfies string[];
 
 describe("a card's files reach the run started from it", () => {
   test("the card's File is copied into the run's inputs under the card's name for it, and frozen on the record", async () => {

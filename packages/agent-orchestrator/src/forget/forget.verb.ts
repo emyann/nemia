@@ -5,6 +5,7 @@
  * (`EngineService`), run with `runWith`. It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs
  * nothing and is settled as it signed: no pass reads the run again to close it.
  */
+import { askKey } from '../runs/run-keys.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
@@ -29,7 +30,6 @@ import {
 import { lstatOf } from '../record/record.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { UnloadedFolder } from '../steps/steps.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
 import { PlaceService, readRunPlace, type Place, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
@@ -112,7 +112,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const git = asksStanding(f.run, f.steps) ? yield* standingLive([f.run]) : standingReader(NOTHING_READ);
   const asked = yield* PlaceService;
-  const refusal = yield* tried(() => refusalOf(home, id, f, git, asked));
+  const refusal = yield* refusalOf(id, f, git, asked);
   if (refusal) {
     const refused: Forgot = { ...said, kind: 'refused', refusal, ...nothing() };
     return refused;
@@ -127,7 +127,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   yield* (yield* RunDoor).forgetting.write(RunId.read(id), taskIds);
   yield* closeWaitingTasks(e, run, f.views);
   if (!isRepositoryRun(run) || !place) {
-    const files = yield* tried(() => removeKeyed(home, id, Object.keys(run.steps)));
+    const files = yield* removeKeyed(home, id, Object.keys(run.steps));
     const folder: Forgot = { ...said, folder: true, kind: 'forgotten', ...nothing(), files, engine: yield* forgetTasks(id, taskIds) };
     return folder;
   }
@@ -138,7 +138,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
     return held;
   }
   const branches = yield* tried(() => deleteBranches(run, how, place, worktrees.handedOff));
-  const files = yield* tried(() => removeKeyed(home, id, Object.keys(run.steps)));
+  const files = yield* removeKeyed(home, id, Object.keys(run.steps));
   const forgotten: Forgot = { ...said, kind: 'forgotten', ...worktrees, branches, files, engine: yield* forgetTasks(id, taskIds) };
   return forgotten;
 });
@@ -150,7 +150,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
  */
 const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: string) {
   const home = yield* StoreRoot;
-  const files = yield* tried(() => removeKeyed(home, id, undefined));
+  const files = yield* removeKeyed(home, id, undefined);
   const { declared } = yield* PlaceService;
   const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true, fix: declared.say.orphans }] : [];
   const taskIds = yield* (yield* RunDoor).forgetting.read(RunId.read(id));
@@ -222,12 +222,10 @@ const asksStanding = (run: Run, steps: readonly StepSpec[] | undefined) =>
  * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
  * stands for an ending that has not run, and a merge the ending staged, as `git` reads them.
  */
-function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, place: Place) {
+const refusalOf = Effect.fnUntraced(function* (id: string, f: Forgetting, git: BranchReader, place: Place) {
   const { run, steps } = f;
-  const askAt = (a: AskName) => runsAtOnce(home).asks.where(id, a);
-  const others = runsAtOnce(home)
-    .runs.list()
-    .filter((o) => o.id !== id);
+  const askAt = (a: AskName) => askKey(id, a);
+  const others = (yield* (yield* RunDoor).runs.list()).filter((o) => o.id !== id);
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const { phaseOf, reader, asked, verdictOf, checkKillOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
@@ -248,7 +246,7 @@ function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, p
     `nemia rm ${run.id}`,
     checkKillOf,
   ) satisfies string | null;
-}
+});
 
 /**
  * Remove a repository run's worktrees through its place (`runWorktrees`, `handWorktree`), in one `remove`, which prunes git's list, and
@@ -354,10 +352,11 @@ function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead,
  * stored run's), and `worktrees/<id>` once it is empty. Nothing else, and never the engine's, which `forgetTasks` asks the engine to
  * forget.
  */
-function removeKeyed(home: string, id: string, names: readonly string[] | undefined) {
-  const kept = untrustRunHome(home, id);
+const removeKeyed = Effect.fnUntraced(function* (home: string, id: string, names: readonly string[] | undefined) {
+  const door = yield* RunDoor;
+  const kept = yield* tried(() => untrustRunHome(home, id));
   if (kept) sayLeft(kept);
-  const removed = runsAtOnce(home).runs.forget(id);
+  const removed = yield* door.runs.forget(RunId.read(id));
   const remove = (at: string) => {
     const st = lstatOf(at);
     if (!st) return;
@@ -371,8 +370,10 @@ function removeKeyed(home: string, id: string, names: readonly string[] | undefi
   } catch (err) {
     sayLeft(leftWhy(checks, err, ['ENOENT']));
   }
-  const otherIds = names ? [] : runsAtOnce(home).runs.ids();
-  for (const file of checkLogsOf(id, names, logs, otherIds)) remove(path.join(checks, file));
+  const otherIds = names ? [] : yield* door.runs.ids();
+  yield* tried(() => {
+    for (const file of checkLogsOf(id, names, logs, otherIds)) remove(path.join(checks, file));
+  });
   const worktrees = path.join(home, 'worktrees', id);
   try {
     fs.rmdirSync(worktrees);
@@ -381,4 +382,4 @@ function removeKeyed(home: string, id: string, names: readonly string[] | undefi
     sayLeft(leftWhy(worktrees, err, ['ENOENT', 'ENOTEMPTY', 'EEXIST']));
   }
   return removed;
-}
+});

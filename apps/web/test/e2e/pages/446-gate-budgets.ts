@@ -6,15 +6,14 @@ import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../
 import { budgetWord, dollars } from '../../../src/lib/money.ts';
 import { BUDGETING, writeBudgeting } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedAsks } from '../world.ts';
 
 /** Whether `r` is the POST of the approval of the gated step. */
 const approving = (r: { request: () => { method: () => string }; url: () => string }) =>
   r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, BUDGETING.id, `/steps/${BUDGETING.gated}/approve`);
 
-/** The JSON of the approval file `file`, or nothing where it is not there. */
-const approvalIn = (file: string) =>
-  (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as { budgets?: Record<string, number> };
+/** The JSON of BUDGETING's approval `name`, or nothing where the store holds none. */
+const approvalIn = (name: string) => JSON.parse(storedAsks(BUDGETING.id)[name] ?? '{}') as { budgets?: Record<string, number> };
 
 /**
  * The run whose caps' bound stays under the cost line it was started under: its gate draws its budgets and the run's line, and says
@@ -67,7 +66,6 @@ export default {
       ...writeBudgeting(store!, { id: BUDGETING.underId, costLine: BUDGETING.line.under }),
     ];
     const { id, gated, above, under, underId, line } = BUDGETING;
-    const asks = path.join(store!, 'runs', `${id}.asks`);
     try {
       await expectUnderTheLine(page);
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
@@ -101,7 +99,7 @@ export default {
         throw new Refused(`the approval sends the budget the person changed and no other — it sent ${JSON.stringify(sent)}`);
       if (approved.status() !== 202)
         throw new Refused(`the api takes the approval with its budgets — it answered ${approved.status()}: ${await approved.text()}`);
-      const file = approvalIn(path.join(asks, `approve-${gated}-1`));
+      const file = approvalIn(`approve-${gated}-1`);
       if (file.budgets?.[above.step] !== above.usd || file.budgets[under.step] !== under.given || Object.keys(file.budgets).length !== 2)
         throw new Refused(`the approval holds the proposal's caps with the person's over them — it holds ${JSON.stringify(file)}`);
 
@@ -126,6 +124,8 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(BUDGETING.id);
+      dropStoredRun(BUDGETING.underId);
       fed(id, 'removed');
       fed(underId, 'removed');
     }

@@ -5,6 +5,7 @@
  * that only a local harness reads (`localFields`), the step as it is told (`toldOf`, told.verb.ts); what its roots are handed of other runs
  * is `handedOf`'s (`handed.verb.ts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import type { Refusal } from '../refusal/refusal.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -143,7 +144,7 @@ export type Filing = {
   run: Run;
   reads: RunRead;
   closer: Closer;
-  mayFile: () => boolean;
+  mayFile: Effect.Effect<boolean, Refusal>;
   notes: string[];
   heads?: Heads;
   /** The store's root, as the pass was given it (`StoreRoot`): where a filing reads the run's factory's MCP server record. */
@@ -263,7 +264,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   const { run, notes } = f;
   const step = stepNamed(f, r.step);
   if (r.stopFirst) return yield* stopFirst(f, r, taskToStop(run, r.step));
-  if (!f.mayFile()) return;
+  if (!(yield* f.mayFile)) return;
   const record = recordNamed(run, r.step);
   const said = tryWord(r, step);
   if (r.mode === 'recheck') {
@@ -483,7 +484,7 @@ const trySpec = (
 export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: readonly Round[]) {
   const looped: string[] = [];
   for (const r of round) {
-    if (!f.mayFile()) break;
+    if (!(yield* f.mayFile)) break;
     yield* fileRound(f, r, looped).pipe(forStep(f.run, stepNamed(f, r.target)));
   }
   return looped;
@@ -616,7 +617,7 @@ function roundSpec(
 export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: readonly string[]) {
   const checked: string[] = [];
   for (const name of names) {
-    if (!f.mayFile()) break;
+    if (!(yield* f.mayFile)) break;
     yield* fileCheck(f, name).pipe(forStep(f.run, stepNamed(f, name)));
     checked.push(name);
   }
@@ -763,7 +764,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   const placed = yield* PlaceService;
   const servers = yield* serversFiling(run.factory ?? DEFAULT_NAMESPACE, f.home, ready, f.notes);
   for (const name of ready.filter((n) => !scripts.includes(n))) {
-    if (!f.mayFile()) break;
+    if (!(yield* f.mayFile)) break;
     const step = stepNamed(f, name);
     if (unsignedStep(servers, step, f.notes) || homeUntrusted(f, step)) continue;
     const landing = placeTold(run, f.reads.steps, step, placed, f.heads?.());
@@ -771,7 +772,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
     f.notes.push(...cutNotes(name, made));
     if (!('cut' in made)) continue;
     const place = made.cut;
-    if (!f.mayFile()) break;
+    if (!(yield* f.mayFile)) break;
     const files = artifactsDir(home, run, name);
     fs.mkdirSync(files, { recursive: true });
     const checked = isRemoteHarness(step.harness) ? [] : yield* checksHandedRead(run, f.reads.steps, step).pipe(over(asRead(f)));

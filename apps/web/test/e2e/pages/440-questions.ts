@@ -6,7 +6,7 @@ import { fed, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from 
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { ASKED } from '../seed.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedAsks, storeRecord } from '../world.ts';
 
 /**
  * A run of two steps that ask a person questions as data, written for this page's visit and taken back before it ends: `design` signed off
@@ -60,7 +60,7 @@ const write = (file: string, text: string) => {
 
 /**
  * Writes the run, its folder and its two tasks into the store at `root`, each task ended once with the closeout it gave, flat as a
- * harness writes it; answers every path written, to take back.
+ * harness writes it; answers every path written, to take back, its record and asks, the keyspace's, taken back by `dropStoredRun`.
  */
 function writeRun(root: string) {
   const { id } = QUESTIONS;
@@ -103,9 +103,8 @@ function writeRun(root: string) {
     path.join(dir, 'open.schema.json'),
     `${JSON.stringify({ ...schema, properties: { open: { 'x-shape': 'questions', description: ASKED.description } } }, null, 2)}\n`,
   );
-  const record = path.join(root, 'runs', `${id}.json`);
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -129,7 +128,7 @@ function writeRun(root: string) {
       2,
     ),
   );
-  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task('design'), task('spec')] satisfies string[];
+  return [dir, path.join(root, 'runs', id), task('design'), task('spec')] satisfies string[];
 }
 
 /** Every option of the form's questions that is chosen: none until the person chooses. */
@@ -229,8 +228,7 @@ export default {
         throw new Refused(
           `the api takes the answers, through the board's proxy — it answered ${response.status()}: ${await response.text()}`,
         );
-      const file = path.join(store!, 'runs', `${id}.asks`, 'retry-spec-2');
-      const ask = (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as {
+      const ask = JSON.parse(storedAsks(id)['retry-spec-2'] ?? '{}') as {
         mode?: string;
         message?: string;
         actor?: Actor;
@@ -242,7 +240,9 @@ export default {
         `Answered by: ${ask.actor ? actorWords(ask.actor) : 'nobody'}`,
       ];
       if (ask.mode !== 'continue' || !ask.actor || ask.message !== lines.join('\n\n'))
-        throw new Refused(`the answers are the next try's message, in the package's words — ${file} holds ${JSON.stringify(ask)}`);
+        throw new Refused(
+          `the answers are the next try's message, in the package's words — the run's ask retry-spec-2 holds ${JSON.stringify(ask)}`,
+        );
       await expectVisible(
         partOf(page, 'spec').locator(`[data-part-asks] [data-asked][data-step="spec"]`),
         "spec's part says its try was asked for",
@@ -251,6 +251,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(id);
       fed(QUESTIONS.id, 'removed');
     }
     await expectCount(page.locator(`a[href="/runs/${QUESTIONS.id}"]`), 0, 'taken back and said on the feed: the run is gone from the list');

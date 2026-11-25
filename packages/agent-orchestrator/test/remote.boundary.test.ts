@@ -18,6 +18,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. Each row leaves a step held at work on its agent, so the
  * file sets `WF_MAX_CONCURRENT` on it itself, since a check the run executes inherits the daemon's ceiling.
  */
+import { keysUnder, runRecord } from '../testing.ts';
 import { beforeAll, describe, test, type TestContext, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -31,7 +32,6 @@ import { decidedOf } from './screens.ts';
 import { bell, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
 import { handled, listedRow, stepRow, told, type StartedAnswer } from './typed.ts';
 import { shownNote, shownStatus, type RunsListed } from '../src/list/list.ts';
@@ -548,13 +548,13 @@ describe(
           const ticked = await own(['tick']);
           if (why !== undefined) assert.match(ticked.err, why);
           assert.ok(runRecord(ROOT, local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(ROOT, local).steps)}`);
-          const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
+          const runs = keysUnder(ROOT, '/registry/runs/').length;
           await assert.rejects(
             start(REMOTE),
             (err: Error & { exitCode?: number }) => err.exitCode === 2 && (why === undefined || why.test(err.message)),
             "nemia start of a step on the agent is refused, in the file's words",
           );
-          assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs, 'no run was written');
+          assert.equal(keysUnder(ROOT, '/registry/runs/').length, runs, 'no run was written');
 
           fs.writeFileSync(FILE, good);
           await own(['tick']);

@@ -19,12 +19,12 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { keysUnder, plantRecord, recordText, runKey, runsNow, testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
-import { list, PERSON, runsAtOnce, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { list, PERSON, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 
 const stand = eachTest(testPlace);
@@ -55,8 +55,9 @@ beforeEachTest(() => {
 });
 
 const record = (id: string, steps: Record<string, { taskId: string | null }>) =>
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',
@@ -98,6 +99,7 @@ const written = () => ({
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(root, 'runs', f), 'utf8')]),
   ),
+  records: Object.fromEntries(keysUnder(root, '/registry/').map((key) => [key, recordText(root, key)])),
   said: [...standIn().said],
 });
 
@@ -180,11 +182,12 @@ describe("a person's words to a working session: the package's `sayRun` hands th
   let said!: Said | undefined;
   const s = story(test);
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
-  let records: Record<string, string> = {};
+  let records: Omit<ReturnType<typeof written>, 'said'> | undefined;
   s.test(
     "words as the board sends them are a 202 with the engine's entry — `at`, `attempt`, `text`, `after` — handed to the engine as given, once, and on the task",
     async () => {
-      records = written().files;
+      const { said: _said, ...stored } = written();
+      records = stored;
       const res = await sayTo('implement', { text: words });
       assert.equal(res.status, 202, await res.clone().text());
       const answer = (await res.json()) as RunSaid;
@@ -212,13 +215,14 @@ describe("a person's words to a working session: the package's `sayRun` hands th
       for (const other of steps.filter((s) => s.name !== 'implement'))
         assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
       assert.equal(
-        (await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
+        (await runWith(engine(), list(engine(), runsNow(root).runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
         'said to 1×',
         "`nemia ls`'s words",
       );
       const summary = (await listedOf(app(), R)).status;
       assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
-      assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
+      const { said: _now, ...stored } = written();
+      assert.deepEqual(stored, records, "the runs' records untouched, and no file of the api's");
     },
   );
 });
@@ -300,13 +304,10 @@ test("words to a step not filed yet are kept for its first try, not delivered: t
   const answer = (await res.json()) as { kept?: true; text: string; attempt: number; after: unknown };
   assert.deepEqual([answer.kept, answer.text, answer.attempt, answer.after], [true, 'Look at the parser first.', 1, null]);
   assert.deepEqual([...standIn().said], before.said, 'no session was told anything');
-  assert.equal(
-    fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'),
-    before.files[`${R}.json`],
-    "the run's record untouched: the words are kept beside it",
-  );
+  assert.ok(before.records[runKey(R)] !== undefined, 'the run has a record to keep');
+  assert.equal(recordText(root, runKey(R)), before.records[runKey(R)], "the run's record untouched: the words are kept beside it");
   assert.deepEqual(
-    runsAtOnce(root)
+    runsNow(root)
       .runs.read(R)
       .saidBefore?.review?.map((w) => w.text),
     ['Look at the parser first.'],

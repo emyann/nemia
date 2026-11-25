@@ -8,6 +8,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
+import { plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -23,7 +24,6 @@ import { namesFor } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import { advanceRun, cancelRun, decideRun, list, startRun, runWith } from '../src/runner.ts';
 import { stepsNow } from './steps-now.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { RunDoor } from '../src/runs/runs.store.ts';
 import { runDoorMemory } from '../src/runs/memory.store.ts';
 import { LINE_NAME } from '../src/run.ts';
@@ -190,8 +190,9 @@ describe('a chain runs to success: plan → implement → review, on one line of
       for (const frozen of [true, false]) {
         const legacyId = `${id}-${frozen ? 'frozen' : 'unfrozen'}`;
         const { workflow, steps, ...rest } = run;
-        fs.writeFileSync(
-          path.join(ROOT, 'runs', `${legacyId}.json`),
+        plantRecord(
+          ROOT,
+          runKey(legacyId),
           JSON.stringify({
             ...rest,
             id: legacyId,
@@ -432,8 +433,8 @@ describe('a failed step, then a cancelled run', () => {
     stage.board().settle(check, 'working');
   });
   s.test("`nemia cancel` stops both — the running check and the queued step — and the mark outlives the pass's write", async () => {
-    const file = path.join(ROOT, 'runs', `${id}.json`);
-    const before = fs.readFileSync(file, 'utf8');
+    const file = runKey(id);
+    const before = recordText(ROOT, file) ?? '';
     const { plan } = await stage.runWith(stage.board().e, cancelRun(id));
     assert.deepEqual(plan, {
       kind: 'cancel',
@@ -443,7 +444,7 @@ describe('a failed step, then a cancelled run', () => {
       ],
     });
     assert.deepEqual(stage.board().stopped, [check, `${id}-b`]);
-    fs.writeFileSync(file, before);
+    plantRecord(ROOT, file, before);
     assert.ok(runRecord(ROOT, id).cancelledAt, 'the daemon wrote back the copy it read before the cancel, and the mark is in its own file');
   });
   s.test('the next pass files nothing, and asks the engine to stop nothing it was asked to stop already', async () => {

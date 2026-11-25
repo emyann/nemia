@@ -9,6 +9,7 @@
  * none: their pages are read, and not planted past one.
  */
 import { root } from './harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,8 +37,9 @@ const repo = path.join(root, 'pf-repo');
 
 const RUNS = names('r-paged', SOME);
 for (const id of RUNS)
-  write(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',

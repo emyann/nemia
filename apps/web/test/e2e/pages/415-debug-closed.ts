@@ -4,7 +4,7 @@ import { fed, LEDGER, openDebug, partOf, photograph, sidebar, themeOf } from '..
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, storedRecordText, storeRecord } from '../world.ts';
 
 /** How long a change on the feed may take to show, as the `live` page holds the board to. */
 const LIVE_MS = 3_000;
@@ -24,9 +24,8 @@ export default {
     const step = SESSION.step;
     const first = `${id}-${step}`;
     const review = `${first}-closed`;
-    const record = path.join(store!, 'runs', `${id}.json`);
     const journal = path.join(store!, 'engine', 'tasks', `${review}.jsonl`);
-    const seeded = fs.readFileSync(record, 'utf8');
+    const seeded = storedRecordText(id);
     const { panel, lifecycle } = await openDebug(partOf(page.locator(LEDGER), SESSION.step), first);
     await expectVisible(lifecycle.locator('[data-state="completed"][data-lit]'), `${step}'s task settled: completed lit`);
     await idle(page);
@@ -46,7 +45,7 @@ export default {
         { kind: 'settled', at, outcome: 'succeeded' },
       ];
       fs.writeFileSync(journal, closed.map((entry) => `${JSON.stringify(entry)}\n`).join(''));
-      fs.writeFileSync(record, JSON.stringify(run, null, 2));
+      storeRecord(id, JSON.stringify(run, null, 2));
       fed(id, step, 'succeeded, closed');
 
       await expectVisible(panel.locator(`[data-path="${review}"]`), `the review task's path once the feed says so`, LIVE_MS);
@@ -73,7 +72,7 @@ export default {
       await timeline.locator('[data-entry="5"] button').click();
       await expectVisible(close.and(page.locator('[data-taken]')), 'scrubbed back to the newest, the close taken again');
     } finally {
-      fs.writeFileSync(record, seeded);
+      storeRecord(id, seeded);
       fs.rmSync(journal, { force: true });
       fed(id, step, 'succeeded');
     }

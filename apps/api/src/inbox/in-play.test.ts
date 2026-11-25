@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo } from 'agent-orchestrator';
 import type { CardList } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -31,8 +31,9 @@ fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
 fs.writeFileSync(path.join(root, 'inbox', `${CARD}.md`), 'Cache the views between passes.\n');
 fs.writeFileSync(path.join(root, 'inbox', `${PARKED}.md`), 'An idea not yet started.\n');
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${RUN}.json`),
+plantRecord(
+  root,
+  runKey(RUN),
   JSON.stringify({
     id: RUN,
     repo: '/code/app',

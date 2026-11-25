@@ -168,7 +168,7 @@ test('REFUSED: a body that reads an imported root by name is found, and a file t
   assert.deepEqual(
     globalRoots(`${importing}export const filesStore = { read: () => path.join(HOME, 'runs') };\n`),
     ["2: this line reads HOME, a root read as this module loaded — export const filesStore = { read: () => path.join(HOME, 'runs') };"],
-    "a store object whose method reads the imported root is refused: the root is `filesStoreAt(home)`'s to be handed",
+    "a store object whose method reads the imported root is refused: the root is the caller's to hand it",
   );
   assert.deepEqual(globalRoots(importing), [], 'the import alone binds the name and reads no store under it');
   assert.deepEqual(globalRoots("export { HOME } from './record/record.store.ts';\n"), [], 'and so does a re-export: the door, not a read');

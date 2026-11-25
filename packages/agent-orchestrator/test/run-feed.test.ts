@@ -14,6 +14,7 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
+import { dropRecord, emptyRuns, rewriteRun, runKey, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, beforeEach, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -46,8 +47,6 @@ import {
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { recordFeed } from '../src/feed/feed.store.ts';
 import { isRunLine } from '../src/feed/feed.ts';
-import { runRecord, rewriteRun } from '../src/record/record.store.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { tryOf } from '../src/record/record.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
@@ -65,7 +64,7 @@ const RUNS = path.join(ROOT, 'runs');
 const FEED = path.join(ROOT, 'feed.jsonl');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
 const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const AT = '2026-09-22T10:05:00.000Z';
@@ -124,6 +123,7 @@ const ended = (id: string, reasons: readonly string[]) => {
 /** A store with no runs and no feed. */
 const emptyStore = () => {
   for (const dir of [RUNS, FEED, path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS, { recursive: true });
 };
 
@@ -544,7 +544,7 @@ describe("a person's acts and the runtime's faults on a run, each said once off 
     );
   });
   s.test('a run gone from the store writes one `removed`, with no line for its steps, then nothing, a restart included', async () => {
-    fs.rmSync(path.join(RUNS, `${other.id}.json`));
+    dropRecord(ROOT, runKey(other.id));
     fs.rmSync(path.join(RUNS, `${other.id}.pruned`), { force: true });
     const before = lines().length;
     await ticks(3);

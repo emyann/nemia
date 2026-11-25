@@ -30,7 +30,6 @@ import {
   prunedWords,
   runTokens,
   timeline,
-  runsAtOnce,
   VERSION,
   type RunSummary,
 } from 'agent-orchestrator';
@@ -39,12 +38,13 @@ import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 import type { RunList } from 'objects';
+import { plantAsk, plantRecord, recordText, runKey, runsNow } from 'agent-orchestrator/testing';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
 const NOWHERE = scratch('nemia-api-nowhere-');
 
 const writeRun = (run: { id: string } & Record<string, unknown>) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'runs', `${run.id}.json`), JSON.stringify(run));
+  plantRecord(root, runKey(run.id), JSON.stringify(run));
 };
 
 const at = '2026-09-12T00:10:00.000Z';
@@ -787,7 +787,7 @@ describe("a store's runs read on the list and on a run's page: each summarized w
   s.test('the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued', async () => {
     const e = engine(process.env);
     for (const id of ['r-2', 'r-4', 'r-5']) {
-      const words = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
+      const words = await runWith(e, list(e, runsNow(root).runs.read(id)));
       const run = await listed(id);
       assert.deepEqual(
         run.steps.map(({ name, message, branch, phase, reason, on, via, verdict }) => ({
@@ -1172,7 +1172,7 @@ describe('a run whose workflow folder changes or vanishes after it starts is rea
         ['implement', 'review'],
       );
       assert.deepEqual(
-        (await runWith(engine(process.env), list(engine(process.env), runsAtOnce(root).runs.read('r-43')))).steps.map(
+        (await runWith(engine(process.env), list(engine(process.env), runsNow(root).runs.read('r-43')))).steps.map(
           (s: { name: string }) => s.name,
         ),
         ['implement', 'review'],
@@ -1340,12 +1340,12 @@ describe("GET /api/runs/:id and a step's log refuse: an unknown run or step is a
     assert.match(error, /No run 'no-such-run'/);
     assert.match(error, /GET \/api\/runs/);
   });
-  test('a run id cannot name a file outside the run store', async () => {
+  test('a run id cannot name a key outside its own: one holding a `/` names no run, though a record is held at the key it spells', async () => {
     writeRun({ ...r2, id: '../escape' });
     assert.equal(
-      runsAtOnce(root).runs.read('../escape').id,
+      (JSON.parse(recordText(root, runKey('../escape')) ?? '{}') as { id?: string }).id,
       '../escape',
-      'the file is a readable run, one directory up: reading the id as a path serves it',
+      'a record is held at the key the id spells: reading the id as a key serves it',
     );
 
     const res = await app.request('/api/runs/..%2Fescape');
@@ -1544,9 +1544,7 @@ function seedLoop(id: string, round: number, again: boolean) {
 
 /** A person's ask, as `nemia retry` and `nemia retry --round` leave one: a file of its own beside the run's record, named for its ask. */
 function askFor(id: string, name: string, ask: object) {
-  const dir = path.join(root, 'runs', `${id}.asks`);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, name), `${JSON.stringify({ ...ask, at: later }, null, 2)}\n`);
+  plantAsk(root, id, name, `${JSON.stringify({ ...ask, at: later }, null, 2)}\n`);
 }
 
 /** A step row as the list and the detail both carry it. */
@@ -1587,7 +1585,7 @@ type Judgement = [
 async function expectJudged(cases: readonly Judgement[]) {
   const e = engine(process.env);
   for (const [id, status, moving, waitingOnYou, rows, why] of cases) {
-    const words = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
+    const words = await runWith(e, list(e, runsNow(root).runs.read(id)));
     for (const [where, run] of [
       ['list', await listed(id)],
       ['detail', (await objectOf(app, id)).status],
@@ -1639,7 +1637,7 @@ describe("what a run established, read as the tick and `nemia ls` have it: each 
   s.test("the api's words, and who it says is waited on, are `list`'s — a refused check's exit code among them", async () => {
     const e = engine(process.env);
     for (const id of ['r-20', 'r-21']) {
-      const words = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
+      const words = await runWith(e, list(e, runsNow(root).runs.read(id)));
       const detail = (await objectOf(app, id)).status;
       for (const [where, run] of [
         ['list', await listed(id)],
@@ -1834,7 +1832,7 @@ describe("what a run established, read as the tick and `nemia ls` have it: each 
         ],
       ];
       for (const [id, status, moving, waitingOnYou, word, why] of cases) {
-        assert.deepEqual((await runWith(e, list(e, runsAtOnce(root).runs.read(id)))).waitingOnYou, waitingOnYou, `${id}, nemia ls: ${why}`);
+        assert.deepEqual((await runWith(e, list(e, runsNow(root).runs.read(id)))).waitingOnYou, waitingOnYou, `${id}, nemia ls: ${why}`);
         for (const [where, run] of [
           ['list', await listed(id)],
           ['detail', (await objectOf(app, id)).status],
@@ -2935,7 +2933,7 @@ describe("where a run's time and tokens went, on its list line and its page, and
         ({ taskId, event }) => event.kind === 'filed' && taskId.startsWith('r-60-'),
       );
       assert.deepEqual(fedFilings, [], "the feed holds no filing of the run: each one read is its view's");
-      const theirs = timeline(runsAtOnce(root).runs.read('r-60'), views);
+      const theirs = timeline(runsNow(root).runs.read('r-60'), views);
       const lessCost = ({ cost, ...total }: { cost: unknown }) => (assert.equal(cost, null, 'nobody priced these sessions'), total);
       assert.deepEqual(
         { rounds: run.timeline.rounds.map(lessCost), run: lessCost(run.timeline.run) },
@@ -3026,7 +3024,7 @@ describe("where a run's time and tokens went, on its list line and its page, and
       assert.equal(run.tokens?.split, '2.7M read from the cache · 230k written to it · 70k uncached · 40k out');
 
       const views = new Map((await Effect.runPromise(engine(process.env).list())).views.map((view) => [view.id, view]));
-      const record = runsAtOnce(root).runs.read('r-61');
+      const record = runsNow(root).runs.read('r-61');
       assert.deepEqual(
         { atWork: summary.atWork, tokens: summary.tokens },
         JSON.parse(JSON.stringify({ atWork: atWork(record, views), tokens: runTokens(record, views) })),

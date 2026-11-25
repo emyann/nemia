@@ -12,6 +12,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest as well, and throws on a difference (`verifyRest` in tick.verb.ts).
  */
+import { readAsks, rewriteRun, runRecord } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,7 +26,7 @@ import { plainEngine } from './promised.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { advanceRun, approveRun, cancelRun, decideRun, forgetRun, list, retryRun, startRun, runWith as runEngine } from '../src/runner.ts';
-import { artifactsDir, readAsks, runRecord, rewriteRun } from '../src/record/record.store.ts';
+import { artifactsDir } from '../src/record/record.store.ts';
 import { phaseOfView } from '../src/views/views-words.ts';
 import { lackedOf } from '../src/record/record.ts';
 import type { Env } from '../src/config/config.store.ts';

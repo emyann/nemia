@@ -9,7 +9,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory, attachWorkflow, setSchedule } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, plantRecord, runKey, setSchedule } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { app, appOf, liveOf, runtime } from '../../app.ts';
 import { ReadMemo } from '../../layer.ts';
@@ -79,8 +79,9 @@ test('the routes these retire answer 404 in the api’s words', async () => {
 /** A record of a run, as a start writes one, `scheduled` where a schedule's fire started it. */
 const writeRun = (id: string, createdAt: string, scheduled?: { factory: string; workflow: string; due: string }) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       workspace: root,

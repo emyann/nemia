@@ -16,7 +16,7 @@ import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { isRefusal, Missing } from '../refusal/refusal.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
 import { unloadedOf } from '../steps/steps.verb.ts';
 import { triesDir } from '../try/try.store.ts';
@@ -100,10 +100,9 @@ export const judgedUnlessUnreadable = Effect.fnUntraced(function* <T, E, R>(
  * (`everyView`), and never a run waited on a `view` a task, its journal once more.
  */
 export const viewsFor = Effect.fn('viewsFor')(function* (e: Engine, runs: readonly Run[], given?: () => readonly Run[]) {
-  const home = yield* StoreRoot;
-  const store = given ?? (() => runsAtOnce(home).runs.list());
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
-  const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
+  const store = parents.size ? (given ? given() : yield* (yield* RunDoor).runs.list()) : [];
+  const read = parents.size ? [...runs, ...store.filter((run) => parents.has(run.id))] : runs;
   const listed = yield* asked('list', e.list(read.flatMap(runTasks)));
   const views: Views = new Map(listed.views.map((view) => [view.id, view]));
   return {

@@ -35,13 +35,12 @@ import { factoryFills, rulesVersion } from '../factory/rules/rules.store.ts';
 import { revisionsOf, type Factory } from '../factory/factory.ts';
 import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { runNamespace } from '../run-list/index.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
 import { within, withinEffect } from '../meter/tally.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
-import { endedForGood, type Run } from '../record/record.ts';
+import { endedForGood, type Run, type Spent } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
 import { appendRevision, ledgerOf } from './revisions.store.ts';
 import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
@@ -430,12 +429,14 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  *   it once between them. A one-off verb that hands none — `advanceRun`, `nemia refresh`, `nemia start` — reads the world for itself.
  */
 export const pinPass = Effect.fn('pinPass')(function* (run: Run, at: string, given?: PassRevisions) {
-  const home = yield* StoreRoot;
   if (endedForGood(run)) return NOTHING;
   const filed = hasStarted(run);
   const read = yield* readOr(given);
+  const door = yield* RunDoor;
   return yield* (filed ? refreshDue(run, at, read) : firstResolve(run, at, read)).pipe(
-    Effect.catchCause((cause) => Effect.sync(() => unread(Cause.squash(cause), filed && runsAtOnce(home).refresh.stands(run.id)))),
+    Effect.catchCause((cause) =>
+      Effect.map(filed ? door.refresh.stands(RunId.read(run.id)) : Effect.succeed(false), (stands) => unread(Cause.squash(cause), stands)),
+    ),
   );
 });
 
@@ -490,8 +491,7 @@ const follows = (run: Run, read: PassRevisions) =>
  * or this run's `nemia refresh`, which resolves to answer.
  */
 const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: PassRevisions) {
-  const home = yield* StoreRoot;
-  if (!runsAtOnce(home).refresh.stands(run.id)) return NOTHING;
+  if (!(yield* (yield* RunDoor).refresh.stands(RunId.read(run.id)))) return NOTHING;
   const resolved = yield* refreshedNow(run, at, read);
   if (!resolved)
     return {
@@ -579,11 +579,15 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
 });
 
 /**
- * What a pass owes the store once it has decided: the record, written where this pass or the pins changed it, and then the refresh ask the
- * pins answered, lifted — in that order, so an ask is never spent on a record that was not written.
+ * What a pass owes the store once it has decided: the record, written where this pass or the pins changed it, with the asks it answers set
+ * aside, in one transaction (`runs.settle`); and then the refresh ask the pins answered, lifted — in that order, so an ask is never spent
+ * on a record that was not written. The meter counts the asks set aside as one act and the record written as another, as it counted their
+ * files.
  */
-export const pinsWritten = Effect.fn('pinsWritten')(function* (run: Run, took: PinnedPass, wrote: boolean) {
+export const pinsWritten = Effect.fn('pinsWritten')(function* (run: Run, took: PinnedPass, wrote: boolean, spent: Omit<Spent, 'write'>) {
   const door = yield* RunDoor;
-  if (wrote || took.wrote) yield* door.runs.rewrite(run);
+  const write = wrote || took.wrote;
+  const settled = door.runs.settle(run, { ...spent, write });
+  yield* withinEffect('act', write ? withinEffect('act', settled) : settled);
   if (took.lift) yield* door.refresh.lift(RunId.read(run.id));
 });

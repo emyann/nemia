@@ -25,6 +25,7 @@
  * - `<folder>/given` is the run's to empty and write each time the step is filed: a link there is never followed, or the filing would
  *   remove and write wherever it points.
  */
+import { keysUnder, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -53,7 +54,6 @@ import {
   gitPlaceLayer,
 } from '../src/runner.ts';
 import * as verbs from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { sentBack, stepTaskId } from '../src/run.ts';
 import { builtinGitPlace, engine, START, type StartInput } from '../src/runner.ts';
 import { factsOf, handled } from './typed.ts';
@@ -222,7 +222,7 @@ test('a folder team starts from a directory that is no repository, and its recor
 });
 
 test('a folder team refuses --repo, --no-worktree and --after, before anything is written', async () => {
-  const before = fs.readdirSync(path.join(ROOT, 'runs')).sort();
+  const before = [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
   const named = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, repoNamed: true, workflowDir: TEAM })));
   assert.equal(named.exitCode, 2);
   assert.match(named.message, /^--repo .*: this workflow's steps say `place: folder`/);
@@ -238,7 +238,11 @@ test('a folder team refuses --repo, --no-worktree and --after, before anything i
   assert.ok(waiting.message.includes('(place: folder)'), waiting.message);
   assert.ok(waiting.message.includes('Start it without --after'), 'and names the flag to drop');
 
-  assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), before, 'nothing was written');
+  assert.deepEqual(
+    [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort(),
+    before,
+    'nothing was written',
+  );
   assert.deepEqual(gitAsked(), []);
 });
 
@@ -248,13 +252,17 @@ test("REFUSED: a folder team whose agent is given the git place's skill, which h
   fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
   fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'clerk.md'), '---\ndescription: Writes notes.\nskills: git\n---\nWrite.\n');
   fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\nagent: clerk\n---\nwrite the note\n');
-  const before = fs.readdirSync(path.join(ROOT, 'runs')).sort();
+  const before = [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
   const refused = await rejection(() => runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: team })));
   assert.equal(refused.exitCode, 2);
   assert.ok(refused.message.startsWith('write: its agent is given the skill `git`'), refused.message);
   assert.ok(refused.message.includes('`place: folder`'), refused.message);
   assert.match(refused.message, /Take `git` off the agent's `skills:`/);
-  assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), before, 'nothing was written');
+  assert.deepEqual(
+    [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort(),
+    before,
+    'nothing was written',
+  );
   assert.deepEqual(gitAsked(), []);
 });
 
@@ -331,7 +339,7 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(forgot.kind, 'forgotten');
   assert.equal(forgot.folder, true);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', run.id)), false, 'its folders went with it');
-  assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), false);
+  assert.equal(recordText(ROOT, runKey(run.id)) !== undefined, false);
   assert.deepEqual(
     [forgot.removed, forgot.gone, forgot.handedOff, forgot.branches],
     [[], [], [], []],
@@ -639,7 +647,7 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
 
   const record = runRecord(ROOT, run.id);
   record.steps.c = sentBack(record.steps.c);
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
   fs.rmSync(path.join(work, 'a', 'gone.md'));
   fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
 
@@ -690,7 +698,7 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
 
   const record = runRecord(ROOT, run.id);
   record.steps.c = sentBack(record.steps.c);
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  plantRecord(ROOT, runKey(run.id), JSON.stringify(record, null, 2));
   let said = '';
   let filed: string[] = [];
   try {

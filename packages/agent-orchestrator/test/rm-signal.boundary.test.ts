@@ -19,6 +19,7 @@ import { gitPlaceLayer } from '../src/place/builtin.store.ts';
 import { markCancelled } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { recordText, runKey } from '../testing.ts';
 
 const DIR = scratch('wf-rm-signal-');
 const STORE = path.join(DIR, 'store');
@@ -121,7 +122,7 @@ test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: 
   const ended = await rm.closed;
   assert.equal(ended.signal, 'SIGINT', `nemia rm ended by SIGINT; it said: ${rm.err()}`);
   assert.ok(groupOf(pgid).includes(String(pgid)), "the group of remove's git outlives the rm");
-  assert.ok(fs.existsSync(wt) && fs.existsSync(path.join(STORE, 'runs', `${id}.json`)), 'the worktree and the record are still there');
+  assert.ok(fs.existsSync(wt) && recordText(STORE, runKey(id)) !== undefined, 'the worktree and the record are still there');
   assert.ok(killGroup(pgid), "the group of remove's git is killed");
   await waitFor(() => groupOf(pgid).length === 0);
   const again = rmIn({ ...env, PATH: process.env.PATH });
@@ -131,5 +132,5 @@ test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: 
   const ended2 = await again.closed;
   assert.equal(ended2.code, 0, `nemia rm again forgets the run; it said: ${again.err()}`);
   assert.ok(!fs.existsSync(wt), 'its worktree is gone');
-  assert.ok(!fs.existsSync(path.join(STORE, 'runs', `${id}.json`)), 'its record is gone');
+  assert.ok(recordText(STORE, runKey(id)) === undefined, 'its record is gone');
 });

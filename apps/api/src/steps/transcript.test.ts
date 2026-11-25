@@ -7,6 +7,7 @@
  * leaves, are `following.test.ts`'s.
  */
 import { config, root } from '../../test/harness.ts';
+import { plantRecord, runKey } from 'agent-orchestrator/testing';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -97,8 +98,9 @@ const runningTask = (taskId: string) => journal(taskId, started);
 
 const RUN = 'r-talk';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(
-  path.join(root, 'runs', `${RUN}.json`),
+plantRecord(
+  root,
+  runKey(RUN),
   JSON.stringify({
     id: RUN,
     repo: '/code/app',

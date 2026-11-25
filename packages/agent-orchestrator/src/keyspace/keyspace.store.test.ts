@@ -56,6 +56,52 @@ function raw(file: string, sql: string) {
 }
 
 describe('the keyspace on disk', () => {
+  test('a transaction body that wrote two keys and then is refused leaves the head and both keys as they were', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const a = await Effect.runPromise(ks.write('/registry/w/a', create('1')));
+    const head = await Effect.runPromise(ks.head);
+    const done = await answered(
+      ks.within((tx) =>
+        Effect.gen(function* () {
+          yield* tx.write('/registry/w/b', create('b'));
+          yield* tx.write('/registry/w/a', update('2', a.revision));
+          return yield* tx.write('/registry/w/a', update('3', a.revision));
+        }),
+      ),
+    );
+    assert.deepEqual(done, { refused: 'stale' });
+    assert.equal(await Effect.runPromise(ks.head), head);
+    assert.equal(await Effect.runPromise(ks.get('/registry/w/b')), undefined);
+    assert.equal((await Effect.runPromise(ks.get('/registry/w/a')))?.value, '1');
+  });
+
+  test('a transaction body reads its own writes before it commits', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const seen = await Effect.runPromise(
+      ks.within((tx) =>
+        Effect.gen(function* () {
+          yield* tx.write('/registry/r/a', create('one'));
+          return { got: yield* tx.get('/registry/r/a'), listed: yield* tx.list('/registry/r/') };
+        }),
+      ),
+    );
+    assert.equal(seen.got?.value, 'one');
+    assert.deepEqual(
+      seen.listed.map((r) => r.key),
+      ['/registry/r/a'],
+    );
+  });
+
+  test('the revisions under a prefix are each live key at its latest revision, a deleted key left out', async () => {
+    const ks = await Effect.runPromise(keyspaceAt(fileOf()));
+    const a = await Effect.runPromise(ks.write('/p/a', create('1')));
+    const a2 = await Effect.runPromise(ks.write('/p/a', update('2', a.revision)));
+    const b = await Effect.runPromise(ks.write('/p/b', create('1')));
+    await Effect.runPromise(ks.write('/p/b', { verb: 'delete', expected: b.revision, value: '' }));
+    await Effect.runPromise(ks.write('/q/c', create('1')));
+    assert.deepEqual([...(await Effect.runPromise(ks.revisions('/p/')))], [['/p/a', a2.revision]]);
+  });
+
   test('a transaction whose second write is stale writes neither, and the head stays where it was', async () => {
     const ks = await Effect.runPromise(keyspaceAt(fileOf()));
     const a = await Effect.runPromise(ks.write('/registry/t/a', create('1')));

@@ -48,7 +48,7 @@ import { FACTORY_SCHEDULES } from './schedule/schedule.verb.ts';
 import { FACTORY_TRIGGERS } from './trigger/trigger.verb.ts';
 import { scheduleRun, schedulesListed, type ScheduleRuns } from './schedule/listed.store.ts';
 import type { ScheduleListed } from './schedule/schedule.ts';
-import { keptRuns } from '../record/files.store.ts';
+import { keptRuns } from '../runs/runs.store.ts';
 import type { PlaceTrust, Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, untrustedPlaces } from '../trust/trust.verb.ts';
 import { FACTORY_SERVER_VERBS } from './servers/servers.verb.ts';
@@ -83,7 +83,7 @@ const listedNow = Effect.fn('listedNow')(function* (memo?: ScheduleRuns) {
   const home = yield* StoreRoot;
   const factories = [...(yield* (yield* FactoryDoor).factories.listed())];
   const verify = yield* setting('verifyRest');
-  const schedules = yield* tried(() => schedulesListed(home, keptRuns(home, memo, scheduleRun, verify)));
+  const schedules = yield* Effect.flatMap(keptRuns(memo, scheduleRun, verify), (runs) => tried(() => schedulesListed(home, runs)));
   return { factories, schedules, untrusted: yield* untrustedPlaces(factories), dir: factoriesDirAt(yield* StoreRoot) } satisfies Listed;
 });
 

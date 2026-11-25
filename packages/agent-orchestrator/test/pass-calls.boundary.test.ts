@@ -8,6 +8,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest.
  */
+import { runRecord } from '../testing.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
@@ -20,7 +21,6 @@ import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { meteredEngine } from '../src/meter/meter.verb.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
@@ -125,7 +125,7 @@ const board = () => {
 /**
  * One pass over the run, metered as `tick` meters it: the engine's calls it made, in order, each with the run's id cut to `R`, and the
  * meter's count of calls in the phases a pass asks the engine in: `journals`, a read, and `act`, which is also every pass's hand-off and
- * its asks consumed (`consumeAsks`), each step's workspace cut, each worktree read against its lockfile before a try, a round or a check
+ * its asks set aside (`runs.settle`), each step's workspace cut, each worktree read against its lockfile before a try, a round or a check
  * is filed in it (`depsBefore`), and the record written (`rewriteRun`).
  */
 const pass = async (b: ReturnType<typeof board>, id: string) => {

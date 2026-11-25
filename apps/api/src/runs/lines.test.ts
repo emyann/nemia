@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { runLines } from 'agent-orchestrator';
 import type { RunLines as RunLinesAnswer } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
@@ -44,8 +44,7 @@ const record = (id: string, card?: string) => ({
   ...(card ? { from: { inbox: card } } : {}),
 });
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-for (const [id, card] of [[R], [FROM, 'lines-card'], [UNFILED]] as const)
-  fs.writeFileSync(path.join(root, 'runs', `${id}.json`), JSON.stringify(record(id, card)));
+for (const [id, card] of [[R], [FROM, 'lines-card'], [UNFILED]] as const) plantRecord(root, runKey(id), JSON.stringify(record(id, card)));
 beforeEachTest(() => {
   for (const id of [R, FROM]) {
     Effect.runSync(engine().file({ id: `t-${id}`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));

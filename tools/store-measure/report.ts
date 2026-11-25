@@ -157,7 +157,8 @@ export const rootAsWritten = (root: string, home = os.homedir()) =>
   root === home || root.startsWith(`${home}${path.sep}`) ? `~${root.slice(home.length)}` : root;
 
 /**
- * The records the Run model refuses, among the runs of the copy at `wf`: each `runs/<id>.json` decoded with run-core's `Run`
+ * The records the Run model refuses, among the runs of the copy at `wf`: each `runs/<id>.json`, there or moved aside under `imported/`
+ * by the keyspace's import, decoded with run-core's `Run`
  * (`packages/agent-orchestrator/src/record/record.model.ts`, its invariants included) after the store's own upgrade, a record that
  * is no JSON left to the unreadable count. The model is reached through the package's root, as `RunModel`, and imported after the
  * store is copied, as the rest is.
@@ -167,10 +168,11 @@ export async function invariantRefusals(wf: string) {
   const { RunModel } = await import('agent-orchestrator');
   const decode = Schema.decodeUnknownExit(RunModel.Run);
   let refused = 0;
-  for (const name of filesOf(path.join(wf, 'runs'), '.json')) {
+  const dirs = [path.join(wf, 'runs'), path.join(wf, 'imported', 'runs')];
+  for (const [dir, name] of dirs.flatMap((dir) => filesOf(dir, '.json').map((name) => [dir, name] as const))) {
     let record: unknown;
     try {
-      record = JSON.parse(fs.readFileSync(path.join(wf, 'runs', name), 'utf8'));
+      record = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
     } catch {
       continue;
     }
@@ -593,7 +595,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const tasks = filesOf(path.join(wf, 'engine', 'tasks'), '.jsonl');
   return {
     counts: {
-      runs: filesOf(path.join(wf, 'runs'), '.json').length,
+      runs: filesOf(path.join(wf, 'runs'), '.json').length + filesOf(path.join(wf, 'imported', 'runs'), '.json').length,
       finishedRuns: listing.filter((r) => FINISHED.has(r.status)).length,
       openRuns: listing.filter((r) => !FINISHED.has(r.status)).length,
       tasks: tasks.length,
@@ -634,6 +636,64 @@ export const machineNow = () => {
   };
 };
 
+/**
+ * The largest run record of the copy at `wf`, as a file before the keyspace's import (`runs/<id>.json`), beside the most a record of the
+ * keyspace holds: a record above it stops the import whole. Null where the copy keeps no run file.
+ * @param wf The copy of the workflows' store.
+ * @param ceiling The most bytes a record of the keyspace holds.
+ */
+export function largestRecord(wf: string, ceiling: number) {
+  const sized = filesOf(path.join(wf, 'runs'), '.json').map((name) => ({
+    id: name.slice(0, -'.json'.length),
+    bytes: fs.statSync(path.join(wf, 'runs', name)).size,
+  }));
+  const largest = sized.reduce<{ id: string; bytes: number } | null>(
+    (max, one) => (max === null || one.bytes > max.bytes ? one : max),
+    null,
+  );
+  return largest === null ? null : { ...largest, ceiling };
+}
+
+/** The files of the folder `dir`, by name; none where it is not there. */
+const plainFilesOf = (dir: string) =>
+  fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isFile() ? [d.name] : [])) : [];
+
+/**
+ * How many run files of the copy at `wf` an import reads into records: each `runs/<id>.json`, each ask under `runs/<id>.asks/` and its
+ * `done/`, and each claim of `started/`.
+ * @param wf The copy of the workflows' store.
+ */
+export function runFilesIn(wf: string) {
+  const runs = path.join(wf, 'runs');
+  const asks = filesOf(runs, '.asks').flatMap((dir) => [
+    ...plainFilesOf(path.join(runs, dir)),
+    ...plainFilesOf(path.join(runs, dir, 'done')),
+  ]);
+  return filesOf(runs, '.json').length + asks.length + filesOf(path.join(wf, 'started'), '.json').length;
+}
+
+/**
+ * The copy at `wf` imported into its keyspace, as the store's first open after the upgrade imports it: its Run door opened at its root
+ * (`RunDoor`, `StoreRoot`) and its runs listed. How long it took, the run files it read into records, and the largest run record it
+ * read. Before the fence is armed: the import writes the copy's keyspace and moves its files aside under `imported/`, which is the
+ * copy's alone.
+ * @param wf The copy of the workflows' store.
+ */
+async function keyspaceImported(wf: string) {
+  const { RECORD_CEILING, RunDoor, StoreRoot } = await import('agent-orchestrator');
+  const largest = largestRecord(wf, RECORD_CEILING);
+  const records = runFilesIn(wf);
+  const t0 = performance.now();
+  await Effect.runPromise(
+    Effect.provideService(
+      Effect.flatMap(RunDoor, (door) => door.runs.ids()),
+      StoreRoot,
+      wf,
+    ),
+  );
+  return { ms: performance.now() - t0, records, largest };
+}
+
 /** The report on the stores `asked` names, copied into `root` and measured there, the fence over every read. */
 async function reportOn(asked: Asked, root: string, commit: string) {
   const t0 = performance.now();
@@ -645,6 +705,7 @@ async function reportOn(asked: Asked, root: string, commit: string) {
     ms: performance.now() - t0,
     leftOut: [...wf.leftOut, ...ae.leftOut.map((p) => `engine store's ${p}`)],
   };
+  const keyspace = await keyspaceImported(path.join(root, 'wf'));
   const fence = installFence([root]);
   let measured: Awaited<ReturnType<typeof measure>>;
   try {
@@ -668,6 +729,7 @@ async function reportOn(asked: Asked, root: string, commit: string) {
     from,
     engine,
     copy,
+    keyspace,
     ...measured,
     spawned,
     placeRefused: { ...placeRefused },

@@ -6,6 +6,7 @@
  * takeover stopped between its writes is finished by the next. Then what `nemia factory adopt` refuses, each with nothing written.
  * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
+import { plantRecord, recordText, runKey, runRecord } from '../../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -17,7 +18,6 @@ import { teamCopy } from '../../test/team.ts';
 import { templated as programsAt } from '../../test/templated.ts';
 import { readFactoryAt } from '../factory/factory.store.ts';
 import { appliedDir, treeDir } from '../factory/applied/applied.store.ts';
-import { runRecord } from '../record/record.store.ts';
 import { advanceRun, startRun } from '../runner.ts';
 import { told, type StartedAnswer } from '../../test/typed.ts';
 import { engineOf, runWith } from '../runtime-client.ts';
@@ -104,8 +104,8 @@ async function aFinished(repo: string, factory: string) {
   fs.writeFileSync(path.join(steps, 'work.md'), '---\nplace: git\n---\nname it\n');
   const board = stage.board();
   const { id } = await stage.runPlaced(startRun({ brief: 'Name it', repo, workflowDir: steps, isolate: false }));
-  const file = path.join(ROOT, 'runs', `${id}.json`);
-  fs.writeFileSync(file, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), factory }, null, 2)}\n`);
+  const file = runKey(id);
+  plantRecord(ROOT, file, `${JSON.stringify({ ...JSON.parse(recordText(ROOT, file) ?? ''), factory }, null, 2)}\n`);
   await stage.runWith(board.e, advanceRun(runRecord(ROOT, id)));
   board.settle(`${id}-work`, 'succeeded', { outcome: 'done', summary: 'named it', artifacts: [], needs: null });
   await stage.runWith(board.e, advanceRun(runRecord(ROOT, id)));

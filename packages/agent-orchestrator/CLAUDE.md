@@ -139,13 +139,14 @@ of its kind, never from an older file that looks alike:
   field its agent's `output:` schema requires.
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
 - **A run is read and written through the Run door (`RunDoor`, `src/runs/runs.store.ts`), a `Context.Reference` whose default is
-  the files**: a test that only needs a run to exist gives its programs one `runDoorMemory()` (`src/runs/memory.store.ts`, imported
-  by path) and plants the run through it; code that reads the door at once (`runsAtOnce(home)`) reads
-  the files whatever door a program was given, so a test whose verb reaches it stays on files. A write breaking the model's `Run` is
-  refused `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it
-  stands: the files hold it by an exclusive claim, `<root>/started/<card>.json`, removed with the run that it names (`runs.forget`),
-  and taken over where its run has no record. A test that removes a run's files by hand removes its claim too, as the e2e's
-  `takeBackRuns` does.
+  the keyspace**: a run's record, its card's claim and its asks are records (`/registry/runs/<id>`, `/registry/claims/<card>`,
+  `/registry/asks/<id>/<name>`), and a test reads and plants them through `testing.ts` (`runRecord`, `recordText`, `plantRecord`,
+  `askNames`, `runsNow` for a door run at once), never as files under `runs/`. A file a test plants there (`runs/<id>.json`, a file
+  under `runs/<id>.asks/`, `started/<card>.json`) is imported by the next open and moved aside under `imported/`, so it reads back
+  nowhere: read the record. A test that only needs a run to exist gives its programs one `runDoorMemory()`
+  (`src/runs/memory.store.ts`, imported by path) and plants the run through it. A write breaking the model's `Run` is refused
+  `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it stands,
+  its claim written with its record and removed with it (`runs.forget`). An ask's refusal names its key, not a path.
 - **A factory is read and written through the Factory door (`FactoryDoor`, `src/factory/door/factories.store.ts`), whose default is rooted**:
   it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
   with `StoreRoot` given where its program is composed (`storeConfigLayer`). A test that only needs a factory to exist gives its program one

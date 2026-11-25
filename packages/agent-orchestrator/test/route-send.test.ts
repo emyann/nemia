@@ -8,6 +8,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { rewriteRun, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -17,12 +18,11 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { TEAM } from './team.ts';
 import { advanceRun, startRun, startFromInbox, runWith, list } from '../src/runner.ts';
-import { artifactsDir, inputsDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
+import { artifactsDir, inputsDir } from '../src/record/record.store.ts';
 import { mountHolds, readsAt, writesAt, type Filed } from './mounted.ts';
 import { resultSteps } from '../src/branches/branches.ts';
 import { stepsOf } from '../src/steps/steps.verb.ts';
 import { inboxAt } from '../src/cards/cards.store.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { parseInboxCard } from '../src/inbox/inbox.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
@@ -45,7 +45,7 @@ const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Plac
     ? typed(argv, e, undefined, place, env)
     : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 
 const SCHEMA = JSON.stringify({
   type: 'object',

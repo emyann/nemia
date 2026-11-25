@@ -21,7 +21,7 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import type { Card } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { addFactory, attachWorkflow, hireAgent, testPlace } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, dropRecord, hireAgent, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
 import { linesOf, listedOf, listedRuns, objectOf, specOf, stepOf } from './run-reads.ts';
 
@@ -61,8 +61,9 @@ fs.mkdirSync(path.join(work, 'write'), { recursive: true });
 beforeEachTest(() => {
   signedOff('t-write', path.join(work, 'write'));
 });
-fs.writeFileSync(
-  path.join(root, 'runs', 'f-notes.json'),
+plantRecord(
+  root,
+  runKey('f-notes'),
   JSON.stringify({
     id: 'f-notes',
     /** A folder run whose one step signed off: its record as `nemia start` writes one, with `place`, none of a repository run's fields. */
@@ -112,8 +113,9 @@ describe("a folder run read on the board: listed by its kind and place, its page
   s.test(
     "the runs list says each run's place in the store's words: a folder run's, and a repository's for a record with no place",
     async () => {
-      const record = path.join(root, 'runs', 'r-repo.json');
-      fs.writeFileSync(
+      const record = runKey('r-repo');
+      plantRecord(
+        root,
         record,
         JSON.stringify({
           id: 'r-repo',
@@ -140,7 +142,7 @@ describe("a folder run read on the board: listed by its kind and place, its page
         );
         assert.equal((await objectOf(app(), 'r-repo')).spec.place, 'git');
       } finally {
-        fs.rmSync(record);
+        dropRecord(root, record);
       }
     },
   );
@@ -236,8 +238,9 @@ describe("a folder run read on the board: listed by its kind and place, its page
     const notAFolder = path.join(root, 'runs', 'f-gone', 'not-a-folder');
     fs.mkdirSync(path.dirname(notAFolder), { recursive: true });
     fs.writeFileSync(notAFolder, 'a file where a folder should be');
-    fs.writeFileSync(
-      path.join(root, 'runs', 'f-gone.json'),
+    plantRecord(
+      root,
+      runKey('f-gone'),
       JSON.stringify({
         id: 'f-gone',
         place: { kind: 'folder' },
@@ -321,8 +324,9 @@ describe("a folder run read on the board: listed by its kind and place, its page
       fs.writeFileSync(path.join(folder, 'given'), 'what I was given, in my own words');
       fs.writeFileSync(path.join(folder, 'note.md'), 'The tides.\n');
       signedOff('t-given-write', folder);
-      fs.writeFileSync(
-        path.join(root, 'runs', 'f-given.json'),
+      plantRecord(
+        root,
+        runKey('f-given'),
         JSON.stringify({
           id: 'f-given',
           place: { kind: 'folder' },

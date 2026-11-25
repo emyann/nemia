@@ -9,6 +9,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,6 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { staged, story } from './story.ts';
 import { advanceRun, startRun, runWith, retryRun } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { SESSION_TOKEN } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { sessionCaller } from '../src/token/caller.verb.ts';

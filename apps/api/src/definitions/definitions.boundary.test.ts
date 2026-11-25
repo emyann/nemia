@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runsAtOnce } from 'agent-orchestrator';
-import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+
+import { addFactory, attachWorkflow, runsNow } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 
@@ -290,7 +290,7 @@ test("each status.revision is the number a run's start pins: 1 at the first star
   const pinnedAtStart = async () => {
     const started = await send('POST', '/api/namespaces/works/runs', { workflow: 'mine', from: 'user', brief: 'Make the plan.' });
     assert.equal(started.status, 201, JSON.stringify(started.body));
-    const pins = runsAtOnce(root).runs.read(String(started.body.id)).pinned ?? [];
+    const pins = runsNow(root).runs.read(String(started.body.id)).pinned ?? [];
     return Object.fromEntries(pins.map((p) => [`${p.kind}/${p.name}`, p.n]));
   };
   const served = async () => ({

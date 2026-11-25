@@ -26,6 +26,7 @@ import { typed } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { dropRecord, plantRecord, runKey } from '../testing.ts';
 
 const ROOT = scratch('wf-stats-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -101,13 +102,16 @@ const planted: string[] = [];
 /** Takes out, once the story `t` ends, every run it planted: the next story reads a store with none of them. */
 const plantedFor = (t: Finishes) =>
   t.onTestFinished(() => {
-    for (const file of planted.splice(0)) fs.rmSync(file, { recursive: true, force: true });
+    for (const file of planted.splice(0))
+      if (file.startsWith('/registry/')) dropRecord(ROOT, file);
+      else fs.rmSync(file, { recursive: true, force: true });
   });
 
 function writeRun(id: string, workflow: object[], steps: Record<string, object>, more: object = {}) {
-  const file = path.join(ROOT, 'runs', `${id}.json`);
+  const file = runKey(id);
   planted.push(file, path.join(ROOT, 'runs', id));
-  fs.writeFileSync(
+  plantRecord(
+    ROOT,
     file,
     JSON.stringify({
       id,

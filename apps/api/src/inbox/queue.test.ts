@@ -29,7 +29,6 @@ import {
   readInbox,
   runSlots,
   runWith as runEngine,
-  runsAtOnce,
   slotWord,
   standingReader,
   standingSnapshot,
@@ -39,6 +38,7 @@ import {
   type StoreRoot,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
+import { emptyRuns, plantRecord, runKey, runsNow } from 'agent-orchestrator/testing';
 
 const repo = scratch('nemia-api-queue-repo-');
 /**
@@ -75,6 +75,7 @@ const JSON_TYPE = { 'content-type': 'application/json' };
 const clear = () => {
   for (const dir of ['inbox', 'queue', 'runs', 'engine']) fs.rmSync(path.join(root, dir), { recursive: true, force: true });
   for (const file of ['tick.json', 'tick-stats.json']) fs.rmSync(path.join(root, file), { force: true });
+  emptyRuns(root);
 };
 
 /** The inbox folder as it is: each file's name and text, to show a refusal wrote nothing. */
@@ -319,7 +320,7 @@ describe('the queue verbs: what a queue or a take-back refuses, writing nothing'
     onStore(queueInInbox(queued.name));
     const started = onStore(addToInbox({ text: 'Started already', workflow: 'dev' })).card;
     fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
+    plantRecord(root, runKey('started-run-k2q9'), startedFrom('started-run-k2q9', started.name));
     fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: broken\nworkflow: dev\n---\nWait for it.\n');
     const before = inboxAsIs();
 
@@ -433,8 +434,9 @@ const pending = (taskId: string) => {
 /** A run of one step, frozen on the record as `nemia start` freezes it. */
 function writeRun(id: string, minute: number, fields: { after?: string[]; taskId?: string; cancelled?: boolean } = {}) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo,
@@ -465,7 +467,7 @@ const ceilings = async () => {
 /** The runs the package's own `runSlots` holds, on the same store, the runs waited on read off `standing.json`, as the api answers them. */
 const packageHeld = async () => {
   const git = standingReader(await runWith(engine(ENV), standingSnapshot()));
-  const held = await runWith(engine(ENV), runSlots(engine(ENV), runsAtOnce(root).runs.list(), settingsOf(ENV), { git, read: new Map() }));
+  const held = await runWith(engine(ENV), runSlots(engine(ENV), runsNow(root).runs.list(), settingsOf(ENV), { git, read: new Map() }));
   return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 };
 

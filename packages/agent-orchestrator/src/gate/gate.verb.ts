@@ -6,11 +6,10 @@
 import { Effect } from 'effect';
 import type { Actor } from 'objects';
 import { tried } from '../runtime-client.ts';
-import { tryOf, type Approval, type Run, type TakenBack } from '../record/record.ts';
+import { tryOf, type Approval, type AsksRead, type Run, type TakenBack } from '../record/record.ts';
 import { approvedFirst, approvedWork } from '../status/status.ts';
 import { approvalRefusal, takeBackJudged } from './gate.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
 import { standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -18,7 +17,6 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { aboveTheWorkflow, approvedCaps, ceilingsOf, laterSteps, proposedBudgets, type StepBudget } from '../budget/budget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * What `nemia approve` did: the run, the approval as written, and its file; the caps it set for the steps after the gate, in the order the
@@ -27,10 +25,10 @@ import { StoreRoot } from '../config/root.store.ts';
 export type Approved = { run: Run; approval: Approval; file: string; caps: StepBudget[]; above: string[] };
 
 /**
- * Approve a step waiting at its gate — `nemia approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`,
- * whole and exclusively, beside the retry asks, with the time and the words given (`message`). The next tick reads it with the run
- * (`runRecord`) and files what waits on the step, handing each step after the gate the words under `## Approved`. Like a retry ask it is
- * the person's own file, and the verb never writes the run's json.
+ * Approve a step waiting at its gate — `nemia approve` — by writing the approval, and nothing else: the run's ask
+ * record `approve-<step>-<try>`, created and never written over, beside the retry asks, with the time and the words given (`message`).
+ * The next tick reads it with the run (`runRecord`) and files what waits on the step, handing each step after the gate the words under
+ * `## Approved`. Like a retry ask it is the person's own record, and the verb never writes the run's.
  *
  * Refused before anything is written, exit 2, with what to do instead: a run not there; and what `approvalRefusal` refuses — empty words, a
  * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, a send-back already asked for,
@@ -55,7 +53,6 @@ export const approveRun = Effect.fn('approve')(function* (
   given: readonly StepBudget[] = [],
   actor?: Actor,
 ) {
-  const home = yield* StoreRoot;
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
@@ -67,7 +64,9 @@ export const approveRun = Effect.fn('approve')(function* (
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const asks = steps.some((s) => s.name === stepName && approvedFirst(s, run));
   const standings = asks ? standingsOf(run, steps, yield* standingLive([run])) : [];
-  const refusal = (now: Run) =>
+  const door = yield* RunDoor;
+  const asksNow = () => Effect.map(door.asks.read(RunId.read(id)), (read) => read.asks);
+  const refusal = (now: Run, asks: AsksRead['asks']) =>
     approvalRefusal(
       steps,
       now,
@@ -77,11 +76,12 @@ export const approveRun = Effect.fn('approve')(function* (
       closeoutReader(views, now, steps),
       closeoutAsked(views),
       exitVerdicts(views, now, steps),
-      runsAtOnce(home).asks.read(id).asks,
+      asks,
       spendReader(views),
       standings,
     );
-  const refused = yield* tried(() => refusal(run));
+  const asksThen = yield* asksNow();
+  const refused = yield* tried(() => refusal(run, asksThen));
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const proposed = proposedBudgets(
     steps.find((s) => s.name === stepName),
@@ -107,13 +107,15 @@ export const approveRun = Effect.fn('approve')(function* (
     ...(work ? { work } : {}),
     ...(actor ? { actor } : {}),
   };
-  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });
+  const written = yield* door.asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });
   const file = written.where;
   if (!written.written) {
     const { stray } = written;
+    const now = yield* door.runs.read(RunId.read(id));
+    const asksAfter = yield* asksNow();
     const why = yield* tried(
       () =>
-        refusal(runsAtOnce(home).runs.read(id)) ??
+        refusal(now, asksAfter) ??
         (stray !== null
           ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: nemia approve ${id} ${stepName}.`
           : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: nemia ls ${id}.`),
@@ -127,9 +129,9 @@ export const approveRun = Effect.fn('approve')(function* (
 export type TakenBackApproval = { run: Run; approval: Approval; file: string; takenBack: TakenBack };
 
 /**
- * Take back the approval of a step that stands approved while nothing it approved has been filed — `nemia approve <run> <step> --off` —
- * by setting its file aside in the run's `.asks/done/` as the pass sets a spent approval aside, with when and by whom (`actor`) written on
- * it (`asks.takeBack`): never deleted. The step then waits at its gate again. The same for an approval that names the work it approved
+ * Take back the approval of a step that stands approved while nothing it approved has been filed — `nemia approve <run> <step> --off` — by
+ * setting its record aside under the run's asks' `done/` as the pass sets a spent approval aside, with when and by whom (`actor`) written
+ * on it (`asks.takeBack`): never deleted. The step then waits at its gate again. The same for an approval that names the work it approved
  * and one an older nemia wrote with none.
  *
  * Refused before anything is moved, exit 2, with what to do instead: a run not there (`Missing`); and what `takeBackJudged` refuses

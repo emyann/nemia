@@ -6,7 +6,7 @@ import { openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { DIAMOND, FACTORIES, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storeRecord } from '../world.ts';
 
 /** The agent the page writes into the checkout's `workflows/agents/` for FACTORIES' `hiring` to hire into `dev`'s `review`. */
 const REVIEWER = 'reviewer-e2e';
@@ -70,7 +70,6 @@ function written(checkout: string) {
   const factoryFile = path.join(store!, 'factories', `${FACTORIES.hiring.name}.json`);
   const factoryText = fs.readFileSync(factoryFile, 'utf8');
   const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
-  const record = path.join(store!, 'runs', `${RECENT.id}.json`);
   const base = execFileSync('git', ['rev-parse', 'main'], { cwd: checkout, encoding: 'utf8' }).trim();
   fs.writeFileSync(reviewerFile, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
   fs.writeFileSync(
@@ -95,12 +94,12 @@ function written(checkout: string) {
     createdAt: new Date().toISOString(),
     steps: { implement: { taskId: null }, review: { taskId: null } },
   };
-  fs.writeFileSync(record, JSON.stringify(run, null, 2));
+  storeRecord(RECENT.id, JSON.stringify(run, null, 2));
   const plain = path.join(store!, 'factories', `${PLAIN}.json`);
   fs.writeFileSync(plain, JSON.stringify({ volumes: worked([checkout]), workflows: [WORKFLOWS.good.name] }, null, 2));
   return (() => {
     fs.rmSync(plain, { force: true });
-    fs.rmSync(record, { force: true });
+    dropStoredRun(RECENT.id);
     fs.rmSync(reviewerFile, { force: true });
     fs.writeFileSync(factoryFile, factoryText);
   }) satisfies () => void;

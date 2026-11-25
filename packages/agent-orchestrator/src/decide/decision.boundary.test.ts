@@ -5,6 +5,7 @@
  *
  * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
+import { plantAsk, plantRecord, runKey, runsNow } from '../../testing.ts';
 import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -22,11 +23,10 @@ import { passStanding } from '../standing/standing.verb.ts';
 import { Missing, isRefusal } from '../refusal/refusal.ts';
 import { runDecision, diffFiles, DIFF_LINES } from './decision.verb.ts';
 import type { Env } from '../config/config.store.ts';
-import { filesStoreAt } from '../record/files.store.ts';
 
 const root = scratch('wf-decision-');
 const ENV: Env = { ...process.env, WF_ROOT: root };
-const stored = filesStoreAt(root);
+const stored = runsNow(root);
 type Place = import('../place/place.store.ts').Place;
 
 /** The engine every read of this file goes through, over the journals it writes under the store's root. */
@@ -122,8 +122,9 @@ const workflow = [
 
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${run.id}.json`),
+  plantRecord(
+    root,
+    runKey(run.id),
     JSON.stringify({
       workspace: run.repo,
       branch: 'main',
@@ -533,9 +534,7 @@ describe('the commands a decision offers are bare `nemia` lines, by the state th
         },
       },
     });
-    const asks = path.join(root, 'runs', 'r-d20.asks');
-    fs.mkdirSync(asks, { recursive: true });
-    fs.writeFileSync(path.join(asks, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+    plantAsk(root, 'r-d20', 'approve-ship-1', JSON.stringify({ at, message: 'Merge it.' }));
 
     const body = await decidable('r-d20');
     const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
@@ -799,7 +798,7 @@ test("a run whose approved ending waits for the repository's checkout, which ano
   ];
   const approve = (id: string) => {
     fs.mkdirSync(path.join(root, 'runs', `${id}.asks`), { recursive: true });
-    fs.writeFileSync(path.join(root, 'runs', `${id}.asks`, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+    plantAsk(root, id, 'approve-ship-1', JSON.stringify({ at, message: 'Merge it.' }));
   };
   settledTask('t-d14-implement', done);
   settledTask('t-d14-notes', done);

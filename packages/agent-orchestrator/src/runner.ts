@@ -15,7 +15,7 @@
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the inbox's folder,
- * `inboxDir`), the Run door's synchronous face (`runsAtOnce`, `runs.store.ts`), which a run's record and a person's files beside it are
+ * `inboxDir`), the Run door (`RunDoor`, `runs.store.ts`), which a run's record and a person's files beside it are
  * read and written through, `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts`
  * (git, a step's worktree, its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches),
  * `artifacts.store.ts` (the files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written),
@@ -273,10 +273,11 @@ export {
   takeoverLine,
 } from './daemon/daemon.ts';
 export type { DaemonFile, DaemonStanding, Identity, Liveness } from './daemon/daemon.ts';
-export { acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFile, runId } from './record/record.store.ts';
+export { artifactsDir, inputsDir, runId } from './record/record.store.ts';
 export { stepsOf } from './steps/steps.verb.ts';
-export { inboxDir, keptRuns } from './record/files.store.ts';
-export { runsAtOnce } from './runs/runs.store.ts';
+export { inboxDir } from './record/files.store.ts';
+export { keptRuns, RunDoor, runFound } from './runs/runs.store.ts';
+export { RECORD_CEILING } from './keyspace/keyspace.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
 export { alive } from './process/alive.store.ts';
 export {

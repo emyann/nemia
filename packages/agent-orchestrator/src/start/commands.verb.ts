@@ -30,7 +30,6 @@ import { EngineService } from '../runtime-client.ts';
 import { standingLive } from '../standing/standing.verb.ts';
 import { contextSection } from '../brief/index.ts';
 import { parentCloseouts } from '../brief/handed.verb.ts';
-import { runsAtOnce } from '../runs/runs.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -279,11 +278,10 @@ export const CONCLUDED: Served<Concluded, typeof ConcludedInput.Type> = {
   ...CONCLUDED_WORDS,
   input: ConcludedInput,
   handler: Effect.fnUntraced(function* (args: typeof ConcludedInput.Type) {
-    const home = yield* StoreRoot;
     const id = args.runId;
     const notId = idRefusal(id, 'read', 'nemia concluded');
     if (notId) throw new Invalid({ message: notId });
-    if (!runsAtOnce(home).runs.exists(id))
+    if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
     const git = yield* standingLive([yield* (yield* RunDoor).runs.read(RunId.read(id))]);
     const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);

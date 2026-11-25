@@ -5,6 +5,7 @@
  * A file of its own, since `tick` reads every run of its store: its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full
  * every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
+import { emptyRuns, listRuns, recordText, runKey, runRecord } from '../../testing.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,6 @@ import type { Env } from '../config/config.store.ts';
 import { lastPassCost, startRun, tickRun, runWith as runEngine, withProposalsPass } from '../runner.ts';
 import { EngineService } from '../runtime-client.ts';
 import { recentFile, recentPasses } from '../daemon/daemon.store.ts';
-import { listRuns, runRecord } from '../record/record.store.ts';
 import { metered, meteredPass, metering, within } from './tally.store.ts';
 import { Effect, Fiber, Metric } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
@@ -122,6 +122,7 @@ const fake = ({
 const emptyStore = () => {
   for (const f of [RUNS, path.join(ROOT, 'feed.jsonl'), path.join(ROOT, 'tick.json'), STATS])
     fs.rmSync(f, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS, { recursive: true });
 };
 
@@ -243,7 +244,7 @@ counts('a pass on a fixture store counts the run records it read: twice as many 
   assert.equal(perRun, Math.round(perRun), `a whole number of reads a run (${two.records} for two)`);
 
   await started(2);
-  const recordBytes = listRuns(ROOT).reduce((n, r) => n + fs.statSync(path.join(RUNS, `${r.id}.json`)).size, 0);
+  const recordBytes = listRuns(ROOT).reduce((n, r) => n + Buffer.byteLength(recordText(ROOT, runKey(r.id)) ?? ''), 0);
   const four = (await runWith(e, tickRun())).cost!;
   assert.equal(four.records, perRun * 4, `four runs are read ${perRun} times each, as two were`);
   assert.ok(

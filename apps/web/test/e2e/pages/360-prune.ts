@@ -7,7 +7,7 @@ import { cardOf, expectClearOfEachOther, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, storedRecord } from '../world.ts';
 
 export default {
   /**
@@ -23,7 +23,7 @@ export default {
   route: '/factories/default',
   expect: async (page) => {
     const { id, branch } = UNMERGED;
-    const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as {
+    const record = storedRecord(id) as {
       repo: string;
       steps: { implement: { workspace: string } };
     };

@@ -5,7 +5,7 @@ import { askRunAction, fed, openRunMenu, photograph, runMenuActions, themeOf } f
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { GATED, SHAPED, writeShaped } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 /** The agent SHAPED is written as a try of, for the visit. */
 const TRIED = 'menu-tried-e2e';
@@ -69,6 +69,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(SHAPED.id);
       if (!hadTries) fs.rmSync(tries, { recursive: true, force: true });
       fed(id, 'removed');
     }

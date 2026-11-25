@@ -105,8 +105,8 @@ export const approvedUnfiled = (step: StepSpec, run: Run) => unfiledApproval(ste
 
 /**
  * What an ending approved and not filed whose approval names no work (`unfiledApproval`, not `approvedUnfiled`) says of a send-back of its
- * work: no try of the work would spend that approval, so it is taken back first — `nemia approve <run> <step> --off`, which sets its file
- * aside in the run's `.asks/done/` — and then the work is sent back (`sendBackTo`). Empty for any other step. Pure.
+ * work: no try of the work would spend that approval, so it is taken back first — `nemia approve <run> <step> --off`, which sets its record
+ * aside under the run's asks' `done/` — and then the work is sent back (`sendBackTo`). Empty for any other step. Pure.
  * @param step The step.
  * @param run The run's record.
  */

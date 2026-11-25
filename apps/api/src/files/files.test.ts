@@ -19,10 +19,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { keysUnder, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { Api, FILE_LIMIT, type FileObject, SCRIPTED_HEADER, TOKEN_COOKIE } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
-import { CLI_VERBS, runsAtOnce, TABLE } from 'agent-orchestrator';
+import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { TEAM } from '../../test/team.ts';
 import { OBJECT_BODY_LIMIT } from '../objects/serve.ts';
 import { called } from '../mcp/port.ts';
@@ -86,7 +86,7 @@ const kept = () => {
 };
 
 /** The run directories of the store now. */
-const runCount = () => fs.readdirSync(path.join(root, 'runs')).length;
+const runCount = () => keysUnder(root, '/registry/runs/').length;
 
 test('three pictures of 3 MB in all, each uploaded, start a card whose run holds each byte for byte, past the 1 MiB of an object write', async () => {
   const pictures = [
@@ -114,7 +114,7 @@ test('three pictures of 3 MB in all, each uploaded, start a card whose run holds
   const res = await post('cards/pictured-card/start', { inputs: files.map((f) => ({ file: f.id })) });
   assert.equal(res.status, 201, await res.clone().text());
   const { id } = (await res.json()) as { id: string };
-  const run = runsAtOnce(root).runs.read(id);
+  const run = runsNow(root).runs.read(id);
   assert.deepEqual(
     run.inputs,
     pictures.map((p) => p.name),

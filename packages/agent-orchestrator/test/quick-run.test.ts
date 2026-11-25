@@ -8,6 +8,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
+import { runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +20,6 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { advanceRun, decideRun, endingSteps, startRun, runWith as runEngine } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-quick-run-');

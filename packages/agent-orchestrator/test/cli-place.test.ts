@@ -7,6 +7,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. The file sets what its starts depend on itself: a run on a
  * repository no factory holds goes to the default factory (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon.
  */
+import { listRuns, recordText, runKey, runRecord } from '../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,6 @@ import { decisionOf } from './screens.ts';
 import { countsLine } from '../src/branches/branches.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { advanceRun, runWith as runEngine } from '../src/runner.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { LINE_NAME } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -97,7 +97,7 @@ test('a run started, read once a pass has read where its branch stands, and remo
 
   const forgot = await forgetTyped((effect) => runWith(engineOf(engine().layer), effect), ROOT, ['rm', id]);
   assert.equal(forgot.error, undefined, forgot.printed.join('\n'));
-  assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false, 'nemia rm forgot the run');
+  assert.equal(recordText(ROOT, runKey(id)) !== undefined, false, 'nemia rm forgot the run');
   assert.equal(fs.existsSync(workspace), false, 'its workspace removed by the place it was handed');
   assert.notEqual(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'what the step left handed off on its branch first');
 });

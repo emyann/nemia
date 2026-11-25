@@ -190,6 +190,41 @@ const REWRITE: Walk[] = [
     says: [false, false],
   },
   {
+    name: 'a settle of a run forgotten answers false and writes nothing back',
+    walk: ({ door }) => {
+      const run = made(door, 'w-settle-gone');
+      act(door.runs.forget(idOf(run.id)));
+      return [act(door.runs.settle(run, { write: true, asks: [], rounds: [] })), act(door.runs.exists(idOf(run.id)))];
+    },
+    says: [false, false],
+  },
+  {
+    name: 'a settle that writes the record sets aside, with it, an approval its record spent and keeps the answer of a retry',
+    walk: ({ door }) => {
+      const run = made(door, 'w-settle');
+      act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, work: { implement: 1 } } }));
+      act(door.asks.write(idOf(run.id), ASKS[0].asked));
+      const { asks, rounds } = done(door.asks.read(idOf(run.id)));
+      const tried = {
+        ...run,
+        steps: {
+          ...run.steps,
+          implement: {
+            ...run.steps.implement,
+            tries: [{ taskId: `${run.id}-implement`, cause: 'fresh' as const }],
+            taskId: `${run.id}-implement-try2`,
+          },
+        },
+      };
+      const settled = act(door.runs.settle(tried, { write: true, asks, rounds }));
+      const read = act(door.runs.read(idOf(run.id))) as Run;
+      const left = done(door.asks.read(idOf(run.id)));
+      const answers = (act(door.asks.answers(idOf(run.id))) as Array<{ message?: string }>).map((a) => a.message);
+      return [settled, read.steps.implement?.tries?.length, left.asks.length, read.approvals, answers];
+    },
+    says: [true, 1, 0, undefined, ['again']],
+  },
+  {
     name: "a run written back carries none of a person's files composed onto it, and reads back with them still",
     walk: ({ door }) => {
       const run = made(door, 'w-one-writer');
@@ -247,6 +282,21 @@ const RUNS: Record<string, Walk[]> = {
   ],
   'runs.create': CREATE,
   'runs.rewrite': REWRITE,
+  'asks.route': [
+    {
+      name: 'a route written twice reads as the second, and no settle spends it',
+      walk: ({ door }) => {
+        const run = made(door, 'w-route');
+        act(door.asks.route(idOf(run.id), 'implement', 1, { route: 'first', at }));
+        const where = done(door.asks.route(idOf(run.id), 'implement', 1, { route: 'second', at }));
+        const read = act(door.runs.read(idOf(run.id))) as Run;
+        act(door.runs.settle(read, { write: true, asks: [], rounds: [] }));
+        const after = act(door.runs.read(idOf(run.id))) as Run;
+        return [where.startsWith('/registry/asks/w-route/'), read.steps.implement?.route?.route, after.steps.implement?.route?.route];
+      },
+      says: [true, 'second', 'second'],
+    },
+  ],
   'runs.stamps': [
     {
       name: "an ask moves its run's stamp, and another run's stands",
@@ -352,13 +402,13 @@ const RUNS: Record<string, Walk[]> = {
       },
       says: {
         removed: [
-          'runs/w-forget.json',
+          '/registry/runs/w-forget',
+          '/registry/asks/w-forget/approve-implement-1',
           'runs/w-forget.cancelled',
           'runs/w-forget.pruned',
           'runs/w-forget.hold',
           'runs/w-forget.refresh',
           'runs/w-forget.labels',
-          'runs/w-forget.asks/',
           'runs/w-forget.said/',
         ],
         taken: false,
@@ -372,7 +422,7 @@ const RUNS: Record<string, Walk[]> = {
         act(door.runs.create(fromCard('w-forget-card', 'w-claimed')));
         return act(door.runs.forget(idOf('w-forget-card')));
       },
-      says: ['runs/w-forget-card.json', 'started/w-claimed.json'],
+      says: ['/registry/runs/w-forget-card', '/registry/claims/w-claimed'],
     },
   ],
   'runs.ids': [
@@ -444,9 +494,9 @@ const ASK_WALKS: Record<string, Walk[]> = {
   'asks.where': [
     {
       name: "an ask is found in its run's asks, by which of its verb it is, its step and its number",
-      walk: ({ door, root }) => {
+      walk: ({ door }) => {
         const where = done(door.asks.where(idOf('w-where'), { of: 'try', step: 'implement', n: 2 }));
-        return [where.startsWith(`${root}/runs/w-where.asks/`), where.endsWith('-implement-2')];
+        return [where.startsWith('/registry/asks/w-where/'), where.endsWith('-implement-2')];
       },
       says: [true, true],
     },
@@ -454,7 +504,7 @@ const ASK_WALKS: Record<string, Walk[]> = {
   'asks.takeBack': [
     {
       name: "an approval taken back is set aside in its run's done/, no longer composed onto the run, and a second take-back finds none",
-      walk: ({ door, root }) => {
+      walk: ({ door }) => {
         made(door, 'w-take');
         const ask = { step: 'implement', try: 1, at, work: { implement: 1 } };
         act(door.asks.write(idOf('w-take'), { kind: 'approve', of: 'gate', ask }));
@@ -462,7 +512,7 @@ const ASK_WALKS: Record<string, Walk[]> = {
         const again = done(door.asks.takeBack(idOf('w-take'), 'implement', 1, { at }));
         const run = act(door.runs.read(idOf('w-take'))) as Run;
         const given = done(door.asks.write(idOf('w-take'), { kind: 'approve', of: 'gate', ask }));
-        return [where?.startsWith(`${root}/runs/w-take.asks/done/`), again, run.approvals, given.written];
+        return [where?.startsWith('/registry/asks/w-take/done/'), again, run.approvals, given.written];
       },
       says: [true, null, undefined, true],
     },
@@ -507,7 +557,7 @@ const ASK_WALKS: Record<string, Walk[]> = {
       },
     },
   ],
-  'asks.consume': [
+  'runs.settle': [
     {
       name: 'each ask written with its actor is read back with it: a retry, a round, an approval at a gate and a loop accepted',
       walk: ({ door }) => {
@@ -538,7 +588,7 @@ const ASK_WALKS: Record<string, Walk[]> = {
         const run = made(door, 'w-consume');
         act(door.asks.write(idOf(run.id), ASKS[0].asked));
         const { asks, rounds } = done(door.asks.read(idOf(run.id)));
-        act(door.asks.consume(run, asks, rounds));
+        act(door.runs.settle(run, { write: false, asks, rounds }));
         const stays = (act(door.asks.read(idOf(run.id))) as { asks: unknown[] }).asks.length;
         const tried = {
           ...run,
@@ -551,7 +601,7 @@ const ASK_WALKS: Record<string, Walk[]> = {
             },
           },
         };
-        act(door.asks.consume(tried, asks, rounds));
+        act(door.runs.settle(tried, { write: false, asks, rounds }));
         return [stays, (act(door.asks.read(idOf(run.id))) as { asks: unknown[] }).asks.length];
       },
       says: [1, 0],
@@ -580,7 +630,7 @@ const ASK_WALKS: Record<string, Walk[]> = {
         act(door.runs.rewrite(sentBack));
         const spent = approvalsOf();
         const { asks, rounds } = done(door.asks.read(idOf(run.id)));
-        act(door.asks.consume(sentBack, asks, rounds));
+        act(door.runs.settle(sentBack, { write: false, asks, rounds }));
         act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'review', try: 1, at, work: { implement: 2 } } }));
         return [before, spent, approvalsOf()];
       },

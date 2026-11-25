@@ -4,7 +4,7 @@ import { fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { DIAMOND, SHAPED, writeShaped } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store } from '../world.ts';
 
 /** The step of DIAMOND's running run at work. */
 const AT_WORK = 'implement';
@@ -62,6 +62,7 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(SHAPED.id);
       fed(id, 'removed');
     }
   },

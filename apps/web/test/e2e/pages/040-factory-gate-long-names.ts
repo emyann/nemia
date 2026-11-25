@@ -5,7 +5,7 @@ import { cardOf, cardsDrawn, expectClearOfEachOther, placeOf, said } from '../ca
 import { expectCount, expectInside, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { lines, write } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { dropStoredRun, OUT, store, storedRecords, storeRecord } from '../world.ts';
 
 /**
  * A run no seed keeps: an ending whose gated step, the step a send-back goes to and the base branch all have long names, four steps and
@@ -29,7 +29,7 @@ const LONG_NAMES = {
 
 /**
  * Writes LONG_NAMES into the store at `root`, dated `createdAt`: its folder, its record and its three tasks. Returns every path written, to
- * take back.
+ * take back; its record, the keyspace's, is taken back by `dropStoredRun`.
  */
 function seedLongNames(root: string, createdAt: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -69,9 +69,8 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()) {
   signedOff(implement, 3, 2.5, { outcome: 'done', summary: 'Implemented it.', needs: null, artifacts: [] });
   signedOff(notes, 2.4, 2, { outcome: 'blocked', summary: 'Wrote half the notes.', needs: asks, artifacts: [] });
   signedOff(back, 2.4, 1.5, { outcome: 'done', summary: 'Reviewed it: nothing to change.', needs: null, artifacts: [] });
-  const record = path.join(root, 'runs', `${id}.json`);
-  write(
-    record,
+  storeRecord(
+    id,
     JSON.stringify(
       {
         id,
@@ -95,7 +94,7 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()) {
       2,
     ),
   );
-  return [record, dir, ...[implement, notes, back].map(task)] satisfies string[];
+  return [dir, ...[implement, notes, back].map(task)] satisfies string[];
 }
 
 export default {
@@ -112,12 +111,9 @@ export default {
   expect: async (page) => {
     const { id, ending, back, onto } = LONG_NAMES;
     const notes = LONG_NAMES.steps[1];
-    const runs = path.join(store!, 'runs');
     const oldest = Math.min(
-      ...fs
-        .readdirSync(runs)
-        .filter((file) => file.endsWith('.json'))
-        .map((file) => Date.parse(JSON.parse(fs.readFileSync(path.join(runs, file), 'utf8')).createdAt))
+      ...storedRecords()
+        .map((record) => Date.parse(String(record.createdAt)))
         .filter((at) => !Number.isNaN(at)),
     );
     const written = seedLongNames(store!, new Date(oldest - 60_000).toISOString());
@@ -183,6 +179,7 @@ export default {
       await expectCount(card.locator('[data-tile]'), 0, 'Reset layout closes it again');
     } finally {
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      dropStoredRun(id);
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);

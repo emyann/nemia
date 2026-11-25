@@ -1,0 +1,81 @@
+store measure of /tmp/nemia-frozen-7ce3-twCi/wf (/tmp/nemia-frozen-7ce3-twCi/ae), copied: 773861 files, 15637.8 MB in 179 s, without nothing
+295 runs (292 finished, 3 open), 2699 tasks, 31.9 MB of journals, 11569 feed lines, 369 cards (278 started); unreadable: 0 runs, 0 pass lines; invariant refusals: 0
+keyspace import: 1070 records in 1.6 s; largest run record: board-look-design-md-is-the-wgfe, 235205 bytes of the 1572864 a record holds
+AMD EPYC-Genoa Processor, 8 cores, 16366.5 MB, node v24.16.0, load 2.18; commit ce61c90e4341; 2026-11-22T14:52:55.407Z; median of 3
+runs read: finished a-red-ci-that-is-a-real-fail-faza, open board-look-a-cost-is-ink-and-x5js; feed from byte 5466921, 1000 lines; her chat: task nemia-20261121051038481, 45 events listed, cursor 3.44.6.5.5.0.1.1.0
+
+run records read: the runs/<id>.json files a read opened; the runs are records of the keyspace here, read off it uncounted, so this column counts none of them and its 0 is no gain
+
+| read | cold ms | cold heap MB | warm ms | warm heap MB | run records read, cold / warm | answer KB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 3218.7 | 0.5 | 459.1 | 0.4 | — | — |
+| tickPassInformed | 3898.9 | 40.2 | 477.9 | 0.4 | — | — |
+| runList | 535.9 | 25.3 | 363.4 | 0.8 | 0 / 0 | 432.1 |
+| runListHundred | 1044.0 | 101.1 | 389.0 | 3.0 | 0 / 0 | 2137.7 |
+| runSummaries | 1672.0 | 306.7 | 107.9 | -0.0 | 0 / 0 | 57.5 |
+| stats | 37945.4 | 199.4 | 844.9 | 0.4 | 0 / 0 | 119.6 |
+| finishedRun | 127.7 | 1.8 | 106.1 | 0.2 | 0 / 0 | 28.1 |
+| openRun | 113.3 | 0.4 | 113.7 | 0.1 | 0 / 0 | 15.3 |
+| feedFromCursor | 60.6 | 0.2 | 48.6 | 0.1 | 0 / 0 | — |
+| runListAfterPass | 109.1 | 0.7 | 69.4 | 0.5 | 0 / 0 | 432.1 |
+| openRunAfterPass | 110.1 | 0.0 | 107.2 | -0.2 | 0 / 0 | 15.3 |
+| inbox | 2245.2 | 306.6 | 737.0 | 0.6 | 0 / 0 | 192.8 |
+| inboxAfterPass | 643.6 | 1.1 | 661.4 | 0.5 | 0 / 0 | 192.8 |
+| chatHistory | 1689.8 | 0.1 | 88.5 | 0.0 | — | — |
+| chatBeatBefore | 1624.2 | -0.0 | 87.7 | 0.0 | — | — |
+| chatFoldStep | 2.9 | -0.1 | 2.3 | -0.1 | — | — |
+| factoryList | 166.2 | 0.1 | 150.6 | 0.0 | 0 / 0 | 9.8 |
+| factoryGet | 51.8 | 0.0 | 49.7 | 0.0 | 0 / 0 | 2.4 |
+| factoryCommands | 31.6 | 0.2 | 25.3 | 0.1 | 0 / 0 | 0.7 |
+| scheduleList | 332.8 | 0.2 | 10.7 | -0.0 | 0 / 0 | 0.1 |
+| hireList | 36.4 | 0.1 | 35.8 | 0.1 | 0 / 0 | 13.5 |
+| volumeList | 313.5 | 0.9 | 330.9 | 0.1 | 0 / 0 | 0.4 |
+| mcpServerList | 4.7 | 0.0 | 3.8 | -0.0 | 0 / 0 | 0.1 |
+| libraryAddList | 14.1 | 0.1 | 12.4 | -0.0 | 0 / 0 | 0.5 |
+| proposalList | 3.6 | 0.0 | 3.2 | 0.0 | 0 / 0 | 0.1 |
+| proposalWaiting | 3.6 | 0.0 | 2.9 | -0.0 | 0 / 0 | 0.1 |
+| cardList | 2047.5 | 306.1 | 510.7 | 0.2 | 0 / 0 | 4.0 |
+| libraryAgents | 19.2 | 0.0 | 17.8 | 0.0 | 0 / 0 | 0.1 |
+| librarySkills | 103.4 | 0.3 | 110.6 | 0.2 | 0 / 0 | 3.2 |
+| ceilings | 288.4 | 0.1 | 312.6 | 0.0 | 0 / 0 | 1.1 |
+| ceilingsAfterPass | 298.8 | -0.5 | 297.0 | -0.1 | 0 / 0 | 1.1 |
+
+spawned: git read (read) ×98, git read (pass) ×102; place writes refused: none
+
+against 8d1f10b0c8f2 of 2026-11-22T14:42:12.502Z: 295 runs now, 295 then; 2699 tasks now, 2699 then; 369 cards now, 369 then
+
+run records read: the runs/<id>.json files a read opened; the runs are records of the keyspace here, read off it uncounted, so this column counts none of them and its 0 is no gain
+
+| read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline | answer KB now | baseline |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| tickPass | 3218.7 | 2993.1 | ×1.08 | 459.1 | 466.4 | ×0.98 | — | — | — | — |
+| tickPassInformed | 3898.9 | 3664.4 | ×1.06 | 477.9 | 490.9 | ×0.97 | — | — | — | — |
+| runList | 535.9 | 518.8 | ×1.03 | 363.4 | 334.7 | ×1.09 | 0 / 0 | 295 / 275 | 432.1 | 432.1 |
+| runListHundred | 1044.0 | 1017.4 | ×1.03 | 389.0 | 327.5 | ×1.19 | 0 / 0 | 295 / 197 | 2137.7 | 2137.7 |
+| runSummaries | 1672.0 | 1557.8 | ×1.07 | 107.9 | 106.3 | ×1.02 | 0 / 0 | 295 / 7 | 57.5 | 57.5 |
+| stats | 37945.4 | 35509.2 | ×1.07 | 844.9 | 877.8 | ×0.96 | 0 / 0 | 295 / 10 | 119.6 | 119.6 |
+| finishedRun | 127.7 | 135.8 | ×0.94 | 106.1 | 122.2 | ×0.87 | 0 / 0 | 1 / 1 | 28.1 | 28.1 |
+| openRun | 113.3 | 114.4 | ×0.99 | 113.7 | 113.9 | ×1.00 | 0 / 0 | 1 / 1 | 15.3 | 15.3 |
+| feedFromCursor | 60.6 | 51.8 | ×1.17 | 48.6 | 49.9 | ×0.97 | 0 / 0 | 0 / 0 | — | — |
+| runListAfterPass | 109.1 | 121.6 | ×0.90 | 69.4 | 72.9 | ×0.95 | 0 / 0 | 0 / 0 | 432.1 | 432.1 |
+| openRunAfterPass | 110.1 | 117.5 | ×0.94 | 107.2 | 114.4 | ×0.94 | 0 / 0 | 1 / 1 | 15.3 | 15.3 |
+| inbox | 2245.2 | 2047.4 | ×1.10 | 737.0 | 672.8 | ×1.10 | 0 / 0 | 593 / 307 | 192.8 | 192.8 |
+| inboxAfterPass | 643.6 | 650.2 | ×0.99 | 661.4 | 632.0 | ×1.05 | 0 / 0 | 298 / 298 | 192.8 | 192.8 |
+| chatHistory | 1689.8 | 1516.2 | ×1.11 | 88.5 | 85.5 | ×1.04 | — | — | — | — |
+| chatBeatBefore | 1624.2 | 1461.9 | ×1.11 | 87.7 | 95.9 | ×0.91 | — | — | — | — |
+| chatFoldStep | 2.9 | 2.4 | ×1.21 | 2.3 | 2.2 | ×1.04 | — | — | — | — |
+| factoryList | 166.2 | 153.3 | ×1.08 | 150.6 | 169.3 | ×0.89 | 0 / 0 | 0 / 0 | 9.8 | 9.8 |
+| factoryGet | 51.8 | 44.6 | ×1.16 | 49.7 | 45.3 | ×1.10 | 0 / 0 | 0 / 0 | 2.4 | 2.4 |
+| factoryCommands | 31.6 | 36.9 | ×0.85 | 25.3 | 24.8 | ×1.02 | 0 / 0 | 0 / 0 | 0.7 | 0.7 |
+| scheduleList | 332.8 | 288.9 | ×1.15 | 10.7 | 18.8 | ×0.57 | 0 / 0 | 295 / 0 | 0.1 | 0.1 |
+| hireList | 36.4 | 43.1 | ×0.84 | 35.8 | 35.4 | ×1.01 | 0 / 0 | 0 / 0 | 13.5 | 13.5 |
+| volumeList | 313.5 | 319.8 | ×0.98 | 330.9 | 287.0 | ×1.15 | 0 / 0 | 295 / 294 | 0.4 | 0.4 |
+| mcpServerList | 4.7 | 4.2 | ×1.11 | 3.8 | 4.0 | ×0.95 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| libraryAddList | 14.1 | 14.8 | ×0.95 | 12.4 | 15.4 | ×0.81 | 0 / 0 | 0 / 0 | 0.5 | 0.5 |
+| proposalList | 3.6 | 3.8 | ×0.93 | 3.2 | 3.1 | ×1.03 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| proposalWaiting | 3.6 | 4.0 | ×0.91 | 2.9 | 2.9 | ×0.98 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| cardList | 2047.5 | 1962.5 | ×1.04 | 510.7 | 491.2 | ×1.04 | 0 / 0 | 593 / 307 | 4.0 | 4.0 |
+| libraryAgents | 19.2 | 18.2 | ×1.05 | 17.8 | 16.0 | ×1.12 | 0 / 0 | 0 / 0 | 0.1 | 0.1 |
+| librarySkills | 103.4 | 107.0 | ×0.97 | 110.6 | 98.7 | ×1.12 | 0 / 0 | 0 / 0 | 3.2 | 3.3 |
+| ceilings | 288.4 | 263.8 | ×1.09 | 312.6 | 288.7 | ×1.08 | 0 / 0 | 295 / 295 | 1.1 | 1.1 |
+| ceilingsAfterPass | 298.8 | 304.0 | ×0.98 | 297.0 | 286.4 | ×1.04 | 0 / 0 | 295 / 295 | 1.1 | 1.1 |

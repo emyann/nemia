@@ -8,7 +8,8 @@
  * is filed under, and the run records a listing reads. Its store is at `ROOT`, given as `ENV` with
  * `WF_VERIFY_REST=0`: nothing here ticks, and a warm read counted under `1` reads every record afresh to verify it.
  */
-import { afterAll, beforeAll, describe, test, vi } from 'vitest';
+import { dropRecord, keysUnder, plantRecord, recordText, runKey, runRecord, runsNow } from '../../testing.ts';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,8 +27,8 @@ import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
 import { inboxDir, parseArgv, START, StartInput, startRun, startFromInbox, StoreRoot } from '../runner.ts';
 import type { Started } from '../start/commands.verb.ts';
 import * as verbs from '../runner.ts';
-import { runRecord } from '../record/record.store.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
+import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
 import { INBOX as INBOX_LIST, INBOX_ADD, type InboxAddInput } from './commands.verb.ts';
 import { inboxLines, type InboxListing } from './inbox.ts';
 import { factsOf, handled, typed, type StartedAnswer } from '../../test/typed.ts';
@@ -35,7 +36,6 @@ import { runWith as runEngine } from '../runtime-client.ts';
 import { main as cli } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
-import { filesStoreAt } from '../record/files.store.ts';
 import { addFactoryAt, attachWorkflowAt } from '../factory/factory.store.ts';
 
 const ROOT = scratch('wf-inbox-');
@@ -50,7 +50,7 @@ const readInbox = () => atRoot(verbs.readInbox());
 const dropFromInbox = (name: string) => atRoot(verbs.dropFromInbox(name));
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer, ENV);
-const filed = filesStoreAt(ROOT);
+const filed = runsNow(ROOT);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
 /**
  * `nemia`, as a person types it, its commands given this test's place: `start` run on its entry's handler (`typed`), a card of the
@@ -146,12 +146,13 @@ const aRepoWith = (...workflows: string[]) => {
   return repo;
 };
 
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** A run record, as `start()` writes one — only what the listing reads of it matters here. */
 const writeRecord = (id: string, from?: Run['from']) =>
-  fs.writeFileSync(
-    path.join(ROOT, 'runs', `${id}.json`),
+  plantRecord(
+    ROOT,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/repo',
@@ -253,8 +254,8 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
         lines.some((l) => /^broken-a1b2 +broken-a1b2\.md: `harness` is not a key an inbox card has\./.test(l)),
         lines.join('\n'),
       );
-      fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
-      fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
+      dropRecord(ROOT, runKey('show-the-flag-on-the-settin-zz99'));
+      dropRecord(ROOT, runKey('an-unrelated-run-yy88'));
     },
   );
   s.test(
@@ -338,7 +339,7 @@ describe('a person parks ideas in the inbox, lists them, starts them and drops t
       );
       const typed = await runPlaced(startRun({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
       assert.equal(
-        Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
+        Object.hasOwn(JSON.parse(recordText(ROOT, runKey(typed.id)) ?? ''), 'from'),
         false,
         'a run typed at nemia start carries no from',
       );
@@ -552,11 +553,11 @@ describe('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbo
         writeRecord('r-outside');
       }
       await assert.rejects(async () => await refused(), refusedWith('Invalid', ...named));
-      assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
+      assert.ok(recordText(ROOT, runKey('r-outside')) !== undefined, 'the record outside the inbox is still there');
       assert.ok(fs.existsSync(file), 'and so is the card');
     });
   afterAll(() => {
-    fs.rmSync(path.join(ROOT, 'runs', 'r-outside.json'));
+    dropRecord(ROOT, runKey('r-outside'));
   });
 });
 
@@ -718,7 +719,7 @@ describe('REFUSED by name at shipped defaults: `nemia start` of an inbox card, b
       assert.deepEqual(inbox(), there, 'every card still in the inbox');
     });
   afterAll(() => {
-    fs.rmSync(path.join(ROOT, 'runs', 'source-a1.json'));
+    dropRecord(ROOT, runKey('source-a1'));
   });
 });
 test.skipIf(process.getuid?.() === 0 && 'root writes a folder it may not write')(
@@ -768,14 +769,20 @@ test('a card gone between its start and the taking off of its `queued:` line is 
   const file = path.join(INBOX, 'gone-a1b2.md');
   fs.mkdirSync(INBOX, { recursive: true });
   fs.writeFileSync(file, `---\nworkflow: dev\nrepo: ${repo}\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views\n`);
-  const write = fs.writeFileSync;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the card removed as the run is made: a race no seam gives
-  vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
-    write.apply(this, args);
-    const created = typeof args[0] === 'string' && path.dirname(args[0]) === path.join(ROOT, 'runs') && args[0].endsWith('.json');
-    if (created && fs.existsSync(file)) fs.rmSync(file);
-  });
-  const started = await runPlaced(startFromInbox({ name: 'gone-a1b2', callerRepo: repo }));
+  const started = await runPlaced(
+    Effect.gen(function* () {
+      const door = yield* RunDoor;
+      const racing: RunDoorShape = {
+        ...door,
+        runs: {
+          ...door.runs,
+          create: (...made: Parameters<RunDoorShape['runs']['create']>) =>
+            Effect.tap(door.runs.create(...made), () => Effect.sync(() => fs.rmSync(file, { force: true }))),
+        },
+      };
+      return yield* startFromInbox({ name: 'gone-a1b2', callerRepo: repo }).pipe(Effect.provideService(RunDoor, racing));
+    }),
+  );
   assert.equal(started.queueLeft, undefined, 'a card already gone is not a line left');
   assert.deepEqual(runRecord(ROOT, started.run.id).from, { inbox: 'gone-a1b2' });
   assert.deepEqual(readInbox(), []);

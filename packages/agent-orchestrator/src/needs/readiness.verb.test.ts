@@ -11,6 +11,7 @@
  * test's own, with no stand-in of it (`test/ambient.ts` puts one of each harness first); Nemia's folder said only where the keeper's
  * trust of it was refused; and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
  */
+import { plantRecord, runKey } from '../../testing.ts';
 import { createFactoryAt } from '../factory/factory.store.ts';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -419,7 +420,7 @@ test('every piece declares what it costs while missing: linger and the bind keep
   assert.equal(costOf('factory'), 'run');
   assert.equal(before.ran, false, 'no run was started in a store with no run record');
   fs.mkdirSync(path.join(home, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(home, 'runs', 'r-1.json'), '{}');
+  plantRecord(home, runKey('r-1'), '{}');
   assert.equal((await readAt(facts({ PATH: '/usr/bin' }))).ran, true, "a run's record says a run was started");
 });
 

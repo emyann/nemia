@@ -12,6 +12,7 @@
  * person tells it, is on the stand-ins in `test/pause.test.ts`. A store of its own, since
  * `tick` reads every run of its store: at `ROOT`, given as `ENV`.
  */
+import { approvalKey, askNames, recordText, runKey, runRecord } from '../../testing.ts';
 import { type Env, settingsOf, type StoreConfig } from '../config/config.store.ts';
 import { storeGiven } from '../../test/config-given.ts';
 import type { StoreRoot } from '../config/root.store.ts';
@@ -30,7 +31,6 @@ import { testPlace } from '../../place/memory/index.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
 import * as verbs from '../runner.ts';
 import { approveRun, retryRun, startRun } from '../runner.ts';
-import { approvalFile, asksDir, runRecord } from '../record/record.store.ts';
 import { tickRun, freshRestMemo } from './tick.verb.ts';
 import { engineOf, runWith as runEngine, storeAdmission } from '../runtime-client.ts';
 import { resumePause, putPause } from '../pause/pause.store.ts';
@@ -295,16 +295,16 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   assert.equal(runRecord(ROOT, checked.id).steps.work?.check, undefined, "checked's work signed, its check not filed");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work`, "refused's try asked, not filed");
   assert.deepEqual(
-    fs.readdirSync(asksDir(ROOT, refused.id)).filter((f) => f !== 'done'),
+    askNames(ROOT, refused.id).filter((f) => !f.startsWith('done/')),
     ['retry-work-2'],
     'and the ask kept',
   );
-  assert.ok(fs.existsSync(approvalFile(ROOT, gated.id, 'plan', 1)), "gated's approval kept");
+  assert.ok(recordText(ROOT, approvalKey(gated.id, 'plan', 1)) !== undefined, "gated's approval kept");
   assert.equal(taskOf(gated, 'work'), undefined, "gated's work not filed on it");
   assert.equal(taskOf(await born, 'work'), undefined, 'nothing filed of the run started while paused');
   assert.equal(last.queue, undefined, 'no queued card started');
   assert.equal(readInbox().find((l) => l.name === card.name)?.tried, undefined, 'nor tried');
-  assert.ok(!('pause' in JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${running.id}.json`), 'utf8'))), 'no record holds the pause');
+  assert.ok(!('pause' in JSON.parse(recordText(ROOT, runKey(running.id)) ?? '')), 'no record holds the pause');
 
   const listed = await runWith(h.e, runsListed());
   assert.deepEqual(

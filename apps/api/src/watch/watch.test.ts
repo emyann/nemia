@@ -20,6 +20,7 @@ import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
+import { dropRecord, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
 const waitFor = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 20 });
@@ -139,8 +140,9 @@ test('a card started arrives as MODIFIED, its status.runs moved though its file,
     const sent = initial.find((e) => named(e) === 'st-1');
     assert.ok(sent && sent.type !== 'BOOKMARK');
     fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, 'runs', 'r-started-st-1.json'),
+    plantRecord(
+      root,
+      runKey('r-started-st-1'),
       JSON.stringify({
         id: 'r-started-st-1',
         repo: '/code/app',
@@ -163,7 +165,7 @@ test('a card started arrives as MODIFIED, its status.runs moved though its file,
     assert.deepEqual((modified.object.status as { runs: string[] }).runs, ['r-started-st-1'], 'its status names the run');
   } finally {
     await w.stop();
-    fs.rmSync(path.join(root, 'runs', 'r-started-st-1.json'), { force: true });
+    dropRecord(root, runKey('r-started-st-1'));
   }
 });
 
@@ -199,11 +201,12 @@ const doneTask = (taskId: string) => {
 
 /** A run of `default` waiting at its `design` gate, its task done, its record laid by hand and taken away after `t`. */
 const gatedRun = (t: TestContext, id: string, createdAt = '2026-11-05T06:00:00.000Z') => {
-  t.onTestFinished(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
+  t.onTestFinished(() => dropRecord(root, runKey(id)));
   doneTask(`t-${id}`);
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',

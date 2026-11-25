@@ -7,6 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`; each test empties the store's runs first.
  */
+import { emptyRuns, runRecord } from '../testing.ts';
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,7 +23,7 @@ import { EngineService as RunsEngine, engineOf } from '../src/runtime-client.ts'
 import { SHOW, TRIES, TRY, CLOSEOUT, TOLD } from '../src/object/commands.verb.ts';
 import { advanceRun, startRun, runWith as runEngine, RunObject, runObject } from '../src/runner.ts';
 import { tryShort } from '../src/object/run.verb.ts';
-import { artifactsDir, runRecord } from '../src/record/record.store.ts';
+import { artifactsDir } from '../src/record/record.store.ts';
 import { Missing } from '../src/refusal/refusal.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import type { StepTry } from '../src/resource/tries.verb.ts';
@@ -47,6 +48,7 @@ const e = () => engineOf(engine().layer);
 
 beforeEach(() => {
   fs.rmSync(RUNS_DIR, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS_DIR, { recursive: true });
 });
 

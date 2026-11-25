@@ -1,70 +1,74 @@
 /**
- * The run store's interface (`RunStore`, `src/record/record.ts`), held to what its files implementation (`filesStore`) answers: a record
- * made, read with a person's files composed onto it, written back with none of them and no byte moved, refused once it is gone; whether a
- * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
- * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`). And a
- * person's writes: an ask of each kind at its name, never over a file there, a hold put once and standing while its file does, a
- * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file; the inbox is the Card
- * door's (`src/cards/cards.store.test.ts`). And what `nemia rm` and `nemia prune --artifacts` read of it: every run's id read or not, a
- * run's files directory found and dropped.
+ * The run store's interface (`RunStore`, `src/record/record.ts`), held to what its keyspace implementation answers (`runDoorKeyspace`,
+ * `src/runs/records.store.ts`): a record made with its card's claim in one transaction, read with a person's files composed onto it,
+ * written back with none of them, refused once it is gone; whether a run is there and whether a person called it off; the stamps a pass
+ * compares, and the asks it reads, settles and answers from, each a record at its key; and the tick asking it, before each filing,
+ * whether a person called the run off since (`mayFileOf`). And a person's writes: an ask of each kind at its key, never over a record
+ * there, a hold standing while its file does, a run forgotten key by key and file by file. And the import of a store's run files, once,
+ * moved aside under `<root>/imported/` and never deleted. And what `nemia rm` and `nemia prune --artifacts` read of it.
  *
- * And the refusal that keeps the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
- * functions from `record.store.ts`, or through `runner.ts`, is refused. The store is the file's own, at `ROOT`.
+ * And the refusals that keep the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
+ * functions from `record.store.ts`, or through `runner.ts`, and a read of runs past the door a program is given. The store is the
+ * file's own, at `ROOT`.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/debt';
+import { Effect } from 'effect';
+import { seamUses, sourcesUnder } from 'test-kit/debt';
 import type { Run } from '../src/run.ts';
 import type { PersonRequest } from '../src/record/record.ts';
 import { scratch } from 'test-kit/scratch';
-import { filesStoreAt } from '../src/record/files.store.ts';
-import { RunDoor, runDoorFiles } from '../src/runs/runs.store.ts';
+import { RunDoor, runDoorKeyspace } from '../src/runs/runs.store.ts';
+import { runsImported } from '../src/runs/records.store.ts';
+import { keyspaceAt, keyspaceFile, RECORD_CEILING } from '../src/keyspace/keyspace.store.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
 import { act, doorFrom, walksOn } from './door-walks.ts';
 import { RUN_WALKS, aRun } from './run-walks.ts';
 import { RunId } from '../src/record/record.model.ts';
 import { mayFileOf } from '../src/tick/advance.verb.ts';
 import { resumePause, putPause } from '../src/pause/pause.store.ts';
 import {
-  acceptFile,
   acceptanceIn,
-  approvalFile,
   approvalIn,
-  askFile,
   askIn,
-  asksDir,
   holdFile,
   markCancelled,
   pruneFile,
-  roundAskFile,
   roundAskIn,
-  runFile,
   runsDir,
   writeHold,
 } from '../src/record/record.store.ts';
+import { askKey, asksPrefix, claimKey, keysUnder, plantRecord, recordText, runFilesImported, runKey, runsNow } from '../testing.ts';
 
 const ROOT = scratch('wf-run-store-');
-const filesStore = filesStoreAt(ROOT);
+const store = runsNow(ROOT);
 const PKG = path.join(import.meta.dirname, '..');
 const at = '2026-09-30T09:00:00.000Z';
 
 /** A run made in the store under `id`. */
 const made = (id: string) => {
   const run = aRun(id);
-  filesStore.runs.create(run);
+  store.runs.create(run);
   return run satisfies Run;
 };
 
 /** A prune marker, as `nemia prune` writes one. */
 const pruned = (id: string) => fs.writeFileSync(pruneFile(ROOT, id), JSON.stringify({ at, worktrees: [] }, null, 2));
 
-/** The Run door over the files of this file's store. */
-const door = doorFrom(RunDoor, runDoorFiles(ROOT));
+/** The record at the run's key, read as JSON. */
+const stored = (id: string) => JSON.parse(recordText(ROOT, runKey(id)) ?? 'null') as Record<string, unknown> | null;
 
-for (const [name, body] of walksOn(RUN_WALKS, () => ({ door, root: ROOT, layer: 'files' }))) test(name, body);
+/** The Run door over the keyspace of this file's store. */
+const door = doorFrom(RunDoor, runDoorKeyspace(ROOT));
 
-test('a record of an older shape reads through the door as the one Run type, and is written back with nothing refused or moved', () => {
+/** `program` run at once at the store `ROOT`. */
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+
+for (const [name, body] of walksOn(RUN_WALKS, () => ({ door, root: ROOT, layer: 'keyspace' }))) test(name, body);
+
+test('a record of an older shape reads through the door as the one Run type, and is written back with nothing refused or lost', () => {
   const id = 'r-older-shape';
   const older = {
     ...aRun(id),
@@ -79,53 +83,61 @@ test('a record of an older shape reads through the door as the one Run type, and
     slotHeldAt: '2026-09-01T00:01:00.000Z',
     keyNobodyNames: 'kept as it was',
   };
-  fs.mkdirSync(runsDir(ROOT), { recursive: true });
-  fs.writeFileSync(runFile(ROOT, id), JSON.stringify(older, null, 2));
+  plantRecord(ROOT, runKey(id), JSON.stringify(older));
   const read = act(door.runs.read(RunId.read(id)));
   assert.ok(!('refused' in read), 'an older record reads');
   assert.equal(read.steps.implement?.tries?.[0]?.cause, 'retries', "a try's former `then` is read as its cause");
   assert.deepEqual(read.gatesTimed, older.gatesTimed, 'a counter of the tick reads as the model names it');
   assert.equal(act(door.runs.rewrite(read)), true, 'and is written back through the model with nothing refused');
-  const written = JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown>;
-  assert.equal(written.keyNobodyNames, 'kept as it was');
+  assert.equal(stored(id)?.keyNobodyNames, 'kept as it was');
 });
 
 describe('a record in the store, read and written back through the door: what it holds is what it held', () => {
   test('a record stored under an id runId would not mint still reads through the door, and is written back (RunId on read is nominal)', () => {
     const id = 'Old_Id';
-    fs.mkdirSync(runsDir(ROOT), { recursive: true });
-    fs.writeFileSync(runFile(ROOT, id), JSON.stringify(aRun(id), null, 2));
+    plantRecord(ROOT, runKey(id), JSON.stringify(aRun(id)));
     const read = act(door.runs.read(RunId.read(id)));
     assert.ok(!('refused' in read), 'a stored id is read as it is');
     assert.equal(act(door.runs.rewrite(read)), true);
   });
-  test('a new run at an id with a record is refused before a byte of the first is written over (wx)', () => {
+  test('a new run at an id with a record is refused before a byte of the first is written over', () => {
     const run = made('r-exclusive');
-    const text = fs.readFileSync(runFile(ROOT, run.id), 'utf8');
+    const text = recordText(ROOT, runKey(run.id));
     assert.deepEqual(act(door.runs.create({ ...run, brief: 'another' })), { refused: 'Conflict' });
-    assert.equal(fs.readFileSync(runFile(ROOT, run.id), 'utf8'), text);
+    assert.equal(recordText(ROOT, runKey(run.id)), text);
   });
   test('a record read and written back moves no byte, a key no nemia writes included', () => {
     const id = 'r-bytes';
-    const text = JSON.stringify({ ...aRun(id), laterKey: { kept: [1, 2] } }, null, 2);
-    fs.mkdirSync(runsDir(ROOT), { recursive: true });
-    fs.writeFileSync(runFile(ROOT, id), text);
-    assert.equal(filesStore.runs.rewrite(filesStore.runs.read(id)), true);
-    assert.equal(fs.readFileSync(runFile(ROOT, id), 'utf8'), text);
+    made(id);
+    store.runs.rewrite({ ...store.runs.read(id), laterKey: { kept: [1, 2] } } as unknown as Run);
+    const text = recordText(ROOT, runKey(id));
+    assert.equal(store.runs.rewrite(store.runs.read(id)), true);
+    assert.equal(recordText(ROOT, runKey(id)), text);
+    assert.deepEqual(stored(id)?.laterKey, { kept: [1, 2] });
   });
   test('a record that is not JSON is left out of the list and said, and the other runs are listed', () => {
     made('r-listed');
-    fs.writeFileSync(runFile(ROOT, 'r-not-json'), '{ not json');
+    plantRecord(ROOT, runKey('r-not-json'), '{ not json');
     const said: string[] = [];
     try {
-      const ids = filesStore.runs.list((line) => said.push(line)).map((run) => run.id);
+      const ids = store.runs.list((line) => said.push(line)).map((run) => run.id);
       assert.ok(ids.includes('r-listed'));
       assert.equal(ids.includes('r-not-json'), false);
       assert.equal(said.length, 1);
       assert.match(said[0], /r-not-json/);
     } finally {
-      fs.rmSync(runFile(ROOT, 'r-not-json'));
+      store.runs.forget('r-not-json');
     }
+  });
+  test("a person's files are composed onto the run read, and never written into its record", () => {
+    const run = made('r-composed');
+    writeHold(ROOT, run.id, ['other-run']);
+    markCancelled(ROOT, run.id);
+    const read = store.runs.read(run.id);
+    assert.ok(read.cancelledAt && read.hold);
+    assert.equal(store.runs.rewrite(read), true);
+    const written = stored(run.id);
+    assert.equal(written && ('cancelledAt' in written || 'hold' in written), false);
   });
 });
 
@@ -134,151 +146,380 @@ describe('whether a person called a run off: a pause, a hold and a record gone, 
     const run = made('r-paused');
     putPause(ROOT, { by: 'ann' });
     try {
-      assert.equal(filesStore.runs.calledOff(run.id), true);
+      assert.equal(store.runs.calledOff(run.id), true);
     } finally {
       resumePause(ROOT);
     }
-    assert.equal(filesStore.runs.calledOff(run.id), false);
+    assert.equal(store.runs.calledOff(run.id), false);
   });
   test("the store's pause is composed onto every run read and listed, and written back into none", () => {
     const run = made('r-pause-read');
     const pause = putPause(ROOT, { why: 'merging by hand', by: 'ann' });
     try {
-      const read = filesStore.runs.read(run.id);
+      const read = store.runs.read(run.id);
       assert.deepEqual(read.pause, pause);
-      assert.deepEqual(filesStore.runs.list().find((r) => r.id === run.id)?.pause, pause);
-      assert.deepEqual(
-        filesStore.runs.list(undefined, (id) => (id === run.id ? run : undefined)).find((r) => r.id === run.id)?.pause,
-        pause,
-        'a run the memo kept is read with the pause as it stands',
-      );
-      assert.equal(filesStore.runs.rewrite(read), true);
-      assert.equal('pause' in JSON.parse(fs.readFileSync(runFile(ROOT, run.id), 'utf8')), false, 'the pause is written into the record');
+      assert.deepEqual(store.runs.list().find((r) => r.id === run.id)?.pause, pause);
+      assert.equal(store.runs.rewrite(read), true);
+      assert.equal('pause' in (stored(run.id) ?? {}), false, 'the pause is written into the record');
     } finally {
       resumePause(ROOT);
     }
-    assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
+    assert.equal('pause' in store.runs.read(run.id), false, 'lifted, no run reads it');
   });
   test('a pass files for a run until a person holds it, and not again in that pass once the hold is lifted', () => {
     const run = made('r-may-file');
-    const mayFile = mayFileOf(ROOT, run);
-    assert.equal(mayFile(), true);
+    const mayFile = mayFileOf(run);
+    assert.equal(atRoot(mayFile), true);
     const hold = writeHold(ROOT, run.id, ['other-run']);
     assert.ok(hold);
-    assert.equal(mayFile(), false);
-    assert.equal(filesStore.holds.lift(run.id, hold.at), true);
-    assert.equal(mayFile(), false);
-    assert.equal(mayFileOf(ROOT, run)(), true);
+    assert.equal(atRoot(mayFile), false);
+    assert.equal(store.holds.lift(run.id, hold.at), true);
+    assert.equal(atRoot(mayFile), false);
+    assert.equal(atRoot(mayFileOf(run)), true);
   });
   test('a pass files nothing for a run whose record is gone', () => {
     const run = made('r-may-file-gone');
-    fs.rmSync(runFile(ROOT, run.id));
-    assert.equal(mayFileOf(ROOT, run)(), false);
+    store.runs.forget(run.id);
+    assert.equal(atRoot(mayFileOf(run)), false);
   });
 });
 
-/** One ask of each kind a person writes, with the path the tick reads it at and its reader's words for a file there that is not one. */
+/** One ask of each kind a person writes, with the key the tick reads it at and its reader's words for a record there that is not one. */
 const asksOfEachKind = (id: string) => {
-  const made: Array<{ asked: PersonRequest; file: string; stray: (file: string) => unknown }> = [
+  const made: Array<{ asked: PersonRequest; key: string; stray: (text: string) => unknown }> = [
     {
       asked: { kind: 'retry', of: 'try', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } },
-      file: askFile(ROOT, id, 'implement', 2),
-      stray: (file) => askIn(file, 'implement', 2),
+      key: askKey(id, { of: 'try', step: 'implement', n: 2 }),
+      stray: (text) => askIn(text, 'implement', 2),
     },
     {
       asked: { kind: 'retry', of: 'round', ask: { step: 'review', round: 3, at } },
-      file: roundAskFile(ROOT, id, 'review', 3),
-      stray: (file) => roundAskIn(file, 'review', 3),
+      key: askKey(id, { of: 'round', step: 'review', n: 3 }),
+      stray: (text) => roundAskIn(text, 'review', 3),
     },
     {
       asked: { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, message: 'yes' } },
-      file: approvalFile(ROOT, id, 'implement', 1),
-      stray: (file) => approvalIn(file, 'implement', 1),
+      key: askKey(id, { of: 'gate', step: 'implement', n: 1 }),
+      stray: (text) => approvalIn(text, 'implement', 1),
     },
     {
       asked: { kind: 'approve', of: 'loop', ask: { step: 'review', try: 1, at, message: 'good enough' } },
-      file: acceptFile(ROOT, id, 'review', 1),
-      stray: (file) => acceptanceIn(file, 'review', 1),
+      key: askKey(id, { of: 'loop', step: 'review', n: 1 }),
+      stray: (text) => acceptanceIn(text, 'review', 1),
     },
   ];
   return made;
 };
 
-test('an ask of each kind is written at the name the tick reads it by, holding the ask alone, and answered where it is', () => {
+test('an ask of each kind is written at the key the tick reads it by, holding the ask alone, and answered where it is', () => {
   const run = made('r-write-asks');
-  for (const { asked, file } of asksOfEachKind(run.id)) {
+  for (const { asked, key } of asksOfEachKind(run.id)) {
     const n = asked.of === 'round' ? asked.ask.round : asked.of === 'base' ? asked.ask.merge.try : asked.ask.try;
-    assert.equal(filesStore.asks.where(run.id, { of: asked.of, step: asked.ask.step, n }), file);
-    assert.deepEqual(filesStore.asks.write(run.id, asked), { written: true, where: file });
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), asked.ask, `${asked.of} is written as the ask alone`);
+    assert.equal(store.asks.where(run.id, { of: asked.of, step: asked.ask.step, n }), key);
+    assert.deepEqual(store.asks.write(run.id, asked), { written: true, where: key });
+    assert.deepEqual(JSON.parse(recordText(ROOT, key) ?? ''), asked.ask, `${asked.of} is written as the ask alone`);
   }
-  const read = filesStore.asks.read(run.id);
+  const read = store.asks.read(run.id);
   assert.equal(read.asks.length, 1);
   assert.equal(read.rounds.length, 1);
   assert.deepEqual(read.notes, []);
+  assert.equal(store.runs.read(run.id).approvals?.length, 1, 'an approval is composed onto the run read');
 });
 
 test('a merge ask is written at its target and try, holding its loop, round, base and commit, and read back as a round ask of its loop', () => {
   const run = made('r-write-merge');
   const merge = { target: 'implement', try: 3, onto: 'main', sha: 'a'.repeat(40) };
-  const file = filesStore.asks.where(run.id, { of: 'base', step: 'implement', n: 3 });
-  assert.match(file, /merge-implement-3$/);
-  assert.deepEqual(filesStore.asks.write(run.id, { kind: 'refresh', of: 'base', ask: { step: 'review', round: 2, at, merge } }), {
+  const key = store.asks.where(run.id, { of: 'base', step: 'implement', n: 3 });
+  assert.equal(key, `${asksPrefix(run.id)}merge-implement-3`);
+  assert.deepEqual(store.asks.write(run.id, { kind: 'refresh', of: 'base', ask: { step: 'review', round: 2, at, merge } }), {
     written: true,
-    where: file,
+    where: key,
   });
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { loop: 'review', round: 2, onto: 'main', sha: 'a'.repeat(40), at });
-  assert.deepEqual(filesStore.asks.read(run.id).rounds, [{ step: 'review', round: 2, at, merge }]);
+  assert.deepEqual(JSON.parse(recordText(ROOT, key) ?? ''), { loop: 'review', round: 2, onto: 'main', sha: 'a'.repeat(40), at });
+  assert.deepEqual(store.asks.read(run.id).rounds, [{ step: 'review', round: 2, at, merge }]);
 });
 
-test("an ask written where a file that is not one stands is refused with the tick's words for it", () => {
+test("an ask written where a record that is not one stands is refused with the tick's words for it, and leaves it as it was", () => {
   const run = made('r-write-stray');
-  for (const { asked, file, stray } of asksOfEachKind(run.id)) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, 'not json');
-    const words = stray(file);
+  for (const { asked, key, stray } of asksOfEachKind(run.id)) {
+    plantRecord(ROOT, key, 'not json');
+    const words = stray('not json');
     assert.equal(typeof words, 'string');
-    assert.deepEqual(filesStore.asks.write(run.id, asked), { written: false, where: file, stray: words });
+    assert.deepEqual(store.asks.write(run.id, asked), { written: false, where: key, stray: words });
+    assert.equal(recordText(ROOT, key), 'not json');
   }
 });
 
 test('a hold file stands while it is there, read as a hold or not, and not once it is gone', () => {
   const run = made('r-stands');
-  assert.equal(filesStore.holds.stands(run.id), false);
+  assert.equal(store.holds.stands(run.id), false);
   fs.writeFileSync(holdFile(ROOT, run.id), 'not json');
-  assert.equal(filesStore.holds.stands(run.id), true);
+  assert.equal(store.holds.stands(run.id), true);
   fs.rmSync(holdFile(ROOT, run.id));
-  assert.equal(filesStore.holds.stands(run.id), false);
+  assert.equal(store.holds.stands(run.id), false);
 });
 
-test("a run forgotten loses its record and every person's file and its directory, in order, and another run keeps its own", () => {
-  const run = made('r-forget');
+test("a run forgotten loses its record, its claim and its asks, key by key, then every person's file and its directory; another run keeps its own", () => {
+  const run = { ...aRun('r-forget'), from: { inbox: 'c-forget' } } satisfies Run;
+  store.runs.create(run);
   const other = made('r-forget-other');
   for (const id of [run.id, other.id]) {
-    filesStore.holds.put(id, ['x'], {});
-    filesStore.runs.cancel(id);
+    store.holds.put(id, ['x'], {});
+    store.runs.cancel(id);
     pruned(id);
-    filesStore.asks.write(id, { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } });
+    store.asks.write(id, { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } });
     fs.mkdirSync(path.join(runsDir(ROOT), id, 'artifacts'), { recursive: true });
     fs.writeFileSync(path.join(runsDir(ROOT), id, 'artifacts', 'x'), 'x');
   }
-  assert.deepEqual(filesStore.runs.forget(run.id), [
-    `runs/${run.id}.json`,
+  assert.deepEqual(store.runs.forget(run.id), [
+    runKey(run.id),
+    claimKey('c-forget'),
+    askKey(run.id, { of: 'gate', step: 'implement', n: 1 }),
     `runs/${run.id}.cancelled`,
     `runs/${run.id}.pruned`,
     `runs/${run.id}.hold`,
-    `runs/${run.id}.asks/`,
     `runs/${run.id}/`,
   ]);
+  assert.deepEqual(keysUnder(ROOT, asksPrefix(run.id)), []);
   assert.deepEqual(
     fs.readdirSync(runsDir(ROOT)).filter((name) => name === run.id || name.startsWith(`${run.id}.`)),
     [],
   );
-  assert.equal(filesStore.runs.exists(other.id), true);
-  const kept = filesStore.runs.read(other.id);
+  assert.equal(store.runs.exists(other.id), true);
+  const kept = store.runs.read(other.id);
   assert.ok(kept.cancelledAt && kept.pruned && kept.hold && kept.approvals);
   assert.equal(fs.existsSync(path.join(runsDir(ROOT), other.id, 'artifacts', 'x')), true);
-  assert.deepEqual(filesStore.runs.forget(run.id), []);
+  assert.deepEqual(store.runs.forget(run.id), []);
+});
+
+describe("a run's stamp: what a pass compares to know a run moved", () => {
+  test('its record written moves it, an ask written moves it, a marker moves it, and the pause does not', () => {
+    const run = made('r-stamp');
+    const stamp = () => store.runs.stamps().get(run.id);
+    const first = stamp();
+    assert.ok(first);
+    store.runs.rewrite({ ...store.runs.read(run.id), brief: 'again' });
+    const second = stamp();
+    assert.notEqual(second, first);
+    store.asks.write(run.id, { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } });
+    const third = stamp();
+    assert.notEqual(third, second);
+    markCancelled(ROOT, run.id);
+    const fourth = stamp();
+    assert.notEqual(fourth, third);
+    putPause(ROOT, { by: 'ann' });
+    try {
+      assert.equal(stamp(), fourth);
+    } finally {
+      resumePause(ROOT);
+    }
+  });
+  test('a run forgotten has no stamp', () => {
+    const run = made('r-stamp-gone');
+    store.runs.forget(run.id);
+    assert.equal(store.runs.stamps().has(run.id), false);
+  });
+});
+
+/** A run under `id` started out of the inbox's card `card`. */
+const fromCard = (id: string, card: string) => ({ ...aRun(id), from: { inbox: card } }) satisfies Run;
+
+describe("a card's claim: a record at /registry/claims/<card>, written with its run in one transaction", () => {
+  test('a run from a card writes its claim naming it, and no listing of runs, taken id or stamp reads it', () => {
+    act(door.runs.create(fromCard('c-unread-run', 'c-unread')));
+    assert.deepEqual(JSON.parse(recordText(ROOT, claimKey('c-unread')) ?? ''), { run: 'c-unread-run' });
+    assert.deepEqual(
+      {
+        listed: store.runs.list(() => {}).some((r) => r.id === 'c-unread'),
+        ids: store.runs.ids().includes('c-unread'),
+        stamped: store.runs.stamps().has('c-unread'),
+        taken: store.runs.taken('c-unread'),
+      },
+      { listed: false, ids: false, stamped: false, taken: false },
+    );
+  });
+  test('REFUSED: the loser of a card leaves no record under its id, and the claim names the first run', () => {
+    act(door.runs.create(fromCard('c-won', 'c-twice')));
+    assert.deepEqual(act(door.runs.create(fromCard('c-lost', 'c-twice'))), { refused: 'Conflict' });
+    assert.equal(recordText(ROOT, runKey('c-lost')), undefined);
+    assert.equal(fs.existsSync(path.join(runsDir(ROOT), 'c-lost')), false);
+    assert.deepEqual(JSON.parse(recordText(ROOT, claimKey('c-twice')) ?? ''), { run: 'c-won' });
+  });
+  test('a run forgotten takes its claim with it, so its card starts again', () => {
+    act(door.runs.create(fromCard('c-again-1', 'c-again')));
+    store.runs.forget('c-again-1');
+    assert.equal(recordText(ROOT, claimKey('c-again')), undefined);
+    assert.equal(act(door.runs.create(fromCard('c-again-2', 'c-again'))), undefined);
+  });
+});
+
+/** A store of its own with run files planted as a store before the keyspace keeps them. */
+const planted = () => {
+  const root = scratch('run-import-');
+  fs.mkdirSync(path.join(root, 'runs', 'i-run.asks', 'done'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'runs', 'i-run.json'), JSON.stringify(fromCard('i-run', 'i-card'), null, 2));
+  fs.writeFileSync(path.join(root, 'runs', 'i-run.asks', 'approve-implement-1'), JSON.stringify({ step: 'implement', try: 1, at }));
+  fs.writeFileSync(path.join(root, 'runs', 'i-run.asks', 'done', 'retry-implement-1'), JSON.stringify({ at }));
+  fs.writeFileSync(path.join(root, 'runs', 'i-run.cancelled'), JSON.stringify({ at }));
+  fs.mkdirSync(path.join(root, 'started'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'started', 'i-card.json'), JSON.stringify({ run: 'i-run' }));
+  return root;
+};
+
+/** The import of the store `root` run at once: how many records it made, or `{ refused }`. */
+const imported = (root: string) => act(Effect.flatMap(keyspaceAt(keyspaceFile(root)), (keyspace) => runsImported(root, keyspace)));
+
+/** Every file under `dir`, relative to it, sorted. */
+const filesUnder = (dir: string) =>
+  fs.existsSync(dir)
+    ? fs
+        .readdirSync(dir, { recursive: true, withFileTypes: true })
+        .filter((e) => e.isFile())
+        .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
+        .sort()
+    : [];
+
+describe("a store's run files imported into its keyspace once, moved aside under imported/ and never deleted", () => {
+  test("a run's record, its asks and its claim become records at their keys, and each file is moved aside; a person's marker stays", () => {
+    const root = planted();
+    assert.equal(imported(root), 4);
+    assert.equal(JSON.parse(recordText(root, runKey('i-run')) ?? '{}').id, 'i-run');
+    assert.deepEqual(keysUnder(root, asksPrefix('i-run')), [
+      `${asksPrefix('i-run')}approve-implement-1`,
+      `${asksPrefix('i-run')}done/retry-implement-1`,
+    ]);
+    assert.deepEqual(JSON.parse(recordText(root, claimKey('i-card')) ?? '{}'), { run: 'i-run' });
+    assert.deepEqual(filesUnder(path.join(root, 'imported')), [
+      'runs/i-run.asks/approve-implement-1',
+      'runs/i-run.asks/done/retry-implement-1',
+      'runs/i-run.json',
+      'started/i-card.json',
+    ]);
+    assert.deepEqual(filesUnder(path.join(root, 'runs')), ['i-run.cancelled']);
+    assert.ok(runsNow(root).runs.read('i-run').cancelledAt, 'the marker still composes onto the record');
+  });
+  test('imported again, nothing is left to import, and nothing moves', () => {
+    const root = planted();
+    imported(root);
+    assert.equal(imported(root), 0);
+  });
+  test('a claim whose run is gone, or whose run was started from another card, is stale: moved aside, and no record', () => {
+    const root = planted();
+    fs.writeFileSync(path.join(root, 'started', 'i-gone.json'), JSON.stringify({ run: 'i-nobody' }));
+    fs.writeFileSync(path.join(root, 'started', 'i-other.json'), JSON.stringify({ run: 'i-run' }));
+    assert.equal(imported(root), 4);
+    assert.equal(recordText(root, claimKey('i-gone')), undefined);
+    assert.equal(recordText(root, claimKey('i-other')), undefined);
+    assert.ok(fs.existsSync(path.join(root, 'imported', 'started', 'i-gone.json')));
+    assert.ok(fs.existsSync(path.join(root, 'imported', 'started', 'i-other.json')));
+  });
+  test('REFUSED: a record larger than the keyspace holds stops the import whole, and nothing is moved', () => {
+    const root = planted();
+    fs.writeFileSync(path.join(root, 'runs', 'i-huge.json'), JSON.stringify({ ...aRun('i-huge'), brief: 'x'.repeat(RECORD_CEILING) }));
+    assert.deepEqual(imported(root), { refused: 'Invalid' });
+    assert.equal(fs.existsSync(path.join(root, 'imported')), false);
+    assert.equal(
+      act(Effect.flatMap(keyspaceAt(keyspaceFile(root)), (keyspace) => keyspace.get(runKey('i-run')))),
+      undefined,
+      'no record made: read off the keyspace without importing again',
+    );
+  });
+  test('a key the keyspace already holds is never written over, and the file is still moved aside', () => {
+    const root = planted();
+    act(
+      Effect.flatMap(keyspaceAt(keyspaceFile(root)), (keyspace) =>
+        keyspace.write(runKey('i-run'), {
+          verb: 'create',
+          expected: null,
+          value: JSON.stringify({ ...fromCard('i-run', 'i-card'), brief: 'kept' }),
+        }),
+      ),
+    );
+    imported(root);
+    assert.equal(JSON.parse(recordText(root, runKey('i-run')) ?? '{}').brief, 'kept');
+    assert.ok(fs.existsSync(path.join(root, 'imported', 'runs', 'i-run.json')));
+  });
+  test('a file moved aside never lands over one moved before it', () => {
+    const root = planted();
+    imported(root);
+    fs.writeFileSync(path.join(root, 'runs', 'i-run.json'), JSON.stringify(fromCard('i-run', 'i-card')));
+    imported(root);
+    assert.deepEqual(
+      filesUnder(path.join(root, 'imported', 'runs')).filter((n) => n.startsWith('i-run.json')),
+      ['i-run.json', 'i-run.json.2'],
+    );
+  });
+  test('an ask that is no JSON stays where it is, and the rest is imported', () => {
+    const root = planted();
+    fs.writeFileSync(path.join(root, 'runs', 'i-run.asks', 'retry-implement-2'), 'not json');
+    imported(root);
+    assert.equal(fs.readFileSync(path.join(root, 'runs', 'i-run.asks', 'retry-implement-2'), 'utf8'), 'not json');
+    assert.equal(recordText(root, askKey('i-run', { of: 'try', step: 'implement', n: 2 })), undefined);
+  });
+  test('an ask that is JSON but no ask of the kind its name says stays where it is, so it never holds its name in the keyspace', () => {
+    const root = planted();
+    const stray = JSON.stringify({ mode: 'recheck', message: 'a message a recheck files no session to read' });
+    fs.writeFileSync(path.join(root, 'runs', 'i-run.asks', 'retry-implement-2'), stray);
+    imported(root);
+    assert.equal(fs.readFileSync(path.join(root, 'runs', 'i-run.asks', 'retry-implement-2'), 'utf8'), stray);
+    assert.equal(recordText(root, askKey('i-run', { of: 'try', step: 'implement', n: 2 })), undefined);
+    assert.ok(
+      recordText(root, askKey('i-run', { of: 'gate', step: 'implement', n: 1 })) !== undefined,
+      'and the asks that read are imported',
+    );
+  });
+  test('a store with no run file makes no keyspace file when it is read', async () => {
+    const root = scratch('run-import-empty-');
+    await runFilesImported(root);
+    assert.deepEqual(runsNow(root).runs.ids(), []);
+    assert.equal(fs.existsSync(keyspaceFile(root)), false);
+  });
+});
+
+describe("what `nemia rm` and `nemia prune --artifacts` read of the store: each run's id, read or not, and its files directory found and dropped", () => {
+  test("every run id with a record is listed, read or not, and none from a person's file alone", () => {
+    const listed = () => store.runs.ids().filter((id) => id.startsWith('r-ids-')) satisfies string[];
+    made('r-ids-read');
+    plantRecord(ROOT, runKey('r-ids-torn'), '{ "id": ');
+    markCancelled(ROOT, 'r-ids-cancelled');
+    store.holds.put('r-ids-held', ['x'], {});
+    plantRecord(ROOT, askKey('r-ids-asked', { of: 'gate', step: 'implement', n: 1 }), '{}');
+    assert.deepEqual(listed(), ['r-ids-read', 'r-ids-torn']);
+    assert.ok(!store.runs.list(() => {}).some((run) => run.id === 'r-ids-torn'), 'where list leaves the torn record out');
+  });
+  test('no run id is listed in a store with no run', () => {
+    assert.deepEqual(runsNow(scratch('wf-run-store-ids-')).runs.ids(), []);
+  });
+  test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
+    const files = (id: string) => path.join(runsDir(ROOT), id, 'artifacts');
+    fs.mkdirSync(files('r-files-there'), { recursive: true });
+    assert.equal(store.runs.filesAt('r-files-there'), files('r-files-there'));
+    assert.equal(store.runs.filesAt('r-files-never'), undefined);
+    fs.mkdirSync(path.join(runsDir(ROOT), 'r-files-linked'), { recursive: true });
+    fs.symlinkSync(files('r-files-there'), files('r-files-linked'));
+    assert.equal(store.runs.filesAt('r-files-linked'), undefined);
+  });
+  test("a run's files directory dropped is gone, and one never there drops as gone", () => {
+    const files = path.join(runsDir(ROOT), 'r-drop-files', 'artifacts');
+    fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
+    fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
+    assert.equal(store.runs.dropFiles('r-drop-files'), null);
+    assert.equal(fs.existsSync(files), false);
+    assert.equal(fs.existsSync(path.join(runsDir(ROOT), 'r-drop-files')), true, 'the run keeps its own directory');
+    assert.equal(store.runs.dropFiles('r-drop-never'), null);
+  });
+  test("REFUSED: a run's files directory that cannot be removed answers why in one line, and stays", (c) => {
+    if (process.getuid?.() === 0) return c.skip('root removes what a mode forbids');
+    const files = path.join(runsDir(ROOT), 'r-drop-stuck', 'artifacts');
+    fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
+    fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
+    fs.chmodSync(path.join(files, 'implement'), 0o555);
+    c.onTestFinished(() => fs.chmodSync(path.join(files, 'implement'), 0o755));
+    const why = store.runs.dropFiles('r-drop-stuck');
+    assert.match(why ?? '', /EACCES/);
+    assert.ok(!why?.includes('\n'), why ?? '');
+    assert.equal(fs.existsSync(path.join(files, 'implement', 'shot.png')), true);
+  });
 });
 
 /** The functions of `record.store.ts` that read or write a run's record or a person's files beside it: `runStore` says each. */
@@ -288,6 +529,9 @@ const GUARDED = [
   'writeRun',
   'rewriteRun',
   'restStamps',
+  'composedRun',
+  'recordValue',
+  'recordIn',
   'readAsks',
   'readAnswers',
   'consumeAsks',
@@ -303,7 +547,7 @@ const GUARDED = [
 ];
 
 /** The files the interface is built from, which alone may import them for good. */
-const OWN = ['src/record/record.store.ts', 'src/record/files.store.ts'];
+const OWN = ['src/record/record.store.ts', 'src/record/files.store.ts', 'src/runs/records.store.ts'];
 
 /** `record.store.ts`, and `runner.ts`, which re-exports some of its functions. */
 const STORE_MODULE = /(?:^|\/)(?:record\.store|runner)(?:\.ts)?$/;
@@ -355,58 +599,6 @@ function refusals(sources: Record<string, string>) {
   return out satisfies string[];
 }
 
-describe("what `nemia rm` and `nemia prune --artifacts` read of the store: each run's id, read or not, and its files directory found and dropped", () => {
-  test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
-    const listed = () => filesStore.runs.ids().filter((id) => id.startsWith('r-ids-')) satisfies string[];
-    made('r-ids-read');
-    fs.writeFileSync(runFile(ROOT, 'r-ids-torn'), '{ "id": ');
-    markCancelled(ROOT, 'r-ids-cancelled');
-    filesStore.holds.put('r-ids-held', ['x'], {});
-    fs.mkdirSync(asksDir(ROOT, 'r-ids-asked'), { recursive: true });
-    assert.deepEqual(listed(), ['r-ids-read', 'r-ids-torn']);
-    assert.ok(!filesStore.runs.list(() => {}).some((run) => run.id === 'r-ids-torn'), 'where list leaves the torn record out');
-  });
-  test('no run id is listed with no runs folder', () => {
-    const away = path.join(scratch('wf-run-store-ids-'), 'runs');
-    fs.renameSync(runsDir(ROOT), away);
-    try {
-      assert.deepEqual(filesStore.runs.ids(), []);
-    } finally {
-      fs.renameSync(away, runsDir(ROOT));
-    }
-  });
-  test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
-    const files = (id: string) => path.join(runsDir(ROOT), id, 'artifacts');
-    fs.mkdirSync(files('r-files-there'), { recursive: true });
-    assert.equal(filesStore.runs.filesAt('r-files-there'), files('r-files-there'));
-    assert.equal(filesStore.runs.filesAt('r-files-never'), undefined);
-    fs.mkdirSync(path.join(runsDir(ROOT), 'r-files-linked'), { recursive: true });
-    fs.symlinkSync(files('r-files-there'), files('r-files-linked'));
-    assert.equal(filesStore.runs.filesAt('r-files-linked'), undefined);
-  });
-  test("a run's files directory dropped is gone, and one never there drops as gone", () => {
-    const files = path.join(runsDir(ROOT), 'r-drop-files', 'artifacts');
-    fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
-    fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
-    assert.equal(filesStore.runs.dropFiles('r-drop-files'), null);
-    assert.equal(fs.existsSync(files), false);
-    assert.equal(fs.existsSync(path.join(runsDir(ROOT), 'r-drop-files')), true, 'the run keeps its own directory');
-    assert.equal(filesStore.runs.dropFiles('r-drop-never'), null);
-  });
-  test("REFUSED: a run's files directory that cannot be removed answers why in one line, and stays", (c) => {
-    if (process.getuid?.() === 0) return c.skip('root removes what a mode forbids');
-    const files = path.join(runsDir(ROOT), 'r-drop-stuck', 'artifacts');
-    fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
-    fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
-    fs.chmodSync(path.join(files, 'implement'), 0o555);
-    c.onTestFinished(() => fs.chmodSync(path.join(files, 'implement'), 0o755));
-    const why = filesStore.runs.dropFiles('r-drop-stuck');
-    assert.match(why ?? '', /EACCES/);
-    assert.ok(!why?.includes('\n'), why ?? '');
-    assert.equal(fs.existsSync(path.join(files, 'implement', 'shot.png')), true);
-  });
-});
-
 /** `said` refuses each of `imported` in turn, naming the file, the function and its module, and the fix: a method on RunStore. */
 function refusedFor(said: readonly string[], ...imported: Array<[fn: string, from: string]>) {
   assert.equal(said.length, imported.length, said.join('\n'));
@@ -449,140 +641,49 @@ test("no file of src but the store's own imports a run's functions from record.s
 });
 
 /**
- * A read of the run store past the Run door: its files store by name (`filesStoreAt`, `filesStore` before it took its root), or the run
- * store's former binding (`runStore.`). The binding itself is gone from `files.store.ts`, so the typecheck refuses an import of it; this
- * refuses the files store named instead.
+ * A read of the run store past the Run door: its files store by name (`filesStoreAt`, `filesStore` before it took its root), the run
+ * store's former binding (`runStore.`), or its records layer (`runRecords`). Each is gone or the door's own; this refuses one named.
  */
-const PAST_THE_DOOR = /\bfilesStore(?:At)?\b|\brunStore\s*\.\s*(?:runs|asks|holds|refresh|forgetting|labels)\b/g;
+const PAST_THE_DOOR = /\bfilesStore(?:At)?\b|\brunRecords\s*\(|\brunStore\s*\.\s*(?:runs|asks|holds|refresh|forgetting|labels)\b/g;
 
-/** The two files the rule leaves out: the files store, which defines it, and the Run door, its one reader. */
-const DOOR_AND_FILES = ['src/record/files.store.ts', 'src/runs/runs.store.ts'];
+/** The files the rule leaves out: the records layer, which defines it, and the Run door, its one reader. */
+const DOOR_AND_FILES = ['src/runs/records.store.ts', 'src/runs/runs.store.ts'];
 
 /** What a read past the door says: the file, how many uses, and the fix. */
 const pastTheDoor = (sources: Record<string, string>) =>
   [...seamUses(sources, PAST_THE_DOOR)].map(
-    ([file, n]) =>
-      `${file} reads the run store past the Run door ${n} time(s): yield RunDoor in a program, or read runsAtOnce (src/runs/runs.store.ts) in a plain function`,
+    ([file, n]) => `${file} reads the run store past the Run door ${n} time(s): yield RunDoor (src/runs/runs.store.ts) in a program`,
   ) satisfies string[];
 
-test('no file of src but the Run door reads the run store: every other reads RunDoor or runsAtOnce', () => {
+test('no file of src but the Run door reads the run store: every other yields RunDoor', () => {
   assert.deepEqual(pastTheDoor(sourcesUnder(PKG, 'src', DOOR_AND_FILES)), []);
 });
 
-test('REFUSED: a file of src that reads the files store, or the run store by its former binding, is named', () => {
+test('REFUSED: a file of src that reads the files store, the records layer or the run store by its former binding, is named', () => {
   const sources = sourcesUnder(PKG, 'src', DOOR_AND_FILES);
   const planted = {
     ...sources,
     'src/cancel/cancel.verb.ts': `${sources['src/cancel/cancel.verb.ts']}\nimport { filesStoreAt } from '../record/files.store.ts';\nconst x = filesStoreAt(home).runs.read('a');\n`,
-    'src/try/try.verb.ts': `${sources['src/try/try.verb.ts']}\nconst y = runStore.asks.read('a');\n`,
+    'src/try/try.verb.ts': `${sources['src/try/try.verb.ts']}\nconst y = runStore.asks.read('a');\nconst z = runRecords(home, open, held);\n`,
   };
   const said = pastTheDoor(planted);
   assert.equal(said.length, 2, said.join('\n'));
   assert.ok(said[0]?.startsWith('src/cancel/cancel.verb.ts reads the run store past the Run door 2 time(s)'), said[0]);
-  assert.ok(said[1]?.startsWith('src/try/try.verb.ts reads the run store past the Run door 1 time(s)'), said[1]);
+  assert.ok(said[1]?.startsWith('src/try/try.verb.ts reads the run store past the Run door 2 time(s)'), said[1]);
 });
 
-/** A read of runs that a door given to the program does not see: a call of `runsAtOnce` or of `keptRuns`, what `RUN_DOOR_DEBT` counts. */
-const UNROOTED_READ = /\brunsAtOnce\s*\(|\bkeptRuns\s*\(/g;
+/** A read of runs that a door given to the program does not see: a call of `runsAtOnce`, the synchronous Run door the keyspace retired. */
+const UNROOTED_READ = /\brunsAtOnce\s*\(/g;
 
-/** What a break of the count says: a file it does not name or a count grown, a count fallen, a file with none left. */
-const unrootedInWords = ({ file, uses: n, kind, owed }: DebtBreak) =>
-  kind === 'grown'
-    ? `${file} reads runs past the door it is given ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor instead`
-    : kind === 'fallen'
-      ? `${file} reads runs past the door it is given ${n} time(s): lower its count in test/run-door.baseline.ts to ${n}, which only shrinks`
-      : `${file} reads runs past the door it is given no more: take its line out of test/run-door.baseline.ts`;
-
-test('no file of src reads runs past the door it is given but as test/run-door.baseline.ts counts it, and the count only shrinks', async () => {
-  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
-  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', DOOR_AND_FILES), UNROOTED_READ), RUN_DOOR_DEBT).map(unrootedInWords), []);
+test('no file of src reads runs past the door it is given: no runsAtOnce is left, and none is owed', () => {
+  assert.deepEqual([...seamUses(sourcesUnder(PKG, 'src', DOOR_AND_FILES), UNROOTED_READ)], []);
 });
 
-test('REFUSED: a new read through runsAtOnce in a file the count does not name, and a count held above what is left', async () => {
-  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
+test('REFUSED: a runsAtOnce(home).runs.read(id) is named with its file', () => {
   const sources = sourcesUnder(PKG, 'src', DOOR_AND_FILES);
-  const again = {
-    ...sources,
-    'src/cancel/cancel.verb.ts': `${sources['src/cancel/cancel.verb.ts']}\nconst z = runsAtOnce(home).runs.read('a');\n`,
-  };
-  assert.deepEqual(
-    debtBreaks(seamUses(again, UNROOTED_READ), RUN_DOOR_DEBT).map(({ file, kind }) => [file, kind]),
-    [['src/cancel/cancel.verb.ts', 'grown']],
-  );
-  const above = debtBreaks(seamUses(sources, UNROOTED_READ), { ...RUN_DOOR_DEBT, 'src/try/try.verb.ts': 2 });
-  assert.deepEqual(
-    above.map(({ file, kind }) => [file, kind]),
-    [['src/try/try.verb.ts', 'fallen']],
-  );
-});
-
-test('REFUSED: a runsAtOnce(home).runs.read(id) in a file the count does not name; and the count equals the calls the code holds', async () => {
-  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
-  const sources = sourcesUnder(PKG, 'src', DOOR_AND_FILES);
-  const unnamed = 'src/disk/disk.verb.ts';
-  assert.equal(RUN_DOOR_DEBT[unnamed], undefined, `${unnamed} is a file the count does not name`);
   const planted = {
     ...sources,
-    [unnamed]: `${sources[unnamed]}\nconst run = (home: string, id: string) => runsAtOnce(home).runs.read(id);\n`,
+    'src/disk/disk.verb.ts': `${sources['src/disk/disk.verb.ts']}\nconst run = (home: string, id: string) => runsAtOnce(home).runs.read(id);\n`,
   };
-  assert.deepEqual(
-    debtBreaks(seamUses(planted, UNROOTED_READ), RUN_DOOR_DEBT).map(({ file, kind, uses }) => [file, kind, uses]),
-    [[unnamed, 'grown', 1]],
-  );
-  const held = Object.fromEntries([...seamUses(sources, UNROOTED_READ)].sort(([a], [b]) => a.localeCompare(b)));
-  const owed = Object.fromEntries(Object.entries(RUN_DOOR_DEBT).sort(([a], [b]) => a.localeCompare(b)));
-  assert.deepEqual(held, owed, 'each file holds as many calls as the count names: the respelling from runsAtOnce. lowered none');
-});
-
-/** A run under `id` started out of the inbox's card `card`. */
-const fromCard = (id: string, card: string) => ({ ...aRun(id), from: { inbox: card } }) satisfies Run;
-
-/** Where the claim of the card `card` is: `<root>/started/<card>.json`. */
-const claimOf = (card: string) => path.join(ROOT, 'started', `${card}.json`);
-
-/** A claim of the card `card` planted for the run `run`, as a crash or a forgotten run leaves one. */
-const plantClaim = (card: string, run: string) => {
-  fs.mkdirSync(path.dirname(claimOf(card)), { recursive: true });
-  fs.writeFileSync(claimOf(card), JSON.stringify({ run }));
-};
-
-test('a claim naming a run with no record is stale: it is taken over, and the claim names the new run', () => {
-  plantClaim('c-stale', 'c-stale-gone');
-  const made = act(door.runs.create(fromCard('c-stale-new', 'c-stale')));
-  assert.equal(made, undefined);
-  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-stale'), 'utf8')), { run: 'c-stale-new' });
-  assert.deepEqual(
-    fs.readdirSync(path.join(ROOT, 'started')).filter((n) => n.includes('c-stale')),
-    ['c-stale.json'],
-  );
-});
-
-test('a claim naming a record from another card is stale, and taken over', () => {
-  act(door.runs.create(fromCard('c-other-run', 'c-other-card')));
-  plantClaim('c-mine', 'c-other-run');
-  assert.equal(act(door.runs.create(fromCard('c-mine-run', 'c-mine'))), undefined);
-  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-mine'), 'utf8')), { run: 'c-mine-run' });
-});
-
-test('a claim lives at <root>/started/<card>.json, and no listing of runs, taken id or stamp reads it', () => {
-  act(door.runs.create(fromCard('c-unread-run', 'c-unread')));
-  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-unread'), 'utf8')), { run: 'c-unread-run' });
-  const listed = filesStore.runs.list(() => {}).map((r) => r.id);
-  assert.deepEqual(
-    {
-      listed: listed.includes('c-unread'),
-      ids: filesStore.runs.ids().includes('c-unread'),
-      stamped: filesStore.runs.stamps().has('c-unread'),
-      taken: filesStore.runs.taken('c-unread'),
-    },
-    { listed: false, ids: false, stamped: false, taken: false },
-  );
-});
-
-test('REFUSED: the loser of a card leaves no record and no folder under its id, and the claim names the first run', () => {
-  act(door.runs.create(fromCard('c-won', 'c-twice')));
-  assert.deepEqual(act(door.runs.create(fromCard('c-lost', 'c-twice'))), { refused: 'Conflict' });
-  assert.equal(fs.existsSync(path.join(runsDir(ROOT), 'c-lost.json')), false);
-  assert.equal(fs.existsSync(path.join(runsDir(ROOT), 'c-lost')), false);
-  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-twice'), 'utf8')), { run: 'c-won' });
+  assert.deepEqual([...seamUses(planted, UNROOTED_READ)], [['src/disk/disk.verb.ts', 1]]);
 });

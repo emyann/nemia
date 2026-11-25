@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { RUN_MARK_EVENTS, RUN_MARKS, runMarkMove, type RunMark, type RunMarkEvent } from '../run-marks/run-marks.ts';
-import { filesStoreAt } from './files.store.ts';
+import { runsNow } from '../../testing.ts';
 import { cancelFile, holdFile, marksAt, pruneFile, removeHold, runsDir, writeHold } from './record.store.ts';
 
 const ID = 'a-run-m4rk';
@@ -28,9 +28,9 @@ function arranged(mark: RunMark) {
 const BROUGHT: Readonly<Record<RunMarkEvent, (home: string) => unknown>> = {
   hold: (home) => writeHold(home, ID, []),
   lift: (home) => removeHold(home, ID, '2026-11-14T00:00:02.000Z'),
-  cancel: (home) => filesStoreAt(home).runs.cancel(ID),
-  prune: (home) => filesStoreAt(home).runs.prune(ID, { at: '2026-11-14T00:00:03.000Z', worktrees: [] }),
-  unprune: (home) => filesStoreAt(home).runs.prune(ID, undefined),
+  cancel: (home) => runsNow(home).runs.cancel(ID),
+  prune: (home) => runsNow(home).runs.prune(ID, { at: '2026-11-14T00:00:03.000Z', worktrees: [] }),
+  unprune: (home) => runsNow(home).runs.prune(ID, undefined),
 };
 
 describe('the store writes the moves the marks machine makes and no other: each event on each set of marks leaves the files where runMarkMove says', () => {

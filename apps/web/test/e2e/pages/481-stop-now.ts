@@ -7,7 +7,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { ENDING, lines } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, restoreRunKeys, store, storedAsks, storedRecord, storedRunKeys, storeRecord } from '../world.ts';
 
 /** The top bar's pause: its one button. */
 const pauseOf = (page: Page) => page.locator('footer[data-machine-bar] button[data-pause]');
@@ -43,34 +43,31 @@ function filesUnder(dir: string): Array<[string, Buffer]> {
 }
 
 /**
- * What a pause at once writes to: the runs, their asks beside them, the engine's journals and feed, the workflow feed, the pause and who
- * lifted it (`cordon.lifted`, which Resume leaves).
+ * What a pause at once writes to of the store's files: the runs' marks and folders, the engine's journals and feed, the workflow feed, the
+ * pause and who lifted it (`cordon.lifted`, which Resume leaves); the runs' records and asks are the keyspace's (`storedRunKeys`).
  */
 const written = () =>
   ['runs', path.join('engine', 'tasks'), path.join('engine', 'feed.jsonl'), 'feed.jsonl', 'cordon', 'cordon.lifted'].map((p) =>
     path.join(store!, p),
   ) satisfies string[];
 
-/** The folders of asks beside the runs, by name. */
-const asksDirs = () => fs.readdirSync(path.join(store!, 'runs')).filter((name) => name.endsWith('.asks')) satisfies string[];
+/** The store's files a pause at once writes to, as they stand, and the runs' records and asks in its keyspace. */
+const snapshot = () => ({ files: new Map(written().flatMap(filesUnder)), keys: storedRunKeys() });
 
-/** The store's files a pause at once writes to, as they stand, and the folders of asks there are. */
-const snapshot = () => ({ files: new Map(written().flatMap(filesUnder)), asks: new Set(asksDirs()) });
-
-/** Puts back every file of `before`, and removes every file and folder of asks written since. */
+/** Puts back every file of `before` and every record and ask, and removes every file, record and ask written since. */
 function restore(before: ReturnType<typeof snapshot>) {
   for (const [file] of written().flatMap(filesUnder)) if (!before.files.has(file)) fs.rmSync(path.join(store!, file));
   for (const [file, bytes] of before.files) fs.writeFileSync(path.join(store!, file), bytes);
-  for (const dir of asksDirs().filter((name) => !before.asks.has(name))) fs.rmSync(path.join(store!, 'runs', dir), { recursive: true });
+  restoreRunKeys(before.keys);
 }
 
 /** Writes LANDING: ENDING's run with its ending filed, and ship's session at work in the repository's checkout, on the engine's feed. */
 function writeLanding() {
-  const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${ENDING.id}.json`), 'utf8')) as {
+  const record = storedRecord(ENDING.id) as {
     steps: Record<string, object>;
   };
   const steps = { ...record.steps, ship: { taskId: LANDING_TASK } };
-  fs.writeFileSync(path.join(store!, 'runs', `${LANDING}.json`), JSON.stringify({ ...record, id: LANDING, steps }));
+  storeRecord(LANDING, JSON.stringify({ ...record, id: LANDING, steps }));
   const at = new Date(Date.now() - 60_000).toISOString();
   const events = [
     { kind: 'filed', at, brief: 'Merge this run onto the base branch.', cwd: '/code/app', maxAttempts: 1 },
@@ -152,8 +149,7 @@ export default {
       if (pauseFile().why !== NOW_WHY) throw new Refused(`the pause's file holds the why given — it holds ${JSON.stringify(pauseFile())}`);
       for (const { run, step, taskId, kind } of read.interrupts) {
         const stopped = journalOf(taskId).includes('"stop-requested"');
-        const asks = path.join(store!, 'runs', `${run}.asks`);
-        const ask = fs.existsSync(asks) && fs.readdirSync(asks).some((f) => fs.readFileSync(path.join(asks, f), 'utf8').includes(taskId));
+        const ask = Object.entries(storedAsks(run)).some(([name, text]) => !name.startsWith('done/') && text.includes(taskId));
         if (kind === 'session' && (stopped || ask))
           throw new Refused(`${run}'s ${step}: a session is cut, never stopped nor asked a try — its task ${taskId} was`);
         if (kind === 'check' && !stopped) throw new Refused(`${run}'s ${step}: its check ${taskId} is asked to stop`);

@@ -10,6 +10,7 @@
  * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
+import { runsNow } from '../testing.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,7 +25,6 @@ import { testPlace } from '../place/memory/index.ts';
 import { startRun } from '../src/runner.ts';
 import { tickRun } from '../src/tick/tick.verb.ts';
 import { EngineService, engineOf } from '../src/runtime-client.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const place = testPlace();
@@ -34,7 +34,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: '10', WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined };
 const runPlaced = runGiven(() => stand().layer, ENV);
-const rooted = filesStoreAt(ROOT);
+const rooted = runsNow(ROOT);
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 stand().world.repository(REPO, {});

@@ -9,6 +9,7 @@
  * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
+import { runRecord } from '../testing.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
@@ -36,7 +37,6 @@ import { tickRun } from '../src/tick/tick.verb.ts';
 import { PHASES, passCost } from '../src/meter/meter.ts';
 import { recentPasses, recordRecentPass } from '../src/daemon/daemon.store.ts';
 import { keepSeries, seriesRead } from '../src/series/series.store.ts';
-import { runRecord } from '../src/record/record.store.ts';
 import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
 
 const place = testPlace();

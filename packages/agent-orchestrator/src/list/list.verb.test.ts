@@ -2,6 +2,7 @@
  * `nemia ls`'s reading of a run (`list`, over `listReading`) says why the runtime holds a step's task queued, off the task's view: a run
  * started and ticked once, its root filed `queued` on the engine's stand-in, a wait planted on that task, and its row's note read.
  */
+import { runRecord } from '../../testing.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,7 +12,6 @@ import { scratch } from 'test-kit/scratch';
 import { staged } from '../../test/story.ts';
 import type { Env } from '../config/config.store.ts';
 import { advanceRun, list, runWith, startRun } from '../runner.ts';
-import { runRecord } from '../record/record.store.ts';
 import { standingSnapshot } from '../standing/standing.verb.ts';
 import { engineOf } from '../runtime-client.ts';
 import { main } from '../cli/main.ts';

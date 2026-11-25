@@ -9,6 +9,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in scratch repositories no factory holds.
  */
+import { askKeyOf, askNames, dropRecord, keysUnder, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -35,7 +36,7 @@ import {
   runWith as runEngine,
   standingLiveOf,
 } from '../src/runner.ts';
-import { listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
@@ -104,22 +105,18 @@ const plannedIn = (repo: string) => {
 
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
 
-const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** An approval, written as a person's file beside the retry asks — what `nemia approve` writes. */
 const approveByHand = (id: string, step: string, n: number, held: unknown = { step, try: n, at: '2026-09-16T23:10:00.000Z' }) => {
-  fs.mkdirSync(asksDir(id), { recursive: true });
-  fs.writeFileSync(path.join(asksDir(id), `approve-${step}-${n}`), typeof held === 'string' ? held : `${JSON.stringify(held, null, 2)}\n`);
+  plantRecord(ROOT, askKeyOf(id, `approve-${step}-${n}`), typeof held === 'string' ? held : `${JSON.stringify(held, null, 2)}\n`);
 };
-/** The files in a run's asks directory, `done/` among them, by name. */
+/** The asks of a run, by name: those waiting, or with `dir` `done`, those spent. */
 const asksOf = (id: string, dir = '') =>
-  fs.existsSync(path.join(asksDir(id), dir))
-    ? fs
-        .readdirSync(path.join(asksDir(id), dir))
-        .filter((f) => !f.startsWith('.') && f !== 'done')
-        .sort()
-    : [];
+  askNames(ROOT, id)
+    .filter((n) => (dir === 'done' ? n.startsWith('done/') : !n.startsWith('done/')))
+    .map((n) => (dir === 'done' ? n.slice('done/'.length) : n))
+    .sort();
 /** The record as the tick wrote it, unread by `runRecord`. */
-const recordOf = (id: string) => fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
+const recordOf = (id: string) => recordText(ROOT, runKey(id)) ?? '';
 
 /** `nemia start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits there. */
 const atItsGate = async (keys: Parameters<typeof planned>[0] = {}) => {
@@ -141,7 +138,7 @@ const refusedAs =
     for (const fact of facts) assert.ok(err.message.includes(fact), `${err.message} does not name ${fact}`);
     return true;
   };
-const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
 
 /** `nemia start --gate plan` on `plan → implement → review`, run until plan has signed off and waits at its gate (or as `phase` says). */
 const heldAtGate = async (phase: EnginePhase = 'succeeded') => {
@@ -223,15 +220,15 @@ describe('a gated run, from `nemia start --gate` to its approval', () => {
     approveByHand(id, 'plan', 3, '{}');
     const others = await tick(b.e, id);
     assert.deepEqual(others.filed, []);
-    const note = others.notes.find((n) => n.startsWith(path.join(asksDir(id), 'approve-plan-3')));
+    const note = others.notes.find((n) => n.startsWith(askKeyOf(id, 'approve-plan-3')));
     assert.ok(note?.includes('no time') && note.includes('nemia approve'), others.notes.join('\n'));
-    for (const f of ['approve-plan-2', 'approve-implement-1', 'approve-plan-3']) fs.rmSync(path.join(asksDir(id), f));
+    for (const f of ['approve-plan-2', 'approve-implement-1', 'approve-plan-3']) dropRecord(ROOT, askKeyOf(id, f));
   });
   s.test("`nemia approve --message` writes the person's approval beside the retry asks, and no record", async () => {
     const record = recordOf(id);
     const approved = (await stage.main(['approve', id, 'plan', '--message', 'Ship the second reading.'], b.e)) as Approved;
-    const file = path.join(asksDir(id), 'approve-plan-1');
-    const held = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const file = askKeyOf(id, 'approve-plan-1');
+    const held = JSON.parse(recordText(ROOT, file) ?? '');
     assert.deepEqual(held, { step: 'plan', try: 1, at: held.at, message: 'Ship the second reading.' });
     assert.ok(!Number.isNaN(Date.parse(held.at)), 'with the time');
     assert.deepEqual(
@@ -331,7 +328,7 @@ describe("a gate's step proposes the caps of the steps after it, and its approva
   });
   s.test('`nemia approve --budget review=4` writes the caps into the approval, the proposal with the amount given over it', async () => {
     const approved = (await stage.main(['approve', id, 'plan', '--budget', 'review=4'], b.e)) as Approved;
-    const held = JSON.parse(fs.readFileSync(path.join(asksDir(id), 'approve-plan-1'), 'utf8'));
+    const held = JSON.parse(recordText(ROOT, askKeyOf(id, 'approve-plan-1')) ?? '');
     assert.deepEqual(held.budgets, { review: 4, implement: 7 });
     assert.deepEqual(
       approved.caps.map((c) => [c.step, c.usd]).sort(([a], [b]) => String(a).localeCompare(String(b))),
@@ -399,8 +396,8 @@ describe("a gate whose caps pass the run's cost line says so in the decision; on
   const s = story(test);
   const atTheGate = async (costLine: number) => {
     const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: budgeted(), isolate: false }));
-    const file = path.join(ROOT, 'runs', `${run.id}.json`);
-    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), costLine }));
+    const file = runKey(run.id);
+    plantRecord(ROOT, file, JSON.stringify({ ...JSON.parse(recordText(ROOT, file) ?? ''), costLine }));
     await tick(b.e, run.id);
     b.settle(`${run.id}-plan`, 'succeeded', proposing(['implement', 60]));
     await tick(b.e, run.id);
@@ -430,7 +427,7 @@ describe('a send-back from a gate spends the approval given before it', () => {
       assert.ok(err.message.startsWith('try 1 of plan is already approved') && err.message.includes('on the next tick'), err.message);
       return true;
     });
-    assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(id), 'approve-plan-1'), 'utf8')).message, 'go ahead');
+    assert.equal(JSON.parse(recordText(ROOT, askKeyOf(id, 'approve-plan-1')) ?? '').message, 'go ahead');
   });
   s.test('`nemia retry --message` before the tick: the session continues with the objection, nothing after it filed', async () => {
     await runWith(gate.e, retryRun(id, 'plan', { mode: 'continue', message: 'Store the flag before you parse it.' }));
@@ -453,7 +450,7 @@ describe('a send-back from a gate spends the approval given before it', () => {
     assert.ok(l.steps[0].note?.startsWith('try 2, continued on your word, answered · approve it: nemia approve '), l.steps[0].note);
   });
   s.test('the spent approval, put back by hand, opens nothing: it names try 1', async () => {
-    fs.copyFileSync(path.join(asksDir(id), 'done', 'approve-plan-1'), path.join(asksDir(id), 'approve-plan-1'));
+    plantRecord(ROOT, askKeyOf(id, 'approve-plan-1'), recordText(ROOT, askKeyOf(id, 'done/approve-plan-1')) ?? '');
     assert.deepEqual((await tick(gate.e, id)).filed, []);
   });
   s.test('approved anew, the next tick files implement, once', async () => {
@@ -464,7 +461,7 @@ describe('a send-back from a gate spends the approval given before it', () => {
   });
   s.test("implement, after plan, is handed plan's answer under `## Answered`, read off the ask consumed into done/", () => {
     const told = gate.tasks.get(`${id}-implement`)!.spec.brief;
-    const at = JSON.parse(fs.readFileSync(path.join(asksDir(id), 'done', 'retry-plan-2'), 'utf8')).at;
+    const at = JSON.parse(recordText(ROOT, askKeyOf(id, 'done/retry-plan-2')) ?? '').at;
     assert.ok(
       told.includes('\n## Answered\n\n') &&
         told.includes(`plan, try 2, answered at ${at}:\n\n\`\`\`text\nStore the flag before you parse it.\n\`\`\``),
@@ -485,7 +482,7 @@ describe('`nemia cancel` and `nemia rm` at a gate', () => {
     const said = refusal.kind === 'refused' ? (refusal.refusal ?? '') : '';
     for (const fact of ['plan waits at its gate', `nemia approve ${id} plan`, `nemia cancel ${id}`, `nemia rm ${id}`])
       assert.ok(said.includes(fact), said);
-    assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), 'nothing of it removed');
+    assert.ok(recordText(ROOT, runKey(id)) !== undefined, 'nothing of it removed');
     const typedRm = await runWith(gate.e, RM.handler({ runId: id }));
     assert.equal(typedRm.removed, false, 'nemia rm left it, its line naming why');
   });
@@ -605,7 +602,7 @@ describe('a parent whose last step waits at its gate has not landed, though a pe
         return true;
       },
     );
-    assert.ok(!fs.existsSync(path.join(asksDir(parent), 'retry-implement-2')), 'no ask written');
+    assert.ok(recordText(ROOT, askKeyOf(parent, 'retry-implement-2')) === undefined, 'no ask written');
     const [first, second] = [await tick(b.e, parent), await tick(b.e, parent)];
     assert.deepEqual(first.filed.concat(second.tried), []);
     assert.equal((await runWith(b.e, parentNow(parent))).landed, true, 'still landed');
@@ -622,7 +619,7 @@ describe("a wordless `nemia retry` asked while a gated step's harness blocked it
     run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }));
     id = run.id;
     b = stage.board();
-    file = path.join(asksDir(id), 'retry-plan-2');
+    file = askKeyOf(id, 'retry-plan-2');
     return t.end;
   });
   const s = story(test);
@@ -657,10 +654,10 @@ describe("a wordless `nemia retry` asked while a gated step's harness blocked it
       };
     await assert.rejects(runWith(b.e, approveRun(id, 'plan')), naming('at its gate', 'retry-plan-2', 'then approve it'));
     await assert.rejects(runWith(b.e, retryRun(id, 'plan', { mode: 'continue', message: 'store it first' })), naming('awaiting approval'));
-    assert.ok(fs.existsSync(file), 'left where it is, for a person to take back');
+    assert.ok(recordText(ROOT, file) !== undefined, 'left where it is, for a person to take back');
   });
   s.test('with the ask deleted, the approval files what follows', async () => {
-    fs.rmSync(file);
+    dropRecord(ROOT, file);
     await runWith(b.e, approveRun(id, 'plan'));
     assert.deepEqual((await tick(b.e, id)).filed, ['implement']);
   });
@@ -826,7 +823,7 @@ describe('`nemia approve`, REFUSED with nothing written', () => {
       runWith(gate.e, approveRun(gate.id, 'plan', 'yes, again')),
       refusedAs('Conflict', 'try 1 of plan is already approved', 'with words', 'on the next tick'),
     );
-    assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(gate.id), 'approve-plan-1'), 'utf8')).message, 'yes');
+    assert.equal(JSON.parse(recordText(ROOT, askKeyOf(gate.id, 'approve-plan-1')) ?? '').message, 'yes');
   });
   test('REFUSED while a send-back is asked for', async () => {
     const sentBack = await heldAtGate();
@@ -848,8 +845,7 @@ describe('`nemia approve`, REFUSED with nothing written', () => {
   });
   test("REFUSED a file at the approval's name that is not one: named, with how to clear it, never read as approved", async () => {
     const stray = await heldAtGate();
-    fs.mkdirSync(asksDir(stray.id), { recursive: true });
-    fs.writeFileSync(path.join(asksDir(stray.id), 'approve-plan-1'), 'yes please');
+    plantRecord(ROOT, askKeyOf(stray.id, 'approve-plan-1'), 'yes please');
     await assert.rejects(
       runWith(stray.e, approveRun(stray.id, 'plan')),
       refusedAs('Conflict', 'try 1 of plan cannot be approved', 'approve-plan-1 is already there', '(rm ', 'then approve again'),

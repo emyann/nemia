@@ -15,6 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
+import { emptyRuns, listRuns, runRecord, runsNow } from '../testing.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
@@ -29,11 +30,9 @@ import { promised } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { tickRun, runWith as runEngine } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { told } from './typed.ts';
 import { typed } from './typed.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 
 const ROOT = scratch('wf-schedule-');
 /** The file's store and settings; `aStore` sets the cap on it. */
@@ -44,7 +43,7 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_RUNS: undefined,
   WF_MAX_CONCURRENT: undefined,
 };
-const filesStore = filesStoreAt(ROOT);
+const filesStore = runsNow(ROOT);
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith } = stage;
 /** `nemia`, as a person types it, its commands given this test's place. */
@@ -92,13 +91,14 @@ const aTeamRepo = () => {
 };
 
 /**
- * A store with no runs, cards, tries, pause or factories, then the factory `solo` on a repository of its own, attaching the team's `dev`,
- * and the clock at `now`. The cap as given: `undefined` unsets it.
+ * A store with no runs (their records emptied: the keyspace keeps them), cards, tries, pause or factories, then the factory `solo` on a
+ * repository of its own, attaching the team's `dev`, and the clock at `now`. The cap as given: `undefined` unsets it.
  */
 const aStore = (t: Finishes, now: string, cap?: string) => {
   for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }
+  emptyRuns(ROOT);
   ENV.WF_MAX_RUNS = cap;
   vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
   const repo = aTeamRepo();

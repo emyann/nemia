@@ -9,6 +9,7 @@
  * `ENV`. Beside the table: the tables' empty read is `readersOf`'s, and the engine's `needs-human` is compared in `src/views/`
  * alone (`blockedWord`, `harnessBlocked`), so no reader judges a blocked session by a word of its own.
  */
+import { listRuns, runRecord, runsNow } from '../testing.ts';
 import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
 import type { Run } from '../src/run.ts';
 import { describe, test } from 'vitest';
@@ -23,9 +24,7 @@ import { decisionRead } from '../src/decide/decision.verb.ts';
 import { decision } from '../src/decide/decide.ts';
 import { landedOf } from '../src/branches/branches.store.ts';
 import { Tracer } from 'effect';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding, standingSnapshot, headsOver, standingReader } from '../src/standing/standing.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { readRun as theRead } from '../src/tick/told.verb.ts';
 import { passAssessment } from '../src/tick/advance.verb.ts';
 import { cancelPlan } from '../src/cancel/cancel.ts';
@@ -42,7 +41,7 @@ const ROOT = scratch('wf-one-read-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const stage = staged({ runWith, main, engineOf, env: ENV });
-const files = filesStoreAt(ROOT);
+const files = runsNow(ROOT);
 /** The run `id` as a reader is given it, the store's pause composed onto it (`runs.read`). */
 const theRun = (id: string) => files.runs.read(id);
 

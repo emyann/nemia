@@ -14,7 +14,7 @@ import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { type CheckOutput, ReadFailed } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -27,8 +27,9 @@ const GONE = 'r-check-output-gone';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
 /** The record of the run `id`, its one step's task `t-co` and its check's task `check`. */
 const seeded = (id: string, check: string) =>
-  fs.writeFileSync(
-    path.join(root, 'runs', `${id}.json`),
+  plantRecord(
+    root,
+    runKey(id),
     JSON.stringify({
       id,
       repo: '/code/app',

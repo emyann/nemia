@@ -15,9 +15,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { keysUnder, runsNow, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest } from '../../test/placed.ts';
-import { runsAtOnce } from 'agent-orchestrator';
+
 import { TEAM } from '../../test/team.ts';
 
 const write = (file: string, text: string) => {
@@ -69,7 +69,7 @@ test("POST /api/namespaces/acme/runs with models, gates and inputs starts a run 
   const res = await post('runs', { workflow: 'dev', brief: 'Add a cache.', ...EXTRAS });
   assert.equal(res.status, 201, await res.clone().text());
   const started = (await res.json()) as { id: string; run?: { models?: Record<string, string>; gated?: string[] } };
-  const run = runsAtOnce(root).runs.read(started.id);
+  const run = runsNow(root).runs.read(started.id);
   assert.deepEqual(run.models, { implement: 'sonnet' });
   assert.deepEqual(run.inputs, ['notes.md', 'shot.png']);
   const inputs = path.join(root, 'runs', started.id, 'inputs');
@@ -88,7 +88,7 @@ test('POST /api/namespaces/acme/cards/:name/start with models starts a run whose
   assert.equal(res.status, 201, await res.clone().text());
   const started = (await res.json()) as { id: string; card: string; run?: { from?: string } };
   assert.equal(started.card, 'cache-card');
-  assert.deepEqual(runsAtOnce(root).runs.read(started.id).models, { implement: 'sonnet' });
+  assert.deepEqual(runsNow(root).runs.read(started.id).models, { implement: 'sonnet' });
   assert.equal(started.run?.from, 'cache-card', 'what nemia start prints of it: the card it came from');
 });
 
@@ -99,7 +99,7 @@ test('`noWorktree` reaches the start: a workflow that ends by merging its result
 });
 
 test('REFUSED: an input whose name holds a folder, and one sent both as text and as bytes, are refused, nothing started', async () => {
-  const before = fs.readdirSync(path.join(root, 'runs')).length;
+  const before = keysUnder(root, '/registry/runs/').length;
   for (const input of [
     { name: '../escape.md', text: 'x' },
     { name: 'both.md', text: 'x', base64: 'eA==' },
@@ -108,7 +108,7 @@ test('REFUSED: an input whose name holds a folder, and one sent both as text and
     assert.equal(res.status, 422, `${JSON.stringify(input)}: ${await res.clone().text()}`);
     assert.match(((await res.json()) as { error: string }).error, /--input/);
   }
-  assert.equal(fs.readdirSync(path.join(root, 'runs')).length, before);
+  assert.equal(keysUnder(root, '/registry/runs/').length, before);
 });
 
 test('DELETE a run of a workflow: refused as a try alone, removed whole with ?whole=true, and --force-unmerged alone refused', async () => {
@@ -131,7 +131,7 @@ test('DELETE a run of a workflow: refused as a try alone, removed whole with ?wh
   assert.equal(gone.status, 200, await gone.clone().text());
   const removed = (await gone.json()) as { id: string; removed: boolean };
   assert.deepEqual([removed.id, removed.removed], [id, true]);
-  assert.equal(runsAtOnce(root).runs.exists(id), false);
+  assert.equal(runsNow(root).runs.exists(id), false);
 });
 
 /** What a removal answers of the run's branches. */
@@ -171,7 +171,7 @@ test('DELETE ?whole=true of a run with no record forgets what was left under its
     body: '{}',
   });
   assert.equal(gone.status, 404, await gone.clone().text());
-  assert.match(((await gone.json()) as { error: string }).error, /runs\/ghost-abcd\.asks/);
+  assert.match(((await gone.json()) as { error: string }).error, /\/registry\/asks\/ghost-abcd\/implement\.json/);
   assert.equal(fs.existsSync(left), false, 'what was left under its id is gone');
   const alone = await app().request('/api/namespaces/default/runs/ghost-abcd', { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
   assert.equal(alone.status, 404, 'a try alone of no record is still no such run');

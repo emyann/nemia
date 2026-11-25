@@ -10,6 +10,20 @@
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
+import {
+  askKeyOf,
+  askNames,
+  asksPrefix,
+  keysUnder,
+  listRuns,
+  plantRecord,
+  readAnswers,
+  recordText,
+  retryAskKey,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -44,11 +58,10 @@ import {
   runWith,
 } from '../src/runner.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
-import { artifactsDir, askFile, asksDir, listRuns, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
+import { artifactsDir, markCancelled } from '../src/record/record.store.ts';
 import { checkOutputFile } from '../src/check/check.store.ts';
 import { readToken } from '../src/token/token.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import { isRepositoryRun, LINE_NAME, shownNote, shownStatus } from '../src/run.ts';
 import type { Listing, RunsListed } from '../src/list/list.ts';
 import { verdictWord } from '../src/check/check.ts';
@@ -69,7 +82,7 @@ const ENV: Env = {
 };
 /** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
 const stage = staged({ runWith, main: told, engineOf, env: ENV });
-const filesStore = filesStoreAt(ROOT);
+const filesStore = runsNow(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = () => {
@@ -139,11 +152,10 @@ describe('a person tries a failed step again, fresh, on another model', () => {
 /** The ask `nemia pause --now` wrote for try 2 of a run's implement, which it stopped, written on disk where a pause writes it. */
 const pauseAskOf = (id: string) => {
   const ask = { step: 'implement', try: 2, mode: 'continue', interrupted: `${id}-implement`, at: '2026-10-04T12:00:00.000Z' };
-  fs.mkdirSync(asksDir(ROOT, id), { recursive: true });
-  fs.writeFileSync(askFile(ROOT, id, 'implement', 2), JSON.stringify(ask));
+  plantRecord(ROOT, retryAskKey(id, 'implement', 2), JSON.stringify(ask));
   return ask;
 };
-const onDisk = (file: string) => JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
+const onDisk = (file: string) => JSON.parse(recordText(ROOT, file) ?? '') as unknown;
 
 describe("a retry over a void pause ask waits for the pass that sets it aside, then is written at the ask's name", () => {
   let pauseAsk!: unknown;
@@ -159,16 +171,16 @@ describe("a retry over a void pause ask waits for the pass that sets it aside, t
       stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' })),
       refusedAs('Conflict', 'try 2 of implement is held by the ask ', 'nemia pause --now', `nemia retry ${id} implement`),
     );
-    assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), pauseAsk);
-    assert.equal(fs.existsSync(path.join(asksDir(ROOT, id), 'done')), false, 'the verb moves no file the tick reads');
+    assert.deepEqual(onDisk(retryAskKey(id, 'implement', 2)), pauseAsk);
+    assert.equal(keysUnder(ROOT, `${asksPrefix(id)}done/`).length > 0, false, 'the verb moves no file the tick reads');
   });
   s.test('a pass sets the void ask aside into done/', async () => {
     await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
-    assert.deepEqual(onDisk(path.join(asksDir(ROOT, id), 'done', 'retry-implement-2')), pauseAsk);
+    assert.deepEqual(onDisk(askKeyOf(id, 'done/retry-implement-2')), pauseAsk);
   });
   s.test("the retry is then written at the ask's name", async () => {
     const { ask } = await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' }));
-    assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), ask);
+    assert.deepEqual(onDisk(retryAskKey(id, 'implement', 2)), ask);
   });
 });
 
@@ -186,8 +198,8 @@ describe('a pause ask still due holds a retry of its try, and is left as it is',
       stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' })),
       refusedAs('Conflict', 'try 2 of implement is asked by nemia pause --now'),
     );
-    assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), pauseAsk);
-    assert.equal(fs.existsSync(path.join(asksDir(ROOT, id), 'done')), false);
+    assert.deepEqual(onDisk(retryAskKey(id, 'implement', 2)), pauseAsk);
+    assert.equal(keysUnder(ROOT, `${asksPrefix(id)}done/`).length > 0, false);
   });
 });
 
@@ -255,8 +267,8 @@ const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
   return printed.join('\n').split('\n');
 };
 
-const asksOf = (id: string) => (fs.existsSync(asksDir(ROOT, id)) ? fs.readdirSync(asksDir(ROOT, id)).filter((f) => f !== 'done') : []);
-const askRead = (id: string, name: string) => JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), name), 'utf8'));
+const asksOf = (id: string) => askNames(ROOT, id).filter((n) => !n.startsWith('done/'));
+const askRead = (id: string, name: string) => JSON.parse(recordText(ROOT, askKeyOf(id, name)) ?? '');
 /** The row of the step `plan` of the run `id` in what `nemia ls` answers (`RunsListed`). */
 const planOf = async (id: string) => stepRow(listedRow((await stage.main(['ls'])) as RunsListed, id), 'plan');
 
@@ -481,7 +493,7 @@ const throughCheck = async (lines: string[], phase: EnginePhase, end: TestEnd = 
 /** The retry asks waiting in a run's directory, by name. */
 const retryAsks = (id: string) => asksOf(id).filter((f) => f.startsWith('retry-'));
 /** The record of `id` as the tick wrote it, unread by `runRecord`. */
-const recordText = (id: string) => fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
+const storedText = (id: string) => recordText(ROOT, runKey(id)) ?? '';
 
 /**
  * A step's record without what every filing writes of the revisions it took — the agent and skill pins and the digest of its closeout
@@ -959,8 +971,8 @@ describe("`nemia retry` writes a person's ask, and the tick honours it once, con
     run = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
     const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh', model: 'opus' }));
     file = asked.file;
-    assert.equal(file, path.join(asksDir(ROOT, run.id), 'retry-implement-2'));
-    written = fs.readFileSync(file, 'utf8');
+    assert.equal(file, askKeyOf(run.id, 'retry-implement-2'));
+    written = recordText(ROOT, file) ?? '';
     assert.deepEqual(JSON.parse(written), asked.ask);
     assert.equal(runRecord(ROOT, run.id).steps.implement?.tries, undefined, 'the verb writes no record');
     assert.match((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note ?? '', /^try 2 asked \(--model opus\)/);
@@ -973,12 +985,12 @@ describe("`nemia retry` writes a person's ask, and the tick honours it once, con
   });
   s.test('the ask is consumed, moved whole into done/, and a second pass files nothing', async () => {
     assert.deepEqual(retryAsks(run.id), []);
-    assert.equal(fs.readFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-implement-2'), 'utf8'), written);
+    assert.equal(recordText(ROOT, askKeyOf(run.id, 'done/retry-implement-2')) ?? '', written);
     const second = await tick(run.id);
     assert.deepEqual([second.tried, second.filed, second.checked], [[], [], []]);
   });
   s.test('the ask put back, as a pass that filed the try and died before consuming it leaves it: spent, it files nothing', async () => {
-    fs.copyFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-implement-2'), file);
+    plantRecord(ROOT, file, recordText(ROOT, askKeyOf(run.id, 'done/retry-implement-2')) ?? '');
     const third = await tick(run.id);
     assert.deepEqual([third.tried, retryAsks(run.id)], [[], []]);
     assert.equal(b.filings.filter((f) => f === try2()).length, 1);
@@ -1286,7 +1298,7 @@ describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and n
       refusedAs('Conflict', 'try 2 of implement is already asked for', '(--continue'),
     );
     assert.deepEqual(retryAsks(id), ['retry-implement-2']);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), 'retry-implement-2'), 'utf8')).mode, 'continue');
+    assert.equal(JSON.parse(recordText(ROOT, askKeyOf(id, 'retry-implement-2')) ?? '').mode, 'continue');
   });
   test('a message to a step whose check did not finish is no refusal: a person may have something to say', async () => {
     const { id } = await throughCheck(['check: npm test'], 'stopped');
@@ -1341,7 +1353,7 @@ describe('`nemia retry --message` takes the next argument as the answer whatever
   const asked = async (sub: TestContext, ...flags: string[]) => {
     const { id } = await throughCheck(['check: npm test'], 'stopped');
     await printedBy(sub, ['retry', id, 'implement', ...flags]);
-    const { step: _, try: __, at: ___, ...how } = JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), 'retry-implement-2'), 'utf8'));
+    const { step: _, try: __, at: ___, ...how } = JSON.parse(recordText(ROOT, askKeyOf(id, 'retry-implement-2')) ?? '');
     return how;
   };
   const rows: Array<[string, string[], object]> = [
@@ -1422,17 +1434,17 @@ describe('a blocked step answered with `nemia retry --message`', () => {
     await tick(run.id);
   });
   s.test("the answer is written on the person's ask and nothing else; `nemia ls` says the try is asked with it", async () => {
-    const record = recordText(run.id);
+    const record = storedText(run.id);
     const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', message: answer }));
     ask = asked.ask;
-    assert.deepEqual(JSON.parse(fs.readFileSync(asked.file, 'utf8')), {
+    assert.deepEqual(JSON.parse(recordText(ROOT, asked.file) ?? ''), {
       step: 'implement',
       try: 2,
       mode: 'continue',
       message: answer,
       at: ask.at,
     });
-    assert.equal(recordText(run.id), record, 'the verb writes no record');
+    assert.equal(storedText(run.id), record, 'the verb writes no record');
     assert.equal(
       (await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note,
       'try 2 asked (--continue, with your answer) — the next tick files it',
@@ -1446,7 +1458,7 @@ describe('a blocked step answered with `nemia retry --message`', () => {
     assert.match(brief, /^## Try 2\n\nThe last try signed off `blocked`\./, 'its session continued, told why it is back');
     assert.ok(brief.includes(`\n\n## Your answer\n\n\`\`\`text\n${answer}\n\`\`\``), brief);
     assert.equal(runRecord(ROOT, run.id).steps.implement?.tries?.[0]?.cause, 'continue');
-    assert.ok(!recordText(run.id).includes('say so in the README'), 'the record keeps no message');
+    assert.ok(!storedText(run.id).includes('say so in the README'), 'the record keeps no message');
     assert.deepEqual(retryAsks(run.id), [], 'consumed');
   });
   s.test('`nemia ls` says the try running was answered, read off the consumed ask; it is honoured once', async () => {
@@ -1490,7 +1502,7 @@ describe('`nemia retry` on a step whose session its harness blocked: the tick st
     assert.equal(note, 'try 2 asked (--continue) — stopping its blocked session, then the tick files it');
   });
   s.test('the next pass asks the engine to stop the session, files nothing, and writes no record', async () => {
-    const record = recordText(run.id);
+    const record = storedText(run.id);
     const first = await tick(run.id);
     assert.deepEqual([b.stopped, first.tried, first.filed, first.status], [[taskId()], [], [], 'running']);
     assert.ok(
@@ -1499,7 +1511,7 @@ describe('`nemia retry` on a step whose session its harness blocked: the tick st
       ),
       first.notes.join('\n'),
     );
-    assert.equal(recordText(run.id), record, 'the record untouched');
+    assert.equal(storedText(run.id), record, 'the record untouched');
     assert.deepEqual(retryAsks(run.id), ['retry-implement-2'], 'the ask waits for its try');
   });
   s.test('passes while the engine stops it carry nothing: no second stop, nothing filed', async () => {
@@ -1547,7 +1559,7 @@ describe('`nemia retry` on a blocked session that works again before any tick: s
     assert.equal(note, 'try 2 asked (--continue) — stopping its session, then the tick files it');
   });
   s.test('the next pass asks the engine to stop it and files nothing; passes after it stop nothing more', async () => {
-    const record = recordText(run.id);
+    const record = storedText(run.id);
     const first = await tick(run.id);
     assert.deepEqual([b.stopped, first.tried, first.filed, first.status], [[taskId()], [], [], 'running']);
     assert.ok(
@@ -1556,7 +1568,7 @@ describe('`nemia retry` on a blocked session that works again before any tick: s
       ),
       first.notes.join('\n'),
     );
-    assert.equal(recordText(run.id), record);
+    assert.equal(storedText(run.id), record);
     for (let pass = 1; pass <= 2; pass++) {
       const again = await tick(run.id);
       assert.deepEqual([b.stopped, again.tried, again.filed, again.notes], [[taskId()], [], [], []], `pass ${pass}`);
@@ -1642,8 +1654,8 @@ describe('telling a running step something with `nemia say`, and the try that co
     run = await startedRun(implementThenReview());
     await tick(run.id);
     ended(taskId(), 'working');
-    record = recordText(run.id);
-    beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
+    record = storedText(run.id);
+    beside = [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort();
     const told = await stage.runWith(
       b.e,
       SAY.handler({ runId: run.id, step: 'implement', text: 'Widen the scope to apps/api too.', caller: PERSON }),
@@ -1653,8 +1665,12 @@ describe('telling a running step something with `nemia say`, and the try that co
     assert.deepEqual([told.try, told.taskId, told.at, told.text], [1, taskId(), first.at, first.text], 'what nemia say prints of it');
   });
   s.test('it writes nothing of its own: the record untouched, no file beside it', () => {
-    assert.equal(recordText(run.id), record);
-    assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), beside, 'the engine journal is the record');
+    assert.equal(storedText(run.id), record);
+    assert.deepEqual(
+      [...fs.readdirSync(path.join(ROOT, 'runs')), ...keysUnder(ROOT, '/registry/runs/')].sort(),
+      beside,
+      'the engine journal is the record',
+    );
   });
   s.test('`nemia ls` notes the step said to, once and then twice', async () => {
     assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0], {
@@ -1685,7 +1701,7 @@ describe('telling a running step something with `nemia say`, and the try that co
     );
     const c = decided.closeouts.implement;
     assert.ok(c && !('error' in c) && c.summary === 'IMPLEMENTER-SUMMARY', "beside the closeout, the step's own account of it");
-    assert.equal(recordText(run.id), record, 'and still nothing written');
+    assert.equal(storedText(run.id), record, 'and still nothing written');
   });
   s.test(
     'a nudge with an answer is handed what was said, as `## Said to your session` inside `## Try 2`, each message with its time, fenced',
@@ -1765,7 +1781,7 @@ describe('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and
     run = await startedRun(implementThenReview());
     taskId = `${run.id}-implement`;
     await tick(run.id);
-    record = recordText(run.id);
+    record = storedText(run.id);
     e = {
       ...b.e,
       say: (id: string, text: string) => {
@@ -1807,7 +1823,7 @@ describe('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and
   test('the engine was never asked by any of the package refusals; nothing said, nothing written', () => {
     assert.deepEqual(asked, [], 'the engine was never asked');
     assert.deepEqual(b.said, []);
-    assert.equal(recordText(run.id), record);
+    assert.equal(storedText(run.id), record);
     assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.said`)), false, 'no word kept for the step not filed');
   });
 });
@@ -2173,7 +2189,7 @@ describe('a check the machine killed under its own limit is run again by `retrie
     run = await throughCheck(['check: npm test', 'retries: 1'], 'failed', squeezed);
   });
   s.test('one pass runs its check again, and files no session', async () => {
-    const before = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
+    const before = recordText(ROOT, runKey(run.id)) ?? '';
     const pass = await tick(run.id);
     assert.deepEqual([pass.tried, pass.checked], [['implement'], ['implement']]);
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no session');
@@ -2182,7 +2198,7 @@ describe('a check the machine killed under its own limit is run again by `retrie
       { taskId: `${run.id}-implement`, check: { taskId: check1(), tip: filedOn(run) }, cause: 'recheck', retried: true },
     ]);
     assert.deepEqual(retryAsks(run.id), [], 'nobody asked for it');
-    fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), before);
+    plantRecord(ROOT, runKey(run.id), before);
   });
   s.test('the pass that filed it died before writing the run down: the recheck is adopted, never filed twice', async () => {
     const again = await tick(run.id);
@@ -2278,10 +2294,10 @@ describe('a run frozen with a step of `maxAttempts: 2`, a key no step has now, s
   const s = story(test);
   s.test('the key is on the frozen step, read as a key the type does not know', async () => {
     run = await startedRun(implementThenReview());
-    const file = path.join(ROOT, 'runs', `${run.id}.json`);
-    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const file = runKey(run.id);
+    const record = JSON.parse(recordText(ROOT, file) ?? '');
     record.workflow = record.workflow.map((x: { name: string }) => (x.name === 'implement' ? { ...x, maxAttempts: 2 } : x));
-    fs.writeFileSync(file, JSON.stringify(record));
+    plantRecord(ROOT, file, JSON.stringify(record));
     const frozen: Record<string, unknown> = runRecord(ROOT, run.id).workflow!.find((x) => x.name === 'implement')!;
     assert.equal(frozen.maxAttempts, 2);
   });
@@ -2329,7 +2345,7 @@ describe("a `--continue` of a try whose session could not start continues the se
 });
 
 describe("REFUSED at `nemia start`: a step named for what a run cuts under a step's name — its check, its try, the run's own line — exit 2, by name, no run written", () => {
-  const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+  const runsWritten = () => keysUnder(ROOT, '/registry/runs/').length;
   const rows: Array<[string, () => string, string[]]> = [
     [
       "a step named for another step's check",

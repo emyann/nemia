@@ -8,6 +8,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
+import { emptyRuns, listRuns, plantRecord, recordText, runKey, runRecord } from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,7 +25,6 @@ import { runGiven, runOver } from './placed.ts';
 import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
 import { startRun, tickRun, runWith as runEngine, gitPlaceLayer, StoreRoot, readInbox as readInboxVerb } from '../src/runner.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
-import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-queue-');
@@ -136,6 +136,7 @@ const board = () => {
  */
 const emptyStore = (cap: string | undefined) => {
   for (const dir of [RUNS, INBOX, path.join(ROOT, 'queue'), path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
+  emptyRuns(ROOT);
   fs.mkdirSync(RUNS, { recursive: true });
   ENV.WF_MAX_RUNS = cap;
 };
@@ -171,8 +172,8 @@ const started = async (brief: string, createdAt: string, opts: { isolate?: boole
       ...(opts.after ? { after: opts.after } : {}),
     }),
   );
-  const file = path.join(RUNS, `${run.id}.json`);
-  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), createdAt }, null, 2));
+  const file = runKey(run.id);
+  plantRecord(ROOT, file, JSON.stringify({ ...JSON.parse(recordText(ROOT, file) ?? ''), createdAt }, null, 2));
   return runRecord(ROOT, run.id);
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;

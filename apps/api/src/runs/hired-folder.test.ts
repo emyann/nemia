@@ -14,7 +14,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, hireAgent, plantRecord, runKey } from 'agent-orchestrator/testing';
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -31,8 +31,9 @@ attachWorkflow({ factory: 'hires', workflow: 'build' });
 hireAgent({ factory: 'hires', agent: 'seldon', step: 'build/design' });
 
 const R = 'r-hired';
-write(
-  path.join(root, 'runs', `${R}.json`),
+plantRecord(
+  root,
+  runKey(R),
   JSON.stringify({
     id: R,
     repo,

@@ -389,10 +389,10 @@ const pauseAskDue = (run: Run, a: RetryAsk, phaseOf: (taskId: string) => TaskPha
 
 /**
  * Whether the ask `nemia pause --now` wrote for a task (`interrupted`) is void: never to be filed, and set aside by the tick, paused or not
- * (`consumeAsks`). Void once the step's current task is another — a later try replaced it — or once that task settled other than
- * `stopped` — it succeeded or failed on its own, its check exited with a number — or settled `stopped` on a step over its budget, which
- * the ask, written with no `--budget`, does not carry (`carries`). Not void while the task has not settled: its stop may still be taken.
- * An ask of a person's own is never void here. Pure.
+ * (the Run door's `runs.settle`). Void once the step's current task is another — a later try replaced it — or once that task settled other
+ * than `stopped` — it succeeded or failed on its own, its check exited with a number — or settled `stopped` on a step over its budget,
+ * which the ask, written with no `--budget`, does not carry (`carries`). Not void while the task has not settled: its stop may still be
+ * taken. An ask of a person's own is never void here. Pure.
  *
  * @param step The step the ask names.
  * @param run The run's record.

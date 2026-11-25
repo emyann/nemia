@@ -44,7 +44,7 @@ import { WorkflowError } from '../step/step.ts';
 import { FactoryDoor, factoryOrNone } from '../factory/door/factories.store.ts';
 import { unattachedRefusal, type Factory } from '../factory/factory.ts';
 import { runId } from '../record/record.store.ts';
-import { keptRuns } from '../record/files.store.ts';
+import { keptRuns } from '../runs/runs.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { everyCardTrigger } from '../factory/applied/applied.store.ts';
 
@@ -66,14 +66,13 @@ export const inboxCards = Effect.fn('inboxCards')(function* () {
  * waits (`waits`): what each card of an `after:` is reads git and the engine, which the queue and the listing read (`waitingOf`).
  */
 export const readInbox = Effect.fn('readInbox')(function* () {
-  const home = yield* StoreRoot;
   const door = yield* CardDoor;
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();
   const factories = yield* readableFactories();
   return cardsListed(
     entries,
-    keptRuns(home, undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
+    yield* keptRuns(undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
     tries,
     factories,
     yield* triggeringOf(entries, factories.values()),

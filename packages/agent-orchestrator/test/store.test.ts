@@ -9,6 +9,19 @@
  * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a
  * pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
+import {
+  askKeyOf,
+  askNames,
+  dropRecord,
+  listRuns,
+  plantRecord,
+  readAnswers,
+  readAsks,
+  recordText,
+  runKey,
+  runRecord,
+  runsNow,
+} from '../testing.ts';
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -50,13 +63,12 @@ import {
 } from '../src/runner.ts';
 import { decidedOf } from './screens.ts';
 import { typed as onHandler } from './typed.ts';
-import { inputsDir, listRuns, markCancelled, readAnswers, readAsks, runRecord, runsDir } from '../src/record/record.store.ts';
+import { inputsDir, markCancelled, runsDir } from '../src/record/record.store.ts';
 import { sayRun } from '../src/say/say.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { Invalid, isRefusal, type Refusal } from '../src/refusal/refusal.ts';
 import * as views from '../src/views/views.verb.ts';
 import { NOTHING_READ, standingLiveOf as liveOf, standingReader } from '../src/standing/standing.verb.ts';
-import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-store-');
@@ -110,7 +122,7 @@ const aRun = (id: string, steps: Run['steps']) =>
   }) satisfies Run;
 
 /** What the daemon does to the run's json, and the only thing it does to it. */
-const writeRun = (run: Run) => fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(run, null, 2));
+const writeRun = (run: Run) => plantRecord(ROOT, runKey(run.id), JSON.stringify(run, null, 2));
 
 /**
  * Just enough engine: what each task is doing, how it signed off if it did, and a `file` the test
@@ -225,14 +237,14 @@ test("REFUSED at shipped defaults: a run is never started under an id the store 
   assert.notEqual(second.id, first.id, "the id drawn again: the first run's record has it");
 
   const runs = path.join(ROOT, 'runs');
-  fs.rmSync(path.join(runs, `${first.id}.json`));
+  dropRecord(ROOT, runKey(first.id));
   fs.rmSync(path.join(runs, first.id), { recursive: true });
-  fs.mkdirSync(path.join(runs, `${first.id}.asks`));
+  plantRecord(ROOT, askKeyOf(first.id, 'retry-implement-2'), '{}');
   draws = 0;
   const third = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   assert.notEqual(third.id, first.id, 'drawn again: the asks its record left have the id');
 
-  fs.rmSync(path.join(runs, `${first.id}.asks`), { recursive: true });
+  dropRecord(ROOT, askKeyOf(first.id, 'retry-implement-2'));
   fs.mkdirSync(path.join(runs, first.id));
   draws = 0;
   const fourth = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
@@ -471,9 +483,8 @@ const throughCheck = async (keys: string, phase: TaskPhase, exitCode?: number) =
   return { run, ...b };
 };
 
-const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** The asks waiting in a run's directory, by name. */
-const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('retry-')) : []);
+const asksOf = (id: string) => askNames(ROOT, id).filter((f) => f.startsWith('retry-'));
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
 /**
  * What a verb refused with, once it has said it was a refusal — for a message to read more than one thing in, and to read something
@@ -522,9 +533,8 @@ test('a pass that filed try 2 and died before writing the run down is adopted, n
 
 test('an ask file the run cannot read is not honoured, and not touched: the pass says so, and files nothing', async () => {
   const { run, e, filings } = await throughCheck('check: npm test', 'failed', 1);
-  fs.mkdirSync(asksDir(run.id), { recursive: true });
-  fs.writeFileSync(path.join(asksDir(run.id), 'retry-implement-2'), 'try harder');
-  fs.writeFileSync(path.join(asksDir(run.id), 'retry-review-2'), JSON.stringify({ mode: 'harder' }));
+  plantRecord(ROOT, askKeyOf(run.id, 'retry-implement-2'), 'try harder');
+  plantRecord(ROOT, askKeyOf(run.id, 'retry-review-2'), JSON.stringify({ mode: 'harder' }));
   const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   assert.deepEqual(pass.tried, []);
   assert.ok(
@@ -573,7 +583,7 @@ const toReview = async (b: ReturnType<typeof board>, id: string, n: number, agai
   assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, id)))).filed, ['review'], `round ${n}: review`);
   b.settle(onRound(id, 'review', n), 'succeeded', reviewSays(again));
 };
-const roundAsksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('round-')) : []);
+const roundAsksOf = (id: string) => askNames(ROOT, id).filter((f) => f.startsWith('round-'));
 /** The JSON under a brief's `heading`. */
 const dataUnder = (brief: string, heading: string) =>
   JSON.parse(new RegExp(`${heading}\\n[\\s\\S]*?\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\``).exec(brief)![1]);
@@ -664,7 +674,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
   );
   assert.doesNotMatch(late, /take that acceptance back|\.asks directory/, 'and does not send them to delete it');
 
-  fs.rmSync(file);
+  dropRecord(ROOT, file);
   assert.equal(
     runRecord(ROOT, run.id).acceptances,
     undefined,
@@ -722,7 +732,6 @@ test('a pass that filed a round and died before writing the run down is adopted,
 test('REFUSED at read: an ask file whose message is not text, is empty, or rides on a recheck is not honoured — and one written before messages reads as it always did', async () => {
   const { run, e, filings } = await throughCheck('check: npm test', 'stopped');
   const at = '2026-09-13T10:00:00.000Z';
-  fs.mkdirSync(asksDir(run.id), { recursive: true });
   const refused = {
     'retry-implement-2': [{ mode: 'continue', message: 42, at }, 'its message is not text'],
     'retry-implement-3': [{ mode: 'fresh', message: ' ', at }, 'its message is empty'],
@@ -731,7 +740,7 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
       'it carries a message and asks for a recheck, which files no session to read it',
     ],
   } as const;
-  for (const [name, [held]] of Object.entries(refused)) fs.writeFileSync(path.join(asksDir(run.id), name), JSON.stringify(held));
+  for (const [name, [held]] of Object.entries(refused)) plantRecord(ROOT, askKeyOf(run.id, name), JSON.stringify(held));
   const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   assert.deepEqual(pass.tried, []);
   for (const [name, [, why]] of Object.entries(refused)) {
@@ -743,9 +752,9 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
   assert.deepEqual([readAsks(ROOT, run.id).asks, readAnswers(ROOT, run.id)], [[], []]);
   assert.equal(filings.length, 2);
 
-  for (const name of Object.keys(refused)) fs.rmSync(path.join(asksDir(run.id), name));
+  for (const name of Object.keys(refused)) dropRecord(ROOT, askKeyOf(run.id, name));
   const legacy = { step: 'implement', try: 2, mode: 'recheck', at };
-  fs.writeFileSync(path.join(asksDir(run.id), 'retry-implement-2'), `${JSON.stringify(legacy, null, 2)}\n`);
+  plantRecord(ROOT, askKeyOf(run.id, 'retry-implement-2'), `${JSON.stringify(legacy, null, 2)}\n`);
   assert.deepEqual(
     readAsks(ROOT, run.id),
     { asks: [legacy], rounds: [], notes: [] },
@@ -791,9 +800,8 @@ const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 test("REFUSED by name at shipped defaults: a file at an ask's name that is not an ask — `nemia retry` and `nemia retry --round` name it and say to delete it, never to wait for an ask no pass honours", async () => {
   const { run, e, filings } = await throughCheck('check: npm test', 'failed', 1);
-  const file = path.join(asksDir(run.id), 'retry-implement-2');
-  fs.mkdirSync(asksDir(run.id), { recursive: true });
-  fs.writeFileSync(file, '{}');
+  const file = askKeyOf(run.id, 'retry-implement-2');
+  plantRecord(ROOT, file, '{}');
   assert.equal((await runWith(e, list(e, runRecord(ROOT, run.id)))).steps[0].note, undefined, '`nemia ls` shows nothing asked');
   assert.deepEqual((await runWith(e, advanceRun(runRecord(ROOT, run.id)))).tried, [], 'and no pass honours it');
   await assert.rejects(
@@ -805,9 +813,9 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
       ),
     ),
   );
-  assert.equal(fs.readFileSync(file, 'utf8'), '{}', 'not written over');
+  assert.equal(recordText(ROOT, file), '{}', 'not written over');
   assert.equal(filings.length, 2);
-  fs.rmSync(file);
+  dropRecord(ROOT, file);
   await runWith(e, retryRun(run.id, 'implement', { mode: 'continue' }));
   assert.deepEqual(
     (await runWith(e, advanceRun(runRecord(ROOT, run.id)))).tried,
@@ -820,9 +828,8 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
   await runWith(b.e, advanceRun(runRecord(ROOT, looping.id)));
   await toReview(b, looping.id, 1, true);
   assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, looping.id)))).looped, [], 'out of rounds, on the first');
-  const roundFile = path.join(asksDir(looping.id), 'round-review-2');
-  fs.mkdirSync(asksDir(looping.id), { recursive: true });
-  fs.writeFileSync(roundFile, '[]');
+  const roundFile = askKeyOf(looping.id, 'round-review-2');
+  plantRecord(ROOT, roundFile, '[]');
   await assert.rejects(
     runWith(b.e, roundRun(looping.id)),
     refusedWith(
@@ -831,7 +838,7 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
       ),
     ),
   );
-  assert.equal(fs.readFileSync(roundFile, 'utf8'), '[]');
+  assert.equal(recordText(ROOT, roundFile), '[]');
 });
 
 test('a step whose harness blocked its session says what the harness waits for — on `nemia ls` and in its decision, read afresh each pass', async () => {
@@ -899,7 +906,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
 
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 
-test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone — and a pass that reaches a run's asks as they are removed does not make their directory again; a record gone between the store's listing and its read is no run, and no failure", async () => {
+test('REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone', async () => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'done.txt' });
@@ -923,43 +930,11 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
   const after = await pass;
   assert.equal(after.status, 'succeeded');
   assert.ok(after.run.tips, "the pass after it finished had its branch's tip to write");
-  assert.ok(!under('runs', `${p.run.id}.json`), 'and did not write them into a record it made again');
+  assert.ok(recordText(ROOT, runKey(p.run.id)) === undefined, 'and did not write them into a record it made again');
   assert.deepEqual(
     listRuns(ROOT).filter((r) => r.id === p.run.id),
     [],
   );
-
-  const q = await aParent(repo, b, { work: 'asked.txt' });
-  const asks = path.join(ROOT, 'runs', `${q.run.id}.asks`);
-  fs.mkdirSync(asks);
-  fs.writeFileSync(
-    path.join(asks, 'retry-implement-1'),
-    JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
-  );
-  const mkdir = fs.mkdirSync;
-  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the asks folder removed as made: a race
-  vi.spyOn(fs, 'mkdirSync').mockImplementation(((at: string, ...rest: unknown[]) => {
-    if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
-    return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
-  }) as never);
-  await runWith(b.e, advanceRun(runRecord(ROOT, q.run.id)));
-  vi.mocked(fs.mkdirSync).mockRestore();
-  assert.ok(
-    !fs.existsSync(asks),
-    'a spent ask the pass moves into `done/` as `nemia rm` removes the directory: no asks directory made again',
-  );
-
-  const vanished = path.join(ROOT, 'runs', 'vanished-a1b2.json');
-  fs.symlinkSync(path.join(ROOT, 'nowhere.json'), vanished);
-  try {
-    assert.ok(listRuns(ROOT).length > 0);
-    assert.ok(
-      !listRuns(ROOT).some((r) => r.id === 'vanished-a1b2'),
-      'listed, then gone before it is read: a dangling link reads as exactly that',
-    );
-  } finally {
-    fs.rmSync(vanished);
-  }
 });
 
 test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before `nemia rm` forgot it hands nothing off and collects nothing afterwards — its workspace, the repository, is still there, and its files directory is not made again', async () => {
@@ -1155,7 +1130,7 @@ async function _viewProgramTypes() {
 
 /** The start program, its face, and what a test of either reads. */
 const startProgram = async () => {
-  const rooted = filesStoreAt(ROOT);
+  const rooted = runsNow(ROOT);
   return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir, rooted };
 };
 

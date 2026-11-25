@@ -1,11 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fed, openFold, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, storedRecordText, storeRecord } from '../world.ts';
 
 export default {
   /**
@@ -17,8 +16,7 @@ export default {
   route: `/runs/${ENDING.id}`,
   expect: async (page) => {
     const { id, ending } = ENDING;
-    const recordFile = path.join(store!, 'runs', `${id}.json`);
-    const seeded = fs.readFileSync(recordFile, 'utf8');
+    const seeded = storedRecordText(id);
     const record = JSON.parse(seeded) as { repo: string; steps: Record<string, Record<string, unknown>> };
     const head = execFileSync('git', ['-C', record.repo, 'rev-parse', 'main'], { encoding: 'utf8' }).trim();
     record.steps[ending] = {
@@ -28,7 +26,7 @@ export default {
     };
     const merges = page.locator('[data-asks] [data-fold="decide"] section[aria-label="Decide"] section[aria-label="Trial merges"]');
     try {
-      fs.writeFileSync(recordFile, JSON.stringify(record, null, 2));
+      storeRecord(id, JSON.stringify(record, null, 2));
       fed(id, ending, 'aborted');
       await page.reload({ waitUntil: 'load' });
       await idle(page);
@@ -47,7 +45,7 @@ export default {
       await settled(page);
       await photograph(merges, path.join(OUT, `semantic-merges-${await themeOf(page)}.png`));
     } finally {
-      fs.writeFileSync(recordFile, seeded);
+      storeRecord(id, seeded);
       fed(id, ending, 'approve');
     }
     await page.reload({ waitUntil: 'load' });

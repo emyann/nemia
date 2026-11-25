@@ -62,11 +62,9 @@ function Table({ rows }: { rows: readonly unknown[] }) {
           <thead>
             <tr>
               {keys.map((key) => (
-                <Body size="small" component="div" className="contents">
-                  <th key={key} scope="col" className="border-b border-outline-variant px-2 py-1 font-mono text-on-surface-variant">
-                    {key}
-                  </th>
-                </Body>
+                <th key={key} scope="col" className="border-b border-outline-variant px-2 py-1 font-mono text-on-surface-variant">
+                  {key}
+                </th>
               ))}
             </tr>
           </thead>

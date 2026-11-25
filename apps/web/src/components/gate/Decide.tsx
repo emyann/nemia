@@ -130,7 +130,9 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
       {!inFolders && <InFull sensitive={sensitive} touched={touched} />}
 
       <section aria-label="Used" className="space-y-1">
-        <h3 className={HEADING}>Used, over every step's current try — and what every try of the run cost</h3>
+        <Body size="small" component="h3" className={HEADING}>
+          Used, over every step's current try — and what every try of the run cost
+        </Body>
         <Facts rows={[['used', total.used], ['cost', total.cost], ...readRows(total), ['every try', cost]]} />
       </section>
 
@@ -163,7 +165,9 @@ export function Offers({
   const lineOf = (offer: Answer) => steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
   return (
     <section aria-label="Answer" className="space-y-2">
-      <h3 className={HEADING}>Answer — each runs its step's command, as the command line would: a try, a round, or an approval</h3>
+      <Body size="small" component="h3" className={HEADING}>
+        Answer — each runs its step's command, as the command line would: a try, a round, or an approval
+      </Body>
       <ul className="space-y-3">
         {offers.map((offer) => (
           <AnswerRow key={offer.step} runId={runId} offer={offer} line={lineOf(offer)} />
@@ -270,22 +274,20 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           <AskPress pending={ask.isPending} held={offer.case === 'answer' && !message.trim()}>
             {words.button}
           </AskPress>
-          <Body size="small" component="div" className="contents">
-            <RadioGroup
-              aria-label={`How to try ${offer.step} again`}
-              name={`${field}-mode`}
-              orientation="horizontal"
-              value={mode}
-              onChange={(m) => setMode(m as RetryMode)}
-              className="gap-x-3 gap-y-1"
-            >
-              {modes.map((m) => (
-                <Radio key={m} value={m}>
-                  {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
-                </Radio>
-              ))}
-            </RadioGroup>
-          </Body>
+          <RadioGroup
+            aria-label={`How to try ${offer.step} again`}
+            name={`${field}-mode`}
+            orientation="horizontal"
+            value={mode}
+            onChange={(m) => setMode(m as RetryMode)}
+            className="gap-x-3 gap-y-1"
+          >
+            {modes.map((m) => (
+              <Radio key={m} value={m}>
+                {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
+              </Radio>
+            ))}
+          </RadioGroup>
         </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
@@ -464,7 +466,9 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
 function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; touched: readonly Touched[] }) {
   return (
     <section aria-label="In full" className="space-y-2">
-      <h3 className={HEADING}>In full: the check-affecting files — what a change could edit to make its check pass</h3>
+      <Body size="small" component="h3" className={HEADING}>
+        In full: the check-affecting files — what a change could edit to make its check pass
+      </Body>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
           {sensitive.length > 1 && (
@@ -581,7 +585,9 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
 function Commands({ commands }: { commands: readonly DecideCommand[] }) {
   return (
     <section aria-label="Commands" className="space-y-2">
-      <h3 className={HEADING}>Commands — copy one to run it</h3>
+      <Body size="small" component="h3" className={HEADING}>
+        Commands — copy one to run it
+      </Body>
       {commands.length ? (
         <ul className="space-y-2">
           {commands.map((c) => (

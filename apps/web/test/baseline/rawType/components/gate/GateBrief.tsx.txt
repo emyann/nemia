@@ -1,2 +1,0 @@
-apps/web/src/components/gate/GateBrief.tsx#text-body-small
-apps/web/src/components/gate/GateBrief.tsx#text-label-medium

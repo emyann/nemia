@@ -192,11 +192,11 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
   return (
     <Body size="medium" data-started={id}>
       Started{' '}
-      <Body size="medium" component="span" className="contents">
-        <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
+      <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
+        <Body size="medium" component="span">
           {id}
-        </Link>
-      </Body>
+        </Body>
+      </Link>
       . Nothing is filed until the daemon&apos;s next pass
       {after.length > 0 && (
         <>
@@ -260,9 +260,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
           No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.
         </Body>
       ) : runs.error ? (
-        <Body size="small" component="div" className="contents">
-          <ReadTrouble what="the runs to wait on" error={runs.error} className="" />
-        </Body>
+        <ReadTrouble what="the runs to wait on" error={runs.error} size="small" />
       ) : !onRepo ? (
         <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
           {[0, 1, 2].map((at) => (

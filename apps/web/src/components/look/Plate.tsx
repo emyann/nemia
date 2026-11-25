@@ -69,7 +69,7 @@ export function PageName({ children }: { children: ReactNode }) {
       component="h1"
       colorRole="on-surface"
       data-page-name
-      className="relative m-0 pb-4.5 font-brand uppercase @lg/page:text-display-small"
+      className="relative m-0 pb-4.5 font-brand uppercase @lg/page:text-display-small @lg/page:font-display-small"
     >
       <span aria-hidden="true" data-page-rule className="absolute inset-x-0 bottom-0 h-px" style={HAIRLINE} />
       <span data-page-name-text className="relative block w-fit">

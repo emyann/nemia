@@ -151,9 +151,7 @@ export function CheckOutput({ read }: { read: CheckRead }) {
         }}
       />
       {output.error ? (
-        <Body size="small" component="div" className="contents">
-          <ReadTrouble what="what the check printed" error={output.error} className="" />
-        </Body>
+        <ReadTrouble what="what the check printed" error={output.error} size="small" />
       ) : data === undefined ? (
         <Reading label="Reading what the check printed">
           <Body size="small" component="div" className="contents">

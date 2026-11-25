@@ -3,7 +3,7 @@ import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown'
 import remarkGfm from 'remark-gfm';
 import { fencedCode, labelFootnotes, languageOf, placeHeadings } from '../../lib/markdown';
 import { cn } from '../../lib/utils';
-import { Body, Checkbox } from '@/components/ui/ds';
+import { Checkbox } from '@/components/ui/ds';
 import { CodeBlock } from '../ai-elements/code-block';
 
 const PLUGINS = [remarkGfm];
@@ -84,11 +84,7 @@ const COMPONENTS: Components = {
   img: drawnImage,
   pre: ({ node }) => {
     const { code, className } = fencedCode(node);
-    return (
-      <Body size="small" component="div" className="contents">
-        <CodeBlock code={code} language={languageOf(className)} className="my-3 [&_pre]:whitespace-pre" />
-      </Body>
-    );
+    return <CodeBlock code={code} language={languageOf(className)} className="my-3 [&_pre]:whitespace-pre" />;
   },
   code: ({ node: _node, className, ...props }) => (
     <code

@@ -168,11 +168,7 @@ function FactoryField({
           <SelectItem key={f.name} id={f.name} label={f.name} />
         ))}
       </Select>
-      {error && (
-        <Body size="small" component="div" className="contents">
-          <ReadTrouble what="the factories" error={error} className="" />
-        </Body>
-      )}
+      {error && <ReadTrouble what="the factories" error={error} size="small" />}
       {picked === '' && (
         <Body size="small" colorRole="on-surface-variant" data-parked>
           Parked with no factory: it gets its factory, workflow and repository when you start it.
@@ -182,7 +178,7 @@ function FactoryField({
         <div data-reading-factories>
           <Reading label="Reading the factories…">
             <Body size="small" component="div" className="contents">
-              <ReadingLines widths={['w-64']} className="" />
+              <ReadingLines widths={['w-64']} />
             </Body>
           </Reading>
         </div>

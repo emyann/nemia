@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { Body, Cell, Column, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Column, Label, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import type { ListedRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/factories';
@@ -10,10 +10,10 @@ import { RunActions } from './RunActions';
 import { CopyId, CutFrame, FRAMED_ROW, FRAMED_TABLE, Run, TableAtCut, TextLink } from '../look';
 
 /** A column's heading, in the look's small caps. */
-const HEAD = 'text-label-small uppercase';
+const HEAD = 'uppercase';
 
 /** A run's title in a row: one line, cut to the column's room, the whole of it in the kit's tooltip. */
-const TITLE = 'block truncate text-body-large font-medium';
+const TITLE = 'block truncate font-medium';
 
 /**
  * A run in flight the list could not judge, a task it reads having a journal that does not read: its id for its title, a link, with a
@@ -34,7 +34,9 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
         <span className="flex min-w-0 flex-col gap-1">
           <TooltipTrigger delay={300}>
             <TextLink to="/runs/$runId" params={{ runId: run.id }} className={TITLE}>
-              {run.id}
+              <Body size="large" component="span">
+                {run.id}
+              </Body>
             </TextLink>
             <Tooltip>{run.id}</Tooltip>
           </TooltipTrigger>
@@ -89,16 +91,24 @@ export function FlightTable({
           <Table aria-label="Runs in flight" density="dense" className={cn('min-w-[880px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
               <Column id="run" isRowHeader className={HEAD}>
-                Run
+                <Label size="small" component="span">
+                  Run
+                </Label>
               </Column>
               <Column id="now" className={cn(HEAD, 'w-[360px]')}>
-                Now
+                <Label size="small" component="span">
+                  Now
+                </Label>
               </Column>
               <Column id="clock" align="end" className={cn(HEAD, 'w-[160px]')}>
-                Clock
+                <Label size="small" component="span">
+                  Clock
+                </Label>
               </Column>
               <Column id="cost" align="end" className={cn(HEAD, 'w-[96px]')}>
-                Cost
+                <Label size="small" component="span">
+                  Cost
+                </Label>
               </Column>
             </TableHeader>
             <TableBody>

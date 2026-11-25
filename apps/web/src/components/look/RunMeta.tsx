@@ -26,20 +26,20 @@ export function QuietLabels({ labels, keys = false }: { labels: Readonly<LabelMa
     <span data-quiet-labels className={cn('inline-flex min-w-0 items-center', keys ? 'flex-wrap gap-1.5' : 'gap-2.5')}>
       {entries.map(([key, value]) => (
         <TooltipTrigger key={key} delay={300}>
-          <Body size="small" component="span" className="contents">
-            <TextLink
-              to="/labels/$key/$value"
-              params={{ key, value }}
-              data-label={`${key}=${value}`}
-              aria-label={`${key}=${value}`}
-              className={cn(
-                'font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface',
-                keys && 'border border-outline-variant px-1.5',
-              )}
-            >
+          <TextLink
+            to="/labels/$key/$value"
+            params={{ key, value }}
+            data-label={`${key}=${value}`}
+            aria-label={`${key}=${value}`}
+            className={cn(
+              'font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface',
+              keys && 'border border-outline-variant px-1.5',
+            )}
+          >
+            <Body size="small" component="span">
               {keys ? `${key}=${value}` : value}
-            </TextLink>
-          </Body>
+            </Body>
+          </TextLink>
           <Tooltip>{`${key}=${value}`}</Tooltip>
         </TooltipTrigger>
       ))}

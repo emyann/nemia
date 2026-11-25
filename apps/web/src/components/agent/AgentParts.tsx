@@ -63,15 +63,15 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
 function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   const here = usePagePlace();
   return (
-    <Body size="small" component="div" className="contents">
-      <RouteLink
-        {...workflowLink(user.from === 'user' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
-        data-node={`${user.workflow}/${user.step}`}
-        className={cn('font-mono text-on-surface', LINK)}
-      >
+    <RouteLink
+      {...workflowLink(user.from === 'user' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
+      data-node={`${user.workflow}/${user.step}`}
+      className={cn('font-mono text-on-surface', LINK)}
+    >
+      <Body size="small" component="span">
         {user.workflow} <span className="text-on-surface-variant">›</span> {user.step}
-      </RouteLink>
-    </Body>
+      </Body>
+    </RouteLink>
   );
 }
 
@@ -276,16 +276,16 @@ export function AgentLink({
 /** A factory that uses a library item, linked to its settings, where its adds are. */
 function FactoryUserLink({ factory }: { factory: string }) {
   return (
-    <Body size="small" component="div" className="contents">
-      <RouteLink
-        to="/factories/$factory/settings"
-        params={{ factory }}
-        data-factory-user={factory}
-        className={cn('font-mono text-on-surface', LINK)}
-      >
+    <RouteLink
+      to="/factories/$factory/settings"
+      params={{ factory }}
+      data-factory-user={factory}
+      className={cn('font-mono text-on-surface', LINK)}
+    >
+      <Body size="small" component="span">
         {factory}
-      </RouteLink>
-    </Body>
+      </Body>
+    </RouteLink>
   );
 }
 

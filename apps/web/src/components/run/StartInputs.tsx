@@ -26,6 +26,20 @@ export const pastLimit = (file: File) => file.size > MOST;
 /** Where the file at `index` stands while the start uploads: uploaded, uploading now, or waiting its turn. */
 const markOf = (index: number, sent: number) => (index < sent ? 'sent' : index === sent ? 'uploading' : 'waiting');
 
+/** What the drop zone says: where its files go, `label`, and under it, quiet, the limit a file keeps to, `note`. */
+function DropWords({ label, note }: { label: string; note: string }) {
+  return (
+    <span className="min-w-0 flex-1">
+      <Body size="medium" component="span" className="block">
+        {label}: drop them here, or
+      </Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="block" data-file-limit>
+        {note}
+      </Body>
+    </span>
+  );
+}
+
 /**
  * The files a start hands its run, as the client hands a start its inputs: dropped on the kit's drop zone, or picked with its file trigger,
  * each listed by its name and size, removable until the start is pressed. The files api's limit is said before anything is sent, and a
@@ -64,14 +78,7 @@ export function StartInputs({
         }}
       >
         <UploadIcon aria-hidden size={20} className="shrink-0" />
-        <span className="min-w-0 flex-1">
-          <Body size="medium" component="span" className="block">
-            {label}: drop them here, or
-          </Body>
-          <Body size="small" component="span" colorRole="on-surface-variant" className="block" data-file-limit>
-            {note}
-          </Body>
-        </span>
+        <DropWords label={label} note={note} />
         <FileTrigger allowsMultiple onSelect={(list) => add([...(list ?? [])])}>
           <Button variant="tonal" size="small" isDisabled={isDisabled}>
             Choose files

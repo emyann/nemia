@@ -11,7 +11,7 @@
  * it is edited, and the task left to the brief a run is started with.
  */
 import type { ReactNode } from 'react';
-import { Body, Tag } from '@/components/ui/ds';
+import { Body, Label, Tag } from '@/components/ui/ds';
 import type { StepLayers, TaskPart } from '../../lib/api/layers.ts';
 import { RouteLink } from '../agent/AgentParts';
 import { Markdown } from '../markdown/Markdown';
@@ -113,7 +113,7 @@ export function Told({
   if (layers && homes) return <WillBeTold layers={layers} homes={homes} level={level} />;
   return (
     <Body size="medium" component="div" className="contents">
-      <details className="" data-told>
+      <details data-told>
         <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">
           {filed ? 'What it was told' : 'What it would be told now'}
         </summary>
@@ -186,7 +186,7 @@ function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: F
 function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; homes: LayerHomes; level: LayerLevel }) {
   return (
     <Body size="medium" component="div" className="contents">
-      <details open className="" data-told data-will-be-told>
+      <details open data-told data-will-be-told>
         <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">What it will be told</summary>
         <div className="mt-2 flex flex-col gap-3">
           <Body size="small" colorRole="on-surface-variant" data-read-now>
@@ -249,7 +249,7 @@ export function StepBody({ body, layers }: { body: string | null; layers: Frozen
   if (layers !== null || !body) return null;
   return (
     <Body size="medium" component="div" className="contents">
-      <Markdown className="">{body}</Markdown>
+      <Markdown>{body}</Markdown>
     </Body>
   );
 }
@@ -294,11 +294,11 @@ function TaskParts({ parts, level }: { parts: Frozen<TaskPart[]>; level: LayerLe
         if (!part.how) return <Words level={UNDER[level]} key={i} text={`## From run ${part.run}\n\n${part.body}`} />;
         return (
           <section key={i} data-from-run={part.run} data-how={part.how} className="flex flex-col gap-1 rounded border p-2">
-            <Heading title={part.run} className="min-w-0 text-label-medium text-on-surface-variant">
+            <Label size="medium" component={Heading} colorRole="on-surface-variant" title={part.run} className="min-w-0">
               <RouteLink to="/runs/$runId" params={{ runId: part.run }} underline="hover" className="block truncate">
                 {HANDED[part.how]} · {part.asked || part.run} ↗
               </RouteLink>
-            </Heading>
+            </Label>
             <Words level={DEEPER[level]} text={part.body} />
           </section>
         );
@@ -325,10 +325,14 @@ export function Layer({
   return (
     <section data-layer={name} className="flex flex-col gap-1">
       {home === undefined ? (
-        <Heading className="text-label-medium text-on-surface-variant">{title}</Heading>
+        <Label size="medium" component={Heading} colorRole="on-surface-variant">
+          {title}
+        </Label>
       ) : (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <Heading className="text-label-medium text-on-surface-variant">{title}</Heading>
+          <Label size="medium" component={Heading} colorRole="on-surface-variant">
+            {title}
+          </Label>
           <Body size="small" component="span" colorRole="on-surface-variant" data-home={name} className="min-w-0 break-all">
             {home}
           </Body>

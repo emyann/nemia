@@ -10,12 +10,24 @@ import { Body } from '@/components/ui/ds';
 
 /**
  * The line a page says where reading `what` (as a person names it: `the agents`, `the run r-1`) failed with `error`, `then` after it:
- * what the trouble does not say, the page's own next step. In the failure's ink by default; `className` keeps a page's own type, ink or
- * room, merged by `cn`.
+ * what the trouble does not say, the page's own next step. `size` is its body role's, medium by default. In the failure's ink by
+ * default; `className` keeps a page's own ink or room, merged by `cn`.
  */
-export function ReadTrouble({ what, error, then, className }: { what: string; error: unknown; then?: ReactNode; className?: string }) {
+export function ReadTrouble({
+  what,
+  error,
+  then,
+  size = 'medium',
+  className,
+}: {
+  what: string;
+  error: unknown;
+  then?: ReactNode;
+  size?: 'small' | 'medium';
+  className?: string;
+}) {
   return (
-    <Body size="medium" data-read-trouble={troubleOf(error).kind} className={cn('text-failure', className)}>
+    <Body size={size} data-read-trouble={troubleOf(error).kind} className={cn('text-failure', className)}>
       {troubleLine(what, error)}
       {then ? <> {then}</> : null}
     </Body>

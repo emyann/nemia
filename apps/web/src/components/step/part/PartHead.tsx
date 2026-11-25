@@ -216,17 +216,17 @@ export function PartHead({ head, size, action: asked }: { head: Head; size: Part
       {head.spend !== 'none' && <Spend spend={head.spend} />}
       {head.note !== 'none' && <Note note={head.note} />}
       {action && (
-        <Label size="large" component="span" className="contents">
-          <TextLink
-            data-step-action
-            to="/runs/$runId/steps/$step"
-            params={{ runId: head.action.runId, step: head.action.step }}
-            className="inline-flex min-h-10 items-center gap-1 self-start uppercase"
-          >
+        <TextLink
+          data-step-action
+          to="/runs/$runId/steps/$step"
+          params={{ runId: head.action.runId, step: head.action.step }}
+          className="inline-flex min-h-10 items-center gap-1 self-start uppercase"
+        >
+          <Label size="large" component="span">
             {head.action.words}
             <ChevronRight aria-hidden="true" className="size-4" />
-          </TextLink>
-        </Label>
+          </Label>
+        </TextLink>
       )}
     </div>
   );

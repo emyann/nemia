@@ -1,1 +1,0 @@
-apps/web/src/components/look/CutButton.tsx#text-label-large

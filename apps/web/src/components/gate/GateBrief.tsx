@@ -117,17 +117,17 @@ function Waits({
         Waiting on you
       </Label>
       {children ?? <p className="break-words whitespace-pre-wrap">{said}</p>}
-      <Body size="small" component="div" className="contents">
-        <RouteLink
-          to="/runs/$runId"
-          params={{ runId: run.id }}
-          hash={anchor ? stepAnchor(anchor) : 'decide'}
-          data-answer-link
-          className={cn('', LINK)}
-        >
+      <RouteLink
+        to="/runs/$runId"
+        params={{ runId: run.id }}
+        hash={anchor ? stepAnchor(anchor) : 'decide'}
+        data-answer-link
+        className={cn('', LINK)}
+      >
+        <Body size="small" component="span">
           Answer it on the run's page
-        </RouteLink>
-      </Body>
+        </Body>
+      </RouteLink>
     </section>
   );
 }

@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Body, Select, SelectItem, Skeleton } from '@/components/ui/ds';
+import { Body, Label, Select, SelectItem, Skeleton } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
 import { factoryWorkflowsQuery, type Place, type Started, type WorkflowRow } from '../../lib/api/workflows.ts';
 import { storeQuery } from '../../lib/api/store.ts';
@@ -38,12 +38,12 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
   return (
     <div data-start-card className="space-y-3 border-t border-outline-variant pt-4">
       {factories.error ? (
-        <Body size="small" component="div" className="contents">
-          <ReadTrouble what="the factories to start it in" error={factories.error} className="" />
-        </Body>
+        <ReadTrouble what="the factories to start it in" error={factories.error} size="small" />
       ) : !place ? (
         <Reading label="Reading the factory…" className="flex flex-col gap-1.5">
-          <Skeleton className="w-20 text-label-medium" />
+          <Label size="medium" component="span" className="contents">
+            <Skeleton className="w-20" />
+          </Label>
           <Skeleton shape="rectangle" className="h-9 max-w-xs rounded-none" />
         </Reading>
       ) : (
@@ -68,12 +68,12 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
   return (
     <div data-start-card data-start-unassigned className="space-y-3 border-t border-outline-variant pt-4">
       {factories.error ? (
-        <Body size="small" component="div" className="contents">
-          <ReadTrouble what="the factories to start it in" error={factories.error} className="" />
-        </Body>
+        <ReadTrouble what="the factories to start it in" error={factories.error} size="small" />
       ) : !factories.data || !store ? (
         <Reading label="Reading the factories…" className="flex flex-col gap-1.5">
-          <Skeleton className="w-20 text-label-medium" />
+          <Label size="medium" component="span" className="contents">
+            <Skeleton className="w-20" />
+          </Label>
           <Skeleton shape="rectangle" className="h-9 max-w-xs rounded-none" />
         </Reading>
       ) : offered.length === 0 ? (
@@ -200,17 +200,13 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
   const unread = read === null && listed.some((w) => w.error !== null);
 
   if (workflows.error) {
-    return (
-      <Body size="small" component="div" className="contents">
-        <ReadTrouble what={`the workflow ${workflow} of the factory ${place.factory}`} error={workflows.error} className="" />
-      </Body>
-    );
+    return <ReadTrouble what={`the workflow ${workflow} of the factory ${place.factory}`} error={workflows.error} size="small" />;
   }
   if (!workflows.data)
     return (
       <Reading label="Reading the workflow…" className="flex flex-col gap-2">
         <Body size="small" component="div" className="contents">
-          <ReadingLines widths={['w-2/3']} className="" />
+          <ReadingLines widths={['w-2/3']} />
         </Body>
         <Skeleton shape="rectangle" className="h-10 w-28 rounded-none" />
       </Reading>
@@ -235,17 +231,12 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
  */
 function StartCard({ entry, workflow, place, onStarted, onRefused }: { entry: InboxEntry; workflow: WorkflowRow; place: Place } & Told) {
   const body = useQuery(cardBodyQuery(entry.name));
-  if (body.error)
-    return (
-      <Body size="small" component="div" className="contents">
-        <ReadTrouble what={`the card ${entry.name}`} error={body.error} className="" />
-      </Body>
-    );
+  if (body.error) return <ReadTrouble what={`the card ${entry.name}`} error={body.error} size="small" />;
   if (body.data === undefined)
     return (
       <Reading label="Reading the card…" className="flex flex-col gap-2">
         <Body size="small" component="div" className="contents">
-          <ReadingLines widths={['w-2/3']} className="" />
+          <ReadingLines widths={['w-2/3']} />
         </Body>
       </Reading>
     );

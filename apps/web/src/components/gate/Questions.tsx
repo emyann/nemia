@@ -299,22 +299,20 @@ export function AskedRow({ step, said }: { step: string; said: string }) {
 /** How the answers reach the step: its session continued, or a new one — a recheck files no session to read them. */
 function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; mode: RetryMode; onMode: (m: RetryMode) => void }) {
   return (
-    <Body size="small" component="div" className="contents">
-      <RadioGroup
-        aria-label={`How to try ${step} again`}
-        name={name}
-        orientation="horizontal"
-        value={mode}
-        onChange={(m) => onMode(m as RetryMode)}
-        className="gap-x-3 gap-y-1"
-      >
-        {(['continue', 'fresh'] as const).map((m) => (
-          <Radio key={m} value={m}>
-            {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
-          </Radio>
-        ))}
-      </RadioGroup>
-    </Body>
+    <RadioGroup
+      aria-label={`How to try ${step} again`}
+      name={name}
+      orientation="horizontal"
+      value={mode}
+      onChange={(m) => onMode(m as RetryMode)}
+      className="gap-x-3 gap-y-1"
+    >
+      {(['continue', 'fresh'] as const).map((m) => (
+        <Radio key={m} value={m}>
+          {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
+        </Radio>
+      ))}
+    </RadioGroup>
   );
 }
 

@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { Body, Focusable, Label, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import { titleOf } from '@/lib/factory';
@@ -49,19 +49,19 @@ export function RunMark({ id, run }: { id: string; run?: NamedRun }) {
   const said = run ? `${titleOf(run)} — ${now?.step ?? 'done'}` : id;
   return (
     <TooltipTrigger delay={300}>
-      <Body size="medium" component="span" className="contents">
-        <TextLink
-          to="/runs/$runId"
-          params={{ runId: id }}
-          data-now-run={id}
-          data-run-mark={id}
-          aria-label={`${id.slice(-4)}: ${said}`}
-          className="inline-flex items-center gap-1 align-baseline font-mono whitespace-nowrap"
-        >
+      <TextLink
+        to="/runs/$runId"
+        params={{ runId: id }}
+        data-now-run={id}
+        data-run-mark={id}
+        aria-label={`${id.slice(-4)}: ${said}`}
+        className="inline-flex items-center gap-1 align-baseline font-mono whitespace-nowrap"
+      >
+        <Body size="medium" component="span">
           <MarkDiamond mark={run ? nowMark(run) : 'rest'} />
           <span className="underline decoration-outline underline-offset-4">{id.slice(-4)}</span>
-        </TextLink>
-      </Body>
+        </Body>
+      </TextLink>
       <Tooltip>{`${id}\n${said}`}</Tooltip>
     </TooltipTrigger>
   );
@@ -73,18 +73,16 @@ export function Chip({ now, small = false }: { now: Pick<Now, 'step' | 'tone'>; 
   return (
     <CutTag edge={tag.variant === 'outlined'}>
       {tag.color === 'alive' ? (
-        <Label size="small" component="div" className="contents">
-          <MeaningTag data-now-word data-tone={now.tone} hue="alive" className={cn('shrink-0 uppercase', small && 'h-5 px-1.5')}>
-            {now.step}
-          </MeaningTag>
-        </Label>
+        <MeaningTag data-now-word data-tone={now.tone} hue="alive" className={cn('shrink-0 uppercase', small && 'h-5 px-1.5')}>
+          {now.step}
+        </MeaningTag>
       ) : (
         <Tag
           data-now-word
           data-tone={now.tone}
           variant={tag.variant}
           color={tag.color}
-          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
+          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5')}
         >
           {now.step}
         </Tag>
@@ -204,24 +202,26 @@ export function Fan({ count, className }: { count: number; className?: string })
 
 /**
  * The few words of what a run waits for (`nowOf`'s words), in its tone's ink; a run they name is its mark (`RunMark`), found among the
- * surface's runs (`among`). `title` says whole what a card cuts to its line.
+ * surface's runs (`among`). `title` says whole what a card cuts to its line, and `size` is the body role's, small on a card's line.
  */
 export function Words({
   words,
   tone,
   among,
   title,
+  size = 'medium',
   className,
 }: {
   words: readonly NowPart[];
   tone: ChipTone;
   among: readonly NamedRun[];
   title?: string;
+  size?: 'small' | 'medium';
   className?: string;
 }) {
   if (words.length === 0) return null;
   return (
-    <Body size="medium" component="span" data-now-words title={title} className={cn('min-w-0', WORDS_INK[tone], className)}>
+    <Body size={size} component="span" data-now-words title={title} className={cn('min-w-0', WORDS_INK[tone], className)}>
       {words.map((part, i) => (
         <span key={i}>
           {i > 0 && ' '}

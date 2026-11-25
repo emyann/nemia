@@ -1,2 +1,0 @@
-apps/web/src/components/run/RunWait.tsx#text-body-medium
-apps/web/src/components/run/RunWait.tsx#text-body-small

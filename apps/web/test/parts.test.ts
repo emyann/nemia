@@ -242,7 +242,7 @@ describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each w
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const nested = await drawn(createElement(CutFrame, { children: createElement('div', null, inner) }));
     assert.equal(grains(nested), 1, 'grain never doubles: the outer frame wears it, the frame inside it none');
-    assert.match(tagWith(nested, 'data-cut-ground'), /data-grain="quiet"/, 'the first ground is the outer frame\'s');
+    assert.match(tagWith(nested, 'data-cut-ground'), /data-grain="quiet"/, "the first ground is the outer frame's");
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const sticker = await drawn(createElement(Sticker, { hue: 'ink', label: 'Cost', children: '$4.25' }));
     assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);

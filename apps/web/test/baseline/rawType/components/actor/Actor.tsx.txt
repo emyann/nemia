@@ -1,1 +1,0 @@
-apps/web/src/components/actor/Actor.tsx#text-body-small

@@ -1,2 +1,0 @@
-apps/web/src/components/factory/FactoryBlock.tsx#text-body-large
-apps/web/src/components/factory/FactoryBlock.tsx#text-body-medium

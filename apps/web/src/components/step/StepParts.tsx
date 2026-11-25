@@ -147,9 +147,7 @@ export function StepWritten({ page }: { page: WorkflowStepPage }) {
   return (
     <AsWritten file={`${page.dir}/${page.step}.md`} source={page.source}>
       <Body size="medium" component="div" className="contents">
-        <Markdown top className="">
-          {page.layers.policy}
-        </Markdown>
+        <Markdown top>{page.layers.policy}</Markdown>
       </Body>
       <KeyTable
         rows={page.keys}
@@ -229,14 +227,14 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
 export function StepPageLink({ page, step }: { page: WorkflowPageAddress | null; step: string }) {
   if (!page) return null;
   return (
-    <Body size="small" component="div" className="contents">
-      <RouteLink
-        {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
-        data-step-page-link={step}
-        className="text-on-surface-variant hover:text-on-surface"
-      >
+    <RouteLink
+      {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
+      data-step-page-link={step}
+      className="text-on-surface-variant hover:text-on-surface"
+    >
+      <Body size="small" component="span">
         What it will be told now →
-      </RouteLink>
-    </Body>
+      </Body>
+    </RouteLink>
   );
 }

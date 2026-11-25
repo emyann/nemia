@@ -39,6 +39,44 @@ export type StepNodeData = {
 };
 export type StepFlowNode = Node<StepNodeData, 'step'>;
 
+/** A step's band of the calls its fence refused, `denied`: how many, in failure's ink, the refusal's words on its tooltip. */
+function DeniedBand({ denied }: { denied: NonNullable<StepView['denied']> }) {
+  return (
+    <Body
+      size="small"
+      data-denied
+      title={denied.words}
+      className="truncate border-t border-outline-variant px-3 py-1 font-mono text-failure"
+    >
+      {deniedNodeText(denied.calls)}
+    </Body>
+  );
+}
+
+/** What cuts a spec line's value to its lines. */
+const CLAMP = { 2: 'line-clamp-2', 3: 'line-clamp-3' } as const;
+
+/**
+ * A step's spec, a fact a line, under its node: each line's label, quiet, and its value in mono, cut to `clamp` lines with the whole on
+ * its tooltip.
+ */
+function SpecLines({ lines, clamp }: { lines: ReturnType<typeof specLines>; clamp: 2 | 3 }) {
+  return (
+    <Body size="small" component="div" className="contents">
+      <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5">
+        {lines.map(([label, value, title = value]) => (
+          <div key={label} className="flex min-w-0 gap-1.5">
+            <dt className="shrink-0 text-on-surface-variant">{label}</dt>
+            <dd className={`min-w-0 font-mono break-words text-on-surface ${CLAMP[clamp]}`} title={title}>
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Body>
+  );
+}
+
 /**
  * One step on the canvas: which step, what it runs on, and what it is doing now.
  *
@@ -142,16 +180,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
           {needNodeText(need)}
         </Body>
       )}
-      {step.denied && (
-        <Body
-          size="small"
-          data-denied
-          title={step.denied.words}
-          className="truncate border-t border-outline-variant px-3 py-1 font-mono text-failure"
-        >
-          {deniedNodeText(step.denied.calls)}
-        </Body>
-      )}
+      {step.denied && <DeniedBand denied={step.denied} />}
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
@@ -333,20 +362,7 @@ export function SpecNode({
 
       {node?.kind === 'condition' && <RouteBand node={node} routes={routes} taken={null} routed={null} />}
 
-      {lines.length > 0 && node?.kind !== 'workflow' && (
-        <Body size="small" component="div" className="contents">
-          <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5">
-            {lines.map(([label, value, title = value]) => (
-              <div key={label} className="flex min-w-0 gap-1.5">
-                <dt className="shrink-0 text-on-surface-variant">{label}</dt>
-                <dd className="line-clamp-3 min-w-0 font-mono break-words text-on-surface" title={title}>
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </Body>
-      )}
+      {lines.length > 0 && node?.kind !== 'workflow' && <SpecLines lines={lines} clamp={3} />}
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
@@ -420,20 +436,7 @@ function BuildingNode({
         </Body>
       </div>
 
-      {lines.length > 0 && (
-        <Body size="small" component="div" className="contents">
-          <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5">
-            {lines.map(([label, value, title = value]) => (
-              <div key={label} className="flex min-w-0 gap-1.5">
-                <dt className="shrink-0 text-on-surface-variant">{label}</dt>
-                <dd className="line-clamp-2 min-w-0 font-mono break-words text-on-surface" title={title}>
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </Body>
-      )}
+      {lines.length > 0 && <SpecLines lines={lines} clamp={2} />}
 
       <Handle type="source" position={sourcePosition} title={`Drag to a step that waits on ${name}`} className={`${HANDLE} !bg-outline`} />
       <Handle

@@ -69,12 +69,12 @@ function TraceIcon({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-/** A line's sentence, cut with an ellipsis where it runs out of room; a file, a command or a query in it is `code`, in mono. */
+/** A line's sentence, cut with an ellipsis where it runs out of room; a file, a command or a query in it is `code`, in mono at its size. */
 function TraceTitle({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
       data-slot="trace-title"
-      className={cn('min-w-0 flex-1 truncate motion-reduce:shimmer-none [&_code]:font-mono [&_code]:text-body-small', className)}
+      className={cn('min-w-0 flex-1 truncate motion-reduce:shimmer-none [&_code]:font-mono', className)}
       {...props}
     />
   );
@@ -142,7 +142,7 @@ function TraceCollapsibleTrigger({
 /** How a step's content stands under it: a sub-agent's steps nested on a rule, or what it asked and what came back, in mono. */
 const CONTENT = {
   nest: 'mb-1 ml-4 border-l border-outline-variant pl-2',
-  body: 'mt-0.5 mb-1.5 ml-8.5 bg-surface-container px-3 py-2 font-mono text-body-small whitespace-pre-wrap wrap-anywhere text-on-surface shadow-[inset_2px_0_0_var(--md-sys-color-outline-variant)]',
+  body: 'mt-0.5 mb-1.5 ml-8.5 bg-surface-container px-3 py-2 font-mono whitespace-pre-wrap wrap-anywhere text-on-surface shadow-[inset_2px_0_0_var(--md-sys-color-outline-variant)]',
 } as const;
 
 /** What a step holds, drawn only while it is open, as `kind` stands it: `nest` for steps under it, `body` for what it asked and got. */
@@ -160,9 +160,15 @@ function TraceCollapsibleContent({
   return (
     <DisclosurePanel data-slot="trace-collapsible-content" className="min-w-0" {...props}>
       {open && (
-        <div data-slot="trace-collapsible-content-inner" data-kind={kind} className={cn('min-w-0', CONTENT[kind], className)}>
+        <Body
+          size="small"
+          component="div"
+          data-slot="trace-collapsible-content-inner"
+          data-kind={kind}
+          className={cn('min-w-0', CONTENT[kind], className)}
+        >
           {children}
-        </div>
+        </Body>
       )}
     </DisclosurePanel>
   );

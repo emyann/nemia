@@ -2,13 +2,13 @@ import { Link as AriaLink } from 'react-aria-components';
 import { newerOf, olderTrailOf, pageSaid, rowsSaid, trailSearch, type PageAt } from '@/lib/finished';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { routeLink } from '../nav/routeLink';
-import { Body } from '@/components/ui/ds';
+import { Body, Label } from '@/components/ui/ds';
 
 const PageLink = routeLink(AriaLink);
 
 /** An outlined button of the pager, in the label face: quiet, dimmed by its ink where it leads nowhere, and ringed as the kit rings. */
 const BUTTON = cn(
-  'inline-flex h-8 items-center border border-outline px-3 font-label-large text-label-large uppercase text-on-surface hover:bg-surface-container-high data-disabled:border-outline-variant data-disabled:text-on-surface-variant data-disabled:hover:bg-transparent',
+  'inline-flex h-8 items-center border border-outline px-3 uppercase text-on-surface hover:bg-surface-container-high data-disabled:border-outline-variant data-disabled:text-on-surface-variant data-disabled:hover:bg-transparent',
   focusRing(),
 );
 
@@ -27,13 +27,17 @@ function PageButton({ trail, which, children }: { trail: readonly string[] | nul
   if (trail === null) {
     return (
       <AriaLink isDisabled className={BUTTON} {...mark}>
-        {children}
+        <Label size="large" component="span">
+          {children}
+        </Label>
       </AriaLink>
     );
   }
   return (
     <PageLink to="." search={searchAt(trail)} className={BUTTON} {...mark}>
-      {children}
+      <Label size="large" component="span">
+        {children}
+      </Label>
     </PageLink>
   );
 }

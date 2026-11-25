@@ -222,7 +222,7 @@ describe("the cut and the grain in the board's source: no ring a clip breaks, th
     for (const name of ['--grain-quiet', '--grain-label'])
       assert.equal(grain.split(`var(${name})`).length - 1, 1, `${name} is drawn by one rule`);
     assert.equal(grain.split('--grain-label:').length - 1, 1, "a label's tile is the same in both schemes");
-    assert.equal(grain.split('--grain-quiet:').length - 1, 2, "a quiet tile is written for each scheme");
+    assert.equal(grain.split('--grain-quiet:').length - 1, 2, 'a quiet tile is written for each scheme');
   });
   test('REFUSED: an entry stylesheet that imports the grain under another at-rule, or not at all', () => {
     const grain = "@import './components/look/grain.css';";
@@ -232,7 +232,7 @@ describe("the cut and the grain in the board's source: no ring a clip breaks, th
     assert.equal(readsGrain("@import\n  './components/look/grain.css'\n;\n@layer base {\n}\n"), true, 'across line breaks');
     assert.equal(readsGrain(fs.readFileSync(path.join(SRC, 'styles.css'), 'utf8')), true, 'the board reads it');
   });
-  test("REFUSED: a quiet grain whose specks are ink in the dark scheme or white in the light one", () => {
+  test('REFUSED: a quiet grain whose specks are ink in the dark scheme or white in the light one', () => {
     const grain = fs.readFileSync(path.join(SRC, GRAIN), 'utf8');
     const [light, dark] = [...grain.matchAll(/--grain-quiet\s*:\s*(url\([^)]+\))/g)].map((found) => found[1] ?? '');
     assert.ok(light && dark && light !== dark, 'the grain writes a quiet tile for each scheme');

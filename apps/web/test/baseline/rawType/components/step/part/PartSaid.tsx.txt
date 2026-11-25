@@ -1,3 +1,0 @@
-apps/web/src/components/step/part/PartSaid.tsx#text-body-medium
-apps/web/src/components/step/part/PartSaid.tsx#text-body-small
-apps/web/src/components/step/part/PartSaid.tsx#text-label-medium

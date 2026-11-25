@@ -1,1 +1,0 @@
-apps/web/src/components/step/part/Fold.tsx#text-label-medium

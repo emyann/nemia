@@ -179,22 +179,20 @@ function RaiseModes({
   onMode: (next: RetryMode) => void;
 }) {
   return (
-    <Body size="small" component="div" className="contents">
-      <RadioGroup
-        aria-label={`How to try ${step} again`}
-        name={name}
-        orientation="horizontal"
-        value={mode}
-        onChange={(m) => onMode(m as RetryMode)}
-        className="gap-x-3 gap-y-1"
-      >
-        {modes.map((m) => (
-          <Radio key={m} value={m}>
-            {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
-          </Radio>
-        ))}
-      </RadioGroup>
-    </Body>
+    <RadioGroup
+      aria-label={`How to try ${step} again`}
+      name={name}
+      orientation="horizontal"
+      value={mode}
+      onChange={(m) => onMode(m as RetryMode)}
+      className="gap-x-3 gap-y-1"
+    >
+      {modes.map((m) => (
+        <Radio key={m} value={m}>
+          {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
+        </Radio>
+      ))}
+    </RadioGroup>
   );
 }
 

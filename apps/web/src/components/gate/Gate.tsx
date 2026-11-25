@@ -371,22 +371,20 @@ function Choice<T extends string>({
   label: (option: T) => ReactNode;
 }) {
   return (
-    <Body size="small" component="div" className="contents">
-      <RadioGroup
-        aria-label={legend}
-        name={name}
-        orientation="horizontal"
-        value={value}
-        onChange={(next) => onChange(next as T)}
-        className="gap-x-3 gap-y-1"
-      >
-        {options.map((o) => (
-          <Radio key={o} value={o}>
-            {label(o)}
-          </Radio>
-        ))}
-      </RadioGroup>
-    </Body>
+    <RadioGroup
+      aria-label={legend}
+      name={name}
+      orientation="horizontal"
+      value={value}
+      onChange={(next) => onChange(next as T)}
+      className="gap-x-3 gap-y-1"
+    >
+      {options.map((o) => (
+        <Radio key={o} value={o}>
+          {label(o)}
+        </Radio>
+      ))}
+    </RadioGroup>
   );
 }
 

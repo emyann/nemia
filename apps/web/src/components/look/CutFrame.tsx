@@ -22,7 +22,8 @@ const InFrame = createContext(false);
 
 /**
  * The look's cut-corner frame: a shape of its own under what it holds, its top-right and bottom-left corners cut, an edge in `hue`
- * around the card's ground, which wears the quiet grain inside the cut (none for a frame inside another, so grain never doubles), and for what waits on a person a glow the shape casts.
+ * around the card's ground, which wears the quiet grain inside the cut (none for a frame inside another, so grain never doubles), and
+ * for what waits on a person a glow the shape casts.
  * Outside the cut nothing is painted: the page's ground shows. Nothing of the frame cuts what it holds off: a focused child's ring is
  * drawn whole, over a cut corner too. `size` is its cut. `fill` is for a frame given a height — a panel that grows to the room it is
  * in — where what it holds is laid out down the whole of it, and scrolls inside rather than past it. `ground` is the class of its

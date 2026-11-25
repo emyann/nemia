@@ -152,6 +152,17 @@ function Buttons({ running, onReset }: { running: string[]; onReset: () => void 
   );
 }
 
+/** The canvas's hint, in its top-left corner: its cards are dragged to arrange, and the arrangement kept in this browser. */
+function ArrangeHint() {
+  return (
+    <Panel position="top-left">
+      <Body size="small" component="span" colorRole="on-surface-variant">
+        Drag to arrange · kept in this browser
+      </Body>
+    </Panel>
+  );
+}
+
 /**
  * The canvas of `RunCanvas`, given the layering it computed.
  *
@@ -244,9 +255,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         fitViewOptions={FIT}
         minZoom={LEAST_ZOOM}
       >
-        <Panel position="top-left" className="text-body-small text-on-surface-variant">
-          Drag to arrange · kept in this browser
-        </Panel>
+        <ArrangeHint />
         <Buttons running={running} onReset={resetLayout} />
         <Background variant={BackgroundVariant.Dots} gap={16} />
         <Controls showInteractive={false} />

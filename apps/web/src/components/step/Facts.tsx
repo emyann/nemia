@@ -21,8 +21,8 @@ import { CheckOutput, type CheckRead } from './CheckOutput';
 import { Fold } from './part/Fold';
 import { Body, Label } from '@/components/ui/ds';
 
-/** A section's quiet heading: small, medium weight, in the muted ink. */
-export const HEADING = 'text-body-small font-medium text-on-surface-variant';
+/** A section's heading, set in the kit's small body role (`<Body size="small" component="h3">`): medium weight, in the full ink. */
+export const HEADING = 'font-medium';
 
 /** A link's look in a fact's words. */
 export const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-on-surface', focusRing());

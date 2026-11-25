@@ -65,7 +65,7 @@ export function CutFrame({
         />
       </span>
       <div className={cn('relative', fill && 'flex h-full min-h-0 flex-col')}>
-        <InFrame value>{children}</InFrame>
+        <InFrame.Provider value>{children}</InFrame.Provider>
       </div>
     </div>
   );

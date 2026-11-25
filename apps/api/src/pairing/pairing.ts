@@ -42,7 +42,7 @@ import { answeredWrite } from '../objects/refused.ts';
 import { cookieSent, overHttps } from '../server/session.ts';
 
 /** `work` over the request's services at the time the clock reads now, read once for the request; a refusal answered by the one map. */
-const ticketed = <A>(work: (s: Served, nowMs: number) => A) =>
+const ticketed = <A>(work: (s: Served, nowMs: number) => A | Promise<A>) =>
   Effect.flatMap(Clock.currentTimeMillis, (nowMs) => answeredWrite(async (s) => work(s, nowMs)));
 
 /** The url the api ticking the store `home` serves at, as its lease says; none where no api ticks it. */
@@ -54,7 +54,7 @@ const leasedUrl = (home: string) => {
 export const pairingsHandlers = readsBounded(Api, 'pairings', (handlers) =>
   handlers
     .handle('ask', ({ payload }) => ticketed((s, nowMs) => pairingAsked(s.home, payload.client, nowMs)))
-    .handle('claim', ({ params, payload }) => ticketed((s, nowMs) => pairingClaimed(s.home, params.id, payload.secret, nowMs)))
+    .handle('claim', ({ params, payload }) => ticketed((s, nowMs) => s.inRequest(pairingClaimed(s.home, params.id, payload.secret, nowMs))))
     .handle('list', () => ticketed((s, nowMs) => pairingsListed(s.home, nowMs)))
     .handle('approve', ({ payload }) =>
       ticketed((s, nowMs) => {
@@ -74,7 +74,7 @@ export const linksHandlers = readsBounded(Api, 'links', (handlers) =>
     )
     .handle('claim', ({ payload, request }) =>
       Effect.gen(function* () {
-        const { token, name } = yield* ticketed((s, nowMs) => linkClaimed(s.home, payload.secret, nowMs));
+        const { token, name } = yield* ticketed((s, nowMs) => s.inRequest(linkClaimed(s.home, payload.secret, nowMs)));
         yield* cookieSent(token, overHttps(request));
         return { cookie: 'set', name } as const;
       }),

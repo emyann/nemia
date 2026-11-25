@@ -22,7 +22,7 @@ import { Hono } from 'hono';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
 import { approvalKey, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
-import { CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { until } from '../../test/waits.ts';
@@ -43,7 +43,7 @@ const door = <A, E>(use: (d: TokenDoorShape) => Effect.Effect<A, E>) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* use(yield* TokenDoor);
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
 
 /** The token door's shape, as the package's `TokenDoor` gives it. */

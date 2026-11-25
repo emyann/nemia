@@ -597,12 +597,12 @@ import * as RunObject from './object/run.model.ts';
  */
 export { RunModel, RunObject };
 
-export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
+export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorAt } from './token/caller.verb.ts';
 export type { CallerOf, PersonTokenFiled, StandingRecord, TokenHolder, TokenNeed } from './token/caller.verb.ts';
 export { linkMinted, pairingApproved, pairingAsked, pairingsListed } from './pairing/pairing.store.ts';
 export { boardBase, linkClaimed, pairingClaimed } from './pairing/commands.verb.ts';
 export { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from './token/commands.verb.ts';
-export { credentialKept } from './token/token.store.ts';
+export { credentialKept, credentialKeptNow } from './token/token.store.ts';
 export { LINK_TTL_MS, PAIRING_TTL_MS, ticketState, type Ticket } from './pairing/ticket.ts';
 export {
   addressKind,

@@ -16,18 +16,15 @@ import { StoreRoot } from '../config/root.store.ts';
 import type { Env } from '../config/config.store.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { tried } from '../runtime-client.ts';
-import { mintPersonTokenFree } from '../token/token.store.ts';
+import { TokenDoor } from '../token/token.store.ts';
+import { fromThrow } from '../door/door.store.ts';
 import { linkMarked, linkMinted, pairingApproved, pairingMarked, pairingsListed, type Marked } from './pairing.store.ts';
 
 /** A person's token minted at `nowMs` for the claim `marked`, under its name or the first free after it; the mark taken back if refused. */
-function mintedFor(home: string, marked: Marked, nowMs: number) {
-  try {
-    return mintPersonTokenFree(home, marked.name, new Date(nowMs));
-  } catch (err) {
-    marked.unmarked();
-    throw err;
-  }
-}
+const mintedFor = (marked: Marked, nowMs: number) =>
+  Effect.flatMap(TokenDoor, (door) => door.persons.mintFree(marked.name, new Date(nowMs))).pipe(
+    Effect.tapError(() => Effect.sync(() => marked.unmarked())),
+  );
 
 /**
  * The pairing `id` claimed with `secret` at `nowMs`: a pairing that waits for its approval answers its phase alone, and the client asks
@@ -39,11 +36,11 @@ function mintedFor(home: string, marked: Marked, nowMs: number) {
  * @param secret The secret the client presents, which must be the pairing's own.
  * @param nowMs The time of the claim, in ms since the epoch.
  */
-export function pairingClaimed(home: string, id: string, secret: string, nowMs: number) {
-  const marked = pairingMarked(home, id, secret, nowMs);
+export const pairingClaimed = Effect.fnUntraced(function* (home: string, id: string, secret: string, nowMs: number) {
+  const marked = yield* fromThrow(() => pairingMarked(home, id, secret, nowMs));
   if ('phase' in marked) return marked satisfies PairingClaimed as PairingClaimed;
-  return { phase: 'claimed', ...mintedFor(home, marked, nowMs) } satisfies PairingClaimed as PairingClaimed;
-}
+  return { phase: 'claimed', ...(yield* mintedFor(marked, nowMs)) } satisfies PairingClaimed as PairingClaimed;
+});
 
 /**
  * The first-visit link whose secret is `secret` claimed at `nowMs`: marked claimed and a person's token minted for the browser that
@@ -53,9 +50,9 @@ export function pairingClaimed(home: string, id: string, secret: string, nowMs: 
  * @param secret The link's secret, as the browser presents it.
  * @param nowMs The time of the claim, in ms since the epoch.
  */
-export function linkClaimed(home: string, secret: string, nowMs: number) {
-  return mintedFor(home, linkMarked(home, secret, nowMs), nowMs);
-}
+export const linkClaimed = Effect.fnUntraced(function* (home: string, secret: string, nowMs: number) {
+  return yield* mintedFor(yield* fromThrow(() => linkMarked(home, secret, nowMs)), nowMs);
+});
 
 /** The port the api listens on where nothing says another: the daemon's. */
 const API_PORT = 8787;

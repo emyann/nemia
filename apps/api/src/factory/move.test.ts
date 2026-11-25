@@ -25,7 +25,7 @@ import { pathToFileURL } from 'node:url';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { BuiltinTemplates, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
-import { reconcileOnce, StoreRoot, storeConfigLayer, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { reconcileOnce, StoreRoot, storeConfigLayer, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { appOver, eachTest } from '../../test/placed.ts';
@@ -215,7 +215,7 @@ const endedToken = (s: Store) =>
         attempt: 1,
         task: 't-move-ended',
       });
-    }).pipe(Effect.provide(tokenDoorFiles(s.home))),
+    }).pipe(Effect.provide(tokenDoorAt(s.home))),
   );
 
 /** The repository `mill` works on: one of the test place's world, by its `file://` URL, which each store clones under itself. */

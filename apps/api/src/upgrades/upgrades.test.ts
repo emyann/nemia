@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { RunningCode, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { RunningCode, TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import type { Upgrade, UpgradesRead } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { root } from '../../test/harness.ts';
@@ -96,7 +96,7 @@ test("a session's token starts no upgrade: 403, and nothing is filed", async () 
   const token = Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
   Effect.runSync(engineFor(engine()).file({ id: task, brief: 'Be on.', cwd: root, harness: 'claude' }));
   engine().settle(task, 'working');

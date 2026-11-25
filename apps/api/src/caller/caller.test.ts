@@ -19,7 +19,7 @@ import { Effect, Layer } from 'effect';
 import { Hono } from 'hono';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { storeConfigLayer, tokenDigest, TokenDoor, tokenDoorFiles, type ProposalCaller, type TokenHolder } from 'agent-orchestrator';
+import { storeConfigLayer, tokenDigest, TokenDoor, tokenDoorAt, type ProposalCaller, type TokenHolder } from 'agent-orchestrator';
 import { Api, TOKEN_COOKIE } from 'objects';
 import { answerError, appOf, liveOf } from '../app.ts';
 import { Engine } from '../store.ts';
@@ -40,7 +40,7 @@ const minted = (name: string, holder?: TokenHolder) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).persons.mint(name, holder);
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
 
 /** A token of the person's, named `caller-laptop`. */
@@ -66,7 +66,7 @@ const TASK = 't-caller-session';
 const sessionToken = Effect.runSync(
   Effect.gen(function* () {
     return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: TASK });
-  }).pipe(Effect.provide(tokenDoorFiles(root))),
+  }).pipe(Effect.provide(tokenDoorAt(root))),
 );
 
 /** The session's task filed on the stand-in and left working: its token is live. */

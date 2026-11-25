@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Effect, Layer, Logger } from 'effect';
-import { credentialKept, emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
+import { credentialKeptNow, emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
 import { ambient } from './ambient.ts';
 
 const CLI = path.join(import.meta.dirname, '..');
@@ -89,7 +89,7 @@ function child(t: TestContext, proc: ChildProcess) {
  * put in the store as a daemon's start puts it (`credentialKept`), which `--no-tick` does not run.
  */
 async function apiOver(t: TestContext, root: string) {
-  credentialKept(root);
+  credentialKeptNow(root);
   const env = { ...ambient('NEMIA_ON_INSTALLED'), PORT: '0', WF_ROOT: root, HKB_REPO: root };
   const api = child(t, spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env, timeout: 120_000 }));
   const url = await api.said((out) => /api listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(out)?.[1]);

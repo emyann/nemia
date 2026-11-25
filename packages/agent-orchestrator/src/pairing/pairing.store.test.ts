@@ -13,6 +13,16 @@ import { mintPersonToken, personTokenOf, personTokens, tokenDigest } from '../to
 import { linkMinted, linksDir, pairingApproved, pairingAsked, pairingsDir, pairingsListed } from './pairing.store.ts';
 import { linkClaimed, pairingClaimed } from './commands.verb.ts';
 import { LINK_TTL_MS, PAIRING_TTL_MS } from './ticket.ts';
+import { Effect } from 'effect';
+import { tokenDoorAt } from '../token/token.store.ts';
+
+/** The pairing claimed at once, at the store `home` (`pairingClaimed`). */
+const claimedNow = (home: string, id: string, secret: string, nowMs: number) =>
+  Effect.runSync(Effect.provide(pairingClaimed(home, id, secret, nowMs), tokenDoorAt(home)));
+
+/** The link claimed at once, at the store `home` (`linkClaimed`). */
+const linkNow = (home: string, secret: string, nowMs: number) =>
+  Effect.runSync(Effect.provide(linkClaimed(home, secret, nowMs), tokenDoorAt(home)));
 
 const ROOT = scratch('wf-pairings-');
 
@@ -37,18 +47,18 @@ test('a pairing asked, approved by its code and claimed answers a token of the p
   assert.equal(asked.expiresAt, new Date(T0 + PAIRING_TTL_MS).toISOString());
   const atRest = () => [...textsUnder(pairingsDir(home)), ...textsUnder(linksDir(home))];
   assert.ok(!atRest().some((t) => t.includes(asked.secret) || t.includes(asked.code.replace('-', ''))), 'no code nor secret at rest');
-  assert.deepEqual(pairingClaimed(home, asked.id, asked.secret, T0 + 1), { phase: 'waiting' }, 'unapproved, it waits');
+  assert.deepEqual(claimedNow(home, asked.id, asked.secret, T0 + 1), { phase: 'waiting' }, 'unapproved, it waits');
   assert.deepEqual(
     pairingsListed(home, T0 + 1).pairings.map((p) => [p.id, p.client, p.phase]),
     [[asked.id, 'laptop', 'waiting']],
   );
   const approved = pairingApproved(home, asked.code.toLowerCase().replace('-', ''), T0 + 2);
   assert.equal(approved.phase, 'claimable', 'matched in lower case and with no dash');
-  const claimed = pairingClaimed(home, asked.id, asked.secret, T0 + 3);
+  const claimed = claimedNow(home, asked.id, asked.secret, T0 + 3);
   assert.equal(claimed.phase, 'claimed');
   assert.equal(claimed.name, 'laptop');
   assert.deepEqual(personTokenOf(home, tokenDigest(claimed.token ?? '')), { name: 'laptop', createdAt: new Date(T0 + 3).toISOString() });
-  refusedAs(() => pairingClaimed(home, asked.id, asked.secret, T0 + 4), Conflict);
+  refusedAs(() => claimedNow(home, asked.id, asked.secret, T0 + 4), Conflict);
   assert.deepEqual(
     personTokens(home).map((t) => t.name),
     ['laptop'],
@@ -68,7 +78,7 @@ test("a client's name already a token's is made unique with -2, -3", () => {
   const names = [1, 2].map((i) => {
     const asked = pairingAsked(home, 'laptop', T0 + i);
     pairingApproved(home, asked.code, T0 + i);
-    return pairingClaimed(home, asked.id, asked.secret, T0 + i).name;
+    return claimedNow(home, asked.id, asked.secret, T0 + i).name;
   });
   assert.deepEqual(names, ['laptop-2', 'laptop-3']);
 });
@@ -76,9 +86,9 @@ test("a client's name already a token's is made unique with -2, -3", () => {
 test('REFUSED: an unknown pairing, a wrong secret, a claim past its time, an approval past it or of no code, a name no token takes', () => {
   const home = aStore();
   const asked = pairingAsked(home, 'laptop', T0);
-  refusedAs(() => pairingClaimed(home, 'nosuch', asked.secret, T0), Missing);
-  refusedAs(() => pairingClaimed(home, '../x', asked.secret, T0), Missing);
-  refusedAs(() => pairingClaimed(home, asked.id, `${asked.secret}x`, T0), Missing);
+  refusedAs(() => claimedNow(home, 'nosuch', asked.secret, T0), Missing);
+  refusedAs(() => claimedNow(home, '../x', asked.secret, T0), Missing);
+  refusedAs(() => claimedNow(home, asked.id, `${asked.secret}x`, T0), Missing);
   refusedAs(() => pairingApproved(home, 'AAAA-AAAA', T0), Missing);
   refusedAs(() => pairingApproved(home, 'not a code', T0), Missing);
   refusedAs(() => pairingApproved(home, asked.code, T0 + PAIRING_TTL_MS), Conflict);
@@ -86,7 +96,7 @@ test('REFUSED: an unknown pairing, a wrong secret, a claim past its time, an app
 
   const late = pairingAsked(home, 'phone', T0);
   pairingApproved(home, late.code, T0 + 1);
-  refusedAs(() => pairingClaimed(home, late.id, late.secret, T0 + PAIRING_TTL_MS), Conflict);
+  refusedAs(() => claimedNow(home, late.id, late.secret, T0 + PAIRING_TTL_MS), Conflict);
   for (const name of ['', 'a b', '-x', 'x'.repeat(57)]) refusedAs(() => pairingAsked(home, name, T0), Invalid);
   assert.deepEqual(personTokens(home), [], 'no token was minted');
 });
@@ -100,15 +110,15 @@ test('a first-visit link is claimed once within its time, its token named board-
   assert.match(secret, /^[A-Za-z0-9_-]{43}$/);
   assert.equal(minted.expiresAt, new Date(T0 + LINK_TTL_MS).toISOString());
   assert.ok(!textsUnder(linksDir(home)).some((t) => t.includes(secret)), 'no secret at rest');
-  refusedAs(() => linkClaimed(home, 'nosuch', T0), Missing);
+  refusedAs(() => linkNow(home, 'nosuch', T0), Missing);
   for (const base of ['box:8787', 'ftp://box', 'not a url']) refusedAs(() => linkMinted(home, base, T0), Invalid);
-  const claimed = linkClaimed(home, secret, T0 + 1);
+  const claimed = linkNow(home, secret, T0 + 1);
   assert.equal(claimed.name, 'board-2026-11-12');
   assert.equal(personTokenOf(home, tokenDigest(claimed.token))?.name, 'board-2026-11-12');
   assert.ok(!textsUnder(linksDir(home)).some((t) => t.includes(claimed.token)), 'no token at rest');
-  refusedAs(() => linkClaimed(home, secret, T0 + 2), Conflict);
+  refusedAs(() => linkNow(home, secret, T0 + 2), Conflict);
   const lapsed = new URL(linkMinted(home, 'http://127.0.0.1:8787', T0).url).searchParams.get('link') ?? '';
-  refusedAs(() => linkClaimed(home, lapsed, T0 + LINK_TTL_MS), Conflict);
+  refusedAs(() => linkNow(home, lapsed, T0 + LINK_TTL_MS), Conflict);
   assert.deepEqual(
     personTokens(home).map((t) => t.name),
     ['board-2026-11-12'],

@@ -10,12 +10,10 @@
 import { NO_TOKEN, root } from '../../test/harness.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
-import { TokenDoor, tokenDoorFiles, type TokenHolder } from 'agent-orchestrator';
+import { keysUnder, testPlace } from 'agent-orchestrator/testing';
+import { TokenDoor, tokenDoorAt, type TokenHolder } from 'agent-orchestrator';
 import type { Token, TokenList, TokenMinted } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 
@@ -28,7 +26,7 @@ const minted = (name: string, holder?: TokenHolder) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).persons.mint(name, holder);
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
+    }).pipe(Effect.provide(tokenDoorAt(root))),
   );
 
 /** A token of the person's. */
@@ -43,7 +41,7 @@ const TASK = 't-tokens-session';
 const sessionToken = Effect.runSync(
   Effect.gen(function* () {
     return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: TASK });
-  }).pipe(Effect.provide(tokenDoorFiles(root))),
+  }).pipe(Effect.provide(tokenDoorAt(root))),
 );
 
 /** The session's task filed on the stand-in and left working: its token is live. */
@@ -96,7 +94,7 @@ test('the list names each standing token by its holder, never a token nor its di
   assert.equal(byName.get('tokens-ops')?.holder, 'agent');
   assert.equal(byName.get('tokens-ops')?.agent, 'operator');
   for (const t of tokens) assert.ok(!('token' in t), `${t.name}: no token in the list`);
-  const digests = fs.readdirSync(path.join(root, 'person-tokens')).map((file) => file.replace(/\.json$/, ''));
+  const digests = keysUnder(root, '/registry/persontokens/').map((key) => key.slice('/registry/persontokens/'.length));
   assert.ok(digests.length > 0, 'the store keeps records to read');
   for (const secret of [personToken, agentToken, ...digests]) assert.ok(!text.includes(secret), 'no token, no digest');
 });

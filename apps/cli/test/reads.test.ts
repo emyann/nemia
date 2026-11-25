@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { credentialKept } from 'agent-orchestrator';
+import { credentialKeptNow } from 'agent-orchestrator';
 import { CHECK_OUTPUT_PAGE, type CheckOutput, LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
@@ -241,7 +241,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV) {
  * credential is put in the store first, as a daemon's start puts it (`credentialKept`), which `--no-tick` does not run.
  */
 async function startApi() {
-  credentialKept(root);
+  credentialKeptNow(root);
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...ENV, PORT: '0' } });
   let said = '';
   const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));

@@ -9,7 +9,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { credentialKept } from 'agent-orchestrator';
+import { credentialKeptNow } from 'agent-orchestrator';
 import { ambient } from './ambient.ts';
 import { scratch } from 'test-kit/scratch';
 
@@ -45,7 +45,7 @@ export async function servedStore(prefix: string, seed: (root: string) => void, 
     };
   })();
   seed(root);
-  credentialKept(root);
+  credentialKeptNow(root);
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...env, PORT: '0' } });
   let said = '';
   const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));

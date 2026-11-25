@@ -17,7 +17,7 @@ export { callerOf, type CallerOf, type StandingRecord, type TokenHolder, type To
 export {
   TokenDoor,
   holderOf,
-  tokenDoorFiles,
+  tokenDoorAt,
   tokenDigest,
   type PersonTokenFiled,
   type TokenDoorShape,

@@ -1,8 +1,9 @@
 /**
- * A person's tokens on the store's disk: minted once under a name and answered once, kept as the record its digest names and never in
- * the clear, readable by its owner alone in a folder only its owner opens; listed by name and date, never by digest; and removed by
- * name. Refusals are asserted by their kind and exit code, never by their sentence. Who a request presenting one is, before and after
- * its removal, is `test/session-token.test.ts`'s. And the store's credential, as the daemon puts it in place at its start: the file
+ * A person's tokens in the store's keyspace: minted once under a name and answered once, kept as the record its digest names and never in
+ * the clear, in a keyspace readable by its owner alone in a folder only its owner opens; listed by name and date, never by digest; two
+ * mints of one name at once making one token and one `Conflict`; removed by name; and a token file of before the keyspace imported.
+ * Refusals are asserted by their kind and exit code, never by their sentence. Who a request presenting one is, before and after its
+ * removal, is `test/session-token.test.ts`'s. And the store's credential, as the daemon puts it in place at its start: the file
  * written 0600 holding a token the store keeps as the person's under `local`; a live one left as it is; and a new one minted where the
  * file's token was retired, is an agent's, or the file holds no token at all.
  */
@@ -11,17 +12,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { Effect } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { keyspaceFile } from '../keyspace/keyspace.store.ts';
+import { acted } from '../../test/door-walks.ts';
+import { keysUnder, recordText } from '../../testing.ts';
 import {
   credentialFile,
-  credentialKept,
+  credentialKeptNow,
   holderOf,
   mintPersonToken,
   personTokenOf,
   personTokens,
-  personTokensDir,
   revokePersonToken,
   tokenDigest,
+  TokenDoor,
+  tokenDoorAt,
 } from './token.store.ts';
 
 const ROOT = scratch('wf-person-tokens-');
@@ -33,21 +39,23 @@ const aStore = () => fs.mkdtempSync(path.join(ROOT, 'store-'));
 const refusedAs = (act: () => unknown, kind: typeof Conflict | typeof Missing | typeof Invalid) =>
   assert.throws(act, (err: unknown) => err instanceof kind && err.exitCode === 2);
 
-test("a person's token is answered once, and its file holds no byte of it, readable by its owner alone", () => {
+test("a person's token is answered once, and its record holds no byte of it, in a keyspace readable by its owner alone", () => {
   const home = aStore();
   const token = mintPersonToken(home, 'laptop');
   assert.match(token, /^[A-Za-z0-9_-]{43}$/, '32 random bytes in base64url');
-  const dir = personTokensDir(home);
-  const files = fs.readdirSync(dir);
-  assert.deepEqual(files, [`${tokenDigest(token)}.json`], 'one record, named by its digest, and no hidden file left');
-  const text = fs.readFileSync(path.join(dir, files[0] ?? ''), 'utf8');
+  assert.deepEqual(
+    keysUnder(home, '/registry/persontokens/'),
+    [`/registry/persontokens/${tokenDigest(token)}`],
+    'one record, by its digest',
+  );
+  const text = recordText(home, `/registry/persontokens/${tokenDigest(token)}`) ?? '';
   assert.ok(!text.includes(token), 'the record holds no byte of the token');
   const record = JSON.parse(text) as { name: string; createdAt: string };
   assert.deepEqual(Object.keys(record).sort(), ['createdAt', 'name']);
   assert.equal(record.name, 'laptop');
   assert.ok(!Number.isNaN(Date.parse(record.createdAt)), 'createdAt is a date');
-  assert.equal(fs.statSync(path.join(dir, files[0] ?? '')).mode & 0o777, 0o600, 'the record is its owner alone');
-  assert.equal(fs.statSync(dir).mode & 0o777, 0o700, 'the folder is opened by its owner alone');
+  assert.equal(fs.statSync(keyspaceFile(home)).mode & 0o777, 0o600, 'the keyspace is its owner alone');
+  assert.equal(fs.statSync(path.dirname(keyspaceFile(home))).mode & 0o777, 0o700, 'the folder is opened by its owner alone');
   assert.deepEqual(personTokenOf(home, tokenDigest(token)), record, 'read again by its digest');
   assert.equal(personTokenOf(home, tokenDigest('never-minted')), null, 'a digest the store holds no record of is none');
 });
@@ -57,7 +65,34 @@ test('REFUSED: a name already used is a Conflict, and a name that is no name is 
   mintPersonToken(home, 'laptop');
   refusedAs(() => mintPersonToken(home, 'laptop'), Conflict);
   for (const name of ['', ' ', '-x', 'a b', 'a/b', 'x'.repeat(64)]) refusedAs(() => mintPersonToken(home, name), Invalid);
-  assert.equal(fs.readdirSync(personTokensDir(home)).length, 1, 'only the first token was written');
+  assert.equal(keysUnder(home, '/registry/persontokens/').length, 1, 'only the first token was written');
+});
+
+test('two mints of one name at once make one token, and the other is a Conflict', async () => {
+  const home = aStore();
+  const door = Effect.runSync(Effect.provide(TokenDoor, tokenDoorAt(home)));
+  const both = await Promise.all([acted(door.persons.mint('laptop')), acted(door.persons.mint('laptop'))]);
+  assert.deepEqual(
+    both.filter((one) => typeof one !== 'string'),
+    [{ refused: 'Conflict' }],
+  );
+  assert.deepEqual(
+    personTokens(home).map((t) => t.name),
+    ['laptop'],
+  );
+});
+
+test('a token file of before the keyspace is imported, read by its digest, and moved aside', () => {
+  const home = aStore();
+  const digest = tokenDigest('an-old-token');
+  fs.mkdirSync(path.join(home, 'person-tokens'), { recursive: true });
+  fs.writeFileSync(
+    path.join(home, 'person-tokens', `${digest}.json`),
+    JSON.stringify({ name: 'old', createdAt: '2026-01-01T00:00:00.000Z' }),
+  );
+  assert.equal(personTokenOf(home, digest)?.name, 'old');
+  assert.deepEqual(fs.readdirSync(path.join(home, 'person-tokens')), []);
+  assert.ok(fs.existsSync(path.join(home, 'imported', 'person-tokens', `${digest}.json`)));
 });
 
 test('the tokens are listed by name and date, never by digest', () => {
@@ -107,7 +142,7 @@ const keptAs = (home: string, token: string) => {
 
 test("the credential is written 0600, holding a token the store keeps as the person's under local, and no hidden file is left", () => {
   const home = aCredentialStore();
-  assert.deepEqual(credentialKept(home), { kind: 'minted', name: 'local' });
+  assert.deepEqual(credentialKeptNow(home), { kind: 'minted', name: 'local' });
   assert.equal(fs.statSync(credentialFile(home)).mode & 0o777, 0o600, 'the file is its owner alone');
   assert.deepEqual(keptAs(home, held(home)), { name: 'local', holder: 'person' });
   assert.deepEqual(
@@ -119,9 +154,9 @@ test("the credential is written 0600, holding a token the store keeps as the per
 
 test('a credential whose token is kept is left alone, and no token is minted', () => {
   const home = aCredentialStore();
-  credentialKept(home);
+  credentialKeptNow(home);
   const first = held(home);
-  assert.deepEqual(credentialKept(home), { kind: 'kept' });
+  assert.deepEqual(credentialKeptNow(home), { kind: 'kept' });
   assert.equal(held(home), first);
   assert.deepEqual(
     personTokens(home).map((t) => t.name),
@@ -131,10 +166,10 @@ test('a credential whose token is kept is left alone, and no token is minted', (
 
 test('a credential whose token was retired with nemia token rm local is minted again at the next start, under local', () => {
   const home = aCredentialStore();
-  credentialKept(home);
+  credentialKeptNow(home);
   const retired = held(home);
   revokePersonToken(home, 'local');
-  assert.deepEqual(credentialKept(home), { kind: 'minted', name: 'local' });
+  assert.deepEqual(credentialKeptNow(home), { kind: 'minted', name: 'local' });
   assert.notEqual(held(home), retired);
   assert.deepEqual(keptAs(home, held(home)), { name: 'local', holder: 'person' });
 });
@@ -147,7 +182,7 @@ test('a file of garbage, an empty one, or one holding an agent-held token is rep
         ? mintPersonToken(home, 'ops', new Date(), { kind: 'agent', agent: 'operator', factory: null, narrowed: null })
         : written;
     fs.writeFileSync(credentialFile(home), value, { mode: 0o644 });
-    assert.equal(credentialKept(home).kind, 'minted', `replaced: ${JSON.stringify(written)}`);
+    assert.equal(credentialKeptNow(home).kind, 'minted', `replaced: ${JSON.stringify(written)}`);
     assert.deepEqual(keptAs(home, held(home)), { name: 'local', holder: 'person' });
     assert.equal(fs.statSync(credentialFile(home)).mode & 0o777, 0o600, 'the file replaced is its owner alone');
   }
@@ -156,6 +191,6 @@ test('a file of garbage, an empty one, or one holding an agent-held token is rep
 test('where a token of the person is already named local, the credential is minted under the first free name after it', () => {
   const home = aCredentialStore();
   mintPersonToken(home, 'local');
-  assert.deepEqual(credentialKept(home), { kind: 'minted', name: 'local-2' });
+  assert.deepEqual(credentialKeptNow(home), { kind: 'minted', name: 'local-2' });
   assert.deepEqual(keptAs(home, held(home)), { name: 'local-2', holder: 'person' });
 });

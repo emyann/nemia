@@ -15,7 +15,7 @@ import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
 import { startedFacts } from './commands.verb.ts';
 import type { Env } from '../config/config.store.ts';
-import { addFactoryAt } from '../factory/factory.store.ts';
+import { addFactoryAt, attachWorkflowAt } from '../factory/factory.store.ts';
 
 const ROOT = scratch('wf-start-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -145,13 +145,14 @@ describe("a start's own --label is judged against its factory's label values; a 
     );
     assert.deepEqual(fs.existsSync(RUNS_DIR) ? fs.readdirSync(RUNS_DIR).sort() : [], before, 'nothing written');
   });
-  test("a card's standing work=store, with no --label, is never what refuses its start", async () => {
-    const started = await runPlaced(
-      startRun({ brief: 'queued', repo, factory: 'lv', workflowDir: folder(), labels: { card: { work: 'store' }, edits: [] } }),
-    ).then(
-      () => '',
-      (err: Error) => err.message,
+  test("a card's standing work=store, with no --label, starts, and the run carries it", async () => {
+    const dev = path.join(scratch('wf-start-labels-dev-'), 'dev');
+    fs.mkdirSync(dev);
+    fs.writeFileSync(path.join(dev, 'work.md'), '---\nplace: git\n---\nwork it\n');
+    attachWorkflowAt(ROOT, { factory: 'lv', workflow: 'dev' });
+    const run = await runPlaced(
+      startRun({ brief: 'queued', repo, factory: 'lv', workflowDir: dev, labels: { card: { work: 'store' }, edits: [] } }),
     );
-    assert.equal(started.includes('work=store'), false, started);
+    assert.deepEqual(run.labels, { work: 'store' });
   });
 });

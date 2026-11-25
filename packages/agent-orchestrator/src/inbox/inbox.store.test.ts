@@ -900,6 +900,17 @@ test('REFUSED: a card filed with a label its factory does not take, nothing file
     { work: 'store' },
     'the default factory judges none',
   );
+  const unread = path.join(ROOT, 'factories', 'unread.json');
+  fs.writeFileSync(unread, '{ not json');
+  try {
+    assert.deepEqual(
+      addToInbox({ text: 'Unread factory', factory: 'unread', labels: ['work=store'] }).card.labels,
+      { work: 'store' },
+      'a factory whose file does not read judges none: the start says what is wrong with it',
+    );
+  } finally {
+    fs.rmSync(unread);
+  }
 
   const parent = await runPlaced(startRun({ brief: 'parent', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
   filed.labels.put(parent.id, { work: 'store' });

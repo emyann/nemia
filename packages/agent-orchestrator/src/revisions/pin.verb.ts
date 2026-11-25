@@ -2,7 +2,7 @@
  * Resolving a run's kinds now, and the person's ask to take the new ones.
  *
  * `pinsOf` reads the four kinds a run resolves — its workflow folder, each step's agent, each skill those agents are given, and its
- * factory's rules — digests each as the package already digests it, gives each its number in the ledger (`appendRevision`) and answers with
+ * factory's rules — digests each as the package already digests it, gives each its number in the ledger (`LedgerDoor`) and answers with
  * the run's pins. `resolvedNow` does that for a run that has filed nothing, reading the folder again so an edit made while the run waited
  * reaches its first step; `refreshedNow` does it for a run that has filed, keeping the step set it already names — on a person's ask, or
  * where the run's factory follows revisions (`revisions: follow`) and a filing is due (`followPass`). `refreshRun` is
@@ -42,7 +42,7 @@ import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
 import { endedForGood, type Run, type Spent } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
-import { appendRevision, ledgerOf } from './revisions.store.ts';
+import { LedgerDoor } from './revisions.store.ts';
 import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -171,11 +171,8 @@ export type PassRevisions = {
   readonly looked: Numbering;
 };
 
-/** How a digest is given its number in the ledger: appended where it is new (`appendRevision`), or read only (`revisionNow`). */
-type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
-
-/** The number `hash` stands at for `kind` and `name`, read off the ledger and never appended: the next number for a content it lacks. */
-const lookedUp = (home: string) => ((kind, name, hash, at) => revisionNow(ledgerOf(home, kind, name), hash, at)) satisfies Numbering;
+/** How a digest is given its number in the ledger: appended where it is new (the Ledger door's `append`), or read only (`revisionNow`). */
+type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) => Effect.Effect<Revision, Refusal>;
 
 /** As many keys as one pass's `Cache` holds: more than a pass can name, so nothing a pass read is let go before the pass is. */
 const PASS_KEYS = Number.MAX_SAFE_INTEGER;
@@ -236,11 +233,29 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
     },
   });
   const digest = (of: KindName, run: FolderRun) => Cache.get(digestCache, JSON.stringify([of.kind, of.name, ...where(run)]));
-  const revision = once<Parameters<Numbering>, Revision>(
-    (kind, name, hash, at) => appendRevision(home, kind, name, hash, at),
-    (kind, name, hash) => JSON.stringify([kind, name, hash]),
+  const ledger = yield* LedgerDoor;
+  const numbered = (read: (kind: RevisionKind, name: string, hash: string, at: string) => Effect.Effect<Revision, Refusal>) => {
+    const at = new Map<string, string>();
+    return Effect.map(
+      Cache.make({
+        capacity: PASS_KEYS,
+        lookup: (key: string) => {
+          const [kind, name, hash] = JSON.parse(key) as [RevisionKind, string, string];
+          return withinEffect('revisions', read(kind, name, hash, at.get(key) ?? ''));
+        },
+      }),
+      (cache) =>
+        ((kind, name, hash, when) => {
+          const key = JSON.stringify([kind, name, hash]);
+          if (!at.has(key)) at.set(key, when);
+          return Cache.get(cache, key);
+        }) satisfies Numbering,
+    );
+  };
+  const revision = yield* numbered((kind, name, hash, when) => ledger.entries.append({ kind, name }, hash, when));
+  const looked = yield* numbered((kind, name, hash, when) =>
+    Effect.map(ledger.entries.of({ kind, name }), (entries) => revisionNow(entries, hash, when)),
   );
-  const looked = once(lookedUp(home), (kind, name, hash) => JSON.stringify([kind, name, hash]));
   return { factory, skills, steps, allows, digest, revision, looked } satisfies PassRevisions;
 });
 
@@ -265,7 +280,7 @@ export const pinsOf = Effect.fn('pinsOf')(function* (
   for (const of of kindsIn(run, steps)) {
     const hash = yield* read.digest(of, run);
     if (hash === null) continue;
-    const { n } = number(of.kind, of.name, hash, at);
+    const { n } = yield* number(of.kind, of.name, hash, at);
     pins.push({ kind: of.kind, name: of.name, n, hash });
   }
   return pins;

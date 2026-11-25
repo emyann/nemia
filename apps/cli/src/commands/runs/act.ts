@@ -121,18 +121,22 @@ const driftWords = (d: NonNullable<RunRefreshed['drift']>[number]) =>
  * @param runId The run's id.
  * @param base Whether `--base` was typed: the merge of the base asked rather than the new revisions.
  */
-export const refreshLines = ({ drift, said: merged, file, step, target, round, takenBack, stray }: RunRefreshed, runId: string, base: boolean) =>
+export const refreshLines = (
+  { drift, said: merged, file, step, target, round, takenBack, stray }: RunRefreshed,
+  runId: string,
+  base: boolean,
+) =>
   base && takenBack
     ? [
         `${runId}  taken back: ${stray ? `a record at the merge of the base into ${target ?? ''}'s work that read as no ask, set aside as it was` : `the merge of the base into ${target ?? ''}'s work${round !== undefined ? `, asked on round ${round}` : ''}`}, at ${takenBack.at} — nothing is filed for it; to ask again: nemia refresh ${runId} ${step ?? ''} --base`,
         `   ${file ?? ''}`,
       ]
     : base
-    ? [`${runId}  ${merged ?? ''}`, `   ${file ?? ''}`]
-    : [
-        `${runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
-        ...(drift ?? []).map((d) => `   ${driftWords(d)}`),
-      ];
+      ? [`${runId}  ${merged ?? ''}`, `   ${file ?? ''}`]
+      : [
+          `${runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
+          ...(drift ?? []).map((d) => `   ${driftWords(d)}`),
+        ];
 
 /**
  * `nemia refresh <runId> [<step>] [--base [--off]]`: the run pinned to the new revisions, or its loop sent to merge its base, or that

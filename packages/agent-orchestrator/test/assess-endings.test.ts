@@ -257,7 +257,7 @@ describe("an ending's gate holds it before it is filed, and `to decide` says the
     assert.equal(
       approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask]),
       'try 2 of review is asked for (--continue, at 2026-09-17T09:00:00.000Z), and ship acts on what it changes: approving now would take the result that ask objects to. ' +
-        "Approve ship once review has signed off again — or, to take the result as it stands, take that ask back first: nemia retry r-1 review --off.",
+        'Approve ship once review has signed off again — or, to take the result as it stands, take that ask back first: nemia retry r-1 review --off.',
     );
   });
 });

@@ -9,7 +9,7 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
-import { askKeyOf, askText, listRuns, plantAsk, recordText, runKey, runRecord, runsNow } from '../testing.ts';
+import { askText, listRuns, plantAsk, recordText, runKey, runRecord, runsNow } from '../testing.ts';
 import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';

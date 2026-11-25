@@ -5,12 +5,7 @@
  * `contracts/ask-take-back.contract.ts`), the key it is taken back at (`askTakenAt`), and the refusal in words (`askTakeBackJudged`).
  * An approval standing is the gate's (`takeBackJudged`, `src/gate/gate.ts`). Pure.
  */
-import type {
-  AskHeld,
-  AskTakeBackStop,
-  AskTakeBackStopOf,
-  AskTakenOf,
-} from '../../contracts/ask-take-back.contract.ts';
+import type { AskHeld, AskTakeBackStop, AskTakeBackStopOf, AskTakenOf } from '../../contracts/ask-take-back.contract.ts';
 import { tryOf, type AskKey, type Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import { roundOf } from '../status/status.ts';
@@ -26,15 +21,7 @@ const ofALoop = (of: AskTakenOf) => of === 'round' || of === 'base' || of === 'l
  * aside.
  */
 export const askTakeBackStop: AskTakeBackStopOf = ({ of, known, looping, held, handedOn }) =>
-  !known
-    ? 'unknown'
-    : ofALoop(of) && !looping
-      ? 'loopless'
-      : held === 'none'
-        ? 'unasked'
-        : held === 'ask' && handedOn
-          ? 'handed-on'
-          : null;
+  !known ? 'unknown' : ofALoop(of) && !looping ? 'loopless' : held === 'none' ? 'unasked' : held === 'ask' && handedOn ? 'handed-on' : null;
 
 /** What each kind of ask is, as a refusal names it. */
 const ASK_WORDS: Record<AskTakenOf, string> = {
@@ -122,13 +109,7 @@ type Judged = { key: AskKey; step: string } | { refused: string; stop: AskTakeBa
  * @param name The step the person named, or undefined where they named none (a loop's ask of the run's one loop).
  * @param held What waits at the ask's key (`asks.held`), read at the key `askTakenAt` names; none where it names none.
  */
-export function askTakeBackJudged(
-  of: AskTakenOf,
-  steps: readonly StepSpec[],
-  run: Run,
-  name: string | undefined,
-  held: AskHeld,
-) {
+export function askTakeBackJudged(of: AskTakenOf, steps: readonly StepSpec[], run: Run, name: string | undefined, held: AskHeld) {
   const asked = stepAsked(of, steps, run, name);
   const { step } = asked;
   const at = askTakenAt(of, steps, run, name);
@@ -141,28 +122,50 @@ export function askTakeBackJudged(
     held: at === undefined ? 'none' : held,
     handedOn,
   });
-  const loops = steps.filter((s) => s.loop).map((s) => s.name);
-  const no = (refused: string) => ({ refused, stop: stop ?? 'unasked' }) satisfies Judged as Judged;
   if (stop === null && at !== undefined) return at satisfies Judged as Judged;
+  return {
+    refused: refusedWords(of, steps, run, name, step, stop ?? 'unasked', at?.key),
+    stop: stop ?? 'unasked',
+  } satisfies Judged as Judged;
+}
+
+/** The words of a take-back refused for `stop`, each naming its fix. */
+function refusedWords(
+  of: AskTakenOf,
+  steps: readonly StepSpec[],
+  run: Run,
+  name: string | undefined,
+  step: StepSpec | undefined,
+  stop: AskTakeBackStop,
+  key: AskKey | undefined,
+) {
+  const loops = steps.filter((s) => s.loop).map((s) => s.name);
+  const no = (refused: string) => refused;
+  const kind = ASK_WORDS[of].replace(/^an? /, '');
   if (step === undefined) {
-    if (name !== undefined)
-      return no(`${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`);
+    if (name !== undefined) return no(`${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`);
     return no(
       loops.length
         ? `${run.id} has ${loops.length} loops, closing at ${loops.join(', ')}: name the one whose ask to take back — ${takeBackCommand(of, run.id, '<step>')}.`
-        : `no step of ${run.id} has \`loop:\`, so it has no ${ASK_WORDS[of].replace(/^an? /, '')} to take back. See where it stands: nemia ls ${run.id}.`,
+        : `no step of ${run.id} has \`loop:\`, so it has no ${kind} to take back. See where it stands: nemia ls ${run.id}.`,
     );
   }
   if (stop === 'loopless')
     return no(
-      `${step.name} has no \`loop:\`, so there is no ${ASK_WORDS[of].replace(/^an? /, '')} of its loop to take back${loops.length ? ` — this run's loops close at ${loops.join(', ')}` : ''}. See where it stands: nemia ls ${run.id}.`,
+      `${step.name} has no \`loop:\`, so there is no ${kind} of its loop to take back${loops.length ? ` — this run's loops close at ${loops.join(', ')}` : ''}. See where it stands: nemia ls ${run.id}.`,
     );
   if (stop === 'handed-on')
     return no(
       `${step.name}'s loop was accepted as it stands, and that acceptance has handed on: what waits on it has been filed, so taking it back would undo nothing. See where the run stands: nemia ls ${run.id}.`,
     );
-  const n = at?.key.n ?? tryOf(run, step.name);
-  const target = at?.key.step ?? step.name;
+  return unaskedWords(of, run, step.name, key);
+}
+
+/** The words of a take-back of an ask nobody asked, naming the verb that asks it. */
+function unaskedWords(of: AskTakenOf, run: Run, stepName: string, key: AskKey | undefined) {
+  const n = key?.n ?? tryOf(run, stepName);
+  const step = { name: stepName };
+  const target = key?.step ?? step.name;
   const what =
     of === 'round'
       ? `round ${n} of ${step.name}'s loop is not asked for`
@@ -173,7 +176,5 @@ export function askTakeBackJudged(
           : of === 'gate'
             ? `nothing waits at the approval of try ${n} of ${step.name}`
             : `try ${n} of ${step.name} is not asked for`;
-  return no(
-    `${what}, so there is nothing to take back. To ask it: ${askAgain(of, run.id, step.name)}. See where it stands: nemia ls ${run.id}.`,
-  );
+  return `${what}, so there is nothing to take back. To ask it: ${askAgain(of, run.id, step.name)}. See where it stands: nemia ls ${run.id}.`;
 }

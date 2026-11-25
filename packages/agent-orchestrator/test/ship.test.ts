@@ -17,18 +17,7 @@
  * (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon. `endings(stage, root)` copies the team's agents and skills
  * beside every folder made under `root`, since the team's `ship.md` names `agent: shipper`.
  */
-import {
-  askDoneKey,
-  askKeyOf,
-  askNames,
-  askText,
-  plantAsk,
-  plantRecord,
-  recordText,
-  runKey,
-  runRecord,
-  runsNow,
-} from '../testing.ts';
+import { askDoneKey, askKeyOf, askNames, askText, plantAsk, plantRecord, recordText, runKey, runRecord, runsNow } from '../testing.ts';
 import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { REFRESH } from '../src/revisions/commands.verb.ts';
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
@@ -2342,11 +2331,7 @@ describe('a loop out of rounds before its ending: accepted as it stands, sent ba
       const waits = (verb: string) => (err: Error & { exitCode?: number }) => {
         assert.equal(err.exitCode, 2);
         assert.match(err.message, /^a merge of main into implement's work is asked \(at \S+\)/);
-        for (const fact of [
-          'the next tick files it once, on round 1: ',
-          ' --base --off — then',
-          ` — then: ${verb}.`,
-        ])
+        for (const fact of ['the next tick files it once, on round 1: ', ' --base --off — then', ` — then: ${verb}.`])
           assert.ok(err.message.includes(fact), `${err.message} names ${fact}`);
         assert.deepEqual(at.asksOf(id), written, 'nothing written');
         return true;

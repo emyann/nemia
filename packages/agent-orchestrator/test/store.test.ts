@@ -745,7 +745,9 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
   assert.deepEqual(pass.tried, []);
   for (const [name, [, why]] of Object.entries(refused)) {
     assert.ok(
-      pass.notes.some((n) => n.endsWith(`${name}: ${why}, so it is not honoured — take it back with nemia retry <runId> <step> --off, and ask with nemia retry`)),
+      pass.notes.some((n) =>
+        n.endsWith(`${name}: ${why}, so it is not honoured — take it back with nemia retry <runId> <step> --off, and ask with nemia retry`),
+      ),
       pass.notes.join('\n'),
     );
   }

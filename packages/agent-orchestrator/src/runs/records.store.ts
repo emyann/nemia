@@ -178,7 +178,10 @@ function allAsksIn(asks: readonly AskEntry[]) {
     const [, target, n] = /^merge-(.+)-(\d+)$/.exec(name) ?? [];
     if (target === undefined || n === undefined) continue;
     const ask = mergeAskIn(text, target, Number(n));
-    if (typeof ask === 'string') read.notes.push(`${where}: ${ask}, so it is not honoured — take it back (nemia refresh <runId> [<step>] --base --off), and ask again with nemia refresh --base`);
+    if (typeof ask === 'string')
+      read.notes.push(
+        `${where}: ${ask}, so it is not honoured — take it back (nemia refresh <runId> [<step>] --base --off), and ask again with nemia refresh --base`,
+      );
     else read.rounds.push(ask);
   }
   return read;
@@ -207,8 +210,12 @@ function strayOf(person: PersonRequest, text: string, step: string, n: number) {
 }
 
 /** What the text at an ask's key holds, read by its kind's reader: an ask, a stray that reads as none, or nothing. */
-const heldAs = (key: AskKey, text: string | undefined): AskHeld =>
-  text === undefined ? 'none' : typeof ASK_READERS[key.of](text, key.step, key.n) === 'string' ? 'stray' : 'ask';
+const heldAs = (key: AskKey, text: string | undefined) =>
+  (text === undefined
+    ? 'none'
+    : typeof ASK_READERS[key.of](text, key.step, key.n) === 'string'
+      ? 'stray'
+      : 'ask') satisfies AskHeld as AskHeld;
 
 /** The first key under `done/` for `name` no record holds: the plain name, else `.2`, `.3`, …. */
 const doneKeyFree = (id: string, name: string, held: ReadonlySet<string>) => {

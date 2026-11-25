@@ -658,7 +658,11 @@ describe("a wordless `nemia retry` asked while a gated step's harness blocked it
     assert.ok(recordText(ROOT, file) !== undefined, 'left where it is, for a person to take back');
   });
   s.test('`nemia retry --off` takes the ask back, set aside with who and when, and the approval files what follows', async () => {
-    const back = await handled(RETRY, { runId: id, step: 'plan', off: true, actor: { kind: 'person', token: 'laptop' } }, { e: b.e, env: ENV });
+    const back = await handled(
+      RETRY,
+      { runId: id, step: 'plan', off: true, actor: { kind: 'person', token: 'laptop' } },
+      { e: b.e, env: ENV },
+    );
     assert.deepEqual([back.try, back.takenBack?.actor?.token, back.stray], [2, 'laptop', undefined]);
     assert.equal(recordText(ROOT, file), undefined, 'nothing waits at its key');
     const kept = JSON.parse(recordText(ROOT, back.file) ?? '{}') as { mode?: string; takenBack?: { at?: string } };
@@ -862,7 +866,13 @@ describe('`nemia approve`, REFUSED with nothing written', () => {
     plantRecord(ROOT, askKeyOf(stray.id, 'approve-plan-1'), 'yes please');
     await assert.rejects(
       runWith(stray.e, approveRun(stray.id, 'plan')),
-      refusedAs('Conflict', 'try 1 of plan cannot be approved', 'approve-plan-1 is already there', `nemia approve ${stray.id} plan --off`, 'then approve again'),
+      refusedAs(
+        'Conflict',
+        'try 1 of plan cannot be approved',
+        'approve-plan-1 is already there',
+        `nemia approve ${stray.id} plan --off`,
+        'then approve again',
+      ),
     );
   });
 });

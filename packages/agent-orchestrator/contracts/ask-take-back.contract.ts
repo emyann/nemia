@@ -41,8 +41,7 @@ const askTakeBackStopSpec = spec<(p: AskTakeBackPut) => AskTakeBackStop | null>(
     takenExactlyWhenSomethingWaitsAndNothingRan: {
       description:
         'An ask is taken back exactly when its step can hold it, something waits at its key, and it is not an acceptance whose waiting steps have run',
-      condition: ({ input: [p], output }) =>
-        (output === null) === (askable(p) && p.held !== 'none' && !(p.held === 'ask' && p.handedOn)),
+      condition: ({ input: [p], output }) => (output === null) === (askable(p) && p.held !== 'none' && !(p.held === 'ask' && p.handedOn)),
     },
     anUnknownStepIsSaidFirst: {
       description: 'A step the run does not have is refused as unknown, whatever else is so of it',

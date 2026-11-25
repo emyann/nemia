@@ -13,7 +13,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, and no cap is set on runs or sessions.
  */
-import { askKeyOf, asksPrefix, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
+import { asksPrefix, dropRecord, keysUnder, plantRecord, runKey, runRecord, runsNow } from '../testing.ts';
 import { takeBackAsk } from '../src/take-back/take-back.verb.ts';
 import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';

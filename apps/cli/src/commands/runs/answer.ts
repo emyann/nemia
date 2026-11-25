@@ -89,6 +89,27 @@ export const retryLines = (
   return [`${typed.runId}  asked: try ${tryNo ?? ''} of ${typed.step} (${how})${words} — ${then}`, `   ${file}`];
 };
 
+/** What a retry asks beside its way, each where it was typed. */
+const askedOf = ({
+  model,
+  round,
+  message,
+  budget,
+  check,
+}: {
+  model?: string;
+  round: boolean;
+  message?: string;
+  budget?: number;
+  check?: string;
+}) => ({
+  ...(model !== undefined ? { model } : {}),
+  ...(round ? { round } : {}),
+  ...(message !== undefined ? { message } : {}),
+  ...(budget !== undefined ? { budget } : {}),
+  ...(check !== undefined ? { check } : {}),
+});
+
 /**
  * `nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer]... [--message]
  * [--budget]`.
@@ -110,14 +131,10 @@ export async function retry(args: Args) {
   const payload = switchArg(args, 'off')
     ? { off: true, ...(round ? { round } : {}) }
     : {
-    mode: way,
-    ...(model !== undefined ? { model } : {}),
-    ...(round ? { round } : {}),
-    ...(message !== undefined ? { message } : {}),
-    ...(budget !== undefined ? { budget } : {}),
-    ...(check !== undefined ? { check } : {}),
-    ...(round ? {} : await answersOf(command, runId, step, typedAnswers)),
-  };
+        mode: way,
+        ...askedOf({ model, round, message, budget, check }),
+        ...(round ? {} : await answersOf(command, runId, step, typedAnswers)),
+      };
   const answer = await asked(command, (c) => c.runs.retry({ params: { namespace, name: runId, step }, payload }));
   said(
     retryLines(answer, {

@@ -103,8 +103,9 @@ const loopAccepted = Effect.fnUntraced(function* (input: ApproveInput) {
 /**
  * `nemia approve --off`: the approval of a step that stands approved while nothing it approved has been filed, taken back (`takeBackRun`),
  * with who took it back (`actor`) where the caller was handed; where none stands, the acceptance of the loop the step closes, or a record
- * at the gate's key that reads as no approval (`takeBackAsk`, `otherAsk`), answered with `loop` or `stray`. It takes the step, and no words, answers or caps (`approveRefusal` refuses
- * them as typed; sent to the api, they are refused here). It answers no `next`: the step waits at its gate again.
+ * at the gate's key that reads as no approval (`takeBackAsk`, `otherAsk`), answered with `loop` or `stray`. It takes the step, and no
+ * words, answers or caps (`approveRefusal` refuses them as typed; sent to the api, they are refused here). It answers no `next`: the
+ * step waits at its gate again.
  */
 const takenBack = Effect.fnUntraced(function* (input: ApproveInput) {
   const { runId, step, actor } = input;
@@ -137,8 +138,13 @@ const takenBack = Effect.fnUntraced(function* (input: ApproveInput) {
       takenBack: back,
     };
   }
+  return yield* askTakenBack(run, of, step, actor);
+});
+
+/** An acceptance, or a stray at the gate's key, taken back (`takeBackAsk`), answered in an approval's shape. */
+const askTakenBack = Effect.fnUntraced(function* (run: Run, of: 'loop' | 'gate', step: string, actor: Actor | undefined) {
   const accepted = of === 'loop' ? acceptanceOf(run, step) : undefined;
-  const taken = yield* takeBackAsk(runId, of, step, actor);
+  const taken = yield* takeBackAsk(run.id, of, step, actor);
   return {
     step: taken.step,
     try: taken.key.n,

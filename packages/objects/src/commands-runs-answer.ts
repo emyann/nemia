@@ -105,8 +105,7 @@ function offRefusal(args: Args) {
  * @param args The command line's arguments, by key.
  */
 export const retryRefusal = (args: Args) =>
-  offRefusal(args) ??
-  (args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args) ?? checkRefusal(args)));
+  offRefusal(args) ?? (args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args) ?? checkRefusal(args)));
 
 /** `nemia retry`: another try of a step, or with `--round` another round of a loop out of rounds. */
 export const RETRY_WORDS = {

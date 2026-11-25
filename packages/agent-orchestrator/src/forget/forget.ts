@@ -3,7 +3,6 @@
  * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line a refusal says (`notForgottenLine`). Pure:
  * what the run's place reads of its repository is handed in.
  */
-import { askKey } from '../runs/run-keys.ts';
 import type { StepSpec } from '../step/step.ts';
 import { andList, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
@@ -339,9 +338,7 @@ function unheardOf(f: Forgetting, a: Assessment | undefined) {
   for (const ask of roundAsks) {
     if (spentRoundAsks(run, [ask]).length || a?.round.some((r) => roundHeard(r, ask))) continue;
     unheard.push(
-      ask.merge
-        ? { of: 'base', step: ask.merge.target, n: ask.merge.try, loop: ask.step }
-        : { of: 'round', step: ask.step, n: ask.round },
+      ask.merge ? { of: 'base', step: ask.merge.target, n: ask.merge.try, loop: ask.step } : { of: 'round', step: ask.step, n: ask.round },
     );
   }
   return unheard;

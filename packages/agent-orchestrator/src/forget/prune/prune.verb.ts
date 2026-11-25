@@ -19,7 +19,6 @@ import { decision } from '../../decide/decide.ts';
 import { askOffLine, forgetRefusal, heldWorktree, idRefusal, inventoryUnread, leftWhy, runWorktrees, type AskName } from '../forget.ts';
 import { stepsOrWhy } from '../../steps/steps.verb.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
-import { askKey } from '../../runs/run-keys.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';
 import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../../place/place.ts';

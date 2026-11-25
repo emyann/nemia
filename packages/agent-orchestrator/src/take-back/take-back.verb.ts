@@ -41,12 +41,7 @@ export type TakenBackAsk = {
  * @param stepName The step the person named, or undefined where they named none.
  * @param actor Who takes it back, where the caller is known.
  */
-export const takeBackAsk = Effect.fn('take-back')(function* (
-  id: string,
-  of: AskTakenOf,
-  stepName: string | undefined,
-  actor?: Actor,
-) {
+export const takeBackAsk = Effect.fn('take-back')(function* (id: string, of: AskTakenOf, stepName: string | undefined, actor?: Actor) {
   const door = yield* RunDoor;
   if (!(yield* door.runs.exists(RunId.read(id))))
     return yield* Effect.fail(

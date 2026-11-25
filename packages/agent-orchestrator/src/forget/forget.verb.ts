@@ -5,7 +5,6 @@
  * (`EngineService`), run with `runWith`. It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs
  * nothing and is settled as it signed: no pass reads the run again to close it.
  */
-import { askKey } from '../runs/run-keys.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';

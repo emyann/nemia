@@ -344,7 +344,7 @@ export const RunAsked = Schema.Struct({
   ),
   stray: Schema.optionalKey(
     Schema.Literal(true).annotate({
-      description: 'Of a take-back, true where what was set aside read as no ask: a stray record at the ask\'s key, kept as it was.',
+      description: "Of a take-back, true where what was set aside read as no ask: a stray record at the ask's key, kept as it was.",
     }),
   ),
 }).annotate({ identifier: 'RunAsked' });
@@ -415,7 +415,7 @@ export const RunApproved = Schema.Struct({
   ),
   takenBack: Schema.optionalKey(
     TakenBack.annotate({
-      description: 'When and by whom the approval, or a loop\'s acceptance, was taken back (--off); absent for one given.',
+      description: "When and by whom the approval, or a loop's acceptance, was taken back (--off); absent for one given.",
     }),
   ),
   stray: Schema.optionalKey(
@@ -482,7 +482,7 @@ export const RunRefresh = Schema.Struct({
   ),
   off: Schema.optionalKey(
     Schema.Boolean.annotate({
-      description: "With base, takes back the merge of the base asked of the loop and not yet filed (--off), setting the ask aside.",
+      description: 'With base, takes back the merge of the base asked of the loop and not yet filed (--off), setting the ask aside.',
     }),
   ),
 }).annotate({ identifier: 'RunRefresh' });

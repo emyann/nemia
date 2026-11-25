@@ -34,6 +34,7 @@ import { typed } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';
 import { revisionsOf, type Factory } from './factory.ts';
 import { volumeBase } from './volume/volume.ts';
+import { treeDir } from './applied/applied.store.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-factory-');
@@ -659,5 +660,29 @@ describe('REFUSED: a detach of a workflow its template still triggers', () => {
       refused('Invalid', 'door', 'front-door'),
     );
     assert.deepEqual(wiringChecked(templated(treeTriggering('intake')), { verb: 'detach', workflow: 'front-door' }).workflows, []);
+  });
+});
+
+describe('the values each label key takes: a hand-made factory reads its file, a templated one its tree', () => {
+  test("a hand-made factory's file states them, and a verb that writes it back keeps them", () => {
+    pipao();
+    const file = path.join(FACTORIES, 'pipao.json');
+    fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), labelValues: { work: ['feature', 'fix'] } }));
+    assert.deepEqual(readFactoryAt(ROOT, 'pipao').labelValues, { work: ['feature', 'fix'] });
+    attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' });
+    assert.deepEqual(fileOf('pipao').labelValues, { work: ['feature', 'fix'] });
+    assert.deepEqual(readFactoryAt(ROOT, 'pipao').labelValues, { work: ['feature', 'fix'] });
+  });
+  test("a templated factory reads its tree's wiring, never its file's", () => {
+    fresh();
+    fs.mkdirSync(FACTORIES, { recursive: true });
+    fs.writeFileSync(
+      path.join(FACTORIES, 'acme.json'),
+      JSON.stringify({ volumes: [], labelValues: { work: ['ignored'] }, template: { source: 't', version: '1.0.0', params: {} } }),
+    );
+    const tree = treeDir(ROOT, 'acme');
+    fs.mkdirSync(tree, { recursive: true });
+    fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: [], hires: {}, labelValues: { work: ['fix'] } }));
+    assert.deepEqual(readFactoryAt(ROOT, 'acme').labelValues, { work: ['fix'] });
   });
 });

@@ -86,6 +86,11 @@ export type FactorySpec = {
    * and the workflow of the template a card naming none is queued on. One whose selector renders empty is not made (`renderFactory`).
    */
   triggers?: Readonly<Record<string, TemplateTrigger>>;
+  /**
+   * The values each label key takes on the cards and runs of a factory made from the template, as `key=value` words apart by whitespace,
+   * often a parameter's value: a label of such a key written with another value is refused. None where it renders empty.
+   */
+  labelValues?: string;
 };
 
 /** A template's card trigger (`FactorySpec.triggers`): its selector, and its target, a workflow of the template. */
@@ -434,6 +439,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
           required: ['selector', 'target'],
         },
       },
+      labelValues: 'string',
       imports: { list: 'not-yet' },
     },
     required: ['version', 'hires'],

@@ -398,17 +398,21 @@ function keyspaceOver(client: Context.Context<SqlClient.SqlClient>) {
 }
 
 /**
- * Opens `file`, sets its pragmas and migrates it, into `scope`; refused `Invalid` where a newer release wrote it. A folder and a file it
- * makes are its owner's alone (`db/` 0700, `state.db` 0600), as a token's record was.
+ * Opens `file`, sets its pragmas and migrates it, into `scope`; refused `Invalid` where a newer release wrote it. Its folder and file are
+ * made its owner's alone (`db/` 0700, `state.db` 0600), as a token's record was, whether it makes them or an older release made them at
+ * the umask's modes.
  */
 const opened = (file: string, scope: Scope.Scope) =>
   Effect.gen(function* () {
-    const made = file !== ':memory:' && !fs.existsSync(file);
-    if (file !== ':memory:' && !fs.existsSync(path.dirname(file))) {
+    if (file !== ':memory:') {
       fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-      fs.chmodSync(path.dirname(file), 0o700);
+      if (!fs.existsSync(file)) fs.closeSync(fs.openSync(file, 'a', 0o600));
+      for (const [at, mode] of [
+        [path.dirname(file), 0o700],
+        [file, 0o600],
+      ] as const)
+        if ((fs.statSync(at).mode & 0o777) !== mode) fs.chmodSync(at, mode);
     }
-    if (made) fs.closeSync(fs.openSync(file, 'a', 0o600));
     const client = yield* Layer.buildWithScope(SqliteClient.layer({ filename: file, busyTimeout: Duration.seconds(30) }), scope);
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

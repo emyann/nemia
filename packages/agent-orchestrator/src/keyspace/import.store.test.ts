@@ -106,3 +106,15 @@ test("the keyspace's folder and file are its owner's alone", async () => {
   assert.equal(fs.statSync(path.dirname(keyspaceFile(root))).mode & 0o777, 0o700);
   assert.equal(fs.statSync(keyspaceFile(root)).mode & 0o777, 0o600);
 });
+
+test("a keyspace an older release made at the umask's modes is made its owner's alone when it is opened", async () => {
+  const root = scratch('wf-import-');
+  fs.mkdirSync(path.dirname(keyspaceFile(root)), { recursive: true, mode: 0o755 });
+  fs.chmodSync(path.dirname(keyspaceFile(root)), 0o755);
+  fs.writeFileSync(keyspaceFile(root), '', { mode: 0o644 });
+  fs.chmodSync(keyspaceFile(root), 0o644);
+  planted(root, 'a', '{"a":1}');
+  await valueAt(root, '/registry/toys/a');
+  assert.equal(fs.statSync(path.dirname(keyspaceFile(root))).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(keyspaceFile(root)).mode & 0o777, 0o600);
+});

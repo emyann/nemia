@@ -238,6 +238,12 @@ function nodeMarkup(run: RunDetail) {
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(StepNode, props)));
 }
 
+/** Whether the line of a node's `<p>` marked `mark` is cut to one line, with `title`, whole, on hover. */
+const truncatedTitled = (html: string, mark: string, title: string) => {
+  const tag = new RegExp(`<p [^>]*${mark}[^>]*>`).exec(html)?.[0] ?? '';
+  return tag.includes(` title="${title}"`) && /class="[^"]*\btruncate\b/.test(tag);
+};
+
 const gateDrawn = (html: string) => />human gate</.test(html) || /data-gate-band/.test(html) || /border-yours/.test(html);
 
 test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked step is — and on a cancelled run, not', () => {
@@ -1780,7 +1786,9 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
 test("a step's node says what it needs: a gate's question after `waits on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
   const question = 'Should a finished run keep its card on the Factory?';
   const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
-  const footer = /<p data-gate-band="true" title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(gate);
+  const footer = /<p data-slot="typography" class="[^"]*\btruncate\b[^"]*" data-gate-band="true" title="([^"]*)">([\s\S]*?)<\/p>/.exec(
+    gate,
+  );
   assert.ok(footer, `one truncated line, as the node's others: a second would make it taller than the layering's row\n${gate}`);
   assert.equal(footer[1], `asks: ${question}`);
   assert.equal(footer[2], `<span class="font-semibold">${PERSON.blocked.rail}</span><span data-need="asks"> · asks: ${question}</span>`);
@@ -1798,7 +1806,7 @@ test("a step's node says what it needs: a gate's question after `waits on you`, 
   const held = nodeMarkup(needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
   assert.equal(gateDrawn(held), false, 'blocked by the harness is no gate: the step asked nothing');
   assert.ok(
-    held.includes(`<p data-need="harness" title="blocked by the harness: ${WAIT.words} · ${LOGIN}" class="truncate `),
+    truncatedTitled(held, 'data-need="harness"', `blocked by the harness: ${WAIT.words} · ${LOGIN}`),
     `the whole of it, with what the session said last, is on hover\n${held}`,
   );
   assert.ok(
@@ -1818,7 +1826,7 @@ test("a step's node says what it needs: a gate's question after `waits on you`, 
 test("a step's node says how many calls its current try was denied, whole, and which on hover — and nothing when none was", () => {
   const two = { words: 'denied: Skill(look), Bash(pytest)', calls: ['Skill(look)', 'Bash(pytest)'] };
   const html = nodeMarkup(needing('unverified · done', { denied: two }, { waitingOnYou: [] }));
-  assert.ok(html.includes(`<p data-denied="true" title="${two.words}" class="truncate `), html);
+  assert.ok(truncatedTitled(html, 'data-denied="true"', two.words), html);
   assert.ok(html.includes('>denied 2 calls</p>'), html);
   const one = nodeMarkup(
     needing(
@@ -1899,7 +1907,9 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
   assert.match(html, />human gate</);
   assert.match(html, /border-yours/);
   assert.match(html, /data-state="awaiting-approval"/);
-  const footer = /<p data-gate-band="true" title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
+  const footer = /<p data-slot="typography" class="[^"]*\btruncate\b[^"]*" data-gate-band="true" title="([^"]*)">([\s\S]*?)<\/p>/.exec(
+    html,
+  );
   assert.ok(footer, html);
   assert.equal(
     footer[2],

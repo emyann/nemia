@@ -119,13 +119,7 @@ export function dressed(text: string) {
 }
 
 /** The class strings that keep a weight beside their role, each in its file alone, with its reason. */
-export const DRESSED: { file: string; classes: string; why: string }[] = [
-  {
-    file: 'src/components/look/Plate.tsx',
-    classes: 'm-0 font-label text-label-large font-extrabold uppercase',
-    why: "a plate's title stands beside its numeral in the label face (Archivo, weight 800), as the Runs page settled it",
-  },
-];
+export const DRESSED: { file: string; classes: string; why: string }[] = [];
 
 /** Every class string of `root`'s `src` outside the kit that `dressed` finds and `kept` lists not for its file, as `file (classes)`. */
 export function dressedIn(root: string, kept = DRESSED) {

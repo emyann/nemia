@@ -308,6 +308,43 @@ const ROWS: Row[] = [
       validate([...ending(true, false).slice(0, 2), step('measure', ['review']), { ...ship, check: 'npm test', after: ['measure'] }]),
     naming: ['ship: ', '(it waits on measure)', 'give measure a `loop:`'],
   },
+  {
+    row: 'base: REFUSED, checks: with neither a gate nor a loop before it',
+    run: () =>
+      validate(
+        ending(false, false).map((s) =>
+          s.name === 'ship' ? { ...s, check: undefined, checks: [{ name: 'receipt', run: 'npm test', after: [] }] } : s,
+        ),
+      ),
+    naming: ['ship: ', '`workspace: base`', '`checks:` (receipt)', '(it waits on review)', 'Add `gate: true`'],
+  },
+  {
+    row: 'base: an ending with two checks, one using no checkout',
+    run: () =>
+      validate(
+        ending(false, true).map((s) =>
+          s.name === 'ship'
+            ? {
+                ...s,
+                check: undefined,
+                checks: [
+                  { name: 'receipt', run: 'npm test', after: [] },
+                  { name: 'base-ci', run: 'npm run wait', after: ['receipt'], usesCheckout: false as const },
+                ],
+              }
+            : s,
+        ),
+      ),
+  },
+  {
+    row: 'base: REFUSED, usesCheckout: false on a step that is no ending',
+    run: () =>
+      validate([
+        { ...step('implement'), checks: [{ name: 'wait', run: 'npm run wait', after: [], usesCheckout: false as const }] },
+        step('review', ['implement']),
+      ]),
+    naming: ['implement: ', '`wait`', '`usesCheckout: false`', 'Delete the line'],
+  },
   { row: "base: a check after a loop (quick's shape)", run: () => validate(ending(true, false)) },
   { row: "base: a gated check (build's shape)", run: () => validate(ending(false, true)) },
   { row: 'base: a check gated after a loop', run: () => validate(ending(true, true)) },

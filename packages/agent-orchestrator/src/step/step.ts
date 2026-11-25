@@ -12,9 +12,16 @@ import type { FieldShape, PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEY
 
 /**
  * One of a step's named checks, as the loader resolved it: its name (`[a-z][a-z0-9-]*`), the shell line it runs, and the checks it waits
- * on, each by name, none where it waits on nothing.
+ * on, each by name, none where it waits on nothing. `usesCheckout: false`, on an ending's check alone, says the check reads and writes
+ * nothing of the repository's own checkout: the checkout is given back once every check that uses it has passed (`checksHoldCheckout`).
+ * Absent, the check uses the step's workspace.
  */
-export type CheckSpec = { readonly name: string; readonly run: string; readonly after: readonly string[] };
+export type CheckSpec = {
+  readonly name: string;
+  readonly run: string;
+  readonly after: readonly string[];
+  readonly usesCheckout?: false;
+};
 
 /** The name `check: <line>` is read under: the step's one check, whose task keeps the id it always had (`checkTaskId`). */
 export const SHORTHAND_CHECK = 'check';
@@ -575,7 +582,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   checks:
-    "the step's named checks, a YAML list of `{ name, run, after, enabled }`: each runs once the checks it waits on passed (the one above it where it names none, `after: []` for none), `enabled: false` turns one off, and the step is verified once every one exits 0",
+    "the step's named checks, a YAML list of `{ name, run, after, enabled, usesCheckout }`: each runs once the checks it waits on passed (the one above it where it names none, `after: []` for none), `enabled: false` turns one off, `usesCheckout: false` on an ending gives the checkout back before it runs, and the step is verified once every one exits 0",
   run: "a command node's shell line: the node runs it with no agent session, signs off `done` on exit 0 with an answer its `output:` decodes, and `failed` on any other exit",
   checkMemory:
     "the memory the step's check asks of the machine, a container's request — `256Mi`: the check is admitted by it and keeps the daemon's default limit; unset asks the daemon's default (`WF_MEMORY_REQUEST`)",

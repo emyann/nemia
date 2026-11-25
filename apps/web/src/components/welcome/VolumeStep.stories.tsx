@@ -60,7 +60,7 @@ export const Choose: Story = {
     const page = await loaded(canvasElement, 'choose');
     await expect(page.querySelectorAll('[data-volume-way]')).toHaveLength(3);
     await expect(page.querySelector('[data-volume-panel]')).toBeNull();
-    await expect(within(page).getByRole('button', { name: 'Skip, set it later' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip, set it later' })).toBeEnabled();
   },
 };
 
@@ -69,7 +69,7 @@ export const Skipped: Story = {
   parameters: { msw: volumeStore() },
   play: async ({ canvasElement, userEvent }) => {
     const page = await loaded(canvasElement, 'choose');
-    await userEvent.click(within(page).getByRole('button', { name: 'Skip, set it later' }));
+    await userEvent.click(within(page).getByRole('link', { name: 'Skip, set it later' }));
     const ground = canvasElement.querySelector('[data-story-ground]');
     await waitFor(() => expect(ground?.getAttribute('data-at')).toBe('/'));
   },
@@ -229,6 +229,6 @@ export const AgainFromSettings: Story = {
     const page = await loaded(canvasElement, 'choose');
     await choose(page, 'folder', userEvent);
     await expect(page.querySelector('[data-volume-mode="ro"]')).toHaveAttribute('data-selected', 'true');
-    await expect(within(page).getByRole('button', { name: 'Skip, set it later' })).toBeEnabled();
+    await expect(within(page).getByRole('link', { name: 'Skip, set it later' })).toBeEnabled();
   },
 };

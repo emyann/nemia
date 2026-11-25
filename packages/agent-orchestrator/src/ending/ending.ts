@@ -35,7 +35,7 @@ import type { CheckoutHold } from '../cap/cap.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { ClaimedAt } from '../../contracts/checkout-claim.contract.ts';
-import { checksPhase, checkStandings } from '../check/index.ts';
+import { checksPhase, currentCheckTask, standingOf } from '../check/index.ts';
 import { stepChecks } from '../step/step.ts';
 import type { ChecksHoldCheckout } from '../../contracts/checkout-checks.contract.ts';
 
@@ -227,7 +227,7 @@ export const landingOpen = (
   const record = run.steps[step.name];
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return false;
   const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
-  const standing = checkStandings(run, step, phaseOf);
+  const standing = (name: string) => (record.check ? standingOf(phaseOf(currentCheckTask(run, step.name, name)), true) : 'waiting');
   const checks = stepChecks(step).map((c) => ({ usesCheckout: c.usesCheckout !== false, standing: standing(c.name) }));
   return busy(phaseOf(record.taskId)) || checksHoldCheckout(checks, own === 'checking') || merging() === 'ours';
 };

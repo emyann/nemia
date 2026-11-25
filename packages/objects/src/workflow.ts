@@ -273,7 +273,7 @@ const stepKeyFields = {
   checks: Schema.optionalKey(
     Text.annotate({
       description:
-        "The step's named checks, each a name, a shell line (run), the checks it waits on (after) and, on an ending, usesCheckout: false where it reads nothing of the repository's own checkout, which is then given back to the next ending once every other check passed; written as a YAML list; exit 0 of every one makes the step verified.",
+        "The step's named checks, each a name, a shell line (run), the checks it waits on (after) and, on an ending, usesCheckout: false where it reads nothing of the repository's own working tree, which is then handed to the next ending once every other check passed; written as a YAML list; exit 0 of every one makes the step verified.",
     }),
   ),
   run: Schema.optionalKey(

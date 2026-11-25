@@ -364,7 +364,7 @@ export const landingContract = (checks: readonly CheckSpec[], words?: LandingWor
     '## The run checks and lands your merge',
     '',
     ...landingChecksTold(checks),
-    'When every one exits 0 the run records what landed, and where you left a merge staged it commits that merge onto the base branch, with',
+    `When ${checks.length > 1 ? 'every one exits' : 'it exits'} 0 the run records what landed, and where you left a merge staged it commits that merge onto the base branch, with`,
     "the `message` your closeout gives as the commit's message; anything else — a refusal, or a check that did not finish — and nothing",
     'lands, a merge you staged being taken back.',
     '',

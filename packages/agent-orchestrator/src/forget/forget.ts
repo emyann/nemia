@@ -264,15 +264,16 @@ function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase) {
   return live;
 }
 
-/** The ending that lands on its check whose merge is not landed (`landingOpen`), with nothing of the run in flight — or undefined. */
+/**
+ * The ending that lands on its check whose merge is not landed, with nothing of the run in flight — or undefined: one that holds the
+ * checkout (`landingOpen`), or one that signed off done whose landing the run has not yet recorded (`checking`), whose checks may have
+ * given the checkout back.
+ */
 function unlandedEnding(f: Forgetting, live: readonly string[]) {
   const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, merging } = f;
   const ending = steps?.find((s) => landsOnCheck(s, run));
-  const unlanded =
-    ending &&
-    !live.length &&
-    steps &&
-    landingOpen(ending, run, ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf), phaseOf, () => merging);
+  const own = ending && steps ? ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) : undefined;
+  const unlanded = ending && own && !live.length && (own === 'checking' || landingOpen(ending, run, own, phaseOf, () => merging));
   return unlanded ? ending : undefined;
 }
 

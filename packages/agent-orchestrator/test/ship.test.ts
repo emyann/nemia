@@ -1609,7 +1609,12 @@ describe("an ending whose check uses no checkout gives the checkout back once it
     await at.pass(a.id);
     const landed = runRecord(ROOT, a.id).steps.ship?.landed;
     assert.ok(landed && 'aborted' in landed, 'A records no landing of its own');
-    assert.match(await statusOf(a.id, 'ship'), /^failed \(check\)/);
+    await at.aPass(e());
+    const decided = (await decisionOn(stage, a.id)).decided!;
+    assert.ok(
+      decided.decision.kind === 'awaiting' && decided.decision.failedCheck.includes('ship'),
+      `A's ship reads failed on its check: ${JSON.stringify(decided.decision)}`,
+    );
     assert.equal(runRecord(ROOT, b.id).steps.ship?.taskId, `${b.id}-ship`, "B's ending is still filed");
     assert.equal(runRecord(ROOT, b.id).steps.ship?.landed, undefined);
   });

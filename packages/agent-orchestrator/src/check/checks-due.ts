@@ -135,13 +135,10 @@ export const stepChecksDue = (run: Run, step: StepSpec, phaseOf: (taskId: string
 
 /**
  * Where each of a step's checks stands on its current try, by its name: `waiting` before the step's checks are on the record, and else
- * read off its task (`standingOf`), a step's one check never `waiting` once on the record (`filedPhase`). The one reading both the pass's
- * filing (`stepChecksDue`) and an ending's hold of the checkout (`landingOpen`) take, so the two never drift. Pure.
- * @param run The run, whose record names the step's checks.
- * @param step The step, by its name.
- * @param phaseOf The phase of a task the engine holds, by its id: `unknown` for one it has no record of.
+ * read off its task (`standingOf`), a step's one check never `waiting` once on the record (`filedPhase`). What the pass's filing reads
+ * (`stepChecksDue`). Pure.
  */
-export const checkStandings = (run: Run, step: Pick<StepSpec, 'name'>, phaseOf: (taskId: string) => TaskPhase) => (name: string) => {
+const checkStandings = (run: Run, step: Pick<StepSpec, 'name'>, phaseOf: (taskId: string) => TaskPhase) => (name: string) => {
   const filed = run.steps[step.name]?.check;
   const standing: CheckStanding =
     filed === undefined ? 'waiting' : standingOf(filedPhase(filed, phaseOf(currentCheckTask(run, step.name, name))), true);

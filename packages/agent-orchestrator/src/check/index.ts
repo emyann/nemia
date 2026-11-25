@@ -59,7 +59,6 @@ export {
   checkNodes,
   checksDue,
   checksPhase,
-  checkStandings,
   currentCheckTask,
   decidingCheckTask,
   standingOf,

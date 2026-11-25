@@ -317,12 +317,13 @@ test('base-ci passes on ci green at the merge commit, reading neither the base t
 test('base-ci reads no working tree: a checkout another landing left dirty and off the base still has the merge judged by its ci', () => {
   const w = afterMerge();
   w.gh.answers(landed(w));
+  const merges = asked(w.gh.calls(), 'pr', 'merge').length;
   fs.appendFileSync(path.join(w.repo, 'a.ts'), 'export const b = 2;\n');
   gitIn(w.repo, 'switch', '-q', '-c', 'elsewhere');
   const r = land(w, 'base-ci', baseCiArgs());
   assert.equal(r.code, 0, r.err);
   assert.equal(waited(r.calls, `commits/${w.merged}`).length, 1, 'it read the CI of the merge commit all the same');
-  assert.deepEqual(asked(r.calls, 'pr', 'merge'), [], 'and merged nothing');
+  assert.equal(asked(r.calls, 'pr', 'merge').length, merges, 'and merged nothing');
 });
 
 test('REFUSED: a verb the script has not, and a merge with no subject, no body file, or a body file that is missing or empty', () => {
@@ -330,7 +331,7 @@ test('REFUSED: a verb the script has not, and a merge with no subject, no body f
   w.gh.answers(mergeable(w));
   const unknown = land(w, 'land');
   assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /`land` is no verb: give merge or receipt/);
+  assert.match(unknown.err, /`land` is no verb: give merge, receipt or base-ci/);
   assert.deepEqual(unknown.calls, []);
 
   const file = body();
@@ -1109,9 +1110,10 @@ test("REFUSED with no re-run where the merge's run is past its first attempt: a 
 test('base-ci told not to wait on ci calls no gh, saying so by landingWaitsOnCi; a --wait-on-ci of neither, or none, is refused before gh', () => {
   const w = afterMerge();
   w.gh.answers(landed(w));
+  const before = w.gh.calls().length;
   const r = land(w, 'base-ci', baseCiArgs('false'));
   assert.equal(r.code, 0, r.err);
-  assert.deepEqual(r.calls, [], 'nothing of GitHub is read');
+  assert.equal(r.calls.length, before, 'nothing of GitHub is read');
   assert.match(r.out, /landingWaitsOnCi/);
 
   const refusals: [string, string[]][] = [
@@ -1161,7 +1163,8 @@ const landChecks = (at: Rendered, workflow: string) => {
     ],
     `sdlc's ${workflow} lands on its receipt, then base-ci, which uses no checkout`,
   );
-  return { receipt: checks[0]!.run, baseCi: checks[1]!.run };
+  const [receipt, baseCi] = checks.map((c) => c.run);
+  return { receipt: receipt ?? '', baseCi: baseCi ?? '' };
 };
 
 test("both land steps' checks, rendered on GitHub, are the receipt and base-ci, run from the run's frozen carried files, and run no suite and no e2e", async () => {

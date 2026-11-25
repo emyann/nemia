@@ -69,7 +69,9 @@ function OptionTitle({ label, recommended }: { label: string; recommended: boole
 function QuestionHead({ q, n }: { q: Frozen<Question>; n: number }) {
   return (
     <>
-      <Label size="small" component="span" colorRole="on-surface-variant" className="block uppercase">{SERIES.eyebrow(n)}</Label>
+      <Label size="small" component="span" colorRole="on-surface-variant" className="block uppercase">
+        {SERIES.eyebrow(n)}
+      </Label>
       <Title size="medium" component="span" className="block text-on-surface">
         {q.title}
       </Title>
@@ -222,12 +224,18 @@ export function QuestionSeries({
   if (!onDraft) {
     return (
       <section data-questions={field} aria-label={field} className="min-w-0 space-y-2">
-        {field && <Body size="small" component="h4" colorRole="on-surface-variant" className="font-mono">{field}</Body>}
-        <ol className="space-y-4 text-body-medium">
-          {questions.map((q, i) => (
-            <QuestionRead key={q.title} q={q} n={i + 1} />
-          ))}
-        </ol>
+        {field && (
+          <Body size="small" component="h4" colorRole="on-surface-variant" className="font-mono">
+            {field}
+          </Body>
+        )}
+        <Body size="medium" component="div" className="contents">
+          <ol className="space-y-4">
+            {questions.map((q, i) => (
+              <QuestionRead key={q.title} q={q} n={i + 1} />
+            ))}
+          </ol>
+        </Body>
       </section>
     );
   }
@@ -291,20 +299,22 @@ export function AskedRow({ step, said }: { step: string; said: string }) {
 /** How the answers reach the step: its session continued, or a new one — a recheck files no session to read them. */
 function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; mode: RetryMode; onMode: (m: RetryMode) => void }) {
   return (
-    <RadioGroup
-      aria-label={`How to try ${step} again`}
-      name={name}
-      orientation="horizontal"
-      value={mode}
-      onChange={(m) => onMode(m as RetryMode)}
-      className="gap-x-3 gap-y-1 text-body-small"
-    >
-      {(['continue', 'fresh'] as const).map((m) => (
-        <Radio key={m} value={m}>
-          {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
-        </Radio>
-      ))}
-    </RadioGroup>
+    <Body size="small" component="div" className="contents">
+      <RadioGroup
+        aria-label={`How to try ${step} again`}
+        name={name}
+        orientation="horizontal"
+        value={mode}
+        onChange={(m) => onMode(m as RetryMode)}
+        className="gap-x-3 gap-y-1"
+      >
+        {(['continue', 'fresh'] as const).map((m) => (
+          <Radio key={m} value={m}>
+            {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
+          </Radio>
+        ))}
+      </RadioGroup>
+    </Body>
   );
 }
 
@@ -323,7 +333,9 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
   if (ask.isSuccess) return <AskedRow step={offer.step} said={askedSaid(ask.data)} />;
   const left = unanswered(offer.questions, draft);
   return (
-    <Body size="medium" component="li"
+    <Body
+      size="medium"
+      component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-questions

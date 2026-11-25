@@ -79,23 +79,25 @@ function Lines({ lines, atEnd }: { lines: Printed['lines']; atEnd: boolean }) {
   }, [atEnd, last]);
   if (!lines.length) return null;
   return (
-    <pre
-      ref={box}
-      role="region"
-      aria-label="Its lines"
-      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
-      tabIndex={0}
-      className={cn('max-h-96 overflow-auto rounded bg-surface-container-highest p-2 font-mono text-body-small leading-snug', focusRing())}
-    >
-      {lines.map((line) => (
-        <span key={line.n} data-line={line.n} className="flex gap-3">
-          <span aria-hidden className="w-12 flex-none text-end text-on-surface-variant select-none">
-            {line.n}
+    <Body size="small" component="div" className="contents">
+      <pre
+        ref={box}
+        role="region"
+        aria-label="Its lines"
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a box that scrolls is reached by the keyboard
+        tabIndex={0}
+        className={cn('max-h-96 overflow-auto rounded bg-surface-container-highest p-2 font-mono leading-snug', focusRing())}
+      >
+        {lines.map((line) => (
+          <span key={line.n} data-line={line.n} className="flex gap-3">
+            <span aria-hidden className="w-12 flex-none text-end text-on-surface-variant select-none">
+              {line.n}
+            </span>
+            <span className="min-w-0 whitespace-pre-wrap break-words">{line.text}</span>
           </span>
-          <span className="min-w-0 whitespace-pre-wrap break-words">{line.text}</span>
-        </span>
-      ))}
-    </pre>
+        ))}
+      </pre>
+    </Body>
   );
 }
 
@@ -149,10 +151,14 @@ export function CheckOutput({ read }: { read: CheckRead }) {
         }}
       />
       {output.error ? (
-        <ReadTrouble what="what the check printed" error={output.error} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadTrouble what="what the check printed" error={output.error} className="" />
+        </Body>
       ) : data === undefined ? (
         <Reading label="Reading what the check printed">
-          <ReadingLines widths={['w-2/3', 'w-1/2', 'w-3/4']} className="gap-1 text-body-small" />
+          <Body size="small" component="div" className="contents">
+            <ReadingLines widths={['w-2/3', 'w-1/2', 'w-3/4']} className="gap-1" />
+          </Body>
         </Reading>
       ) : (
         <>

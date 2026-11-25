@@ -45,9 +45,9 @@ function UnjudgedRow({ run }: { run: UnjudgedRun }) {
         </span>
       </Cell>
       <Cell>
-        <span data-now-unreadable className={`text-body-small break-words ${ink.failure}`}>
+        <Body size="small" component="span" data-now-unreadable className={`break-words ${ink.failure}`}>
           {run.unjudged}
-        </span>
+        </Body>
       </Cell>
       <Cell data-clock />
       <Cell data-cost />

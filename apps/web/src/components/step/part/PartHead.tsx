@@ -77,7 +77,11 @@ function Name({ head }: { head: Head }) {
       <Label component="span" size="large" className="truncate uppercase" title={head.step}>
         {head.step}
       </Label>
-      {head.round !== 'none' && <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">{head.round}</Body>}
+      {head.round !== 'none' && (
+        <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
+          {head.round}
+        </Body>
+      )}
     </div>
   );
 }
@@ -87,8 +91,12 @@ function Time({ time }: { time: CardTime }) {
   return (
     <div data-step-time className="flex flex-wrap items-baseline gap-x-2.5 bg-surface-container-highest px-3 py-2.5">
       <Key className="w-[84px]">{time.label}</Key>
-      <Body size="large" component="span" className={cn('font-mono', TIME_INK[time.ink])}>{time.value}</Body>
-      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">{time.note}</Body>
+      <Body size="large" component="span" className={cn('font-mono', TIME_INK[time.ink])}>
+        {time.value}
+      </Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
+        {time.note}
+      </Body>
     </div>
   );
 }
@@ -131,8 +139,12 @@ function Spend({ spend }: { spend: CardSpend }) {
   return (
     <div data-step-spend="words" className="flex flex-wrap items-baseline gap-x-2.5 border-t border-outline-variant pt-3">
       <Key className="w-24">{spend.label}</Key>
-      <Body size="medium" component="span" colorRole="on-surface" className={'font-mono'}>{spend.said}</Body>
-      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">{spend.note}</Body>
+      <Body size="medium" component="span" colorRole="on-surface" className={'font-mono'}>
+        {spend.said}
+      </Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
+        {spend.note}
+      </Body>
     </div>
   );
 }
@@ -147,7 +159,9 @@ function Note({ note, line = false }: { note: CardNote; line?: boolean }) {
       className={cn('flex min-w-0 items-start gap-2', note.icon === 'fail' ? ink.failure : 'text-on-surface-variant')}
     >
       <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <Body size="small" component="span" className={cn('', line ? 'truncate' : 'break-words')}>{note.text}</Body>
+      <Body size="small" component="span" className={cn('', line ? 'truncate' : 'break-words')}>
+        {note.text}
+      </Body>
     </div>
   );
 }
@@ -191,7 +205,9 @@ export function PartHead({ head, size, action: asked }: { head: Head; size: Part
       {head.facts === 'none' ? (
         <div data-step-reading>
           <Reading label="Reading the step…">
-            <ReadingLines widths={['w-3/4', 'w-1/2']} className="gap-1 text-body-small" />
+            <Body size="small" component="div" className="contents">
+              <ReadingLines widths={['w-3/4', 'w-1/2']} className="gap-1" />
+            </Body>
           </Reading>
         </div>
       ) : (
@@ -200,15 +216,17 @@ export function PartHead({ head, size, action: asked }: { head: Head; size: Part
       {head.spend !== 'none' && <Spend spend={head.spend} />}
       {head.note !== 'none' && <Note note={head.note} />}
       {action && (
-        <TextLink
-          data-step-action
-          to="/runs/$runId/steps/$step"
-          params={{ runId: head.action.runId, step: head.action.step }}
-          className="inline-flex min-h-10 items-center gap-1 self-start text-label-large uppercase"
-        >
-          {head.action.words}
-          <ChevronRight aria-hidden="true" className="size-4" />
-        </TextLink>
+        <Label size="large" component="span" className="contents">
+          <TextLink
+            data-step-action
+            to="/runs/$runId/steps/$step"
+            params={{ runId: head.action.runId, step: head.action.step }}
+            className="inline-flex min-h-10 items-center gap-1 self-start uppercase"
+          >
+            {head.action.words}
+            <ChevronRight aria-hidden="true" className="size-4" />
+          </TextLink>
+        </Label>
       )}
     </div>
   );

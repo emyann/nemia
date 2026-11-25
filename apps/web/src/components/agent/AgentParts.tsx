@@ -42,7 +42,9 @@ const AGENT_FROM: Readonly<Record<AgentListing['from'], string>> = {
 /** Where an agent is read from, as the Workflows page badges a workflow: yours, this repository's, the factory's or Nemia's. */
 export function FromBadge({ from }: { from: AgentListing['from'] }) {
   return (
-    <Body size="small" component="span"
+    <Body
+      size="small"
+      component="span"
       data-from={from}
       className={cn(
         'rounded-full px-2 py-0.5 leading-none font-medium',
@@ -61,13 +63,15 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
 function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   const here = usePagePlace();
   return (
-    <RouteLink
-      {...workflowLink(user.from === 'user' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
-      data-node={`${user.workflow}/${user.step}`}
-      className={cn('font-mono text-body-small text-on-surface', LINK)}
-    >
-      {user.workflow} <span className="text-on-surface-variant">›</span> {user.step}
-    </RouteLink>
+    <Body size="small" component="div" className="contents">
+      <RouteLink
+        {...workflowLink(user.from === 'user' && !('hired' in user && user.hired) ? {} : here, user.from, user.workflow, user.step)}
+        data-node={`${user.workflow}/${user.step}`}
+        className={cn('font-mono text-on-surface', LINK)}
+      >
+        {user.workflow} <span className="text-on-surface-variant">›</span> {user.step}
+      </RouteLink>
+    </Body>
   );
 }
 
@@ -86,7 +90,12 @@ const nodesOf = ({ usedBy, fills }: Pick<AgentListing, 'usedBy' | 'fills'>) => {
 export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'usedBy' | 'fills'>; className?: string }) {
   const nodes = nodesOf(listing);
   return (
-    <Body size="small" colorRole="on-surface-variant" data-used-by className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1', className)}>
+    <Body
+      size="small"
+      colorRole="on-surface-variant"
+      data-used-by
+      className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1', className)}
+    >
       {nodes.length ? (
         <>
           <span>Attached to</span>
@@ -121,7 +130,12 @@ export function Skills({
   compact?: boolean;
   className?: string;
 }) {
-  if (!skills?.length) return none ? <Body size="small" colorRole="on-surface-variant">{none}</Body> : null;
+  if (!skills?.length)
+    return none ? (
+      <Body size="small" colorRole="on-surface-variant">
+        {none}
+      </Body>
+    ) : null;
   return (
     <ul data-skills className={cn('space-y-1.5', className)}>
       {skills.map((skill) => (compact ? <CompactSkill key={skill.id} skill={skill} /> : <FullSkill key={skill.id} skill={skill} />))}
@@ -137,7 +151,13 @@ function FullSkill({ skill }: { skill: AgentSkill }) {
       {skill.tags.length > 0 && (
         <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
           {skill.tags.map((tag) => (
-            <Body size="small" component="span" colorRole="on-surface-variant" key={tag} className="rounded bg-surface-container-highest px-1 py-px font-mono">
+            <Body
+              size="small"
+              component="span"
+              colorRole="on-surface-variant"
+              key={tag}
+              className="rounded bg-surface-container-highest px-1 py-px font-mono"
+            >
               {tag}
             </Body>
           ))}
@@ -152,7 +172,9 @@ function CompactSkill({ skill }: { skill: AgentSkill }) {
   return (
     <Body size="medium" component="li" data-agent-skill={skill.id} className="leading-snug">
       <span className="block font-semibold text-on-surface">{skill.name}</span>{' '}
-      <Body size="small" component="span" colorRole="on-surface-variant" className="line-clamp-2">{skill.description}</Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="line-clamp-2">
+        {skill.description}
+      </Body>
     </Body>
   );
 }
@@ -254,14 +276,16 @@ export function AgentLink({
 /** A factory that uses a library item, linked to its settings, where its adds are. */
 function FactoryUserLink({ factory }: { factory: string }) {
   return (
-    <RouteLink
-      to="/factories/$factory/settings"
-      params={{ factory }}
-      data-factory-user={factory}
-      className={cn('font-mono text-body-small text-on-surface', LINK)}
-    >
-      {factory}
-    </RouteLink>
+    <Body size="small" component="div" className="contents">
+      <RouteLink
+        to="/factories/$factory/settings"
+        params={{ factory }}
+        data-factory-user={factory}
+        className={cn('font-mono text-on-surface', LINK)}
+      >
+        {factory}
+      </RouteLink>
+    </Body>
   );
 }
 
@@ -283,8 +307,12 @@ export function AgentRefused({
 }) {
   return (
     <div role="alert" data-agent-refused className="space-y-1.5 rounded border border-failure bg-failure-container px-3 py-2">
-      <Body size="medium" className="font-medium text-on-failure-container">{verb}:</Body>
-      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{message}</Body>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        {verb}:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {message}
+      </Body>
       {users.length > 0 && (
         <Body size="small" className="flex flex-wrap gap-x-2 text-on-failure-container">
           <span>Open</span>
@@ -303,8 +331,12 @@ export function AgentRefused({
 export function SkillRefused({ message }: { message: string }) {
   return (
     <div role="alert" data-skill-refused className="space-y-1.5 rounded border border-failure bg-failure-container px-3 py-2">
-      <Body size="medium" className="font-medium text-on-failure-container">Not written:</Body>
-      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{message}</Body>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        Not written:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {message}
+      </Body>
     </div>
   );
 }
@@ -331,7 +363,9 @@ export function SkillSourceBadge({ from, foundIn = null }: { from: SkillSource |
   const folder = from === null && foundIn !== null;
   const lost = from === null && !folder;
   return (
-    <Body size="small" component="span"
+    <Body
+      size="small"
+      component="span"
       data-skill-from={folder ? 'folder' : (from ?? 'none')}
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 leading-none font-medium',
@@ -374,9 +408,13 @@ export function GivenSkills({
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {row.from ? (
-                <SkillLink from={row.from} name={row.name} className="text-body-small font-medium text-on-surface" />
+                <Body size="small" component="span" className="contents">
+                  <SkillLink from={row.from} name={row.name} className="font-medium text-on-surface" />
+                </Body>
               ) : (
-                <Body size="small" component="span" colorRole="on-surface" className="font-mono font-medium">{row.name}</Body>
+                <Body size="small" component="span" colorRole="on-surface" className="font-mono font-medium">
+                  {row.name}
+                </Body>
               )}
               <SkillSourceBadge from={row.from} foundIn={row.foundIn} />
             </p>
@@ -385,7 +423,11 @@ export function GivenSkills({
                 Read from <code className="font-mono break-all">{row.foundIn}</code>
               </Body>
             )}
-            {row.entry && <Body size="small" colorRole="on-surface-variant">{row.entry.description}</Body>}
+            {row.entry && (
+              <Body size="small" colorRole="on-surface-variant">
+                {row.entry.description}
+              </Body>
+            )}
             {row.error !== null && (
               <Body size="small" data-given-error className="font-mono whitespace-pre-wrap break-words text-failure">
                 {row.error}

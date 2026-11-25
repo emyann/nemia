@@ -10,7 +10,10 @@ import { Body } from '@/components/ui/ds';
 /** The line, its hairlines on either side of the words; `className` sets their type, the data marks its caller's own. */
 export function Marker({ className, children, ...props }: React.ComponentProps<'div'>) {
   return (
-    <Body size="medium" component="div" colorRole="on-surface-variant"
+    <Body
+      size="medium"
+      component="div"
+      colorRole="on-surface-variant"
       {...props}
       data-slot="marker"
       className={cn(

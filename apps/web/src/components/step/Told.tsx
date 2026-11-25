@@ -112,12 +112,14 @@ export function Told({
   if (!told && !layers) return null;
   if (layers && homes) return <WillBeTold layers={layers} homes={homes} level={level} />;
   return (
-    <details className="text-body-medium" data-told>
-      <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">
-        {filed ? 'What it was told' : 'What it would be told now'}
-      </summary>
-      {layers ? <Layers layers={layers} parts={parts} level={level} /> : <Words level={level} text={told ?? ''} />}
-    </details>
+    <Body size="medium" component="div" className="contents">
+      <details className="" data-told>
+        <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">
+          {filed ? 'What it was told' : 'What it would be told now'}
+        </summary>
+        {layers ? <Layers layers={layers} parts={parts} level={level} /> : <Words level={level} text={told ?? ''} />}
+      </details>
+    </Body>
   );
 }
 
@@ -129,7 +131,9 @@ function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: F
   return (
     <div className="mt-2 flex flex-col gap-3">
       {layers.agent === null ? (
-        <Body size="small" colorRole="on-surface-variant">{noAgent(false)}</Body>
+        <Body size="small" colorRole="on-surface-variant">
+          {noAgent(false)}
+        </Body>
       ) : (
         <>
           <Body size="small" colorRole="on-surface-variant">
@@ -148,7 +152,9 @@ function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: F
       )}
       {layers.folderFiles && (
         <Layer level={level} name="folder" title={FOLDER_FILES}>
-          <Body size="small" colorRole="on-surface-variant">{FOLDER_FILES_SAID}</Body>
+          <Body size="small" colorRole="on-surface-variant">
+            {FOLDER_FILES_SAID}
+          </Body>
         </Layer>
       )}
       {layers.factory !== null && (
@@ -179,51 +185,59 @@ function Layers({ layers, parts, level }: { layers: Frozen<StepLayers>; parts: F
  */
 function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; homes: LayerHomes; level: LayerLevel }) {
   return (
-    <details open className="text-body-medium" data-told data-will-be-told>
-      <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">What it will be told</summary>
-      <div className="mt-2 flex flex-col gap-3">
-        <Body size="small" colorRole="on-surface-variant" data-read-now>
-          Read now from the files, and frozen when a run starts: a run is told what they say then
-          {layers.agent === null
-            ? '.'
-            : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}. ${PRECEDENCE_NOTE}`}
-        </Body>
-        {layers.agent === null ? (
-          <Body size="small" colorRole="on-surface-variant">{noAgent(true)}</Body>
-        ) : (
-          <>
-            <Layer level={level} name="instructions" title={INSTRUCTIONS(layers.agent)} home={homes.instructions}>
-              <details data-instructions-fold>
-                <Body size="small" component="summary" colorRole="on-surface-variant" className="cursor-pointer hover:text-on-surface">Read them</Body>
-                <Words level={UNDER[level]} text={layers.instructions} none="Its file gives no instructions" />
-              </details>
-              <Skills word="Its skills:" skills={layers.agentSkills} link={homes.skill} />
+    <Body size="medium" component="div" className="contents">
+      <details open className="" data-told data-will-be-told>
+        <summary className="cursor-pointer text-on-surface-variant hover:text-on-surface">What it will be told</summary>
+        <div className="mt-2 flex flex-col gap-3">
+          <Body size="small" colorRole="on-surface-variant" data-read-now>
+            Read now from the files, and frozen when a run starts: a run is told what they say then
+            {layers.agent === null
+              ? '.'
+              : `, ${layers.factory === null ? "the agent's words and yours" : "the agent's words, yours and the factory's rules"} ${layers.via === 'prompt' ? 'in its system prompt' : 'at the head of its brief'}. ${PRECEDENCE_NOTE}`}
+          </Body>
+          {layers.agent === null ? (
+            <Body size="small" colorRole="on-surface-variant">
+              {noAgent(true)}
+            </Body>
+          ) : (
+            <>
+              <Layer level={level} name="instructions" title={INSTRUCTIONS(layers.agent)} home={homes.instructions}>
+                <details data-instructions-fold>
+                  <Body size="small" component="summary" colorRole="on-surface-variant" className="cursor-pointer hover:text-on-surface">
+                    Read them
+                  </Body>
+                  <Words level={UNDER[level]} text={layers.instructions} none="Its file gives no instructions" />
+                </details>
+                <Skills word="Its skills:" skills={layers.agentSkills} link={homes.skill} />
+              </Layer>
+              <Layer level={level} name="custom" title={CUSTOM_INSTRUCTIONS} home={homes.custom}>
+                <Words level={UNDER[level]} text={layers.custom} none="None written" />
+              </Layer>
+            </>
+          )}
+          {layers.folderFiles && (
+            <Layer level={level} name="folder" title={FOLDER_FILES}>
+              <Body size="small" colorRole="on-surface-variant">
+                {FOLDER_FILES_SAID}
+              </Body>
             </Layer>
-            <Layer level={level} name="custom" title={CUSTOM_INSTRUCTIONS} home={homes.custom}>
-              <Words level={UNDER[level]} text={layers.custom} none="None written" />
+          )}
+          {(layers.factory !== null || homes.factory) && (
+            <Layer level={level} name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
+              <Words level={UNDER[level]} text={layers.factory} none={NO_RULES_TOLD} />
             </Layer>
-          </>
-        )}
-        {layers.folderFiles && (
-          <Layer level={level} name="folder" title={FOLDER_FILES}>
-            <Body size="small" colorRole="on-surface-variant">{FOLDER_FILES_SAID}</Body>
+          )}
+          <Layer level={level} name="policy" title={STEP_POLICY} home={homes.words}>
+            <Words level={UNDER[level]} text={layers.policy || null} none="No words of its own" />
+            <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
+            <Fence agent={layers.agent} fence={layers.fence} />
           </Layer>
-        )}
-        {(layers.factory !== null || homes.factory) && (
-          <Layer level={level} name="factory" title={FACTORY_RULES} home={homes.factory ?? undefined}>
-            <Words level={UNDER[level]} text={layers.factory} none={NO_RULES_TOLD} />
-          </Layer>
-        )}
-        <Layer level={level} name="policy" title={STEP_POLICY} home={homes.words}>
-          <Words level={UNDER[level]} text={layers.policy || null} none="No words of its own" />
-          <Skills word="Adds the skills:" skills={layers.addedSkills} link={homes.skill} />
-          <Fence agent={layers.agent} fence={layers.fence} />
-        </Layer>
-        <Body size="small" colorRole="on-surface-variant" data-layer="task">
-          Then the task: the brief a run is started with.
-        </Body>
-      </div>
-    </details>
+          <Body size="small" colorRole="on-surface-variant" data-layer="task">
+            Then the task: the brief a run is started with.
+          </Body>
+        </div>
+      </details>
+    </Body>
   );
 }
 
@@ -233,7 +247,11 @@ function WillBeTold({ layers, homes, level }: { layers: Frozen<StepLayers>; home
  */
 export function StepBody({ body, layers }: { body: string | null; layers: Frozen<StepLayers> | null }) {
   if (layers !== null || !body) return null;
-  return <Markdown className="text-body-medium">{body}</Markdown>;
+  return (
+    <Body size="medium" component="div" className="contents">
+      <Markdown className="">{body}</Markdown>
+    </Body>
+  );
 }
 
 /**
@@ -335,7 +353,12 @@ export function Words({
   none?: string;
   level?: LayerLevel | (typeof DEEPER)[LayerLevel];
 }) {
-  if (text === null) return <Body size="small" colorRole="on-surface-variant" className="italic">{none}</Body>;
+  if (text === null)
+    return (
+      <Body size="small" colorRole="on-surface-variant" className="italic">
+        {none}
+      </Body>
+    );
   return (
     <Markdown level={level} top className="rounded bg-surface-container-highest/60 p-3">
       {text}

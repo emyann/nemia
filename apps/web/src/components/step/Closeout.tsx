@@ -69,7 +69,9 @@ export function CheckVerdictWords({ verdict }: { verdict: CheckVerdict | null })
 export function AsItCame({ raw }: { raw: unknown }) {
   return (
     <section aria-label="As it came" className="space-y-1">
-      <Body size="small" component="h4" colorRole="on-surface-variant">the statement as it came</Body>
+      <Body size="small" component="h4" colorRole="on-surface-variant">
+        the statement as it came
+      </Body>
       <Json data-raw value={raw} />
     </section>
   );

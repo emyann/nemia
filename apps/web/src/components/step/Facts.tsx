@@ -46,16 +46,18 @@ export function FactList({
   className?: string;
 }) {
   return (
-    <dl aria-label={label} className={cn('grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-body-small', className)}>
-      {facts.map((fact, i) => (
-        <div key={`${fact.label}-${i}`} className="contents">
-          <dt className="text-on-surface-variant">{fact.label}</dt>
-          <dd data-fact={fact.label} data-state={fact.state} className={cn('min-w-0 break-words', STATE[fact.state ?? 'none'])}>
-            <FactWords runId={runId} fact={fact} />
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <Body size="small" component="div" className="contents">
+      <dl aria-label={label} className={cn('grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1', className)}>
+        {facts.map((fact, i) => (
+          <div key={`${fact.label}-${i}`} className="contents">
+            <dt className="text-on-surface-variant">{fact.label}</dt>
+            <dd data-fact={fact.label} data-state={fact.state} className={cn('min-w-0 break-words', STATE[fact.state ?? 'none'])}>
+              <FactWords runId={runId} fact={fact} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Body>
   );
 }
 
@@ -87,14 +89,16 @@ export function TrialMerges({ runId, collisions }: { runId: string; collisions: 
 /** Label and value, one per row. A value that is not set reads as a dash. */
 export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {
   return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-body-medium">
-      {rows.map(([label, value]) => (
-        <div key={label} data-fact={label} className="contents">
-          <dt className="text-on-surface-variant">{label}</dt>
-          <dd className="min-w-0 break-words">{value ?? '—'}</dd>
-        </div>
-      ))}
-    </dl>
+    <Body size="medium" component="div" className="contents">
+      <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+        {rows.map(([label, value]) => (
+          <div key={label} data-fact={label} className="contents">
+            <dt className="text-on-surface-variant">{label}</dt>
+            <dd className="min-w-0 break-words">{value ?? '—'}</dd>
+          </div>
+        ))}
+      </dl>
+    </Body>
   );
 }
 
@@ -303,7 +307,9 @@ const filedFence = (filed: string | null, workflow: string | null) =>
 function Marked({ value, mark, word = false, title }: { value: string; mark: string; word?: boolean; title?: string }) {
   return (
     <span data-mark={mark} title={title}>
-      <span className={word ? undefined : 'font-mono text-body-small'}>{value}</span>
+      <Body size="small" component="span" className={word ? undefined : 'font-mono'}>
+        {value}
+      </Body>
       <span className="text-on-surface-variant"> · {mark}</span>
     </span>
   );
@@ -314,7 +320,12 @@ function Marked({ value, mark, word = false, title }: { value: string; mark: str
  *
  * @param value the text to draw, null for none
  */
-export const code = (value: string | null) => (value === null ? null : <Body size="small" component="span" className="font-mono">{value}</Body>);
+export const code = (value: string | null) =>
+  value === null ? null : (
+    <Body size="small" component="span" className="font-mono">
+      {value}
+    </Body>
+  );
 
 /**
  * A path on the machine, as a `Facts` value: the path, and a button that copies it. A folder run's work is somewhere under the store
@@ -326,7 +337,9 @@ export const code = (value: string | null) => (value === null ? null : <Body siz
 export const pathRow = (at: string | null) =>
   at === null ? null : (
     <span data-path className="flex items-start gap-1">
-      <Body size="small" component="span" className="min-w-0 break-all font-mono">{at}</Body>
+      <Body size="small" component="span" className="min-w-0 break-all font-mono">
+        {at}
+      </Body>
       <CopyButton text={at} what="the path" />
     </span>
   );
@@ -348,13 +361,15 @@ export function spentRows(step: Priced) {
   return [
     [
       'spent',
-      <span
+      <Body
+        size="small"
+        component="span"
         key="spent"
         data-spent={over ? 'over' : 'within'}
-        className={`font-mono text-body-small ${over ? 'font-semibold text-failure' : ''}`}
+        className={`font-mono ${over ? 'font-semibold text-failure' : ''}`}
       >
         {text}
-      </span>,
+      </Body>,
     ],
   ] satisfies Array<[string, ReactNode]>;
 }
@@ -421,9 +436,16 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
       )}
       {rebuilt > 0 &&
         rest.map((part) => (
-          <span key={part} data-rebuilt={rebuilt} className={`block text-body-small font-semibold ${WARN}`} title={REBUILT_TITLE}>
+          <Body
+            size="small"
+            component="span"
+            key={part}
+            data-rebuilt={rebuilt}
+            className={`block font-semibold ${WARN}`}
+            title={REBUILT_TITLE}
+          >
             {part}
-          </span>
+          </Body>
         ))}
     </span>
   );
@@ -454,7 +476,9 @@ export function Check({
   const title = named ? `Check ${name}` : 'Check';
   return (
     <section aria-label={title} className="space-y-2">
-      <Label size="medium" component="h3" colorRole="on-surface-variant">{title}</Label>
+      <Label size="medium" component="h3" colorRole="on-surface-variant">
+        {title}
+      </Label>
       <Facts
         rows={[
           ...(named ? namedRows(verdict, started, ended) : []),
@@ -471,7 +495,11 @@ export function Check({
             : []),
         ]}
       />
-      {refused?.unreadable && <Body size="small" className="text-failure">{refused.unreadable}</Body>}
+      {refused?.unreadable && (
+        <Body size="small" className="text-failure">
+          {refused.unreadable}
+        </Body>
+      )}
       {refused?.stdout && <Stream name="output" log={refused.stdout} />}
       {refused && refused.stderr.lines.length > 0 && <Stream name="stderr" log={refused.stderr} />}
       {read && taskId !== null && (
@@ -516,15 +544,22 @@ export function Checks({
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
 function Stream({ name, log }: { name: string; log: Frozen<StepLog> }) {
-  if (!log.lines.length) return <Body size="small" colorRole="on-surface-variant">No {name}.</Body>;
+  if (!log.lines.length)
+    return (
+      <Body size="small" colorRole="on-surface-variant">
+        No {name}.
+      </Body>
+    );
   return (
     <div className="space-y-1">
       <Body size="small" colorRole="on-surface-variant">
         {log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}
       </Body>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-container-highest p-2 font-mono text-body-small leading-snug">
-        {log.lines.join('\n')}
-      </pre>
+      <Body size="small" component="div" className="contents">
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-container-highest p-2 font-mono leading-snug">
+          {log.lines.join('\n')}
+        </pre>
+      </Body>
     </div>
   );
 }

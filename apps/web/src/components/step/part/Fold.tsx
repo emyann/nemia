@@ -17,7 +17,9 @@ export function Fold({ name, title, open = false, children }: { name: string; ti
   return (
     <Disclosure data-fold={name} isExpanded={isExpanded} onExpandedChange={setExpanded}>
       <DisclosureTrigger className="min-h-0 px-0 py-1">
-        <Label size="medium" component="span" colorRole="on-surface-variant" className="font-label-medium uppercase">{title}</Label>
+        <Label size="medium" component="span" colorRole="on-surface-variant" className="font-label-medium uppercase">
+          {title}
+        </Label>
       </DisclosureTrigger>
       <DisclosurePanel isUnstyled className={UNCLIPPED}>
         {isExpanded && <div className="space-y-3 pt-2 pb-1">{children}</div>}

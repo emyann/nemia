@@ -34,7 +34,9 @@ export function TryPicker({ step, tries, shown }: { step: string; tries: readonl
     >
       {triesByRound(tries).map(({ round, tries: ofRound }) => (
         <span key={round} data-round={round} className="flex items-center">
-          <Label size="small" component="span" colorRole="on-surface-variant" className="me-2 uppercase">round {round}</Label>
+          <Label size="small" component="span" colorRole="on-surface-variant" className="me-2 uppercase">
+            round {round}
+          </Label>
           {ofRound.map((t) => (
             <Segment key={t.try} id={String(t.try)} data-try={t.try} className="flex-none">
               {t.current ? `try ${t.try} (current)` : `try ${t.try}`}

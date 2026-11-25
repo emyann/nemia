@@ -86,7 +86,12 @@ export function RunHeader({ run }: { run: RunDetail }) {
           <Title size="large" component="h1" data-run-title className="m-0 min-w-0 font-title-large break-words">
             {titleOf(run)}
           </Title>
-          <Label size="medium" component="span" data-run-state={standing} className={cn('rounded px-2 py-0.5', container[standingHue(standing)])}>
+          <Label
+            size="medium"
+            component="span"
+            data-run-state={standing}
+            className={cn('rounded px-2 py-0.5', container[standingHue(standing)])}
+          >
             {standing}
           </Label>
         </div>

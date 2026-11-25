@@ -14,7 +14,9 @@ export function Ledger({ run }: { run: RunDetail }) {
   const agents = useQuery(agentsQuery);
   return (
     <section aria-label="Every step" data-ledger={run.steps.length} className="space-y-4">
-      <Label size="large" component="h2" colorRole="on-surface-variant">Every step</Label>
+      <Label size="large" component="h2" colorRole="on-surface-variant">
+        Every step
+      </Label>
       {run.steps.map((step) => (
         <StepPart key={step.name} view={run} step={step.name} size="L" agents={agents.data} id={stepAnchor(step.name)} />
       ))}

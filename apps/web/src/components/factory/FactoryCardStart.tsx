@@ -17,7 +17,11 @@ import { WorkflowsUnread } from '../workflow/WorkflowOptions';
 import { Reading, ReadingLines } from '@/components/look';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
-const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+const code = (text: string) => (
+  <Body size="small" component="span" className="contents">
+    <code className="font-mono">{text}</code>
+  </Body>
+);
 
 /** What a card's start is told: a start the api took, and a refusal to show, null when the start is asked again. */
 type Told = { onStarted: (started: Started) => void; onRefused: (message: string | null) => void };
@@ -34,7 +38,9 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
   return (
     <div data-start-card className="space-y-3 border-t border-outline-variant pt-4">
       {factories.error ? (
-        <ReadTrouble what="the factories to start it in" error={factories.error} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadTrouble what="the factories to start it in" error={factories.error} className="" />
+        </Body>
       ) : !place ? (
         <Reading label="Reading the factory…" className="flex flex-col gap-1.5">
           <Skeleton className="w-20 text-label-medium" />
@@ -62,7 +68,9 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
   return (
     <div data-start-card data-start-unassigned className="space-y-3 border-t border-outline-variant pt-4">
       {factories.error ? (
-        <ReadTrouble what="the factories to start it in" error={factories.error} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadTrouble what="the factories to start it in" error={factories.error} className="" />
+        </Body>
       ) : !factories.data || !store ? (
         <Reading label="Reading the factories…" className="flex flex-col gap-1.5">
           <Skeleton className="w-20 text-label-medium" />
@@ -114,11 +122,15 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
     <>
       {offered.length === 0 ? (
         <div className="space-y-1.5">
-          <Body size="medium" className="font-medium">Workflow</Body>
+          <Body size="medium" className="font-medium">
+            Workflow
+          </Body>
           <Body size="small" data-no-workflow className="text-yours">
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </Body>
-          <Body size="small" colorRole="on-surface-variant">The workflows the factory {code(factory.name)} offers.</Body>
+          <Body size="small" colorRole="on-surface-variant">
+            The workflows the factory {code(factory.name)} offers.
+          </Body>
         </div>
       ) : (
         <Select
@@ -164,7 +176,9 @@ function Wired({ factory, workflow, on }: { factory: Pick<Factory, 'name'>; work
   }
   return (
     <div className="space-y-1">
-      <Body size="medium" className="font-medium">Repository</Body>
+      <Body size="medium" className="font-medium">
+        Repository
+      </Body>
       <Body size="small" colorRole="on-surface-variant" data-factory-repo className="font-mono break-all">
         {on.repo}
       </Body>
@@ -187,13 +201,17 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
 
   if (workflows.error) {
     return (
-      <ReadTrouble what={`the workflow ${workflow} of the factory ${place.factory}`} error={workflows.error} className="text-body-small" />
+      <Body size="small" component="div" className="contents">
+        <ReadTrouble what={`the workflow ${workflow} of the factory ${place.factory}`} error={workflows.error} className="" />
+      </Body>
     );
   }
   if (!workflows.data)
     return (
       <Reading label="Reading the workflow…" className="flex flex-col gap-2">
-        <ReadingLines widths={['w-2/3']} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadingLines widths={['w-2/3']} className="" />
+        </Body>
         <Skeleton shape="rectangle" className="h-10 w-28 rounded-none" />
       </Reading>
     );
@@ -217,11 +235,18 @@ function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: Inbox
  */
 function StartCard({ entry, workflow, place, onStarted, onRefused }: { entry: InboxEntry; workflow: WorkflowRow; place: Place } & Told) {
   const body = useQuery(cardBodyQuery(entry.name));
-  if (body.error) return <ReadTrouble what={`the card ${entry.name}`} error={body.error} className="text-body-small" />;
+  if (body.error)
+    return (
+      <Body size="small" component="div" className="contents">
+        <ReadTrouble what={`the card ${entry.name}`} error={body.error} className="" />
+      </Body>
+    );
   if (body.data === undefined)
     return (
       <Reading label="Reading the card…" className="flex flex-col gap-2">
-        <ReadingLines widths={['w-2/3']} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadingLines widths={['w-2/3']} className="" />
+        </Body>
       </Reading>
     );
   return (

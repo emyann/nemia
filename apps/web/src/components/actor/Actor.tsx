@@ -14,7 +14,10 @@ export function Actor({ actor, className }: { actor: ActorRead | undefined; clas
   const Glyph = actor.kind === 'agent' ? Bot : UserRound;
   const words = actorWords(actor);
   return (
-    <Body size="small" component="span" colorRole="on-surface-variant"
+    <Body
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
       data-actor={actor.kind}
       title={`Made by ${words}`}
       className={cn('inline-flex min-w-0 items-center gap-1', className)}

@@ -26,18 +26,20 @@ export function QuietLabels({ labels, keys = false }: { labels: Readonly<LabelMa
     <span data-quiet-labels className={cn('inline-flex min-w-0 items-center', keys ? 'flex-wrap gap-1.5' : 'gap-2.5')}>
       {entries.map(([key, value]) => (
         <TooltipTrigger key={key} delay={300}>
-          <TextLink
-            to="/labels/$key/$value"
-            params={{ key, value }}
-            data-label={`${key}=${value}`}
-            aria-label={`${key}=${value}`}
-            className={cn(
-              'text-body-small font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface',
-              keys && 'border border-outline-variant px-1.5',
-            )}
-          >
-            {keys ? `${key}=${value}` : value}
-          </TextLink>
+          <Body size="small" component="span" className="contents">
+            <TextLink
+              to="/labels/$key/$value"
+              params={{ key, value }}
+              data-label={`${key}=${value}`}
+              aria-label={`${key}=${value}`}
+              className={cn(
+                'font-medium whitespace-nowrap text-on-surface-variant hover:text-on-surface',
+                keys && 'border border-outline-variant px-1.5',
+              )}
+            >
+              {keys ? `${key}=${value}` : value}
+            </TextLink>
+          </Body>
           <Tooltip>{`${key}=${value}`}</Tooltip>
         </TooltipTrigger>
       ))}
@@ -120,7 +122,13 @@ export function RunMeta({
   const where = <Where factory={namespaceOf(run.factory)} workflowDir={run.workflowDir} workflowPage={workflowPage} />;
   if (whole)
     return (
-      <Body size="small" component="span" colorRole="on-surface-variant" data-run-meta className="flex min-w-0 flex-col gap-1.5 font-medium">
+      <Body
+        size="small"
+        component="span"
+        colorRole="on-surface-variant"
+        data-run-meta
+        className="flex min-w-0 flex-col gap-1.5 font-medium"
+      >
         <span className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-1">
           <CopyId id={run.id} />
           {where}
@@ -134,7 +142,13 @@ export function RunMeta({
       </Body>
     );
   return (
-    <Body size="small" component="span" colorRole="on-surface-variant" data-run-meta className="flex min-w-0 items-center gap-3.5 font-medium whitespace-nowrap">
+    <Body
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
+      data-run-meta
+      className="flex min-w-0 items-center gap-3.5 font-medium whitespace-nowrap"
+    >
       <CopyId id={run.id} short />
       {where}
       {labelled && (

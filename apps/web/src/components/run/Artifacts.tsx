@@ -72,7 +72,12 @@ export function Artifacts({
   size?: boolean;
   none?: string;
 }) {
-  if (!artifacts.length) return <Body size="small" colorRole="on-surface-variant">{none}</Body>;
+  if (!artifacts.length)
+    return (
+      <Body size="small" colorRole="on-surface-variant">
+        {none}
+      </Body>
+    );
   const pictures = artifacts.filter((a): a is Served => served(a) && a.kind === 'image');
   const rest = artifacts.filter((a) => !(served(a) && a.kind === 'image'));
   return (
@@ -188,19 +193,23 @@ const linkClass = 'font-mono font-medium text-on-surface underline underline-off
 export function Values({ values }: { values: readonly StepValue[] }) {
   if (!values.length) return null;
   return (
-    <ul data-values className="mt-1 flex flex-col gap-1 text-body-small">
-      {values.map((v, i) => (
-        <li key={`${i}:${v.name}`} data-value={v.name} className="break-all">
-          <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">{v.name}</Label>{' '}
-          {v.link ? (
-            <a href={v.link} target="_blank" rel="noreferrer" className={linkClass}>
-              {v.value}
-            </a>
-          ) : (
-            <span className="font-mono">{v.value}</span>
-          )}
-        </li>
-      ))}
-    </ul>
+    <Body size="small" component="div" className="contents">
+      <ul data-values className="mt-1 flex flex-col gap-1">
+        {values.map((v, i) => (
+          <li key={`${i}:${v.name}`} data-value={v.name} className="break-all">
+            <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
+              {v.name}
+            </Label>{' '}
+            {v.link ? (
+              <a href={v.link} target="_blank" rel="noreferrer" className={linkClass}>
+                {v.value}
+              </a>
+            ) : (
+              <span className="font-mono">{v.value}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Body>
   );
 }

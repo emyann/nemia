@@ -48,7 +48,12 @@ export function Decide({ run }: { run: RunDetail }) {
         }
       />
     );
-  if (!decidable || !isDecidable(data)) return <Body size="medium" colorRole="on-surface-variant">Nothing to decide on it now.</Body>;
+  if (!decidable || !isDecidable(data))
+    return (
+      <Body size="medium" colorRole="on-surface-variant">
+        Nothing to decide on it now.
+      </Body>
+    );
   return (
     <DecideFrame>
       <DecisionParts runId={run.id} decision={data} run={run} />
@@ -97,9 +102,9 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
   return (
     <>
       {overBudget && (
-        <p data-over-budget className={`rounded px-3 py-2 font-mono text-body-small break-words ${container.yours}`}>
+        <Body size="small" data-over-budget className={`rounded px-3 py-2 font-mono break-words ${container.yours}`}>
           {overBudget}
-        </p>
+        </Body>
       )}
 
       <div className="space-y-4">
@@ -113,7 +118,9 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
-          <Body size="medium" colorRole="on-surface-variant">No branch to read: no step worked on one.</Body>
+          <Body size="medium" colorRole="on-surface-variant">
+            No branch to read: no step worked on one.
+          </Body>
         )}
         {!inFolders && <LessonChip lesson={lesson} />}
       </div>
@@ -221,7 +228,9 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
         ? ['fresh', 'continue']
         : ['continue', 'fresh'];
   return (
-    <Body size="medium" component="li"
+    <Body
+      size="medium"
+      component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}
@@ -261,20 +270,22 @@ function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { ca
           <AskPress pending={ask.isPending} held={offer.case === 'answer' && !message.trim()}>
             {words.button}
           </AskPress>
-          <RadioGroup
-            aria-label={`How to try ${offer.step} again`}
-            name={`${field}-mode`}
-            orientation="horizontal"
-            value={mode}
-            onChange={(m) => setMode(m as RetryMode)}
-            className="gap-x-3 gap-y-1 text-body-small"
-          >
-            {modes.map((m) => (
-              <Radio key={m} value={m}>
-                {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
-              </Radio>
-            ))}
-          </RadioGroup>
+          <Body size="small" component="div" className="contents">
+            <RadioGroup
+              aria-label={`How to try ${offer.step} again`}
+              name={`${field}-mode`}
+              orientation="horizontal"
+              value={mode}
+              onChange={(m) => setMode(m as RetryMode)}
+              className="gap-x-3 gap-y-1"
+            >
+              {modes.map((m) => (
+                <Radio key={m} value={m}>
+                  {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
+                </Radio>
+              ))}
+            </RadioGroup>
+          </Body>
         </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
@@ -340,17 +351,23 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
     <div data-touched={branch} className="space-y-2">
       <Body size="medium">
         <span className="text-on-surface-variant">touched </span>
-        <Body size="small" component="span" className="break-all font-mono">{branch}</Body>
+        <Body size="small" component="span" className="break-all font-mono">
+          {branch}
+        </Body>
       </Body>
       {'error' in radius ? (
-        <Body size="medium" className="text-failure">{radius.error}</Body>
+        <Body size="medium" className="text-failure">
+          {radius.error}
+        </Body>
       ) : radius.changes.length ? (
         <>
           <GroupRows groups={radius.groups} />
           <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
         </>
       ) : (
-        <Body size="medium" colorRole="on-surface-variant">nothing — the branch changed no file against the base</Body>
+        <Body size="medium" colorRole="on-surface-variant">
+          nothing — the branch changed no file against the base
+        </Body>
       )}
     </div>
   );
@@ -359,33 +376,35 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
 function GroupRows({ groups }: { groups: readonly Group[] }) {
   const most = mostLines(groups);
   return (
-    <ul
-      aria-label="Groups"
-      className="grid grid-cols-[minmax(0,max-content)_max-content_minmax(3rem,1fr)_max-content] items-center gap-x-3 gap-y-1 text-body-small"
-    >
-      {groups.map((g) => {
-        const counted = g.files - g.binary;
-        return (
-          <li key={g.name} data-group={g.name} className="contents">
-            <span className="truncate font-mono" title={g.name}>
-              {g.name}
-            </span>
-            <span className="text-right tabular-nums text-on-surface-variant">
-              {g.files} file{g.files === 1 ? '' : 's'}
-            </span>
-            <GroupBar group={g} most={most} />
-            <span className="font-mono tabular-nums">
-              {counted > 0 && (
-                <>
-                  <span className="text-on-surface">+{g.added}</span> <span className="text-on-surface-variant">−{g.removed}</span>
-                </>
-              )}
-              {g.binary > 0 && <span className="text-on-surface-variant">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+    <Body size="small" component="div" className="contents">
+      <ul
+        aria-label="Groups"
+        className="grid grid-cols-[minmax(0,max-content)_max-content_minmax(3rem,1fr)_max-content] items-center gap-x-3 gap-y-1"
+      >
+        {groups.map((g) => {
+          const counted = g.files - g.binary;
+          return (
+            <li key={g.name} data-group={g.name} className="contents">
+              <span className="truncate font-mono" title={g.name}>
+                {g.name}
+              </span>
+              <span className="text-right tabular-nums text-on-surface-variant">
+                {g.files} file{g.files === 1 ? '' : 's'}
+              </span>
+              <GroupBar group={g} most={most} />
+              <span className="font-mono tabular-nums">
+                {counted > 0 && (
+                  <>
+                    <span className="text-on-surface">+{g.added}</span> <span className="text-on-surface-variant">−{g.removed}</span>
+                  </>
+                )}
+                {g.binary > 0 && <span className="text-on-surface-variant">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </Body>
   );
 }
 
@@ -448,9 +467,15 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
       <h3 className={HEADING}>In full: the check-affecting files — what a change could edit to make its check pass</h3>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
-          {sensitive.length > 1 && <Body size="small" colorRole="on-surface-variant" className="break-all font-mono">{branch}</Body>}
+          {sensitive.length > 1 && (
+            <Body size="small" colorRole="on-surface-variant" className="break-all font-mono">
+              {branch}
+            </Body>
+          )}
           {error ? (
-            <Body size="medium" className="text-failure">{error}</Body>
+            <Body size="medium" className="text-failure">
+              {error}
+            </Body>
           ) : files.length ? (
             files.map((file) => (
               <DiffFileView
@@ -463,7 +488,9 @@ function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; t
               />
             ))
           ) : (
-            <Body size="medium" colorRole="on-surface-variant">none</Body>
+            <Body size="medium" colorRole="on-surface-variant">
+              none
+            </Body>
           )}
         </div>
       ))}
@@ -503,16 +530,18 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
           </span>
         )}
       </Body>
-      <pre className="max-h-96 overflow-auto border-t border-outline-variant py-1 font-mono text-body-small leading-snug">
-        {file.lines.map((line, i) => {
-          const kind = diffLine(line);
-          return (
-            <span key={i} data-line={kind} className={cn('block w-max min-w-full whitespace-pre px-2', LINE_CLASS[kind])}>
-              {line || ' '}
-            </span>
-          );
-        })}
-      </pre>
+      <Body size="small" component="div" className="contents">
+        <pre className="max-h-96 overflow-auto border-t border-outline-variant py-1 font-mono leading-snug">
+          {file.lines.map((line, i) => {
+            const kind = diffLine(line);
+            return (
+              <span key={i} data-line={kind} className={cn('block w-max min-w-full whitespace-pre px-2', LINE_CLASS[kind])}>
+                {line || ' '}
+              </span>
+            );
+          })}
+        </pre>
+      </Body>
       {file.cut > 0 && (
         <Body size="small" colorRole="on-surface-variant" data-cut={file.cut} className="border-t border-outline-variant px-2 py-1">
           {file.cut} more line{file.cut === 1 ? '' : 's'} — the command line&apos;s decide prints them all
@@ -532,7 +561,9 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
         : [`lesson ${lesson.said}`, 'A branch could not be read, so nobody can say what it wrote.', dashed.grey];
   return (
     <p>
-      <Body size="small" component="span"
+      <Body
+        size="small"
+        component="span"
         data-lesson={lesson.state}
         title={title}
         className={cn('inline-block rounded px-2 py-0.5 font-mono', className)}
@@ -560,7 +591,9 @@ function Commands({ commands }: { commands: readonly DecideCommand[] }) {
           ))}
         </ul>
       ) : (
-        <Body size="medium" colorRole="on-surface-variant">None yet: the run is still moving.</Body>
+        <Body size="medium" colorRole="on-surface-variant">
+          None yet: the run is still moving.
+        </Body>
       )}
     </section>
   );

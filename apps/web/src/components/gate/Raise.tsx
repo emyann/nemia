@@ -57,7 +57,9 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
   if (taken) return <RaiseAsked step={offer.step} said={taken} />;
 
   return (
-    <Body size="medium" component="li"
+    <Body
+      size="medium"
+      component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}
@@ -116,7 +118,10 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { case: 'raise' }>;
   return (
     <>
       <p className="break-words">
-        <strong>{offer.step}</strong> <Body size="small" component="span" className="font-mono">{offer.message}</Body>
+        <strong>{offer.step}</strong>{' '}
+        <Body size="small" component="span" className="font-mono">
+          {offer.message}
+        </Body>
       </p>
       {asks &&
         (offer.needs ? (
@@ -174,20 +179,22 @@ function RaiseModes({
   onMode: (next: RetryMode) => void;
 }) {
   return (
-    <RadioGroup
-      aria-label={`How to try ${step} again`}
-      name={name}
-      orientation="horizontal"
-      value={mode}
-      onChange={(m) => onMode(m as RetryMode)}
-      className="gap-x-3 gap-y-1 text-body-small"
-    >
-      {modes.map((m) => (
-        <Radio key={m} value={m}>
-          {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
-        </Radio>
-      ))}
-    </RadioGroup>
+    <Body size="small" component="div" className="contents">
+      <RadioGroup
+        aria-label={`How to try ${step} again`}
+        name={name}
+        orientation="horizontal"
+        value={mode}
+        onChange={(m) => onMode(m as RetryMode)}
+        className="gap-x-3 gap-y-1"
+      >
+        {modes.map((m) => (
+          <Radio key={m} value={m}>
+            {MODES[m]} <code className="text-on-surface-variant">--{m}</code>
+          </Radio>
+        ))}
+      </RadioGroup>
+    </Body>
   );
 }
 

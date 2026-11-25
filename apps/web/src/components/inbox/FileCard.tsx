@@ -19,7 +19,11 @@ import { inputsAdded } from '@/lib/startInputs';
 import { StartInputs } from '../run/StartInputs';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
-const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+const code = (text: string) => (
+  <Body size="small" component="span" className="contents">
+    <code className="font-mono">{text}</code>
+  </Body>
+);
 
 /**
  * The box: the idea, the Factory list (`FactoryField`) and, under a factory, the workflow it runs and the repository the factory gives it
@@ -91,7 +95,9 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         <CutPress pending={file.isPending} type="submit" isDisabled={!idea.trim() || file.isPending}>
           {file.isPending ? 'Filing…' : 'File'}
         </CutPress>
-        <Body size="small" component="span" colorRole="on-surface-variant">Parked, not started: nothing runs until you start it.</Body>
+        <Body size="small" component="span" colorRole="on-surface-variant">
+          Parked, not started: nothing runs until you start it.
+        </Body>
       </div>
       {filed && !keptBy(shown)(filed) && <Hidden name={filed.name} shown={shown!} />}
       {file.isError && <NotFiled message={file.error.message} />}
@@ -119,8 +125,12 @@ function IdeaField({ idea, onIdea }: { idea: string; onIdea: (idea: string) => v
 function NotFiled({ message }: { message: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <Body size="medium" className="font-medium text-on-failure-container">Not filed. The api refused it:</Body>
-      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{message}</Body>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        Not filed. The api refused it:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {message}
+      </Body>
     </div>
   );
 }
@@ -158,7 +168,11 @@ function FactoryField({
           <SelectItem key={f.name} id={f.name} label={f.name} />
         ))}
       </Select>
-      {error && <ReadTrouble what="the factories" error={error} className="text-body-small" />}
+      {error && (
+        <Body size="small" component="div" className="contents">
+          <ReadTrouble what="the factories" error={error} className="" />
+        </Body>
+      )}
       {picked === '' && (
         <Body size="small" colorRole="on-surface-variant" data-parked>
           Parked with no factory: it gets its factory, workflow and repository when you start it.
@@ -167,7 +181,9 @@ function FactoryField({
       {!error && !read && (
         <div data-reading-factories>
           <Reading label="Reading the factories…">
-            <ReadingLines widths={['w-64']} className="text-body-small" />
+            <Body size="small" component="div" className="contents">
+              <ReadingLines widths={['w-64']} className="" />
+            </Body>
           </Reading>
         </div>
       )}
@@ -212,7 +228,9 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
         )}
       </div>
       <div className="space-y-1.5">
-        <Body size="medium" className="font-medium">Repository</Body>
+        <Body size="medium" className="font-medium">
+          Repository
+        </Body>
         {on !== null && 'why' in on ? (
           <Body size="small" data-unwired={on.refused} className="break-words text-yours">
             {on.why}

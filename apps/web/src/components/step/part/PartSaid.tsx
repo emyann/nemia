@@ -21,30 +21,34 @@ export function PartSaid({ step, said }: { step: StepView; said: Said }) {
   const shown = step.tries.find((t) => t.try === step.shown);
   const outcome = shown ? outcomeOf(shown, 'No closeout on the record of this try.') : null;
   return (
-    <section data-part-said={step.name} aria-label="What it said" className="min-w-0 scroll-mt-4 space-y-2 text-body-medium">
-      <Label size="medium" component="h3" colorRole="on-surface-variant" className="uppercase">Said</Label>
-      {outcome && <OutcomeHead outcome={outcome} />}
-      {shown?.answer && <YourAnswer answer={shown.answer} by={shown.answeredBy} />}
-      {said.kind === 'unreadable' ? (
-        <AsItCame raw={step.unreadable?.raw ?? said.error} />
-      ) : (
-        <>
-          <Body size="medium" colorRole="on-surface" data-summary>
-            {summaryShown(said.summary)}
-          </Body>
-          {said.needs && <ClosedNeeds needs={said.needs} />}
-          {step.closeout?.refused.map((why) => (
-            <Body size="small" key={why} data-refused className="text-failure">
-              not accepted: {why}
+    <Body size="medium" component="div" className="contents">
+      <section data-part-said={step.name} aria-label="What it said" className="min-w-0 scroll-mt-4 space-y-2">
+        <Label size="medium" component="h3" colorRole="on-surface-variant" className="uppercase">
+          Said
+        </Label>
+        {outcome && <OutcomeHead outcome={outcome} />}
+        {shown?.answer && <YourAnswer answer={shown.answer} by={shown.answeredBy} />}
+        {said.kind === 'unreadable' ? (
+          <AsItCame raw={step.unreadable?.raw ?? said.error} />
+        ) : (
+          <>
+            <Body size="medium" colorRole="on-surface" data-summary>
+              {summaryShown(said.summary)}
             </Body>
-          ))}
-          {said.account && (
-            <Fold name="account" title="Its account">
-              <Markdown data-body>{said.account}</Markdown>
-            </Fold>
-          )}
-        </>
-      )}
-    </section>
+            {said.needs && <ClosedNeeds needs={said.needs} />}
+            {step.closeout?.refused.map((why) => (
+              <Body size="small" key={why} data-refused className="text-failure">
+                not accepted: {why}
+              </Body>
+            ))}
+            {said.account && (
+              <Fold name="account" title="Its account">
+                <Markdown data-body>{said.account}</Markdown>
+              </Fold>
+            )}
+          </>
+        )}
+      </section>
+    </Body>
   );
 }

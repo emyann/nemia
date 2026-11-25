@@ -108,31 +108,33 @@ export function Gate({
   if (taken) return <GateTaken step={step} taken={taken} />;
 
   return (
-    <section
-      aria-label={`The gate of ${step}`}
-      data-gate="awaiting"
-      className={cn('space-y-4 text-body-medium', framed && 'rounded border border-yours bg-surface-container-low p-3')}
-    >
-      {framed && <GateSentence step={step} back={back} acts={acts} />}
+    <Body size="medium" component="div" className="contents">
+      <section
+        aria-label={`The gate of ${step}`}
+        data-gate="awaiting"
+        className={cn('space-y-4', framed && 'rounded border border-yours bg-surface-container-low p-3')}
+      >
+        {framed && <GateSentence step={step} back={back} acts={acts} />}
 
-      <div className="min-w-0 space-y-4">
-        {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
-        <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} />
-        <ApproveForm
-          step={step}
-          acts={acts}
-          onto={onto}
-          approveLine={approveLine}
-          approval={approval}
-          busy={busy}
-          budgeting={budgeting}
-          {...answering}
-        />
-        {back.length > 0 && (
-          <SendBackForm step={step} back={back} to={to} onTo={setTo} field={field} sendBack={sendBack} busy={busy} {...answering} />
-        )}
-      </div>
-    </section>
+        <div className="min-w-0 space-y-4">
+          {questions.length > 0 && <GateQuestions step={step} questions={questions} draft={draft} onDraft={setDraft} />}
+          <GateBudgetFields step={step} budgets={budgets} amounts={amounts} onAmounts={setAmounts} />
+          <ApproveForm
+            step={step}
+            acts={acts}
+            onto={onto}
+            approveLine={approveLine}
+            approval={approval}
+            busy={busy}
+            budgeting={budgeting}
+            {...answering}
+          />
+          {back.length > 0 && (
+            <SendBackForm step={step} back={back} to={to} onTo={setTo} field={field} sendBack={sendBack} busy={busy} {...answering} />
+          )}
+        </div>
+      </section>
+    </Body>
   );
 }
 
@@ -369,20 +371,22 @@ function Choice<T extends string>({
   label: (option: T) => ReactNode;
 }) {
   return (
-    <RadioGroup
-      aria-label={legend}
-      name={name}
-      orientation="horizontal"
-      value={value}
-      onChange={(next) => onChange(next as T)}
-      className="gap-x-3 gap-y-1 text-body-small"
-    >
-      {options.map((o) => (
-        <Radio key={o} value={o}>
-          {label(o)}
-        </Radio>
-      ))}
-    </RadioGroup>
+    <Body size="small" component="div" className="contents">
+      <RadioGroup
+        aria-label={legend}
+        name={name}
+        orientation="horizontal"
+        value={value}
+        onChange={(next) => onChange(next as T)}
+        className="gap-x-3 gap-y-1"
+      >
+        {options.map((o) => (
+          <Radio key={o} value={o}>
+            {label(o)}
+          </Radio>
+        ))}
+      </RadioGroup>
+    </Body>
   );
 }
 
@@ -460,16 +464,14 @@ export const sendBackBody = ({
 /** A gate once a person's word is taken (`takenOf`): the step it was about, and what the next tick does with it. */
 function GateTaken({ step, taken }: { step: string; taken: { named: string; said: string } }) {
   return (
-    <section
-      aria-label={`The gate of ${step}`}
-      data-gate="taken"
-      className="rounded border border-outline-variant px-3 py-2 text-body-medium"
-    >
-      <strong>{taken.named}</strong>{' '}
-      <Body size="small" component="span" colorRole="on-surface-variant" data-note className="font-mono">
-        {taken.said}
-      </Body>
-    </section>
+    <Body size="medium" component="div" className="contents">
+      <section aria-label={`The gate of ${step}`} data-gate="taken" className="rounded border border-outline-variant px-3 py-2">
+        <strong>{taken.named}</strong>{' '}
+        <Body size="small" component="span" colorRole="on-surface-variant" data-note className="font-mono">
+          {taken.said}
+        </Body>
+      </section>
+    </Body>
   );
 }
 
@@ -527,49 +529,59 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
   const work = run.steps.filter((one) => waitsOn.has(one.name));
 
   return (
-    <section
-      aria-label={`What ${step.name} would act on`}
-      className="min-w-0 space-y-3 rounded border border-outline-variant p-3 text-body-medium"
-    >
-      <div className="space-y-1">
-        <Label size="medium" component="h3" colorRole="on-surface-variant">The result it would act on</Label>
-        {standings.map((s) => (
-          <p key={s.branch} data-standing={s.where} className="break-words">
-            <Body size="small" component="span" className="font-mono">{s.said}</Body>
-            {s.stat && (
-              <Body size="small" component="span" colorRole="on-surface-variant" data-stat className="block font-mono">
-                {s.stat}
+    <Body size="medium" component="div" className="contents">
+      <section aria-label={`What ${step.name} would act on`} className="min-w-0 space-y-3 rounded border border-outline-variant p-3">
+        <div className="space-y-1">
+          <Label size="medium" component="h3" colorRole="on-surface-variant">
+            The result it would act on
+          </Label>
+          {standings.map((s) => (
+            <p key={s.branch} data-standing={s.where} className="break-words">
+              <Body size="small" component="span" className="font-mono">
+                {s.said}
               </Body>
-            )}
-          </p>
-        ))}
-        {!standings.length &&
-          (error || isDecidable(data) ? (
-            <Body size="small" colorRole="on-surface-variant">
-              {error
-                ? `The branch could not be read: ${troubleOf(error).words}`
-                : 'No result branch of its own: the work is on the base branch.'}
-            </Body>
-          ) : (
-            <Reading label="Reading the branch…">
-              <ReadingLines widths={['w-2/3', 'w-1/3']} className="font-mono text-body-small" />
-            </Reading>
+              {s.stat && (
+                <Body size="small" component="span" colorRole="on-surface-variant" data-stat className="block font-mono">
+                  {s.stat}
+                </Body>
+              )}
+            </p>
           ))}
-      </div>
+          {!standings.length &&
+            (error || isDecidable(data) ? (
+              <Body size="small" colorRole="on-surface-variant">
+                {error
+                  ? `The branch could not be read: ${troubleOf(error).words}`
+                  : 'No result branch of its own: the work is on the base branch.'}
+              </Body>
+            ) : (
+              <Reading label="Reading the branch…">
+                <Body size="small" component="div" className="contents">
+                  <ReadingLines widths={['w-2/3', 'w-1/3']} className="font-mono" />
+                </Body>
+              </Reading>
+            ))}
+        </div>
 
-      {work.length > 0 && (
-        <ul aria-label="The work it acts on" className="space-y-1 border-t border-outline-variant pt-3">
-          {work.map((one) => (
-            <li key={one.name} data-acts-on={one.name} className="break-words">
-              <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(one.name)} className={LINK}>
-                What {one.name} gave
-              </RouteLink>
-              {one.closeout && <Body size="small" component="span" colorRole="on-surface-variant"> — {one.closeout.summary}</Body>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+        {work.length > 0 && (
+          <ul aria-label="The work it acts on" className="space-y-1 border-t border-outline-variant pt-3">
+            {work.map((one) => (
+              <li key={one.name} data-acts-on={one.name} className="break-words">
+                <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(one.name)} className={LINK}>
+                  What {one.name} gave
+                </RouteLink>
+                {one.closeout && (
+                  <Body size="small" component="span" colorRole="on-surface-variant">
+                    {' '}
+                    — {one.closeout.summary}
+                  </Body>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </Body>
   );
 }
 
@@ -613,31 +625,33 @@ export function Approved({
   budgets?: Frozen<GateBudgets> | null;
 }) {
   return (
-    <section
-      aria-label={`The approval of ${step}`}
-      data-approval={approval.try}
-      className="space-y-1 rounded border border-sage bg-surface-container px-3 py-2 text-body-medium text-on-surface-variant"
-    >
-      <p>
-        <span className="font-medium text-on-surface">Approved</span>{' '}
-        <span className="text-on-surface-variant">
-          try {approval.try}, {when(approval.at)} —{' '}
-          {ends
-            ? `your approval filed it, and the step is handed ${approval.message === null ? 'it' : 'these words'} as the terms it acts on`
-            : `every step after the gate is handed ${approval.message === null ? 'the approval' : 'these words'}`}
-        </span>
-      </p>
-      <Actor actor={approval.actor} />
-      {approval.message === null ? (
-        <p data-words="none" className="text-on-surface-variant">
-          with no words
+    <Body size="medium" component="div" className="contents">
+      <section
+        aria-label={`The approval of ${step}`}
+        data-approval={approval.try}
+        className="space-y-1 rounded border border-sage bg-surface-container px-3 py-2 text-on-surface-variant"
+      >
+        <p>
+          <span className="font-medium text-on-surface">Approved</span>{' '}
+          <span className="text-on-surface-variant">
+            try {approval.try}, {when(approval.at)} —{' '}
+            {ends
+              ? `your approval filed it, and the step is handed ${approval.message === null ? 'it' : 'these words'} as the terms it acts on`
+              : `every step after the gate is handed ${approval.message === null ? 'the approval' : 'these words'}`}
+          </span>
         </p>
-      ) : (
-        <p data-words className="whitespace-pre-wrap break-words">
-          {approval.message}
-        </p>
-      )}
-      {budgets?.from === 'approved' && <GateBudgetRows step={step} budgets={budgets} />}
-    </section>
+        <Actor actor={approval.actor} />
+        {approval.message === null ? (
+          <p data-words="none" className="text-on-surface-variant">
+            with no words
+          </p>
+        ) : (
+          <p data-words className="whitespace-pre-wrap break-words">
+            {approval.message}
+          </p>
+        )}
+        {budgets?.from === 'approved' && <GateBudgetRows step={step} budgets={budgets} />}
+      </section>
+    </Body>
   );
 }

@@ -8,7 +8,18 @@ import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
 import { MachineCanvas } from './MachineCanvas';
 import { Reading, ReadingLines } from '@/components/look';
-import { Body, Button, Disclosure, DisclosurePanel, DisclosureTrigger, Pressable, SideSheet, Skeleton, Slider, Title } from '@/components/ui/ds';
+import {
+  Body,
+  Button,
+  Disclosure,
+  DisclosurePanel,
+  DisclosureTrigger,
+  Pressable,
+  SideSheet,
+  Skeleton,
+  Slider,
+  Title,
+} from '@/components/ui/ds';
 import { ReadTrouble } from '@/components/frame/ReadTrouble';
 
 type Step = StepView;
@@ -39,7 +50,9 @@ export function DebugPanel({ run, step, shown }: { run: RunDetail; step: Step; s
     <section aria-label="Debug" className="shrink-0">
       <Disclosure isExpanded={isExpanded} onExpandedChange={setExpanded}>
         <DisclosureTrigger className="min-h-0 py-1.5">
-          <Body size="small" component="span" colorRole="on-surface-variant" className="font-body-small">Debug</Body>
+          <Body size="small" component="span" colorRole="on-surface-variant" className="font-body-small">
+            Debug
+          </Body>
         </DisclosureTrigger>
         <DisclosurePanel isUnstyled className={UNCLIPPED}>
           {isExpanded && <PathOf run={run} step={step} shown={shown} />}
@@ -95,7 +108,9 @@ function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: numbe
       ) : !read.data ? (
         <Reading label="Reading the path…" className="flex flex-col gap-3">
           <Skeleton shape="rectangle" className="h-24 rounded-none" />
-          <ReadingLines widths={['w-full', 'w-5/6', 'w-full', 'w-2/3']} className="gap-1 font-mono text-body-small" />
+          <Body size="small" component="div" className="contents">
+            <ReadingLines widths={['w-full', 'w-5/6', 'w-full', 'w-2/3']} className="gap-1 font-mono" />
+          </Body>
         </Reading>
       ) : (
         <PathDrawn read={read.data} reading={read.isPlaceholderData} at={at} lit={lit} taken={taken} onScrub={onScrub} />
@@ -123,7 +138,12 @@ function PathDrawn({
   taken: readonly string[];
   onScrub: (i: number) => void;
 }) {
-  if (read.taskId === null) return <Body size="medium" colorRole="on-surface-variant">Not filed yet, so there is no path to show.</Body>;
+  if (read.taskId === null)
+    return (
+      <Body size="medium" colorRole="on-surface-variant">
+        Not filed yet, so there is no path to show.
+      </Body>
+    );
   return (
     <div
       data-path={read.taskId}
@@ -172,7 +192,9 @@ function WideGraph({
         title={
           <div className="min-w-0 flex-1 space-y-2">
             <Title component="h2">{PATH_TITLE}</Title>
-            <code className="block font-mono text-body-small text-on-surface-variant">{taskId}</code>
+            <Body size="small" component="span" className="contents">
+              <code className="block font-mono text-on-surface-variant">{taskId}</code>
+            </Body>
             <div className="max-w-xl">
               <Scrubber path={path} at={at} onScrub={onScrub} />
             </div>
@@ -258,41 +280,48 @@ function Timeline({
 }) {
   const now = new Date(useNow(60_000));
   const routes = new Set(machine.edges.map((e) => `${e.from}->${e.to}`));
-  if (path.length === 0) return <Body size="medium" colorRole="on-surface-variant">Its journal has nothing on it yet.</Body>;
+  if (path.length === 0)
+    return (
+      <Body size="medium" colorRole="on-surface-variant">
+        Its journal has nothing on it yet.
+      </Body>
+    );
   return (
     <div className="space-y-2">
       <Scrubber path={path} at={at} onScrub={onScrub} />
-      <ol aria-label="The path" className="space-y-0.5 font-mono text-body-small">
-        {path.map((s, i) => {
-          const verb = byPerson(path, i, machine.verbs);
-          const offGraph = !verb && i > 0 && path[i - 1].state !== s.state && !routes.has(`${path[i - 1].state}->${s.state}`);
-          return (
-            <li key={i} data-entry={i} data-state-at={s.state} aria-current={i === at ? 'step' : undefined}>
-              <Pressable
-                onPress={() => onScrub(i)}
-                className={cn(
-                  'flex w-full items-baseline gap-2 rounded-shape-extra-small px-1.5 py-0.5',
-                  i === at && 'bg-alive-container text-on-alive-container',
-                  i > at && 'text-on-surface-variant',
-                )}
-              >
-                <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
-                  <span data-said>
-                    <span className="font-semibold">{s.state}</span> <span className="text-on-surface-variant">← {s.event}</span>
-                  </span>
-                  {verb && (
-                    <span data-by-person={verb} className="text-on-surface-variant italic">
-                      (by a person: {verb})
-                    </span>
+      <Body size="small" component="div" className="contents">
+        <ol aria-label="The path" className="space-y-0.5 font-mono">
+          {path.map((s, i) => {
+            const verb = byPerson(path, i, machine.verbs);
+            const offGraph = !verb && i > 0 && path[i - 1].state !== s.state && !routes.has(`${path[i - 1].state}->${s.state}`);
+            return (
+              <li key={i} data-entry={i} data-state-at={s.state} aria-current={i === at ? 'step' : undefined}>
+                <Pressable
+                  onPress={() => onScrub(i)}
+                  className={cn(
+                    'flex w-full items-baseline gap-2 rounded-shape-extra-small px-1.5 py-0.5',
+                    i === at && 'bg-alive-container text-on-alive-container',
+                    i > at && 'text-on-surface-variant',
                   )}
-                  {offGraph && <span className="text-on-surface-variant">(no edge)</span>}
-                </span>
-                <span className="shrink-0 text-on-surface-variant">{clockWord(new Date(s.at), now)}</span>
-              </Pressable>
-            </li>
-          );
-        })}
-      </ol>
+                >
+                  <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
+                    <span data-said>
+                      <span className="font-semibold">{s.state}</span> <span className="text-on-surface-variant">← {s.event}</span>
+                    </span>
+                    {verb && (
+                      <span data-by-person={verb} className="text-on-surface-variant italic">
+                        (by a person: {verb})
+                      </span>
+                    )}
+                    {offGraph && <span className="text-on-surface-variant">(no edge)</span>}
+                  </span>
+                  <span className="shrink-0 text-on-surface-variant">{clockWord(new Date(s.at), now)}</span>
+                </Pressable>
+              </li>
+            );
+          })}
+        </ol>
+      </Body>
     </div>
   );
 }

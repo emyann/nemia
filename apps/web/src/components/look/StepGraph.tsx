@@ -44,8 +44,12 @@ function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; m
       <Label size="small" component="span" title={name} className={cn('truncate uppercase', (mark && NAME_INK[mark]) ?? 'text-on-surface')}>
         {name}
       </Label>
-      <Body size="small" component="span" colorRole="on-surface" className="truncate">{named?.agent ?? '—'}</Body>
-      <Body size="small" component="span" colorRole="on-surface-variant" className="truncate font-mono">{named?.said || '–'}</Body>
+      <Body size="small" component="span" colorRole="on-surface" className="truncate">
+        {named?.agent ?? '—'}
+      </Body>
+      <Body size="small" component="span" colorRole="on-surface-variant" className="truncate font-mono">
+        {named?.said || '–'}
+      </Body>
     </span>
   );
 }
@@ -291,7 +295,9 @@ function Node({
     return (
       <div data-fold={point.names.join(' ')} className="absolute" style={box}>
         <Told said={said}>
-          <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono leading-none">+{point.names.length}</Body>
+          <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono leading-none">
+            +{point.names.length}
+          </Body>
         </Told>
       </div>
     );

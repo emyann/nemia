@@ -19,11 +19,13 @@ export const BLOCK_SIZE = { width: 288, height: 176 } as const;
 export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
   const repos = block.repos.join(', ');
   return (
-    <div
+    <Body
+      size="medium"
+      component="div"
       data-factory={block.name}
       data-inspected={block.inspected || undefined}
       style={BLOCK_SIZE}
-      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-surface-container-low p-4 text-body-medium text-on-surface shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-on-surface/10 hover:ring-on-surface/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
+      className={`flex cursor-pointer flex-col gap-2 rounded-xl bg-surface-container-low p-4 text-on-surface shadow-sm ${block.inspected ? 'ring-2 ring-ring' : 'ring-1 ring-on-surface/10 hover:ring-on-surface/30 in-focus-visible:ring-2 in-focus-visible:ring-ring'}`}
     >
       <span className="flex items-center gap-2">
         <FactoryIcon className="size-4 shrink-0 text-on-surface-variant" />
@@ -50,6 +52,6 @@ export function FactoryBlockNode({ data: block }: NodeProps<FactoryFlowNode>) {
           </span>
         </>
       )}
-    </div>
+    </Body>
   );
 }

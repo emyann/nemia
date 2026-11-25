@@ -10,14 +10,16 @@ import { cn } from '@/components/ui/ds/utils';
 export function BreakdownRows({ breakdown }: { breakdown: Breakdown }) {
   return (
     <>
-      <dl data-breakdown className="m-0 mt-1 grid grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-body-medium">
-        {breakdown.rows.map((row) => (
-          <div key={row.what} data-breakdown-row={row.what} className="contents">
-            <dt>{row.what}</dt>
-            <dd className={cn('m-0 text-end font-mono', !row.none && 'text-on-surface')}>{row.said}</dd>
-          </div>
-        ))}
-      </dl>
+      <Body size="medium" component="div" className="contents">
+        <dl data-breakdown className="m-0 mt-1 grid grid-cols-[1fr_auto] gap-x-6 gap-y-1">
+          {breakdown.rows.map((row) => (
+            <div key={row.what} data-breakdown-row={row.what} className="contents">
+              <dt>{row.what}</dt>
+              <dd className={cn('m-0 text-end font-mono', !row.none && 'text-on-surface')}>{row.said}</dd>
+            </div>
+          ))}
+        </dl>
+      </Body>
       {breakdown.foot && (
         <Body size="small" data-breakdown-foot className="m-0 mt-2 border-t border-outline-variant pt-2">
           {breakdown.foot}

@@ -119,13 +119,15 @@ export function PageLink({ entry, entries, children }: { entry: InboxEntry; entr
 export function CardStateChip({ state }: { state: CardState }) {
   const { word, title, hue } = CARD_WORDS[state];
   return (
-    <span
+    <Body
+      size="small"
+      component="span"
       data-card-state={state}
       title={title}
-      className={`inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-body-small leading-none ${container[hue]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 font-mono leading-none ${container[hue]}`}
     >
       {word}
-    </span>
+    </Body>
   );
 }
 
@@ -192,12 +194,13 @@ export function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<Inbo
   const { refused } = entry.tried;
   const now = useNow(60_000);
   return (
-    <p
+    <Body
+      size="small"
       data-tried={refused ? 'refused' : 'failed'}
-      className={`rounded border px-3 py-2 text-body-small break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-on-surface-variant'}`}
+      className={`rounded border px-3 py-2 break-words ${refused ? 'border-failure bg-failure-container text-on-failure-container' : 'border-outline-variant text-on-surface-variant'}`}
     >
       {triedLine(entry, instantWords(new Date(entry.tried.at), new Date(now)))}
-    </p>
+    </Body>
   );
 }
 
@@ -214,8 +217,12 @@ const NOT_DONE: Record<CardRefusal['action'], string> = {
 export function Refused({ refusal }: { refusal: CardRefusal }) {
   return (
     <div data-refused={refusal.action} className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <Body size="medium" className="font-medium text-on-failure-container">{NOT_DONE[refusal.action]}. The api refused it:</Body>
-      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{refusal.message}</Body>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        {NOT_DONE[refusal.action]}. The api refused it:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {refusal.message}
+      </Body>
     </div>
   );
 }
@@ -247,17 +254,18 @@ export function CardQueue({ entry }: { entry: InboxEntry }) {
         </Body>
       )}
       {entry.waits?.length ? (
-        <p
+        <Body
+          size="small"
           data-card-waits={entry.waits.map((w) => w.card).join(' ')}
           data-stalled={entry.waits.some((w) => w.stalled) ? 'true' : 'false'}
           className={
             entry.waits.some((w) => w.stalled)
-              ? 'rounded border border-failure bg-failure-container px-3 py-2 text-body-small text-on-failure-container'
-              : 'text-body-small text-on-surface-variant'
+              ? 'rounded border border-failure bg-failure-container px-3 py-2 text-on-failure-container'
+              : 'text-on-surface-variant'
           }
         >
           {waitWords(entry.name, entry.waits)}
-        </p>
+        </Body>
       ) : null}
     </>
   );

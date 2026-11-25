@@ -65,7 +65,9 @@ export function StartInputs({
       >
         <UploadIcon aria-hidden size={20} className="shrink-0" />
         <span className="min-w-0 flex-1">
-          <Body size="medium" component="span" className="block">{label}: drop them here, or</Body>
+          <Body size="medium" component="span" className="block">
+            {label}: drop them here, or
+          </Body>
           <Body size="small" component="span" colorRole="on-surface-variant" className="block" data-file-limit>
             {note}
           </Body>
@@ -92,10 +94,14 @@ export function StartInputs({
                 <Body size="medium" component="span" className="min-w-0 flex-1 truncate font-mono" title={file.name}>
                   {file.name}
                 </Body>
-                <span className={past ? 'shrink-0 text-body-small text-failure' : 'shrink-0 text-body-small text-on-surface-variant'}>
+                <Body size="small" component="span" className={past ? 'shrink-0 text-failure' : 'shrink-0 text-on-surface-variant'}>
                   {past ? `${sizeWords(file.size)}, past the ${MOST_WORDS} a file may be` : sizeWords(file.size)}
-                </span>
-                {mark && <Body size="small" component="span" colorRole="on-surface-variant" className="shrink-0">{MARK_WORDS[mark]}</Body>}
+                </Body>
+                {mark && (
+                  <Body size="small" component="span" colorRole="on-surface-variant" className="shrink-0">
+                    {MARK_WORDS[mark]}
+                  </Body>
+                )}
                 <IconButton
                   size="xsmall"
                   variant="standard"

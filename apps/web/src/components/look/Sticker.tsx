@@ -21,7 +21,9 @@ export function Sticker({ hue, label, children }: { hue: Hue | 'ink'; label: str
       data-grain="label"
       className={cn('inline-flex flex-col gap-0.5 rounded-[14px] px-3.5 pt-2.5 pb-[9px]', TONE[hue])}
     >
-      <Label size="small" component="span" className="uppercase">{label}</Label>
+      <Label size="small" component="span" className="uppercase">
+        {label}
+      </Label>
       <span className="font-label text-[22px] leading-[26px] font-extrabold" style={WIDE}>
         {children}
       </span>

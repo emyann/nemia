@@ -40,21 +40,23 @@ export function ResendCard({
       <Body size="medium">
         Send this card on as a card of its own, handed the run it was started as. Where that run waits on you, it is called off.
       </Body>
-      <RadioGroup
-        aria-label={`Where ${entry.name} is sent on to`}
-        name={`resend-${entry.name}`}
-        orientation="horizontal"
-        value={workflow}
-        onChange={setWorkflow}
-        className="gap-x-3 gap-y-1 text-body-small"
-      >
-        {workflows.map((w) => (
-          <Radio key={w} value={w}>
-            {w}
-          </Radio>
-        ))}
-        <Radio value={NONE}>None — its factory&apos;s card triggers take it</Radio>
-      </RadioGroup>
+      <Body size="small" component="div" className="contents">
+        <RadioGroup
+          aria-label={`Where ${entry.name} is sent on to`}
+          name={`resend-${entry.name}`}
+          orientation="horizontal"
+          value={workflow}
+          onChange={setWorkflow}
+          className="gap-x-3 gap-y-1"
+        >
+          {workflows.map((w) => (
+            <Radio key={w} value={w}>
+              {w}
+            </Radio>
+          ))}
+          <Radio value={NONE}>None — its factory&apos;s card triggers take it</Radio>
+        </RadioGroup>
+      </Body>
       <Button icon={send.isPending ? Pending : undefined} variant="outlined" isDisabled={send.isPending} onPress={() => send.mutate()}>
         {send.isPending ? 'Sending on…' : 'Send on'}
       </Button>

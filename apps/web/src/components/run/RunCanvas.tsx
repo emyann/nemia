@@ -88,7 +88,11 @@ export function RunCanvas(props: Props) {
   }, [names, edges]);
 
   if (computed instanceof Error) {
-    return <Body size="medium" className="rounded border border-failure px-3 py-2 text-failure">{computed.message}</Body>;
+    return (
+      <Body size="medium" className="rounded border border-failure px-3 py-2 text-failure">
+        {computed.message}
+      </Body>
+    );
   }
   return (
     <ReactFlowProvider>

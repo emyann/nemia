@@ -146,9 +146,11 @@ function homesOf(page: WorkflowStepPage, place: PagePlace) {
 export function StepWritten({ page }: { page: WorkflowStepPage }) {
   return (
     <AsWritten file={`${page.dir}/${page.step}.md`} source={page.source}>
-      <Markdown top className="text-body-medium">
-        {page.layers.policy}
-      </Markdown>
+      <Body size="medium" component="div" className="contents">
+        <Markdown top className="">
+          {page.layers.policy}
+        </Markdown>
+      </Body>
       <KeyTable
         rows={page.keys}
         note={
@@ -185,19 +187,33 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
   const now = new Date(useNow(60_000));
   return (
     <section aria-label="Recent runs" data-recent-runs className="space-y-2">
-      <Label size="medium" component="h2" colorRole="on-surface-variant" className="uppercase">Recent runs</Label>
+      <Label size="medium" component="h2" colorRole="on-surface-variant" className="uppercase">
+        Recent runs
+      </Label>
       {page.recentRuns.length === 0 ? (
-        <Body size="medium" colorRole="on-surface-variant">No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.</Body>
+        <Body size="medium" colorRole="on-surface-variant">
+          No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.
+        </Body>
       ) : (
         <ul className="space-y-1.5">
           {page.recentRuns.map((run) => (
-            <Body size="medium" component="li" key={run.id} data-recent-run={run.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Body
+              size="medium"
+              component="li"
+              key={run.id}
+              data-recent-run={run.id}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1"
+            >
               <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(page.step)} className={cn('min-w-0 truncate', LINK)}>
                 {titleOf(run)}
               </RouteLink>
-              <Body size="small" component="span" colorRole="on-surface-variant">{clockWord(new Date(run.createdAt), now)}</Body>
+              <Body size="small" component="span" colorRole="on-surface-variant">
+                {clockWord(new Date(run.createdAt), now)}
+              </Body>
               {run.factory && <FactoryTag name={run.factory} />}
-              <Body size="small" component="span" colorRole="on-surface-variant">{run.filed ? 'What it was told' : 'not reached yet'}</Body>
+              <Body size="small" component="span" colorRole="on-surface-variant">
+                {run.filed ? 'What it was told' : 'not reached yet'}
+              </Body>
             </Body>
           ))}
         </ul>
@@ -213,12 +229,14 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
 export function StepPageLink({ page, step }: { page: WorkflowPageAddress | null; step: string }) {
   if (!page) return null;
   return (
-    <RouteLink
-      {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
-      data-step-page-link={step}
-      className="text-body-small text-on-surface-variant hover:text-on-surface"
-    >
-      What it will be told now →
-    </RouteLink>
+    <Body size="small" component="div" className="contents">
+      <RouteLink
+        {...workflowLink(placeOfAddress(page), page.from, page.workflow, step)}
+        data-step-page-link={step}
+        className="text-on-surface-variant hover:text-on-surface"
+      >
+        What it will be told now →
+      </RouteLink>
+    </Body>
   );
 }

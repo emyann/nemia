@@ -27,49 +27,53 @@ export function Timeline({ run }: { run: RunDetail }) {
 
   return (
     <section aria-label="Timeline" className="space-y-2">
-      <Title size="small" component="h2">Timeline</Title>
+      <Title size="small" component="h2">
+        Timeline
+      </Title>
       <Body size="small" colorRole="on-surface-variant">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more
         than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
         session at, once it ended; a check costs nothing.
       </Body>
       <div className="overflow-x-auto rounded border border-outline-variant">
-        <table className="w-full text-left text-body-small tabular-nums">
-          <thead className="bg-surface-container text-on-surface-variant">
-            <tr>
-              {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (
-                <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">
-                  {heading}
-                </th>
+        <Body size="small" component="div" className="contents">
+          <table className="w-full text-left tabular-nums">
+            <thead className="bg-surface-container text-on-surface-variant">
+              <tr>
+                {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (
+                  <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {steps.flatMap((step) =>
+                step.timeline.flatMap((t) => [
+                  <TryRow key={`${step.name}/${t.try}`} step={step.name} t={t} />,
+                  ...(t.check
+                    ? [
+                        <SpanRow
+                          key={`${step.name}/${t.try}/check`}
+                          step={step.name}
+                          label={`try ${t.try} check`}
+                          task="check"
+                          span={t.check}
+                          used={null}
+                          cost={null}
+                        />,
+                      ]
+                    : []),
+                ]),
+              )}
+            </tbody>
+            <tfoot className="border-t border-outline-variant bg-surface-container">
+              {totals.map((total) => (
+                <TotalRow key={`${total.loop}:${total.round}`} total={total} named={went.length > 1} />
               ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant">
-            {steps.flatMap((step) =>
-              step.timeline.flatMap((t) => [
-                <TryRow key={`${step.name}/${t.try}`} step={step.name} t={t} />,
-                ...(t.check
-                  ? [
-                      <SpanRow
-                        key={`${step.name}/${t.try}/check`}
-                        step={step.name}
-                        label={`try ${t.try} check`}
-                        task="check"
-                        span={t.check}
-                        used={null}
-                        cost={null}
-                      />,
-                    ]
-                  : []),
-              ]),
-            )}
-          </tbody>
-          <tfoot className="border-t border-outline-variant bg-surface-container">
-            {totals.map((total) => (
-              <TotalRow key={`${total.loop}:${total.round}`} total={total} named={went.length > 1} />
-            ))}
-          </tfoot>
-        </table>
+            </tfoot>
+          </table>
+        </Body>
       </div>
     </section>
   );

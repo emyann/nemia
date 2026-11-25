@@ -84,7 +84,11 @@ function Said({ run, line }: { run: RunDetail; line: GotLine }) {
     case 'agent':
       return (
         <>
-          {line.skills.length > 0 && <Body size="small" className="font-mono">skills: {line.skills.join(', ')}</Body>}
+          {line.skills.length > 0 && (
+            <Body size="small" className="font-mono">
+              skills: {line.skills.join(', ')}
+            </Body>
+          )}
           {line.text && <Markdown>{line.text}</Markdown>}
         </>
       );
@@ -95,7 +99,9 @@ function Said({ run, line }: { run: RunDetail; line: GotLine }) {
 export function PartGot({ run, got }: { run: RunDetail; got: readonly GotLine[] }) {
   return (
     <section data-part-got aria-label="What it got" className="min-w-0 space-y-1">
-      <Label size="medium" component="h3" colorRole="on-surface-variant" className="uppercase">Got</Label>
+      <Label size="medium" component="h3" colorRole="on-surface-variant" className="uppercase">
+        Got
+      </Label>
       <ul className="space-y-0.5">
         {got.map((line, i) => (
           <li key={i} data-got={line.from} className="min-w-0">

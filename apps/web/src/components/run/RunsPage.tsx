@@ -101,7 +101,9 @@ export function RunsFailed({ error }: { error: unknown }) {
   return (
     <Frame state="error">
       <div role="alert" className="flex flex-col gap-1">
-        <p className={`m-0 text-body-medium ${ink.failure}`}>The runs could not be loaded.</p>
+        <Body size="medium" className={`m-0 ${ink.failure}`}>
+          The runs could not be loaded.
+        </Body>
         <Body size="small" colorRole="on-surface-variant" data-error-reason className="m-0 break-words">
           {troubleOf(error).words}
         </Body>
@@ -161,8 +163,12 @@ function CountChip({ count, word, tone }: { count: number; word: string; tone: '
       <CutTag edge={drawn === 'quiet'}>
         <CountTag count={count} drawn={drawn} tag={tag}>
           <span className="inline-flex items-baseline gap-2.5">
-            <Body size="large" component="span" className="font-mono">{count}</Body>
-            <Label size="large" component="span" className="uppercase">{word}</Label>
+            <Body size="large" component="span" className="font-mono">
+              {count}
+            </Body>
+            <Label size="large" component="span" className="uppercase">
+              {word}
+            </Label>
           </span>
         </CountTag>
       </CutTag>

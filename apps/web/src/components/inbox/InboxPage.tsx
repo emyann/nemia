@@ -33,7 +33,11 @@ type InboxAt = { factory?: string; l?: string; cards?: 'ended' };
 /** What the Inbox says Remove does to a started card, after the runs it was started as. */
 const REMOVE_STARTED = 'Remove drops it; to run the idea elsewhere, send it on.';
 
-const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
+const code = (text: string) => (
+  <Body size="small" component="span" className="contents">
+    <code className="font-mono">{text}</code>
+  </Body>
+);
 
 /**
  * The inbox: a box that files a card, and the cards, newest first, each startable and removable. The page keeps what a start or a drop was
@@ -332,8 +336,12 @@ function StartCard({
 function NotACard({ error }: { error: string }) {
   return (
     <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <Body size="medium" className="font-medium text-on-failure-container">Does not read as a card, so it cannot start:</Body>
-      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{error}</Body>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        Does not read as a card, so it cannot start:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {error}
+      </Body>
     </div>
   );
 }

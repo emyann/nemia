@@ -72,7 +72,11 @@ function Gave({ run, step, now }: { run: RunDetail; step: string; now: Date }) {
     <div data-result-gave={step} className="space-y-2">
       <ToPart run={run.id} step={step} />
       <Routed message={own.message} />
-      {own.closeout?.summary && <Body size="medium" className="break-words">{own.closeout.summary}</Body>}
+      {own.closeout?.summary && (
+        <Body size="medium" className="break-words">
+          {own.closeout.summary}
+        </Body>
+      )}
       {gave !== 'none' && <PartGave step={own} gave={gave} size="L" />}
     </div>
   );
@@ -135,7 +139,9 @@ export function RunResult({ run }: { run: RunDetail }) {
   return (
     <div className="grid items-start gap-6 @3xl/page:grid-cols-2">
       <section aria-label="The ask" data-run-ask className="min-w-0 space-y-3">
-        <Label size="large" component="h2" colorRole="on-surface-variant">The ask</Label>
+        <Label size="large" component="h2" colorRole="on-surface-variant">
+          The ask
+        </Label>
         <Markdown>{run.brief}</Markdown>
         {run.fromNote && (
           <Body size="medium" colorRole="on-surface-variant" data-from={run.from?.inbox}>
@@ -144,7 +150,9 @@ export function RunResult({ run }: { run: RunDetail }) {
         )}
       </section>
       <section aria-label="The result" data-run-result={resultOf(resultStepsOf(run)).kind} className="min-w-0 space-y-3">
-        <Label size="large" component="h2" colorRole="on-surface-variant">The result</Label>
+        <Label size="large" component="h2" colorRole="on-surface-variant">
+          The result
+        </Label>
         <Result run={run} />
       </section>
     </div>

@@ -56,9 +56,17 @@ function namedSteps(run: PanelRun, read: PanelRead | null, now: number) {
 function Fact({ name, value, under }: { name: string; value: ReactNode; under?: string | null }) {
   return (
     <span data-fact={name.toLowerCase()} className="flex min-w-0 flex-col gap-0.5">
-      <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">{name}</Label>
-      <Body size="large" component="span" colorRole="on-surface" className="font-mono">{value}</Body>
-      {under && <Body size="small" component="span" colorRole="on-surface-variant">{under}</Body>}
+      <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
+        {name}
+      </Label>
+      <Body size="large" component="span" colorRole="on-surface" className="font-mono">
+        {value}
+      </Body>
+      {under && (
+        <Body size="small" component="span" colorRole="on-surface-variant">
+          {under}
+        </Body>
+      )}
     </span>
   );
 }
@@ -78,8 +86,13 @@ function WorksIn({ run }: { run: PanelRun }) {
   const where = run.repo ?? (run.work ? `Its steps work in folders under ${run.work}` : 'Its steps work in folders the run made');
   return (
     <span data-fact="works-in" className="col-span-4 grid grid-cols-[120px_1fr] items-baseline gap-3 pt-2">
-      <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">Works in</Label>
-      <Body size="medium" component="span" colorRole="on-surface"
+      <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
+        Works in
+      </Label>
+      <Body
+        size="medium"
+        component="span"
+        colorRole="on-surface"
         data-works-in={run.repo ? 'repository' : 'folders'}
         title={where}
         className="truncate font-mono"
@@ -134,9 +147,13 @@ const waitsOnOf = (run: PanelRun) => [
 function RunsLine({ name, ids, among }: { name: string; ids: readonly string[]; among: readonly NamedRun[] }) {
   return (
     <span data-runs={name} className="grid grid-cols-[120px_1fr] items-baseline gap-3">
-      <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">{name}</Label>
+      <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
+        {name}
+      </Label>
       {ids.length === 0 ? (
-        <Body size="medium" component="span" colorRole="on-surface-variant">no run</Body>
+        <Body size="medium" component="span" colorRole="on-surface-variant">
+          no run
+        </Body>
       ) : (
         <span className="flex flex-wrap gap-x-3.5 gap-y-1">
           {ids.map((id) => (
@@ -175,7 +192,10 @@ export function PanelFoot({
   const line = read?.steps.find((one) => one.name === step)?.lastLine ?? null;
   return (
     <span data-foot className={className}>
-      <Body size="small" component="span" colorRole="on-surface-variant"
+      <Body
+        size="small"
+        component="span"
+        colorRole="on-surface-variant"
         data-last-line
         title={line ?? undefined}
         className={cn('min-w-0 flex-1 truncate bg-background px-3 py-2 font-mono')}

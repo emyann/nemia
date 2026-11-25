@@ -42,14 +42,13 @@ function Trace({ className, ...props }: React.ComponentProps<'div'>) {
 /** One step: its icon, its sentence and its fact, in the state `status` says, done when it says none. */
 function TraceLine({ className, status, ...props }: React.ComponentProps<'span'> & { status?: TraceStatus }) {
   return (
-    <Body size="medium" component="span" colorRole="on-surface"
+    <Body
+      size="medium"
+      component="span"
+      colorRole="on-surface"
       data-slot="trace-line"
       data-status={status}
-      className={cn(
-        'flex min-h-8 w-full max-w-full min-w-0 items-center gap-2.5 px-2 py-1',
-        status && STATUS[status],
-        className,
-      )}
+      className={cn('flex min-h-8 w-full max-w-full min-w-0 items-center gap-2.5 px-2 py-1', status && STATUS[status], className)}
       {...props}
     />
   );
@@ -84,7 +83,10 @@ function TraceTitle({ className, ...props }: React.ComponentProps<'span'>) {
 /** A line's quiet fact on its right, in mono: a duration, a count, a diff stat. */
 function TraceDescription({ className, ...props }: React.ComponentProps<'span'>) {
   return (
-    <Body size="small" component="span" colorRole="on-surface-variant"
+    <Body
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
       data-slot="trace-description"
       className={cn('shrink-0 font-mono tabular-nums', className)}
       {...props}

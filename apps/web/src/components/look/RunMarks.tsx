@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { Body, Focusable, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Focusable, Label, Tag, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import { titleOf } from '@/lib/factory';
@@ -49,17 +49,19 @@ export function RunMark({ id, run }: { id: string; run?: NamedRun }) {
   const said = run ? `${titleOf(run)} — ${now?.step ?? 'done'}` : id;
   return (
     <TooltipTrigger delay={300}>
-      <TextLink
-        to="/runs/$runId"
-        params={{ runId: id }}
-        data-now-run={id}
-        data-run-mark={id}
-        aria-label={`${id.slice(-4)}: ${said}`}
-        className="inline-flex items-center gap-1 align-baseline font-mono text-body-medium whitespace-nowrap"
-      >
-        <MarkDiamond mark={run ? nowMark(run) : 'rest'} />
-        <span className="underline decoration-outline underline-offset-4">{id.slice(-4)}</span>
-      </TextLink>
+      <Body size="medium" component="span" className="contents">
+        <TextLink
+          to="/runs/$runId"
+          params={{ runId: id }}
+          data-now-run={id}
+          data-run-mark={id}
+          aria-label={`${id.slice(-4)}: ${said}`}
+          className="inline-flex items-center gap-1 align-baseline font-mono whitespace-nowrap"
+        >
+          <MarkDiamond mark={run ? nowMark(run) : 'rest'} />
+          <span className="underline decoration-outline underline-offset-4">{id.slice(-4)}</span>
+        </TextLink>
+      </Body>
       <Tooltip>{`${id}\n${said}`}</Tooltip>
     </TooltipTrigger>
   );
@@ -71,14 +73,11 @@ export function Chip({ now, small = false }: { now: Pick<Now, 'step' | 'tone'>; 
   return (
     <CutTag edge={tag.variant === 'outlined'}>
       {tag.color === 'alive' ? (
-        <MeaningTag
-          data-now-word
-          data-tone={now.tone}
-          hue="alive"
-          className={cn('shrink-0 uppercase', small && 'h-5 px-1.5 text-label-small')}
-        >
-          {now.step}
-        </MeaningTag>
+        <Label size="small" component="div" className="contents">
+          <MeaningTag data-now-word data-tone={now.tone} hue="alive" className={cn('shrink-0 uppercase', small && 'h-5 px-1.5')}>
+            {now.step}
+          </MeaningTag>
+        </Label>
       ) : (
         <Tag
           data-now-word
@@ -119,7 +118,11 @@ export function Pips({ round, tone, words = false }: { round: NonNullable<Now['r
           ))}
         </span>
       </Marked>
-      {words && <Body size="medium" component="span" colorRole="on-surface-variant">{said}</Body>}
+      {words && (
+        <Body size="medium" component="span" colorRole="on-surface-variant">
+          {said}
+        </Body>
+      )}
     </span>
   );
 }
@@ -160,7 +163,9 @@ export function Ring({ budget, words = false }: { budget: NonNullable<Now['budge
         </svg>
       </Marked>
       {budget.over ? (
-        <Body size="small" component="span" className={cn('', ink.failure)}>{NOW_WORDS.over(budget.capSaid)}</Body>
+        <Body size="small" component="span" className={cn('', ink.failure)}>
+          {NOW_WORDS.over(budget.capSaid)}
+        </Body>
       ) : (
         words && (
           <Body size="small" component="span" colorRole="on-surface" data-ring-words className={cn('font-mono whitespace-nowrap')}>
@@ -177,7 +182,10 @@ export function Fan({ count, className }: { count: number; className?: string })
   const said = NOW_WORDS.waitedBy(count);
   return (
     <Marked said={said}>
-      <Body size="small" component="span" colorRole="on-surface-variant"
+      <Body
+        size="small"
+        component="span"
+        colorRole="on-surface-variant"
         data-waited-by={count}
         aria-label={said}
         role="img"

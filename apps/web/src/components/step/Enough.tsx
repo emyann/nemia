@@ -19,7 +19,9 @@ export function EnoughRow({ runId, offer, line }: { runId: string; offer: Extrac
   const words = OFFERS.enough;
   if (approve.isSuccess) return <AskedRow step={offer.step} said={`try ${approve.data.try} ${words.approved(offer.step)}`} />;
   return (
-    <Body size="medium" component="li"
+    <Body
+      size="medium"
+      component="li"
       data-offer={offer.case}
       data-kind={offer.kind}
       data-step={offer.step}

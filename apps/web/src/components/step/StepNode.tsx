@@ -89,9 +89,9 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-label-small uppercase ${gate ? 'text-yours' : 'text-on-surface-variant'}`}>
+          <Label size="small" component="span" className={`uppercase ${gate ? 'text-yours' : 'text-on-surface-variant'}`}>
             {gate ? 'human gate' : headOf(node, index)}
-          </span>
+          </Label>
           {running && (
             <span
               role="img"
@@ -116,23 +116,25 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
       </div>
 
       {cost && (
-        <p
+        <Body
+          size="small"
           data-cost={over ? 'over' : 'within'}
           title={
             step.budget
               ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
               : 'What its tries have cost'
           }
-          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small ${over ? 'font-semibold text-failure' : 'text-on-surface-variant'}`}
+          className={`truncate border-t border-outline-variant px-3 py-1 font-mono ${over ? 'font-semibold text-failure' : 'text-on-surface-variant'}`}
         >
           <span className="font-sans font-normal">cost </span>
           {cost}
-        </p>
+        </Body>
       )}
 
       {gate && <GateBand word={PERSON[state].rail} need={need ? { kind: need.kind, said: nodeNeed(need, step) } : null} />}
       {!gate && need && (
-        <Body size="small"
+        <Body
+          size="small"
           data-need={need.kind}
           title={needText(need)}
           className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-on-yours-container"
@@ -141,7 +143,8 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
         </Body>
       )}
       {step.denied && (
-        <Body size="small"
+        <Body
+          size="small"
           data-denied
           title={step.denied.words}
           className="truncate border-t border-outline-variant px-3 py-1 font-mono text-failure"
@@ -169,7 +172,11 @@ function RunsOnOrGave({ step, gave, line }: { step: StepNodeData['step']; gave: 
         <PartGave step={step} gave={gave} size="S" />
       </div>
     );
-  return <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">{line}</Body>;
+  return (
+    <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">
+      {line}
+    </Body>
+  );
 }
 
 /**
@@ -319,22 +326,26 @@ export function SpecNode({
         <Body size="medium" className="mt-0.5 truncate font-semibold" title={name}>
           {name}
         </Body>
-        <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">{nodeLine(node, spec)}</Body>
+        <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">
+          {nodeLine(node, spec)}
+        </Body>
       </div>
 
       {node?.kind === 'condition' && <RouteBand node={node} routes={routes} taken={null} routed={null} />}
 
       {lines.length > 0 && node?.kind !== 'workflow' && (
-        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
-          {lines.map(([label, value, title = value]) => (
-            <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-on-surface-variant">{label}</dt>
-              <dd className="line-clamp-3 min-w-0 font-mono break-words text-on-surface" title={title}>
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <Body size="small" component="div" className="contents">
+          <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5">
+            {lines.map(([label, value, title = value]) => (
+              <div key={label} className="flex min-w-0 gap-1.5">
+                <dt className="shrink-0 text-on-surface-variant">{label}</dt>
+                <dd className="line-clamp-3 min-w-0 font-mono break-words text-on-surface" title={title}>
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Body>
       )}
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
@@ -392,28 +403,36 @@ function BuildingNode({
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">{stepLabel(index)}</Label>
+          <Label size="small" component="span" colorRole="on-surface-variant" className="uppercase">
+            {stepLabel(index)}
+          </Label>
           {build.unsaved && (
-            <Label size="small" component="span" className="rounded-full bg-yours-container px-1.5 text-on-yours-container">unsaved</Label>
+            <Label size="small" component="span" className="rounded-full bg-yours-container px-1.5 text-on-yours-container">
+              unsaved
+            </Label>
           )}
         </div>
         <Body size="medium" className="mt-0.5 truncate font-semibold" title={name}>
           {name}
         </Body>
-        <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">{runsOn(spec)}</Body>
+        <Body size="small" colorRole="on-surface-variant" className="mt-0.5 truncate font-mono">
+          {runsOn(spec)}
+        </Body>
       </div>
 
       {lines.length > 0 && (
-        <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5 text-body-small">
-          {lines.map(([label, value, title = value]) => (
-            <div key={label} className="flex min-w-0 gap-1.5">
-              <dt className="shrink-0 text-on-surface-variant">{label}</dt>
-              <dd className="line-clamp-2 min-w-0 font-mono break-words text-on-surface" title={title}>
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <Body size="small" component="div" className="contents">
+          <dl className="space-y-0.5 border-t border-outline-variant px-3 py-1.5">
+            {lines.map(([label, value, title = value]) => (
+              <div key={label} className="flex min-w-0 gap-1.5">
+                <dt className="shrink-0 text-on-surface-variant">{label}</dt>
+                <dd className="line-clamp-2 min-w-0 font-mono break-words text-on-surface" title={title}>
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Body>
       )}
 
       <Handle type="source" position={sourcePosition} title={`Drag to a step that waits on ${name}`} className={`${HANDLE} !bg-outline`} />
@@ -465,7 +484,9 @@ function RouteBand({
     ) : null;
   const proposes = routed?.kind === 'proposes' ? routed.route : null;
   return (
-    <Body size="small" colorRole="on-surface-variant"
+    <Body
+      size="small"
+      colorRole="on-surface-variant"
       data-routes
       title={taken ? `It took the route ${taken}.` : proposes ? `It proposes the route ${proposes}.` : 'No route taken yet.'}
       className="truncate border-t border-outline-variant px-3 py-1 font-mono"
@@ -491,7 +512,8 @@ function RouteBand({
 /** A gate's band under its node: the rail's word for the state, then what it waits for, whole on hover. */
 function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; said: string } | null }) {
   return (
-    <Body size="small"
+    <Body
+      size="small"
       data-gate-band
       title={need?.said}
       className="truncate border-t border-outline-variant bg-yours-container px-3 py-1 text-on-yours-container"

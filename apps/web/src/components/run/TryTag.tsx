@@ -6,7 +6,10 @@ import { Body, Label } from '@/components/ui/ds';
 /** The tag a try's run wears on Runs, on the Factory and on its own page: started from an agent's page, and not from a workflow. */
 export function TryTag({ agent }: { agent: string }) {
   return (
-    <Label size="small" component="span" colorRole="on-surface-variant"
+    <Label
+      size="small"
+      component="span"
+      colorRole="on-surface-variant"
       data-try-tag={agent}
       title={`A try of the agent ${agent}, started from its page: fenced to its own folder, with a dollar to spend`}
       className="shrink-0 rounded-full border border-dashed border-outline px-1.5 py-0.5 leading-none"

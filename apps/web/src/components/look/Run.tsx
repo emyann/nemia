@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Cell, Label, Row, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Label, Row, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import type { RunView } from '@/lib/api/judged';
 import type { RunClock as Clock } from '@/lib/api/runs';
@@ -197,13 +197,15 @@ function WordsSaid({ run, look, among, cut }: { run: PartRun; look: Look; among:
   const said = run.waiting?.word || run.holding?.word;
   return (
     <span {...saying('words')} className={cn('min-w-0', cut && 'truncate')}>
-      <Words
-        words={words}
-        tone={look.now.tone}
-        among={among.filter((other) => other.id !== run.id)}
-        title={cut ? [said || whole, run.waiting?.advice || run.holding?.advice].filter(Boolean).join('\n') : undefined}
-        className={cn(cut && 'text-body-small')}
-      />
+      <Body size="small" component="div" className="contents">
+        <Words
+          words={words}
+          tone={look.now.tone}
+          among={among.filter((other) => other.id !== run.id)}
+          title={cut ? [said || whole, run.waiting?.advice || run.holding?.advice].filter(Boolean).join('\n') : undefined}
+          className={cn(cut && '')}
+        />
+      </Body>
     </span>
   );
 }
@@ -381,7 +383,9 @@ function RunCard({
         <span {...saying('graph')} className={s.steps()}>
           <StepGraph run={run} wrap={wrap} className={still} />
         </span>
-        <CostSaid run={run} className="text-body-small" />
+        <Body size="small" component="span" className="contents">
+          <CostSaid run={run} className="" />
+        </Body>
       </span>
       {children}
     </Framed>
@@ -424,7 +428,9 @@ function RunBig(props: RunProps & { look: Look; among: readonly PartRun[] }) {
           <span {...saying('graph')} className={s.steps()}>
             <StepGraph run={run} wrap={wrap} className={still} />
           </span>
-          <CostSaid run={run} className="text-body-small" />
+          <Body size="small" component="span" className="contents">
+            <CostSaid run={run} className="" />
+          </Body>
           <span {...saying('action')} className="ml-auto inline-flex">
             <CutButton to="/runs/$runId" params={{ runId: run.id }} quiet className={still}>
               {OPENS}

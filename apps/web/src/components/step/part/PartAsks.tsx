@@ -38,7 +38,9 @@ function Words({ asks }: { asks: Asks }) {
       {asks.waitingFor && (
         <p data-asks-waiting className="break-words">
           {asks.waitingFor.words}
-          <Body size="small" component="span" colorRole="on-surface-variant" className="block">{asks.waitingFor.advice}</Body>
+          <Body size="small" component="span" colorRole="on-surface-variant" className="block">
+            {asks.waitingFor.advice}
+          </Body>
         </p>
       )}
     </>
@@ -84,8 +86,10 @@ export function PartAsks({ run, step, asks, size }: { run: RunDetail; step: Step
     );
   }
   return (
-    <section data-part-asks={size} aria-label={`What ${step.name} asks of you`} className="min-w-0 space-y-3 text-body-medium">
-      <Answered run={run} step={step} asks={asks} />
-    </section>
+    <Body size="medium" component="div" className="contents">
+      <section data-part-asks={size} aria-label={`What ${step.name} asks of you`} className="min-w-0 space-y-3">
+        <Answered run={run} step={step} asks={asks} />
+      </section>
+    </Body>
   );
 }

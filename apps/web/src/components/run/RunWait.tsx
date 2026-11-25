@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import type { Actor as ActorRead } from 'objects';
 import { container } from '../../lib/meaning';
 import { Actor } from '../actor/Actor';
+import { Body } from '@/components/ui/ds';
 
 /** What a run waits on other runs for, in the package's words: a start `--after` runs (`waiting`) or a person's hold (`holding`). */
 type RunWaitFacts = {
@@ -20,30 +21,34 @@ type RunWaitFacts = {
  */
 export function RunWait({ label, wait, actor, children }: { label: string; wait: RunWaitFacts; actor?: ActorRead; children?: ReactNode }) {
   return (
-    <section
-      aria-label={label}
-      data-on-you={wait.waitingOnYou}
-      className={`space-y-1 rounded px-3 py-2 text-body-medium ${wait.waitingOnYou ? container.yours : container.grey}`}
-    >
-      <p className="font-mono">{wait.word}</p>
-      <p data-advice>{wait.advice}</p>
-      <Actor actor={actor} className="text-inherit" />
-      {wait.runs.length > 0 && (
-        <ul className="flex flex-wrap gap-x-3 text-body-small">
-          {wait.runs.map((w) => (
-            <li key={w.run}>
-              {w.missing ? (
-                <span className="font-mono">{w.run}</span>
-              ) : (
-                <Link to="/runs/$runId" params={{ runId: w.run }} className="font-mono underline underline-offset-2">
-                  {w.run}
-                </Link>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {children}
-    </section>
+    <Body size="medium" component="div" className="contents">
+      <section
+        aria-label={label}
+        data-on-you={wait.waitingOnYou}
+        className={`space-y-1 rounded px-3 py-2 ${wait.waitingOnYou ? container.yours : container.grey}`}
+      >
+        <p className="font-mono">{wait.word}</p>
+        <p data-advice>{wait.advice}</p>
+        <Actor actor={actor} className="text-inherit" />
+        {wait.runs.length > 0 && (
+          <Body size="small" component="div" className="contents">
+            <ul className="flex flex-wrap gap-x-3">
+              {wait.runs.map((w) => (
+                <li key={w.run}>
+                  {w.missing ? (
+                    <span className="font-mono">{w.run}</span>
+                  ) : (
+                    <Link to="/runs/$runId" params={{ runId: w.run }} className="font-mono underline underline-offset-2">
+                      {w.run}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Body>
+        )}
+        {children}
+      </section>
+    </Body>
   );
 }

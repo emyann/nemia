@@ -40,7 +40,9 @@ export function ContextPicker({
         Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not landed, not judged.
       </Body>
       {runs.error ? (
-        <ReadTrouble what="the runs to read" error={runs.error} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadTrouble what="the runs to read" error={runs.error} className="" />
+        </Body>
       ) : !listed ? (
         <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
           {[0, 1, 2].map((at) => (
@@ -52,7 +54,9 @@ export function ContextPicker({
           ))}
         </Reading>
       ) : !listed.length ? (
-        <Body size="small" colorRole="on-surface-variant">No run to read.</Body>
+        <Body size="small" colorRole="on-surface-variant">
+          No run to read.
+        </Body>
       ) : (
         <ul aria-label="Runs to read" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {listed.map((run) => (
@@ -68,7 +72,9 @@ export function ContextPicker({
                   <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={run.title}>
                     {run.title}
                   </span>
-                  <Body size="small" component="span" colorRole="on-surface-variant" className="hidden shrink-0 font-mono @md/page:inline">{run.id}</Body>
+                  <Body size="small" component="span" colorRole="on-surface-variant" className="hidden shrink-0 font-mono @md/page:inline">
+                    {run.id}
+                  </Body>
                   <Body size="small" component="span" colorRole="on-surface-variant" data-standing className="shrink-0" title={run.advice}>
                     {run.standing}
                   </Body>
@@ -105,15 +111,21 @@ export function ConcludedPreview({ run }: { run: string }) {
         )}
       </Body>
       {concluded.error ? (
-        <ReadTrouble what="what it concluded" error={concluded.error} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadTrouble what="what it concluded" error={concluded.error} className="" />
+        </Body>
       ) : !concluded.data ? (
         <Reading label="Reading what it concluded…" className="rounded p-2">
-          <ReadingLines widths={['w-full', 'w-5/6', 'w-1/2']} className="text-body-small" />
+          <Body size="small" component="div" className="contents">
+            <ReadingLines widths={['w-full', 'w-5/6', 'w-1/2']} className="" />
+          </Body>
         </Reading>
       ) : (
-        <Markdown level={5} className="max-h-60 overflow-y-auto rounded bg-surface-container-highest/60 p-2 text-body-small">
-          {concluded.data.section}
-        </Markdown>
+        <Body size="small" component="div" className="contents">
+          <Markdown level={5} className="max-h-60 overflow-y-auto rounded bg-surface-container-highest/60 p-2">
+            {concluded.data.section}
+          </Markdown>
+        </Body>
       )}
     </section>
   );

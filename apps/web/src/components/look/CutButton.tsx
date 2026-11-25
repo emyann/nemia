@@ -62,7 +62,9 @@ function Body({
           style={{ clipPath: cutRing(CUT, GAP, RING) }}
         />
       )}
-      <Label size="large" component="span"
+      <Label
+        size="large"
+        component="span"
         data-cut-shape
         className={cn(
           'relative inline-flex items-center gap-2 whitespace-nowrap uppercase',

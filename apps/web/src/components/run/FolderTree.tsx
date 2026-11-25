@@ -14,9 +14,17 @@ type Key = Parameters<NonNullable<TreeProps<object>['onAction']>>[0];
 /** What a file row says after its name: its size where the api serves it, when it went where a prune removed it, nothing else. */
 function After({ file }: { file: StepArtifact }) {
   if ('pruned' in file)
-    return <Body size="small" component="span" colorRole="on-surface-variant">removed at {when(file.prunedAt)}, by a prune of its files</Body>;
+    return (
+      <Body size="small" component="span" colorRole="on-surface-variant">
+        removed at {when(file.prunedAt)}, by a prune of its files
+      </Body>
+    );
   if (!('url' in file)) return null;
-  return <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">· {bytesWord(file.size)}</Body>;
+  return (
+    <Body size="small" component="span" colorRole="on-surface-variant" className="font-mono">
+      · {bytesWord(file.size)}
+    </Body>
+  );
 }
 
 /** A file row's lead: the picture itself, small, where it is one the api serves; else a file's glyph. */
@@ -103,7 +111,12 @@ export function FolderTree({
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState<ReadonlySet<Key>>(new Set());
-  if (!files.length) return <Body size="small" colorRole="on-surface-variant">{none}</Body>;
+  if (!files.length)
+    return (
+      <Body size="small" colorRole="on-surface-variant">
+        {none}
+      </Body>
+    );
   const tree = folderTreeOf(files);
   const opened = (key: Key) => {
     if (typeof key === 'string' && key.endsWith('/')) {

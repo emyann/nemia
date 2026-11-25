@@ -86,8 +86,12 @@ export const roundAsk = (queryClient: QueryClient, runId: string, namespaceNow: 
 export function Refusal({ error, not = 'Not asked' }: { error: Error; not?: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <Body size="medium" className="font-medium text-on-failure-container">{not}. The api refused it:</Body>
-      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{error.message}</Body>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        {not}. The api refused it:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {error.message}
+      </Body>
     </div>
   );
 }

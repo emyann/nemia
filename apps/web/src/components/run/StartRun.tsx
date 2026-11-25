@@ -138,8 +138,12 @@ function StartPress({ pending, held, children }: { pending: boolean; held: boole
 function StartRefused({ message }: { message: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
-      <Body size="medium" className="font-medium text-on-failure-container">Not started. The api refused it:</Body>
-      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">{message}</Body>
+      <Body size="medium" className="font-medium text-on-failure-container">
+        Not started. The api refused it:
+      </Body>
+      <Body size="small" className="font-mono whitespace-pre-wrap break-words text-on-failure-container">
+        {message}
+      </Body>
     </div>
   );
 }
@@ -188,9 +192,11 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
   return (
     <Body size="medium" data-started={id}>
       Started{' '}
-      <Link to="/runs/$runId" params={{ runId: id }} className="font-mono text-body-medium underline underline-offset-2">
-        {id}
-      </Link>
+      <Body size="medium" component="span" className="contents">
+        <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
+          {id}
+        </Link>
+      </Body>
       . Nothing is filed until the daemon&apos;s next pass
       {after.length > 0 && (
         <>
@@ -254,7 +260,9 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
           No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.
         </Body>
       ) : runs.error ? (
-        <ReadTrouble what="the runs to wait on" error={runs.error} className="text-body-small" />
+        <Body size="small" component="div" className="contents">
+          <ReadTrouble what="the runs to wait on" error={runs.error} className="" />
+        </Body>
       ) : !onRepo ? (
         <Reading label="Reading the runs…" className="divide-y divide-outline-variant rounded border border-outline">
           {[0, 1, 2].map((at) => (
@@ -265,7 +273,9 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
           ))}
         </Reading>
       ) : !onRepo.length ? (
-        <Body size="small" colorRole="on-surface-variant">No run on this repository to wait on.</Body>
+        <Body size="small" colorRole="on-surface-variant">
+          No run on this repository to wait on.
+        </Body>
       ) : (
         <ul aria-label="Runs to wait on" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {onRepo.map((run) => (
@@ -280,8 +290,17 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
                   <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
                     {titleOf(run)}
                   </span>
-                  <Body size="small" component="span" colorRole="on-surface-variant" className="hidden shrink-0 font-mono @md/page:inline">{run.id}</Body>
-                  <Body size="small" component="span" colorRole="on-surface-variant" data-standing className="shrink-0" title={run.waiting?.advice}>
+                  <Body size="small" component="span" colorRole="on-surface-variant" className="hidden shrink-0 font-mono @md/page:inline">
+                    {run.id}
+                  </Body>
+                  <Body
+                    size="small"
+                    component="span"
+                    colorRole="on-surface-variant"
+                    data-standing
+                    className="shrink-0"
+                    title={run.waiting?.advice}
+                  >
                     {standingOf(run)}
                   </Body>
                 </Body>

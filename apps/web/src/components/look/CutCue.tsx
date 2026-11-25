@@ -19,7 +19,12 @@ const WORDS: Record<FrameHue, string> = {
 export function CutCue({ hue = 'none', children }: { hue?: FrameHue; children: ReactNode }) {
   return (
     <CutFrame hue={hue} size={9} className="inline-flex shrink-0">
-      <Label size="small" component="span" data-cue={hue} className={cn('inline-flex h-7 items-center px-3.5 whitespace-nowrap uppercase', WORDS[hue])}>
+      <Label
+        size="small"
+        component="span"
+        data-cue={hue}
+        className={cn('inline-flex h-7 items-center px-3.5 whitespace-nowrap uppercase', WORDS[hue])}
+      >
         {children}
       </Label>
     </CutFrame>

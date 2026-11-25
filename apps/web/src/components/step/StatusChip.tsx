@@ -37,14 +37,16 @@ export function StatusChip({
   const state = stepState(codes, runCancelled, runHeld);
   const { rail, meaning } = stateWordsOf(state, codes.on, runHeld);
   return (
-    <span
+    <Body
+      size="small"
+      component="span"
       title={chipTitle(state, meaning, codes.message, note)}
       data-state={state}
-      className={`inline-flex max-w-full min-w-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-body-small leading-none ${stateClass[state]}`}
+      className={`inline-flex max-w-full min-w-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono leading-none ${stateClass[state]}`}
     >
       {state === 'unverified' && <CircleDashed aria-hidden strokeWidth={2.5} className="size-2.5 shrink-0" />}
       <span className="truncate">{rail}</span>
-    </span>
+    </Body>
   );
 }
 

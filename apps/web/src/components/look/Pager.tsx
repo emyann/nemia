@@ -46,7 +46,10 @@ function PageButton({ trail, which, children }: { trail: readonly string[] | nul
 export function Pager({ trail, next, count, total, size }: PageAt) {
   const at = { trail, next, count, total, size };
   return (
-    <Body size="small" component="div" colorRole="on-surface-variant"
+    <Body
+      size="small"
+      component="div"
+      colorRole="on-surface-variant"
       data-pager
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 font-mono"
     >

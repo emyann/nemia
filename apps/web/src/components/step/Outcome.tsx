@@ -30,11 +30,17 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
       <div className="flex items-center justify-between gap-2">
         <p data-outcome={word} data-by={outcome.by} className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Tag className={BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by]}>{word}</Tag>{' '}
-          <Body size="small" component="span" colorRole="on-surface-variant">{BY[outcome.by]}</Body>
+          <Body size="small" component="span" colorRole="on-surface-variant">
+            {BY[outcome.by]}
+          </Body>
         </p>
         {aside}
       </div>
-      {outcome.by === 'agent' && outcome.cut && <Body size="small" className="text-failure">… {outcome.cut}.</Body>}
+      {outcome.by === 'agent' && outcome.cut && (
+        <Body size="small" className="text-failure">
+          … {outcome.cut}.
+        </Body>
+      )}
       {outcome.by !== 'agent' && (
         <p data-reason className="text-on-surface-variant">
           {outcome.words}
@@ -57,39 +63,43 @@ const ANSWER: Record<string, string> = {
  */
 export function Replies({ replies }: { replies: ReadonlyArray<Record<string, unknown>> }) {
   return (
-    <ul className="space-y-2 text-body-small">
-      {replies.map((reply, i) => {
-        const answer = text(reply.answer ?? '');
-        const why = reply.why === undefined ? '' : text(reply.why);
-        return (
-          <li key={i} data-answer={answer} className="space-y-0.5">
-            <Markdown>{text(reply.finding ?? '')}</Markdown>{' '}
-            <div className="flex items-start gap-1.5 text-on-surface-variant">
-              <span className="shrink-0">
-                → <Tag className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Tag>
-              </span>
-              {why && (
-                <>
-                  {' '}
-                  <span aria-hidden>·</span> <Markdown>{why}</Markdown>
-                </>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <Body size="small" component="div" className="contents">
+      <ul className="space-y-2">
+        {replies.map((reply, i) => {
+          const answer = text(reply.answer ?? '');
+          const why = reply.why === undefined ? '' : text(reply.why);
+          return (
+            <li key={i} data-answer={answer} className="space-y-0.5">
+              <Markdown>{text(reply.finding ?? '')}</Markdown>{' '}
+              <div className="flex items-start gap-1.5 text-on-surface-variant">
+                <span className="shrink-0">
+                  → <Tag className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Tag>
+                </span>
+                {why && (
+                  <>
+                    {' '}
+                    <span aria-hidden>·</span> <Markdown>{why}</Markdown>
+                  </>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Body>
   );
 }
 
 /** A value as the JSON it came as. */
 export function Json({ value, ...data }: { value: unknown } & Record<`data-${string}`, string | boolean>) {
   return (
-    <pre
-      {...data}
-      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-container-highest p-2 font-mono text-body-small leading-snug"
-    >
-      {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
-    </pre>
+    <Body size="small" component="div" className="contents">
+      <pre
+        {...data}
+        className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-container-highest p-2 font-mono leading-snug"
+      >
+        {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+      </pre>
+    </Body>
   );
 }

@@ -77,14 +77,16 @@ export function Labels({ labels, edit }: { labels: Readonly<LabelMap>; edit: (ed
             </Button>
           }
         >
-          <input
-            aria-label="Add a label"
-            name="label"
-            value={text}
-            placeholder="key=value"
-            onChange={(event) => setText(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent py-1.5 pl-3.5 text-body-medium text-on-surface outline-none placeholder:text-on-surface-variant"
-          />
+          <Body size="medium" component="span" className="contents">
+            <input
+              aria-label="Add a label"
+              name="label"
+              value={text}
+              placeholder="key=value"
+              onChange={(event) => setText(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent py-1.5 pl-3.5 text-on-surface outline-none placeholder:text-on-surface-variant"
+            />
+          </Body>
         </CutField>
         {refused === null ? null : (
           <Body size="small" role="alert" data-labels-refused className="m-0 text-failure">

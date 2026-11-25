@@ -52,7 +52,9 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
     >
       <Handle type="target" position={Position.Top} isConnectable={false} className="opacity-0" />
       <div className="px-2.5 pt-1.5">
-        <Label size="small" component="p" colorRole="on-surface-variant" className={`uppercase`}>{kindOf(data)}</Label>
+        <Label size="small" component="p" colorRole="on-surface-variant" className={`uppercase`}>
+          {kindOf(data)}
+        </Label>
         <Body size="medium" data-state-name className="font-semibold">
           {data.id}
         </Body>

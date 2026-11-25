@@ -1,4 +1,4 @@
-import { Cell, Column, Focusable, Label, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
+import { Body, Cell, Column, Focusable, Label, Row, Table, TableBody, TableHeader, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
@@ -63,9 +63,11 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell className="py-2.5">
         <span className="flex min-w-0 flex-col gap-1">
           <TooltipTrigger delay={300}>
-            <TextLink to="/runs/$runId" params={{ runId: run.id }} className="block truncate text-body-large font-medium">
-              {titleOf(run)}
-            </TextLink>
+            <Body size="large" component="span" className="contents">
+              <TextLink to="/runs/$runId" params={{ runId: run.id }} className="block truncate font-medium">
+                {titleOf(run)}
+              </TextLink>
+            </Body>
             <Tooltip>{titleOf(run)}</Tooltip>
           </TooltipTrigger>
           <RunMeta run={run} workflowPage={workflowPage} />
@@ -83,7 +85,9 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell>
         <TooltipTrigger delay={300}>
           <Focusable>
-            <Label size="small" component="span"
+            <Label
+              size="small"
+              component="span"
               data-ended
               role="img"
               aria-label={ended.word}

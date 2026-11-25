@@ -21,14 +21,20 @@ export const RECEIPTS = ['timeline', 'checks', 'specs', 'tokens', 'where'] as co
 
 /** What a receipt says where the run has nothing of it. */
 function Nothing({ children }: { children: ReactNode }) {
-  return <Body size="small" colorRole="on-surface-variant">{children}</Body>;
+  return (
+    <Body size="small" colorRole="on-surface-variant">
+      {children}
+    </Body>
+  );
 }
 
 /** A step's name over what a receipt says of it. */
 function OfStep({ name, mark, children }: { name: string; mark: string; children: ReactNode }) {
   return (
     <div data-receipt={mark} data-step={name} className="space-y-1">
-      <Body size="small" component="h3" colorRole="on-surface-variant" className="font-mono">{name}</Body>
+      <Body size="small" component="h3" colorRole="on-surface-variant" className="font-mono">
+        {name}
+      </Body>
       {children}
     </div>
   );
@@ -199,7 +205,9 @@ function Where({ run }: { run: RunDetail }) {
 export function Receipts({ run, open = false }: { run: RunDetail; open?: boolean }) {
   return (
     <section aria-label="Receipts" data-receipts className="space-y-1 border-t border-outline-variant pt-4">
-      <Label size="large" component="h2" colorRole="on-surface-variant">Receipts</Label>
+      <Label size="large" component="h2" colorRole="on-surface-variant">
+        Receipts
+      </Label>
       <Fold name="timeline" title="Timeline" open={open}>
         {run.steps.some((s) => s.timeline.length > 0) ? <Timeline run={run} /> : <Nothing>Nothing of it is on the clock yet.</Nothing>}
       </Fold>

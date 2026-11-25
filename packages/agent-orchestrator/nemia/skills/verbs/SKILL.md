@@ -471,7 +471,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                nemia cancel <runId>, and start again.
                                each tool's words: tools.md#route
                                on the port: route
-  nemia refresh <runId> [<step>] [--base]
+  nemia refresh <runId> [<step>] [--base [--off]]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the
                                ones they hold now, so every filing after it — a new step, a retry,
@@ -484,7 +484,9 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --base: take the base instead — a loop's work that no longer merges
                                cleanly goes back to merge it, once, on the next tick, on the round it
                                is on, which the merge does not spend; the step is the one that closes
-                               the loop, left out where the run has one loop
+                               the loop, left out where the run has one loop;
+                               --base --off: take back that merge, asked and not yet filed: the ask
+                               is set aside, never deleted, and the loop waits on you again
                                each tool's words: tools.md#refresh
                                on the port: refresh
   nemia say <runId> <step> "<words>"
@@ -896,7 +898,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
 Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose, at a shell with their words as `--message`, or its tool on the port with them as its message: its prompt is their decision, asked once. `retry` asks only of a step that waits on the person, or with `--budget`.
 
 ```text
-  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck [--check <name>] | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>] | <runId> <step> --off | <runId> [<step>] --round --off
                                try a step waiting on you again, once, on the next tick:
                                --continue (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
@@ -919,6 +921,9 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone, "<n>=none" says none of its options fits; --message is
                                then the note under your answers
+                               --off: take back the try asked of the step and not yet filed, or with
+                               --round the round asked of its loop: the ask is set aside, never
+                               deleted, and the step waits on you again
                                each tool's words: tools.md#retry
                                on the port: retry
   nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"] | <runId> <step> --off
@@ -946,7 +951,9 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                a step's own budget
                                --off: take back the approval of a step that stands approved while
                                nothing it approved has been filed — an ending waiting on the base
-                               branch, held, or not yet ticked. The step waits at its gate again
+                               branch, held, or not yet ticked. The step waits at its gate again.
+                               Of a loop's step accepted as it stands, while nothing waiting on it
+                               is filed: the acceptance taken back, and the loop waits on you again
                                each tool's words: tools.md#approve
                                on the port: approve
 ```

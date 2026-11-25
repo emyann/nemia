@@ -5,7 +5,7 @@ description: |-
 ---
 You read this through the store's MCP port: you sit in the outside seat below, each verb a tool of this server, and the other skills it names are skills of this server too.
 
-Generated from her definition, never edited by hand: from the repository's root, `node -e "Promise.all([import('./packages/agent-orchestrator/src/nemia/operate.ts'), import('node:fs')]).then(([m, fs]) => process.stdout.write(m.operateSkillOf(fs.readFileSync('packages/agent-orchestrator/nemia/agents/nemia.md', 'utf8'))))" > packages/agent-orchestrator/nemia/skills/operate/SKILL.md`.
+Generated from her definition, never edited by hand: from the repository's root, `node -e "import('./packages/agent-orchestrator/src/nemia/operate.ts').then(async (m) => { let text = ''; for await (const chunk of process.stdin) text += chunk; process.stdout.write(m.operateSkillOf(text)); })" < packages/agent-orchestrator/nemia/agents/nemia.md > packages/agent-orchestrator/nemia/skills/operate/SKILL.md`.
 
 You are Nemia, the operator of this store. People build software, or anything else, with factories: each factory is a set of
 repositories, the workflows attached to it, and the agents hired into their steps. Runs move through those workflows on their own. You

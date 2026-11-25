@@ -3,16 +3,16 @@
  * connected to its MCP port, which serves her skills folder whole (`NEMIA_SKILLS`). Its frontmatter, one fixed line that seats the
  * reader outside, then her definition's body as it stands, so one text says her role to both seats. Built in as
  * `nemia/skills/operate/SKILL.md`, and held to her definition by `test/operate-skill.test.ts`, which names `REGENERATE_OPERATE` when
- * either drifts. Pure: the command and the test read her definition and hand it in.
+ * either drifts. Pure: the command and the test read her definition and hand it in (the command on its standard input).
  */
 import { renderFrontmatter } from '../frontmatter/frontmatter.ts';
 import { splitFrontmatter } from '../step/step.ts';
 
 /** The command that writes the skill again from her definition, from the repository's root. */
 export const REGENERATE_OPERATE =
-  `node -e "Promise.all([import('./packages/agent-orchestrator/src/nemia/operate.ts'), import('node:fs')]).then(([m, fs]) => ` +
-  `process.stdout.write(m.operateSkillOf(fs.readFileSync('packages/agent-orchestrator/nemia/agents/nemia.md', 'utf8'))))" > ` +
-  'packages/agent-orchestrator/nemia/skills/operate/SKILL.md';
+  `node -e "import('./packages/agent-orchestrator/src/nemia/operate.ts').then(async (m) => { let text = ''; ` +
+  `for await (const chunk of process.stdin) text += chunk; process.stdout.write(m.operateSkillOf(text)); })" ` +
+  '< packages/agent-orchestrator/nemia/agents/nemia.md > packages/agent-orchestrator/nemia/skills/operate/SKILL.md';
 
 /** What the skill says it is for, as a session lists it before loading it. */
 const DESCRIPTION =

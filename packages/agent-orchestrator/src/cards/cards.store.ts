@@ -358,8 +358,7 @@ const filesOf = (home: string, text: string) => {
  * The card files of a store from before the keyspace — and a card a person drops into the inbox by hand — `inbox/<name>.md`, filed at
  * the file's change time, and the tick's tries, `queue/<name>.json`: what the kind's import takes up. A card's text is taken as it is,
  * and checked as a card when it is read; a try that is not JSON stays where it is. An entry of the inbox that is no card — a folder, a
- * file of another kind, an `.md` whose name is no card's — stays where it is, said in the log (`strays`); a hidden file and a README are
- * not.
+ * file that is no `.md` — stays where it is, said in the log (`strays`); a hidden file is not.
  */
 export const CARD_FILES: ImportKind = {
   name: 'cards',
@@ -393,11 +392,11 @@ export const CARD_FILES: ImportKind = {
   ],
   strays: (home) =>
     entriesIn(inboxAt(home))
-      .filter((entry) => !entry.startsWith('.') && entry !== 'README.md')
-      .filter((entry) => !(entry.endsWith('.md') && Option.isSome(Schema.decodeUnknownOption(CardName.OnCreate)(entry.slice(0, -3)))))
+      .filter((entry) => !entry.startsWith('.'))
+      .filter((entry) => !(entry.endsWith('.md') && fs.statSync(path.join(inboxAt(home), entry)).isFile()))
       .map((entry) => ({
         entry: path.join(inboxAt(home), entry),
-        why: 'a card is a file <name>.md whose name a card may take, and this is none: file the idea with nemia inbox add',
+        why: 'a card is a file <name>.md, and this is none: file the idea with nemia inbox add',
       })),
 };
 

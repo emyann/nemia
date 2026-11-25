@@ -44,13 +44,11 @@ test("a card file dropped into the inbox is filed at its file's time and moved a
   assert.ok(fs.existsSync(path.join(root, 'imported', 'inbox', 'an-idea.md.2')), 'and is moved aside beside the first');
 });
 
-test('an entry of the inbox that is no card is said in the log as the import passes over it; a hidden file and a README are not', () => {
+test('an entry of the inbox that is no card is said in the log as the import passes over it; a hidden file is not', () => {
   const { root, door, inbox } = store();
   fs.mkdirSync(path.join(inbox, 'a-folder'), { recursive: true });
   fs.writeFileSync(path.join(inbox, 'notes.txt'), 'not a card');
-  fs.writeFileSync(path.join(inbox, 'Not A Card.md'), 'not a name');
   fs.writeFileSync(path.join(inbox, '.idea.md.swp'), 'x');
-  fs.writeFileSync(path.join(inbox, 'README.md'), '# ideas\n');
   fs.writeFileSync(path.join(inbox, 'an-idea.md'), 'an idea\n');
   const warned: string[] = [];
   const keeper = Logger.make(({ message }) => void warned.push((Array.isArray(message) ? message : [message]).join(' ')));
@@ -59,14 +57,14 @@ test('an entry of the inbox that is no card is said in the log as the import pas
     entries.map((e) => e.file),
     ['an-idea.md'],
   );
-  const named = ['a-folder', 'notes.txt', 'Not A Card.md'].map((entry) => path.join(inbox, entry));
+  const named = ['a-folder', 'notes.txt'].map((entry) => path.join(inbox, entry));
   assert.deepEqual(
     named.map((entry) => warned.some((line) => line.startsWith(`${entry} was not imported`))),
-    [true, true, true],
+    [true, true],
     warned.join('\n'),
   );
-  assert.equal(warned.length, 3, warned.join('\n'));
-  assert.deepEqual(fs.readdirSync(inbox).sort(), ['.idea.md.swp', 'Not A Card.md', 'README.md', 'a-folder', 'notes.txt']);
+  assert.equal(warned.length, 2, warned.join('\n'));
+  assert.deepEqual(fs.readdirSync(inbox).sort(), ['.idea.md.swp', 'a-folder', 'notes.txt']);
   assert.ok(fs.existsSync(path.join(root, 'imported', 'inbox', 'an-idea.md')));
 });
 

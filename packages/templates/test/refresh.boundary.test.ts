@@ -71,7 +71,13 @@ function world(moved: Moved, { worktree = true }: { worktree?: boolean } = {}) {
   gitIn(repo, 'init', '-q', '-b', 'main');
   const base = commit(
     repo,
-    { 'a.ts': 'export const a = 1;\n', [DERIVED]: '{ "v": 0 }\n', 'other.txt': 'zero\n', '.github/workflows/ci.yml': 'name: ci\n' },
+    {
+      'a.ts': 'export const a = 1;\n',
+      [DERIVED]: '{ "v": 0 }\n',
+      'other.txt': 'zero\n',
+      '.github/workflows/ci.yml': 'name: ci\n',
+      '.gitignore': 'deps/\n',
+    },
     'base',
   );
   const bare = bareOrigin(repo);
@@ -100,6 +106,21 @@ const commands = (w: World) => ({
   nothing: `touch '${w.marker}'`,
   outside: `printf 'cut\\n' > ${DERIVED} && printf 'x\\n' > a.ts && git add ${DERIVED} a.ts && touch '${w.marker}'`,
   fails: `echo 'cannot cut: fix it' >&2; exit 1`,
+  needs: `test -f deps/c.ts && printf 'cut\\n' > ${DERIVED} && git add ${DERIVED} && touch '${w.marker}'`,
+});
+
+/** Where a fixture's install touches when it runs to its end. */
+const installed = (w: World) => `${w.marker}-install`;
+
+/**
+ * The commands a fixture gives as the factory's install: `deps`, which runs only with the merge in progress and installs `c.ts`, a
+ * file the moved base alone has, into the ignored `deps/` the `needs` refresh reads; `fails`; and `tracked`, which writes a tracked
+ * file.
+ */
+const installs = (w: World) => ({
+  deps: `git rev-parse -q --verify MERGE_HEAD >/dev/null && mkdir -p deps && cp c.ts deps/c.ts && touch '${installed(w)}'`,
+  fails: `echo 'cannot install: fix it' >&2; exit 1`,
+  tracked: `printf 'x\\n' > a.ts && touch '${installed(w)}'`,
 });
 
 /** One open pull request of this run at `head`, as `gh pr list --json` gives it, GitHub calling it `mergeable`. */
@@ -128,8 +149,8 @@ const opened = (w: World, mergeable = 'CONFLICTING') => [
 /** The subject the merge is given, which the receipt's merge of a refreshed head takes again. */
 const SUBJECT = "Land a run's change through its pull request";
 
-/** The merge verb's arguments: the factory's refresh `refresh` and its derived paths `derives`. */
-const mergeArgs = (w: World, refresh: string, derives = DERIVED) => [
+/** The merge verb's arguments: the factory's refresh `refresh`, its derived paths `derives` and its install `install`, where given. */
+const mergeArgs = (w: World, refresh: string, derives = DERIVED, install?: string) => [
   '--run',
   RUN,
   '--subject',
@@ -142,6 +163,7 @@ const mergeArgs = (w: World, refresh: string, derives = DERIVED) => [
   refresh,
   '--derives',
   derives,
+  ...(install === undefined ? [] : ['--install', install]),
 ];
 
 /** Run `verb` in the owner's checkout, its step's files folder named both ways a land step and its check are given it. */
@@ -219,6 +241,50 @@ test('REFUSED: a conflict outside the derived paths, a command that writes outsi
   const r = land(fails, 'merge', mergeArgs(fails, commands(fails).fails));
   untouched(fails, r);
   assert.ok(r.err.includes('cannot cut: fix it'), `the command's stderr is quoted:\n${r.err}`);
+});
+
+test("the factory's install runs on the merged tree before the refresh, which reads what it installed", () => {
+  const w = world('derived');
+  w.gh.answers(opened(w));
+  const r = land(w, 'merge', mergeArgs(w, commands(w).needs, DERIVED, installs(w).deps));
+  assert.equal(r.code, 0, r.err);
+  assert.ok(fs.existsSync(installed(w)) && fs.existsSync(w.marker), 'the install and the refresh both ran');
+  const head = tipIn(w.bare, RESULT);
+  assert.deepEqual(parents(w.repo, head!), [w.tip, w.moved], 'a merge of the base into the reviewed tip');
+  assert.deepEqual(stands(w.run!), { branch: RESULT, head, clean: true, merging: false });
+  assert.ok(fs.existsSync(path.join(w.files, 'refreshed.json')), 'recorded for the check');
+  assert.equal(asked(r.calls, 'pr', 'merge').length, 0, 'the check merges it, once ci is green at it');
+});
+
+test('with no worktree holding the branch, the install runs in the scratch one, removed after', () => {
+  const w = world('derived', { worktree: false });
+  w.gh.answers(opened(w));
+  const r = land(w, 'merge', mergeArgs(w, commands(w).needs, DERIVED, installs(w).deps));
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(parents(w.repo, tipIn(w.bare, RESULT)!), [w.tip, w.moved]);
+  assert.equal(gitIn(w.repo, 'worktree', 'list', '--porcelain').match(/^worktree /gm)?.length, 1, 'the scratch worktree is gone');
+});
+
+test("a branch that holds the base runs no install, and the merge is today's", () => {
+  const w = world('held');
+  w.gh.answers(opened(w, 'MERGEABLE'));
+  const r = land(w, 'merge', mergeArgs(w, commands(w).cut, DERIVED, installs(w).deps));
+  assert.equal(r.code, 0, r.err);
+  assert.ok(!fs.existsSync(installed(w)), 'the install is not run');
+  assert.equal(asked(r.calls, 'pr', 'merge')[0]?.argv[5], w.tip, 'merged at the reviewed tip');
+});
+
+test('REFUSED: an install that fails runs no refresh, and one that writes a tracked file; nothing pushed', () => {
+  const fails = world('derived');
+  fails.gh.answers(opened(fails));
+  const r = land(fails, 'merge', mergeArgs(fails, commands(fails).cut, DERIVED, installs(fails).fails));
+  untouched(fails, r);
+  assert.ok(r.err.includes('cannot install: fix it'), `the install's stderr is quoted:\n${r.err}`);
+  assert.ok(!fs.existsSync(fails.marker), 'the refresh is not run');
+  const tracked = world('derived');
+  tracked.gh.answers(opened(tracked));
+  untouched(tracked, land(tracked, 'merge', mergeArgs(tracked, commands(tracked).cut, DERIVED, installs(tracked).tracked)));
+  assert.ok(fs.existsSync(installed(tracked)), 'the install ran');
 });
 
 test('REFUSED: a run worktree with uncommitted changes, before anything is merged into it', () => {

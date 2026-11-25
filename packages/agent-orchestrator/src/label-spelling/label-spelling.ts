@@ -10,6 +10,7 @@
  */
 import type { LabelKeyShape } from '../../contracts/label-key.contract.ts';
 import type { LabelChange, Labels } from '../../contracts/labels.contract.ts';
+import type { LabelValuesRefused } from '../../contracts/label-values.contract.ts';
 import type { ClosedFeedLabels } from '../feed/index.ts';
 
 /**
@@ -178,3 +179,16 @@ export function parseLabelEdits(texts: readonly string[]) {
     | { readonly edits: readonly LabelChange[] }
     | { readonly refused: string };
 }
+
+/**
+ * Which of the labels `given` a factory whose rules are `rules` does not take: each whose key a rule names with a value it does not
+ * list, with the values that key takes. Pure, and proved by `contracts/label-values.contract.ts`.
+ * @param rules The keys the factory names, each with the values it takes.
+ * @param given The labels a write gives, as it sets them.
+ */
+export const labelValuesRefused: LabelValuesRefused = (rules, given) =>
+  given.flatMap((label) => {
+    const first = rules.find((rule) => rule.key === label.key);
+    if (first === undefined || rules.some((rule) => rule.key === label.key && rule.values.includes(label.value))) return [];
+    return [{ key: label.key, value: label.value, takes: first.values }];
+  });

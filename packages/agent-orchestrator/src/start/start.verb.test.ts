@@ -146,9 +146,12 @@ describe("a start's own --label is judged against its factory's label values; a 
     assert.deepEqual(fs.existsSync(RUNS_DIR) ? fs.readdirSync(RUNS_DIR).sort() : [], before, 'nothing written');
   });
   test("a card's standing work=store, with no --label, starts, and the run carries it", async () => {
-    const dev = path.join(scratch('wf-start-labels-dev-'), 'dev');
+    const team = scratch('wf-start-labels-dev-');
+    const dev = path.join(team, 'dev');
     fs.mkdirSync(dev);
-    fs.writeFileSync(path.join(dev, 'work.md'), '---\nplace: git\n---\nwork it\n');
+    fs.mkdirSync(path.join(team, 'agents'));
+    fs.writeFileSync(path.join(team, 'agents', 'implementer.md'), '---\nrole: Engineer\ndescription: Does the work.\n---\nDo it.\n');
+    fs.writeFileSync(path.join(dev, 'work.md'), '---\nplace: git\nagent: implementer\n---\nwork it\n');
     attachWorkflowAt(ROOT, { factory: 'lv', workflow: 'dev' });
     const run = await runPlaced(
       startRun({ brief: 'queued', repo, factory: 'lv', workflowDir: dev, labels: { card: { work: 'store' }, edits: [] } }),

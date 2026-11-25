@@ -39,6 +39,7 @@ const TREES = await rendered([
       'implementCheck=echo own',
       'landingRefresh=node x.ts cut',
       'landingDerives=a.json',
+      'landingInstall=x install',
       'landingCheckMemory=256Mi',
       'lightMemoryRequest=768Mi',
     ],
@@ -188,17 +189,20 @@ test("the factory's label rules reach the janitor's check and its filing as thei
   assert.ok(stepIn(treeOf('set'), 'janitor', 'argus').body.includes('\nwork=fix:fix\n'), "Argus's note quotes the rules");
 });
 
-test("the factory's landing refresh reaches land's merge as its two flags, and both reviews' notes name the paths it derives", () => {
+test("the factory's landing refresh reaches land's merge as its three flags, and both reviews' notes name the paths it derives", () => {
   const tree = treeOf('set');
   for (const workflow of ['build', 'quick'])
     assert.ok(
-      stepIn(tree, workflow, 'land').body.includes(' --refresh "node x.ts cut" --derives "a.json"'),
-      `${workflow}/land's merge carries both flags`,
+      stepIn(tree, workflow, 'land').body.includes(' --refresh "node x.ts cut" --derives "a.json" --install "x install"'),
+      `${workflow}/land's merge carries the three flags`,
     );
   for (const workflow of ['build', 'quick'])
     assert.ok(stepIn(tree, workflow, 'review').body.includes('`a.json`'), `${workflow}/review names the derived paths`);
   const plain = stepIn(treeOf('plain'), 'build', 'land').body;
-  assert.ok(plain.includes(' --refresh "" --derives ""'), 'unset, both are given empty, which the merge takes as no refresh');
+  assert.ok(
+    plain.includes(' --refresh "" --derives "" --install ""'),
+    'unset, each is given empty, which the merge takes as no refresh and no install',
+  );
 });
 
 test("build's and quick's implement try again on their own twice when their check refuses, either way, and land never does", () => {

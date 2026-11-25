@@ -3,19 +3,22 @@
  * <cmd>`, the paths it owns `--derives <paths>`) and the run's pull request lacks the base: two runs that change one derived file side
  * by side (a version, a digest) would otherwise meet at the landing as a conflict no review can answer, since what the second must
  * write depends on what the first landed. So the base is merged into the run's branch here, in the worktree that has the branch checked
- * out (a scratch one, removed after, where none has), the factory's command is run in it by `sh -c` to derive its files again from the
- * merged tree, and the result is pushed for CI to judge; the land step's check (`landing.ts receipt`) merges it once CI is green there.
+ * out (a scratch one, removed after, where none has), the factory's install is run in it by `sh -c` where it names one (`--install
+ * <cmd>`), so the dependencies are the merged tree's and not the branch's (or none, in a scratch worktree), then the factory's command
+ * by `sh -c` to derive its files again from the merged tree, the two sharing one bound, and the result is pushed for CI to judge; the
+ * land step's check (`landing.ts receipt`) merges it once CI is green there.
  * A file of its own, beside `landing.ts`, since the refresh is a concept of its own and the landing is near the 800 lines a file stops
  * at; it imports `exec.ts` alone, as a carried script may import a sibling the run froze with it.
  *
- * The bound is mechanical, since the review read a head that no longer lands as is: the head pushed is git's plain merge of the
- * reviewed head and the base (`git merge-tree --write-tree`), differing from it only in the paths `--derives` names. A command that
+ * The bound is mechanical, since the review read a head that no longer lands as is: the head pushed is git's plain merge of the reviewed
+ * head and the base (`git merge-tree --write-tree`), differing from it only in the paths `--derives` names. An install or a command that
  * exits non-zero (its stderr quoted), a path left unmerged, a change it left out of the index, and a difference from the plain merge
- * outside those paths each take the merge back (`git merge --abort`) and refuse, nothing pushed. A merge that went clean and that the
- * command changed nothing of is taken back too and the landing merges as it did before the refresh. Otherwise the merge is committed,
- * pushed to the branch with no force (`git push origin <sha>:refs/heads/<branch>`), and recorded for the check in `refreshed.json` in
- * the step's files folder (`$WF_STEP_FILES`, which the check is given as `WF_ARTIFACTS`), the merge commit's body copied in whole so
- * the check's merge reads what the session wrote even where its file has since changed.
+ * outside those paths each take the merge back (`git merge --abort`, then `git reset --hard` of what an install or a command wrote out of
+ * the index, the worktree having been clean before the merge) and refuse, nothing pushed. A merge that went clean and that the command
+ * changed nothing of is taken back too and the landing merges as it did before the refresh. Otherwise the merge is committed, pushed to the
+ * branch with no force (`git push origin <sha>:refs/heads/<branch>`), and recorded for the check in `refreshed.json` in the step's files
+ * folder (`$WF_STEP_FILES`, which the check is given as `WF_ARTIFACTS`), the merge commit's body copied in whole so the check's merge reads
+ * what the session wrote even where its file has since changed.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -40,6 +43,8 @@ export type Asked = {
   onto: string;
   command: string;
   derives: string;
+  /** The factory's command that installs the merged tree's dependencies before `command`, or empty where it names none. */
+  install: string;
   subject: string;
   bodyFile: string;
   /** The line a person types to run the land step again, which a refusal ends with. */
@@ -47,8 +52,8 @@ export type Asked = {
 };
 
 /**
- * How long the factory's command may run, in milliseconds: the session that types the merge has ten minutes a call, and the merge's
- * reads of GitHub take some of them.
+ * How long the factory's install and command may run together, in milliseconds: the session that types the merge has ten minutes a
+ * call, and the merge's fetch, its reads of GitHub and its push take some of them.
  */
 const COMMAND_BOUND = 300_000;
 
@@ -100,24 +105,51 @@ const excluded = (derives: string) =>
     .filter(Boolean)
     .map((it) => `:(exclude,glob)${it}`);
 
-/**
- * The trial in the worktree `at`, a merge of the base in progress there: the factory's command run, and the index it left read
- * against git's plain merge. Refuses where the command failed, left a path unmerged or a change out of the index, or changed anything
- * outside the derived paths. True where the result is the plain merge and that went clean: there is nothing to refresh.
- */
-function tried(at: string, a: Asked) {
-  const ran = spawnSync('sh', ['-c', a.command], {
+/** `command` run by `sh -c` at the root of the worktree `at`, for at most `bound` milliseconds. */
+const shell = (at: string, command: string, bound: number) =>
+  spawnSync('sh', ['-c', command], {
     cwd: at,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: COMMAND_BOUND,
+    timeout: bound,
     maxBuffer: OUTPUT_BYTES,
   });
+
+/** What a command that ran said of its end: that it did not finish, or its exit. */
+const ended = (status: number | null) => (status === null ? 'did not finish' : `exited ${status}`);
+
+/**
+ * The factory's install of `a` run in the worktree `at`, a merge of the base in progress there, so the refresh reads the dependencies
+ * the merged tree names: the milliseconds it took, none where `a` names no install. Refuses, its stderr quoted, where it failed.
+ */
+function install(at: string, a: Asked) {
+  if (!a.install) return 0;
+  const started = performance.now();
+  const ran = shell(at, a.install, COMMAND_BOUND);
   if (ran.status !== 0)
     throw new Refusal(
-      `the factory's refresh (\`${a.command}\`) ${ran.status === null ? 'did not finish' : `exited ${ran.status}`} on the base merged ` +
+      `the factory's install (\`${a.install}\`) ${ended(ran.status)} on the base merged into \`${a.branch}\`, so the refresh was not ` +
+        `run, the landing took the merge back and pushed nothing. It said:\n${(ran.stderr || ran.error?.message || '').trim()}\n` +
+        `  Fix what it names (the factory's \`landingInstall\`, or the dependencies on the base), or run it by hand in \`${at}\` after ` +
+        `\`git merge --no-ff --no-commit origin/${a.onto}\`.\n${a.retry}`,
+    );
+  return performance.now() - started;
+}
+
+/**
+ * The trial in the worktree `at`, a merge of the base in progress there and the factory's install run, which took `spent`
+ * milliseconds of the bound: the factory's command run, and the index it left read against git's plain merge. Refuses where the
+ * command failed, left a path unmerged or a change out of the index, or changed anything outside the derived paths. True where the
+ * result is the plain merge and that went clean: there is nothing to refresh.
+ */
+function tried(at: string, a: Asked, spent: number) {
+  const ran = shell(at, a.command, Math.max(1, Math.round(COMMAND_BOUND - spent)));
+  if (ran.status !== 0)
+    throw new Refusal(
+      `the factory's refresh (\`${a.command}\`) ${ended(ran.status)} on the base merged ` +
         `into \`${a.branch}\`, so the landing took the merge back and pushed nothing. It said:\n${(ran.stderr || ran.error?.message || '').trim()}\n` +
-        `  Fix what it names on the branch, or run it by hand in \`${at}\` after \`git merge --no-ff --no-commit origin/${a.onto}\`.\n${a.retry}`,
+        `  Fix what it names on the branch, or run it by hand in \`${at}\` after \`git merge --no-ff --no-commit origin/${a.onto}\`` +
+        `${a.install ? '' : ": a refresh that needs what the base added to the dependencies names the factory's install in `landingInstall`"}.\n${a.retry}`,
     );
   const unmerged = gitAt(at, 'the paths left unmerged', 'diff', '--name-only', '--diff-filter=U');
   if (unmerged)
@@ -129,8 +161,8 @@ function tried(at: string, a: Asked) {
   const unstaged = gitAt(at, 'what the refresh left out of the index', 'diff', '--name-only');
   if (unstaged)
     throw new Refusal(
-      `the factory's refresh changed ${unstaged.split('\n').join(', ')} and left ${unstaged.includes('\n') ? 'them' : 'it'} out of the ` +
-        `index: a refresh \`git add\`s each file it derives. Fix the command, then the step is retried. Nothing is pushed.\n${a.retry}`,
+      `the factory's ${a.install ? 'install or refresh' : 'refresh'} changed ${unstaged.split('\n').join(', ')} and left ${unstaged.includes('\n') ? 'them' : 'it'} out of the ` +
+        `index: an install changes no tracked file, and a refresh \`git add\`s each file it derives. Fix the command, then the step is retried. Nothing is pushed.\n${a.retry}`,
     );
   const index = gitAt(at, 'the tree the refresh made', 'write-tree');
   const plain = run('git', ['-C', at, 'merge-tree', '--write-tree', a.tip, `origin/${a.onto}`]);
@@ -183,9 +215,10 @@ export function refresh(a: Asked) {
     if (!merging(at)) throw new Refusal(`\`git merge origin/${a.onto}\` did not start in \`${at}\`: ${merged.err}\n${a.retry}`);
     let same: boolean;
     try {
-      same = tried(at, a);
+      same = tried(at, a, install(at, a));
     } catch (err) {
       run('git', ['-C', at, 'merge', '--abort']);
+      run('git', ['-C', at, 'reset', '-q', '--hard']);
       throw err;
     }
     if (same) {

@@ -21,13 +21,15 @@
  *   nothing a second time. Given the factory's own command `--refresh <cmd>` and the paths it derives `--derives <paths>` (the factory's
  *   `landingRefresh` and `landingDerives`, each may be empty, and an empty `--refresh` is the merge above), where the pull request's head
  *   is the run's own and leaves no branch out but does not hold `origin/<base>` after a `git fetch origin`, it refreshes the branch first
- *   (`refresh.ts`): the base merged into it in the worktree that has it checked out, the command run there to derive its files again, the
+ *   (`refresh.ts`): the base merged into it in the worktree that has it checked out, the factory's install `--install <cmd>`
+ *   (`landingInstall`, which may be empty and then installs nothing) run there first, so the dependencies are the merged tree's, the
+ *   command run there to derive its files again, the
  *   result committed and pushed with no force, and `refreshed.json` left in `$WF_STEP_FILES` for the check; it then merges nothing and
  *   exits 0, saying the check merges once CI is green at the pushed head. A refresh the command changed nothing of, on a merge that went
  *   clean, is taken back, and the merge goes on as above. **The landed commit differs from the reviewed head only in the files
  *   `landingDerives` names**, since review reads a head that no longer lands as is: the refreshed head is git's plain merge of the
  *   reviewed head and the base (`git merge-tree --write-tree`), differing from it only in the derived paths, and a refresh with any other
- *   difference, any path left unmerged, or a command that exits non-zero is refused and taken back, nothing pushed.
+ *   difference, any path left unmerged, or an install or a command that exits non-zero is refused and taken back, nothing pushed.
  * - `receipt --run <id> --check <name> --wait-on-ci <true|false>`, which the land step's `check:` runs: it refuses unless the pull request
  *   is `MERGED` with a merge commit that is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every
  *   commit of every `wf/<id>/*` branch has an equivalent patch on HEAD — the three facts the run's own `landingDue` needs to record
@@ -418,9 +420,10 @@ function bodyOf(file: string) {
 
 /** `merge`: this run's own green pull request merged with a merge commit, and the checkout fast-forwarded onto it. */
 function merge(args: string[]) {
-  const opts = options('merge', args, ['--run', '--subject', '--body-file', '--check'], ['--refresh', '--derives']);
+  const opts = options('merge', args, ['--run', '--subject', '--body-file', '--check'], ['--refresh', '--derives', '--install']);
   const [id, subject, file, check] = [opts['--run'], opts['--subject'], opts['--body-file'], opts['--check']];
-  const [command, derives] = [(opts['--refresh'] ?? '').trim(), (opts['--derives'] ?? '').trim()];
+  const given = (flag: string) => (opts[flag] ?? '').trim();
+  const [command, derives, install] = [given('--refresh'), given('--derives'), given('--install')];
   bodyOf(file);
   const named = tips(id);
   const branch = settled();
@@ -461,6 +464,7 @@ function merge(args: string[]) {
           onto,
           command,
           derives,
+          install,
           subject,
           bodyFile: file,
           retry: retryLine(id),

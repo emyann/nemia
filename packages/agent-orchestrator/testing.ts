@@ -321,3 +321,4 @@ export const readAsks = (root: string, id: string) => runsNow(root).asks.read(id
  */
 export const readAnswers = (root: string, id: string) => runsNow(root).asks.answers(id);
 export { RECORD_CEILING } from './src/keyspace/keyspace.store.ts';
+export { deliveryKey, subscriptionKey } from './src/subscription/subscription.store.ts';

@@ -1,7 +1,7 @@
 /**
  * The Subscription door's contract (`SubscriptionDoor`, `src/subscription/subscription.store.ts`), as walks (`door-walks.ts`): every
- * method's rows, run on the files by `src/subscription/subscription.store.test.ts` and on the memory stand-in by
- * `src/subscription/memory.store.test.ts`. A subscription put is listed, dropped and gone, its deliverer's file apart from it; a delivery
+ * method's rows, run on the keyspace by `src/subscription/subscription.store.test.ts` and on the memory stand-in by
+ * `src/subscription/memory.store.test.ts`. A subscription put is listed, dropped and gone, its deliverer's record apart from it; a delivery
  * written is listed, read back whole, written over and removed. And the write check: a subscription under a name that is none, at a
  * name taken, with minutes not above zero, no selector, a selector the feed does not take or a cursor below 0, a drop of none, and a
  * delivery under a bad name or with a cursor below 0, are refused and nothing is written.
@@ -61,7 +61,8 @@ export const SUBSCRIPTION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       walk: ({ door }) => {
         put(door, 'zeta');
         put(door, 'alpha', aSubscription('nemia-2', { scope: { atLeast: 'semi-auto' } }));
-        return done(door.subscriptions.list());
+        const { listed: all, left } = done(door.subscriptions.list());
+        return { listed: all.map(({ name, subscription }) => ({ name, subscription })), left };
       },
       says: {
         listed: [
@@ -80,7 +81,7 @@ export const SUBSCRIPTION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         put(door, 'watch');
         return {
           again: act(door.subscriptions.put(nameOf('watch'), aSubscription('other'))),
-          listed: done(door.subscriptions.list()).listed,
+          listed: done(door.subscriptions.list()).listed.map(({ name, subscription }) => ({ name, subscription })),
         };
       },
       says: { again: { refused: 'Conflict' }, listed: [{ name: 'watch', subscription: aSubscription() }] },

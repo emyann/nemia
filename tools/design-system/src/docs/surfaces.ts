@@ -103,6 +103,6 @@ export const surfacesTable = (valueOf: (role: string, theme: string) => string) 
     '| --- | --- | --- | --- |',
     ...rows,
     '',
-    "The Colors view lists these same roles in one section, `md`, since each is named as the code names it (`md-sys-color-…`): a fill, then what goes on it, with the contrast beside it. Nemia's own names follow the same rule: `meaning-on-yours` goes on `meaning-yours`, and so for `alive`, `money`, `failure`, `rest` and `sage`.",
+    "The Colors view lists these same roles in one section, `md`, since each is named as the code names it (`md-sys-color-…`): a fill, then what goes on it, with the contrast beside it. Nemia's own names follow the same rule: `meaning-on-yours` goes on `meaning-yours`, and so for `alive`, `failure`, `rest` and `sage`.",
   ].join('\n');
 };

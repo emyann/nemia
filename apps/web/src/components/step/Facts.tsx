@@ -350,7 +350,7 @@ export function spentRows(step: Priced) {
       <span
         key="spent"
         data-spent={over ? 'over' : 'within'}
-        className={`font-mono text-body-small ${over ? 'font-semibold text-money' : ''}`}
+        className={`font-mono text-body-small ${over ? 'font-semibold text-failure' : ''}`}
       >
         {text}
       </span>,
@@ -388,7 +388,7 @@ export const unreadRows = (words: string | null) =>
       ]
     : []) satisfies Array<[string, ReactNode]>;
 
-const WARN = 'text-money';
+const WARN = 'text-on-surface';
 
 /**
  * What sessions read, by price: the counts — `read 21.4M · wrote 412k · peak 167k` — and, beneath, a resumed session that wrote its
@@ -420,7 +420,7 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
       )}
       {rebuilt > 0 &&
         rest.map((part) => (
-          <span key={part} data-rebuilt={rebuilt} className={`block text-body-small ${WARN}`} title={REBUILT_TITLE}>
+          <span key={part} data-rebuilt={rebuilt} className={`block text-body-small font-semibold ${WARN}`} title={REBUILT_TITLE}>
             {part}
           </span>
         ))}

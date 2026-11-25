@@ -79,7 +79,7 @@ function VolumeRow({
           {v.readOnly ? ':ro' : ':rw'}
         </Tag>
         <Button
-          variant="text"
+          variant="outlined"
           size="xsmall"
           className="ml-auto"
           icon={removing ? Pending : undefined}

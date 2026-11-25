@@ -170,13 +170,13 @@ function CountChip({ count, word, tone }: { count: number; word: string; tone: '
   );
 }
 
-/** The text button that opens, and closes, the bar of the runs that wait on you in every factory. */
+/** The outlined button that opens, and closes, the bar of the runs that wait on you in every factory. */
 function AcrossFactories() {
   const { open, toggle } = useBar();
   return (
     <Button
       data-waiting-opener
-      variant="text"
+      variant="outlined"
       size="xsmall"
       aria-expanded={open?.kind === 'waiting'}
       onPress={() => toggle({ kind: 'waiting' })}
@@ -200,7 +200,7 @@ function Nothing({ children }: { children: string }) {
  * The runs, in three parts, by two reads the api filters by the address' factory: what waits on a person, a card a run and never a
  * row; the runs in flight, a quiet table, each row saying how many of the page's open runs wait on it; and one page of the finished
  * runs, the one the address' trail leads to, newest finished first. Each part's head is a count chip in its colour saying the api's
- * own count; where nothing waits on you that part is one line, its chip quiet, and a text button opens the bar of what waits on you in
+ * own count; where nothing waits on you that part is one line, its chip quiet, and an outlined button opens the bar of what waits on you in
  * every factory. Every
  * time on the page is a fact to the minute, said against the instant its answer was read at: nothing here counts by itself.
  */

@@ -10,7 +10,17 @@ import { Sticker } from './Sticker';
  * headline, rows that add up to the tile, a closing note. The tooltip opens on focus at once and on a resting pointer, and asks the
  * api nothing: the answer the tile is drawn from carries its rows. A tile given no breakdown is drawn alone, and takes no focus.
  */
-export function StatTile({ hue, label, value, breakdown }: { hue: Hue; label: string; value: string; breakdown: Breakdown | null }) {
+export function StatTile({
+  hue,
+  label,
+  value,
+  breakdown,
+}: {
+  hue: Hue | 'ink';
+  label: string;
+  value: string;
+  breakdown: Breakdown | null;
+}) {
   const name = label.toLowerCase();
   const tile = (
     <Sticker hue={hue} label={label}>

@@ -33,6 +33,7 @@ import {
   withClient,
   withProposal,
   kitBoxes,
+  cutPresses,
   kitButtons,
   kitChoices,
   kitRadios,
@@ -265,8 +266,8 @@ const holds = (cls: string, form: string) => form.split(' ').every((c) => cls.sp
 /** Whether the class list `cls` carries any class of the drawn form `form`. */
 const touches = (cls: string, form: string) => form.split(' ').some((c) => cls.split(' ').includes(c));
 
-/** Whether `cls` is drawn as a wait on a person: the yours container whole, and nothing of an amount's or a failure's. */
-const drawnYours = (cls: string) => holds(cls, container.yours) && !touches(cls, container.money) && !touches(cls, container.failure);
+/** Whether `cls` is drawn as a wait on a person: the yours container whole, and nothing of a failure's. */
+const drawnYours = (cls: string) => holds(cls, container.yours) && !touches(cls, container.failure);
 
 test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
   const html = offersMarkup(
@@ -606,7 +607,11 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
   const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
   const buttons = (form: string) => kitButtons(forms.get(form)!);
-  assert.deepEqual(buttons('Approve plan'), [['submit', false, 'Approve']], 'Approve is enabled with no words: an approval needs none');
+  assert.deepEqual(
+    cutPresses(forms.get('Approve plan')!),
+    [['submit', false, 'Approve']],
+    'Approve is enabled with no words: an approval needs none',
+  );
   assert.deepEqual(
     buttons('Send plan back'),
     [['submit', true, 'Send back']],
@@ -975,7 +980,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   );
   assert.match(
     capped,
-    /<span data-peak="cap" class="[^"]*text-money[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/,
+    /<span data-peak="cap" class="font-semibold text-on-surface" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/,
   );
   const unpeaked = markup(createElement(Read, { said: 'read 900k · wrote 20k · compacted at its 100k cap', peak: 'cap', rebuilt: 0 }));
   assert.match(
@@ -1049,7 +1054,7 @@ test('a gate whose step asks questions draws them before its answer, with the re
   );
   assert.match(
     html,
-    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-cut-button="press"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
   );
   assert.match(
     html,
@@ -1062,7 +1067,7 @@ test('a gate whose step asks questions draws them before its answer, with the re
   const plain = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.doesNotMatch(plain, /data-gate-questions|Not answered|data-recommend-all/);
   assert.ok(
-    kitButtons(plain).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
+    cutPresses(plain).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
     'Approve, enabled',
   );
 });
@@ -1081,14 +1086,14 @@ test("the inspector's gate of a step that asks questions draws them too, its App
   );
   assert.match(
     asked,
-    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-slot="button"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
+    /<span title="Not answered: How is the card cut\? · Where do the answers go\?" class="inline-flex"><button data-cut-button="press"[^>]*type="submit"[^>]*disabled=""(?:(?!<\/button>)[\s\S])*>Approve</,
   );
   const plain = atGate({ closeout: planCloseout });
   const none = await routedWith(createElement(Asked, { run: plain, step: plain.steps[0] }));
   assert.match(none, /aria-label="What review asks of you"/);
   assert.doesNotMatch(none, /data-question=|Not answered|data-recommend-all/);
   assert.ok(
-    kitButtons(none).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
+    cutPresses(none).some(([type, disabled, words]) => type === 'submit' && !disabled && words === 'Approve'),
     'Approve, enabled',
   );
 });

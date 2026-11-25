@@ -53,8 +53,8 @@ const RUNS = {
 const ROW: CSSProperties = { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 32 };
 const WHOLE: CSSProperties = { maxWidth: 880 };
 
-/** The step's part at each size: S and M side by side, L under them. */
-function Sizes({ run }: { run: RunDetail }) {
+/** The step's part at each size: S and M side by side, L under them, unless `whole` is false. */
+function Sizes({ run, whole = true }: { run: RunDetail; whole?: boolean }) {
   const at = (size: PartSize) => <StepPart view={run} step="design" size={size} now={NOW} />;
   return (
     <Unread>
@@ -63,7 +63,7 @@ function Sizes({ run }: { run: RunDetail }) {
           {at('S')}
           {at('M')}
         </div>
-        <div style={WHOLE}>{at('L')}</div>
+        {whole && <div style={WHOLE}>{at('L')}</div>}
       </div>
     </Unread>
   );
@@ -134,10 +134,13 @@ export const WaitingToStart: StoryObj<{ run: RunDetail }> = {
   },
 };
 
-/** A step at its gate: what it asks of you first, then what it said and gave. */
+/**
+ * A step at its gate: what it asks of you first, then what it said and gave. S and M alone: M and L each draw the gate's Approve, a
+ * view's one filled action, which the gate's own stories draw whole.
+ */
 export const WaitsOnYou: StoryObj = {
   parameters: { a11y: { test: 'todo' } },
-  render: () => <Sizes run={RUNS.waitsOnYou} />,
+  render: () => <Sizes run={RUNS.waitsOnYou} whole={false} />,
   play: async ({ canvasElement }) => void (await cardAtM(canvasElement, 'gate', 'yours', 'Read and approve')),
 };
 

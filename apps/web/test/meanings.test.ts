@@ -3,8 +3,8 @@
  * Material's roles and no colour of the board's own: this holds them to the rulebook. Each meaning's colour, its ink, its container and
  * the container's ink equal the table of `DESIGN.md` (*The four meanings*) in the light scheme, written at the stylesheet's root, and in
  * the dark one, written under `prefers-color-scheme: dark`; `failure` may be Material's error, read through the theme
- * (`theme/theme.css`), within the rounding of the `hsl()` the generator writes. The names are the four meanings' roles, rest's tint
- * `sage`, and `money`, which the board-look's second card takes off its last part (`test/baseline/money/`). Each ink reads at 4.5:1 on
+ * (`theme/theme.css`), within the rounding of the `hsl()` the generator writes. The names are the four meanings' roles and rest's tint
+ * `sage`: a cost is no meaning, and drawn in ink. Each ink reads at 4.5:1 on
  * its fill, and each meaning's colour, as the ink of a word on a neutral surface, on every rung of the ladder, in both schemes. Needs
  * no browser: both files are read as text.
  */
@@ -34,8 +34,8 @@ const MEANINGS = ['yours', 'alive', 'failure', 'rest'] as const;
 /** The roles a meaning has: its colour, the ink on it, its container and the ink on that; rest has the first two. */
 const ROLES = ['', 'on-', '-container', 'on--container'] as const;
 
-/** The variables beside the four meanings' roles: rest's tint, and money, retiring. */
-const BESIDE = ['sage', 'on-sage', 'money', 'on-money', 'money-container', 'on-money-container'];
+/** The variables beside the four meanings' roles: rest's tint. */
+const BESIDE = ['sage', 'on-sage'];
 
 /** The ladder's rungs (DESIGN.md, *Neutrals: the surface ladder*), on which a meaning's colour is read as a word's ink. */
 const RUNGS = [
@@ -205,7 +205,7 @@ test("the stylesheet writes each meaning at the rulebook's value, in light and i
   );
 });
 
-test("the meanings are the four, rest's tint and money, retiring, each written once a scheme", () => {
+test("the meanings are the four and rest's tint, each written once a scheme", () => {
   const four = MEANINGS.flatMap((meaning) => (meaning === 'rest' ? ROLES.slice(0, 2) : ROLES).map((role) => nameOf(meaning, role)));
   assert.deepEqual([...WRITTEN.light.keys()].sort(), [...four, ...BESIDE].sort(), 'the light scheme, at the root');
   assert.deepEqual(

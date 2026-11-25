@@ -37,10 +37,10 @@ export const askTag = (ask: Ask) =>
   (ask.chose !== undefined
     ? { words: ask.kind === 'proposal' ? 'Proposed' : 'Answered', hue: 'grey' }
     : ask.kind === 'proposal'
-      ? { words: 'Proposes', hue: 'money' }
+      ? { words: 'Proposes', hue: 'yours' }
       : { words: ask.kind === 'permission' ? 'Asks to run' : 'Asks you', hue: 'yours' }) satisfies {
     words: string;
-    hue: 'yours' | 'money' | 'grey';
+    hue: 'yours' | 'grey';
   };
 
 /**
@@ -217,7 +217,13 @@ export function ChatAsk({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string, pi
             <Options question={question} pick={pick} onPick={setPick} />
           </fieldset>
           <div className="flex flex-wrap items-center gap-2">
-            <Button data-chat-answer size="xsmall" isDisabled={!askAnswered(pick)} onPress={() => onAnswer(ask.call, [pick])}>
+            <Button
+              data-chat-answer
+              variant="outlined"
+              size="xsmall"
+              isDisabled={!askAnswered(pick)}
+              onPress={() => onAnswer(ask.call, [pick])}
+            >
               Answer
             </Button>
             <AskLinks text={ask.text} />

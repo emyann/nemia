@@ -68,7 +68,7 @@ export function WelcomePage() {
         />
       )}
       <footer className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="text" size="small" data-welcome-skip onPress={skip}>
+        <Button variant="outlined" size="small" data-welcome-skip onPress={skip}>
           Skip for now
         </Button>
         {ready && (

@@ -136,7 +136,13 @@ function Confirm({
       In force
     </Tag>
   ) : (
-    <Button size="xsmall" data-auto-confirm isDisabled={pending} onPress={() => onAsk({ verb: 'confirm', id: rule.id, words: rule.words })}>
+    <Button
+      variant="outlined"
+      size="xsmall"
+      data-auto-confirm
+      isDisabled={pending}
+      onPress={() => onAsk({ verb: 'confirm', id: rule.id, words: rule.words })}
+    >
       Confirm
     </Button>
   );

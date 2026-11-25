@@ -121,10 +121,10 @@ function LabelPage() {
               </span>
             ))}
             <span data-label-spent>
-              <StatTile hue="money" label="Spent" value={dollars(spent)} breakdown={null} />
+              <StatTile hue="ink" label="Spent" value={dollars(spent)} breakdown={null} />
             </span>
             <span data-label-cost>
-              <StatTile hue="money" label="Cost per landed run" value={dollars(cost)} breakdown={null} />
+              <StatTile hue="ink" label="Cost per landed run" value={dollars(cost)} breakdown={null} />
             </span>
           </div>
           <TextLink to="/runs" search={{ l: selector }} className="w-fit text-body-medium underline">

@@ -114,7 +114,7 @@ function RulesForm({ data, pending, onChange }: { data: Rules; pending: boolean;
           </FieldDescription>
         </Field>
         <Field orientation="horizontal" className="flex-wrap">
-          <Button type="submit" isDisabled={pending || !draft.trim() || unchanged}>
+          <Button type="submit" variant="outline" isDisabled={pending || !draft.trim() || unchanged}>
             {pending && <Pending size={16} />}
             {pending ? 'Writing…' : 'Save'}
           </Button>

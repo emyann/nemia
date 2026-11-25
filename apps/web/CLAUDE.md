@@ -171,8 +171,8 @@ here.
   (`<file>#<module>:<name>`), each control a file draws by hand (a raw `<button>`, `<input>`, `<select>` or `<textarea>`, or an
   import of `lib/classes.ts`'s control strings, `handDrawn`; an input whose literal `type` is `checkbox` or `radio` is keyed by it, the kit
   drawing each with its own part), and the `todo` stories. `test/rulebook.test.ts` holds the rules of `DESIGN.md` the pages do not
-  yet obey to four more lists of the same baseline: a kit accent role the board's parts write (`accentRole`), the retiring `money`
-  (`money`), a raw type class where the kit's primitive belongs (`rawType`) and a surface role of the kit's (`kitSurface`). The
+  yet obey to four more lists of the same baseline: a kit accent role the board's parts write (`accentRole`), a `money` class or variable,
+  which no cost writes any more (`money`, kept empty so the word cannot come back), a raw type class where the kit's primitive belongs (`rawType`) and a surface role of the kit's (`kitSurface`). The
   baseline is a folder, `test/baseline/<list>/<path under src>.txt`, a file per list and source file holding that file's entries one a line (`shardOf`,
   `test/baseline.ts`, proved by `contracts/baseline-shard.contract.ts`), so that a cut deletes a file and two runs' cuts never meet in one
   file, which git merges clean. A file you mend is cut from its list in the same change: its line, or the file where it is the last
@@ -312,9 +312,15 @@ here.
   `routeTree.gen.ts`, a route's `Route` and the look's door are exempt.
 - A colour says one thing, one of four meanings: `yours` (waits on a person), `alive`, `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` writes each beside the theme, light at its root and dark under the media query (`--meaning-*`, `bg-yours`), at the
-  values of `DESIGN.md`'s table, which `test/meanings.test.ts` holds, with contrast; `failure` is Material's error. `money` keeps its
-  amber there until the board-look's second card takes it off its last part (`test/baseline/money/`). `lib/meaning.ts` holds the
-  drawn forms, each class a whole literal, and a tag in one is the look's `MeaningTag`.
+  values of `DESIGN.md`'s table, which `test/meanings.test.ts` holds, with contrast; `failure` is Material's error. A cost is no meaning:
+  it is drawn in ink, `failure` past its budget, and its sticker takes the look's `ink` tone (`Sticker`'s `hue: 'ink'`), the Control rung
+  under plain ink. `lib/meaning.ts` holds the drawn forms, each class a whole literal, and a tag in one is the look's `MeaningTag`.
+- A view, the page and each thing that opens over it, holds at most one filled action, the look's `CutPress` or `CutButton`; every
+  other action is the kit's outlined button, and a text action is the look's `TextLink` (`DESIGN.md`, *Ink and the one action*). A
+  button of the kit's or shadcn's drawn filled, as words alone or in a variant it cannot read is refused where it is written, with no
+  baseline (`buttonForms`, `test/stories.ts`, held by `test/one-action.test.ts`), and a story whose view holds two filled actions
+  fails after it is drawn, its play's dialogs open (`overFilled` and `filledViews`, `.storybook/filled.ts`, proved by
+  `contracts/one-filled.contract.ts`).
 - A cut corner is a shape of its own under unclipped content: `look/cut.ts`, `look/CutFrame.tsx`, `look/CutButton.tsx`. Its
   geometry (`cutShape`, `cutRing`, `cutPoints`, `cutEdge` and `cutHold`) is taken from `./cut` by a part of the look alone, and no
   file outside the look writes a cut, a clip path or a polygon (`test/look.test.ts`): it takes the part that draws one. A part that

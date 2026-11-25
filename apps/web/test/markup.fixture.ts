@@ -649,6 +649,17 @@ export const kitButtons = (html: string) =>
   ]) satisfies [string, boolean, string][];
 
 /**
+ * Each of the look's cut presses in `html` (`CutPress`), in order: its type, whether it is disabled, and its words.
+ * @param html The markup the presses are rendered in.
+ */
+export const cutPresses = (html: string) =>
+  [...html.matchAll(/<button data-cut-button="press"([^>]*)>([\s\S]*?)<\/button>/g)].map((m) => [
+    /\btype="(\w+)"/.exec(m[1])?.[1] ?? '',
+    /\bdisabled=""/.test(m[1]),
+    /<span class="relative">([^<]*)</.exec(m[2])?.[1] ?? '',
+  ]) satisfies [string, boolean, string][];
+
+/**
  * Each choice of the ds kit's radios and checkboxes in `html`, in order: its value, its kind, and whether it is chosen; those of the
  * group whose name `name` matches alone, where it is given.
  * @param html The markup the choices are rendered in.

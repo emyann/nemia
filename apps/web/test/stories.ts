@@ -274,6 +274,141 @@ export const handDrawn = (file: string, source: string) => {
   return [...found] satisfies string[];
 };
 
+/** The button systems the board draws a button with: the kit's, and shadcn's left. */
+type ButtonSystem = 'kit' | 'shadcn';
+
+/** The system whose button `spec`, imported by `file`, is, with the names that are a button there; null for any other module. */
+const buttonModuleOf = (file: string, spec: string) => {
+  const module = canonicalOf(file, spec);
+  if (module === '@/components/ui/button') return { system: 'shadcn', names: ['Button', 'LinkButton'] } as const;
+  const at = spec.startsWith('@/')
+    ? path.posix.join(SRC, spec.slice(2))
+    : spec.startsWith('.')
+      ? path.posix.join(path.posix.dirname(file), spec)
+      : null;
+  const bare = at?.replace(/\.tsx?$/, '').replace(/\/index$/, '');
+  if (bare === `${SRC}/components/ui/ds`) return { system: 'kit', names: ['Button'] } as const;
+  if (bare === `${SRC}/components/ui/ds/components/Button`) return { system: 'kit', names: ['default'] } as const;
+  return null;
+};
+
+/**
+ * Each name `file`'s source binds to a button of the kit or of shadcn: an import by the name it binds, and a `routeLink(<one>)`
+ * assigned to a name.
+ */
+const buttonBindings = (file: string, tree: ts.SourceFile) => {
+  const bound = new Map<string, ButtonSystem>();
+  for (const node of tree.statements) {
+    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || !node.importClause) continue;
+    const module = buttonModuleOf(file, node.moduleSpecifier.text);
+    if (!module) continue;
+    const names: readonly string[] = module.names;
+    const clause = node.importClause;
+    if (clause.name && names.includes('default')) bound.set(clause.name.text, module.system);
+    if (clause.namedBindings && ts.isNamedImports(clause.namedBindings))
+      for (const one of clause.namedBindings.elements)
+        if (names.includes((one.propertyName ?? one.name).text)) bound.set(one.name.text, module.system);
+  }
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      ts.isCallExpression(node.initializer) &&
+      ts.isIdentifier(node.initializer.expression) &&
+      node.initializer.expression.text === 'routeLink' &&
+      node.initializer.arguments[0] &&
+      ts.isIdentifier(node.initializer.arguments[0])
+    ) {
+      const system = bound.get(node.initializer.arguments[0].text);
+      if (system) bound.set(node.name.text, system);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  return bound;
+};
+
+/** The variants that draw a button filled: the kit's and shadcn's defaults, and the kit's floating action. */
+const FILLED_VARIANTS = ['filled', 'default', 'fab'];
+
+/** The variants that draw a button as words alone. */
+const TEXT_VARIANTS = ['text', 'link'];
+
+/** The literal a variant's value is, each branch of a conditional; null where one is no literal. */
+const variantsOf = (value: ts.Expression) => {
+  const literals: string[] = [];
+  const open = [value];
+  for (let at = open.pop(); at; at = open.pop()) {
+    if (ts.isStringLiteralLike(at)) literals.push(at.text);
+    else if (ts.isParenthesizedExpression(at)) open.push(at.expression);
+    else if (ts.isConditionalExpression(at)) open.push(at.whenTrue, at.whenFalse);
+    else return null;
+  }
+  return literals;
+};
+
+/** Whether a JSX element holds a word of its own as text: a button of words, not of an icon or a face. */
+const hasWords = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement) =>
+  ts.isJsxOpeningElement(node) && ts.isJsxElement(node.parent)
+    ? node.parent.children.some((child) => ts.isJsxText(child) && child.text.trim() !== '')
+    : false;
+
+/**
+ * The form `node`, a button of the kit's or shadcn's, is drawn in where it breaks *Ink and the one action*: `filled` (no variant, both
+ * systems' default being filled, or a filled one in either branch), `text` (a text or link variant holding words, a text action that
+ * is no link), `variant?` (a variant it cannot read, or props spread with none); null for an outlined, tonal or elevated one, and a
+ * text one of an icon or a face alone.
+ */
+const formOf = (node: ts.JsxOpeningElement | ts.JsxSelfClosingElement) => {
+  let spread = false;
+  for (const one of node.attributes.properties) {
+    if (ts.isJsxSpreadAttribute(one)) spread = true;
+    if (!ts.isJsxAttribute(one) || !ts.isIdentifier(one.name) || one.name.text !== 'variant') continue;
+    const at = one.initializer;
+    const value = !at
+      ? null
+      : ts.isStringLiteral(at)
+        ? [at.text]
+        : ts.isJsxExpression(at) && at.expression
+          ? variantsOf(at.expression)
+          : null;
+    if (value === null) return 'variant?' as const;
+    if (value.some((v) => FILLED_VARIANTS.includes(v))) return 'filled' as const;
+    if (value.some((v) => TEXT_VARIANTS.includes(v)) && hasWords(node)) return 'text' as const;
+    return null;
+  }
+  return spread ? ('variant?' as const) : ('filled' as const);
+};
+
+/**
+ * Each button of the kit's or shadcn's `file`'s source draws in a form *Ink and the one action* (`DESIGN.md`) refuses, once each, as
+ * `<Tag form>`: filled, which is the look's cut button alone (`CutPress`, `CutButton`), a text action, which is a link (`TextLink`),
+ * and a variant it cannot read. It reads a tag bound by an import of the kit's `Button` or shadcn's `Button` and `LinkButton`, and a
+ * name a `routeLink` of one is given. None for a file of the kit, shadcn's own `ui/`, `ai-elements/` or the look, which draw them.
+ * @param file The file, from the workspace root.
+ * @param source Its text.
+ */
+export const buttonForms = (file: string, source: string) => {
+  if (!file.startsWith(`${SRC}/`) || ofAnotherSystem(file)) return [] satisfies string[];
+  const tree = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const bound = buttonBindings(file, tree);
+  const found = new Set<string>();
+  const visit = (node: ts.Node) => {
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      ts.isIdentifier(node.tagName) &&
+      bound.has(node.tagName.text)
+    ) {
+      const form = formOf(node);
+      if (form) found.add(`<${node.tagName.text} ${form}>`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  return [...found] satisfies string[];
+};
+
 /**
  * What the map of destinations lacks and holds past its use: each key the board takes that it gives no destination (`unmapped`), and
  * each key it gives a destination that nothing takes (`unused`), once each.

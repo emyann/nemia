@@ -110,13 +110,13 @@ function Pages({ data, at, onAt }: { data: Printed; at: At; onAt: (at: At) => vo
   if (before === undefined && next === undefined && 'last' in at) return null;
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="text" isDisabled={before === undefined} onPress={() => before !== undefined && onAt({ before })}>
+      <Button variant="outlined" isDisabled={before === undefined} onPress={() => before !== undefined && onAt({ before })}>
         Earlier lines
       </Button>
-      <Button variant="text" isDisabled={next === undefined} onPress={() => next !== undefined && onAt({ from: next })}>
+      <Button variant="outlined" isDisabled={next === undefined} onPress={() => next !== undefined && onAt({ from: next })}>
         Later lines
       </Button>
-      <Button variant="text" isDisabled={'last' in at} onPress={() => onAt({ last: true })}>
+      <Button variant="outlined" isDisabled={'last' in at} onPress={() => onAt({ last: true })}>
         The end
       </Button>
     </div>

@@ -125,8 +125,8 @@ export function Pips({ round, tone, words = false }: { round: NonNullable<Now['r
 }
 
 /**
- * The step's budget as a ring of what it spent of its cap, in money's hue, and in red with its words once it is past its cap; with
- * `words`, what it spent of its cap beside it, in money's ink.
+ * The step's budget as a ring of what it spent of its cap, in ink, and in failure's red with its words once it is past its cap;
+ * with `words`, what it spent of its cap beside it, in ink.
  */
 export function Ring({ budget, words = false }: { budget: NonNullable<Now['budget']>; words?: boolean }) {
   const round = 2 * Math.PI * 5;
@@ -155,7 +155,7 @@ export function Ring({ budget, words = false }: { budget: NonNullable<Now['budge
             strokeWidth="2.4"
             strokeDasharray={`${(share * round).toFixed(2)} ${round.toFixed(2)}`}
             transform="rotate(-90 7 7)"
-            className={budget.over ? 'stroke-failure' : 'stroke-money'}
+            className={budget.over ? 'stroke-failure' : 'stroke-on-surface'}
           />
         </svg>
       </Marked>
@@ -163,7 +163,7 @@ export function Ring({ budget, words = false }: { budget: NonNullable<Now['budge
         <span className={cn('text-body-small', ink.failure)}>{NOW_WORDS.over(budget.capSaid)}</span>
       ) : (
         words && (
-          <span data-ring-words className={cn('font-mono text-body-small whitespace-nowrap', ink.money)}>
+          <span data-ring-words className={cn('font-mono text-body-small whitespace-nowrap text-on-surface')}>
             {dollars(budget.spent)} of {budget.capSaid}
           </span>
         )

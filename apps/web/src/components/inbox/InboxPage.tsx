@@ -277,7 +277,7 @@ function CardItem({
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           {startable && (
-            <Button variant={starting ? 'outlined' : 'filled'} aria-expanded={starting} onPress={() => setStarting(!starting)}>
+            <Button variant="outlined" aria-expanded={starting} onPress={() => setStarting(!starting)}>
               {starting ? 'Close' : 'Start'}
             </Button>
           )}

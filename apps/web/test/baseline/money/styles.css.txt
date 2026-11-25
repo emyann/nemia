@@ -1,8 +1,0 @@
-apps/web/src/styles.css#--color-money
-apps/web/src/styles.css#--color-money-container
-apps/web/src/styles.css#--color-on-money
-apps/web/src/styles.css#--color-on-money-container
-apps/web/src/styles.css#--meaning-money
-apps/web/src/styles.css#--meaning-money-container
-apps/web/src/styles.css#--meaning-on-money
-apps/web/src/styles.css#--meaning-on-money-container

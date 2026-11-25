@@ -225,10 +225,10 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
         </>
       )}
       ?
-      <Button icon={pending ? Pending : undefined} color="error" onPress={onRemove} isDisabled={pending}>
+      <Button icon={pending ? Pending : undefined} variant="outlined" color="error" onPress={onRemove} isDisabled={pending}>
         {pending ? 'Removing…' : 'Remove'}
       </Button>
-      <Button variant="text" onPress={() => setAsking(false)} isDisabled={pending}>
+      <Button variant="outlined" onPress={() => setAsking(false)} isDisabled={pending}>
         Keep it
       </Button>
     </span>

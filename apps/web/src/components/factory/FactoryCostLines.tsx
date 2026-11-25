@@ -87,7 +87,7 @@ function CostLineRow({ factory, workflow, usd }: { factory: string; workflow: st
             no cost line
           </span>
         ) : (
-          <span data-cost-line-said={usd} className="font-mono text-body-medium text-money">
+          <span data-cost-line-said={usd} className="font-mono text-body-medium text-on-surface">
             {budgetWord(usd)}
           </span>
         )}
@@ -143,7 +143,7 @@ function CostLineForm({
         className="w-36"
         inputClassName="font-mono"
       />
-      <Button type="submit" isDisabled={pending || !savable}>
+      <Button type="submit" variant="outline" isDisabled={pending || !savable}>
         {pending && <Pending size={16} />}
         {pending ? 'Writing…' : 'Save'}
       </Button>

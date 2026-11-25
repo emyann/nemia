@@ -2,4 +2,3 @@ apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/alert:Alert
 apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/alert:AlertDescription
 apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/alert:AlertTitle
 apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/badge:Badge
-apps/web/src/components/factory/FactorySchedules.tsx#@/components/ui/button:LinkButton

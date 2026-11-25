@@ -18,7 +18,7 @@ body { background: var(--md-sys-color-surface); width: 960px; height: 320px; pos
 h1 { position: absolute; left: 32px; bottom: 72px; margin: 0; white-space: nowrap; font: 400 60px/0.95 var(--font-michroma); color: var(--md-sys-color-on-surface); }
 p { position: absolute; left: 32px; bottom: 36px; margin: 0; font: 400 15px/22px var(--font-barlow); color: var(--md-sys-color-on-surface-variant); }
 svg { position: absolute; left: 0; top: 0; }
-.yours { fill: var(--md-sys-color-primary); } .alive { fill: var(--md-sys-color-secondary); } .money { fill: var(--md-sys-color-tertiary); }
+.yours { fill: var(--md-sys-color-primary); } .alive { fill: var(--md-sys-color-secondary); } .neutral { fill: var(--md-sys-color-tertiary); }
 .rest { fill: var(--md-sys-color-inverse-surface); } .deep { fill: var(--md-sys-color-surface-container-high); }
 .edge { fill: none; stroke: var(--md-sys-color-primary); stroke-width: 1; }
 </style>
@@ -29,7 +29,7 @@ svg { position: absolute; left: 0; top: 0; }
 <polygon class="deep" points="408,0 556,0 584,28 584,112 436,112 408,84"/>
 <polygon class="edge" points="424.5,0 546.5,0 567.5,21 567.5,95.5 445.5,95.5 424.5,74.5"/>
 <polygon class="alive" points="592,0 712,0 736,24 736,112 616,112 592,88"/>
-<polygon class="money" points="744,0 832,0 856,24 856,112 768,112 744,88"/>
+<polygon class="neutral" points="744,0 832,0 856,24 856,112 768,112 744,88"/>
 <rect class="rest" x="864" y="-14" width="96" height="126" rx="14"/>
 </svg>
 <h1>Nemia Design System</h1>

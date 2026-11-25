@@ -40,7 +40,12 @@ export function EnoughRow({ runId, offer, line }: { runId: string; offer: Extrac
         }}
       >
         <TextField aria-label={words.field(offer.step)} multiline value={message} onChange={setMessage} placeholder={words.placeholder} />
-        <Button icon={approve.isPending ? Pending : undefined} type="submit" isDisabled={approve.isPending || !message.trim()}>
+        <Button
+          icon={approve.isPending ? Pending : undefined}
+          variant="outlined"
+          type="submit"
+          isDisabled={approve.isPending || !message.trim()}
+        >
           {approve.isPending ? 'Approving…' : words.button}
         </Button>
       </form>

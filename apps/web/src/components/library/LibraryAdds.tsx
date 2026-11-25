@@ -76,6 +76,7 @@ export function LibraryAdds({ name }: { name: string }) {
           </Select>
           <Button
             size="sm"
+            variant="outline"
             data-library-add-press
             isDisabled={chosen === undefined || change.isPending}
             onPress={() => chosen && change.mutate(chosen)}

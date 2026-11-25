@@ -54,7 +54,7 @@ export function ChatKeptMessage({
             <Button variant="outlined" size="xsmall" onPress={() => setDraft(kept.text)}>
               Edit
             </Button>
-            <Button variant="text" size="xsmall" onPress={onDiscard}>
+            <Button variant="outlined" size="xsmall" onPress={onDiscard}>
               Discard
             </Button>
           </>
@@ -70,7 +70,7 @@ export function ChatKeptMessage({
             >
               Keep the change
             </Button>
-            <Button variant="text" size="xsmall" onPress={() => setDraft(null)}>
+            <Button variant="outlined" size="xsmall" onPress={() => setDraft(null)}>
               Leave it
             </Button>
           </>

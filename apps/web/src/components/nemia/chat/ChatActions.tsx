@@ -22,12 +22,12 @@ export function ChatActions({ ask, onAnswer }: { ask: Ask; onAnswer: (id: string
       <AskWords text={ask.text} />
       {question !== undefined && !answered && (
         <div className="flex flex-wrap gap-2">
-          {question.options.map((option, i) => (
+          {question.options.map((option) => (
             <Button
               key={option.label}
               data-chat-action={option.label}
               size="xsmall"
-              variant={i === 0 ? 'filled' : 'outlined'}
+              variant="outlined"
               onPress={() => onAnswer(ask.call, [{ question: question.question, labels: [option.label] }])}
             >
               {option.label}

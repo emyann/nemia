@@ -166,7 +166,7 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
         inputClassName="min-h-40"
       />
       <div className="flex flex-wrap items-center gap-2">
-        <Button icon={pending ? Pending : undefined} type="submit" isDisabled={pending || !draft.trim() || unchanged}>
+        <Button icon={pending ? Pending : undefined} variant="outlined" type="submit" isDisabled={pending || !draft.trim() || unchanged}>
           {pending ? 'Writing…' : 'Save'}
         </Button>
         {data.stored &&
@@ -174,6 +174,7 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
             <span data-instruction-clear-asks className="flex flex-wrap items-center gap-2 text-body-small text-on-surface-variant">
               Remove the words the store keeps?
               <Button
+                variant="outlined"
                 color="error"
                 size="xsmall"
                 isDisabled={pending}
@@ -184,7 +185,7 @@ function StoreForm({ data, pending, onChange }: { data: Instruction; pending: bo
               >
                 Clear
               </Button>
-              <Button variant="text" size="xsmall" isDisabled={pending} onPress={() => setAsking(false)}>
+              <Button variant="outlined" size="xsmall" isDisabled={pending} onPress={() => setAsking(false)}>
                 Keep them
               </Button>
             </span>

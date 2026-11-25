@@ -131,6 +131,7 @@ function Picker({ page, pending, onHire }: { page: WorkflowStepPage; pending: bo
       </Select>
       <Button
         data-hire
+        variant="outlined"
         className="mt-2"
         icon={pending ? Pending : undefined}
         isDisabled={pending || picked === null}

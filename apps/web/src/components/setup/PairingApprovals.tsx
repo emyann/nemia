@@ -57,7 +57,7 @@ function PendingPairing({ pairing, approves }: { pairing: Pairing; approves: App
           <CutPress pending={pending} type="submit" isDisabled={pending || code.trim() === ''}>
             {pending ? 'Approving…' : 'Approve'}
           </CutPress>
-          <Button variant="text" size="xsmall" isDisabled={pending} onPress={() => setOpen(false)}>
+          <Button variant="outlined" size="xsmall" isDisabled={pending} onPress={() => setOpen(false)}>
             Cancel
           </Button>
         </form>

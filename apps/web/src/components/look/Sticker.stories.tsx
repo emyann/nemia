@@ -14,10 +14,10 @@ export const Clock: StoryObj = {
   ),
 };
 
-/** An amount, in the hue of money. */
+/** An amount, in plain ink: a cost is no meaning. */
 export const Cost: StoryObj = {
   render: () => (
-    <Sticker hue="money" label="Cost">
+    <Sticker hue="ink" label="Cost">
       $4.25
     </Sticker>
   ),

@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
 import type { Milestone } from 'objects';
-import { CutButton, PageName } from '@/components/look';
-import { Button } from '@/components/ui/ds';
+import { CutButton, PageName, TextLink, CutPress } from '@/components/look';
 import { useHerSheet } from '@/components/frame/HerSheet';
 import { factoryNamesQuery } from '@/lib/api/factories';
 import { milestonesQuery } from '@/lib/api/readiness';
@@ -26,7 +24,6 @@ const WATCH_EVERY_MS = 3_000;
  * leaves for the board on every screen.
  */
 export function FactoryStep() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const her = useHerSheet();
   const [way, setWay] = useState<FactoryWay | undefined>(undefined);
@@ -70,9 +67,9 @@ export function FactoryStep() {
               <p className="m-0 text-body-medium text-on-surface-variant">
                 Her chat opens beside this page. This step moves on by itself once she has made the factory.
               </p>
-              <Button variant="filled" data-factory-talk onPress={her.show}>
+              <CutPress data-factory-talk onPress={her.show}>
                 Talk to Nemia
-              </Button>
+              </CutPress>
             </section>
           )}
           {screen === 'template' && (
@@ -89,9 +86,9 @@ export function FactoryStep() {
       )}
       {screen === 'guide' && <FactoryGuide />}
       <footer className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="text" size="small" data-welcome-skip onPress={() => void navigate({ to: '/' })}>
+        <TextLink to="/" data-welcome-skip>
           Skip for now
-        </Button>
+        </TextLink>
         {done && (
           <CutButton data-welcome-next to={nextLink ?? '/'}>
             {next === undefined ? 'On to the board' : `Next: ${MILESTONE_NAMES[next].toLowerCase()}`}

@@ -19,11 +19,11 @@ async function answer<T>(page: Page, pathname: string) {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
-/** The button's dot says the daemon's tone, its quota in money that it nears its limit, and its name both; the feed is followed. */
+/** The button's dot says the daemon's tone, its quota marked that it nears its limit, and its name both; the feed is followed. */
 async function says(page: Page) {
   await expectCount(page.locator('footer[data-frame-footer]'), 0, 'no bottom bar: the gauges button holds its facts');
   await expectVisible(markOf(page).and(page.locator('[data-daemon-dot="none"][data-tone="down"]')), "the dot: the e2e's api ticks nothing");
-  await expectVisible(markOf(page).locator('[data-quota-line][data-quota-mark]'), 'the quota in money: the week is past the mark');
+  await expectVisible(markOf(page).locator('[data-quota-line][data-quota-mark]'), 'the quota marked: the week is past the mark');
   await expectVisible(
     machineBarOf(page).getByRole('button', { name: /^This machine: daemon not ticking, .*, quota .*, near its limit$/ }),
     'its name says the daemon, what is at work and the quota',
@@ -67,7 +67,7 @@ async function opens(page: Page) {
 
 export default {
   /**
-   * The machine bar's gauges button, on the Factory: its dot in the daemon's tone, its quota in money while it nears its limit, its name
+   * The machine bar's gauges button, on the Factory: its dot in the daemon's tone, its quota marked while it nears its limit, its name
    * saying both; it opens the machine's gauges in the frame's side sheet, which hold what the bottom bar held, and closes them. The pause
    * is its own page's (`480-pause.ts`).
    */

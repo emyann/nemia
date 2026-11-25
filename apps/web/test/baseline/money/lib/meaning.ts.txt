@@ -1,8 +1,0 @@
-apps/web/src/lib/meaning.ts#--meaning-money
-apps/web/src/lib/meaning.ts#bg-money
-apps/web/src/lib/meaning.ts#bg-money-container
-apps/web/src/lib/meaning.ts#border-money
-apps/web/src/lib/meaning.ts#ring-money
-apps/web/src/lib/meaning.ts#text-money
-apps/web/src/lib/meaning.ts#text-on-money
-apps/web/src/lib/meaning.ts#text-on-money-container

@@ -57,7 +57,7 @@ function Tiles({ run }: { run: RunDetail }) {
       </span>
       <span data-run-cost title={run.cost ? spentTitle(run.cost, "the run's tries") : undefined}>
         <StatTile
-          hue="money"
+          hue="ink"
           label="Cost"
           value={run.cost?.said ?? 'none'}
           breakdown={run.cost && run.stepCosts ? costBreakdown(run.cost, run.stepCosts) : null}

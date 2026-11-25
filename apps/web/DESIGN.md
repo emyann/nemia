@@ -205,13 +205,16 @@ There is one button pair, and no third style.
 
 - **The filled button** is the one main action of a view, and it is
   yellow with black on it (`primary`, `on-primary`), in the look's cut:
-  File, Start a run that is opened, Approve, Try again. Exactly one to a
-  view. It is yellow because pressing it is your move, which is what
-  yellow says.
+  File, Start a run that is opened, Approve, Try again. At most one to a
+  view; a page of equal forms, such as a factory's Settings, has none. A
+  view is the page, and each thing that opens over it: a dialog, a
+  popover's form, a side sheet. It is yellow because pressing it is your
+  move, which is what yellow says.
 - **The outlined button** is every other action, in plain ink on an
   `outline` edge: Queue, Remove, Cancel, Send back, and an action repeated
-  down a list, such as Start on each card of the inbox. A list never
-  repeats a filled button.
+  down a list, such as Start on each card of the inbox, Add in the skill
+  picker, Confirm on each policy rule. A list never repeats a filled
+  button, and the rail and the machine bar hold none: Pause is outlined.
 - **A text action** is a link: plain ink, underlined. It is not a third
   button.
 
@@ -241,7 +244,8 @@ are ink, so the kit's selected and tonal parts are neutral as they come.
 The kit also draws its primary on a switch, a checkbox, a radio, a slider,
 a tab's indicator and a text button: those take ink through the kit's
 component colours, which the kit must offer a theme (asked of the kit; see
-*What the kit owes this look*).
+*What the kit owes this look*). The board draws no text button meanwhile:
+a text action is the look's link.
 
 ### The four meanings
 

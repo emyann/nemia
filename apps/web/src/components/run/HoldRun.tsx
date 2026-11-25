@@ -10,7 +10,7 @@ import { Refusal } from '../gate/Ask';
 import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { sayWritten } from '@/lib/written';
-import { Pending, Reading } from '@/components/look';
+import { Reading, CutPress } from '@/components/look';
 import { Body, Button, Checkbox, CheckboxGroup, Skeleton, TextField, Title } from '@/components/ui/ds';
 
 /**
@@ -26,7 +26,7 @@ export function HoldQuestion({ run, onClose }: { run: Pick<RunView, 'id' | 'repo
         <div role="alert" data-hold-unread>
           <Refusal error={error} not="The runs to wait on could not be read" />
         </div>
-        <Button variant="text" size="xsmall" onPress={onClose}>
+        <Button variant="outlined" size="xsmall" onPress={onClose}>
           Close
         </Button>
       </div>
@@ -111,9 +111,9 @@ function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; o
         <Button type="button" variant="outlined" size="xsmall" onPress={onClose} isDisabled={hold.isPending}>
           Cancel
         </Button>
-        <Button icon={hold.isPending ? Pending : undefined} type="submit" size="xsmall" isDisabled={hold.isPending}>
+        <CutPress pending={hold.isPending} type="submit" isDisabled={hold.isPending}>
           {hold.isPending ? 'Holding…' : 'Hold'}
-        </Button>
+        </CutPress>
       </div>
     </form>
   );

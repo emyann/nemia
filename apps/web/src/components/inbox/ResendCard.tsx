@@ -55,7 +55,7 @@ export function ResendCard({
         ))}
         <Radio value={NONE}>None — its factory&apos;s card triggers take it</Radio>
       </RadioGroup>
-      <Button icon={send.isPending ? Pending : undefined} isDisabled={send.isPending} onPress={() => send.mutate()}>
+      <Button icon={send.isPending ? Pending : undefined} variant="outlined" isDisabled={send.isPending} onPress={() => send.mutate()}>
         {send.isPending ? 'Sending on…' : 'Send on'}
       </Button>
       {answer && <Resent answer={answer} />}

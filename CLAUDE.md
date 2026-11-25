@@ -37,9 +37,10 @@ holds what every change needs.
   `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
   (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`, `design-system`). Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs on it every
-  job the change reaches (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
-  the pull request `ci` judged was merged (`packages/templates/sdlc/carried/landing.ts`), then a wait on main's own `ci` at the
-  merge commit, so a landing that turns main red fails its land step — so no step's suite reads the merged tree, and main's own `ci`
+  job the change reaches (`packages/templates/sdlc/workflows/build/implement.md`); the landing's checks run no suite at all — `receipt`, that
+  the pull request `ci` judged was merged (`packages/templates/sdlc/carried/landing.ts`), then `base-ci`, a wait on main's own `ci` at the
+  merge commit, which says `usesCheckout: false`, so the checkout is given back to the next landing while it waits, and a landing
+  that turns main red still fails its land step — so no step's suite reads the merged tree, and main's own `ci`
   is the last word on it. A failing test is the check's refusal, answered in the next try. Outside a run no check
   follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsrs --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
@@ -118,7 +119,8 @@ session of their own opened by `nemia factory home nemia <this repository>`. Thi
   neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
   anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
   merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
-  `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).
+  `checks:`, `landing.ts receipt`, then `landing.ts base-ci` (`usesCheckout: false`: the checkout is given back to the next run's ending
+  between the two), and records the commit that landed once both exit 0 (`landingDue`).
   Where the branch lacks the base and the factory names a refresh (sdlc's `landingRefresh` and `landingDerives`), the merge first
   brings the base into the run's branch, derives the factory's files again (`packages/templates/sdlc/carried/refresh.ts`) and pushes,
   merging nothing; the receipt merges that head once `ci` is green there. The landed commit differs from git's plain merge of the

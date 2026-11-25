@@ -215,12 +215,12 @@ describe('REFUSED: a command node or a named check the run could not file as wri
       'file-notes:',
     ],
     [
-      'an ending on the base branch with two checks',
+      'a check that uses no checkout on a step in a worktree',
       {
-        'land.md':
-          '---\nafter: implement\nplace: git\nworkspace: base\ngate: true\nchecks:\n  - { name: merge, run: npm run merge }\n  - { name: receipt, run: npm run receipt }\n---\nLand it.\n',
+        'review.md':
+          '---\nafter: implement\nplace: git\nchecks:\n  - { name: wait, run: npm run wait, usesCheckout: false }\n---\nReview it.\n',
       },
-      'land:',
+      'review:',
     ],
   ];
   const inTeam = (files: Record<string, string>) => {

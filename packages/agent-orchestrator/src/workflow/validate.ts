@@ -164,19 +164,24 @@ function validateCommands(steps: readonly StepSpec[]) {
   }
 }
 
-/** Refused: an ending that lands on its check (`workspace: base`) with more than one check: the run lands on one check's exit 0. */
+/**
+ * Refused: a check that says it uses no checkout (`usesCheckout: false`) on a step that is no ending. Only an ending works in the
+ * repository's own checkout, which a check gives back to the next ending by saying so; a step in a worktree the run owns holds nothing.
+ */
 function validateBaseChecks(steps: readonly StepSpec[]) {
   for (const s of steps) {
-    if (!endsOnBase(s) || stepChecks(s).length <= 1) continue;
-    throw new WorkflowError(
-      `${s.name}: \`workspace: base\` lands the run on its check's exit 0, and this step has ${stepChecks(s).length} checks. Keep one, as \`check: <line>\`.`,
-    );
+    if (endsOnBase(s)) continue;
+    const free = stepChecks(s).find((c) => c.usesCheckout === false);
+    if (free)
+      throw new WorkflowError(
+        `${s.name}: the check \`${free.name}\` says \`usesCheckout: false\`, which gives the repository's own checkout back to the next ending, and this step is no ending (\`workspace: base\`): it works in a worktree of its own and holds no checkout. Delete the line.`,
+      );
   }
 }
 
 /**
- * Why nobody may file an ending's `check:`: it has no `gate: true`, so no approval starts it, and it waits on no step with a `loop:`,
- * so no pass of a step that could send the work back routes it either. Undefined where one of the two holds.
+ * Why nobody may file an ending's `check:` or `checks:`: it has no `gate: true`, so no approval starts it, and it waits on no step with a
+ * `loop:`, so no pass of a step that could send the work back routes it either. Undefined where one of the two holds.
  *
  * A `check:` there is the run's own: it runs the command on the merge the step staged and commits that merge onto the base branch on its
  * word (`landingDue`). Nothing may start that but a person's approval, or the pass of a step the ending waits on that can send the work
@@ -185,15 +190,21 @@ function validateBaseChecks(steps: readonly StepSpec[]) {
  * not in `workspaceOf`, given one step's keys.
  */
 function unfilableCheck(steps: readonly StepSpec[], s: StepSpec) {
-  if (s.check === undefined || s.gate === true) return undefined;
+  if (!hasChecks(s) || s.gate === true) return undefined;
   if (s.after.some((name) => steps.some((x) => x.name === name && x.loop))) return undefined;
   const waits = s.after.length ? `no step with a \`loop:\` (it waits on ${s.after.join(', ')})` : 'nothing';
   const before = s.after.length === 1 ? s.after[0] : 'the step before it';
+  const said =
+    s.check === undefined
+      ? `\`checks:\` (${stepChecks(s)
+          .map((c) => c.name)
+          .join(', ')}) are commands`
+      : `\`check: ${s.check}\` is a command`;
   return (
-    `, and \`check: ${s.check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base` +
+    `, and ${said} the run executes there on the merge the step leaves staged, committing it onto the base` +
     ` branch when it passes — which is nobody's to start unless a person approves it or a step that can send the work back has passed,` +
     ` and this step has no \`gate: true\` and waits on ${waits}. Add \`gate: true\`, give ${before} a \`loop:\` so that its pass files the` +
-    ` landing, or delete the \`check:\` line.`
+    ` landing, or delete the \`${s.check === undefined ? 'checks:' : 'check:'}\` line.`
   );
 }
 

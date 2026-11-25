@@ -4,7 +4,8 @@
  *
  * - a merge that brings a dependency: the check runs `npm install` in the checkout first, and git's index keeps the merge's lockfile;
  * - a merge whose lockfile is main's: no `npm` is run, proven by one planted first on the `PATH`, and `node_modules` is as it was;
- * - a merge its check refused: aborted with the branch's package left installed under an ignored `node_modules`, until `npm install`.
+ * - a merge its check refused: aborted with the branch's package left installed under an ignored `node_modules`, until `npm install`;
+ * - an ending's check that uses no checkout (`usesCheckout: false`): it runs no install, where the check before it, which uses it, does.
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
@@ -304,4 +305,35 @@ test("a merge its check refused is aborted with the branch's packages left insta
   assert.match(npm(repo, 'install'), /removed 1 package/, "npm install on main removes what main's lockfile does not name");
   assert.equal(fs.existsSync(path.join(repo, 'node_modules', 'b')), false);
   assert.equal(git(repo, 'status', '--porcelain'), '');
+});
+
+test("an ending's check that uses no checkout (`usesCheckout: false`) runs no install first, while its check that uses the checkout does", async () => {
+  const repo = anNpmRepo();
+  const dir = requiringB();
+  const ship = path.join(dir, 'ship.md');
+  fs.writeFileSync(
+    ship,
+    fs
+      .readFileSync(ship, 'utf8')
+      .replace(
+        /^check: .+$/m,
+        `checks:\n  - name: receipt\n    run: node -e "require('b')"\n  - name: base-ci\n    run: echo waited\n    usesCheckout: false`,
+      ),
+  );
+  const { id, e, tasks, settle, signed } = await stagedAndSigned({ repo, dir, work: addB });
+  const receipt = `${id}-ship-check-receipt`;
+  assert.match(tasks.get(receipt)!.spec.config?.command?.[2] ?? '', /\nnode -e "require\('b'\)"$/, 'the receipt installs first');
+  assert.ok(
+    signed.notes.some((n) => n.includes('npm install')),
+    signed.notes.join('\n'),
+  );
+  assert.ok(checkoutParts(repo), 'the checkout still lacks what the merge asks for when base-ci is filed');
+  settle(receipt, 'succeeded', undefined, 0);
+  const next = await runWith(e, advanceRun(runRecord(ROOT, id)));
+  assert.deepEqual(tasks.get(`${id}-ship-check-base-ci`)!.spec.config?.command, ['sh', '-c', 'echo waited'], 'base-ci alone, no install');
+  assert.equal(
+    next.notes.some((n) => n.includes('npm install')),
+    false,
+    next.notes.join('\n'),
+  );
 });

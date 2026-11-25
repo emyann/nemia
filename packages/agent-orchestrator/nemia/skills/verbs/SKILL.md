@@ -952,8 +952,8 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                --off: take back the approval of a step that stands approved while
                                nothing it approved has been filed — an ending waiting on the base
                                branch, held, or not yet ticked. The step waits at its gate again.
-                               Of a loop's step accepted as it stands, while nothing waiting on it
-                               is filed: the acceptance taken back, and the loop waits on you again
+                               Of a loop ended as it stands, while nothing waiting on its step is
+                               filed: that acceptance taken back, and the loop waits on you again
                                each tool's words: tools.md#approve
                                on the port: approve
 ```

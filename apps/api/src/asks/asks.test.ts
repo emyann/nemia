@@ -195,7 +195,7 @@ describe('POST …/retry: what it refuses — a message it will not carry, a ste
     const unread: Array<[unknown, string]> = [
       ['not json', 'payload'],
       [['continue'], 'payload'],
-      [{}, 'payload.mode'],
+      [{ off: 'yes' }, 'payload.off'],
       [{ mode: 'again' }, 'payload.mode'],
       [{ mode: 'continue', message: 42 }, 'payload.message'],
       [{ mode: 'fresh', model: 3 }, 'payload.model'],
@@ -211,6 +211,7 @@ describe('POST …/retry: what it refuses — a message it will not carry, a ste
       [{ mode: 'continue', model: 'opus' }, /^`model`[^]*goes with "mode": "fresh"/],
       [{ mode: 'fresh', model: '' }, /^`model` is blank/],
       [{ mode: 'fresh', model: '  ' }, /^`model` is blank/],
+      [{ mode: 'fresh', off: true }, /^--off takes back an ask/],
     ];
     for (const [body, fact] of refused) assert.match(await refusedWith(await ask('implement', body), 422, JSON.stringify(body)), fact);
     assert.match(await refusedWith(await ask('implement', { mode: 'continue' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);

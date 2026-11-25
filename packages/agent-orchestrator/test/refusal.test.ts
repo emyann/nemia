@@ -177,11 +177,12 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  * importing nothing but the runtime's vocabulary door, already loaded, and types, and neither touching a disk. `memoryBytesWord` stays in
  * `out-of-memory/out-of-memory.ts` rather than `objects`, whose one entry would load the effect barrel here.
  *
- * `agent-orchestrator/run` is one more since a run's asks are records of the keyspace: `runs/run-keys.ts`, the keys `forget/forget.ts`
- * names a run's asks by. Pure, importing nothing but types, and touching no disk.
+ * `agent-orchestrator/run` was one more once a run's asks became records of the keyspace: `runs/run-keys.ts`, the keys `forget/forget.ts`
+ * named a run's asks by. It is one fewer again since `forget/forget.ts` names each ask by the command that takes it back (`askOffLine`),
+ * and reads no key.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 222, effect: 15 },
+  'agent-orchestrator/run': { all: 221, effect: 15 },
   'agent-orchestrator/workflow': { all: 157, effect: 15 },
 };
 

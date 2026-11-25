@@ -10,7 +10,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 
 /**
  * Which ask is taken back, by the kind its key names: `try` (`retry-…`), `round` (`round-…`), `base` (`merge-…`), `loop`
- * (`accept-…`), and `gate` (`approve-…`) for a record there that does not read as an approval.
+ * (the acceptance's key), and `gate` (`approve-…`) for a record there that does not read as an approval.
  */
 export type AskTakenOf = 'try' | 'round' | 'base' | 'loop' | 'gate';
 

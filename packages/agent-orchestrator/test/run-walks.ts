@@ -501,6 +501,21 @@ const ASK_WALKS: Record<string, Walk[]> = {
       says: [true, true],
     },
   ],
+  'asks.held': [
+    {
+      name: 'what waits at an ask key is held as an ask once written, as none before, and none at the key of another kind',
+      walk: ({ door }) => {
+        made(door, 'w-held');
+        const key = { of: 'try', step: 'implement', n: 2 } as const;
+        const before = done(door.asks.held(idOf('w-held'), key));
+        act(door.asks.write(idOf('w-held'), ASKS[0].asked));
+        const after = done(door.asks.held(idOf('w-held'), key));
+        const other = done(door.asks.held(idOf('w-held'), { of: 'round', step: 'implement', n: 2 }));
+        return [before, after, other];
+      },
+      says: ['none', 'ask', 'none'],
+    },
+  ],
   'asks.takeBack': [
     {
       name: "an approval taken back is set aside in its run's done/, no longer composed onto the run, and a second take-back finds none",

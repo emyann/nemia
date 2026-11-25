@@ -210,12 +210,10 @@ function strayOf(person: PersonRequest, text: string, step: string, n: number) {
 }
 
 /** What the text at an ask's key holds, read by its kind's reader: an ask, a stray that reads as none, or nothing. */
-const heldAs = (key: AskKey, text: string | undefined) =>
-  (text === undefined
-    ? 'none'
-    : typeof ASK_READERS[key.of](text, key.step, key.n) === 'string'
-      ? 'stray'
-      : 'ask') satisfies AskHeld as AskHeld;
+const heldAs = (key: AskKey, text: string | undefined) => {
+  const held: AskHeld = text === undefined ? 'none' : typeof ASK_READERS[key.of](text, key.step, key.n) === 'string' ? 'stray' : 'ask';
+  return held;
+};
 
 /** The first key under `done/` for `name` no record holds: the plain name, else `.2`, `.3`, …. */
 const doneKeyFree = (id: string, name: string, held: ReadonlySet<string>) => {

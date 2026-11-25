@@ -137,24 +137,24 @@ export function readsGrain(css: string) {
   return at !== -1 && (other === -1 || at < other);
 }
 
-/** A surface's specks by the red, green and blue its tile's colour matrix gives every pixel. */
+/** A quiet grain's specks by the red, green and blue its tile's colour matrix gives every pixel. */
 const SPECKS: Readonly<Record<string, string>> = { '0,0,0': 'ink', '1,1,1': 'white' };
 
-/** The specks of the surface tile `rules` writes, `ink` or `white`; `unread` where it writes none, or one of another colour. */
+/** The specks of the quiet tile `rules` writes, `ink` or `white`; `unread` where it writes none, or one of another colour. */
 const specksOf = (rules: string) => {
-  const tile = /--grain-surface\s*:\s*url\(\s*['"]([^'"]+)['"]\s*\)/.exec(rules)?.[1] ?? '';
+  const tile = /--grain-quiet\s*:\s*url\(\s*['"]([^'"]+)['"]\s*\)/.exec(rules)?.[1] ?? '';
   const values = /<feColorMatrix[^>]*\svalues="([^"]+)"/.exec(decodeURIComponent(tile))?.[1]?.trim().split(/\s+/) ?? [];
   return SPECKS[[values[4], values[9], values[14]].join(',')] ?? 'unread';
 };
 
 /**
- * The specks of a surface's grain in each scheme, as `css`, the look's grain, writes them: the light scheme's above the dark
- * scheme's media rule, the dark one's inside it, which ends above the rule that draws the surface. `unread` for both where either
+ * The specks of the quiet grain in each scheme, as `css`, the look's grain, writes them: the light scheme's above the dark
+ * scheme's media rule, the dark one's inside it, which ends above the rule that draws the quiet grain. `unread` for both where either
  * mark is missing.
  */
-export function surfaceSpecks(css: string) {
+export function quietSpecks(css: string) {
   const dark = css.search(/@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)/);
-  const drawn = css.search(/\[data-grain\s*=\s*['"]surface['"]\s*\]/);
+  const drawn = css.search(/\[data-grain\s*=\s*['"]quiet['"]\s*\]/);
   if (dark === -1 || drawn < dark) return { light: 'unread', dark: 'unread' } satisfies { light: string; dark: string };
   return { light: specksOf(css.slice(0, dark)), dark: specksOf(css.slice(dark, drawn)) } satisfies { light: string; dark: string };
 }
@@ -218,11 +218,11 @@ describe("the cut and the grain in the board's source: no ring a clip breaks, th
     ]);
     assert.deepEqual(tilesOutside(sources), [], 'no page and no part writes a tile of its own');
     const grain = sources[GRAIN] ?? '';
-    assert.equal(grain.split('feTurbulence').length - 1, 3, "the surface's in each scheme, and the label's");
-    for (const name of ['--grain-surface', '--grain-label'])
+    assert.equal(grain.split('feTurbulence').length - 1, 3, "the quiet one's in each scheme, and the label's");
+    for (const name of ['--grain-quiet', '--grain-label'])
       assert.equal(grain.split(`var(${name})`).length - 1, 1, `${name} is drawn by one rule`);
     assert.equal(grain.split('--grain-label:').length - 1, 1, "a label's tile is the same in both schemes");
-    assert.equal(grain.split('--grain-surface:').length - 1, 2, "a surface's tile is written for each scheme");
+    assert.equal(grain.split('--grain-quiet:').length - 1, 2, "a quiet tile is written for each scheme");
   });
   test('REFUSED: an entry stylesheet that imports the grain under another at-rule, or not at all', () => {
     const grain = "@import './components/look/grain.css';";
@@ -232,16 +232,16 @@ describe("the cut and the grain in the board's source: no ring a clip breaks, th
     assert.equal(readsGrain("@import\n  './components/look/grain.css'\n;\n@layer base {\n}\n"), true, 'across line breaks');
     assert.equal(readsGrain(fs.readFileSync(path.join(SRC, 'styles.css'), 'utf8')), true, 'the board reads it');
   });
-  test("REFUSED: a surface's grain whose specks are ink in the dark scheme or white in the light one", () => {
+  test("REFUSED: a quiet grain whose specks are ink in the dark scheme or white in the light one", () => {
     const grain = fs.readFileSync(path.join(SRC, GRAIN), 'utf8');
-    const [light, dark] = [...grain.matchAll(/--grain-surface\s*:\s*(url\([^)]+\))/g)].map((found) => found[1] ?? '');
-    assert.ok(light && dark && light !== dark, 'the grain writes a surface tile for each scheme');
+    const [light, dark] = [...grain.matchAll(/--grain-quiet\s*:\s*(url\([^)]+\))/g)].map((found) => found[1] ?? '');
+    assert.ok(light && dark && light !== dark, 'the grain writes a quiet tile for each scheme');
     const swapped = grain.replace(light, '<light>').replace(dark, light).replace('<light>', dark);
-    assert.deepEqual(surfaceSpecks(swapped), { light: 'white', dark: 'ink' }, 'the two swapped are read as swapped');
-    assert.deepEqual(surfaceSpecks(grain.replace(/\[data-grain\s*=\s*'surface'\s*\]/, '[data-grain]')), {
+    assert.deepEqual(quietSpecks(swapped), { light: 'white', dark: 'ink' }, 'the two swapped are read as swapped');
+    assert.deepEqual(quietSpecks(grain.replace(/\[data-grain\s*=\s*'quiet'\s*\]/, '[data-grain]')), {
       light: 'unread',
       dark: 'unread',
     });
-    assert.deepEqual(surfaceSpecks(grain), { light: 'ink', dark: 'white' }, 'ink specks in the light scheme, light ones in the dark');
+    assert.deepEqual(quietSpecks(grain), { light: 'ink', dark: 'white' }, 'ink specks in the light scheme, light ones in the dark');
   });
 });

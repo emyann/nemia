@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import { createContext, use, type HTMLAttributes, type ReactNode } from 'react';
 import { paint } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { cutFoot, cutPoints, cutShape, type CutSize } from './cut';
@@ -17,9 +17,12 @@ const EDGE: Record<FrameHue, string> = {
 /** The glow of a frame that waits on a person, cast by its shape and so following its cut; no other frame glows. */
 const GLOW = `drop-shadow(0 0 10px color-mix(in srgb, ${paint.yours} 26%, transparent))`;
 
+/** Whether a part is drawn inside a cut frame: a frame there wears no grain, which never doubles. */
+const InFrame = createContext(false);
+
 /**
  * The look's cut-corner frame: a shape of its own under what it holds, its top-right and bottom-left corners cut, an edge in `hue`
- * around the card's ground, which wears the surface's grain inside the cut, and for what waits on a person a glow the shape casts.
+ * around the card's ground, which wears the quiet grain inside the cut (none for a frame inside another, so grain never doubles), and for what waits on a person a glow the shape casts.
  * Outside the cut nothing is painted: the page's ground shows. Nothing of the frame cuts what it holds off: a focused child's ring is
  * drawn whole, over a cut corner too. `size` is its cut. `fill` is for a frame given a height — a panel that grows to the room it is
  * in — where what it holds is laid out down the whole of it, and scrolls inside rather than past it. `ground` is the class of its
@@ -43,6 +46,7 @@ export function CutFrame({
   className?: string;
   children: ReactNode;
 }) {
+  const inFrame = use(InFrame);
   return (
     <div data-cut-frame={hue} className={cn('relative p-px text-on-surface', className)}>
       <span
@@ -54,12 +58,14 @@ export function CutFrame({
         <span data-cut-edge className="absolute inset-0" style={{ backgroundColor: EDGE[hue], clipPath: cutShape(size) }} />
         <span
           data-cut-ground
-          data-grain="surface"
+          data-grain={inFrame ? undefined : 'quiet'}
           className={cn('absolute inset-0', ground)}
           style={{ clipPath: `polygon(${cutPoints(size, 1)})` }}
         />
       </span>
-      <div className={cn('relative', fill && 'flex h-full min-h-0 flex-col')}>{children}</div>
+      <div className={cn('relative', fill && 'flex h-full min-h-0 flex-col')}>
+        <InFrame value>{children}</InFrame>
+      </div>
     </div>
   );
 }

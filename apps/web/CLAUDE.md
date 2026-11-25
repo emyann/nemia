@@ -482,7 +482,9 @@ e2e page*.
 - A foot's button needs `ml-auto` only once the foot wraps: two children under `justify-between` stand apart on one line without it, so
   its proof draws the card narrow.
 - The grain is `apps/web/src/components/look/grain.css`, each tile written once and percent-encoded whole — the build's minifier refuses a
-  raw `<svg` in a custom property — and worn by a part that writes `data-grain`; on a cut frame it is the ground layer's, clipped with it.
+  raw `<svg` in a custom property — and worn by a part that writes `data-grain`: `label` whole on a label, `quiet`, a third of the
+  frame's former weight (the owner's pick of 2026-11-25), on a cut frame's ground layer, clipped with it, and none on a frame inside
+  another, which `CutFrame` knows from a context it provides, so grain never doubles (`test/parts.test.ts`).
 - Text dimmed by an `opacity` falls under 4.5:1: sink a card into the floor (`bg-background`) or use the muted ink instead.
 - A text that stands on `ScanLines` is `unmeasured` by the contrast measure, its ground being an image, and an unmeasured text is never
   refused: a page of the look measures through `contrastHolds` (`apps/web/test/e2e/runs-contrast.ts`), which flattens the ground first. A

@@ -231,12 +231,18 @@ describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each w
       assert.equal(/filter/.test(tagWith(html, 'data-cut-shape')), hue === 'yours', `${hue}: only what waits on you glows`);
     }
   });
-  test("the grain: the cut frame's ground wears the surface's, a sticker and a plate a label's, a tag and a button none", async () => {
+  test("the grain: the cut frame's ground wears the quiet one, a frame inside a frame none, a sticker and a plate a label's, a tag and a button none", async () => {
     const child = createElement('button', { type: 'button' }, 'Approve');
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const frame = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
-    assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="surface"/);
+    assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="quiet"/);
     assert.equal(grains(frame), 1, 'the ground alone: neither the edge, the shape that casts the glow, nor what the frame holds');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const inner = createElement(CutFrame, { size: 12, children: child });
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const nested = await drawn(createElement(CutFrame, { children: createElement('div', null, inner) }));
+    assert.equal(grains(nested), 1, 'grain never doubles: the outer frame wears it, the frame inside it none');
+    assert.match(tagWith(nested, 'data-cut-ground'), /data-grain="quiet"/, 'the first ground is the outer frame\'s');
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
     const sticker = await drawn(createElement(Sticker, { hue: 'ink', label: 'Cost', children: '$4.25' }));
     assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);

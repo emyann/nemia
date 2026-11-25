@@ -471,8 +471,8 @@ test('on 2026-07-28 tools/list carries resultType complete, ttlMs PORT_LIST_TTL_
   assert.equal(discovered?.resultType, 'complete');
   assert.deepEqual(
     (discovered?.capabilities as { extensions?: unknown } | undefined)?.extensions,
-    { ...FILES_EXTENSION, [SKILLS_EXTENSION_ID]: {} },
-    'server/discover advertises the files extension, inline alone, and the skills extension',
+    { ...FILES_EXTENSION, [SKILLS_EXTENSION_ID]: { directoryRead: true } },
+    "server/discover advertises the files extension, inline alone, and the skills extension, whose catalog reads a skill's folder",
   );
   await client.close();
 });

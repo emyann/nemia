@@ -189,9 +189,7 @@ export function RecentRuns({ page }: { page: WorkflowStepPage }) {
         Recent runs
       </Label>
       {page.recentRuns.length === 0 ? (
-        <Body size="medium">
-          No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.
-        </Body>
+        <Body size="medium">No run holds this step yet{page.factory ? ` in ${page.factory}` : ''}.</Body>
       ) : (
         <ul className="space-y-1.5">
           {page.recentRuns.map((run) => (

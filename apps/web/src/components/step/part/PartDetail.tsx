@@ -164,12 +164,7 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
 
 /** The step's tries on the clock: each try's session and check, when each was spawned and how long it queued and ran. */
 function StepTimeline({ step }: { step: StepView }) {
-  if (step.timeline.length === 0)
-    return (
-      <Body size="small">
-        Nothing of it on the clock yet.
-      </Body>
-    );
+  if (step.timeline.length === 0) return <Body size="small">Nothing of it on the clock yet.</Body>;
   return (
     <Body size="small" component="div" className="contents">
       <ol aria-label="Its time" className="space-y-1 font-mono">

@@ -21,11 +21,7 @@ export const RECEIPTS = ['timeline', 'checks', 'specs', 'tokens', 'where'] as co
 
 /** What a receipt says where the run has nothing of it. */
 function Nothing({ children }: { children: ReactNode }) {
-  return (
-    <Body size="small">
-      {children}
-    </Body>
-  );
+  return <Body size="small">{children}</Body>;
 }
 
 /** A step's name over what a receipt says of it. */

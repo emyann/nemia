@@ -544,12 +544,7 @@ export function Checks({
 
 /** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
 function Stream({ name, log }: { name: string; log: Frozen<StepLog> }) {
-  if (!log.lines.length)
-    return (
-      <Body size="small">
-        No {name}.
-      </Body>
-    );
+  if (!log.lines.length) return <Body size="small">No {name}.</Body>;
   return (
     <div className="space-y-1">
       <Body size="small" colorRole="on-surface-variant">

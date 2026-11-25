@@ -195,9 +195,7 @@ function TurnOn({ line }: { line: string | null }) {
   }
   return (
     <div data-nemia-off className="flex flex-col gap-2 border-t border-outline-variant pt-4">
-      <Body size="medium">
-        Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.
-      </Body>
+      <Body size="medium">Or let Nemia, the store&apos;s own agent, keep a session that asks you what waits on you.</Body>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outlined" size="xsmall" data-nemia-turn-on isDisabled={turnOn.isPending} onPress={() => turnOn.mutate()}>
           Turn Nemia on

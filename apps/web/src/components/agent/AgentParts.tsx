@@ -423,11 +423,7 @@ export function GivenSkills({
                 Read from <code className="font-mono break-all">{row.foundIn}</code>
               </Body>
             )}
-            {row.entry && (
-              <Body size="small">
-                {row.entry.description}
-              </Body>
-            )}
+            {row.entry && <Body size="small">{row.entry.description}</Body>}
             {row.error !== null && (
               <Body size="small" data-given-error className="font-mono whitespace-pre-wrap break-words text-failure">
                 {row.error}

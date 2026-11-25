@@ -138,12 +138,7 @@ function PathDrawn({
   taken: readonly string[];
   onScrub: (i: number) => void;
 }) {
-  if (read.taskId === null)
-    return (
-      <Body size="medium">
-        Not filed yet, so there is no path to show.
-      </Body>
-    );
+  if (read.taskId === null) return <Body size="medium">Not filed yet, so there is no path to show.</Body>;
   return (
     <div
       data-path={read.taskId}
@@ -280,12 +275,7 @@ function Timeline({
 }) {
   const now = new Date(useNow(60_000));
   const routes = new Set(machine.edges.map((e) => `${e.from}->${e.to}`));
-  if (path.length === 0)
-    return (
-      <Body size="medium">
-        Its journal has nothing on it yet.
-      </Body>
-    );
+  if (path.length === 0) return <Body size="medium">Its journal has nothing on it yet.</Body>;
   return (
     <div className="space-y-2">
       <Scrubber path={path} at={at} onScrub={onScrub} />

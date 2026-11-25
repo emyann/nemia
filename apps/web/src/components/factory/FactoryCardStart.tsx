@@ -128,9 +128,7 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
           <Body size="small" data-no-workflow className="text-yours">
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </Body>
-          <Body size="small">
-            The workflows the factory {code(factory.name)} offers.
-          </Body>
+          <Body size="small">The workflows the factory {code(factory.name)} offers.</Body>
         </div>
       ) : (
         <Select

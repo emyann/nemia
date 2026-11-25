@@ -52,9 +52,7 @@ export function ContextPicker({
           ))}
         </Reading>
       ) : !listed.length ? (
-        <Body size="small">
-          No run to read.
-        </Body>
+        <Body size="small">No run to read.</Body>
       ) : (
         <ul aria-label="Runs to read" className="max-h-44 divide-y divide-outline-variant overflow-y-auto rounded border border-outline">
           {listed.map((run) => (

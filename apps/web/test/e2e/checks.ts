@@ -336,9 +336,10 @@ export async function expectUncut(elements: Locator, assertion: string, timeout 
  * No text of a view sits in a box in a box in a box (`DESIGN.md`, *Neutrals: the surface ladder*: a view is two boxes deep at most;
  * what would be a third box is a rule or a gap), within `timeout`. Counted up from each text the view shows, to `root` (the page's own
  * view, `main[data-frame-page]`, by default): a box is an element laid out as a block that paints a ground other than the one it stands
- * on, draws a hairline on all four sides, or is a cut frame (`data-cut-frame`, whose ground is a layer beside what it holds). A control's own fill is its rung, no box:
- * a button, a field, a link, a tag, a chip, a row, a sticker; and a dialog, a menu, a listbox or a popover over the page starts a count
- * of its own. Nothing to look at is refused too.
+ * on, draws a hairline on all four sides, or is a cut frame (`data-cut-frame`, whose ground is a layer beside what it holds). A
+ * control's own fill is its rung, no box: a button, a field, a link, a tag, a chip, a row, a sticker; and a dialog, a menu, a listbox or
+ * a popover over the page starts a count of its own. The refusal names each text and the boxes it sits in. Nothing to look at is
+ * refused too.
  */
 export async function expectTwoDeep(page: Page, assertion: string, root = 'main[data-frame-page]', timeout = WAIT_MS) {
   await expectNone(
@@ -351,13 +352,13 @@ export async function expectTwoDeep(page: Page, assertion: string, root = 'main[
         const own = '[role=dialog],[role=alertdialog],[role=menu],[role=listbox],[role=tooltip],[popover]';
         const clear = (colour: string) => colour === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(colour);
         const sides = ['Top', 'Right', 'Bottom', 'Left'] as const;
-        const groundOf = (element: Element | null): string => {
+        const groundOf = (element: Element | null) => {
           for (let at = element; at; at = at.parentElement) {
             const layer = at.hasAttribute('data-cut-frame') ? at.querySelector(':scope > * > [data-cut-ground]') : at;
             const colour = layer ? getComputedStyle(layer).backgroundColor : 'transparent';
-            if (!clear(colour)) return colour;
+            if (!clear(colour)) return colour satisfies string;
           }
-          return getComputedStyle(document.body).backgroundColor;
+          return getComputedStyle(document.body).backgroundColor satisfies string;
         };
         const isBox = (element: Element) => {
           if (element.hasAttribute('data-cut-frame')) return true;

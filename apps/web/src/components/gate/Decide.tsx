@@ -48,12 +48,7 @@ export function Decide({ run }: { run: RunDetail }) {
         }
       />
     );
-  if (!decidable || !isDecidable(data))
-    return (
-      <Body size="medium">
-        Nothing to decide on it now.
-      </Body>
-    );
+  if (!decidable || !isDecidable(data)) return <Body size="medium">Nothing to decide on it now.</Body>;
   return (
     <DecideFrame>
       <DecisionParts runId={run.id} decision={data} run={run} />
@@ -118,9 +113,7 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
-          <Body size="medium">
-            No branch to read: no step worked on one.
-          </Body>
+          <Body size="medium">No branch to read: no step worked on one.</Body>
         )}
         {!inFolders && <LessonChip lesson={lesson} />}
       </div>
@@ -367,9 +360,7 @@ export function TouchedBranch({ touched: { branch, radius } }: { touched: Touche
           <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
         </>
       ) : (
-        <Body size="medium">
-          nothing — the branch changed no file against the base
-        </Body>
+        <Body size="medium">nothing — the branch changed no file against the base</Body>
       )}
     </div>
   );
@@ -597,9 +588,7 @@ function Commands({ commands }: { commands: readonly DecideCommand[] }) {
           ))}
         </ul>
       ) : (
-        <Body size="medium">
-          None yet: the run is still moving.
-        </Body>
+        <Body size="medium">None yet: the run is still moving.</Body>
       )}
     </section>
   );

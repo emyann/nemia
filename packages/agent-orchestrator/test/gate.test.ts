@@ -44,6 +44,7 @@ import { decidedOn } from './screens.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { handled, listedRow, told, type StartedAnswer } from './typed.ts';
 import { RETRY } from '../src/retry/commands.verb.ts';
+import { APPROVE } from '../src/gate/commands.verb.ts';
 import { onYouWords, type RunsListed } from '../src/list/list.ts';
 import { RM } from '../src/runner.ts';
 
@@ -874,6 +875,15 @@ describe('`nemia approve`, REFUSED with nothing written', () => {
         'then approve again',
       ),
     );
+    const back = await handled(APPROVE, { runId: stray.id, step: 'plan', off: true }, { e: stray.e, env: ENV });
+    assert.deepEqual(
+      [back.stray, back.loop, typeof back.takenBack?.at],
+      [true, false, 'string'],
+      '`nemia approve --off` sets the stray aside',
+    );
+    assert.deepEqual(JSON.parse(recordText(ROOT, back.file) ?? '{}').stray, 'yes please', 'kept as it was, never deleted');
+    await runWith(stray.e, approveRun(stray.id, 'plan'));
+    assert.deepEqual(asksOf(stray.id), ['approve-plan-1'], 'and the approval is written where the stray stood');
   });
 });
 

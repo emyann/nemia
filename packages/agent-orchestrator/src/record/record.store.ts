@@ -625,7 +625,7 @@ export function approvalsIn(asks: readonly AskEntry[]) {
     const read = approvalIn(text, step, Number(n));
     if (typeof read === 'string')
       notes.push(
-        `${where}: ${read}, so it opens no gate — take it back with nemia approve <runId> <step> --off, and approve with nemia approve`,
+        `${where}: ${read}, so it opens no gate — at the step's try now, take it back with nemia approve <runId> <step> --off and approve with nemia approve; one at any other key blocks no ask, and goes with the run (nemia rm)`,
       );
     else approvals.push(read);
   }
@@ -749,7 +749,7 @@ export function acceptancesIn(asks: readonly AskEntry[]) {
     const read = acceptanceIn(text, step, Number(n));
     if (typeof read === 'string')
       notes.push(
-        `${where}: ${read}, so it ends no loop — take it back with nemia approve <runId> <step> --off, and accept with nemia approve`,
+        `${where}: ${read}, so it ends no loop — at the step's try now, take it back with nemia approve <runId> <step> --off and end the loop with nemia approve; one at any other key blocks no ask, and goes with the run (nemia rm)`,
       );
     else acceptances.push(read);
   }
@@ -795,14 +795,14 @@ export function asksIn(asks: readonly AskEntry[]) {
       const ask = askIn(text, tried, Number(triedN));
       if (typeof ask === 'string')
         read.notes.push(
-          `${where}: ${ask}, so it is not honoured — take it back with nemia retry <runId> <step> --off, and ask with nemia retry`,
+          `${where}: ${ask}, so it is not honoured — at the step's next try, take it back with nemia retry <runId> <step> --off and ask with nemia retry; one at any other key blocks no ask, and goes with the run (nemia rm)`,
         );
       else read.asks.push(ask);
     } else if (again !== undefined && againN !== undefined) {
       const ask = roundAskIn(text, again, Number(againN));
       if (typeof ask === 'string')
         read.notes.push(
-          `${where}: ${ask}, so it is not honoured — take it back with nemia retry <runId> [<step>] --round --off, and ask with nemia retry --round`,
+          `${where}: ${ask}, so it is not honoured — at the loop's next round, take it back with nemia retry <runId> [<step>] --round --off and ask with nemia retry --round; one at any other key blocks no ask, and goes with the run (nemia rm)`,
         );
       else read.rounds.push(ask);
     }

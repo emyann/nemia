@@ -180,7 +180,7 @@ function allAsksIn(asks: readonly AskEntry[]) {
     const ask = mergeAskIn(text, target, Number(n));
     if (typeof ask === 'string')
       read.notes.push(
-        `${where}: ${ask}, so it is not honoured — take it back (nemia refresh <runId> [<step>] --base --off), and ask again with nemia refresh --base`,
+        `${where}: ${ask}, so it is not honoured — at the target's next try, take it back (nemia refresh <runId> [<step>] --base --off) and ask again with nemia refresh --base; one at any other key blocks no ask, and goes with the run (nemia rm)`,
       );
     else read.rounds.push(ask);
   }

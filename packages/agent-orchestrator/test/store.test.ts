@@ -746,7 +746,9 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
   for (const [name, [, why]] of Object.entries(refused)) {
     assert.ok(
       pass.notes.some((n) =>
-        n.endsWith(`${name}: ${why}, so it is not honoured — take it back with nemia retry <runId> <step> --off, and ask with nemia retry`),
+        n.endsWith(
+          `${name}: ${why}, so it is not honoured — at the step's next try, take it back with nemia retry <runId> <step> --off and ask with nemia retry; one at any other key blocks no ask, and goes with the run (nemia rm)`,
+        ),
       ),
       pass.notes.join('\n'),
     );

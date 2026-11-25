@@ -87,7 +87,7 @@ function CostLineRow({ factory, workflow, usd }: { factory: string; workflow: st
             no cost line
           </span>
         ) : (
-          <span data-cost-line-said={usd} className="font-mono text-body-medium text-money">
+          <span data-cost-line-said={usd} className="font-mono text-body-medium text-on-surface">
             {budgetWord(usd)}
           </span>
         )}

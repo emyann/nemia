@@ -122,7 +122,7 @@ export function StepNode({ data, selected, sourcePosition = Position.Right, targ
               ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
               : 'What its tries have cost'
           }
-          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small ${over ? 'font-semibold text-money' : 'text-on-surface-variant'}`}
+          className={`truncate border-t border-outline-variant px-3 py-1 font-mono text-body-small ${over ? 'font-semibold text-failure' : 'text-on-surface-variant'}`}
         >
           <span className="font-sans font-normal">cost </span>
           {cost}

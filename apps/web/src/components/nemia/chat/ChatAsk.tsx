@@ -37,10 +37,10 @@ export const askTag = (ask: Ask) =>
   (ask.chose !== undefined
     ? { words: ask.kind === 'proposal' ? 'Proposed' : 'Answered', hue: 'grey' }
     : ask.kind === 'proposal'
-      ? { words: 'Proposes', hue: 'money' }
+      ? { words: 'Proposes', hue: 'yours' }
       : { words: ask.kind === 'permission' ? 'Asks to run' : 'Asks you', hue: 'yours' }) satisfies {
     words: string;
-    hue: 'yours' | 'money' | 'grey';
+    hue: 'yours' | 'grey';
   };
 
 /**

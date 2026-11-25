@@ -238,7 +238,7 @@ describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each w
     assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="surface"/);
     assert.equal(grains(frame), 1, 'the ground alone: neither the edge, the shape that casts the glow, nor what the frame holds');
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-    const sticker = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
+    const sticker = await drawn(createElement(Sticker, { hue: 'ink', label: 'Cost', children: '$4.25' }));
     assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);
     assert.equal(grains(sticker), 1);
     for (const quiet of [false, true]) {
@@ -450,10 +450,10 @@ describe("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and
       'the lit part hangs from the name',
     );
   });
-  test('the sticker: a label over its value, filled in its hue', async () => {
+  test('the sticker: a label over its value, filled in its hue, or in plain ink for a cost', async () => {
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
-    const html = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
-    assert.match(tagWith(html, 'data-sticker'), /data-sticker="money"[^>]*bg-money text-on-money/);
+    const html = await drawn(createElement(Sticker, { hue: 'ink', label: 'Cost', children: '$4.25' }));
+    assert.match(tagWith(html, 'data-sticker'), /data-sticker="ink"[^>]*bg-surface-container-highest text-on-surface/);
     assert.match(html, />Cost<\/span><span[^>]*>\$4\.25</);
   });
   test("the scan lines: a glow and lines in the ink of what is read, thinned, no meaning's hue, and the glow alone without lines", async () => {

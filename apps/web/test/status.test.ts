@@ -307,9 +307,6 @@ describe("the meanings of a state's colour: one thing each, the look's meanings 
     assert.equal(meaningOf(stateDrawn.working.hue), 'alive');
     for (const state of states) assert.equal(stateClass[state], classOf(stateDrawn[state]), `${state}'s chip is drawn from the table`);
 
-    assert.deepEqual(brokenMeanings(given('blocked', { hue: 'money', form: 'filled' })), [
-      'blocked is money: amber is an amount, never a state',
-    ]);
     assert.deepEqual(brokenMeanings(given('awaiting-approval', { hue: 'alive', form: 'filled' })), [
       'awaiting-approval waits on a person and is alive, not yours',
     ]);
@@ -367,7 +364,7 @@ describe("the meanings of a state's colour: one thing each, the look's meanings 
     );
     const tokens = tokensOf(resting);
     assert.equal(wears(tokens, container.grey), true, 'a wait that ends by itself is at rest, grey');
-    for (const hue of ['money', 'failure', 'alive', 'yours'] as const) {
+    for (const hue of ['failure', 'alive', 'yours'] as const) {
       assert.equal(wears(tokens, container[hue]), false, `a resting wait draws no ${hue}`);
     }
 

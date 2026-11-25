@@ -17,7 +17,7 @@ const COST: Breakdown = {
 };
 
 /** A tile with a breakdown: it takes the focus, and its tooltip adds up to it. */
-export const WithABreakdown: StoryObj = { render: () => <StatTile hue="money" label="Cost" value="$4.25" breakdown={COST} /> };
+export const WithABreakdown: StoryObj = { render: () => <StatTile hue="ink" label="Cost" value="$4.25" breakdown={COST} /> };
 
 /** A tile given no breakdown: drawn alone, it takes no focus. */
 export const Alone: StoryObj = { render: () => <StatTile hue="alive" label="Clock" value="27m" breakdown={null} /> };

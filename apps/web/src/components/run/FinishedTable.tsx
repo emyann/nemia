@@ -77,7 +77,7 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell data-clock>
         <RunClock run={run} asOf={asOf} finished />
       </Cell>
-      <Cell data-cost className={cn(FACT, ink.money)}>
+      <Cell data-cost className={cn(FACT, 'text-on-surface')}>
         <RunCost run={run} />
       </Cell>
       <Cell>

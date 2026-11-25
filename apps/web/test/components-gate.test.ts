@@ -265,8 +265,8 @@ const holds = (cls: string, form: string) => form.split(' ').every((c) => cls.sp
 /** Whether the class list `cls` carries any class of the drawn form `form`. */
 const touches = (cls: string, form: string) => form.split(' ').some((c) => cls.split(' ').includes(c));
 
-/** Whether `cls` is drawn as a wait on a person: the yours container whole, and nothing of an amount's or a failure's. */
-const drawnYours = (cls: string) => holds(cls, container.yours) && !touches(cls, container.money) && !touches(cls, container.failure);
+/** Whether `cls` is drawn as a wait on a person: the yours container whole, and nothing of a failure's. */
+const drawnYours = (cls: string) => holds(cls, container.yours) && !touches(cls, container.failure);
 
 test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
   const html = offersMarkup(
@@ -975,7 +975,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   );
   assert.match(
     capped,
-    /<span data-peak="cap" class="[^"]*text-money[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/,
+    /<span data-peak="cap" class="font-semibold text-on-surface" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/,
   );
   const unpeaked = markup(createElement(Read, { said: 'read 900k · wrote 20k · compacted at its 100k cap', peak: 'cap', rebuilt: 0 }));
   assert.match(

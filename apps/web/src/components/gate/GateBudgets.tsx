@@ -133,10 +133,10 @@ function BudgetRow({
             value={typed === undefined ? row.usd : typed.trim() === '' ? null : Number(typed)}
             onAmount={(amount) => onTyped(row.step, amount === null ? '' : String(amount))}
             className="w-36"
-            inputClassName="font-mono text-money"
+            inputClassName="font-mono text-on-surface"
           />
         ) : (
-          <span data-amount className="font-mono text-money">
+          <span data-amount className="font-mono text-on-surface">
             {row.said}
           </span>
         )}{' '}

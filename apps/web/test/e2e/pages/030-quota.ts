@@ -45,7 +45,7 @@ export default {
         1,
         `the gauges button holds each window's label and percentage, marked: the week is ${QUOTA.week.used}% used`,
       );
-      await expectVisible(short.locator('[data-quota-line][data-quota-mark]'), 'marked, the gauges button draws its quota in money');
+      await expectVisible(short.locator('[data-quota-line][data-quota-mark]'), 'marked, the gauges button draws its quota in semibold ink');
       await expectVisible(
         short.and(page.getByRole('button', { name: /^This machine: .*, quota .*, near its limit$/ })),
         'and its name says the quota nears its limit',

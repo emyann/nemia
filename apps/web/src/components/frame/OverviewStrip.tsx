@@ -147,12 +147,12 @@ function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
           {strip.landed}
         </Sticker>
         <StatTile
-          hue="money"
+          hue="ink"
           label="Spent"
           value={dollars(strip.spentUsd)}
           breakdown={strip.spentTokens && tokensBreakdown(strip.spentTokens, `${dollars(strip.spentUsd)} today`)}
         />
-        <Sticker hue="grey" label="Per landing">
+        <Sticker hue="ink" label="Per landing">
           {dollars(strip.perLanding)}
         </Sticker>
         <Sticker hue="failure" label="Failed">
@@ -211,7 +211,7 @@ function Agents({ strip }: { strip: Strip }) {
 const meterLabel = (w: QuotaWindow) => w.label.charAt(0).toUpperCase() + w.label.slice(1);
 
 /**
- * The quota of this machine: a meter in money for each window, `PAST 80%` once one is used past the mark, and when it runs out and
+ * The quota of this machine: a meter for each window, `PAST 80%` once one is used past the mark, and when it runs out and
  * resets. A reading that is not fresh says why, with the last good one's meters under it and when it was.
  */
 function QuotaFrame({ quota, error, now }: { quota: Quota | undefined; error: Error | null; now: number }) {
@@ -249,7 +249,7 @@ function QuotaFrame({ quota, error, now }: { quota: Quota | undefined; error: Er
         <Meter key={w.key} label={meterLabel(w)} value={w.usedPercentage} showValue color="tertiary" />
       ))}
       {fresh && line && (
-        <Body data-quota-line component="span" size="small" className="text-money contain-inline-size">
+        <Body data-quota-line component="span" size="small" className="text-on-surface contain-inline-size">
           {line.runsOut && <span className="whitespace-nowrap">{line.runsOut} ·</span>}{' '}
           <span className="whitespace-nowrap">{line.resets}</span>
         </Body>

@@ -1,1 +1,0 @@
-apps/web/src/components/look/RunMarks.tsx#stroke-money

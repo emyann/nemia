@@ -80,7 +80,7 @@ function Window({
   emphasis?: boolean;
 }) {
   return (
-    <span {...data} data-marked={words.marked || undefined} className={words.marked ? 'text-money' : undefined}>
+    <span {...data} data-marked={words.marked || undefined} className={words.marked ? 'font-semibold text-on-surface' : undefined}>
       {words.marked && <TriangleAlert aria-label={`${markAt}% or more used`} className="mr-1 inline size-3.5 -translate-y-px" />}
       {words.label}{' '}
       <span

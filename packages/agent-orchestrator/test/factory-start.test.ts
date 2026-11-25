@@ -1016,7 +1016,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
       await startRefused(
         () => startTypedFrom(repo, ['start', card, '--workflows', 'build', '--no-worktree']),
         'Invalid',
-        card,
+        'nemia get card loose',
         '`factory: <name>`',
         'pipao',
         '--factory <name>',

@@ -976,8 +976,7 @@ describe('REFUSED by name: `nemia retry` of a step over its budget', () => {
       'try 3 of implement is asked for (--continue, at ',
       'without a --budget above $4.25',
       '$4.25 of its $3 budget',
-      'retry-implement-3',
-      '.asks',
+      'nemia retry r-1 implement --off',
       'nemia retry r-1 implement --budget <amount>',
     );
     names(refusal({ mode: 'continue' }, [{ ...askFor(3), budget: 10 }]), 'try 3 of implement is already asked for');
@@ -1043,8 +1042,7 @@ describe('a step blocked under its cap takes a `--budget` above it, not past its
       refusal({ mode: 'continue', budget: 40 }, [{ ...askFor(2), budget: 20 }]),
       'try 2 of implement is asked for (--continue, at ',
       'with --budget 20, not above $20',
-      'retry-implement-2',
-      '.asks',
+      'nemia retry r-1 implement --off',
       'nemia retry r-1 implement --budget <amount>',
     );
   });
@@ -1062,7 +1060,7 @@ describe('a step blocked under its cap takes a `--budget` above it, not past its
       'try 2 of implement is asked for (--continue, at ',
       'with --budget 10',
       'no `budget:`',
-      'retry-implement-2',
+      'nemia retry r-1 implement --off',
       'nemia retry r-1 implement.',
     );
   });

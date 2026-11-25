@@ -166,7 +166,7 @@ describe('acceptAsk: what `nemia approve` takes', () => {
     const again = refusalOf(accept(inRound(3, acceptedTry(3)), 'review', ENOUGH));
     names(again, 'try 3 of review is already accepted', '2026-09-20T14:05:00.000Z');
     const rounded = acceptAsk(LOOP, r, 'review', ENOUGH, ALL_SUCCEEDED, said, asked, [roundAskFor(4)]);
-    names(refusalOf(rounded), "round 4 of review's loop is already asked for", 'round-review-4', '.asks');
+    names(refusalOf(rounded), "round 4 of review's loop is already asked for", 'nemia retry r-1 review --round --off');
   });
   test("REFUSED: below the cap, or held on a budget, ending early is not a person's", () => {
     namesFor(
@@ -247,7 +247,7 @@ describe('roundAsk: what `nemia retry --round` takes and refuses', () => {
   });
   test('REFUSED: an accepted loop, naming the acceptance rather than an unasked sign-off', () => {
     const accepted = refusalOf(roundAsk(LOOP, inRound(3, acceptedTry(3)), 'review', ALL_SUCCEEDED, saidIn(3, true), asked));
-    names(accepted, 'review asked for round 4', '2026-09-20T14:05:00.000Z', '(nemia approve)', 'accept-review-3', '.asks');
+    names(accepted, 'review asked for round 4', '2026-09-20T14:05:00.000Z', '(nemia approve)', 'nemia approve r-1 review --off');
     names(accepted, 'nemia retry r-1 review --round');
     assert.ok(!accepted.includes('without asking'));
   });
@@ -274,7 +274,7 @@ describe('roundAsk past a budget: once more only with `--budget` above what the 
       "round 2 of review's loop is asked for (at ",
       'without a --budget above $4.25',
       '$4.25 of its $3 budget',
-      'round-review-2',
+      'nemia retry r-1 review --round --off',
       'nemia retry r-1 review --round --budget <amount>',
     );
   });

@@ -616,15 +616,14 @@ describe('REFUSED at a gate, pass after pass: a wordless ask for the next try is
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     assert.ok(l.steps[0].note?.startsWith('approve it: nemia approve r-1 plan'), l.steps[0].note);
   });
-  test('REFUSED a send-back with words: nemia retry names the wordless ask and says to delete it', () => {
+  test('REFUSED a send-back with words: nemia retry names the wordless ask and says to take it back', () => {
     names(
       retryRefusal(PLANNED, atPlan(), 'plan', withWords, PLAN_DONE, signedDone, asked, () => undefined, [wordless]),
       'try 2 of plan is asked for',
       '(--continue, at 2026-09-16T23:00:00.000Z)',
       'with no words',
       'plan is awaiting approval',
-      'retry-plan-2',
-      '.asks',
+      'nemia retry r-1 plan --off',
       OBJECTION,
     );
   });

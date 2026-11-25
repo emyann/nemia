@@ -112,13 +112,14 @@ const toldBy = (e: Engine, taskId: string, text: string) =>
  *
  * An ask is written under its try's name, exclusively, and never over a file there. One that does not read as an ask — `{}`, a hand edit, a
  * torn copy — is honoured by no pass, and `nemia ls` shows nothing asked, so "already asked for, wait for it" would be a wait for ever. The
- * way out is a person's: delete the file, and ask again.
+ * way out is a person's: take it back, which sets it aside as it is, and ask again.
  * @param where The file the ask would be written to.
  * @param stray Why the file there is no ask, as the tick reads it, or null where it reads as one or is gone.
  * @param what What was asked for, as the refusal names it: `try 2 of review`.
- * @param again The command that asks again once the file is deleted.
+ * @param again The command that asks again once the record is taken back.
+ * @param off The command that takes the record back (`--off`), setting it aside under the run's asks' `done/`.
  */
-export function strayAsk(where: string, stray: string | null, what: string, again: string) {
+export function strayAsk(where: string, stray: string | null, what: string, again: string, off: string) {
   if (stray === null) return null;
-  return `${what} cannot be asked for: ${where} is already there, and it is not an ask — ${stray}. No tick honours it, and nemia ls shows nothing asked, so waiting would be for ever. Delete it (rm ${where}), then ask again: ${again}.`;
+  return `${what} cannot be asked for: ${where} is already there, and it is not an ask — ${stray}. No tick honours it, and nemia ls shows nothing asked, so waiting would be for ever. Take it back — ${off}, which sets it aside as it is — then ask again: ${again}.`;
 }

@@ -7,6 +7,8 @@
  * table of them. The bar is `BAR` for every text, with no relief for a large one.
  *
  * What it does not see: a state no picture reaches (a hover, a focus); the text of a pseudo-element; a shape of an SVG under a text.
+ * A field shows its value, else its placeholder: a field whose value and placeholder are blank shows no text, and a placeholder
+ * painted transparent (the kit's text field, until it is focused) is no text a person reads, so neither is measured.
  * A cut frame's ground is read from its own layer (`data-cut-ground`), which is no ancestor of what the frame holds. A ground under
  * a grain, a tile of one colour whose specks come and go, is measured twice: plain, and at the grain's far end, the speck at its
  * strongest `GRAIN_TAIL` of the tile laid over the ground, a row that says `grained`. A ground drawn by any other
@@ -269,8 +271,11 @@ function inPage(root: Element, { rgba, over, groundOf }: Reader) {
   }
   for (const field of Array.from(root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'))) {
     if (!shown(field) || ['checkbox', 'radio', 'hidden', 'file', 'range', 'color'].includes(field.type)) continue;
-    if (field.value) add(field, getComputedStyle(field).color, field.value);
-    else if (field.placeholder) add(field, getComputedStyle(field, '::placeholder').color, field.placeholder);
+    if (field.value.trim()) add(field, getComputedStyle(field).color, field.value);
+    else if (field.placeholder.trim()) {
+      const hint = getComputedStyle(field, '::placeholder').color;
+      if (rgba(hint)[3] > 0) add(field, hint, field.placeholder);
+    }
   }
   return { scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', pairs: [...rows.values()] } satisfies Measured;
 }

@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { cardText, plantRecord, runKey, testPlace } from 'agent-orchestrator/testing';
+import { askKeyOf, cardText, plantAsk, plantRecord, recordText, runKey, testPlace } from 'agent-orchestrator/testing';
 import { TABLE_ACCEPT } from 'objects';
 import { TokenDoor, tokenDoorAt } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
@@ -56,9 +56,13 @@ for (const name of ['plan', 'implement', 'nudged', 'talk', 'review'])
 
 /**
  * A run's record: its steps, each its task or none, `gate: true` on `gated`'s, in `factory` where one is named, started from the inbox card
- * `card` where one is named.
+ * `card` where one is named, and `loop`'s step looping back to the step it names, after it.
  */
-const record = (id: string, steps: Record<string, string | null>, more: { gated?: string; factory?: string; card?: string } = {}) =>
+const record = (
+  id: string,
+  steps: Record<string, string | null>,
+  more: { gated?: string; factory?: string; card?: string; loop?: { step: string; to: string } } = {},
+) =>
   plantRecord(
     root,
     runKey(id),
@@ -77,6 +81,7 @@ const record = (id: string, steps: Record<string, string | null>, more: { gated?
         after: [],
         body: `${name} it.`,
         ...(name === more.gated ? { gate: true } : {}),
+        ...(name === more.loop?.step ? { after: [more.loop.to], loop: more.loop.to } : {}),
       })),
       steps: Object.fromEntries(Object.entries(steps).map(([name, taskId]) => [name, { taskId }])),
       ...(more.factory ? { factory: more.factory } : {}),
@@ -342,6 +347,42 @@ describe('each write keeps who acted, by the token its request presented, and th
     const called = await status('ra-by-resent');
     assert.equal(typeof called.cancelledAt, 'string', 'the next read judges it called off');
     assert.deepEqual(called.cancelledBy, person, 'kept as who sent the card on');
+  });
+  test('a try taken back (`off`) keeps who took it back, answered, and is set aside with it, never deleted', async () => {
+    task('t-by-back', 'succeeded', BLOCKED);
+    record('ra-by-back', { implement: 't-by-back' });
+    const asked = await answered(
+      await send('POST', `${run('ra-by-back')}/steps/implement/retry`, { mode: 'continue', message: 'Postgres.' }),
+    );
+    assert.equal(asked.status, 202, JSON.stringify(asked.body));
+    const back = await answered(await send('POST', `${run('ra-by-back')}/steps/implement/retry`, { off: true }));
+    assert.equal(back.status, 202, JSON.stringify(back.body));
+    const takenBack = back.body.takenBack as { at?: string; actor?: unknown } | undefined;
+    assert.deepEqual([back.body.try, takenBack?.actor, typeof takenBack?.at], [2, person, 'string'], 'answered with who took it back');
+    assert.equal(recordText(root, askKeyOf('ra-by-back', 'retry-implement-2')), undefined, 'nothing waits at its key');
+    const kept = JSON.parse(recordText(root, String(back.body.file)) ?? '{}') as { message?: string; takenBack?: { actor?: unknown } };
+    assert.deepEqual([kept.message, kept.takenBack?.actor], ['Postgres.', person], 'set aside with its words and who');
+  });
+  test('a merge of the base taken back (`base` and `off`) keeps who took it back, answered, and is set aside with it', async () => {
+    task('t-by-merge-implement', 'succeeded', DONE);
+    task('t-by-merge-review', 'succeeded', DONE);
+    record(
+      'ra-by-merge',
+      { implement: 't-by-merge-implement', review: 't-by-merge-review' },
+      { loop: { step: 'review', to: 'implement' } },
+    );
+    const merge = { loop: 'review', round: 1, onto: 'main', sha: 'a'.repeat(40), at: at(1) };
+    plantAsk(root, 'ra-by-merge', 'merge-implement-2', JSON.stringify(merge));
+    const back = await answered(await send('POST', `${run('ra-by-merge')}/refresh`, { step: 'review', base: true, off: true }));
+    assert.equal(back.status, 202, JSON.stringify(back.body));
+    const takenBack = back.body.takenBack as { actor?: unknown } | undefined;
+    assert.deepEqual(
+      [back.body.step, back.body.target, back.body.sha, takenBack?.actor],
+      ['review', 'implement', merge.sha, person],
+      'answered with the merge and who took it back',
+    );
+    assert.equal(recordText(root, askKeyOf('ra-by-merge', 'merge-implement-2')), undefined, 'nothing waits at its key');
+    assert.deepEqual(JSON.parse(recordText(root, String(back.body.file)) ?? '{}').takenBack?.actor, person, 'set aside with who');
   });
   test("a cancel keeps who called the run off, answered and served on the run's status", async () => {
     task('t-by-called', 'working');

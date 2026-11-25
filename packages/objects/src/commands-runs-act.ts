@@ -130,9 +130,11 @@ export const ROUTE_WORDS = {
   class: 'act',
 } as const satisfies CommandWords;
 
-/** The refusal of a step named without `--base`, which alone takes one; null where none is. */
-export function refreshRefusal({ runId, step, base }: Args) {
+/** The refusal of a step, or `--off`, given without `--base`, which alone takes them; null where none is. */
+export function refreshRefusal({ runId, step, base, off }: Args) {
   const id = typeof runId === 'string' ? runId : '<runId>';
+  if (base !== true && off === true)
+    return `--off takes back a merge of the base asked of a loop, so it goes with --base: nemia refresh ${id}${typeof step === 'string' ? ` ${step}` : ''} --base --off. New revisions taken are not taken back.`;
   return base !== true && typeof step === 'string'
     ? `nemia refresh takes a step only with --base, which merges the base into the work of the loop it closes: nemia refresh ${id} ${step} --base. The new revisions are the whole run's: nemia refresh ${id}.`
     : null;
@@ -142,7 +144,7 @@ export function refreshRefusal({ runId, step, base }: Args) {
 export const REFRESH_WORDS = {
   name: 'refresh',
   served: [{ endpoint: 'runs.refresh' }],
-  usage: '<runId> [<step>] [--base]',
+  usage: '<runId> [<step>] [--base [--off]]',
   help: [
     'take the new revisions: a run keeps the workflow, agents, skills and',
     'factory rules it resolved when it started, and this pins it to the',
@@ -156,16 +158,21 @@ export const REFRESH_WORDS = {
     "--base: take the base instead — a loop's work that no longer merges",
     'cleanly goes back to merge it, once, on the next tick, on the round it',
     'is on, which the merge does not spend; the step is the one that closes',
-    'the loop, left out where the run has one loop',
+    'the loop, left out where the run has one loop;',
+    '--base --off: take back that merge, asked and not yet filed: the ask',
+    'is set aside, never deleted, and the loop waits on you again',
   ],
   spec: {
     positionals: [
       { key: 'runId', takes: 'required', kind: 'name' },
       { key: 'step', takes: 'optional', kind: 'name' },
     ],
-    flags: [{ flag: '--base', kind: 'switch', key: 'base' }],
+    flags: [
+      { flag: '--base', kind: 'switch', key: 'base' },
+      { flag: '--off', kind: 'switch', key: 'off' },
+    ],
     unknown: (arg) =>
-      `nemia refresh takes one run's id, and with --base the step that closes the loop whose work merges: not ${arg}. nemia refresh <runId>, or nemia refresh <runId> [<step>] --base.`,
+      `nemia refresh takes one run's id, and with --base the step that closes the loop whose work merges, and --off: not ${arg}. nemia refresh <runId>, or nemia refresh <runId> [<step>] --base [--off].`,
     missing: 'nemia refresh takes the run to pin to the new revisions: nemia refresh <runId>.',
   },
   check: refreshRefusal,

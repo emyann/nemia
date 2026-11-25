@@ -3,7 +3,8 @@
  * into its looping step (`mergeRun`).
  */
 import { Effect, Schema } from 'effect';
-import { REFRESH_WORDS, refreshRefusal, RunRefresh } from 'objects';
+import { Actor, REFRESH_WORDS, refreshRefusal, RunRefresh } from 'objects';
+import { takeBackAsk } from '../take-back/take-back.verb.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { checked, type Served } from '../command/entry.verb.ts';
 import { mergeRun } from '../merge/merge.verb.ts';
@@ -11,13 +12,19 @@ import { mergeAskedLine } from '../merge/merge.ts';
 import { refreshRun } from './pin.verb.ts';
 import { type Drift } from './revisions.ts';
 
-/** What `nemia refresh` takes: the run, and the ask as the api is sent it (`objects`' `RunRefresh`): `base`, and its looping step. */
-export const RefreshInput = Schema.Struct({ runId: Schema.String, ...RunRefresh.fields });
+/**
+ * What `nemia refresh` takes: the run, and the ask as the api is sent it (`objects`' `RunRefresh`): `base`, its looping step, and `off`;
+ * and who asks (`actor`, objects' `Actor`), which the api hands of its caller and a take-back keeps — none from the command line.
+ */
+export const RefreshInput = Schema.Struct({ runId: Schema.String, ...RunRefresh.fields, actor: Schema.optionalKey(Actor) });
 export type RefreshInput = typeof RefreshInput.Type;
 
 /**
  * `nemia refresh`: a run asked to take the new revisions of the kinds it resolved, and the drift it was asked on; or, with `--base`, a
  * loop's work sent back to merge its base branch, on the round it is on (what `nemia merge` was, decision 7).
+ *
+ * With `--base --off`, the merge asked and not yet filed is taken back instead (`takeBackAsk`): set aside, never deleted, with when and
+ * by whom, and the loop waits on the person again.
  *
  * It takes, it does not reload: the next pass re-pins the run and renders its steps' agent files again, so every filing after it — a new
  * step, a retry, a round — is filed on the revisions the world holds now. Nothing already filed is re-run.
@@ -32,15 +39,31 @@ export const REFRESH: Served<
     round?: number;
     file?: string;
     said?: string;
+    takenBack?: { at: string; actor?: Actor };
+    stray?: true;
   },
   RefreshInput
 > = {
   ...REFRESH_WORDS,
   input: RefreshInput,
   handler: Effect.fnUntraced(function* (input: RefreshInput) {
-    yield* checked(refreshRefusal(input));
+    const { actor: _actor, ...typed } = input;
+    yield* checked(refreshRefusal(typed));
     const { runId } = input;
     if (input.base !== true) return { drift: yield* refreshRun(runId) };
+    if (input.off === true) {
+      const taken = yield* takeBackAsk(runId, 'base', input.step, input.actor);
+      const merge = taken.round?.merge;
+      return {
+        step: taken.step,
+        target: taken.key.step,
+        ...(merge ? { onto: merge.onto, sha: merge.sha } : {}),
+        ...(taken.round ? { round: taken.round.round } : {}),
+        file: taken.file,
+        takenBack: taken.takenBack,
+        ...(taken.stray ? { stray: true as const } : {}),
+      };
+    }
     const { run, ask, file } = yield* mergeRun(runId, input.step);
     const looping = (yield* stepsOf(run)).find((s) => s.name === ask.step);
     if (looping === undefined)

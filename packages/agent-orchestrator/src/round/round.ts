@@ -227,7 +227,7 @@ function roundWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], over
   const above = Math.max(0, ...over.map((o) => o.spent.usd));
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
   if (pending && over.length && !(pending.budget !== undefined && pending.budget > above))
-    return `round ${now + 1} of ${looping.name}'s loop is asked for (at ${pending.at}) without a --budget above ${dollars(above)}, and ${overWords(over)}, so no tick honours it. Delete that ask — round-${looping.name}-${now + 1}, in the run's .asks directory — and ask again: nemia retry ${run.id} ${looping.name} --round --budget <amount>.`;
+    return `round ${now + 1} of ${looping.name}'s loop is asked for (at ${pending.at}) without a --budget above ${dollars(above)}, and ${overWords(over)}, so no tick honours it. Take that ask back — nemia retry ${run.id} ${looping.name} --round --off — and ask again: nemia retry ${run.id} ${looping.name} --round --budget <amount>.`;
   if (pending)
     return `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`;
   return mergeWaits(
@@ -316,7 +316,7 @@ export function roundAsk(
   if (accepted && !filed) {
     return no(
       `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (nemia approve): its loop is over on their word. ` +
-        `Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-${looping.name}-${tryOf(run, looping.name)}, in the run's .asks directory — then ask again: nemia retry ${run.id} ${looping.name} --round.`,
+        `Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — nemia approve ${run.id} ${looping.name} --off — then ask again: nemia retry ${run.id} ${looping.name} --round.`,
     );
   }
   const over = loopOver(steps, looping, run, spendOf);
@@ -431,7 +431,7 @@ function acceptWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[]) {
   if (pending) {
     return (
       `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick files it: accepting now would end a loop that is about to go round again. ` +
-      `To take the work as it stands instead, take that ask back first — round-${looping.name}-${now + 1}, in the run's .asks directory — then accept it: nemia approve ${run.id} ${looping.name} --message "<why>".`
+      `To take the work as it stands instead, take that ask back first — nemia retry ${run.id} ${looping.name} --round --off — then accept it: nemia approve ${run.id} ${looping.name} --message "<why>".`
     );
   }
   return mergeWaits(

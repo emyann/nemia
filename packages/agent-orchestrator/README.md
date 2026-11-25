@@ -2936,6 +2936,18 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   `.asks/done/` as a spent one is, beside any there, with `takenBack` written on it — when, and who (`actor`). Refused, naming the fix,
   for a gate not approved and once anything of the step is filed, in the words a second approval gives a step that has handed on
   (`takeBackJudged`, its stop proved by `contracts/take-back.contract.ts`).
+- **A person takes back every other ask before a pass spends it, by the verb that asked it, with `--off`.** A try:
+  `wf retry <run> <step> --off`. A round: `wf retry <run> [<step>] --round --off`. A merge of the base: `wf refresh <run> [<step>] --base
+  --off`. A loop's acceptance: `wf approve <run> <step> --off`, where no approval of the step stands, while nothing waiting on the looping
+  step has a task. Over the api and the MCP port, `off: true` on the retry, the refresh or the approval (a retry's `mode` is then left out,
+  as it defaults to continue). Each sets the record at the ask's key aside under the run's `done/`, never deleting it, with `takenBack`
+  written on it — when, and who (`actor`) — as an approval taken back is. A record at that key that reads as no ask of its kind (a stray,
+  which would block every new ask there) is set aside the same way, its text kept whole under `stray`. A taken-back retry's words are no
+  answer (`asks.answers` leaves it out). Refused, naming the fix: a step the run does not have, a loop's ask of a step that closes no
+  loop, nothing asked, and an acceptance that has handed on (`askTakeBackJudged`, `src/take-back/take-back.ts`, its stop proved by
+  `contracts/ask-take-back.contract.ts`). Every refusal that once said to remove an ask's file names its take-back instead: review's
+  case, a retry asked with no words while its step waits at its gate, is taken back with `wf retry <run> <step> --off`, and the step is
+  then approved.
 - **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,
   not committed under the step's name, until the step's next try.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the
